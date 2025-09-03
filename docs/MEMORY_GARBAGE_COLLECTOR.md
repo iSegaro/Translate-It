@@ -12,6 +12,7 @@ The **Memory Garbage Collector** is an advanced memory management system designe
 - [Core Components](#core-components)
 - [Event System Support](#event-system-support)
 - [Usage Examples](#usage-examples)
+- [Vue Composable (useResourceTracker)](#vue-composable-useresourcetracker)
 - [Integration Points](#integration-points)
 - [Memory Statistics](#memory-statistics)
 - [Configuration](#configuration)
@@ -303,6 +304,219 @@ class ActionbarIconManager extends ResourceTracker {
   }
 }
 ```
+
+## Vue Composable (useResourceTracker)
+
+The `useResourceTracker` is a Vue 3 Composition API composable that provides automatic memory management for Vue components. It eliminates the need for manual cleanup by integrating with Vue's lifecycle hooks.
+
+### 🚀 Key Features
+
+- ✅ **Automatic Cleanup**: No manual cleanup required - uses `onUnmounted`
+- ✅ **Vue Integration**: Native Vue 3 Composition API support
+- ✅ **Zero Memory Leaks**: Prevents memory leaks in Vue components
+- ✅ **Simple API**: Drop-in replacement for manual ResourceTracker usage
+- ✅ **Performance Optimized**: Minimal overhead with centralized cleanup
+
+### 📦 Installation & Usage
+
+#### 1. Import the composable
+
+```javascript
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
+```
+
+#### 2. Use in Vue component
+
+```vue
+<script setup>
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
+
+// Automatic cleanup - no manual intervention needed!
+const tracker = useResourceTracker('my-component')
+</script>
+```
+
+#### 3. Track resources
+
+```javascript
+// Event listeners - automatically cleaned up
+tracker.addEventListener(window, 'resize', () => {
+  console.log('Window resized!')
+})
+
+// Timers - automatically cleaned up
+tracker.trackTimeout(() => {
+  console.log('Timer completed!')
+}, 1000)
+
+// Intervals - automatically cleaned up
+tracker.trackInterval(() => {
+  console.log('Interval tick!')
+}, 1000)
+
+// Custom resources - automatically cleaned up
+tracker.trackResource('my-api-connection', () => {
+  // Cleanup function
+  disconnectAPI()
+})
+```
+
+### 🎯 Complete Example
+
+```vue
+<template>
+  <div>
+    <button @click="startTimer">Start Timer</button>
+    <button @click="addListener">Add Listener</button>
+    <p>Timer active: {{ timerActive }}</p>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
+
+const tracker = useResourceTracker('timer-demo')
+const timerActive = ref(false)
+
+const startTimer = () => {
+  timerActive.value = true
+
+  // Timer automatically cleaned up when component unmounts
+  tracker.trackTimeout(() => {
+    timerActive.value = false
+    console.log('Timer completed!')
+  }, 5000)
+}
+
+const addListener = () => {
+  // Event listener automatically cleaned up
+  tracker.addEventListener(window, 'resize', () => {
+    console.log('Window resized!')
+  })
+}
+
+// No manual cleanup needed!
+// Everything is handled automatically by Vue's onUnmounted
+</script>
+```
+
+### 🔧 API Reference
+
+#### `useResourceTracker(groupId)`
+
+Creates a new resource tracker instance with automatic cleanup.
+
+**Parameters:**
+- `groupId` (string): Unique identifier for grouping resources
+
+**Returns:**
+- `ResourceTracker`: Tracker instance for managing resources
+
+#### ResourceTracker Methods
+
+##### `addEventListener(element, event, handler, options?)`
+
+Add event listener with automatic cleanup.
+
+```javascript
+tracker.addEventListener(window, 'resize', handleResize)
+tracker.addEventListener(document, 'click', handleClick)
+```
+
+##### `trackTimeout(callback, delay)`
+
+Add timeout with automatic cleanup.
+
+```javascript
+const timerId = tracker.trackTimeout(() => {
+  console.log('Done!')
+}, 1000)
+```
+
+##### `trackInterval(callback, delay)`
+
+Add interval with automatic cleanup.
+
+```javascript
+const intervalId = tracker.trackInterval(() => {
+  console.log('Tick!')
+}, 1000)
+```
+
+##### `trackResource(id, cleanupFn)`
+
+Add custom resource with automatic cleanup.
+
+```javascript
+tracker.trackResource('api-connection', () => {
+  // Cleanup logic
+  disconnectAPI()
+})
+```
+
+##### `trackCache(cache, options?)`
+
+Add cache with automatic cleanup.
+
+```javascript
+const cache = new SmartCache({ maxSize: 100 })
+tracker.trackCache(cache)
+```
+
+### 🔄 Migration from Manual ResourceTracker
+
+#### ❌ Old Approach (Manual Cleanup)
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import ResourceTracker from '@/core/memory/ResourceTracker'
+
+const tracker = new ResourceTracker('my-component')
+
+// Manual cleanup required
+onUnmounted(() => {
+  tracker.cleanup() // Easy to forget = memory leak!
+})
+</script>
+```
+
+#### ✅ New Approach (Automatic Cleanup)
+
+```vue
+<script setup>
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
+
+const tracker = useResourceTracker('my-component')
+// No manual cleanup needed!
+</script>
+```
+
+### 📋 Migration Checklist
+
+When migrating from ResourceTracker to useResourceTracker:
+
+- [ ] Change import statement
+- [ ] Replace `new ResourceTracker()` with `useResourceTracker()`
+- [ ] Remove `onUnmounted` and manual `cleanup()` calls
+- [ ] Test that everything works correctly
+
+### 🚨 Important Notes
+
+1. **Vue Components Only**: Use only in Vue components, not in regular classes
+2. **Unique Group IDs**: Use unique IDs for each component
+3. **Automatic Cleanup**: Never call manual cleanup
+4. **Performance**: Very low overhead
+
+### 🔗 Integration with Other Systems
+
+- **ResourceTracker**: Base class for resource management
+- **SmartCache**: Intelligent caching with TTL
+- **MemoryManager**: Centralized memory management
+- **MemoryMonitor**: Memory usage monitoring
+
+---
 
 ## Memory Statistics
 

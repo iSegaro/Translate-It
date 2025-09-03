@@ -2,6 +2,8 @@
 
 A comprehensive memory management system designed to prevent memory leaks in the Translate-It browser extension. This system provides automatic resource tracking, smart caching, lifecycle management, and memory monitoring capabilities.
 
+> **📖 Note**: This is a local README for the memory system implementation. For complete documentation including Vue composables, advanced usage examples, and integration guides, see [docs/MEMORY_GARBAGE_COLLECTOR.md](../../docs/MEMORY_GARBAGE_COLLECTOR.md).
+
 ## Table of Contents
 
 - [Features](#features)
@@ -63,6 +65,8 @@ tracker.trackCache(cache)
 // No manual cleanup needed!
 </script>
 ```
+
+> **💡 Tip**: For more advanced usage examples, migration guides, and complete API documentation, see [docs/MEMORY_GARBAGE_COLLECTOR.md](../../docs/MEMORY_GARBAGE_COLLECTOR.md).
 
 ### Memory Monitoring
 
@@ -189,6 +193,8 @@ clear()                  // Clear all entries
 getStats()               // Get cache statistics
 destroy()                // Destroy cache and cleanup
 ```
+
+> **📚 Note**: For complete API documentation including `useResourceTracker` composable methods, see [docs/MEMORY_GARBAGE_COLLECTOR.md](../../docs/MEMORY_GARBAGE_COLLECTOR.md).
 
 ## Configuration
 
@@ -412,5 +418,6 @@ setInterval(() => {
 
 ---
 
-**For more information, see the [main project documentation](../../README.md)**</content>
+**For more information, see the [main project documentation](../../README.md)**  
+**For complete Memory Garbage Collector documentation, see [docs/MEMORY_GARBAGE_COLLECTOR.md](../../docs/MEMORY_GARBAGE_COLLECTOR.md)**</content>
 <parameter name="oldString"># Memory Garbage Collector System
