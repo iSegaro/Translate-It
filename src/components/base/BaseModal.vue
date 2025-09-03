@@ -49,6 +49,7 @@
 <script setup>
 import { onMounted, onUnmounted, watch } from 'vue'
 import BaseButton from './BaseButton.vue'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const props = defineProps({
   modelValue: {
@@ -87,6 +88,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'close', 'open'])
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('base-modal')
 
 const handleClose = () => {
   emit('update:modelValue', false)
@@ -129,11 +133,13 @@ watch(() => props.modelValue, (newValue) => {
 }, { immediate: true })
 
 onMounted(() => {
-  document.addEventListener('keydown', handleEscapeKey)
+  // Add escape key listener with automatic cleanup
+  tracker.addEventListener(document, 'keydown', handleEscapeKey)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleEscapeKey)
+  // Event listener cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
   unlockScroll()
 })
 </script>

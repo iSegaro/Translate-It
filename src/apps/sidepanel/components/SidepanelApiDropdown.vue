@@ -35,6 +35,7 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useApiProvider } from '@/composables/shared/useApiProvider.js'
 import { useUI } from '@/composables/ui/useUI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import ApiProviderItem from './ApiProviderItem.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -63,6 +64,9 @@ const {
 } = useApiProvider()
 
 const { showVisualFeedback } = useUI()
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('sidepanel-api-dropdown')
 
 // Template refs
 const dropdownMenu = ref(null)
@@ -193,15 +197,15 @@ const positionDropdown = () => {
   dropdown.style.top = `${topPosition}px`
 }
 
-// Setup event listeners
+// Setup event listeners with automatic cleanup
 const setupEventListeners = () => {
   // Handle clicks outside dropdown
-  document.addEventListener('click', handleOutsideClick)
+  tracker.addEventListener(document, 'click', handleOutsideClick)
 }
 
-// Cleanup event listeners
+// Cleanup event listeners - now handled automatically by useResourceTracker
 const cleanupEventListeners = () => {
-  document.removeEventListener('click', handleOutsideClick)
+  // No manual cleanup needed!
 }
 
 // Handle outside clicks
@@ -269,7 +273,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cleanupEventListeners()
+  // Event listeners cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 

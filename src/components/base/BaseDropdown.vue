@@ -43,6 +43,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const props = defineProps({
   position: {
@@ -69,6 +70,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['open', 'close', 'toggle'])
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('base-dropdown')
 
 const dropdownRef = ref(null)
 const isOpen = ref(false)
@@ -189,13 +193,14 @@ defineExpose({
 })
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-  document.addEventListener('focusin', handleClickOutside)
+  // Add click and focus listeners with automatic cleanup
+  tracker.addEventListener(document, 'click', handleClickOutside)
+  tracker.addEventListener(document, 'focusin', handleClickOutside)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('focusin', handleClickOutside)
+  // Event listeners cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 

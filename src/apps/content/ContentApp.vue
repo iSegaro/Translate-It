@@ -48,6 +48,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
@@ -73,6 +74,9 @@ const {
   cleanupEventListeners
 } = useWindowsManager();
 
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('content-app')
+
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
 const activeIcons = ref([]); // Stores { id, position } for each icon
@@ -84,8 +88,8 @@ const onIconClick = (id) => {
 };
 
 const setupOutsideClickHandler = () => {
-  // Listen for clicks on the host document
-  document.addEventListener('click', (event) => {
+  // Listen for clicks on the host document with automatic cleanup
+  tracker.addEventListener(document, 'click', (event) => {
     // Check if click is outside all Vue components
     const shadowHost = document.getElementById('translate-it-host');
     if (!shadowHost) return;
@@ -244,8 +248,8 @@ onMounted(() => {
 onUnmounted(() => {
   logger.info('ContentApp component is being unmounted.');
   
-  // Cleanup WindowsManager event listeners
-  cleanupEventListeners();
+  // Event listeners cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 });
 </script>
 

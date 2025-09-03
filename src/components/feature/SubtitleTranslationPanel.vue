@@ -246,6 +246,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const emit = defineEmits(['subtitleDetected', 'translationComplete', 'error'])
 
@@ -253,6 +254,9 @@ const emit = defineEmits(['subtitleDetected', 'translationComplete', 'error'])
 const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
 const { handleError } = useErrorHandler()
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('subtitle-translation-panel')
 
 // State
 const isConnected = ref(false)
@@ -365,12 +369,13 @@ const stopSubtitleDetection = async () => {
 }
 
 const startListeningForSubtitles = () => {
-  // Set up message listener for subtitle events
-  browser.runtime.onMessage.addListener.call(browser.runtime.onMessage, handleSubtitleMessage)
+  // Set up message listener for subtitle events with automatic cleanup
+  tracker.addEventListener(browser.runtime.onMessage, 'addListener', handleSubtitleMessage)
 }
 
 const stopListeningForSubtitles = () => {
-  browser.runtime.onMessage.removeListener(handleSubtitleMessage)
+  // Remove message listener - cleanup is handled automatically by useResourceTracker
+  // No manual removal needed!
 }
 
 const handleSubtitleMessage = async (message) => {
@@ -500,6 +505,11 @@ const playSubtitle = async (subtitle) => {
     utterance.rate = 0.9
     utterance.pitch = 1
     
+    // Track TTS resource for automatic cleanup
+    tracker.trackResource(`tts-${Date.now()}`, () => {
+      speechSynthesis.cancel()
+    })
+    
     speechSynthesis.speak(utterance)
   } catch (err) {
     await handleError(err, 'subtitle-translation-tts')
@@ -573,9 +583,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (isConnected.value) {
-    stopSubtitleDetection()
-  }
+  // Subtitle detection cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 

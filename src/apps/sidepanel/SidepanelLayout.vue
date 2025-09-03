@@ -56,8 +56,12 @@ import SidepanelToolbar from './components/SidepanelToolbar.vue';
 import { Icon } from '@iconify/vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelLayout');
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('sidepanel-layout')
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
@@ -131,7 +135,6 @@ const handleHistoryItemSelect = (historyData) => {
   isHistoryVisible.value = false
   closeHistoryPanel()
 }
-
 
 // Handle sidepanel click to deactivate select element mode
 const handleSidepanelClick = async () => {

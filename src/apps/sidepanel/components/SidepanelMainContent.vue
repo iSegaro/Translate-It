@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 const { t } = useUnifiedI18n()
 
@@ -92,6 +92,7 @@ import { useTranslationStore } from "@/features/translation/stores/translation.j
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
@@ -106,6 +107,9 @@ import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 
 
 const { handleError } = useErrorHandler();
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('sidepanel-main-content');
 
 // Languages composable
 const languages = useLanguages();
@@ -360,13 +364,13 @@ onMounted(async () => {
       targetLang.value = targetLang.value || 'Persian';
     }
 
-    // Add focus listener for clipboard updates
+    // Add focus listener for clipboard updates with automatic cleanup
   logger.debug("Adding focus listeners...");
-    document.addEventListener("focus", handleFocus, true);
-    window.addEventListener("focus", handleFocus);
+    tracker.addEventListener(document, "focus", handleFocus, true);
+    tracker.addEventListener(window, "focus", handleFocus);
     
-    // Add clear fields listener
-    document.addEventListener('clear-fields', handleClearFields);
+    // Add clear fields listener with automatic cleanup
+    tracker.addEventListener(document, 'clear-fields', handleClearFields);
 
     // Initialize translation data
   logger.debug("Loading last translation...");
@@ -379,10 +383,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Clean up event listeners
-  document.removeEventListener("focus", handleFocus, true);
-  window.removeEventListener("focus", handleFocus);
-  document.removeEventListener('clear-fields', handleClearFields);
+  // Event listeners cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 
   // Cancel any pending translation request
   if (currentAbortController.value) {

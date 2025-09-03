@@ -110,6 +110,7 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -117,6 +118,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const settingsStore = useSettingsStore()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ThemeSelector')
 const { t } = useI18n()
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('theme-selector')
 
 const broadcastThemeChange = (theme) => {
   browser.runtime.sendMessage({
@@ -173,8 +177,9 @@ watch(() => settingsStore.settings.THEME, (newTheme) => {
 }, { immediate: true })
 
 // Listen for system theme changes when in auto mode
+// Setup media query listener for auto theme with automatic cleanup
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-mediaQuery.addEventListener('change', () => {
+tracker.addEventListener(mediaQuery, 'change', () => {
   if (settingsStore.settings.THEME === 'auto') {
     applyTheme('auto')
   }

@@ -291,6 +291,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { computed } from 'vue'
 
@@ -320,6 +321,9 @@ const emit = defineEmits(['close', 'retake', 'translate', 'save'])
 // Stores and APIs
 const translationStore = useTranslationStore()
 const { translateImage } = useExtensionAPI()
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('capture-preview')
 
 // Reactive state
 const isVisible = ref(true)
@@ -506,18 +510,32 @@ const playTTS = async () => {
     
     utterance.onend = () => {
       isPlayingTTS.value = false
+      // Remove TTS resource when finished
+      tracker.clearTimer('tts-playback')
     }
     
     utterance.onerror = () => {
       isPlayingTTS.value = false
       showFeedback('Speech synthesis failed', 'error')
+      // Remove TTS resource on error
+      tracker.clearTimer('tts-playback')
     }
+    
+    // Track TTS resource for automatic cleanup
+    tracker.trackResource('tts-playback', () => {
+      if (isPlayingTTS.value) {
+        speechSynthesis.cancel()
+        isPlayingTTS.value = false
+      }
+    })
     
     speechSynthesis.speak(utterance)
   } catch (err) {
     await handleError(err, 'capture-preview-tts')
     isPlayingTTS.value = false
     showFeedback('Speech synthesis failed', 'error')
+    // Remove TTS resource on error
+    tracker.clearTimer('tts-playback')
   }
 }
 
@@ -591,9 +609,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (isPlayingTTS.value) {
-    speechSynthesis.cancel()
-  }
+  // TTS cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 

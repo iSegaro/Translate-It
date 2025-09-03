@@ -27,17 +27,18 @@
       </button>
     </div>
     
-    <template v-else>
-      <SidepanelLayout />
-    </template>
+    <SidepanelLayout v-else />
+    
+    <!-- Removed loading component fallback since we now load synchronously -->
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
@@ -48,6 +49,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
+// Static import is now used for SidepanelLayout
+
+
 // Stores
 const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
@@ -57,6 +61,9 @@ const { t, changeLanguage } = useUnifiedI18n()
 
 // Error handling
 const { handleError } = useErrorHandler()
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('sidepanel-app')
 
 // State
 const isLoading = ref(true)
@@ -108,12 +115,12 @@ const initialize = async () => {
     logger.debug('Applying initial theme:', settings.THEME)
     await applyTheme(settings.THEME)
 
-    // Step 4: Add message listener
-    browser.runtime.onMessage.addListener(handleMessage)
+    // Step 4: Add message listener with automatic cleanup
+    tracker.addEventListener(browser.runtime.onMessage, 'addListener', handleMessage)
     
-    // Step 5: Add system theme change listener for auto mode
+    // Step 5: Add system theme change listener with automatic cleanup
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    mediaQuery.addEventListener('change', handleSystemThemeChange)
+    tracker.addEventListener(mediaQuery, 'change', handleSystemThemeChange)
   } catch (error) {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
@@ -128,11 +135,8 @@ const initialize = async () => {
 onMounted(initialize)
 
 onUnmounted(() => {
-  browser.runtime.onMessage.removeListener(handleMessage);
-  
-  // Remove system theme listener
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  // Event listeners cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 });
 
 const retryLoading = () => {

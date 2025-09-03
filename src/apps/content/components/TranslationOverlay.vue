@@ -7,11 +7,15 @@
 import { ref } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { shouldApplyRtl } from '@/utils/text/textDetection.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 // State management for translated elements using direct DOM manipulation
 const translatedElementsMap = new Map(); // element -> {originalText, translationId}
 const originalTextsMap = new Map(); // element -> originalText
 let translationIdCounter = 0;
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('translation-overlay')
 
 // Generate unique IDs for translations
 const generateUniqueTranslationId = () => {
@@ -140,9 +144,9 @@ const handleNavigationChange = () => {
   }
 };
 
-// Listen for navigation events (works for both traditional and SPA navigation)
-window.addEventListener('popstate', handleNavigationChange);
-window.addEventListener('pushstate', handleNavigationChange);
+// Listen for navigation events (works for both traditional and SPA navigation) with automatic cleanup
+tracker.addEventListener(window, 'popstate', handleNavigationChange);
+tracker.addEventListener(window, 'pushstate', handleNavigationChange);
 
 // For SPAs that use history.pushState/replaceState, we need to override them
 const originalPushState = history.pushState;

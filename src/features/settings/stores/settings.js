@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/shared/config/config.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
@@ -363,10 +363,14 @@ export const useSettingsStore = defineStore('settings', () => {
     logger.error('Failed to initialize settings store:', error)
   })
 
-  // Cleanup listener on store destruction
-  onUnmounted(() => {
-    cleanupStorageListener()
-  })
+  // Cleanup listener on store destruction - only if we're in a component context
+  const instance = getCurrentInstance()
+  if (instance) {
+    onUnmounted(() => {
+      cleanupStorageListener()
+    })
+  }
+  // Note: If not in component context, cleanup will happen when browser extension unloads
   
   return {
     // State
