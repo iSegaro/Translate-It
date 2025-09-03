@@ -127,22 +127,22 @@ export async function universalTextInsertion(
 
     // تنظیم انتخاب در صورت نیاز یا انتخاب کل محتوا برای جایگزینی
     if (start !== null && end !== null) {
-      if (element.isContentEditable && typeof window !== 'undefined') {
-        // برای contentEditable از selection API استفاده کن
-        const selection = window.getSelection();
-        const range = document.createRange();
+    if (element.isContentEditable && typeof window !== 'undefined') {
+      // برای contentEditable از selection API استفاده کن
+      const selection = window.getSelection();
+      const range = document.createRange();
 
-        // پیدا کردن text node مناسب
-        const textNode = findTextNodeAtPosition(element, start);
-        if (textNode) {
-          range.setStart(
-            textNode,
-            Math.min(start, textNode.textContent.length)
-          );
-          range.setEnd(textNode, Math.min(end, textNode.textContent.length));
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
+      // پیدا کردن text node مناسب
+      const textNode = findTextNodeAtPosition(element, start);
+      if (textNode) {
+        range.setStart(
+          textNode,
+          Math.min(start, textNode.textContent.length)
+        );
+        range.setEnd(textNode, Math.min(end, textNode.textContent.length));
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
       } else {
         // برای input/textarea
         element.setSelectionRange(start, end);
