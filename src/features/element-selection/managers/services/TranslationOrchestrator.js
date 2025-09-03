@@ -14,9 +14,12 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class TranslationOrchestrator {
+export class TranslationOrchestrator extends ResourceTracker {
   constructor(stateManager) {
+    super('translation-orchestrator')
+    
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TranslationOrchestrator');
     this.stateManager = stateManager;
     this.translationRequests = new Map();
@@ -28,8 +31,8 @@ export class TranslationOrchestrator {
   async initialize() {
     this.logger.debug('TranslationOrchestrator initialized');
     
-    // Set up periodic cleanup of old timeout requests (every 5 minutes)
-    setInterval(() => this.cleanupOldTimeoutRequests(), 5 * 60 * 1000);
+    // Set up periodic cleanup of old timeout requests (every 5 minutes) using ResourceTracker
+    this.trackInterval(() => this.cleanupOldTimeoutRequests(), 5 * 60 * 1000);
   }
 
   /**

@@ -8,6 +8,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 // Import services
 import { ElementHighlighter } from "./services/ElementHighlighter.js";
@@ -20,8 +21,10 @@ import { StateManager } from "./services/StateManager.js";
 // Import constants
 import { KEY_CODES } from "./constants/selectElementConstants.js";
 
-export class SelectElementManager {
+export class SelectElementManager extends ResourceTracker {
   constructor() {
+    super('select-element-manager')
+    
     this.isActive = false;
     this.isProcessingClick = false;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElement');
@@ -70,9 +73,12 @@ export class SelectElementManager {
     this.isActive = true;
     this.abortController = new AbortController();
     const options = { signal: this.abortController.signal, capture: true };
-    document.addEventListener("mouseover", this.handleMouseOver, options);
-    document.addEventListener("mouseout", this.handleMouseOut, options);
-    document.addEventListener("click", this.handleClick, options);
+    
+    // Use ResourceTracker for event listeners
+    this.addEventListener(document, "mouseover", this.handleMouseOver, options);
+    this.addEventListener(document, "mouseout", this.handleMouseOut, options);
+    this.addEventListener(document, "click", this.handleClick, options);
+    
     this.elementHighlighter.addGlobalStyles();
     this.elementHighlighter.disablePageInteractions();
     this.logger.operation("Select element mode activated");
@@ -95,6 +101,10 @@ export class SelectElementManager {
       this.abortController = null;
     }
     await this.elementHighlighter.deactivateUI();
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    this.cleanup();
+    
     this.logger.operation("Select element UI deactivated");
   }
 

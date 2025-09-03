@@ -4,10 +4,13 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { taggleLinks } from "@/core/helpers.js";
 import { UI_CONSTANTS } from "../constants/selectElementConstants.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 // pageEventBus import removed - no longer needed for Shadow DOM
 
-export class ElementHighlighter {
+export class ElementHighlighter extends ResourceTracker {
   constructor() {
+    super('element-highlighter')
+    
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementHighlighter');
     this.currentHighlighted = null;
     this.overlayElements = new Set();
@@ -175,7 +178,8 @@ export class ElementHighlighter {
   handleMouseOut(element) {
     // Only clear if leaving the highlighted element
     if (element === this.currentHighlighted) {
-      setTimeout(() => {
+      // Use ResourceTracker for timeout management
+      this.trackTimeout(() => {
         if (this.currentHighlighted === element) {
           // Remove highlight class and attribute
           element.classList.remove('translate-it-element-highlighted');

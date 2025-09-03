@@ -4,9 +4,12 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG, KEY_CODES } from "../constants/selectElementConstants.js";
 import { SelectElementValidation } from "@/features/element-selection/constants/SelectElementModes.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class ModeManager {
+export class ModeManager extends ResourceTracker {
   constructor() {
+    super('mode-manager')
+    
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ModeManager');
     this.config = { ...CONFIG };
     this.state = {
@@ -26,8 +29,8 @@ export class ModeManager {
    * Setup keyboard listeners for Ctrl key dynamic mode switching
    */
   setupKeyboardListeners() {
-    // Listen for keydown events
-    document.addEventListener('keydown', (event) => {
+    // Listen for keydown events (using ResourceTracker)
+    this.addEventListener(document, 'keydown', (event) => {
       if (event.key === KEY_CODES.CONTROL && !this.state.isCtrlPressed && this.state.isActive) {
         this.state.isCtrlPressed = true;
         this.setMode('simple');
@@ -36,8 +39,8 @@ export class ModeManager {
       }
     }, true);
 
-    // Listen for keyup events
-    document.addEventListener('keyup', (event) => {
+    // Listen for keyup events (using ResourceTracker)
+    this.addEventListener(document, 'keyup', (event) => {
       if (event.key === KEY_CODES.CONTROL && this.state.isCtrlPressed && this.state.isActive) {
         this.state.isCtrlPressed = false;
         this.setMode(this.config.baseMode);
@@ -47,8 +50,8 @@ export class ModeManager {
       }
     }, true);
 
-    // Handle window blur (when user switches to another window/tab while holding Ctrl)
-    window.addEventListener('blur', () => {
+    // Handle window blur (using ResourceTracker)
+    this.addEventListener(window, 'blur', () => {
       if (this.state.isCtrlPressed && this.state.isActive) {
         this.state.isCtrlPressed = false;
         this.setMode(this.config.baseMode);
@@ -57,8 +60,8 @@ export class ModeManager {
       }
     });
 
-    // Handle tab visibility change (when user switches to another tab)
-    document.addEventListener('visibilitychange', () => {
+    // Handle tab visibility change (using ResourceTracker)
+    this.addEventListener(document, 'visibilitychange', () => {
       if (document.hidden && this.state.isActive) {
         this.logger.info('🔄 Tab became hidden: Deactivating select element mode');
       }
