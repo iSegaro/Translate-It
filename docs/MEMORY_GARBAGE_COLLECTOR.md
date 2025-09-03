@@ -4,16 +4,37 @@
 
 The **Memory Garbage Collector** is an advanced memory management system designed specifically for browser extensions to prevent memory leaks and ensure optimal performance. It provides comprehensive resource tracking, automatic cleanup, and support for multiple event system types including DOM EventTargets, Browser Extension APIs, and custom event systems.
 
-## 🎯 Key Features
+## Table of Contents
 
-- **Multi-Event System Support**: Handles DOM, Browser APIs, and custom event systems
-- **Automatic Resource Tracking**: Tracks timers, event listeners, caches, and custom resources
-- **Smart Cleanup**: Environment-aware cleanup for service workers and content scripts
-- **Memory Monitoring**: Real-time memory usage tracking and leak detection
-- **TTL-Based Caching**: Intelligent cache management with automatic expiration
-- **Group-Based Cleanup**: Batch cleanup of related resources
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [File Structure](#file-structure)
+- [Core Components](#core-components)
+- [Event System Support](#event-system-support)
+- [Usage Examples](#usage-examples)
+- [Integration Points](#integration-points)
+- [Memory Statistics](#memory-statistics)
+- [Configuration](#configuration)
+- [Debugging & Monitoring](#debugging--monitoring)
+- [Testing](#testing)
+- [Error Handling](#error-handling)
+- [Performance Considerations](#performance-considerations)
+- [Lifecycle Management](#lifecycle-management)
+- [Best Practices](#best-practices)
+- [Related Systems](#related-systems)
+- [API Reference](#api-reference)
 
-## 🏗️ Architecture
+## Key Features
+
+- ✅ **Multi-Event System Support**: Handles DOM, Browser APIs, and custom event systems
+- ✅ **Automatic Resource Tracking**: Tracks timers, event listeners, caches, and custom resources
+- ✅ **Smart Cleanup**: Environment-aware cleanup for service workers and content scripts
+- ✅ **Memory Monitoring**: Real-time memory usage tracking and leak detection
+- ✅ **TTL-Based Caching**: Intelligent cache management with automatic expiration
+- ✅ **Group-Based Cleanup**: Batch cleanup of related resources
+- ✅ **Cross-Environment Compatibility**: Works in Browser, Node.js, and Service Workers
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -51,7 +72,7 @@ The **Memory Garbage Collector** is an advanced memory management system designe
            └─────────────────────┘
 ```
 
-## 📁 File Structure
+## File Structure
 
 ```
 src/core/memory/
@@ -63,7 +84,7 @@ src/core/memory/
 └── index.js              # Module exports
 ```
 
-## 🔧 Core Components
+## Core Components
 
 ### MemoryManager
 
@@ -120,7 +141,7 @@ Memory usage monitoring and leak detection system.
 - Leak detection
 - Performance statistics
 
-## 🎨 Event System Support
+## Event System Support
 
 The Memory Garbage Collector supports three types of event systems:
 
@@ -145,7 +166,7 @@ this.addEventListener(storageManager, 'change', this.handleStorageChange)
 this.addEventListener(messagingSystem, 'message', this.handleMessage)
 ```
 
-## 🚀 Usage Examples
+## Usage Examples
 
 ### Basic Class Integration
 
@@ -225,7 +246,7 @@ class SettingsManager extends ResourceTracker {
 }
 ```
 
-## 🔄 Integration Points
+## Integration Points
 
 ### StorageCore Integration
 ```javascript
@@ -283,7 +304,7 @@ class ActionbarIconManager extends ResourceTracker {
 }
 ```
 
-## 📊 Memory Statistics
+## Memory Statistics
 
 The system provides comprehensive memory statistics:
 
@@ -309,7 +330,7 @@ console.log(stats)
 */
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### MemoryManager Configuration
 ```javascript
@@ -331,7 +352,7 @@ const cache = new SmartCache({
 })
 ```
 
-## 🔍 Debugging & Monitoring
+## Debugging & Monitoring
 
 ### Enable Debug Logging
 ```javascript
@@ -354,7 +375,7 @@ if (leaks.length > 0) {
 }
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Unit Tests
 ```javascript
@@ -390,7 +411,7 @@ describe('Browser API Integration', () => {
 })
 ```
 
-## 🚨 Error Handling
+## Error Handling
 
 The system includes comprehensive error handling:
 
@@ -399,14 +420,14 @@ The system includes comprehensive error handling:
 - **Memory Thresholds**: Alerts when memory usage exceeds limits
 - **Resource Leaks**: Detects and reports potential memory leaks
 
-## 📈 Performance Considerations
+## Performance Considerations
 
 - **WeakMap Usage**: Memory-efficient storage for event listeners
 - **Batch Cleanup**: Efficient group-based resource cleanup
 - **Lazy Initialization**: Components initialized only when needed
 - **Minimal Overhead**: Lightweight tracking with minimal performance impact
 
-## 🔄 Lifecycle Management
+## Lifecycle Management
 
 ### Service Worker Context
 ```javascript
@@ -428,7 +449,7 @@ window.addEventListener('beforeunload', () => {
 })
 ```
 
-## 🎯 Best Practices
+## Best Practices
 
 1. **Always Extend ResourceTracker**: Use the mixin for automatic resource management
 2. **Use Group IDs**: Organize resources by feature or component
@@ -436,14 +457,14 @@ window.addEventListener('beforeunload', () => {
 4. **Monitor Memory Usage**: Regularly check memory statistics
 5. **Handle Custom Events**: Use the universal addEventListener for all event types
 
-## 🔗 Related Systems
+## Related Systems
 
 - **[Storage Manager](STORAGE_MANAGER.md)**: Integrated with Memory Garbage Collector
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)**: Works with memory monitoring
 - **[Logging System](LOGGING_SYSTEM.md)**: Logs memory events and statistics
 - **[Windows Manager](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)**: Uses ResourceTracker for cleanup
 
-## 📚 API Reference
+## API Reference
 
 ### MemoryManager API
 - `trackResource(id, cleanupFn, groupId?)`
