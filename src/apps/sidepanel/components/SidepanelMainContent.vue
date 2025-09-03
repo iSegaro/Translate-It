@@ -255,16 +255,16 @@ const revertTranslation = () => {
 onMounted(async () => {
   logger.debug("[SidepanelMainContent] Component mounting...");
   
-  // Listen for global events from header component
-  document.addEventListener('clear-storage', clearStorage)
-  document.addEventListener('revert-translation', revertTranslation)
-  document.addEventListener('translate-request', (_event) => {
+  // Listen for global events from header component with automatic cleanup
+  tracker.addEventListener(document, 'clear-storage', clearStorage)
+  tracker.addEventListener(document, 'revert-translation', revertTranslation)
+  tracker.addEventListener(document, 'translate-request', (_event) => {
     logger.debug("🔔 Translate request received from header");
     if (sourceText.value?.trim()) {
       handleTranslate()
     }
   })
-  document.addEventListener('languages-swapped', () => {
+  tracker.addEventListener(document, 'languages-swapped', () => {
     // Note: We only swap languages, not text content
     // Text content should remain in their respective fields
   })

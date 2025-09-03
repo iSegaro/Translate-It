@@ -164,7 +164,7 @@ const handleKeyDown = async (event) => {
 
 // Lifecycle management for ESC listener
 onMounted(() => {
-  document.addEventListener('keydown', handleKeyDown, { capture: true })
+  tracker.addEventListener(document, 'keydown', handleKeyDown, { capture: true })
   
   // Load saved version preference
   const savedVersion = localStorage.getItem('sidepanel-enhanced-version')
@@ -179,7 +179,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeyDown, { capture: true })
+  // Event listener cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 
