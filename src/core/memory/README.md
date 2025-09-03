@@ -24,44 +24,44 @@ A comprehensive memory management system designed to prevent memory leaks in the
 - ✅ **Cross-Environment Support** - Works in Browser, Node.js, and Service Workers
 - ✅ **Developer-Friendly APIs** - Simple and intuitive interface
 - ✅ **Performance Optimized** - Minimal overhead and efficient cleanup
+- ✅ **Vue Integration** - Automatic cleanup with Vue Composables
+- ✅ **Centralized Management** - Single timer system for all cleanup tasks
+- ✅ **Environment-Aware** - Different behavior in development vs production
 
 ## Architecture
 
 ```
 MemoryManager (Core)
 ├── ResourceTracker (Mixin for classes)
-├── SmartCache (TTL-based cache)
-├── GlobalCleanup (Lifecycle hooks)
-└── MemoryMonitor (Usage monitoring)
+├── SmartCache (TTL-based cache with centralized cleanup)
+├── GlobalCleanup (Lifecycle hooks with centralized GC)
+├── MemoryMonitor (Usage monitoring with centralized monitoring)
+└── useResourceTracker (Vue Composable for automatic cleanup)
 ```
 
 ## Quick Start
 
-### Basic Usage
+### Vue Composable (Recommended)
 
 ```javascript
-import { ResourceTracker } from '@/core/memory/ResourceTracker.js'
-import { SmartCache } from '@/core/memory/SmartCache.js'
+<script setup>
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
-class MyComponent extends ResourceTracker {
-  constructor() {
-    super('my-component')
+// Automatic cleanup when component unmounts!
+const tracker = useResourceTracker('my-vue-component')
 
-    // Track event listener
-    this.addEventListener(window, 'resize', this.handleResize)
+// Track event listener - automatically cleaned up
+tracker.addEventListener(window, 'resize', () => console.log('Resized!'))
 
-    // Track timer
-    this.trackTimeout(() => console.log('done'), 1000)
+// Track timer - automatically cleaned up
+tracker.trackTimeout(() => console.log('Timer done'), 1000)
 
-    // Use smart cache
-    this.cache = new SmartCache({ maxSize: 100, defaultTTL: 30000 })
-  }
+// Track cache - automatically cleaned up
+const cache = new SmartCache({ maxSize: 100 })
+tracker.trackCache(cache)
 
-  destroy() {
-    // Automatic cleanup of all resources
-    super.destroy()
-  }
-}
+// No manual cleanup needed!
+</script>
 ```
 
 ### Memory Monitoring

@@ -2,6 +2,8 @@
  * Memory Garbage Collector - Smart Cache System
  * Cache with TTL, size limits, and automatic cleanup
  */
+import { getMemoryManager } from './MemoryManager.js'
+
 class SmartCache extends Map {
   constructor(options = {}) {
     super()
@@ -11,9 +13,16 @@ class SmartCache extends Map {
     this.expiryTimes = new Map()
     this.cleanupInterval = null
     this.isDestroyed = false
+    this.useCentralCleanup = options.useCentralCleanup !== false
 
-    // Start cleanup interval
-    this.startCleanupInterval()
+    // Register with centralized cleanup system
+    if (this.useCentralCleanup) {
+      const memoryManager = getMemoryManager()
+      memoryManager.registerCache(this)
+    } else {
+      // Fallback to individual cleanup interval
+      this.startCleanupInterval()
+    }
   }
 
   /**
@@ -204,7 +213,14 @@ class SmartCache extends Map {
   destroy() {
     if (this.isDestroyed) return
 
-    this.stopCleanupInterval()
+    // Unregister from centralized cleanup
+    if (this.useCentralCleanup) {
+      const memoryManager = getMemoryManager()
+      memoryManager.unregisterCache(this)
+    } else {
+      this.stopCleanupInterval()
+    }
+
     this.clear()
     this.isDestroyed = true
   }

@@ -10,10 +10,31 @@ import browser from 'webextension-polyfill'
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GlobalCleanup')
 
 class GlobalCleanup {
-  constructor() {
+  constructor(options = {}) {
     this.memoryManager = getMemoryManager()
     this.gcInterval = null
     this.isInitialized = false
+    this.useCentralGC = options.useCentralGC !== false
+
+    // Only initialize individual GC if not using centralized system
+    if (!this.useCentralGC) {
+      this.initPeriodicGC()
+    }
+  }
+
+  /**
+   * Initialize periodic garbage collection (fallback when not using centralized)
+   */
+  initPeriodicGC() {
+    if (this.gcInterval) return
+
+    this.gcInterval = setInterval(() => {
+      logger.debug('Periodic garbage collection triggered')
+      this.memoryManager.performGarbageCollection()
+    }, 5 * 60 * 1000) // 5 minutes
+
+    // Track the GC interval
+    this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
   }
 
   /**
@@ -136,6 +157,11 @@ class GlobalCleanup {
       this.gcInterval = null
     }
 
+    // Stop centralized GC if using it
+    if (this.useCentralGC) {
+      this.memoryManager.stopCentralTimer()
+    }
+
     this.memoryManager.cleanupGroup('global-cleanup')
     this.isInitialized = false
     logger.debug('Global cleanup destroyed')
@@ -147,19 +173,25 @@ let globalCleanupInstance = null
 
 /**
  * Get the global cleanup instance
+ * @param {Object} options - Configuration options
  */
-export function getGlobalCleanup() {
+export function getGlobalCleanup(options = {}) {
   if (!globalCleanupInstance) {
-    globalCleanupInstance = new GlobalCleanup()
+    const defaultOptions = {
+      useCentralGC: true,
+      ...options
+    }
+    globalCleanupInstance = new GlobalCleanup(defaultOptions)
   }
   return globalCleanupInstance
 }
 
 /**
  * Initialize global cleanup hooks
+ * @param {Object} options - Configuration options
  */
-export function initializeGlobalCleanup() {
-  const cleanup = getGlobalCleanup()
+export function initializeGlobalCleanup(options = {}) {
+  const cleanup = getGlobalCleanup(options)
   cleanup.initialize()
   return cleanup
 }

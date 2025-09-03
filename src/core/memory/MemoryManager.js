@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager')
 
 class MemoryManager {
-  constructor() {
+  constructor(options = {}) {
     this.resources = new Map() // resourceId -> cleanup function
     this.groups = new Map() // groupId -> Set of resourceIds
     this.timers = new Set()
@@ -26,8 +26,25 @@ class MemoryManager {
       memoryUsage: 0
     }
 
-    // Initialize DOM cleanup observer
-    this.initDOMCleanupObserver()
+    // Centralized cleanup system
+    this.registeredCaches = new Set()
+    this.registeredMonitors = new Set()
+    this.centralTimer = null
+    this.centralTimerInterval = options.centralTimerInterval || 60 * 1000 // 1 minute
+
+    // Environment-based configuration
+    this.isDevelopment = options.enableMonitoring !== false &&
+                        (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')
+
+    // Initialize systems based on environment
+    if (this.isDevelopment) {
+      this.initCentralTimer()
+    }
+
+    // Initialize DOM cleanup observer (only if needed)
+    if (options.enableDOMObserver !== false) {
+      this.initDOMCleanupObserver()
+    }
   }
 
   /**
@@ -652,6 +669,95 @@ class MemoryManager {
   }
 
   /**
+   * Initialize centralized timer for periodic cleanup and monitoring
+   */
+  initCentralTimer() {
+    if (this.centralTimer) return
+
+    this.centralTimer = setInterval(() => {
+      this.performCentralCleanup()
+    }, this.centralTimerInterval)
+
+    logger.debug(`Centralized cleanup timer initialized (${this.centralTimerInterval}ms interval)`)
+  }
+
+  /**
+   * Perform centralized cleanup for all registered caches and monitors
+   */
+  performCentralCleanup() {
+    try {
+      // Cleanup all registered caches
+      this.registeredCaches.forEach(cache => {
+        if (cache && typeof cache.cleanup === 'function') {
+          cache.cleanup()
+        }
+      })
+
+      // Run monitoring for all registered monitors
+      this.registeredMonitors.forEach(monitor => {
+        if (monitor && typeof monitor.performMonitoring === 'function') {
+          monitor.performMonitoring()
+        }
+      })
+
+      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors`)
+    } catch (error) {
+      logger.warn('Error during central cleanup:', error)
+    }
+  }
+
+  /**
+   * Register a cache for centralized cleanup
+   * @param {Object} cache - Cache instance with cleanup method
+   */
+  registerCache(cache) {
+    if (cache && typeof cache.cleanup === 'function') {
+      this.registeredCaches.add(cache)
+      logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`)
+    }
+  }
+
+  /**
+   * Unregister a cache from centralized cleanup
+   * @param {Object} cache - Cache instance
+   */
+  unregisterCache(cache) {
+    this.registeredCaches.delete(cache)
+    logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`)
+  }
+
+  /**
+   * Register a monitor for centralized monitoring
+   * @param {Object} monitor - Monitor instance with performMonitoring method
+   */
+  registerMonitor(monitor) {
+    if (monitor && typeof monitor.performMonitoring === 'function') {
+      this.registeredMonitors.add(monitor)
+      logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`)
+    }
+  }
+
+  /**
+   * Unregister a monitor from centralized monitoring
+   * @param {Object} monitor - Monitor instance
+   */
+  unregisterMonitor(monitor) {
+    this.registeredMonitors.delete(monitor)
+    logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`)
+  }
+
+  /**
+   * Stop centralized timer
+   */
+  stopCentralTimer() {
+    if (this.centralTimer) {
+      clearInterval(this.centralTimer)
+      this.centralTimer = null
+      logger.debug('Centralized cleanup timer stopped')
+    }
+  }
+
+  /**
    * Generate detailed report with event listener information
    */
   generateReport() {
@@ -677,10 +783,22 @@ let memoryManagerInstance = null
 
 /**
  * Get the global memory manager instance
+ * @param {Object} options - Configuration options
  */
-export function getMemoryManager() {
+export function getMemoryManager(options = {}) {
   if (!memoryManagerInstance) {
-    memoryManagerInstance = new MemoryManager()
+    // Determine environment and set default options
+    const isDevelopment = options.enableMonitoring !== false &&
+                         (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')
+
+    const defaultOptions = {
+      enableMonitoring: isDevelopment,
+      enableDOMObserver: true,
+      centralTimerInterval: 60 * 1000, // 1 minute
+      ...options
+    }
+
+    memoryManagerInstance = new MemoryManager(defaultOptions)
   }
   return memoryManagerInstance
 }

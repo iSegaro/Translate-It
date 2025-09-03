@@ -9,7 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryMonitor')
 
 class MemoryMonitor {
-  constructor() {
+  constructor(options = {}) {
     this.memoryManager = getMemoryManager()
     this.measurements = []
     this.thresholds = {
@@ -18,6 +18,12 @@ class MemoryMonitor {
     }
     this.monitorInterval = null
     this.isMonitoring = false
+    this.useCentralMonitoring = options.useCentralMonitoring !== false
+
+    // Register with centralized monitoring if enabled
+    if (this.useCentralMonitoring) {
+      this.memoryManager.registerMonitor(this)
+    }
   }
 
   /**
@@ -29,16 +35,29 @@ class MemoryMonitor {
     logger.init('Memory monitoring started')
     this.isMonitoring = true
 
-    // Monitor every 30 seconds
-    this.monitorInterval = setInterval(() => {
+    // Only start individual monitoring if not using centralized system
+    if (!this.useCentralMonitoring) {
+      this.monitorInterval = setInterval(() => {
+        this.performMonitoring()
+      }, 30 * 1000)
+
+      // Track the monitor interval
+      this.memoryManager.trackTimer(this.monitorInterval, 'memory-monitor')
+    }
+  }
+
+  /**
+   * Perform monitoring tasks (called by centralized system or individual timer)
+   */
+  performMonitoring() {
+    try {
       this.measureMemory()
       this.checkThresholds()
       this.detectLeaks()
       this.monitorEventListeners()
-    }, 30 * 1000)
-
-    // Track the monitor interval
-    this.memoryManager.trackTimer(this.monitorInterval, 'memory-monitor')
+    } catch (error) {
+      logger.warn('Error during monitoring:', error)
+    }
   }
 
   /**
@@ -76,6 +95,11 @@ class MemoryMonitor {
    */
   stopMonitoring() {
     if (!this.isMonitoring) return
+
+    // Unregister from centralized monitoring
+    if (this.useCentralMonitoring) {
+      this.memoryManager.unregisterMonitor(this)
+    }
 
     if (this.monitorInterval) {
       clearInterval(this.monitorInterval)
@@ -362,19 +386,25 @@ let memoryMonitorInstance = null
 
 /**
  * Get the memory monitor instance
+ * @param {Object} options - Configuration options
  */
-export function getMemoryMonitor() {
+export function getMemoryMonitor(options = {}) {
   if (!memoryMonitorInstance) {
-    memoryMonitorInstance = new MemoryMonitor()
+    const defaultOptions = {
+      useCentralMonitoring: true,
+      ...options
+    }
+    memoryMonitorInstance = new MemoryMonitor(defaultOptions)
   }
   return memoryMonitorInstance
 }
 
 /**
  * Start memory monitoring
+ * @param {Object} options - Configuration options
  */
-export function startMemoryMonitoring() {
-  const monitor = getMemoryMonitor()
+export function startMemoryMonitoring(options = {}) {
+  const monitor = getMemoryMonitor(options)
   monitor.startMonitoring()
   return monitor
 }
