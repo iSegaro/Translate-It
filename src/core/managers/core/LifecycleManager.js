@@ -15,7 +15,7 @@ import * as Handlers from "@/core/background/handlers/index.js"; // This might n
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
-import { dynamicIconManager } from '@/core/managers/DynamicIconManager.js';
+import { actionbarIconManager } from '@/utils/browser/ActionbarIconManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
@@ -26,7 +26,7 @@ class LifecycleManager {
     this.translationEngine = null;
     this.featureLoader = featureLoader;
     this.messageHandler = simpleMessageHandler;
-    this.dynamicIconManager = dynamicIconManager;
+    this.dynamicIconManager = actionbarIconManager;
     if (!this.messageHandler.initialized) {
       this.messageHandler.initialize();
     }
@@ -82,9 +82,9 @@ class LifecycleManager {
   }
 
   async initializeDynamicIconManager() {
-    logger.debug('Initializing DynamicIconManager...');
+    logger.debug('Initializing ActionbarIconManager...');
     await this.dynamicIconManager.initialize();
-    logger.debug('DynamicIconManager initialized');
+    logger.debug('ActionbarIconManager initialized');
   }
 
   registerMessageHandlers() {
