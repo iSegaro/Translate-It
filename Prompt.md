@@ -17,6 +17,7 @@
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
 - **Logging System**: سیستم log ساختارمند
 - **UI Host System**: اپلیکیشن متمرکز Vue برای مدیریت تمام UIهای درون-صفحه در Shadow DOM
+- **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته برای جلوگیری از memory leaks با پشتیبانی از DOM، Browser APIs و سیستم‌های event سفارشی
 
 ## روش‌های ترجمه
 1. **انتخاب متن**: ترجمه متن انتخاب شده با نمایش آیکون یا کادر مستقیم
@@ -66,6 +67,7 @@
 - **`src/core/`**: زیرساخت اصلی
   - `background/` - service worker، handlers، lifecycle
   - `content-scripts/` - اسکریپت‌های محتوا
+  - `memory/` - سیستم Memory Garbage Collector پیشرفته (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
   - `managers/` - مدیریت‌کننده‌های هسته
 
 ### 🛠️ Pure Utilities (ساده‌سازی شده)
@@ -85,6 +87,7 @@
 - **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
 - **`docs/STORAGE_MANAGER.md`**: مدیریت storage با caching
 - **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
+- **`docs/MEMORY_GARBAGE_COLLECTOR.md`**: سیستم مدیریت حافظه پیشرفته و جلوگیری از memory leaks
 
 ### مستندات ویژگی‌ها  
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host

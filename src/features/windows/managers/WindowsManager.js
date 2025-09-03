@@ -18,6 +18,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 console.log('[LOG] WindowsManager.js loaded and evaluated');
 
@@ -25,7 +26,7 @@ console.log('[LOG] WindowsManager.js loaded and evaluated');
  * Modular WindowsManager for translation windows and icons
  * Refactored to use specialized modules for better maintainability
  */
-export class WindowsManager {
+export class WindowsManager extends ResourceTracker {
   /**
    * Get pageEventBus instance at runtime
    */
@@ -35,6 +36,9 @@ export class WindowsManager {
 
   constructor(options = {}) {
     console.log('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
+    // Initialize ResourceTracker first
+    super('windows-manager');
+    
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsManager');
     this.logger.debug('WindowsManager constructor called', options);
@@ -124,8 +128,8 @@ export class WindowsManager {
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
-    // Development toggle handler
-    window.addEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
+    // Development toggle handler - use tracked event listener
+    this.addEventListener(window, 'toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
   }
 
   /**
@@ -1055,5 +1059,37 @@ export class WindowsManager {
 
   get isInIframe() {
     return this.crossFrameManager.isInIframe;
+  }
+
+  /**
+   * Destroy the WindowsManager and cleanup all resources
+   */
+  destroy() {
+    // Cleanup event listeners and resources
+    this.cleanup();
+    
+    // Clean up DOM references
+    this.displayElement = null;
+    this.innerContainer = null;
+    this.icon = null;
+    
+    // Destroy child managers if they have destroy methods
+    if (this.crossFrameManager && typeof this.crossFrameManager.destroy === 'function') {
+      this.crossFrameManager.destroy();
+    }
+    if (this.translationHandler && typeof this.translationHandler.destroy === 'function') {
+      this.translationHandler.destroy();
+    }
+    if (this.clickManager && typeof this.clickManager.destroy === 'function') {
+      this.clickManager.destroy();
+    }
+    if (this.themeManager && typeof this.themeManager.destroy === 'function') {
+      this.themeManager.destroy();
+    }
+    if (this.ttsManager && typeof this.ttsManager.destroy === 'function') {
+      this.ttsManager.destroy();
+    }
+    
+    this.logger.debug('🗑️ WindowsManager destroyed');
   }
 }

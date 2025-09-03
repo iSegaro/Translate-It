@@ -10,6 +10,10 @@ import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 // Import Main DOM CSS as raw string for injection
 import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 
+// Import Memory Garbage Collector
+import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
+import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
+
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
@@ -214,6 +218,12 @@ if (!access.isAccessible) {
       vueBridge: vueBridge.isInitialized,
       ttsHandler: true  // Using unified GOOGLE_TTS_SPEAK system
     });
+
+    // Initialize Memory Garbage Collector
+    initializeGlobalCleanup();
+    startMemoryMonitoring();
+    logger.debug("✅ [Content Script] Memory Garbage Collector initialized!");
+    
     })();
   }
 }

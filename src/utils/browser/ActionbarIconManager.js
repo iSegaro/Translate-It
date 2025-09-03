@@ -3,6 +3,8 @@ import browser from 'webextension-polyfill';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import SmartCache from '@/core/memory/SmartCache.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
 
@@ -10,11 +12,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
  * Actionbar Icon Manager - Minimal, fast, reliable
  * Manages browser action bar icons with dynamic provider overlays
  */
-class ActionbarIconManager {
+class ActionbarIconManager extends ResourceTracker {
   constructor() {
+    super('actionbar-icon-manager')
     this.currentProvider = null;
     this.isInitialized = false;
-    this.iconCache = new Map(); // Simple Map cache
+    this.iconCache = new SmartCache({ maxSize: 50, defaultTTL: 1800000 }); // 30 minutes TTL
     
     // Provider icon mapping
     this.providerIcons = {
@@ -45,8 +48,8 @@ class ActionbarIconManager {
       // Update icon immediately
       await this.updateIcon(this.currentProvider);
 
-      // Listen for provider changes
-      storageManager.on('change', async (data) => {
+      // Listen for provider changes using tracked event listener
+      this.addEventListener(storageManager, 'change', async (data) => {
         if (data.key === 'TRANSLATION_API' && data.newValue !== this.currentProvider) {
           this.currentProvider = data.newValue;
           await this.updateIcon(this.currentProvider);
@@ -56,7 +59,7 @@ class ActionbarIconManager {
       this.isInitialized = true;
       
     } catch (error) {
-      logger.error('❌ Failed to initialize SimpleDynamicIconManager:', error);
+      logger.error('❌ Failed to initialize ActionbarIconManager:', error);
     }
   }
 
@@ -183,6 +186,16 @@ class ActionbarIconManager {
   clearCache() {
     this.iconCache.clear();
     logger.debug('🧹 Icon cache cleared');
+  }
+
+  /**
+   * Destroy the icon manager and cleanup all resources
+   */
+  destroy() {
+    this.iconCache.destroy();
+    // Call parent destroy
+    super.destroy();
+    logger.debug('🗑️ ActionbarIconManager destroyed');
   }
 }
 

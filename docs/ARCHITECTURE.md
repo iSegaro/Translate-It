@@ -19,6 +19,7 @@
 - ✅ **Cross-Browser Support** - Chrome and Firefox MV3
 - ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
 - ✅ **Smart Messaging System** - Intelligent routing eliminates 3+ second retry delays
+- ✅ **Memory Garbage Collector** - Advanced memory management system preventing memory leaks with support for DOM, Browser APIs, and custom event systems
 
 ---
 
@@ -31,6 +32,7 @@
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
+- **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system preventing memory leaks
 
 ### Feature-Specific Documentation
 - **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
@@ -81,7 +83,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
 │  Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager → Storage Manager → Error Handler            │
-│  Logger System → TTS Manager → Windows Manager                 │
+│  Logger System → TTS Manager → Windows Manager → Memory Garbage Collector │
 └─────────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -219,6 +221,13 @@ src/
 │   │   └── listeners/         # Event listeners
 │   ├── content-scripts/       # Content script entry
 │   │   └── index.js           # Content script entry
+│   ├── memory/                # Memory Garbage Collector System
+│   │   ├── MemoryManager.js   # Core memory management
+│   │   ├── ResourceTracker.js # Resource tracking mixin
+│   │   ├── SmartCache.js      # TTL-based caching
+│   │   ├── GlobalCleanup.js   # Lifecycle cleanup hooks
+│   │   ├── MemoryMonitor.js   # Memory usage monitoring
+│   │   └── index.js           # Module exports
 │   ├── managers/              # Core managers
 │   │   ├── core/              # LifecycleManager, FeatureManager
 │   │   ├── content/           # Content-specific managers

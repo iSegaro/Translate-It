@@ -9,6 +9,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
 
+// Import Memory Garbage Collector
+import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
+import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
 
 registerAllProviders();
@@ -18,6 +22,12 @@ globalThis.backgroundService = backgroundService;
 
 backgroundService.initialize().then(() => {
   logger.debug("✅ [Background] Background service initialization completed!");
+  
+  // Initialize Memory Garbage Collector
+  initializeGlobalCleanup();
+  startMemoryMonitoring();
+  logger.debug("✅ [Background] Memory Garbage Collector initialized!");
+  
 }).catch((error) => {
   logger.error("❌ [Background] Background service initialization failed:", error);
 });

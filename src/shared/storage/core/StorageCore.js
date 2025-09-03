@@ -13,10 +13,13 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import SmartCache from '@/core/memory/SmartCache.js';
 
-class StorageCore {
+class StorageCore extends ResourceTracker {
   constructor() {
-    this.cache = new Map();
+    super('storage-core')
+    this.cache = new SmartCache({ maxSize: 200, defaultTTL: 60000 }); // 1 minute TTL
     this.listeners = new Map(); // event_name -> Set of callbacks
     this._isReady = false;
     this._readyPromise = null;
@@ -86,10 +89,8 @@ class StorageCore {
     };
 
     try {
-      browser.storage.onChanged.addListener.call(
-        browser.storage.onChanged,
-        this._changeListener
-      );
+      // Use tracked event listener
+      this.addEventListener(browser.storage.onChanged, 'change', this._changeListener);
     } catch (error) {
       this.logger.warn('Failed to setup change listener', error);
     }
@@ -407,13 +408,9 @@ class StorageCore {
    */
   async cleanup() {
     try {
-      // Remove storage change listener
-      if (this._changeListener && browser?.storage?.onChanged) {
-        browser.storage.onChanged.removeListener(this._changeListener);
-      }
-
+      // Remove storage change listener (handled by ResourceTracker)
       // Clear cache and listeners
-      this.cache.clear();
+      this.cache.destroy();
       this.listeners.clear();
 
       this._isReady = false;
@@ -421,6 +418,15 @@ class StorageCore {
     } catch (error) {
       this.logger.warn('Cleanup error', error);
     }
+  }
+
+  /**
+   * Destroy the storage core and cleanup all resources
+   */
+  destroy() {
+    this.cleanup();
+    // Call parent destroy
+    super.destroy();
   }
 }
 
