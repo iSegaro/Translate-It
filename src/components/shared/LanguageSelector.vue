@@ -201,43 +201,45 @@ const handleDropdownClick = () => {
 }
 
 // Initialize languages
-onMounted(async () => {
-  await languages.loadLanguages()
-  
-  // Set default languages from settings if not provided
-  try {
-    await settingsStore.loadSettings()
-    const settings = settingsStore.settings
-    
-    // Only set if current values are empty or default
-    if (!sourceLanguage.value || sourceLanguage.value === 'Auto-Detect') {
-      // SOURCE_LANGUAGE might be a name like "English" or code like "en"
-      const sourceLang = settings.SOURCE_LANGUAGE || 'English'
-      let sourceDisplay
-      if (sourceLang.length <= 3) {
-        sourceDisplay = languages.getLanguageDisplayValue(sourceLang) || 'Auto-Detect'
-      } else {
-        sourceDisplay = sourceLang // Already a display name
+onMounted(() => {
+  // Load languages asynchronously (non-blocking)
+  languages.loadLanguages().then(() => {
+    // Set default languages from settings if not provided
+    settingsStore.loadSettings().then(() => {
+      const settings = settingsStore.settings
+      
+      // Only set if current values are empty or default
+      if (!sourceLanguage.value || sourceLanguage.value === 'Auto-Detect') {
+        // SOURCE_LANGUAGE might be a name like "English" or code like "en"
+        const sourceLang = settings.SOURCE_LANGUAGE || 'English'
+        let sourceDisplay
+        if (sourceLang.length <= 3) {
+          sourceDisplay = languages.getLanguageDisplayValue(sourceLang) || 'Auto-Detect'
+        } else {
+          sourceDisplay = sourceLang // Already a display name
+        }
+        sourceLanguage.value = sourceDisplay
+        logger.debug('[LanguageSelector] Set source language from settings:', sourceDisplay)
       }
-      sourceLanguage.value = sourceDisplay
-      logger.debug('[LanguageSelector] Set source language from settings:', sourceDisplay)
-    }
-    
-    if (!targetLanguage.value || targetLanguage.value === 'English') {
-      // TARGET_LANGUAGE might be a name like "Farsi" or code like "fa"
-      const targetLang = settings.TARGET_LANGUAGE || 'Farsi'
-      let targetDisplay
-      if (targetLang.length <= 3) {
-        targetDisplay = languages.getLanguageDisplayValue(targetLang) || 'Farsi'
-      } else {
-        targetDisplay = targetLang // Already a display name
+      
+      if (!targetLanguage.value || targetLanguage.value === 'English') {
+        // TARGET_LANGUAGE might be a name like "Farsi" or code like "fa"
+        const targetLang = settings.TARGET_LANGUAGE || 'Farsi'
+        let targetDisplay
+        if (targetLang.length <= 3) {
+          targetDisplay = languages.getLanguageDisplayValue(targetLang) || 'Farsi'
+        } else {
+          targetDisplay = targetLang // Already a display name
+        }
+        targetLanguage.value = targetDisplay
+        logger.debug('[LanguageSelector] Set target language from settings:', targetDisplay)
       }
-      targetLanguage.value = targetDisplay
-      logger.debug('[LanguageSelector] Set target language from settings:', targetDisplay)
-    }
-  } catch (error) {
-    await handleError(error, 'language-selector-init')
-  }
+    }).catch(error => {
+      handleError(error, 'language-selector-settings')
+    });
+  }).catch(error => {
+    handleError(error, 'language-selector-languages')
+  });
 });
 </script>
 
