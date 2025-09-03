@@ -120,8 +120,8 @@ export class TextFieldIconManager extends ResourceTracker {
     }
 
     // Protocol check
-    if (!["http:", "https:"].includes(window.location.protocol)) {
-      this.logger.debug('Skipping icon creation: Invalid protocol.');
+    if (typeof window === 'undefined' || !["http:", "https:"].includes(window.location.protocol)) {
+      this.logger.debug('Skipping icon creation: Invalid protocol or no window.');
       return null;
     }
 

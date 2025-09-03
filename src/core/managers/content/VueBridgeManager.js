@@ -286,7 +286,7 @@ class ContentScriptVueBridge {
 }
 
 export const vueBridge = new ContentScriptVueBridge();
-if (!/^(chrome|moz)-extension:\/\//.test(window.location.protocol)) {
+if (typeof window !== 'undefined' && !/^(chrome|moz)-extension:\/\//.test(window.location.protocol)) {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => vueBridge.initialize());
   } else {

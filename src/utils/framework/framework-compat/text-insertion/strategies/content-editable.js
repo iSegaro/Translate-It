@@ -17,6 +17,10 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
     element.focus();
     await smartDelay(10);
 
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
     const selection = window.getSelection();
 
     // اگر انتخاب ندارد، کل محتوا را انتخاب کن

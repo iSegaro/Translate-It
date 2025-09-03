@@ -15,13 +15,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'selectionUtils');
 export function checkTextSelection(element) {
   if (!element) return false;
   
-  if (element.isContentEditable) {
+  if (element.isContentEditable && typeof window !== 'undefined') {
     const selection = window.getSelection();
     const hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
     
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
-    if (window.location.hostname.includes('reddit.com')) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
   logger.debug('Reddit selection check:', {
         hasSelection,
         isCollapsed: selection?.isCollapsed,
@@ -36,7 +36,7 @@ export function checkTextSelection(element) {
     
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
-    if (window.location.hostname.includes('reddit.com')) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
   logger.debug('Reddit input/textarea selection check:', {
         hasSelection,
         selectionStart: element.selectionStart,

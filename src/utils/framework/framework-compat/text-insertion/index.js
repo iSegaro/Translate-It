@@ -39,11 +39,11 @@ export async function optimizedTextInsertion(
   const strategy = detectOptimalStrategy(element);
   const hasSelection = checkTextSelection(element);
 
-  logger.debug('Using optimized insertion strategy', { strategy, hostname: window.location.hostname });
+  logger.debug('Using optimized insertion strategy', { strategy, hostname: typeof window !== 'undefined' ? window.location.hostname : '' });
 
   // تنظیم انتخاب در صورت نیاز
   if (start !== null && end !== null) {
-    if (element.isContentEditable) {
+    if (element.isContentEditable && typeof window !== 'undefined') {
       const selection = window.getSelection();
       const range = document.createRange();
       const textNode = findTextNodeAtPosition(element, start);
@@ -127,7 +127,7 @@ export async function universalTextInsertion(
 
     // تنظیم انتخاب در صورت نیاز یا انتخاب کل محتوا برای جایگزینی
     if (start !== null && end !== null) {
-      if (element.isContentEditable) {
+      if (element.isContentEditable && typeof window !== 'undefined') {
         // برای contentEditable از selection API استفاده کن
         const selection = window.getSelection();
         const range = document.createRange();
@@ -149,7 +149,7 @@ export async function universalTextInsertion(
       }
     } else {
       // انتخاب کل محتوا برای جایگزینی کامل
-      if (element.isContentEditable) {
+      if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(element);

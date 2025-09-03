@@ -28,13 +28,13 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
     });
 
     // ویژگی ویژه برای Google Docs (از example.js)
-    if (window.location.hostname.includes("docs.google.com")) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes("docs.google.com")) {
       pasteEvent.docs_plus_ = true;
     }
 
     // اگر انتخاب ندارد، کل محتوا را انتخاب کن
     if (!hasSelection) {
-      if (element.isContentEditable) {
+      if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(element);

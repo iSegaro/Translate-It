@@ -26,7 +26,7 @@ export async function tryGoogleDocsInsertion(element, text) {
     }
 
     // fallback: تلاش روی المان اصلی
-    if (element && window.location.hostname.includes("docs.google.com")) {
+    if (element && typeof window !== 'undefined' && window.location.hostname.includes("docs.google.com")) {
       return await tryOptimizedPasteInsertion(element, text, false);
     }
 

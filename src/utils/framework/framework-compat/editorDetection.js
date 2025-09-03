@@ -24,7 +24,7 @@ export function isComplexEditor(element) {
     }
 
     // بررسی URL سایت - فقط Office suites که واقعاً پیچیده هستند
-    const hostname = window.location.hostname.toLowerCase();
+    const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
     const trueComplexSites = [
       'docs.google.com',
       'office.live.com',

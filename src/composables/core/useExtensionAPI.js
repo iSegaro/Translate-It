@@ -134,7 +134,7 @@ export function useExtensionAPI() {
     try {
       const api = getbrowserAPI();
       // Chrome-specific sidepanel API
-      if (api.sidePanel) {
+      if (api.sidePanel && typeof window !== 'undefined') {
         await api.sidePanel.open({ windowId: window.id });
       } else {
         // Fallback to opening in a new tab

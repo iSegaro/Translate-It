@@ -105,7 +105,7 @@ export function useHistory() {
         (await getTranslationString("CONFIRM_CLEAR_ALL_HISTORY")) ||
         "Are you sure you want to clear all translation history?";
 
-      const userConfirmed = window.confirm(confirmMessage);
+      const userConfirmed = typeof window !== 'undefined' && window.confirm(confirmMessage);
 
       if (userConfirmed) {
         historyItems.value = [];

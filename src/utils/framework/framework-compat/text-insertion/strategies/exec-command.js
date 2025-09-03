@@ -50,7 +50,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
     }
 
     // برای contentEditable
-    if (element.isContentEditable) {
+    if (element.isContentEditable && typeof window !== 'undefined') {
       const selection = window.getSelection();
 
       if (hasSelection && selection && !selection.isCollapsed) {

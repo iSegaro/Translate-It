@@ -40,7 +40,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     });
     
     // برای Reddit و contentEditable، از روش ساده‌تر استفاده کن
-    if (element.isContentEditable && window.location.hostname.includes('reddit.com')) {
+    if (element.isContentEditable && typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
       const simpleSuccess = await handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection);
       if (simpleSuccess) {
         return true;
@@ -76,7 +76,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
       element.dispatchEvent(keydownEvent);
       
       // اضافه کردن کاراکتر
-      if (element.isContentEditable) {
+      if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         logger.debugLazy(() => [`Char ${i+1}/${text.length}: "${char}", rangeCount: ${selection.rangeCount}`]);
         
@@ -241,6 +241,10 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       textLength: text.length
     });
 
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
     const selection = window.getSelection();
     
     if (hasSelection && selection.rangeCount > 0) {
@@ -347,7 +351,7 @@ async function clearElementContent(element) {
     if (!currentContent) return;
     
     // انتخاب کل محتوا
-    if (element.isContentEditable) {
+    if (element.isContentEditable && typeof window !== 'undefined') {
       const selection = window.getSelection();
       const range = document.createRange();
       range.selectNodeContents(element);
@@ -368,7 +372,7 @@ async function clearElementContent(element) {
     element.dispatchEvent(deleteEvent);
     
     // پاک کردن محتوا
-    if (element.isContentEditable) {
+    if (element.isContentEditable && typeof window !== 'undefined') {
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
         selection.deleteFromDocument();

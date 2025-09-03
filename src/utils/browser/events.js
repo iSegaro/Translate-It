@@ -13,7 +13,7 @@ export const setCursorToEnd = (element) => {
 
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       element.selectionStart = element.selectionEnd = element.value.length;
-    } else if (element.isContentEditable) {
+    } else if (element.isContentEditable && typeof window !== 'undefined') {
       const range = document.createRange();
       const selection = window.getSelection();
       range.selectNodeContents(element);
@@ -41,7 +41,7 @@ export const setCursorPosition = (element, position = "end", offset = 0) => {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       const pos = position === "start" ? 0 : element.value.length;
       element.setSelectionRange(pos + offset, pos + offset);
-    } else if (element.isContentEditable) {
+    } else if (element.isContentEditable && typeof window !== 'undefined') {
       const range = document.createRange();
       const selection = window.getSelection();
       const childNodes = element.childNodes;
@@ -106,6 +106,10 @@ export const getEventPath = (event) => {
  */
 export const getSelectedTextWithDash = () => {
   try {
+    if (typeof window === 'undefined') {
+      return "";
+    }
+
     const selection = window.getSelection();
     let selectedText = "";
 

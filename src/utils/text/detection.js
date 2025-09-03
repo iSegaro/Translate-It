@@ -36,9 +36,11 @@ export function collectTextNodes(targetElement) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
 
-        const style = window.getComputedStyle(parent);
-        if (style.display === "none" || style.visibility === "hidden") {
-          return NodeFilter.FILTER_REJECT;
+        if (typeof window !== 'undefined') {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return NodeFilter.FILTER_REJECT;
+          }
         }
 
         // Skip empty text nodes

@@ -70,15 +70,19 @@ export function setupWindowErrorHandlers(context) {
   }
   
   // Register event listeners
-  window.addEventListener('error', handleWindowError)
-  window.addEventListener('unhandledrejection', handleUnhandledRejection)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('error', handleWindowError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+  }
   
   logger.debug(`[${context}] Window error handlers registered`)
   
   // Return cleanup function
   return () => {
-    window.removeEventListener('error', handleWindowError)
-    window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('error', handleWindowError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
     logger.debug(`[${context}] Window error handlers cleaned up`)
   }
 }

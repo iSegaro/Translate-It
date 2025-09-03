@@ -35,7 +35,7 @@ export async function smartTextReplacement(
       isContentEditable: element.isContentEditable,
       hasSpellcheck: element.hasAttribute("spellcheck"),
       spellcheckValue: element.getAttribute("spellcheck"),
-      hostname: window.location.hostname,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : '',
     });
 
     // استراتژی 1: Optimized Text Insertion
@@ -71,12 +71,13 @@ export async function smartTextReplacement(
     ];
     const shouldUseNaturalTyping =
       useNaturalTyping &&
+      typeof window !== 'undefined' &&
       naturalTypingSites.some((site) =>
-        window.location.hostname.includes(site)
+        typeof window !== 'undefined' && window.location.hostname.includes(site)
       );
 
     if (shouldUseNaturalTyping) {
-      logger.debug('Trying natural typing', { hostname: window.location.hostname });
+      logger.debug('Trying natural typing', { hostname: typeof window !== 'undefined' ? window.location.hostname : '' });
 
       // بررسی انتخاب فعلی
       const hasCurrentSelection = checkTextSelection(element);

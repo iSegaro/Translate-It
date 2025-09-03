@@ -33,7 +33,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
 
     // اگر انتخاب ندارد، کل محتوا را انتخاب کن (برای حفظ undo)
     if (!hasSelection) {
-      if (element.isContentEditable) {
+      if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(element);

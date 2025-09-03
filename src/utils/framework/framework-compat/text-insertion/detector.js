@@ -6,7 +6,7 @@
  * @returns {string} نوع استراتژی بهینه
  */
 export function detectOptimalStrategy(element) {
-  const hostname = window.location.hostname;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
 
   // Google Docs - استراتژی ویژه
   if (hostname.includes("docs.google.com")) {

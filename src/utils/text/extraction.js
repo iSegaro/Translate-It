@@ -92,9 +92,11 @@ export function collectTextNodes(targetElement, useIntelligentGrouping = true) {
 
         // Skip hidden elements
         try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === "none" || style.visibility === "hidden") {
-            return NodeFilter.FILTER_REJECT;
+          if (typeof window !== 'undefined') {
+            const style = window.getComputedStyle(parent);
+            if (style.display === "none" || style.visibility === "hidden") {
+              return NodeFilter.FILTER_REJECT;
+            }
           }
         } catch {
           // If getComputedStyle fails, accept the node
@@ -143,10 +145,12 @@ function collectTextNodesOptimized(targetElement) {
 
         // Skip hidden elements
         try {
-          const style = window.getComputedStyle(parent);
-          // TODO: ممکن که به style.opacity نیازی نباشه تا در این شرط بررسی شود.
-          if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
-            return NodeFilter.FILTER_REJECT;
+          if (typeof window !== 'undefined') {
+            const style = window.getComputedStyle(parent);
+            // TODO: ممکن که به style.opacity نیازی نباشه تا در این شرط بررسی شود.
+            if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+              return NodeFilter.FILTER_REJECT;
+            }
           }
         } catch {
           // If getComputedStyle fails, accept the node

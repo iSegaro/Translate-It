@@ -20,7 +20,7 @@ export const Platform = {
  * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function detectPlatform() {
-  const hostname = window.location.hostname.toLowerCase();
+  const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
   const platformMap = {
     "web.whatsapp.com": Platform.WhatsApp,
     "web.telegram.org": Platform.Telegram,
@@ -43,7 +43,7 @@ export function detectPlatform() {
  * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function getPlatformName() {
-  const hostname = window.location.hostname.toLowerCase();
+  const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
 
   // لیست پلتفرم‌های پشتیبانی شده
   const platformPatterns = [
@@ -73,7 +73,7 @@ export function getPlatformName() {
  * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function detectPlatformByURL() {
-  const hostname = window.location.hostname.toLowerCase();
+  const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
   if (hostname.includes("twitter.com") || hostname.includes("x.com"))
     return Platform.Twitter;
   if (hostname.includes("medium.com")) return Platform.Medium;

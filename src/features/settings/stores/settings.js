@@ -68,7 +68,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // Getters
   const isDarkTheme = computed(() => {
     if (settings.value.THEME === 'auto') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches
+      return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
     }
     return settings.value.THEME === 'dark'
   })
@@ -231,7 +231,9 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       await saveAllSettings();
       logger.info('[Import] Completed – reloading UI');
-      window.location.reload();
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
       return true;
     } catch (error) {
       logger.error('[Import] Failed:', error);

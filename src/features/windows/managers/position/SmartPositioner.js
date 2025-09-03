@@ -19,7 +19,12 @@ export class SmartPositioner {
   calculateSmartPosition(position, topWindow = null) {
     if (!topWindow) {
       const topDocument = this.positionCalculator.getTopDocument();
-      topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+      topWindow = topDocument.defaultView || topDocument.parentWindow || (typeof window !== 'undefined' ? window : null);
+    }
+
+    if (!topWindow) {
+      this.logger.warn('No valid window found for positioning');
+      return position;
     }
 
     // Get viewport dimensions
@@ -170,7 +175,12 @@ export class SmartPositioner {
     
     if (!topWindow) {
       const topDocument = this.positionCalculator.getTopDocument();
-      topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+      topWindow = topDocument.defaultView || topDocument.parentWindow || (typeof window !== 'undefined' ? window : null);
+    }
+
+    if (!topWindow) {
+      this.logger.warn('No valid window found for positioning');
+      return null;
     }
 
     const styles = {
