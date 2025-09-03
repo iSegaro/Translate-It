@@ -243,6 +243,102 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Google Translate - Free translation service settings
+  GoogleTranslate: {
+    rateLimit: {
+      maxConcurrent: 2, // Moderate concurrent requests
+      delayBetweenRequests: 100, // Fast requests for free service
+      burstLimit: 5,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 10000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit', // Use character-based chunking
+      characterLimit: 3900, // Google's character limit
+      maxChunksPerBatch: 10,
+      delimiter: '\n\n---\n\n' // Google's reliable delimiter
+    },
+    streaming: {
+      enabled: true, // Enable streaming for real-time chunk translation
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'daily_quota',
+        'rate_limit'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'daily_quota': { delay: 86400000, temporary: false },
+        'rate_limit': { delay: 5000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true, // Supports batch via chunking
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: true // Google supports dictionary
+    }
+  },
+
+  // Yandex Translate - Free translation service settings
+  YandexTranslate: {
+    rateLimit: {
+      maxConcurrent: 2, // Moderate concurrent requests
+      delayBetweenRequests: 150, // Slightly slower than Google
+      burstLimit: 4,
+      burstWindow: 1200,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 15000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit', // Use character-based chunking
+      characterLimit: 10000, // Yandex's character limit
+      maxChunksPerBatch: 8,
+      delimiter: null // Yandex uses array format
+    },
+    streaming: {
+      enabled: true, // Enable streaming for real-time chunk translation
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'daily_quota',
+        'rate_limit',
+        'server_error'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'daily_quota': { delay: 86400000, temporary: false },
+        'rate_limit': { delay: 10000, temporary: true },
+        'server_error': { delay: 5000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true, // Supports batch via chunking
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: false // Yandex doesn't support dictionary
+    }
+  },
+
   // Custom Provider - Flexible/configurable settings
   Custom: {
     rateLimit: {
@@ -331,6 +427,11 @@ function normalizeProviderName(providerName) {
     'deepseek': 'DeepSeek',
     'openrouter': 'OpenRouter',
     'webai': 'WebAI',
+    'googletranslate': 'GoogleTranslate',
+    'google-translate': 'GoogleTranslate',
+    'yandextranslate': 'YandexTranslate',
+    'yandex-translate': 'YandexTranslate',
+    'yandex': 'YandexTranslate',
     'custom': 'Custom',
     'custom-openai': 'Custom'
   };

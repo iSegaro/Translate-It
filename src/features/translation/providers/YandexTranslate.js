@@ -1,5 +1,5 @@
 // src/providers/implementations/YandexTranslateProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -18,15 +18,21 @@ const langNameToCodeMap = {
   afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepal: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
 };
 
-export class YandexTranslateProvider extends BaseProvider {
+export class YandexTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
-  static reliableJsonMode = true;
+  static reliableJsonMode = false;
   static supportsDictionary = false;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
   static CHAR_LIMIT = 10000;
+  
+  // BaseTranslateProvider capabilities
+  static supportsStreaming = true;
+  static chunkingStrategy = 'character_limit';
+  static characterLimit = 10000;
+  static maxChunksPerBatch = 8;
 
   constructor() {
     super("YandexTranslate");
@@ -48,7 +54,62 @@ export class YandexTranslateProvider extends BaseProvider {
     }).replace(/-/g, '');
   }
 
-  async _batchTranslate(texts, sl, tl, abortController = null) {
+  /**
+   * Translate a single chunk of texts using Yandex's API
+   * @param {string[]} chunkTexts - Texts in this chunk
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts for this chunk
+   */
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+    const context = `${this.providerName.toLowerCase()}-translate-chunk`;
+    const lang = sourceLang === "auto" ? targetLang : `${sourceLang}-${targetLang}`;
+    logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sourceLang}' target='${targetLang}'`);
+
+    const uuid = this._generateUuid();
+    const formData = new URLSearchParams();
+    formData.append('lang', lang);
+    chunkTexts.forEach(text => formData.append('text', text || ''));
+
+    const url = new URL(YandexTranslateProvider.mainUrl);
+    url.searchParams.set("id", `${uuid}-0-0`);
+    url.searchParams.set("srv", "android");
+
+    const result = await this._executeApiCall({
+      url: url.toString(),
+      fetchOptions: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": navigator.userAgent,
+        },
+        body: formData,
+      },
+      extractResponse: (data) => {
+        if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunkTexts.length) {
+          logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
+          return chunkTexts.map(() => '');
+        }
+        return data.text;
+      },
+      context,
+      abortController,
+    });
+
+    return result || chunkTexts.map(() => '');
+  }
+
+  /**
+   * Traditional batch processing (fallback) - preserves original implementation
+   * @param {string[]} texts - Texts to translate
+   * @param {string} sl - Source language
+   * @param {string} tl - Target language
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _traditionalBatchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
     const context = `${this.providerName.toLowerCase()}-translate`;
     try {
       const lang = sl === "auto" ? tl : `${sl}-${tl}`;
@@ -71,44 +132,66 @@ export class YandexTranslateProvider extends BaseProvider {
         chunks.push(currentChunk);
       }
 
-      const chunkPromises = chunks.map(async (chunk) => {
-        const uuid = this._generateUuid();
-        const formData = new URLSearchParams();
-        formData.append('lang', lang);
-        chunk.forEach(text => formData.append('text', text || ''));
-
-        const url = new URL(YandexTranslateProvider.mainUrl);
-        url.searchParams.set("id", `${uuid}-0-0`);
-        url.searchParams.set("srv", "android");
-
-        const result = await this._executeApiCall({
-          url: url.toString(),
-          fetchOptions: {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "User-Agent": navigator.userAgent,
-            },
-            body: formData,
-          },
-          extractResponse: (data) => {
-            if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunk.length) {
-              logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
-              return chunk.map(() => '');
-            }
-            return data.text;
-          },
-          context: `${context}-chunk`,
-          abortController,
-        });
-        return result || chunk.map(() => '');
-      });
+      // Import rate limiting manager
+      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
 
       // Process chunks sequentially with rate limiting
       const translatedChunks = [];
-      for (const chunkPromise of chunkPromises) {
-        const result = await chunkPromise;
-        translatedChunks.push(result);
+      for (let i = 0; i < chunks.length; i++) {
+        // Check for cancellation
+        if (abortController && abortController.signal.aborted) {
+          const cancelError = new Error('Translation cancelled by user');
+          cancelError.name = 'AbortError';
+          throw cancelError;
+        }
+
+        const chunk = chunks[i];
+        const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
+
+        try {
+          // Execute chunk translation with rate limiting
+          const result = await rateLimitManager.executeWithRateLimit(
+            this.providerName,
+            async () => {
+              const uuid = this._generateUuid();
+              const formData = new URLSearchParams();
+              formData.append('lang', lang);
+              chunk.forEach(text => formData.append('text', text || ''));
+
+              const url = new URL(YandexTranslateProvider.mainUrl);
+              url.searchParams.set("id", `${uuid}-0-0`);
+              url.searchParams.set("srv", "android");
+
+              return await this._executeApiCall({
+                url: url.toString(),
+                fetchOptions: {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": navigator.userAgent,
+                  },
+                  body: formData,
+                },
+                extractResponse: (data) => {
+                  if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunk.length) {
+                    logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
+                    return chunk.map(() => '');
+                  }
+                  return data.text;
+                },
+                context: chunkContext,
+                abortController,
+              });
+            },
+            chunkContext
+          );
+
+          translatedChunks.push(result || chunk.map(() => ''));
+        } catch (error) {
+          logger.error(`[Yandex] Chunk ${i + 1} failed:`, error);
+          // Fallback for failed chunks
+          translatedChunks.push(chunk.map(() => ''));
+        }
       }
       return translatedChunks.flat();
 

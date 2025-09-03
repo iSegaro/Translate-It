@@ -1,5 +1,5 @@
 // src/core/providers/GoogleTranslateProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import {
   getGoogleTranslateUrlAsync,
   getEnableDictionaryAsync
@@ -16,13 +16,19 @@ const langNameToCodeMap = {
   afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh", chinese: "zh", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
 };
 
-export class GoogleTranslateProvider extends BaseProvider {
+export class GoogleTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Free Google Translate service";
   static displayName = "Google Translate";
-  static reliableJsonMode = true;
+  static reliableJsonMode = false;
   static supportsDictionary = true;
   static CHAR_LIMIT = 3900;
+  
+  // BaseTranslateProvider capabilities
+  static supportsStreaming = true;
+  static chunkingStrategy = 'character_limit';
+  static characterLimit = 3900;
+  static maxChunksPerBatch = 10;
 
   constructor() {
     super("GoogleTranslate");
@@ -34,7 +40,98 @@ export class GoogleTranslateProvider extends BaseProvider {
     return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
   }
 
-  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
+  /**
+   * Translate a single chunk of texts using Google's API
+   * @param {string[]} chunkTexts - Texts in this chunk
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts for this chunk
+   */
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+    const context = `${this.providerName.toLowerCase()}-translate-chunk`;
+    const isDictionaryEnabled = await getEnableDictionaryAsync();
+    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
+    const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
+
+    const apiUrl = await getGoogleTranslateUrlAsync();
+    const queryParams = new URLSearchParams({
+      client: 'gtx',
+      sl: sourceLang,
+      tl: targetLang,
+      dt: 't',
+    });
+
+    if (shouldIncludeDictionary && chunkTexts.length === 1) {
+      queryParams.append('dt', 'bd');
+    }
+
+    const textToTranslate = chunkTexts.join(RELIABLE_DELIMITER);
+    const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
+
+    const result = await this._executeApiCall({
+      url: `${apiUrl}?${queryParams.toString()}`,
+      fetchOptions: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: requestBody,
+      },
+      extractResponse: (data) => {
+        if (!data?.[0]?.[0]?.[0]) {
+          return { translatedSegments: chunkTexts.map(() => ''), candidateText: '' };
+        }
+
+        const translatedText = data[0].map(segment => segment[0]).join('');
+        const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
+
+        if (translatedSegments.length !== chunkTexts.length) {
+          logger.warn("[Google] Translated segment count mismatch after splitting.", { 
+            expected: chunkTexts.length, 
+            got: translatedSegments.length 
+          });
+          return { translatedSegments: [translatedText], candidateText: '' };
+        }
+
+        let candidateText = "";
+        if (shouldIncludeDictionary && data[1]) {
+          candidateText = data[1].map((dict) => {
+            const pos = dict[0] || "";
+            const terms = dict[1] || [];
+            return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+          }).join("");
+        }
+
+        return {
+          translatedSegments,
+          candidateText: candidateText.trim(),
+        };
+      },
+      context,
+      abortController,
+    });
+
+    // Handle dictionary formatting for single segment
+    if (chunkTexts.length === 1 && result?.candidateText) {
+      const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
+      return [`${result.translatedSegments[0]}\n\n${formattedDictionary}`];
+    }
+
+    return result?.translatedSegments || chunkTexts;
+  }
+
+  /**
+   * Traditional batch processing (fallback) - preserves original implementation
+   * @param {string[} texts - Texts to translate
+   * @param {string} sl - Source language
+   * @param {string} tl - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _traditionalBatchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
     const context = `${this.providerName.toLowerCase()}-translate`;
     const isDictionaryEnabled = await getEnableDictionaryAsync();
     // Dictionary should only be enabled for single-segment translations and NOT in Field mode.

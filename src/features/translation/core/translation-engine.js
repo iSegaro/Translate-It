@@ -280,8 +280,8 @@ export class TranslationEngine {
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
 
-    // For Select Element JSON mode, use optimized streaming strategy
-    if (isSelectJson) {
+    // For Select Element JSON mode, use optimized streaming strategy (only for AI providers with reliable JSON mode)
+    if (isSelectJson && providerReliableJson) {
       logger.debug('[TranslationEngine] Using optimized JSON strategy for provider:', provider);
       const tabId = sender?.tab?.id;
       return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
@@ -406,7 +406,24 @@ export class TranslationEngine {
                 try {
                     const batchResult = await rateLimitManager.executeWithRateLimit(
                         provider,
-                        () => providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode),
+                        () => {
+                            // Check provider type to determine which method to call
+                            const providerClass = providerInstance?.constructor;
+                            if (providerClass?.type === "ai") {
+                                // AI providers use _translateBatch method directly
+                                return providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode, abortController);
+                            } else {
+                                // Traditional providers (including streaming ones) use translate method
+                                const batchJson = JSON.stringify(batch);
+                                return providerInstance.translate(batchJson, sourceLanguage, targetLanguage, {
+                                    mode: mode,
+                                    messageId: messageId,
+                                    engine: this,
+                                    originalSourceLang: sourceLanguage,
+                                    originalTargetLang: targetLanguage
+                                });
+                            }
+                        },
                         `batch-${i + 1}/${batches.length}`
                     );
 
@@ -414,11 +431,74 @@ export class TranslationEngine {
                     consecutiveFailures = 0;
                     adaptiveDelay = Math.max(adaptiveDelay * 0.8, 0);
 
+                    // Parse result based on provider type
+                    const providerClass = providerInstance?.constructor;
+                    let finalBatchResult;
+                    if (providerClass?.type === "ai") {
+                        // AI providers return arrays directly
+                        finalBatchResult = batchResult;
+                    } else {
+                        // Traditional providers (including streaming ones) return JSON string from translate() method
+                        if (typeof batchResult === 'string') {
+                            try {
+                                const parsedResult = JSON.parse(batchResult);
+                                logger.debug(`[TranslationEngine] Parsed JSON result structure:`, parsedResult);
+                                if (Array.isArray(parsedResult)) {
+                                    // Extract text from objects: [{text: "..."}, ...] → ["...", ...]
+                                    finalBatchResult = parsedResult.map(item => 
+                                        typeof item === 'object' && item !== null && 'text' in item ? item.text : String(item)
+                                    );
+                                    logger.debug(`[TranslationEngine] Extracted texts:`, finalBatchResult);
+                                } else {
+                                    finalBatchResult = [String(parsedResult)];
+                                }
+                            } catch (error) {
+                                logger.warn(`[TranslationEngine] Failed to parse traditional provider JSON result:`, error);
+                                logger.debug(`[TranslationEngine] Raw result that failed to parse (${typeof batchResult}):`, batchResult);
+                                
+                                // Try to fix common JSON parsing issues (e.g., Persian commas)
+                                try {
+                                    const fixedResult = batchResult.replace(/،/g, ',').replace(/\s*،\s*/g, ', ');
+                                    const parsedFixed = JSON.parse(fixedResult);
+                                    if (Array.isArray(parsedFixed)) {
+                                        finalBatchResult = parsedFixed.map(item => 
+                                            typeof item === 'object' && item !== null && 'text' in item ? item.text : String(item)
+                                        );
+                                        logger.info(`[TranslationEngine] Successfully fixed malformed JSON with delimiter replacement`);
+                                    } else {
+                                        finalBatchResult = [String(parsedFixed)];
+                                    }
+                                } catch (fixError) {
+                                    logger.warn(`[TranslationEngine] JSON fix attempt also failed:`, fixError);
+                                    // Ultimate fallback: try to extract array content using regex
+                                    const arrayMatch = batchResult.match(/\["([^"]*)"(?:\s*[،,]\s*"([^"]*)")*\]/);
+                                    if (arrayMatch) {
+                                        // Extract all quoted strings from the array-like string
+                                        const extractedTexts = batchResult.match(/"([^"]*)"/g);
+                                        if (extractedTexts) {
+                                            finalBatchResult = extractedTexts.map(text => text.slice(1, -1)); // Remove quotes
+                                            logger.info(`[TranslationEngine] Successfully extracted texts using regex fallback`);
+                                        } else {
+                                            finalBatchResult = [String(batchResult)];
+                                        }
+                                    } else {
+                                        finalBatchResult = [String(batchResult)];
+                                    }
+                                }
+                            }
+                        } else if (Array.isArray(batchResult)) {
+                            // Fallback: already an array (shouldn't happen for traditional providers)
+                            finalBatchResult = batchResult;
+                        } else {
+                            finalBatchResult = [String(batchResult)];
+                        }
+                    }
+
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,
                         {
                           success: true,
-                          data: batchResult,
+                          data: finalBatchResult,
                           originalData: batch,
                           batchIndex: i,
                           provider: provider,
