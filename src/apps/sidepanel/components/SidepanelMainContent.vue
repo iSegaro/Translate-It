@@ -1,109 +1,333 @@
 <template>
   <div class="sidepanel-wrapper main-content">
-    <UnifiedTranslationInput
-        mode="sidepanel"
-        :enhanced="false"
-        :show-controls="true"
-        :show-language-selector="true"
-        :show-provider-selector="true"
-        :show-input-label="true"
-        :show-result-label="true"
-        :input-rows="6"
-        :auto-translate-on-paste="autoTranslateOnPaste"
-        :is-selecting="isSelecting"
-        :initial-source-language="sourceLang"
-        :initial-target-language="targetLang"
-        :auto-detect-label="'Auto-Detect'"
-        :source-title="'Source Language'"
-        :target-title="'Target Language'"
-        :swap-title="'Swap Languages'"
-        :swap-alt="'Swap'"
-        :input-label="t('SIDEPANEL_SOURCE_TEXT_LABEL', 'Source Text')"
-        :result-label="t('SIDEPANEL_TARGET_TEXT_LABEL', 'Translation')"
-        :input-placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate...')"
-        :result-placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"
-        :copy-source-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"
+    <!-- Language Controls Section -->
+    <div class="language-controls">
+      <!-- Language Selector Row -->
+      <div class="language-selector-row">
+        <LanguageSelector
+          v-model:source-language="sourceLanguage"
+          v-model:target-language="targetLanguage"
+          :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
+          :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
+          :swap-title="t('SIDEPANEL_SWAP_LANGUAGES_TITLE', 'جابجایی زبان‌ها')"
+          :swap-alt="t('SIDEPANEL_SWAP_LANGUAGES_ALT', 'Swap')"
+          :auto-detect-label="'Auto-Detect'"
+        />
+      </div>
+      
+      <!-- Translate Button Row -->
+      <div class="translate-button-row">
+        <ProviderSelector
+          mode="split"
+          :disabled="!canTranslateFromForm"
+          @translate="handleTranslate"
+          @provider-change="handleProviderChange"
+        />
+      </div>
+    </div>
+
+    <!-- Select Element Status -->
+    <div
+      v-if="isSelecting"
+      class="selection-status"
+    >
+      <div class="selection-indicator">
+        <div class="selection-spinner" />
+        <span>{{ t('SIDEPANEL_SELECT_ELEMENT_MESSAGE', 'Click on any element on the webpage to translate...') }}</span>
+      </div>
+    </div>
+
+    <!-- Translation Form (similar to popup structure) -->
+    <form
+      class="translation-form"
+      @submit.prevent="handleTranslate"
+    >
+      <!-- Source Input Field -->
+      <TranslationInputField
+        ref="sourceInputRef"
+        v-model="sourceText"
+        :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate...')"
+        :language="currentSourceLanguage"
+        :rows="6"
+        :tabindex="1"
+        :copy-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"
+        :copy-alt="t('SIDEPANEL_COPY_SOURCE_ALT_ICON', 'Copy')"
+        :tts-title="t('SIDEPANEL_VOICE_SOURCE_TITLE_ICON', 'Speak source text')"
+        :tts-alt="t('SIDEPANEL_VOICE_SOURCE_ALT_ICON', 'Voice Source')"
         :paste-title="t('SIDEPANEL_PASTE_SOURCE_TITLE_ICON', 'Paste from clipboard')"
-        :tts-source-title="t('SIDEPANEL_VOICE_SOURCE_TITLE_ICON', 'Speak source text')"
-        :copy-result-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
-        :tts-result-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Speak translation')"
-        :select-element-message="t('SIDEPANEL_SELECT_ELEMENT_MESSAGE', 'Click on any element on the webpage to translate...')"
-        :provider-selector-mode="'split'"
-        @can-translate-change="handleCanTranslateChange"
+        :paste-alt="t('SIDEPANEL_PASTE_SOURCE_ALT_ICON', 'Paste')"
+        :auto-translate-on-paste="autoTranslateOnPaste"
+        @translate="handleTranslate"
+        @input="handleSourceInput"
+        @keydown="handleKeydown"
       />
+
+      <!-- Translation Display -->
+      <TranslationDisplay
+        ref="translationResultRef"
+        :content="translatedText"
+        :language="currentTargetLanguage"
+        :is-loading="isTranslating"
+        :error="translationError"
+        :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"
+        :copy-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
+        :copy-alt="t('SIDEPANEL_COPY_TARGET_ALT_ICON', 'Copy Result')"
+        :tts-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Speak translation')"
+        :tts-alt="t('SIDEPANEL_VOICE_TARGET_ALT_ICON', 'Voice Target')"
+        mode="sidepanel"
+        :enable-markdown="true"
+        :show-fade-in-animation="true"
+      />
+    </form>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
-import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
-import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-
+import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
+import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+
+// Components
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import TranslationInputField from '@/components/shared/TranslationInputField.vue'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
-import UnifiedTranslationInput from "@/components/shared/UnifiedTranslationInput.vue";
-
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('sidepanel-main-content')
+
+// Stores
+const settingsStore = useSettingsStore()
 
 // Composables
 const selectElement = useSelectElementTranslation();
 const { t } = useUnifiedI18n();
-
-// Translation composable
 const translation = useUnifiedTranslation('sidepanel');
+const { handleError } = useErrorHandler()
 
-// State
-const sourceLang = ref(AUTO_DETECT_VALUE);
-const targetLang = ref("English");
-const autoTranslateOnPaste = ref(false);
+// Refs
+const sourceInputRef = ref(null)
+const translationResultRef = ref(null)
+
+// State from composables
+const {
+  sourceText,
+  translatedText,
+  isTranslating,
+  translationError,
+  canTranslate,
+  triggerTranslation,
+  clearTranslation,
+  loadLastTranslation
+} = translation
+
+// Language state management - matching popup approach
+const sourceLanguage = ref(AUTO_DETECT_VALUE)
+const targetLanguage = ref('English')
+const autoTranslateOnPaste = ref(false)
+const canTranslateFromForm = ref(false)
+
+// Local state
+const lastTranslation = ref(null)
 
 // Computed
 const isSelecting = computed(() => selectElement.isSelectModeActive.value);
 
-// Event Handlers for UnifiedTranslationInput
-const handleCanTranslateChange = (canTranslate) => {
-  // UnifiedTranslationInput emits this event
-};
+// Watch canTranslate and emit changes
+watch(canTranslate, (newValue) => {
+  canTranslateFromForm.value = newValue
+}, { immediate: true })
 
-// Lifecycle
-onMounted(() => {
-  logger.debug("[SidepanelMainContent] Component mounted");
-  
-  // Load saved languages asynchronously (non-blocking)
-  Promise.all([
-    getSourceLanguageAsync(),
-    getTargetLanguageAsync()
-  ]).then(([sourceLanguage, targetLanguage]) => {
-    sourceLang.value = sourceLanguage;
-    targetLang.value = targetLanguage;
-  }).catch(error => {
-    logger.error("[SidepanelMainContent] Language loading failed:", error);
-  });
-  
-  // Load last translation through unified composable
-  try {
-    translation.loadLastTranslation();
-  } catch (error) {
-    logger.error("[SidepanelMainContent] Translation loading failed:", error);
+// Watch for source text changes
+watch(sourceText, (newValue, oldValue) => {
+  if (oldValue !== undefined && newValue !== oldValue) {
+    logger.debug("📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
   }
+}, { deep: true })
+
+// Watch for language changes
+watch(sourceLanguage, (newValue, oldValue) => {
+  logger.debug("🌍 Source language changed:", oldValue, "→", newValue);
+}, { immediate: true })
+
+watch(targetLanguage, (newValue, oldValue) => {
+  logger.debug("🌍 Target language changed:", oldValue, "→", newValue);
+}, { immediate: true })
+
+// Reactive language values - these will update when settings change
+const currentSourceLanguage = computed(() => {
+  const lang = settingsStore.settings.SOURCE_LANGUAGE
+  return lang
+})
+const currentTargetLanguage = computed(() => {
+  const lang = settingsStore.settings.TARGET_LANGUAGE
+  return lang
+})
+
+// Methods
+const handleSourceInput = (_event) => {
+  // Handled by TranslationInputField component
+}
+
+const handleKeydown = (_event) => {
+  // Handled by TranslationInputField component
+}
+
+const handleTranslate = async () => {
+  logger.debug("🎯 Translation button clicked");
+  
+  if (!canTranslate.value) {
+    logger.warn("⚠️ Translation blocked - canTranslate is false");
+    return;
+  }
+  
+  try {
+    logger.info("🚀 Starting translation process...");
+    logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    
+    // Get current language values from language selector
+    const sourceLanguageValue = sourceLanguage.value;
+    const targetLanguageValue = targetLanguage.value;
+    
+    logger.debug("🌍 Languages:", sourceLanguageValue, "→", targetLanguageValue);
+    
+    // Store last translation for revert functionality
+    lastTranslation.value = {
+      source: sourceText.value,
+      target: translatedText.value,
+      sourceLanguage: sourceLanguageValue,
+      targetLanguage: targetLanguageValue
+    }
+    
+    // Use composable translation function with current language values
+    logger.debug("📡 Triggering translation...");
+    await triggerTranslation(sourceLanguageValue, targetLanguageValue)    
+    logger.info("✅ Translation completed successfully");
+
+  } catch (error) {
+    logger.error("❌ Translation failed:", error);
+    await handleError(error, 'sidepanel-translation')
+  }
+}
+
+const handleProviderChange = (provider) => {
+  logger.info("[SidepanelMainContent] 🔄 Provider changed to:", provider);
+  // Provider change is handled automatically by the ProviderSelector
+}
+
+const clearStorage = () => {
+  clearTranslation()
+  lastTranslation.value = null
+}
+
+const revertTranslation = () => {
+  if (lastTranslation.value) {
+    sourceText.value = lastTranslation.value.target || ''
+    translatedText.value = lastTranslation.value.source || ''
+    
+    // Swap languages too
+    const tempSource = lastTranslation.value.targetLanguage
+    const tempTarget = lastTranslation.value.sourceLanguage
+    
+    if (tempSource && tempTarget) {
+      sourceLanguage.value = tempSource
+      targetLanguage.value = tempTarget
+      settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', tempSource)
+      settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', tempTarget)
+    }
+  }
+}
+
+
+// Event listeners
+onMounted(async () => {
+  logger.debug("[SidepanelMainContent] Component mounting...");
+  
+  // Listen for global events from header component
+  document.addEventListener('clear-storage', clearStorage)
+  document.addEventListener('revert-translation', revertTranslation)
+  document.addEventListener('translate-request', (_event) => {
+    logger.debug("🔔 Translate request received from header");
+    if (sourceText.value?.trim()) {
+      handleTranslate()
+    }
+  })
+  document.addEventListener('languages-swapped', () => {
+    // Note: We only swap languages, not text content
+    // Text content should remain in their respective fields
+  })
+  
+  // Initialize language refs with saved settings (matching popup approach)
+  try {
+    const savedSource = await getSourceLanguageAsync()
+    const savedTarget = await getTargetLanguageAsync()
+    
+    // Handle source language - if it's auto/AUTO_DETECT_VALUE, use 'Auto-Detect'
+    if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
+      sourceLanguage.value = 'Auto-Detect'
+    } else {
+      sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect'
+    }
+    
+    // Handle target language
+    targetLanguage.value = getLanguageDisplayName(savedTarget) || settingsStore.settings.TARGET_LANGUAGE || 'English'
+    
+    logger.debug("✅ Languages initialized from settings:", {
+      savedSource,
+      savedTarget,
+      sourceLanguageValue: sourceLanguage.value,
+      targetLanguageValue: targetLanguage.value
+    })
+  } catch (err) {
+    logger.warn("Error loading language settings:", err)
+    sourceLanguage.value = 'Auto-Detect'
+    targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
+  }
+  
+  // Add clear-storage event listener to reset languages (matching popup approach)
+  document.addEventListener('clear-storage', async () => {
+    logger.debug("🔄 Clear storage event - resetting languages to saved settings");
+    try {
+      const savedSource = await getSourceLanguageAsync()
+      const savedTarget = await getTargetLanguageAsync()
+      
+      // Handle source language - if it's auto/AUTO_DETECT_VALUE, use 'Auto-Detect'
+      if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
+        sourceLanguage.value = 'Auto-Detect'
+      } else {
+        sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect'
+      }
+      
+      // Handle target language
+      targetLanguage.value = getLanguageDisplayName(savedTarget) || 'English'
+      
+      logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget)
+    } catch (error) {
+      logger.error("❌ Failed to reset languages:", error)
+    }
+  })
+  
+  // Initialize translation data
+  await loadLastTranslation()
 });
 </script>
 
 <style scoped>
 .sidepanel-wrapper {
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   height: 100%;
   position: relative;
 }
@@ -111,8 +335,170 @@ onMounted(() => {
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   height: 100%;
   flex: 1;
 }
+
+.language-controls {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  margin: 0;
+  gap: 12px;
+  background: var(--language-controls-bg-color);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.language-selector-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  position: relative;
+  z-index: 11;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.language-selector-row :deep(.language-controls) {
+  width: 100%;
+  max-width: 100%;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px;
+  padding: 8px 0;
+  margin: 0;
+  background: transparent;
+  height: auto;
+  justify-content: space-between;
+  flex-wrap: nowrap !important;
+}
+
+.language-selector-row :deep(.language-select) {
+  flex: 1 1 auto !important;
+  min-width: 80px;
+  max-width: 150px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.language-selector-row :deep(.swap-button) {
+  flex: 0 0 32px !important;
+  width: 32px;
+  height: 32px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  z-index: 12 !important;
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  box-sizing: border-box !important;
+}
+
+.language-selector-row :deep(.swap-button img) {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.translate-button-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 5;
+  min-height: 40px;
+  box-sizing: border-box;
+  margin-top: 8px;
+}
+
+.translate-button-row :deep(.provider-selector) {
+  min-width: auto;
+}
+
+.selection-status {
+  padding: 12px;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info);
+  border-radius: 6px;
+  margin: 6px 12px;
+}
+
+.selection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-info);
+  font-size: 14px;
+}
+
+.selection-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-info);
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.translation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  flex: 1;
+}
+
+/* Sidepanel-specific adjustments (similar to popup) */
+.translation-form :deep(.textarea-container) {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-textarea-background);
+  padding: 5px;
+  margin: 6px 12px;
+}
+
+.translation-form :deep(.translation-textarea) {
+  min-height: 120px;
+  max-height: 200px;
+  font-size: 13px;
+  padding: 42px 8px 8px 8px;
+}
+
+.translation-form :deep(.translation-display.sidepanel-mode) {
+  margin: 6px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.translation-form :deep(.result-content) {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  font-size: 13px;
+  height: 100%;
+}
+
 </style>
