@@ -4,11 +4,13 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'BaseSubtitle');
 
-
-export default class BaseSubtitleHandler {
+export default class BaseSubtitleHandler extends ResourceTracker {
   constructor(translationProvider, errorHandler, notifier) {
+    super('base-subtitle-handler');
     this.translationProvider = translationProvider;
     this.errorHandler = errorHandler;
     this.notifier = notifier;
@@ -78,7 +80,7 @@ export default class BaseSubtitleHandler {
     }
 
     if (this.checkInterval) {
-      clearInterval(this.checkInterval);
+      this.clearTimer(this.checkInterval);
       this.checkInterval = null;
     }
 
@@ -109,7 +111,7 @@ export default class BaseSubtitleHandler {
           resolve(null);
         } else {
           elapsed += checkInterval;
-          setTimeout(check, checkInterval);
+          this.trackTimeout(check, checkInterval);
         }
       };
       check();
@@ -143,7 +145,7 @@ export default class BaseSubtitleHandler {
 
       if (hasChanges) {
         // Debounce for performance
-        setTimeout(() => this.processSubtitles(), 200);
+        this.trackTimeout(() => this.processSubtitles(), 200);
       }
     });
 
@@ -156,7 +158,7 @@ export default class BaseSubtitleHandler {
 
   // بررسی دوره‌ای (fallback)
   setupPeriodicCheck() {
-    this.checkInterval = setInterval(() => {
+    this.checkInterval = this.trackInterval(() => {
       this.processSubtitles();
     }, 1000);
   }
@@ -295,7 +297,7 @@ export default class BaseSubtitleHandler {
     if (this.isActive) {
       this.stop();
       // مقداری تاخیر برای بارگذاری صفحه جدید
-      setTimeout(() => this.start(), 1000);
+      this.trackTimeout(() => this.start(), 1000);
     }
   }
 
@@ -305,5 +307,6 @@ export default class BaseSubtitleHandler {
     this.translationProvider = null;
     this.errorHandler = null;
     this.notifier = null;
+    super.destroy(); // Call parent destroy to cleanup tracked resources
   }
 }

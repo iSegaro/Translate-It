@@ -73,14 +73,14 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
             resolve(false);
           } else {
             elapsed += checkInterval;
-            setTimeout(check, checkInterval);
+            this.trackTimeout(check, checkInterval);
           }
         } catch {
           if (elapsed >= maxWait) {
             resolve(false);
           } else {
             elapsed += checkInterval;
-            setTimeout(check, checkInterval);
+            this.trackTimeout(check, checkInterval);
           }
         }
       };
@@ -135,12 +135,14 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     }
 
     // Event delegation برای hover events
-    document.addEventListener(
+    this.addEventListener(
+      document,
       "mouseenter",
       this.handleSubtitleHover.bind(this),
       true,
     );
-    document.addEventListener(
+    this.addEventListener(
+      document,
       "mouseleave",
       this.handleSubtitleLeave.bind(this),
       true,
@@ -289,7 +291,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
 
   // Override setupPeriodicCheck با فرکانس بیشتر برای Netflix
   setupPeriodicCheck() {
-    this.checkInterval = setInterval(() => {
+    this.checkInterval = this.trackInterval(() => {
       this.processSubtitles();
     }, 500); // بررسی سریع‌تر برای Netflix
   }
@@ -307,10 +309,6 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
 
   // پاک‌سازی Netflix specific resources
   destroy() {
-    // Remove event listeners
-    document.removeEventListener("mouseenter", this.handleSubtitleHover, true);
-    document.removeEventListener("mouseleave", this.handleSubtitleLeave, true);
-
     // Remove styles
     const style = document.querySelector("#netflix-subtitle-style");
     if (style) {
