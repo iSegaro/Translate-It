@@ -12,7 +12,7 @@
 - **Composables**: منطق business قابل استفاده مجدد
 - **Text Actions**: سیستم یکپارچه copy/paste و **TTS پیشرفته** با قابلیت Play/Pause/Resume/Stop
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
-- **Provider System**: 10+ سرویس ترجمه با factory pattern
+- **Provider System**: 10+ سرویس ترجمه با معماری سلسله‌مراتبی (BaseProvider, BaseTranslateProvider, BaseAIProvider) و مدیریت Rate Limiting و Circuit Breaker.
 - **Error Management**: سیستم مدیریت خطای متمرکز
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
 - **Logging System**: سیستم log ساختارمند
@@ -44,7 +44,7 @@
 
 ### 🏪 Feature-Based Organization (جدید)
 - **`src/features/`**: هر feature خودکفا و مستقل
-  - `translation/` - موتور ترجمه، providers، handlers، stores
+  - `translation/` - موتور ترجمه، شامل `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
   - `tts/` - سیستم Text-to-Speech پیشرفته با مدیریت وضعیت
   - `screen-capture/` - سیستم کپچر صفحه و OCR
   - `element-selection/` - انتخاب و ترجمه المنت‌های DOM
@@ -56,7 +56,7 @@
 
 ### 🔧 Shared Systems (منتقل شده از سطح بالا)
 - **`src/shared/`**: سیستم‌های مشترک
-  - `messaging/` - سیستم پیام‌رسانی هوشمند
+  - `messaging/` - سیستم پیام‌رسانی هوشمند (شامل `SmartMessaging` که برای ارتباط با `StreamingManager` استفاده می‌شود)
   - `storage/` - مدیریت ذخیره‌سازی با caching
   - `error-management/` - مدیریت خطای متمرکز
   - `logging/` - سیستم log ساختارمند  
@@ -126,4 +126,3 @@
 - **Build Tools**: Webpack، pnpm
 - **Polyfill**: webextension-polyfill برای سازگاری
 - **Modern Architecture**: Feature-based با 9 feature اصلی
-
