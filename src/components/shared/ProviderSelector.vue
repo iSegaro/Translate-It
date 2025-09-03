@@ -307,7 +307,7 @@ const handleStorageChange = (changes, areaName) => {
 }
 
 // Initialize providers
-onMounted(async () => {
+onMounted(() => {
   // Use provider registry for consistent provider information
   const providersFromRegistry = getProvidersForDropdown()
   availableProviders.value = providersFromRegistry.map(provider => ({
