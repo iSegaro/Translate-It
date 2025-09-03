@@ -477,7 +477,7 @@ class MemoryManager {
    */
   performGarbageCollection() {
     // Force garbage collection if available (development only)
-    if (window.gc && typeof window.gc === 'function') {
+    if (typeof window !== 'undefined' && window.gc && typeof window.gc === 'function') {
       window.gc()
     }
 
