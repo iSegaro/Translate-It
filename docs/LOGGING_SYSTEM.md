@@ -42,6 +42,52 @@ console.log('[Component]')    // Avoid - use logger instead
 createLogger()                // Internal use only
 ```
 
+## 🚨 Critical: Temporal Dead Zone (TDZ) Prevention
+
+**For early-loaded modules** (like utilities imported at startup), use **lazy initialization** to prevent TDZ errors:
+
+```javascript
+// ✅ SAFE: Lazy initialization for early-loaded modules
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection');
+  }
+  return logger;
+};
+
+// Use getLogger() instead of logger
+getLogger().debug('This is safe from TDZ');
+getLogger().error('Error occurred', error);
+```
+
+```javascript
+// ❌ DANGEROUS: Immediate initialization (causes TDZ in early modules)
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection'); // TDZ Risk!
+logger.debug('This may fail with "Cannot access before initialization"');
+```
+
+### When to Use Lazy Initialization
+
+Use lazy initialization when:
+- ✅ Module is imported early in application startup
+- ✅ Module is a utility function used by many components
+- ✅ Module is imported by main app files (`main.js`, `popup.js`, etc.)
+- ✅ You see "Cannot access 'LOG_COMPONENTS' before initialization" errors
+
+### When Immediate Initialization is Safe
+
+Use immediate initialization when:
+- ✅ Component is loaded on-demand (not at startup)
+- ✅ Component is a Vue component or service loaded later
+- ✅ No early import dependencies exist
+
 ## Log Levels
 
 | Level | Value | Purpose | When to Use |
@@ -218,7 +264,21 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'Handler')
 ```
 
-### 2. Log Level Selection
+### 2. TDZ Prevention Strategy
+**Always use lazy initialization for utility modules:**
+
+```javascript
+// ✅ Best Practice: Utility modules (textDetection.js, i18n.js, etc.)
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection');
+  }
+  return logger;
+};
+```
+
+### 3. Log Level Selection
 Choose appropriate log levels:
 
 ```javascript
@@ -235,7 +295,7 @@ logger.info('Translation completed', { duration: '2.1s' })
 logger.debug('Processing DOM element', element)
 ```
 
-### 3. Structured Data
+### 4. Structured Data
 Include relevant context in logs:
 
 ```javascript
@@ -251,7 +311,7 @@ logger.error('Translation failed', {
 logger.error('Translation failed for ' + text + ' using ' + provider)
 ```
 
-### 4. Performance Best Practices
+### 5. Performance Best Practices
 Use lazy evaluation for expensive debug logs:
 
 ```javascript
@@ -262,7 +322,7 @@ logger.debugLazy(() => ['Heavy computation result:', expensiveFunction()])
 logger.debug('Heavy computation result:', expensiveFunction())
 ```
 
-### 5. Initialization Logging
+### 6. Initialization Logging
 Use `init()` for component initialization:
 
 ```javascript
@@ -354,6 +414,33 @@ logger.error('Something failed', error)
 
 ## Troubleshooting
 
+### TDZ (Temporal Dead Zone) Errors
+
+**Error:** `Cannot access 'LOG_COMPONENTS' before initialization`
+
+**Cause:** Early-loaded modules trying to access LOG_COMPONENTS during module evaluation.
+
+**Solution:** Use lazy initialization pattern:
+
+```javascript
+// ❌ Problematic
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection');
+
+// ✅ Solution
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection');
+  }
+  return logger;
+};
+
+// Use getLogger() instead of logger
+getLogger().debug('Safe from TDZ');
+```
+
+**Affected Files:** Utility modules like `textDetection.js`, `i18n.js`, `languages.js` that are imported early.
+
 ### No logs appearing
 ```javascript
 // Check current level
@@ -411,9 +498,10 @@ The logging system provides:
 - **Structured Logging**: Support for objects and structured data
 - **Performance-Optimized**: Level checking + lazy evaluation prevent unnecessary work
 - **Memory Efficient**: Cached logger instances prevent object duplication
+- **TDZ-Safe**: Lazy initialization prevents temporal dead zone errors
 - **Easy Configuration**: Simple API for adjusting log levels at runtime
 
-**Key Insight**: Use `getScopedLogger()` universally - it's the only logging API you need.
+**Key Insight**: Use `getScopedLogger()` universally - it's the only logging API you need. For early-loaded modules, use lazy initialization to prevent TDZ issues.
 
 ## Architecture Benefits
 
@@ -422,6 +510,12 @@ The logging system provides:
 - **Level Gating**: Early return prevents expensive string formatting
 - **Instance Caching**: Same logger object reused for identical component/subcomponent
 - **Frozen Objects**: Logger instances are immutable to prevent accidental modification
+
+### 🛡️ Reliability Features
+- **TDZ Prevention**: Lazy initialization pattern prevents temporal dead zone errors
+- **Circular Dependency Safe**: Minimal imports prevent initialization order issues
+- **Error Boundary**: Logger failures don't crash the application
+- **Memory Leak Prevention**: Cached instances with proper cleanup
 
 ### 🧩 Developer Experience
 - **Single API**: Only one way to create loggers (no confusion)
@@ -663,5 +757,5 @@ This pattern enables powerful debugging capabilities while respecting Manifest V
 
 ---
 
-**📅 Last Updated:** August 16, 2025 - Added Cross-World Communication Guide  
-**📊 Status:** ✅ Production Ready - 100% Modern Logging API
+**📅 Last Updated:** September 3, 2025 - Added TDZ Prevention Guide & Lazy Initialization Patterns  
+**📊 Status:** ✅ Production Ready - 100% Modern Logging API with TDZ Safety
