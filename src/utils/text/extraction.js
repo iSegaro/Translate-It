@@ -4,7 +4,8 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { IsDebug } from "@/shared/config/config.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Background", 'extraction');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'extraction');
 
 import { correctTextDirection } from "./textDetection.js";
 import { getTranslationString } from "../i18n/i18n.js";

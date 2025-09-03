@@ -9,7 +9,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import browser from 'webextension-polyfill';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'StreamingManager');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StreamingManager');
 
 export class StreamingManager {
   constructor() {

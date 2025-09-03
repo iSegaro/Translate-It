@@ -7,7 +7,7 @@ import { SelectElementValidation } from "@/features/element-selection/constants/
 
 export class ModeManager {
   constructor() {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ModeManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ModeManager');
     this.config = { ...CONFIG };
     this.state = {
       isCtrlPressed: false,

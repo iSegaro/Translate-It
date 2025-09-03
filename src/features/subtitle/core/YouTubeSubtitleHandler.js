@@ -3,7 +3,7 @@
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'YouTubeSubtitle');
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'YouTubeSubtitle');
 
 import { safeSetText } from "@/utils/ui/html-sanitizer.js";
 

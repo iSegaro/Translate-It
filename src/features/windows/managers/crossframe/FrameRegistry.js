@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
  */
 export class FrameRegistry {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FrameRegistry');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'FrameRegistry');
     this.frameId = Math.random().toString(36).substring(7);
     this.isInIframe = window !== window.top;
     this.debugCrossFrame = false;

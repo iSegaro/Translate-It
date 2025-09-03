@@ -4,7 +4,7 @@ import { getSettingsAsync } from '@/shared/config/config.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SubtitleStatusHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleStatusHandler');
 
 export async function handleSubtitleStatus(message, sender) {
   logger.debug('Subtitle status request received', { 

@@ -9,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class ClickManager {
   constructor(crossFrameManager, state) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ClickManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'ClickManager');
     this.crossFrameManager = crossFrameManager;
     this.state = state;
     

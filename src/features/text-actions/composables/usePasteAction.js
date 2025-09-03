@@ -5,7 +5,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePasteAction')
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'usePasteAction')
 
 export function usePasteAction() {
   // State

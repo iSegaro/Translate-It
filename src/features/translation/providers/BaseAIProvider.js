@@ -10,7 +10,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import browser from 'webextension-polyfill';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseAIProvider');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
 export class BaseAIProvider extends BaseProvider {
   // Provider capabilities - to be overridden by subclasses

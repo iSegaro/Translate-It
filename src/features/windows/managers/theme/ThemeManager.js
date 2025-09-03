@@ -13,7 +13,7 @@ import browser from "webextension-polyfill";
  */
 export class ThemeManager {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ThemeManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'ThemeManager');
     this.currentTheme = 'light';
     this.themeChangeListener = null;
     this.boundHandleThemeChange = null;

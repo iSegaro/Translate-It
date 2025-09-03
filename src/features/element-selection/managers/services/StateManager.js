@@ -5,7 +5,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 
 export class StateManager {
   constructor() {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'StateManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'StateManager');
     this.originalTexts = new Map(); // This will be used by applyTranslationsToNodes
     this.translatedElements = new Map(); // Keep track of top-level translated elements
   }

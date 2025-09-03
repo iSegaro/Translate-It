@@ -7,7 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'QueueManager');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
 
 /**
  * Queue item status types

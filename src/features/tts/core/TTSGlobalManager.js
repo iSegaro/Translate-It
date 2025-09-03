@@ -7,7 +7,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { isContextError } from '@/core/extensionContext.js'
 import browser from 'webextension-polyfill';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSGlobalManager')
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSGlobalManager')
 
 /**
  * Singleton class to manage TTS instances globally

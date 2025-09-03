@@ -10,7 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
  */
 export class WindowsFactory {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsFactory');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsFactory');
   }
 
   /**

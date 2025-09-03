@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'capture-store');
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'capture-store');
 
 export const useCaptureStore = defineStore('capture', () => {
   // State

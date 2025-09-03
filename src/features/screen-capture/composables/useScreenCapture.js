@@ -3,7 +3,7 @@ import { useExtensionAPI } from "@/composables/core/useExtensionAPI.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useScreenCapture');
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'useScreenCapture');
 
 export function useScreenCapture() {
   const { startScreenCapture, captureScreenArea } = useExtensionAPI();

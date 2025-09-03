@@ -9,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class AnimationManager {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'AnimationManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'AnimationManager');
   }
 
   /**

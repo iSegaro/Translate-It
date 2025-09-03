@@ -24,7 +24,7 @@ export class SelectElementManager {
   constructor() {
     this.isActive = false;
     this.isProcessingClick = false;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElement');
     
     // Initialize services
     this.stateManager = new StateManager();

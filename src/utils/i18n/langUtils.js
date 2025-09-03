@@ -5,7 +5,8 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getLanguageInfoFromName } from "../text/textDetection.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger('Background', 'langUtils');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'langUtils');
 
 
 /**

@@ -8,16 +8,45 @@ export const LOG_LEVELS = {
 };
 
 export const LOG_COMPONENTS = {
-  BACKGROUND: 'Background',
-  CORE: 'Core',            // لایه هسته (bootstrapping, dependency wiring)
-  CONTENT: 'Content',      // اسکریپت‌های content و تعامل DOM
-  TRANSLATION: 'Translation', // موتور ترجمه / pipeline
-  MESSAGING: 'Messaging',
-  PROVIDERS: 'Providers',
-  UI: 'UI',
-  STORAGE: 'Storage',
-  CAPTURE: 'Capture',
-  ERROR: 'Error',
+  // لایه‌های اصلی
+  BACKGROUND: 'Background',        // src/core/background/
+  CORE: 'Core',                   // src/core/ (به جز background و content-scripts)
+  CONTENT: 'Content',             // src/core/content-scripts/
+
+  // اپلیکیشن‌ها و UI
+  UI: 'UI',                       // src/apps/ و src/components/
+  POPUP: 'Popup',                 // src/apps/popup/
+  SIDEPANEL: 'Sidepanel',         // src/apps/sidepanel/
+  OPTIONS: 'Options',             // src/apps/options/
+
+  // Features
+  TRANSLATION: 'Translation',     // src/features/translation/
+  TTS: 'TTS',                     // src/features/tts/
+  SCREEN_CAPTURE: 'ScreenCapture', // src/features/screen-capture/
+  ELEMENT_SELECTION: 'ElementSelection', // src/features/element-selection/
+  TEXT_ACTIONS: 'TextActions',    // src/features/text-actions/
+  SUBTITLE: 'Subtitle',           // src/features/subtitle/
+  HISTORY: 'History',             // src/features/history/
+  SETTINGS: 'Settings',           // src/features/settings/
+  WINDOWS: 'Windows',             // src/features/windows/
+
+  // سیستم‌های مشترک
+  MESSAGING: 'Messaging',         // src/shared/messaging/
+  STORAGE: 'Storage',             // src/shared/storage/
+  ERROR: 'Error',                 // src/shared/error-management/
+  CONFIG: 'Config',               // src/shared/config/
+
+  // ابزارها و utilities
+  UTILS: 'Utils',                 // src/utils/
+  BROWSER: 'Browser',             // src/utils/browser/
+  TEXT: 'Text',                   // src/utils/text/
+  FRAMEWORK: 'Framework',         // src/utils/framework/
+
+  // Providers (زیرمجموعه Translation)
+  PROVIDERS: 'Providers',         // src/features/translation/providers/
+
+  // Legacy aliases (برای backward compatibility)
+  CAPTURE: 'ScreenCapture',       // Legacy alias for SCREEN_CAPTURE
 };
 
 export default {

@@ -4,7 +4,7 @@ import { TranslationEngine } from "@/features/translation/core/translation-engin
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SubtitleTranslateHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleTranslateHandler');
 
 export async function handleSubtitleTranslate(message) {
   logger.debug('Subtitle translation request received', { 

@@ -9,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class PositionCalculator {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'PositionCalculator');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'PositionCalculator');
   }
 
   /**

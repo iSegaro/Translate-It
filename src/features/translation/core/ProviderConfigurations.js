@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ProviderConfigurations');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderConfigurations');
 
 /**
  * Provider-specific configurations

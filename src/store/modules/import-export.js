@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger('Core', 'import-export');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'import-export');
 
 export const useImportExportStore = defineStore('import-export', () => {
   // State

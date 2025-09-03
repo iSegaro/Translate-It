@@ -4,7 +4,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleResultClosed');
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'handleResultClosed');
 
 const errorHandler = new ErrorHandler();
 

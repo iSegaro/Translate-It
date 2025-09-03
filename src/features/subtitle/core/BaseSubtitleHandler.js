@@ -4,7 +4,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'BaseSubtitle');
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'BaseSubtitle');
 
 
 export default class BaseSubtitleHandler {

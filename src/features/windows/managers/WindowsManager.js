@@ -36,7 +36,7 @@ export class WindowsManager {
   constructor(options = {}) {
     console.log('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
     // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsManager');
     this.logger.debug('WindowsManager constructor called', options);
     
     // Initialize cross-frame communication first to get frameId

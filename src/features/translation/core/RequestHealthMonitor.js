@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'RequestHealthMonitor');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RequestHealthMonitor');
 
 export class RequestHealthMonitor {
   constructor() {

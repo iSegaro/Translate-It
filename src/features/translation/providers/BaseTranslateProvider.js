@@ -14,7 +14,7 @@ import browser from 'webextension-polyfill';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseTranslateProvider');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
 export class BaseTranslateProvider extends BaseProvider {
   // Provider capabilities - to be overridden by subclasses

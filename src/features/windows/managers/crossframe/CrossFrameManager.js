@@ -10,7 +10,7 @@ import { MessageRouter } from "./MessageRouter.js";
  */
 export class CrossFrameManager {
   constructor(options = {}) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'CrossFrameManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'CrossFrameManager');
     this.debugCrossFrame = options.debugCrossFrame === true;
     
     // Initialize registry and router

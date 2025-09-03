@@ -8,7 +8,7 @@ import { errorMessages as ErrorMessages } from "@/shared/error-management/ErrorM
 
 export class ErrorHandlingService {
   constructor() {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ErrorHandlingService');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ErrorHandlingService');
     this.errorHandler = ErrorHandler.getInstance();
   }
 

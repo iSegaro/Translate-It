@@ -6,7 +6,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
 export function useTTSSmart() {
   

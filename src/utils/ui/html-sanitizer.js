@@ -3,7 +3,8 @@
 
 import { filterXSS } from "xss";
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Core", 'html-sanitizer');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'html-sanitizer');
 
 /**
  * XSS configuration that matches the project's security requirements

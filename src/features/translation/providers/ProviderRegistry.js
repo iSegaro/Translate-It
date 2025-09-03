@@ -1,7 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ProviderRegistry');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderRegistry');
 class ProviderRegistry {
   constructor() {
     this.providers = new Map();

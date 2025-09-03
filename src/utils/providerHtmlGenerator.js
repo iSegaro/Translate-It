@@ -2,7 +2,8 @@
 import { getSupportedProviders } from "../core/provider-registry.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Background", 'providerHtmlGenerator');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'providerHtmlGenerator');
 
 
 // Helper function to get provider by ID

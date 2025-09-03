@@ -9,7 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
 import { setStateForTab } from './selectElementStateManager.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleActivateSelectElementMode');
+const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleActivateSelectElementMode');
 
 const errorHandler = new ErrorHandler();
 

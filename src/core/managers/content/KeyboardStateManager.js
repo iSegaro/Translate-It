@@ -1,5 +1,5 @@
 /**
- iimport { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';port { getScopedLogger } from '@/shared/logging/logger.js'; KeyboardStateManager - Centralized keyboard state tracking
+ * KeyboardStateManager - Centralized keyboard state tracking
  * Manages key press states for better keyboard shortcut handling
  */
 

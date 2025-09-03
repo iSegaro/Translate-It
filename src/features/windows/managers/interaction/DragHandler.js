@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
  */
 export class DragHandler {
   constructor(positionCalculator) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'DragHandler');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'DragHandler');
     this.positionCalculator = positionCalculator;
     
     // Drag state

@@ -7,7 +7,7 @@ import { generateRevertMessageId } from '@/utils/messaging/messageId.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleRevertTranslation');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleRevertTranslation');
 
 const errorHandler = new ErrorHandler();
 

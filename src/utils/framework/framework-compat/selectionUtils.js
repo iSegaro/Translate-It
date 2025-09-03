@@ -1,9 +1,10 @@
 // src/utils/framework-compat/selectionUtils.js
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // Use scoped cached logger (migration from old lazy pattern)
-const logger = getScopedLogger("Background", 'selectionUtils');
+const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'selectionUtils');
 
 
 /**

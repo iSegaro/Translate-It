@@ -17,7 +17,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationOrchestrator');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TranslationOrchestrator');
     this.stateManager = stateManager;
     this.translationRequests = new Map();
     this.escapeKeyListener = null;

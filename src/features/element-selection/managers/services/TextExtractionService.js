@@ -6,7 +6,7 @@ import { CONFIG, CACHE_CONFIG } from "../constants/selectElementConstants.js";
 
 export class TextExtractionService {
   constructor() {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextExtractionService');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TextExtractionService');
     this.config = { ...CONFIG };
     this.elementValidationCache = CACHE_CONFIG.ELEMENT_VALIDATION;
     this.textContentCache = CACHE_CONFIG.TEXT_CONTENT;

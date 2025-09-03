@@ -1,6 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'settings-modules');
+const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings-modules');
 // Utility for loading settings modules
 // Separated from main options.js to avoid circular imports
 

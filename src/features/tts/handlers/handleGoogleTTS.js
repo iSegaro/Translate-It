@@ -6,7 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/core/browserHandlers.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
 // Use a global promise to ensure offscreen document is created only once.
 let offscreenDocumentPromise = null;

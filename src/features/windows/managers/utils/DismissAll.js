@@ -8,7 +8,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  * Utility function to dismiss all selection windows across all documents
  */
 export function dismissAllSelectionWindows() {
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'DismissAll');
+  const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'DismissAll');
   logger.debug("Dismissing all selection windows");
   
   try {

@@ -9,7 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'index');
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
 
 registerAllProviders();
 

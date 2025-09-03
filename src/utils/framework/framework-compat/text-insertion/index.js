@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/index.js
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { checkTextSelection } from "../selectionUtils.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {

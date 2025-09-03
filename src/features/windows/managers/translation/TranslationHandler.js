@@ -3,6 +3,7 @@
 import browser from "webextension-polyfill";
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js"
 import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
@@ -16,7 +17,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
  */
 export class TranslationHandler {
   constructor() {
-    this.logger = getScopedLogger('Content', 'TranslationHandler');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationHandler');
     this.activeRequests = new Map();
   }
 

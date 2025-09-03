@@ -10,7 +10,7 @@ import { TranslationMode, CONFIG } from "@/shared/config/config.js";
  */
 export class TranslationRenderer {
   constructor(factory, ttsManager) {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationRenderer');
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'TranslationRenderer');
     this.factory = factory;
     this.ttsManager = ttsManager;
   }

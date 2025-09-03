@@ -2,7 +2,8 @@
 
 import { checkTextSelection } from "./selectionUtils.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Background", 'naturalTyping');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'naturalTyping');
 
 
 /**

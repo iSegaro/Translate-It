@@ -2,7 +2,8 @@
 
 import { smartDelay } from "../helpers.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Background", 'exec-command');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'exec-command');
 
 
 /**

@@ -7,7 +7,7 @@ import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleTranslate');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslate');
 const errorHandler = new ErrorHandler();
 
 /**

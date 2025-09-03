@@ -7,7 +7,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseProvider');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
 /**
  * Base class for all translation providers.

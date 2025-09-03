@@ -12,7 +12,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
-// Avoid importing LOG_COMPONENTS here to prevent early evaluation cycles; use literal names instead.
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 class StorageCore {
   constructor() {
@@ -21,7 +21,7 @@ class StorageCore {
     this._isReady = false;
     this._readyPromise = null;
     this._changeListener = null;
-  this.logger = getScopedLogger('Storage', 'Core');
+  this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
     this._initializeAsync();
   }
 

@@ -5,7 +5,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SubtitleToggleHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleToggleHandler');
 
 export async function handleSubtitleToggle(message) {
   logger.debug('Subtitle toggle request received', { 

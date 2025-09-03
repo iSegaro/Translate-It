@@ -4,7 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleTranslateText');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslateText');
 
 const errorHandler = new ErrorHandler();
 

@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { requestHealthMonitor } from './RequestHealthMonitor.js';
 import { getProviderRateLimit } from './ProviderConfigurations.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'RateLimitManager');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
 /**
  * Default fallback configuration for unknown providers

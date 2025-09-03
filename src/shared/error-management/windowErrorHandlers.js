@@ -7,7 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'windowErrorHandlers')
+const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'windowErrorHandlers')
 
 /**
  * Setup window-level error handlers for Vue applications

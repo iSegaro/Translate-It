@@ -8,8 +8,9 @@ import { ErrorTypes } from "./ErrorTypes.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-const logger = getScopedLogger('Error', 'ErrorHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorHandler');
 
 let _instance = null; // Singleton instance
 

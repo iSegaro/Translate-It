@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
  */
 export class WindowsState {
   constructor(frameId) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsState');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsState');
     this.frameId = frameId;
     this.isInIframe = window !== window.top;
     this.reset();

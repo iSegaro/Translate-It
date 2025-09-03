@@ -13,7 +13,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from 
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import browser from 'webextension-polyfill';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
 
 export class TranslationEngine {
   constructor() {

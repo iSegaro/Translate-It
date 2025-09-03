@@ -9,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class MessageRouter {
   constructor(frameRegistry, options = {}) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageRouter');
+  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'MessageRouter');
     this.frameRegistry = frameRegistry;
     this.onOutsideClick = options.onOutsideClick;
     this.onWindowCreationRequest = options.onWindowCreationRequest;

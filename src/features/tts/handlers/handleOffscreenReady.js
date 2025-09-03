@@ -4,7 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'OffscreenReadyHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'OffscreenReadyHandler');
 
 /**
  * Handle OFFSCREEN_READY messages from offscreen document (Chromium-based browsers)

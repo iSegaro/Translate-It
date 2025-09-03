@@ -14,7 +14,7 @@ import { isContextError } from '@/core/extensionContext.js';
  */
 export class TTSManager {
   constructor(windowId = 'unknown') {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TTSManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSManager');
     this.windowId = windowId;
     
     // Initialize TTS Global Manager

@@ -4,7 +4,7 @@ import { browser } from "@/utils/browser-polyfill.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'cleanupSelectionWindows');
+const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'cleanupSelectionWindows');
 
 
 /**
