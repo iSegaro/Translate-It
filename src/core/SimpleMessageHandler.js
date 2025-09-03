@@ -70,6 +70,7 @@ class SimpleMessageHandler {
         }
       } else {
         logger.debug(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);
+        logger.debug(`[SimpleMessageHandler] Available handlers:`, Array.from(this.handlers.keys()));
         // No handler found - let other listeners handle it
         return false;
       }
