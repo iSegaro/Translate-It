@@ -6,11 +6,21 @@ import { getMemoryManager } from './MemoryManager.js';
 
 const isDevelopment = import.meta.env.DEV;
 
+// Helper function to check if debugging features should be enabled
+const shouldEnableDebugging = () => {
+  // In production, only enable debugging if explicitly requested
+  if (!isDevelopment) {
+    return typeof globalThis !== 'undefined' && globalThis.__MEMORY_DEBUG__ === true;
+  }
+  // In development, always enable debugging
+  return true;
+};
+
 class ResourceTracker {
   constructor(groupId) {
     this.groupId = groupId;
     this.memoryManager = getMemoryManager();
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       this.resources = new Set();
     }
   }
@@ -24,12 +34,12 @@ class ResourceTracker {
   trackTimeout(callback, delay) {
     const timerId = setTimeout(() => {
       callback();
-      if (isDevelopment) {
+      if (shouldEnableDebugging()) {
         this.resources.delete(`timer_${timerId}`);
       }
     }, delay);
 
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       const resourceId = `timer_${timerId}`;
       this.resources.add(resourceId);
     }
@@ -41,7 +51,7 @@ class ResourceTracker {
   trackInterval(callback, delay) {
     const intervalId = setInterval(callback, delay);
 
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       const resourceId = `interval_${intervalId}`;
       this.resources.add(resourceId);
     }
@@ -66,21 +76,21 @@ class ResourceTracker {
     else if (element && typeof element.addEventListener === 'function') {
       element.addEventListener(event, handler);
     }
-    else if (isDevelopment) {
+    else if (shouldEnableDebugging()) {
       console.warn('Unsupported event target type:', element);
     }
 
     // Let the memory manager handle the actual resource tracking
     this.memoryManager.trackEventListener(element, event, handler, this.groupId);
 
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       const resourceId = `event_${event}_${Date.now()}`;
       this.resources.add(resourceId);
     }
   }
 
   trackResource(resourceId, cleanupFn) {
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       this.resources.add(resourceId);
     }
     this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId);
@@ -88,7 +98,7 @@ class ResourceTracker {
 
   trackCache(cache, options = {}) {
     this.memoryManager.trackCache(cache, options, this.groupId);
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       const resourceId = `cache_${Date.now()}`;
       this.resources.add(resourceId);
     }
@@ -98,7 +108,7 @@ class ResourceTracker {
     clearTimeout(timerId);
     clearInterval(timerId);
     this.memoryManager.timers.delete(timerId);
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       this.resources.delete(`timer_${timerId}`);
       this.resources.delete(`interval_${timerId}`);
     }
@@ -106,16 +116,16 @@ class ResourceTracker {
 
   cleanup() {
     this.memoryManager.cleanupGroup(this.groupId);
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       this.resources.clear();
     }
   }
 
   getStats() {
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       return {
         groupId: this.groupId,
-        trackedResources: this.resources.size,
+        trackedResources: this.resources ? this.resources.size : 0,
         memoryManagerStats: this.memoryManager.getMemoryStats()
       };
     }
