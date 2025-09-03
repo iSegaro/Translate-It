@@ -34,10 +34,41 @@ class MemoryMonitor {
       this.measureMemory()
       this.checkThresholds()
       this.detectLeaks()
+      this.monitorEventListeners()
     }, 30 * 1000)
 
     // Track the monitor interval
     this.memoryManager.trackTimer(this.monitorInterval, 'memory-monitor')
+  }
+
+  /**
+   * Monitor event listeners for potential leaks
+   */
+  monitorEventListeners() {
+    const eventReport = this.memoryManager.getEventListenerReport()
+
+    // Log summary every 5 minutes (every 10th check since we check every 30s)
+    if (!this.eventCheckCount) this.eventCheckCount = 0
+    this.eventCheckCount++
+
+    if (this.eventCheckCount % 10 === 0) {
+      logger.debug(`Event listener summary: ${eventReport.totalElements} elements, ${eventReport.totalEvents} events, ${eventReport.totalListeners} listeners`)
+    }
+
+    // Check for potential leaks
+    if (eventReport.potentialLeaks.length > 0) {
+      logger.warn(`Potential event listener leaks detected:`, eventReport.potentialLeaks)
+
+      // Auto-cleanup for critical cases
+      const criticalEvents = ['scroll', 'resize', 'mousemove', 'touchmove']
+      eventReport.potentialLeaks.forEach(leak => {
+        if (criticalEvents.includes(leak.event) && leak.count > 20) {
+          logger.warn(`Auto-cleaning up excessive ${leak.event} listeners: ${leak.count}`)
+          const cleanupCount = this.memoryManager.cleanupEventListeners(leak.event)
+          logger.info(`Auto-cleaned up ${cleanupCount} ${leak.event} listeners`)
+        }
+      })
+    }
   }
 
   /**
@@ -109,16 +140,29 @@ class MemoryMonitor {
   }
 
   /**
-   * Handle critical memory usage
+   * Handle critical memory usage with enhanced event listener cleanup
    */
   handleCriticalMemory() {
     logger.error('Critical memory usage detected, performing emergency cleanup')
 
     // Log current memory stats before cleanup
     const beforeStats = this.memoryManager.getMemoryStats()
-    logger.info(`Memory stats before cleanup: ${JSON.stringify(beforeStats)}`)
+    logger.info(`Memory stats before cleanup:`, beforeStats)
 
-    // Force garbage collection
+    // Enhanced cleanup: prioritize event listeners
+    const eventReport = this.memoryManager.getEventListenerReport()
+    logger.info(`Event listener report:`, eventReport)
+
+    // Clean up high-risk event listeners first
+    if (eventReport.potentialLeaks.length > 0) {
+      logger.warn(`Cleaning up ${eventReport.potentialLeaks.length} potential event listener leaks`)
+      eventReport.potentialLeaks.forEach(leak => {
+        const cleanupCount = this.memoryManager.cleanupEventListeners(leak.event)
+        logger.info(`Cleaned up ${cleanupCount} ${leak.event} listeners`)
+      })
+    }
+
+    // Perform general garbage collection
     this.memoryManager.performGarbageCollection()
 
     // Clear all caches if available
@@ -128,14 +172,20 @@ class MemoryMonitor {
 
     // Log memory stats after cleanup
     const afterStats = this.memoryManager.getMemoryStats()
-    logger.info(`Memory stats after cleanup: ${JSON.stringify(afterStats)}`)
+    logger.info(`Memory stats after cleanup:`, afterStats)
 
     // Calculate cleanup effectiveness
     const memoryFreed = beforeStats.memoryUsage - afterStats.memoryUsage
-    logger.info(`Memory cleanup effectiveness: ${(memoryFreed / 1024 / 1024).toFixed(2)}MB freed`)
+    const listenersCleaned = beforeStats.activeEventListeners - afterStats.activeEventListeners
 
-    // Emit critical memory event
-    this.emitMemoryEvent('critical', this.getCurrentMemory())
+    logger.info(`Memory cleanup effectiveness: ${(memoryFreed / 1024 / 1024).toFixed(2)}MB freed, ${listenersCleaned} event listeners cleaned`)
+
+    // Emit critical memory event with detailed info
+    this.emitMemoryEvent('critical', this.getCurrentMemory(), {
+      memoryFreed,
+      listenersCleaned,
+      eventReport: afterStats.eventStats
+    })
   }
 
   /**
