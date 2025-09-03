@@ -7,21 +7,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTextFieldInteractionStore } from '../stores/textFieldInteraction.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 export function useTextFieldIcon() {
-  // Extend ResourceTracker for memory management
-  const ResourceTrackedComposable = class extends ResourceTracker {
-    constructor() {
-      super('text-field-icon-composable')
-    }
-  }
-  
-  const tracker = new ResourceTrackedComposable()
+  // Use the new Vue composable for automatic cleanup
+  const tracker = useResourceTracker('text-field-icon-composable')
   const store = useTextFieldInteractionStore();
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useTextFieldIcon');
-  
-  // Local reactive state
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useTextFieldIcon');  // Local reactive state
   const isInitialized = ref(false);
   const pageEventBus = ref(null);
   
@@ -158,43 +150,26 @@ export function useTextFieldIcon() {
     };
   };
   
-  /**
-   * Cleanup event listeners
-   */
-  const cleanup = () => {
-    // Use ResourceTracker cleanup for automatic resource management
-    tracker.cleanup();
-    
-    store.clearAllIcons();
-    isInitialized.value = false;
-    pageEventBus.value = null;
-    
-    logger.debug('Text field icon system cleaned up');
-  };
-  
   // Lifecycle hooks
   onMounted(() => {
     logger.debug('Text field icon composable mounted');
   });
-  
-  onUnmounted(() => {
-    cleanup();
-    logger.debug('Text field icon composable unmounted');
-  });
-  
+
+  // Note: cleanup is now automatic via useResourceTracker
+
   return {
     // State
     isInitialized,
     activeIcons,
     isIconActive,
     iconCount,
-    
+
     // Methods
     initialize,
     handleIconClick,
     getIcon,
     hasIcon,
-    getIconsInfo,
-    cleanup
+    getIconsInfo
+    // cleanup removed - now automatic
   };
 }

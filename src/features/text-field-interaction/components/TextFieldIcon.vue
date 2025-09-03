@@ -36,17 +36,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { ref, computed, onMounted } from 'vue';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
-// Extend ResourceTracker for memory management
-const ResourceTrackedComponent = class extends ResourceTracker {
-  constructor() {
-    super('text-field-icon-component')
-  }
-}
-
-const tracker = new ResourceTrackedComponent()
+// Use the new Vue composable for automatic cleanup
+const tracker = useResourceTracker('text-field-icon-component')
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -122,10 +116,7 @@ const onKeydown = (event) => {
 onMounted(() => {
 });
 
-onUnmounted(() => {
-  // Use ResourceTracker cleanup for automatic resource management
-  tracker.cleanup();
-});
+// Note: cleanup is now automatic via useResourceTracker
 </script>
 
 <style scoped>

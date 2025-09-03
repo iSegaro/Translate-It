@@ -7,21 +7,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTextFieldInteractionStore } from '../stores/textFieldInteraction.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 export function useFieldShortcuts() {
-  // Extend ResourceTracker for memory management
-  const ResourceTrackedComposable = class extends ResourceTracker {
-    constructor() {
-      super('field-shortcuts-composable')
-    }
-  }
-  
-  const tracker = new ResourceTrackedComposable()
+  // Use the new Vue composable for automatic cleanup
+  const tracker = useResourceTracker('field-shortcuts-composable')
   const store = useTextFieldInteractionStore();
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useFieldShortcuts');
-  
-  // Local reactive state
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useFieldShortcuts');  // Local reactive state
   const isInitialized = ref(false);
   const isProcessing = ref(false);
   const lastShortcutTime = ref(0);
@@ -226,43 +218,25 @@ export function useFieldShortcuts() {
     logger.debug('Shortcut statistics reset');
   };
   
-  /**
-   * Cleanup keyboard listeners
-   */
-  const cleanup = () => {
-    // Use ResourceTracker cleanup for automatic resource management
-    tracker.cleanup();
-    
-    isInitialized.value = false;
-    isProcessing.value = false;
-    lastShortcutTime.value = 0;
-    shortcutManager.value = null;
-    
-    logger.debug('Field shortcuts system cleaned up');
-  };
-  
   // Lifecycle hooks
   onMounted(() => {
     logger.debug('Field shortcuts composable mounted');
   });
-  
-  onUnmounted(() => {
-    cleanup();
-    logger.debug('Field shortcuts composable unmounted');
-  });
-  
+
+  // Note: cleanup is now automatic via useResourceTracker
+
   return {
     // State
     isInitialized,
     isProcessing,
     canExecuteShortcuts,
     shortcutStats,
-    
+
     // Methods
     initialize,
     triggerShortcut,
     getShortcutInfo,
-    resetStats,
-    cleanup
+    resetStats
+    // cleanup removed - now automatic
   };
 }
