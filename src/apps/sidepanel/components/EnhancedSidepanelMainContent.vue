@@ -1,50 +1,42 @@
 <template>
   <div class="sidepanel-wrapper main-content enhanced">
     <UnifiedTranslationInput
-      mode="sidepanel"
-      :enhanced="true"
-      :show-controls="true"
-      :show-language-selector="true"
-      :show-provider-selector="true"
-      :show-input-label="true"
-      :show-result-label="true"
-      :input-rows="6"
-      :auto-translate-on-paste="autoTranslateOnPaste"
-      :is-selecting="isSelecting"
-      :initial-source-language="sourceLang"
-      :initial-target-language="targetLang"
-      :auto-detect-label="'Auto-Detect'"
-      :source-title="'Source Language'"
-      :target-title="'Target Language'"
-      :swap-title="'Swap Languages'"
-      :swap-alt="'Swap'"
-      :input-label="t('SOURCE_TEXT', 'Source Text')"
-      :result-label="t('TRANSLATION', 'Translation')"
-      :input-placeholder="t('ENTER_TEXT_TO_TRANSLATE', 'Enter text to translate...')"
-      :result-placeholder="t('TRANSLATION_PLACEHOLDER', 'Translation will appear here...')"
-      :copy-source-title="t('COPY_SOURCE_TEXT', 'Copy source text')"
-      :paste-title="t('PASTE_FROM_CLIPBOARD', 'Paste from clipboard')"
-      :tts-source-title="t('SPEAK_SOURCE_TEXT', 'Speak source text')"
-      :copy-result-title="t('COPY_TRANSLATION', 'Copy translation')"
-      :tts-result-title="t('SPEAK_TRANSLATION', 'Speak translation')"
-      :select-element-message="t('SELECT_ELEMENT_ACTIVE_MESSAGE', 'Click on any element on the webpage to translate...')"
-      :provider-selector-mode="'split'"
-      @can-translate-change="handleCanTranslateChange"
-      @source-text-copied="handleSourceTextCopied"
-      @source-text-pasted="handleSourceTextPasted"
-      @source-tts-speaking="handleSourceTTSSpeaking"
-      @translation-copied="handleTranslationCopied"
-      @translation-tts-speaking="handleTranslationTTSSpeaking"
-      @action-failed="handleActionFailed"
-    />
-
-    <!-- Status Bar -->
-    <div
-      v-if="statusMessage"
-      class="status-bar"
-    >
-      <span :class="['status-message', statusType]">{{ statusMessage }}</span>
-    </div>
+        mode="sidepanel"
+        :enhanced="true"
+        :show-controls="true"
+        :show-language-selector="true"
+        :show-provider-selector="true"
+        :show-input-label="true"
+        :show-result-label="true"
+        :input-rows="6"
+        :auto-translate-on-paste="autoTranslateOnPaste"
+        :is-selecting="isSelecting"
+        :initial-source-language="sourceLang"
+        :initial-target-language="targetLang"
+        :auto-detect-label="'Auto-Detect'"
+        :source-title="'Source Language'"
+        :target-title="'Target Language'"
+        :swap-title="'Swap Languages'"
+        :swap-alt="'Swap'"
+        :input-label="t('SIDEPANEL_SOURCE_TEXT_LABEL', 'Source Text')"
+        :result-label="t('SIDEPANEL_TARGET_TEXT_LABEL', 'Translation')"
+        :input-placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate...')"
+        :result-placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"
+        :copy-source-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"
+        :paste-title="t('SIDEPANEL_PASTE_SOURCE_TITLE_ICON', 'Paste from clipboard')"
+        :tts-source-title="t('SIDEPANEL_VOICE_SOURCE_TITLE_ICON', 'Speak source text')"
+        :copy-result-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
+        :tts-result-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Speak translation')"
+        :select-element-message="t('SIDEPANEL_SELECT_ELEMENT_MESSAGE', 'Click on any element on the webpage to translate...')"
+        :provider-selector-mode="'split'"
+        @can-translate-change="handleCanTranslateChange"
+        @source-text-copied="handleSourceTextCopied"
+        @source-text-pasted="handleSourceTextPasted"
+        @source-tts-speaking="handleSourceTTSSpeaking"
+        @translation-copied="handleTranslationCopied"
+        @translation-tts-speaking="handleTranslationTTSSpeaking"
+        @action-failed="handleActionFailed"
+      />
   </div>
 </template>
 
@@ -53,7 +45,7 @@ import { ref, computed, onMounted } from "vue";
 
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { useI18n } from "@/composables/shared/useI18n.js";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
@@ -66,7 +58,7 @@ import UnifiedTranslationInput from "@/components/shared/UnifiedTranslationInput
 
 // Composables
 const selectElement = useSelectElementTranslation();
-const { t } = useI18n();
+const { t } = useUnifiedI18n();
 
 // Translation composable
 const translation = useUnifiedTranslation('sidepanel');
@@ -75,8 +67,6 @@ const translation = useUnifiedTranslation('sidepanel');
 const sourceLang = ref(AUTO_DETECT_VALUE);
 const targetLang = ref("English");
 const autoTranslateOnPaste = ref(false);
-const statusMessage = ref("");
-const statusType = ref("info");
 
 // Computed
 const isSelecting = computed(() => selectElement.isSelectModeActive.value);
@@ -87,63 +77,30 @@ const handleCanTranslateChange = (canTranslate) => {
   // UnifiedTranslationInput emits this event
 };
 
-const handleSourceTextCopied = () => {
-  logger.debug("[EnhancedSidepanelMainContent] Source text copied");
-  showStatus("Source text copied to clipboard!", "success", 2000);
-};
-
-const handleSourceTextPasted = (event) => {
-  logger.debug("[EnhancedSidepanelMainContent] Text pasted:", event.text.substring(0, 30) + "...");
-  showStatus("Text pasted from clipboard!", "success", 2000);
-};
-
-const handleSourceTTSSpeaking = () => {
-  logger.debug("[EnhancedSidepanelMainContent] Playing source TTS");
-  showStatus("Playing source text...", "info", 0);
-};
-
-const handleTranslationCopied = () => {
-  logger.debug("[EnhancedSidepanelMainContent] Translation copied");
-  showStatus("Translation copied to clipboard!", "success", 2000);
-};
-
-const handleTranslationTTSSpeaking = () => {
-  logger.debug("[EnhancedSidepanelMainContent] Playing translation TTS");
-  showStatus("Playing translation...", "info", 0);
-};
-
-const handleActionFailed = (event) => {
-  logger.error("[EnhancedSidepanelMainContent] Action failed:", event);
-  showStatus(`Action failed: ${event.error.message}`, "error", 3000);
-};
-
-// Status Management
-const showStatus = (message, type = "info", duration = 2000) => {
-  statusMessage.value = message;
-  statusType.value = type;
-  
-  if (duration > 0) {
-    setTimeout(() => {
-      statusMessage.value = "";
-    }, duration);
-  }
-};
 
 // Lifecycle
-onMounted(async () => {
+onMounted(() => {
   logger.debug("[EnhancedSidepanelMainContent] Component mounted");
   
+  // Load saved languages asynchronously (non-blocking)
+  Promise.all([
+    getSourceLanguageAsync(),
+    getTargetLanguageAsync()
+  ]).then(([sourceLanguage, targetLanguage]) => {
+    sourceLang.value = sourceLanguage;
+    targetLang.value = targetLanguage;
+  }).catch(error => {
+    logger.error("[EnhancedSidepanelMainContent] Language loading failed:", error);
+  });
+  
+  // Load last translation through unified composable
   try {
-    // Load saved languages
-    sourceLang.value = await getSourceLanguageAsync();
-    targetLang.value = await getTargetLanguageAsync();
-    
-    // Load last translation through unified composable
     translation.loadLastTranslation();
   } catch (error) {
-    logger.error("[EnhancedSidepanelMainContent] Initialization failed:", error);
+    logger.error("[EnhancedSidepanelMainContent] Translation loading failed:", error);
   }
 });
+
 </script>
 
 <style scoped>
@@ -160,15 +117,15 @@ onMounted(async () => {
   display: block;
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--color-text-primary);
+  color: var(--color-text, var(--text-color, #212121));
   margin-bottom: 0.5rem;
 }
 
 .input-container {
   position: relative;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border, var(--border-color, #e0e0e0));
   border-radius: 8px;
-  background: var(--color-bg-primary);
+  background: var(--color-background, var(--bg-color, #ffffff));
   transition: border-color 0.2s ease;
 }
 
@@ -185,14 +142,14 @@ onMounted(async () => {
   background: transparent;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--color-text-primary);
+  color: var(--color-text, var(--text-color, #212121));
   resize: vertical;
   font-family: inherit;
   outline: none;
 }
 
 .translation-textarea.enhanced::placeholder {
-  color: var(--color-text-placeholder);
+  color: var(--color-text-placeholder, var(--placeholder-color, #9aa0a6));
 }
 
 /* Enhanced result section now uses TranslationDisplay */
@@ -213,46 +170,6 @@ onMounted(async () => {
   flex: 1;
   min-height: 120px;
 }
-
-.status-bar {
-  position: fixed;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-}
-
-.status-message {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(4px);
-}
-
-.status-message.success {
-  background: var(--color-success-bg);
-  border-color: var(--color-success);
-  color: var(--color-success);
-}
-
-.status-message.error {
-  background: var(--color-error-bg);
-  border-color: var(--color-error);
-  color: var(--color-error);
-}
-
-.status-message.info {
-  background: var(--color-info-bg);
-  border-color: var(--color-info);
-  color: var(--color-info);
-}
-
 
 /* Responsive adjustments */
 @media (max-width: 480px) {

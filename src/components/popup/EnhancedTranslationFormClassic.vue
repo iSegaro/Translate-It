@@ -19,12 +19,6 @@
     :initial-source-language="currentSourceLanguage"
     :initial-target-language="currentTargetLanguage"
     @can-translate-change="handleCanTranslateChange"
-    @source-text-copied="handleSourceTextCopied"
-    @source-text-pasted="handleSourceTextPasted"
-    @source-tts-speaking="handleSourceTTSSpeaking"
-    @translation-copied="handleTranslationCopied"
-    @translation-tts-speaking="handleTranslationTTSSpeaking"
-    @action-failed="handleActionFailed"
   />
 </template>
 
@@ -53,27 +47,4 @@ const handleCanTranslateChange = (canTranslate) => {
   emit('can-translate-change', canTranslate)
 }
 
-const handleSourceTextCopied = () => {
-  logger.debug("[EnhancedTranslationForm] Source text copied")
-}
-
-const handleSourceTextPasted = (event) => {
-  logger.debug("[EnhancedTranslationForm] Text pasted:", event.text.substring(0, 30) + "...")
-}
-
-const handleSourceTTSSpeaking = () => {
-  logger.debug("[EnhancedTranslationForm] Playing source TTS")
-}
-
-const handleTranslationCopied = () => {
-  logger.debug("[EnhancedTranslationForm] Translation copied")
-}
-
-const handleTranslationTTSSpeaking = () => {
-  logger.debug("[EnhancedTranslationForm] Playing translation TTS")
-}
-
-const handleActionFailed = (event) => {
-  logger.error("[EnhancedTranslationForm] Action failed:", event)
-}
 </script>

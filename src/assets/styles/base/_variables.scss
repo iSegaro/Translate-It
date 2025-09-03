@@ -141,12 +141,10 @@
   --color-text-secondary: var(--tab-button-color, #757575);
   --color-text-disabled: #bdbdbd;
   
-  // Success, warning, error colors
-  --color-success: #4caf50;
-  --color-warning: #ff9800;
-  --color-error: #f44336;
-  --color-info: #2196f3;
-  
+  // Component-specific variables (mapped from theme)  
+  --color-bg-secondary: var(--sidebar-bg-color, #f8f9fa);
+  --color-text-placeholder: var(--placeholder-color, #9aa0a6);
+    
   // Default fallback values for provider icon filtering (light theme bias)
   --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
   --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);

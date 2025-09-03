@@ -369,8 +369,11 @@
     "message": "Sidepanel"
   },
 
+  "SIDEPANEL_SOURCE_TEXT_LABEL": { "message": "Source Text" },
+  "SIDEPANEL_TARGET_TEXT_LABEL": { "message": "Translation" },
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Enter..." },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": { "message": "Translation result will appear here..." },
+  "SIDEPANEL_SELECT_ELEMENT_MESSAGE": { "message": "Click on any element on the webpage to translate..." },
   "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "Translate" },
   "SIDEPANEL_SETTINGS_TITLE_ICON": { "message": "Options" },
   "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "Clear fields" },

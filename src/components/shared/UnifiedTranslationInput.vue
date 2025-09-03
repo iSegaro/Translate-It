@@ -348,17 +348,10 @@ const handleTranslate = async () => {
 const handleSourceInput = (event) => {
   const text = event.target.value
   
-  // Apply text direction correction
+  // Apply text direction correction to the textarea element
   try {
-    const correctedText = correctTextDirection(text)
-    if (correctedText !== text) {
-      sourceText.value = correctedText
-      nextTick(() => {
-        if (sourceInputRef.value) {
-          sourceInputRef.value.focus()
-          sourceInputRef.value.setSelectionRange(correctedText.length, correctedText.length)
-        }
-      })
+    if (sourceInputRef.value) {
+      correctTextDirection(sourceInputRef.value, text)
     }
   } catch (error) {
     logger.warn(`[${props.mode}] Text direction correction failed:`, error)
@@ -387,14 +380,12 @@ const handleKeydown = (event) => {
 // ActionToolbar Event Handlers
 const handleSourceTextCopied = (text) => {
   logger.debug(`[${props.mode}] Source text copied:`, text.substring(0, 50) + '...')
-  setStatus('Source text copied', 'success', 2000)
   emit('source-text-copied', text)
 }
 
 const handleSourceTextPasted = (data) => {
   logger.debug(`[${props.mode}] Source text pasted:`, data.text.substring(0, 50) + '...')
   sourceText.value = data.text
-  setStatus('Text pasted from clipboard', 'success', 2000)
   emit('source-text-pasted', data)
   
   // Auto-translate if enabled
@@ -407,38 +398,23 @@ const handleSourceTextPasted = (data) => {
 
 const handleSourceTTSSpeaking = (data) => {
   logger.debug(`[${props.mode}] Source TTS started:`, data.text.substring(0, 50) + '...')
-  setStatus('Speaking source text...', 'info', 3000)
   emit('source-tts-speaking', data)
 }
 
 const handleTranslationCopied = (text) => {
   logger.debug(`[${props.mode}] Translation copied:`, text.substring(0, 50) + '...')
-  setStatus('Translation copied', 'success', 2000)
   emit('translation-copied', text)
 }
 
 const handleTranslationTTSSpeaking = (data) => {
   logger.debug(`[${props.mode}] Translation TTS started:`, data.text.substring(0, 50) + '...')
-  setStatus('Speaking translation...', 'info', 3000)
   emit('translation-tts-speaking', data)
 }
 
 const handleActionFailed = (error) => {
   logger.error(`[${props.mode}] Action failed:`, error)
   const errorMessage = error?.message || error?.error || error || 'Action failed'
-  setStatus(errorMessage, 'error', 4000)
   emit('action-failed', error)
-}
-
-// Status management
-const setStatus = (message, type = 'info', duration = 3000) => {
-  statusMessage.value = message
-  statusType.value = type
-  
-  setTimeout(() => {
-    statusMessage.value = ''
-    statusType.value = ''
-  }, duration)
 }
 
 // Focus management
@@ -450,12 +426,17 @@ const focusInput = () => {
   })
 }
 
-// Auto-resize for popup mode
-const { usePopupResize } = props.mode === 'popup' ? await import('@/composables/ui/usePopupResize.js').catch(() => ({ usePopupResize: null })) : { usePopupResize: null }
-
-if (props.mode === 'popup' && usePopupResize) {
-  const resizeComposable = usePopupResize()
-  // Enable auto-resize if available
+// Auto-resize for popup mode (load dynamically to avoid async setup)
+let resizeComposable = null
+if (props.mode === 'popup') {
+  import('@/composables/ui/usePopupResize.js').then(({ usePopupResize }) => {
+    if (usePopupResize) {
+      resizeComposable = usePopupResize()
+      // Enable auto-resize if available
+    }
+  }).catch(err => {
+    logger.debug('Failed to load usePopupResize:', err)
+  })
 }
 
 // Component lifecycle
