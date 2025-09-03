@@ -8,12 +8,14 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { isContextError } from '@/core/extensionContext.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * Manages Text-to-Speech functionality for WindowsManager
  */
-export class TTSManager {
+export class TTSManager extends ResourceTracker {
   constructor(windowId = 'unknown') {
+    super('tts-manager');
     this.logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSManager');
     this.windowId = windowId;
     
@@ -305,27 +307,27 @@ export class TTSManager {
         
         const audio = new Audio(ttsUrl);
         
-        // Add timeout
-        const timeout = setTimeout(() => {
+        // Add timeout using ResourceTracker
+        const timeout = this.trackTimeout(() => {
           audio.pause();
           audio.src = "";
           reject(new Error('Google TTS timeout'));
         }, WindowsConfig.TIMEOUTS.TTS_TIMEOUT);
         
         audio.onended = () => {
-          clearTimeout(timeout);
+          this.clearTimer(timeout);
           this.logger.debug("Google TTS audio completed");
           resolve();
         };
         
         audio.onerror = (error) => {
-          clearTimeout(timeout);
+          this.clearTimer(timeout);
           this.logger.error("Google TTS audio error:", error);
           reject(new Error(`Google TTS failed: ${error.message}`));
         };
         
         audio.play().catch((playError) => {
-          clearTimeout(timeout);
+          this.clearTimer(timeout);
           reject(new Error(`Google TTS play failed: ${playError.message}`));
         });
         
@@ -425,7 +427,7 @@ export class TTSManager {
   createTTSIcon(textToSpeak, title = "Speak", factory) {
     const icon = factory.createTTSIcon(title);
     
-    icon.addEventListener("click", async (e) => {
+    this.addEventListener(icon, "click", async (e) => {
       e.stopPropagation();
       this.logger.debug("🔊 TTS icon clicked!", { text: textToSpeak?.substring(0, 50) + "...", title });
       try {
@@ -543,6 +545,9 @@ export class TTSManager {
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    
+    // Call ResourceTracker cleanup for automatic resource management
+    super.cleanup();
     
     this.logger.debug(`[TTSManager ${this.windowId}] Cleanup completed`);
   }

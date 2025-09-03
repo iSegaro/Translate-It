@@ -3,13 +3,15 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * Manages animations for icons and windows
  */
-export class AnimationManager {
+export class AnimationManager extends ResourceTracker {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'AnimationManager');
+    super('animation-manager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'AnimationManager');
   }
 
   /**
@@ -25,14 +27,14 @@ export class AnimationManager {
       iconElement.style.transformOrigin = "bottom center";
       iconElement.style.transition = `opacity ${WindowsConfig.ANIMATION.ICON_ANIMATION.DURATION}ms ease-out, transform ${WindowsConfig.ANIMATION.ICON_ANIMATION.DURATION}ms ${WindowsConfig.ANIMATION.ICON_ANIMATION.EASING}`;
 
-      // Trigger animation after delay
-      setTimeout(() => {
+      // Trigger animation after delay using ResourceTracker
+      this.trackTimeout(() => {
         if (iconElement && iconElement.isConnected) {
           iconElement.style.opacity = "1";
           iconElement.style.transform = "scale(1)";
           
-          // Resolve after animation completes
-          setTimeout(() => {
+          // Resolve after animation completes using ResourceTracker
+          this.trackTimeout(() => {
             resolve();
           }, WindowsConfig.ANIMATION.ICON_ANIMATION.DURATION);
         } else {
@@ -53,7 +55,7 @@ export class AnimationManager {
       iconElement.style.opacity = "0";
       iconElement.style.transform = "scale(0.5)";
 
-      setTimeout(() => {
+      this.trackTimeout(() => {
         if (iconElement && iconElement.parentNode) {
           iconElement.remove();
         }
@@ -75,7 +77,7 @@ export class AnimationManager {
           windowElement.style.opacity = "0.95";
           windowElement.style.transform = "scale(1)";
           
-          setTimeout(() => {
+          this.trackTimeout(() => {
             resolve();
           }, fadeInDuration);
         } else {
@@ -97,20 +99,19 @@ export class AnimationManager {
       windowElement.style.opacity = "0";
       windowElement.style.transform = "scale(0.5)";
 
-      // Set up fallback timeout
-      const fallbackTimeout = setTimeout(() => {
+      // Set up fallback timeout using ResourceTracker
+      const fallbackTimeout = this.trackTimeout(() => {
         this.logger.debug('Animation fallback timeout triggered');
         resolve();
       }, fadeOutDuration + 50);
 
-      // Listen for transition end
+      // Listen for transition end using ResourceTracker
       const handleTransitionEnd = () => {
-        clearTimeout(fallbackTimeout);
-        windowElement.removeEventListener('transitionend', handleTransitionEnd);
+        this.clearTimer(fallbackTimeout);
         resolve();
       };
 
-      windowElement.addEventListener('transitionend', handleTransitionEnd, { once: true });
+      this.addEventListener(windowElement, 'transitionend', handleTransitionEnd, { once: true });
     });
   }
 
@@ -199,7 +200,7 @@ export class AnimationManager {
       const originalOpacity = copyElement.style.opacity || '1';
       copyElement.style.opacity = '0.5';
       
-      setTimeout(() => {
+      this.trackTimeout(() => {
         if (copyElement && copyElement.isConnected) {
           copyElement.style.opacity = originalOpacity;
         }

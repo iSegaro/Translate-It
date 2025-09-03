@@ -4,15 +4,14 @@ import YouTubeSubtitleHandler from "./YouTubeSubtitleHandler.js";
 import NetflixSubtitleHandler from "./NetflixSubtitleHandler.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'Subtitle');
 
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-
-// (logger defined above)
-
-
-export default class SubtitleManager {
+export default class SubtitleManager extends ResourceTracker {
   constructor(translationProvider, errorHandler, notifier) {
+    super('subtitle-manager');
     this.translationProvider = translationProvider;
     this.errorHandler = errorHandler;
     this.notifier = notifier;
@@ -152,11 +151,11 @@ export default class SubtitleManager {
       }
     };
 
-    setInterval(checkUrl, 1000);
+    this.trackInterval(checkUrl, 1000);
 
-    // نیز گوش دادن به popstate
-    window.addEventListener("popstate", () => {
-      setTimeout(() => this.handleUrlChange(), 100);
+    // نیز گوش دادن به popstate using ResourceTracker
+    this.addEventListener(window, "popstate", () => {
+      this.trackTimeout(() => this.handleUrlChange(), 100);
     });
   }
 
@@ -184,8 +183,8 @@ export default class SubtitleManager {
     // اگر handler تغییر کرده
     if (this.isEnabled) {
       this.stop();
-      // تاخیر کوتاه برای بارگذاری صفحه
-      setTimeout(() => this.start(), 500);
+      // تاخیر کوتاه برای بارگذاری صفحه using ResourceTracker
+      this.trackTimeout(() => this.start(), 500);
     }
   }
 
@@ -203,6 +202,10 @@ export default class SubtitleManager {
   // پاک‌سازی منابع
   destroy() {
     this.stop();
+    
+    // Call ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.translationProvider = null;
     this.errorHandler = null;
     this.notifier = null;

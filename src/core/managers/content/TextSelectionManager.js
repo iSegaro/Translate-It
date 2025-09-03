@@ -10,9 +10,11 @@ import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "@/utils/brow
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class TextSelectionManager {
+export class TextSelectionManager extends ResourceTracker {
   constructor(options = {}) {
+    super('text-selection-manager');
     // Accept WindowsManager instance through dependency injection, or create one
     this.selectionWindows = options.windowsManager || new WindowsManager({});
     this.messenger = options.messenger;
@@ -138,7 +140,7 @@ export class TextSelectionManager {
         //    - برای حالت پنجره فوری (immediate)، تأخیر پیش‌فرض (250ms)
         const delay = selectionTranslationMode === "onClick" ? 10 : 250;
 
-        this.selectionTimeoutId = setTimeout(() => {
+        this.selectionTimeoutId = this.trackTimeout(() => {
           this.selectionTimeoutId = null;
           this.processSelectedText(selectedText, event);
         }, delay);
@@ -147,8 +149,8 @@ export class TextSelectionManager {
         this.lastProcessedText = selectedText;
         this.lastProcessedTime = currentTime;
 
-        // اضافه کردن listener برای لغو ترجمه در صورت کلیک
-        document.addEventListener("mousedown", this.cancelSelectionTranslation);
+        // اضافه کردن listener برای لغو ترجمه در صورت کلیک using ResourceTracker
+        this.addEventListener(document, "mousedown", this.cancelSelectionTranslation);
       }
     } else {
       // **IMPORTANT**: When no text is selected (outside click), only allow dismissal if click is outside translation window
@@ -254,9 +256,9 @@ export class TextSelectionManager {
 
         // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
         if (this.selectionTimeoutId) {
-          clearTimeout(this.selectionTimeoutId);
+          this.clearTimer(this.selectionTimeoutId);
           this.selectionTimeoutId = null;
-          document.removeEventListener("mousedown", this.cancelSelectionTranslation);
+          // ResourceTracker handles event listener cleanup automatically
         }
       }
 
@@ -417,7 +419,7 @@ export class TextSelectionManager {
     }
     
     // حذف listener بعد از نمایش پاپ‌آپ
-    document.removeEventListener("mousedown", this.cancelSelectionTranslation);
+    // ResourceTracker handles event listener cleanup automatically
   }
 
   /**
@@ -426,7 +428,7 @@ export class TextSelectionManager {
    */
   cancelSelectionTranslation() {
     if (this.selectionTimeoutId) {
-      clearTimeout(this.selectionTimeoutId);
+      this.clearTimer(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
       this.logger.debug('Selection translation cancelled');
       
@@ -435,7 +437,7 @@ export class TextSelectionManager {
       this.lastProcessedTime = 0;
       
       try {
-        document.removeEventListener("mousedown", this.cancelSelectionTranslation);
+        // ResourceTracker handles event listener cleanup automatically
       } catch {
         // خطا در حذف
       }
@@ -516,16 +518,12 @@ export class TextSelectionManager {
     
     // Clear any remaining timeouts
     if (this.selectionTimeoutId) {
-      clearTimeout(this.selectionTimeoutId);
+      this.clearTimer(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
     }
     
-    // Remove event listeners
-    try {
-      document.removeEventListener("mousedown", this.cancelSelectionTranslation);
-    } catch {
-      // Listener may not have been added
-    }
+    // Call ResourceTracker cleanup for automatic resource management
+    super.cleanup();
     
     this.logger.debug('Cleaned up');
   }

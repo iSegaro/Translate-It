@@ -116,7 +116,11 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/shared/config/
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('popup-app')
 
 
 // Stores & Composables
@@ -184,7 +188,7 @@ const initialize = async () => {
     await Promise.race([
       settingsStore.loadSettings(),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
+        tracker.trackTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
     
@@ -211,8 +215,8 @@ const initialize = async () => {
       targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
     }
     
-    // Add clear-storage event listener to reset languages (matching sidepanel approach)
-    document.addEventListener('clear-storage', async () => {
+    // Add clear-storage event listener to reset languages using ResourceTracker
+    tracker.addEventListener(document, 'clear-storage', async () => {
       logger.debug("🔄 Clear storage event - resetting languages to saved settings");
       try {
         const savedSource = await getSourceLanguageAsync()
@@ -305,8 +309,8 @@ const retryLoading = () => {
   // Reset store state
   settingsStore.$reset && settingsStore.$reset()
   
-  // Retry mounting logic
-  setTimeout(() => {
+  // Retry mounting logic using ResourceTracker
+  tracker.trackTimeout(() => {
     initialize()
   }, 100)
 }

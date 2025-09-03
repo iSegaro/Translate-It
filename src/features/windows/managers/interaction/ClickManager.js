@@ -3,13 +3,15 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * Manages click events and outside click detection for WindowsManager
  */
-export class ClickManager {
+export class ClickManager extends ResourceTracker {
   constructor(crossFrameManager, state) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'ClickManager');
+    super('click-manager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'ClickManager');
     this.crossFrameManager = crossFrameManager;
     this.state = state;
     
@@ -39,16 +41,16 @@ export class ClickManager {
     // Remove existing listener first
     this.removeOutsideClickListener();
 
-    // Add local click listener
-    document.addEventListener("click", this._handleOutsideClick, { capture: true });
+    // Add local click listener using ResourceTracker
+    this.addEventListener(document, "click", this._handleOutsideClick, { capture: true });
 
     // Enable cross-frame broadcasting
     this.crossFrameManager.enableGlobalClickBroadcast();
     this.crossFrameManager.requestGlobalClickRelay(true);
 
-    // Store removal function
+    // Store removal function for cross-frame cleanup
     this.removeMouseDownListener = () => {
-      document.removeEventListener("click", this._handleOutsideClick, { capture: true });
+      // ResourceTracker will handle event listener cleanup automatically
       
       // Disable cross-frame broadcasting if no active elements
       if (!this.state.hasActiveElements) {
@@ -151,11 +153,12 @@ export class ClickManager {
       }
     };
 
-    iconElement.addEventListener("click", boundIconClick);
+    this.addEventListener(iconElement, "click", boundIconClick);
     
-    // Return cleanup function
+    // Return cleanup function (ResourceTracker handles automatic cleanup)
     return () => {
-      iconElement.removeEventListener("click", boundIconClick);
+      // ResourceTracker automatically handles cleanup
+      this.logger.debug('Icon click handler cleanup requested');
     };
   }
 
@@ -230,11 +233,11 @@ export class ClickManager {
       handler(e);
     };
 
-    element.addEventListener('click', wrappedHandler, options);
+    this.addEventListener(element, 'click', wrappedHandler, options);
     
-    // Return cleanup function
+    // Return cleanup function (ResourceTracker handles automatic cleanup)
     return () => {
-      element.removeEventListener('click', wrappedHandler, options);
+      this.logger.debug('Element click listener cleanup requested');
     };
   }
 
@@ -250,10 +253,10 @@ export class ClickManager {
       handler(e);
     };
 
-    element.addEventListener('dblclick', wrappedHandler);
+    this.addEventListener(element, 'dblclick', wrappedHandler);
     
     return () => {
-      element.removeEventListener('dblclick', wrappedHandler);
+      this.logger.debug('Double-click listener cleanup requested');
     };
   }
 
@@ -288,6 +291,10 @@ export class ClickManager {
     this.removeOutsideClickListener();
     this.onOutsideClick = null;
     this.onIconClick = null;
+    
+    // Call ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('ClickManager cleanup completed');
   }
 }

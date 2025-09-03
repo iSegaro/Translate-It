@@ -175,8 +175,12 @@ import IconButton from './IconButton.vue'
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
+
+// Resource tracker for automatic cleanup
+const tracker = useResourceTracker('provider-selector')
 
 // Composables
 const { t } = useUnifiedI18n()
@@ -248,8 +252,8 @@ const handleTranslate = () => {
   isTranslating.value = true
   emit('translate', { provider: currentProvider.value })
   
-  // Reset after a delay (actual implementation should listen for translation completion)
-  setTimeout(() => {
+  // Reset after a delay using ResourceTracker (actual implementation should listen for translation completion)
+  tracker.trackTimeout(() => {
     isTranslating.value = false
   }, 1000)
 }
@@ -316,22 +320,18 @@ onMounted(() => {
     icon: provider.icon
   }))
   
-  // Add click listener to close dropdown
-  document.addEventListener('click', closeDropdown)
+  // Add click listener to close dropdown using ResourceTracker
+  tracker.addEventListener(document, 'click', closeDropdown)
   
-  // Add storage listener for cross-context updates
+  // Add storage listener for cross-context updates using ResourceTracker
   if (typeof browser !== 'undefined' && browser.storage) {
-    browser.storage.onChanged.addListener(handleStorageChange)
+    tracker.addEventListener(browser.storage.onChanged, 'addListener', handleStorageChange)
   }
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeDropdown)
-  
-  // Clean up storage listener
-  if (typeof browser !== 'undefined' && browser.storage) {
-    browser.storage.onChanged.removeListener(handleStorageChange)
-  }
+  // Event listener cleanup is now handled automatically by useResourceTracker
+  // No manual cleanup needed!
 })
 </script>
 

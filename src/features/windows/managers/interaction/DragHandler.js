@@ -2,13 +2,15 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * Handles drag and drop functionality for translation windows
  */
-export class DragHandler {
+export class DragHandler extends ResourceTracker {
   constructor(positionCalculator) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'DragHandler');
+    super('drag-handler');
+    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'DragHandler');
     this.positionCalculator = positionCalculator;
     
     // Drag state
@@ -35,8 +37,8 @@ export class DragHandler {
     this.dragElement = element;
     this.dragHandle = dragHandle;
     
-    // Add mousedown listener to drag handle
-    this.dragHandle.addEventListener("mousedown", this._onMouseDown);
+    // Add mousedown listener to drag handle using ResourceTracker
+    this.addEventListener(this.dragHandle, "mousedown", this._onMouseDown);
     
     this.logger.debug('Drag handlers setup completed');
   }
@@ -57,9 +59,9 @@ export class DragHandler {
     // Get appropriate document for event listeners
     const topDocument = this.positionCalculator.getTopDocument();
 
-    // Add global listeners for mouse move and up
-    topDocument.addEventListener("mousemove", this._onMouseMove);
-    topDocument.addEventListener("mouseup", this._onMouseUp);
+    // Add global listeners for mouse move and up using ResourceTracker
+    this.addEventListener(topDocument, "mousemove", this._onMouseMove);
+    this.addEventListener(topDocument, "mouseup", this._onMouseUp);
 
     // Prevent text selection and default behaviors
     e.preventDefault();
@@ -126,9 +128,8 @@ export class DragHandler {
     // Get appropriate document for cleanup
     const topDocument = this.positionCalculator.getTopDocument();
 
-    // Remove global listeners
-    topDocument.removeEventListener("mousemove", this._onMouseMove);
-    topDocument.removeEventListener("mouseup", this._onMouseUp);
+    // Remove global listeners (ResourceTracker handles cleanup automatically)
+    // topDocument.removeEventListener calls are now handled by ResourceTracker
 
     // Reset visual feedback
     if (this.dragHandle) {
@@ -145,7 +146,7 @@ export class DragHandler {
   enableDragging() {
     if (this.dragHandle && this.dragElement) {
       this.dragHandle.style.cursor = "move";
-      this.dragHandle.addEventListener("mousedown", this._onMouseDown);
+      this.addEventListener(this.dragHandle, "mousedown", this._onMouseDown);
     }
   }
 
@@ -155,7 +156,7 @@ export class DragHandler {
   disableDragging() {
     if (this.dragHandle) {
       this.dragHandle.style.cursor = "default";
-      this.dragHandle.removeEventListener("mousedown", this._onMouseDown);
+      // ResourceTracker handles event listener cleanup automatically
     }
   }
 
@@ -205,19 +206,8 @@ export class DragHandler {
     // Stop any active drag
     this.forceStopDrag();
     
-    // Remove handle event listener
-    if (this.dragHandle) {
-      this.dragHandle.removeEventListener("mousedown", this._onMouseDown);
-    }
-
-    // Clean up global listeners (safety cleanup)
-    try {
-      const topDocument = this.positionCalculator.getTopDocument();
-      topDocument.removeEventListener("mousemove", this._onMouseMove);
-      topDocument.removeEventListener("mouseup", this._onMouseUp);
-    } catch (error) {
-      this.logger.warn('Error cleaning up global drag listeners:', error);
-    }
+    // ResourceTracker handles all event listener cleanup automatically
+    // Manual cleanup is no longer needed
 
     // Reset state
     this.isDragging = false;
@@ -254,6 +244,10 @@ export class DragHandler {
    */
   cleanup() {
     this.removeDragHandlers();
+    
+    // Call ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('DragHandler cleanup completed');
   }
 }
