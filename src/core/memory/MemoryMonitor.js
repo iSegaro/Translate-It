@@ -251,7 +251,7 @@ class MemoryMonitor {
       return;
     }
 
-    logger.warn('High memory usage detected, performing cleanup')
+    logger.info('High memory usage detected, performing cleanup');
 
     // Perform garbage collection
     this.memoryManager.performGarbageCollection()
