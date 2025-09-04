@@ -15,6 +15,48 @@ const createOffscreenLogger = () => {
 
 const logger = createOffscreenLogger();
 
+// Import ResourceTracker for memory management
+// Note: Since this is an offscreen document, we'll create a simple tracker
+class OffscreenResourceTracker {
+  constructor() {
+    this.timeouts = new Set();
+    this.intervals = new Set();
+  }
+
+  trackTimeout(callback, delay) {
+    const timeoutId = setTimeout(() => {
+      this.timeouts.delete(timeoutId);
+      callback();
+    }, delay);
+    this.timeouts.add(timeoutId);
+    return timeoutId;
+  }
+
+  clearTimeout(timeoutId) {
+    if (this.timeouts.has(timeoutId)) {
+      clearTimeout(timeoutId);
+      this.timeouts.delete(timeoutId);
+    }
+  }
+
+  cleanup() {
+    // Clear all tracked timeouts
+    for (const timeoutId of this.timeouts) {
+      clearTimeout(timeoutId);
+    }
+    this.timeouts.clear();
+
+    // Clear all tracked intervals
+    for (const intervalId of this.intervals) {
+      clearInterval(intervalId);
+    }
+    this.intervals.clear();
+  }
+}
+
+// Create global resource tracker for offscreen
+const resourceTracker = new OffscreenResourceTracker();
+
 let currentAudio = null;
 let currentUtterance = null;
 let currentFetchController = null;
@@ -26,8 +68,8 @@ logger.info("TTS script loaded - Version 1.5 - Fixed race condition and null aud
 if (chrome.runtime) {
   chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {});
   // Try multiple times to ensure readiness is sent
-  setTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 100);
-  setTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 500);
+  resourceTracker.trackTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 100);
+  resourceTracker.trackTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 500);
 }
 
 
@@ -328,7 +370,7 @@ function handleTTSGetVoices(sendResponse) {
         speechSynthesis.addEventListener('voiceschanged', voicesChangedHandler, { once: true });
         
         // Set a timeout in case voiceschanged doesn't fire
-        setTimeout(() => {
+        resourceTracker.trackTimeout(() => {
           if (responseAlreadySent) return;
           responseAlreadySent = true;
           
@@ -552,7 +594,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     currentFetchController = new AbortController();
     
     // Timeout for Google TTS fetch
-    const fetchTimeout = setTimeout(() => {
+    const fetchTimeout = resourceTracker.trackTimeout(() => {
       if (!responseSent && currentFetchController) {
         currentFetchController.abort();
         currentFetchController = null;
@@ -574,7 +616,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       }
     })
     .then(response => {
-      clearTimeout(fetchTimeout); // Clear the timeout on successful response
+      resourceTracker.clearTimeout(fetchTimeout); // Clear the timeout on successful response
       currentFetchController = null; // Clear the AbortController reference
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -628,7 +670,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       }
     })
     .catch(async (err) => { // Make this catch block async
-      clearTimeout(fetchTimeout); // Clear the timeout on error too
+      resourceTracker.clearTimeout(fetchTimeout); // Clear the timeout on error too
       currentFetchController = null; // Clear the AbortController reference
       currentAudio = null;
       isPlaying = false; // Reset playing state
@@ -682,7 +724,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         console.log("[Offscreen] Cancelling existing speech synthesis");
         speechSynthesis.cancel();
         // Small delay to ensure cancellation completes
-        setTimeout(() => startWebSpeech(), 100);
+        resourceTracker.trackTimeout(() => startWebSpeech(), 100);
       } else {
         startWebSpeech();
       }
@@ -728,7 +770,7 @@ function handleWebSpeechFallback(data, sendResponse) {
               console.debug("[Offscreen] Attempting Web Speech recovery...");
               
               // Wait a bit and try once more
-              setTimeout(() => {
+              resourceTracker.trackTimeout(() => {
                 if (!responseAlreadySent) {
                   speechSynthesis.cancel();
                   const retryUtterance = new SpeechSynthesisUtterance(data.text);
@@ -770,7 +812,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         };
 
         // Add timeout as additional safety measure
-        const timeout = setTimeout(() => {
+        const timeout = resourceTracker.trackTimeout(() => {
           if (!responseAlreadySent && currentUtterance) {
             console.warn("[Offscreen] Web Speech TTS timeout, cancelling");
             speechSynthesis.cancel();
@@ -784,13 +826,13 @@ function handleWebSpeechFallback(data, sendResponse) {
         // Clear timeout when speech ends
         const originalOnEnd = currentUtterance.onend;
         currentUtterance.onend = (event) => {
-          clearTimeout(timeout);
+          resourceTracker.clearTimeout(timeout);
           if (originalOnEnd) originalOnEnd(event);
         };
 
         const originalOnError = currentUtterance.onerror;
         currentUtterance.onerror = (event) => {
-          clearTimeout(timeout);
+          resourceTracker.clearTimeout(timeout);
           if (originalOnError) originalOnError(event);
         };
 
@@ -825,7 +867,7 @@ function handleAudioPlayback(url, sendResponse) {
       } catch (error) {
         logger.error("Response send failed:", error);
         // Try alternative approach
-        setTimeout(() => {
+        resourceTracker.trackTimeout(() => {
           try {
             sendResponse(response);
             logger.debug("Response sent via retry");
@@ -1073,3 +1115,31 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
     sendResponse({ success: false, error: error.message });
   }
 }
+
+// Cleanup resources when page unloads
+window.addEventListener('beforeunload', () => {
+  logger.debug('Offscreen document unloading, cleaning up resources...');
+  resourceTracker.cleanup();
+  
+  // Cancel any ongoing fetch
+  if (currentFetchController) {
+    currentFetchController.abort();
+    currentFetchController = null;
+  }
+  
+  // Stop any current audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  
+  // Cancel any ongoing speech synthesis
+  if (speechSynthesis.speaking || speechSynthesis.pending) {
+    speechSynthesis.cancel();
+  }
+  
+  currentUtterance = null;
+  isPlaying = false;
+  
+  logger.debug('Offscreen cleanup completed');
+});
