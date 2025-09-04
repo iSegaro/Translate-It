@@ -15,15 +15,15 @@ export const MEMORY_TIMING = {
   CENTRAL_TIMER_INTERVAL: 60 * 1000,            // 1 minute - central memory manager timer
   
   // Memory monitoring intervals
-  MEMORY_MONITOR_INTERVAL: 30 * 1000,           // 30 seconds - memory usage monitoring
+  MEMORY_MONITOR_INTERVAL: 60 * 1000,           // 60 seconds - memory usage monitoring
   
   // Cache TTL (Time To Live) settings
   CACHE_DEFAULT_TTL: 30 * 60 * 1000,            // 30 minutes - default cache expiration
   CRITICAL_CACHE_TTL: 60 * 60 * 1000,           // 1 hour - critical cache expiration (storage, config)
   
-  // Memory monitoring thresholds (in bytes)
-  MEMORY_WARNING_THRESHOLD: 50 * 1024 * 1024,   // 50MB - warning threshold
-  MEMORY_CRITICAL_THRESHOLD: 100 * 1024 * 1024, // 100MB - critical threshold
+  // Memory monitoring thresholds (in bytes) - realistic for browser extensions
+  MEMORY_WARNING_THRESHOLD: 200 * 1024 * 1024,  // 200MB - warning threshold (realistic for extensions)
+  MEMORY_CRITICAL_THRESHOLD: 400 * 1024 * 1024, // 400MB - critical threshold (aggressive cleanup needed)
   
   // Resource tracking limits
   MAX_CACHE_SIZE: 200,                          // Maximum cache entries
