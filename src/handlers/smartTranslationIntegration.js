@@ -11,7 +11,12 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
+
+// Create a global resource tracker for this module
+const resourceTracker = new ResourceTracker('smart-translation-integration');
 
 
 
@@ -19,7 +24,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 function clearPendingNotificationData(context = 'cleanup') {
   // Clear timeout if it exists
   if (window.pendingTranslationDismissTimeout) {
-    clearTimeout(window.pendingTranslationDismissTimeout);
+    resourceTracker.clearTimeout(window.pendingTranslationDismissTimeout);
     window.pendingTranslationDismissTimeout = null;
   }
   
@@ -386,7 +391,9 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
     try {
       if (target.focus && typeof target.focus === 'function') {
         target.focus();
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => {
+          resourceTracker.trackTimeout(resolve, 10);
+        });
       }
     } catch (focusError) {
       logger.warn('Failed to focus target element', focusError);
@@ -439,4 +446,15 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
     logger.error('Error in applyTranslation', err);
     return false;
   }
+}
+
+// Cleanup function for module-level resources
+export function cleanupSmartTranslationIntegration() {
+  // Clear any pending timeouts
+  clearPendingNotificationData('module-cleanup');
+  
+  // Cleanup all tracked resources
+  resourceTracker.cleanup();
+  
+  logger.debug('SmartTranslationIntegration cleanup completed');
 }

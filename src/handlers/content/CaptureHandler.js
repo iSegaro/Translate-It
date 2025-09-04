@@ -13,12 +13,14 @@ import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 // removed legacy createLogger import
 
 
-export class ContentCaptureHandler {
+export class ContentCaptureHandler extends ResourceTracker {
   constructor() {
+    super('content-capture-handler')
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
@@ -150,5 +152,25 @@ export class ContentCaptureHandler {
 
   getStatus() {
     return { ...this.isActive(), screenSelector: !!this.screenSelector, capturePreview: !!this.capturePreview, captureResult: !!this.captureResult };
+  }
+
+  cleanup() {
+    if (this.screenSelector) {
+      this.screenSelector.cleanup();
+      this.screenSelector = null;
+    }
+    if (this.capturePreview) {
+      this.capturePreview.cleanup();
+      this.capturePreview = null;
+    }
+    if (this.captureResult) {
+      this.captureResult.cleanup();
+      this.captureResult = null;
+    }
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('ContentCaptureHandler cleanup completed');
   }
 }

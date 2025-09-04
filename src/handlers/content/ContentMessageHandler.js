@@ -8,9 +8,11 @@ import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class ContentMessageHandler {
+export class ContentMessageHandler extends ResourceTracker {
   constructor() {
+    super('content-message-handler')
     this.handlers = new Map();
     this.initialized = false;
     this.context = MessagingContexts.CONTENT;
@@ -204,6 +206,16 @@ export class ContentMessageHandler {
   async handleRevertTranslation() {
     this.logger.debug('Handling revertTranslation action');
     return await revertHandler.executeRevert();
+  }
+
+  async cleanup() {
+    this.handlers.clear();
+    this.selectElementManager = null;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    this.logger.debug('ContentMessageHandler cleanup completed');
   }
 }
 

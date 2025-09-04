@@ -3,14 +3,17 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
  * Handles both Vue and Legacy translation systems
  */
 
-export class RevertHandler {
+export class RevertHandler extends ResourceTracker {
   constructor() {
+    super('revert-handler')
     this.context = 'content-revert';
     this.isExecuting = false; // Prevent duplicate executions
   }
@@ -172,6 +175,15 @@ export class RevertHandler {
       type: 'RevertHandler',
       capabilities: ['vue-revert', 'legacy-revert']
     };
+  }
+
+  cleanup() {
+    this.isExecuting = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('RevertHandler cleanup completed');
   }
 }
 
