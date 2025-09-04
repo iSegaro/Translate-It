@@ -237,6 +237,7 @@ Format your response as:
 
 Keep it brief and useful. Do not include examples, long definitions, or explanations.
 
+Now, please translate the following texts:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_DICTIONARY ---*/
@@ -252,6 +253,7 @@ Instructions:
 
 Return **only** the translated text. Do not include explanations, markdown, or any other content.
 
+Now, please translate the following texts:
 $_{TEXT}
 `,
   /*--- End PROMPT_BASE_POPUP_TRANSLATE ---*/
