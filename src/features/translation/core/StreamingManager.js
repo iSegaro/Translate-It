@@ -8,11 +8,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import browser from 'webextension-polyfill';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StreamingManager');
 
-export class StreamingManager {
+export class StreamingManager extends ResourceTracker {
   constructor() {
+    super('streaming-manager')
+    
     // Track active streaming sessions
     this.activeStreams = new Map(); // messageId -> streamInfo
     this.senderInfo = new Map(); // messageId -> sender details
@@ -25,6 +28,9 @@ export class StreamingManager {
       completedSessions: 0,
       errorSessions: 0
     };
+
+    // Set up periodic cleanup using ResourceTracker
+    this.trackInterval(() => this.cleanupOldStreams(), 5 * 60 * 1000); // 5 minutes
   }
 
   /**
@@ -429,14 +435,40 @@ export class StreamingManager {
       logger.debug(`[StreamingManager] Cleaned up ${cleanedCount} old streams`);
     }
   }
+
+  /**
+   * Cleanup all resources
+   */
+  cleanup() {
+    logger.debug('[StreamingManager] Performing comprehensive cleanup');
+    
+    // Cancel all active streams
+    for (const [messageId] of this.activeStreams) {
+      this._immediateCleanup(messageId);
+    }
+    
+    // Clear all maps
+    this.activeStreams.clear();
+    this.senderInfo.clear();
+    this.streamingResults.clear();
+    
+    // Reset statistics
+    this.stats = {
+      totalSessions: 0,
+      activeSessions: 0,
+      completedSessions: 0,
+      errorSessions: 0
+    };
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('[StreamingManager] Cleanup completed');
+  }
 }
 
 // Create singleton instance
 export const streamingManager = new StreamingManager();
 
-// Set up periodic cleanup
-setInterval(() => {
-  streamingManager.cleanupOldStreams();
-}, 5 * 60 * 1000); // Every 5 minutes
-
-logger.debug('[StreamingManager] Initialized with periodic cleanup');
+// Remove manual setInterval since ResourceTracker handles it
+logger.debug('[StreamingManager] Initialized with ResourceTracker cleanup');
