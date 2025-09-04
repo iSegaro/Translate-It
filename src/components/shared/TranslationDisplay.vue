@@ -56,7 +56,10 @@
         contentClass
       ]"
       :dir="textDirection.dir"
-      :style="{ textAlign: textDirection.textAlign }"
+      :style="{ 
+        textAlign: textDirection.textAlign,
+        direction: textDirection.dir 
+      }"
       v-html="renderedContent"
     />
   </div>
@@ -383,8 +386,7 @@ onMounted(() => {
   font-family: inherit;
   font-size: 14px;
   box-sizing: border-box;
-  direction: ltr;
-  text-align: left;
+  /* direction and text-align are set via inline styles for RTL support */
   min-height: 50px;
   background-color: var(--bg-result-color, #ffffff);
   color: var(--text-color, #212529);
@@ -559,8 +561,8 @@ onMounted(() => {
 .translation-content :deep(ul),
 .translation-content :deep(ol) {
   margin: 8px 0;
-  padding-left: 20px;
-  padding-right: 8px;
+  padding-inline-start: 20px;
+  padding-inline-end: 8px;
 }
 
 .translation-content :deep(li) {
@@ -587,9 +589,9 @@ onMounted(() => {
 }
 
 .translation-content :deep(blockquote) {
-  border-left: 3px solid var(--accent-color, #007bff);
-  padding-left: 12px;
-  margin-left: 0;
+  border-inline-start: 3px solid var(--accent-color, #007bff);
+  padding-inline-start: 12px;
+  margin-inline-start: 0;
   color: var(--text-secondary, #6c757d);
   font-style: italic;
 }
