@@ -4,10 +4,14 @@
 import { ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'useCopyAction')
 
 export function useCopyAction() {
+  // Use ResourceTracker for automatic cleanup
+  const tracker = useResourceTracker('copy-action')
+  
   // State
   const isCopying = ref(false)
   const lastCopiedText = ref('')
