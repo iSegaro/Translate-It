@@ -6,16 +6,18 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { KeyboardStateManager } from '../KeyboardStateManager.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class ShortcutManager {
+export class ShortcutManager extends ResourceTracker {
   constructor() {
+    super('shortcut-manager')
     this.shortcuts = new Map();
     this.listeners = new Map();
     this.initialized = false;
     this.globalListener = null;
     this.keyboardStateManager = null;
     this.ctrlSlashShortcut = null;
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ShortcutManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ShortcutManager');
   }
 
   /**
@@ -31,6 +33,14 @@ export class ShortcutManager {
     // Initialize KeyboardStateManager
     this.keyboardStateManager = new KeyboardStateManager();
     this.keyboardStateManager.initialize();
+
+    // Track KeyboardStateManager for automatic cleanup
+    this.trackResource('keyboardStateManager', () => {
+      if (this.keyboardStateManager) {
+        this.keyboardStateManager.cleanup();
+        this.keyboardStateManager = null;
+      }
+    });
 
     // Setup global keyboard listener
     this.setupGlobalListener();
@@ -52,13 +62,10 @@ export class ShortcutManager {
    */
   setupGlobalListener() {
     this.globalListener = this.handleKeyboardEvent.bind(this);
-    
-    // Use capture phase to catch events before other handlers
-    document.addEventListener('keydown', this.globalListener, {
-      capture: true,
-      passive: false
-    });
-    
+
+    // Use ResourceTracker to track the event listener for automatic cleanup
+    this.addEventListener(document, 'keydown', this.globalListener);
+
     this.logger.debug('Global keyboard listener setup');
   }
 
@@ -76,10 +83,18 @@ export class ShortcutManager {
     // Register Ctrl+/ shortcut for translation
     const ctrlSlashShortcut = new FieldShortcutManager();
     this.registerShortcut('Ctrl+/', ctrlSlashShortcut);
-    
+
     // Store reference for initialization later
     this.ctrlSlashShortcut = ctrlSlashShortcut;
-    
+
+    // Track ctrlSlashShortcut for automatic cleanup
+    this.trackResource('ctrlSlashShortcut', () => {
+      if (this.ctrlSlashShortcut) {
+        this.ctrlSlashShortcut.cleanup();
+        this.ctrlSlashShortcut = null;
+      }
+    });
+
     this.logger.debug('Default shortcuts registered');
   }
 
@@ -212,30 +227,15 @@ export class ShortcutManager {
    * Cleanup shortcut manager
    */
   cleanup() {
-    // Remove global listener
-    if (this.globalListener) {
-      document.removeEventListener('keydown', this.globalListener, { capture: true });
-      this.globalListener = null;
-    }
-
-    // Cleanup KeyboardStateManager
-    if (this.keyboardStateManager) {
-      this.keyboardStateManager.cleanup();
-      this.keyboardStateManager = null;
-    }
-
-    // Cleanup individual shortcuts
-    if (this.ctrlSlashShortcut) {
-      this.ctrlSlashShortcut.cleanup();
-      this.ctrlSlashShortcut = null;
-    }
-
     // Clear shortcuts
     this.shortcuts.clear();
     this.listeners.clear();
     this.initialized = false;
-    
+
     this.logger.operation('Cleaned up');
+
+    // ResourceTracker will automatically cleanup tracked resources (event listeners, KeyboardStateManager, ctrlSlashShortcut)
+    super.cleanup();
   }
 }
 

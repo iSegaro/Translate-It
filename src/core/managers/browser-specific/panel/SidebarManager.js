@@ -4,14 +4,17 @@
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SidebarManager');
 
 /**
  * Firefox Sidebar Manager
  * Manages Firefox sidebar and provides fallback functionality
  */
-export class FirefoxSidebarManager {
+export class FirefoxSidebarManager extends ResourceTracker {
   constructor() {
+    super('firefox-sidebar-manager')
     this.browser = null;
     this.initialized = false;
   }
@@ -104,5 +107,15 @@ export class FirefoxSidebarManager {
       hasWindowsAPI: !!this.browser?.windows,
       hasTabsAPI: !!this.browser?.tabs,
     };
+  }
+
+  cleanup() {
+    this.browser = null;
+    this.initialized = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('FirefoxSidebarManager cleanup completed');
   }
 }

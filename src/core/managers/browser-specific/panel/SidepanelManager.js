@@ -6,13 +6,15 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SidepanelManager');
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * Chrome Side Panel Manager
  * Manages Chrome's native side panel functionality
  */
-export class ChromeSidePanelManager {
+export class ChromeSidePanelManager extends ResourceTracker {
   constructor() {
+    super('chrome-sidepanel-manager')
     this.browser = null;
     this.initialized = false;
   }
@@ -100,5 +102,15 @@ export class ChromeSidePanelManager {
       initialized: this.initialized,
       hasSidePanelAPI: !!this.browser?.sidePanel,
     };
+  }
+
+  cleanup() {
+    this.browser = null;
+    this.initialized = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('ChromeSidePanelManager cleanup completed');
   }
 }

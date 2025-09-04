@@ -12,16 +12,17 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-// ...existing code...
 
 
 /**
  * Central manager for screen capture translation functionality
  * Orchestrates the entire capture, preview, translate, and display workflow
  */
-export class CaptureManager {
+export class CaptureManager extends ResourceTracker {
   constructor() {
+    super('capture-manager')
     this.isActive = false;
     this.currentCapture = null;
     this.screenSelector = null;
@@ -521,25 +522,27 @@ export class CaptureManager {
    * Clean up all capture components and reset state
    */
   cleanup() {
-  logger.debug('Cleaning up');
+    logger.debug('Cleaning up');
 
     this.isActive = false;
     this.currentCapture = null;
     this.captureOptions = null;
 
-    // Note: UI components (screenSelector, capturePreview, captureResult)
+    // Cleanup screenSelector if exists
+    if (this.screenSelector) {
+      this.screenSelector.cleanup();
+      this.screenSelector = null;
+    }
+
+    // Note: UI components (capturePreview, captureResult)
     // are now managed in content script, not background script
-    this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
-  }
-
-  /**
-   * Check if capture is currently active
-   * @returns {boolean} True if active
-   */
-  isCapturing() {
-    return this.isActive;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('CaptureManager cleanup completed');
   }
 }
 

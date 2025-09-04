@@ -16,11 +16,13 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
 import { actionbarIconManager } from '@/utils/browser/ActionbarIconManager.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
-class LifecycleManager {
+class LifecycleManager extends ResourceTracker {
   constructor() {
+    super('lifecycle-manager')
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
@@ -261,6 +263,17 @@ class LifecycleManager {
       const contextMenuManager = new ContextMenuManager();
       await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
     }
+  }
+
+  cleanup() {
+    this.initialized = false;
+    this.browser = null;
+    this.translationEngine = null;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('LifecycleManager cleanup completed');
   }
 }
 

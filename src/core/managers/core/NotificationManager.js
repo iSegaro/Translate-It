@@ -1,6 +1,7 @@
 // src/managers/core/NotificationManager.js
 
 import { pageEventBus } from '@/core/PageEventBus.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * NotificationManager (v2)
@@ -8,18 +9,19 @@ import { pageEventBus } from '@/core/PageEventBus.js';
  * This class provides a clean API for other content-script modules.
  * It determines the correct way to show a notification based on the context.
  */
-export default class NotificationManager {
+export default class NotificationManager extends ResourceTracker {
+  constructor() {
+    super('notification-manager')
+  }
   /**
    * Shows a notification.
    *
    * @param {string} message The message to display.
    * @param {('error'|'warning'|'success'|'info'|'status'|'revert')} [type='info'] The type of notification.
-   * @param {boolean} [auto=true] (Note: vue-sonner handles auto-dismissal by default).
-   * @param {number|null} [duration=null] The duration in ms.
-   * @param {Function|null} [onClick=null] A callback for when the notification is clicked.
+   * @param {number|null} [duration=4000] The duration in ms.
    * @returns {string} A unique ID for the notification.
    */
-  show(message, type = 'info', auto = true, duration = 4000, onClick = null) {
+  show(message, type = 'info', duration = 4000) {
     const toastId = `${type}-${Date.now()}`;
     
     const detail = {
@@ -49,5 +51,10 @@ export default class NotificationManager {
    */
   dismissAll() {
     pageEventBus.emit('dismiss_all_notifications');
+  }
+
+  cleanup() {
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
   }
 }

@@ -5,6 +5,7 @@ import { CONFIG } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'FeatureManager');
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 
@@ -14,11 +15,12 @@ import { storageManager } from "@/shared/storage/core/StorageCore.js";
  *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SUBTITLE_TRANSLATION"|"SHOW_SUBTITLE_ICON"|"SCREEN_CAPTURE"} FeatureKey
  */
 
-export default class FeatureManager {
+export default class FeatureManager extends ResourceTracker {
   /**
    * @param {Object.<FeatureKey, boolean>} initialFlags
    */
   constructor(initialFlags = {}) {
+    super('feature-manager')
     this.keyMap = {
       EXTENSION_ENABLED: "EXTENSION_ENABLED",
       TRANSLATE_ON_TEXT_FIELDS: "TEXT_FIELDS",
@@ -96,5 +98,17 @@ export default class FeatureManager {
       this.flags[flag] = next;
       this._subscribers[flag]?.forEach((fn) => fn());
     }
+  }
+
+  cleanup() {
+    // Clear all subscribers
+    for (const flag in this._subscribers) {
+      this._subscribers[flag] = [];
+    }
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('FeatureManager cleanup completed');
   }
 }

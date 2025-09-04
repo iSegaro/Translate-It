@@ -9,6 +9,7 @@ import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/shared/config/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
@@ -88,8 +89,9 @@ async function focusOrCreateTab(url) {
  * Context Menu Manager
  * Handles context menu creation and management across browsers
  */
-export class ContextMenuManager {
+export class ContextMenuManager extends ResourceTracker {
   constructor() {
+    super('context-menu-manager');
     this.browser = null;
     this.initialized = false;
     this.createdMenus = new Set();
@@ -405,10 +407,11 @@ export class ContextMenuManager {
           await this._activateSelectElement(tab);
           break;
 
-        case ACTION_TRANSLATE_ELEMENT_ID:
+        case ACTION_TRANSLATE_ELEMENT_ID: {
           const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
           await this._activateSelectElement(activeTab);
           break;
+        }
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:
           await focusOrCreateTab(browser.runtime.getURL("html/options.html"));
@@ -512,5 +515,7 @@ export class ContextMenuManager {
 
     this.initialized = false;
     this.createdMenus.clear();
+    
+    super.cleanup();
   }
 }

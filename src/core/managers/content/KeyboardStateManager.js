@@ -5,16 +5,18 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class KeyboardStateManager {
+export class KeyboardStateManager extends ResourceTracker {
   constructor() {
+    super('keyboard-state-manager')
     this.keyStates = new Map();
     this.listeners = new Map();
     this.initialized = false;
-    
+
     // Initialize logger
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'KeyboardStateManager');
-    
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'KeyboardStateManager');
+
     // Commonly tracked keys
     this.TRACKED_KEYS = {
       CTRL: ['Control', 'Meta'],
@@ -22,11 +24,11 @@ export class KeyboardStateManager {
       SHIFT: ['Shift'],
       ESCAPE: ['Escape']
     };
-    
+
     // Bind methods for event listeners
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
-    
+
     this.logger.init('KeyboardStateManager initialized');
   }
 
@@ -39,10 +41,10 @@ export class KeyboardStateManager {
       return;
     }
 
-    // Setup global keyboard listeners
-    document.addEventListener('keydown', this.handleKeyDown, { capture: true });
-    document.addEventListener('keyup', this.handleKeyUp, { capture: true });
-    
+    // Setup global keyboard listeners using ResourceTracker
+    this.addEventListener(document, 'keydown', this.handleKeyDown);
+    this.addEventListener(document, 'keyup', this.handleKeyUp);
+
     // Initialize key states
     this.resetAllStates();
     
@@ -300,17 +302,14 @@ export class KeyboardStateManager {
    * Cleanup resources and event listeners
    */
   cleanup() {
-    // Remove event listeners
-    if (this.initialized) {
-      document.removeEventListener('keydown', this.handleKeyDown, { capture: true });
-      document.removeEventListener('keyup', this.handleKeyUp, { capture: true });
-    }
-    
     // Clear states and listeners
     this.keyStates.clear();
     this.listeners.clear();
     this.initialized = false;
-    
+
+    // Use ResourceTracker cleanup for automatic resource management (includes event listeners)
+    super.cleanup();
+
     this.logger.debug('Cleaned up');
   }
 }

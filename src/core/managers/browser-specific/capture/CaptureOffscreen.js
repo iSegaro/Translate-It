@@ -6,6 +6,7 @@ import { MessageFormat, MessagingContexts, MessageActions } from "@/shared/messa
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'CaptureOffscreen');
 
@@ -13,8 +14,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'CaptureOffscreen');
  * Offscreen Screen Capture Manager for Chrome
  * Uses Chrome's offscreen documents API for advanced screen capture
  */
-export class OffscreenCaptureManager {
+export class OffscreenCaptureManager extends ResourceTracker {
   constructor() {
+    super('offscreen-capture-manager')
     this.browser = null;
     this.offscreenCreated = false;
     this.initialized = false;
@@ -242,6 +244,12 @@ export class OffscreenCaptureManager {
       logger.error("❌ Error during capture manager cleanup:", error);
     }
 
+    this.browser = null;
     this.initialized = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug("✅ Offscreen capture manager cleanup completed");
   }
 }

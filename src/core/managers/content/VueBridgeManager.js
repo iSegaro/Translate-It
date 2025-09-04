@@ -6,11 +6,13 @@ import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'VueBridgeManager');
 
-class ContentScriptVueBridge {
+class ContentScriptVueBridge extends ResourceTracker {
   constructor() {
+    super('vue-bridge-manager')
     this.vueInstances = new Map();
     this.pinia = createPinia();
     this.isInitialized = false;
@@ -281,7 +283,13 @@ class ContentScriptVueBridge {
 
   cleanup = () => {
     for (const instanceId of this.vueInstances.keys()) this.destroyMicroApp(instanceId);
+    this.componentRegistry.clear();
     this.isInitialized = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
+    logger.debug('VueBridgeManager cleanup completed');
   }
 }
 
