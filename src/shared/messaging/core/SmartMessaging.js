@@ -85,7 +85,8 @@ function promiseTimeout(promise, ms) {
 
 export async function sendSmart(message, options = {}) {
   const {
-    timeout = isFastAction(message.action) ? 3000 : 15000,
+    timeout = isFastAction(message.action) ? 3000 : 
+             (message.action === MessageActions.TRANSLATE ? 60000 : 15000),
     usePortForAll = false
   } = options
 
