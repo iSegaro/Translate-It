@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { getTimeoutAsync, TranslationMode } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "@/utils/messaging/messageId.js";
+import { calculateDynamicTimeout } from "@/features/translation/utils/timeoutCalculator.js";
 import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
@@ -77,25 +78,22 @@ export class TranslationOrchestrator extends ResourceTracker {
 
   /**
    * Calculate dynamic timeout based on the number of segments to translate
+   * Uses the shared timeout calculator with local TIMEOUT_CONFIG
    * @param {number} segmentCount - Number of translation segments
    * @returns {number} - Timeout in milliseconds
    */
   calculateDynamicTimeout(segmentCount) {
-    if (!segmentCount || segmentCount <= 0) {
-      return TRANSLATION_TIMEOUT_FALLBACK;
-    }
+    // Use shared utility with local configuration override
+    const timeout = calculateDynamicTimeout(segmentCount, {
+      BASE_TIMEOUT: TIMEOUT_CONFIG.BASE_TIMEOUT,
+      TIME_PER_SEGMENT: TIMEOUT_CONFIG.TIME_PER_SEGMENT,
+      MAX_TIMEOUT: TIMEOUT_CONFIG.MAX_TIMEOUT,
+      MIN_TIMEOUT: TIMEOUT_CONFIG.MIN_TIMEOUT,
+      FALLBACK_TIMEOUT: TRANSLATION_TIMEOUT_FALLBACK
+    });
 
-    // Calculate timeout: base + (segments × time per segment)
-    const calculatedTimeout = TIMEOUT_CONFIG.BASE_TIMEOUT + (segmentCount * TIMEOUT_CONFIG.TIME_PER_SEGMENT);
-    
-    // Apply min/max constraints
-    const finalTimeout = Math.max(
-      TIMEOUT_CONFIG.MIN_TIMEOUT,
-      Math.min(calculatedTimeout, TIMEOUT_CONFIG.MAX_TIMEOUT)
-    );
-
-    this.logger.debug(`Dynamic timeout calculated: ${segmentCount} segments → ${finalTimeout}ms (${finalTimeout/1000}s)`);
-    return finalTimeout;
+    this.logger.debug(`Dynamic timeout calculated via shared utility: ${segmentCount} segments → ${timeout}ms (${timeout/1000}s)`);
+    return timeout;
   }
 
   async processSelectedElement(element, originalTextsMap, textNodes) {

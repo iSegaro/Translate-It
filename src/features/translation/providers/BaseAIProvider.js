@@ -6,6 +6,7 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translation/utils/timeoutCalculator.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import browser from 'webextension-polyfill';
@@ -106,11 +107,7 @@ export class BaseAIProvider extends BaseProvider {
             () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId),
             `streaming-batch-${batchIndex + 1}/${batches.length}`
           ),
-          new Promise((_, reject) => {
-            // Dynamic timeout based on batch size: 5 seconds per segment + 30 seconds base
-            const timeoutMs = Math.max(60000, batch.length * 5000 + 30000);
-            setTimeout(() => reject(new Error(`Rate limit execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs);
-          })
+          this._createBatchTimeoutPromise(batch.length)
         ]);
 
         // Add results to collection
@@ -276,6 +273,16 @@ export class BaseAIProvider extends BaseProvider {
    */
   _getTotalComplexity(texts) {
     return texts.reduce((sum, text) => sum + this._calculateTextComplexity(text), 0);
+  }
+
+  /**
+   * Create a timeout promise for batch processing
+   * Uses dynamic timeout calculation based on batch size
+   * @private
+   */
+  _createBatchTimeoutPromise(batchSize) {
+    const timeoutMs = calculateBatchTimeout(batchSize, this.providerName);
+    return createTimeoutPromise(timeoutMs, `Rate limit execution`);
   }
 
   /**
