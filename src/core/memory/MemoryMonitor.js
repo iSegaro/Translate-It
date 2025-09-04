@@ -239,6 +239,17 @@ class MemoryMonitor {
    */
   handleWarningMemory() {
     if (!import.meta.env.DEV) return;
+    
+    // Check if translation is active before cleanup
+    const isTranslationActive = typeof window !== 'undefined' && window.isTranslationInProgress;
+    
+    if (isTranslationActive) {
+      logger.warn('High memory usage detected, but translation is active. Deferring cleanup until completion.')
+      // Emit warning memory event but don't perform aggressive cleanup
+      this.emitMemoryEvent('warning', this.getCurrentMemory())
+      return;
+    }
+
     logger.warn('High memory usage detected, performing cleanup')
 
     // Perform garbage collection

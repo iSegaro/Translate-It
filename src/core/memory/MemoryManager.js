@@ -747,21 +747,29 @@ class MemoryManager {
   performCentralCleanup() {
     if (!shouldEnableDebugging()) return;
     try {
-      // Cleanup all registered caches
+      // Check if there's an active translation before cleaning up translation-related resources
+      const isTranslationActive = typeof window !== 'undefined' && window.isTranslationInProgress;
+      
+      // Cleanup all registered caches (safe to cleanup)
       this.registeredCaches.forEach(cache => {
         if (cache && typeof cache.cleanup === 'function') {
           cache.cleanup();
         }
       });
 
-      // Run monitoring for all registered monitors
+      // Run monitoring for all registered monitors, but skip SelectElementManager cleanup if translation is active
       this.registeredMonitors.forEach(monitor => {
         if (monitor && typeof monitor.performMonitoring === 'function') {
+          // Skip cleanup of translation-related managers during active translation
+          if (isTranslationActive && monitor.constructor.name === 'SelectElementManager') {
+            logger.debug('Skipping SelectElementManager cleanup during active translation');
+            return;
+          }
           monitor.performMonitoring();
         }
       });
 
-      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors`);
+      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors (translation active: ${isTranslationActive})`);
     } catch (error) {
       logger.warn('Error during central cleanup:', error);
     }
