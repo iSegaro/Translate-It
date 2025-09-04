@@ -90,17 +90,17 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     window.history.pushState = (...args) => {
       originalPushState.apply(window.history, args);
-      setTimeout(() => this.handleNavigationChange(), 100);
+      this.trackTimeout(() => this.handleNavigationChange(), 100);
     };
 
     window.history.replaceState = (...args) => {
       originalReplaceState.apply(window.history, args);
-      setTimeout(() => this.handleNavigationChange(), 100);
+      this.trackTimeout(() => this.handleNavigationChange(), 100);
     };
 
     // Listen for popstate
-    window.addEventListener("popstate", () => {
-      setTimeout(() => this.handleNavigationChange(), 100);
+    this.addEventListener(window, "popstate", () => {
+      this.trackTimeout(() => this.handleNavigationChange(), 100);
     });
   }
 
@@ -110,7 +110,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     if (newVideoId !== this.currentVideoId) {
       this.currentVideoId = newVideoId;
-  logger.debug(`Video changed to: ${newVideoId}`);
+      logger.debug(`Video changed to: ${newVideoId}`);
 
       if (this.isActive) {
         this.handleUrlChange();
@@ -132,7 +132,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       let elapsed = 0;
 
       while (!this.currentVideoId && elapsed < maxWait) {
-        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+        await new Promise((resolve) => this.trackTimeout(resolve, checkInterval));
         this.currentVideoId = this.getCurrentVideoId();
         elapsed += checkInterval;
       }
@@ -174,13 +174,20 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     if (subtitleButton) {
       observer.observe(subtitleButton, { attributes: true });
       this.subtitleStateObserver = observer;
+      // Track the observer for cleanup
+      this.trackResource('subtitleStateObserver', () => {
+        if (this.subtitleStateObserver) {
+          this.subtitleStateObserver.disconnect();
+          this.subtitleStateObserver = null;
+        }
+      });
     }
 
     // بررسی اولیه وضعیت
     this.updateContainerVisibility();
 
     // بررسی دوره‌ای هم برای اطمینان (هر 2 ثانیه)
-    this.subtitleCheckInterval = setInterval(() => {
+    this.subtitleCheckInterval = this.trackInterval(() => {
       this.updateContainerVisibility();
     }, 2000);
   }
@@ -340,12 +347,14 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     }
 
     // Event delegation برای hover events - بهبود یافته
-    document.addEventListener(
+    this.addEventListener(
+      document,
       "mouseenter",
       this.handleSubtitleHover.bind(this),
       true,
     );
-    document.addEventListener(
+    this.addEventListener(
+      document,
       "mouseleave",
       this.handleSubtitleLeave.bind(this),
       true,
@@ -407,7 +416,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     if (!this.subtitleContainer || !this.subtitleBox) return;
 
     // Hover events for pause/resume
-    this.subtitleBox.addEventListener("mouseenter", () => {
+    this.addEventListener(this.subtitleBox, "mouseenter", () => {
       if (!this.isDragging) {
         logger.debug('Direct hover enter on subtitle box');
         this.pauseVideo();
@@ -415,7 +424,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       }
     });
 
-    this.subtitleBox.addEventListener("mouseleave", () => {
+    this.addEventListener(this.subtitleBox, "mouseleave", () => {
       if (!this.isDragging) {
         logger.debug('Direct hover leave from subtitle box');
         this.resumeVideo();
@@ -424,12 +433,13 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     });
 
     // Drag events
-    this.subtitleContainer.addEventListener(
+    this.addEventListener(
+      this.subtitleContainer,
       "mousedown",
       this.handleDragStart.bind(this),
     );
-    document.addEventListener("mousemove", this.handleDragMove.bind(this));
-    document.addEventListener("mouseup", this.handleDragEnd.bind(this));
+    this.addEventListener(document, "mousemove", this.handleDragMove.bind(this));
+    this.addEventListener(document, "mouseup", this.handleDragEnd.bind(this));
   }
 
   handleDragStart(e) {
@@ -620,7 +630,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       clearTimeout(this.subtitleCleanupTimeout);
     }
 
-    this.subtitleCleanupTimeout = setTimeout(() => {
+    this.subtitleCleanupTimeout = this.trackTimeout(() => {
       this.recentSubtitles.clear();
       logger.debug('Recent subtitles history cleared');
     }, this.minClearSubtitleLines);
@@ -635,7 +645,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     }
 
     // تنظیم تایمر جدید برای مخفی کردن کادر
-    this.subtitleHideTimeout = setTimeout(() => {
+    this.subtitleHideTimeout = this.trackTimeout(() => {
       if (this.subtitleBox) {
         this.subtitleBox.classList.remove("visible");
         logger.debug('Subtitle box auto-hidden after timeout',  );
@@ -770,37 +780,16 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
   // پاک‌سازی YouTube specific resources
   destroy() {
-    // Remove event listeners
-    document.removeEventListener("mouseenter", this.handleSubtitleHover, true);
-    document.removeEventListener("mouseleave", this.handleSubtitleLeave, true);
-
-    // Remove drag event listeners
-    document.removeEventListener("mousemove", this.handleDragMove);
-    document.removeEventListener("mouseup", this.handleDragEnd);
-
     // پاک‌سازی subtitle state monitoring
     if (this.subtitleStateObserver) {
       this.subtitleStateObserver.disconnect();
       this.subtitleStateObserver = null;
     }
 
-    if (this.subtitleCheckInterval) {
-      clearInterval(this.subtitleCheckInterval);
-      this.subtitleCheckInterval = null;
-    }
-
     // پاک‌سازی timing
     this.lastDisplayTime = 0;
     this.currentSubtitleText = "";
     this.recentSubtitles.clear();
-    if (this.subtitleCleanupTimeout) {
-      clearTimeout(this.subtitleCleanupTimeout);
-      this.subtitleCleanupTimeout = null;
-    }
-    if (this.subtitleHideTimeout) {
-      clearTimeout(this.subtitleHideTimeout);
-      this.subtitleHideTimeout = null;
-    }
 
     // Remove fixed subtitle container
     if (this.subtitleContainer) {
@@ -815,14 +804,6 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.lastDisplayTime = 0;
     this.currentSubtitleText = "";
     this.recentSubtitles.clear();
-    if (this.subtitleCleanupTimeout) {
-      clearTimeout(this.subtitleCleanupTimeout);
-      this.subtitleCleanupTimeout = null;
-    }
-    if (this.subtitleHideTimeout) {
-      clearTimeout(this.subtitleHideTimeout);
-      this.subtitleHideTimeout = null;
-    }
 
     // Clear subtitle lines array
     this.subtitleLines = [];
