@@ -4,6 +4,7 @@
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MEMORY_TIMING, TRANSLATION_MEMORY } from './constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager');
 
@@ -45,7 +46,7 @@ class MemoryManager {
       this.registeredCaches = new Set();
       this.registeredMonitors = new Set();
       this.centralTimer = null;
-      this.centralTimerInterval = options.centralTimerInterval || 60 * 1000; // 1 minute
+      this.centralTimerInterval = options.centralTimerInterval || MEMORY_TIMING.CENTRAL_TIMER_INTERVAL;
     }
     this.initCentralTimer(); // Moved outside the if (isDevelopment) block
 
@@ -472,8 +473,14 @@ class MemoryManager {
     const allResourceIds = Array.from(this.resources.keys());
     allResourceIds.forEach(resourceId => this.cleanupResource(resourceId));
 
-    // Clear caches
+    // Clear caches (skip critical caches)
     this.caches.forEach(cache => {
+      if (cache.isCritical) {
+        if (isDevelopment) {
+          logger.debug('Skipping critical cache during cleanup');
+        }
+        return;
+      }
       if (cache.destroy && typeof cache.destroy === 'function') {
         try {
           cache.destroy();
@@ -484,7 +491,14 @@ class MemoryManager {
         }
       }
     });
-    this.caches.clear();
+    // Remove non-critical caches from the set
+    const criticalCaches = new Set();
+    this.caches.forEach(cache => {
+      if (cache.isCritical) {
+        criticalCaches.add(cache);
+      }
+    });
+    this.caches = criticalCaches;
 
     // Clear groups
     this.groups.clear();
@@ -584,16 +598,39 @@ class MemoryManager {
   }
 
   /**
-   * Perform garbage collection
+   * Check if translation is currently active
+   * @returns {boolean} True if translation is active
+   */
+  isTranslationActive() {
+    // Check if translation engine group has active resources
+    const translationGroup = this.groups.get('translation-engine');
+    const hasActiveTranslation = translationGroup && translationGroup.size > 0;
+    
+    if (hasActiveTranslation && isDevelopment) {
+      logger.debug('Translation active, deferring cleanup operations');
+    }
+    
+    return hasActiveTranslation;
+  }
+
+  /**
+   * Perform garbage collection (skip critical caches and during translations)
    */
   performGarbageCollection() {
     if (!isDevelopment) return;
+
+    // Skip GC during active translation
+    if (TRANSLATION_MEMORY.SKIP_CLEANUP_DURING_TRANSLATION && this.isTranslationActive()) {
+      logger.debug('Skipping garbage collection during active translation');
+      return;
+    }
+
     // Force garbage collection if available (development only)
     if (typeof window !== 'undefined' && window.gc && typeof window.gc === 'function') {
       window.gc();
     }
 
-    // Cleanup expired resources
+    // Cleanup expired resources (skip critical caches)
     this.cleanupAll();
 
     // Update memory stats

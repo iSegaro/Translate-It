@@ -5,6 +5,7 @@
 import { getMemoryManager } from './MemoryManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { MEMORY_TIMING } from './constants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryMonitor')
 
@@ -17,8 +18,8 @@ class MemoryMonitor {
     this.memoryManager = getMemoryManager()
     this.measurements = []
     this.thresholds = {
-      warning: 50 * 1024 * 1024, // 50MB
-      critical: 100 * 1024 * 1024 // 100MB
+      warning: MEMORY_TIMING.MEMORY_WARNING_THRESHOLD,
+      critical: MEMORY_TIMING.MEMORY_CRITICAL_THRESHOLD
     }
     this.logThresholds = {
       warning: this.thresholds.warning * 2, // 100MB for logging
@@ -48,7 +49,7 @@ class MemoryMonitor {
     if (!this.useCentralMonitoring) {
       this.monitorInterval = setInterval(() => {
         this.performMonitoring()
-      }, 30 * 1000)
+      }, MEMORY_TIMING.MEMORY_MONITOR_INTERVAL)
 
       // Track the monitor interval
       this.memoryManager.trackTimer(this.monitorInterval, 'memory-monitor')

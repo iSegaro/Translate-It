@@ -3,17 +3,19 @@
  * Cache with TTL, size limits, and automatic cleanup
  */
 import { getMemoryManager } from './MemoryManager.js'
+import { MEMORY_TIMING } from './constants.js'
 
 class SmartCache extends Map {
   constructor(options = {}) {
     super()
     this.maxSize = options.maxSize || 100
-    this.defaultTTL = options.defaultTTL || 30 * 60 * 1000 // 30 minutes
+    this.defaultTTL = options.defaultTTL || MEMORY_TIMING.CACHE_DEFAULT_TTL
     this.accessTimes = new Map()
     this.expiryTimes = new Map()
     this.cleanupInterval = null
     this.isDestroyed = false
     this.useCentralCleanup = options.useCentralCleanup !== false
+    this.isCritical = options.isCritical || false // Mark as critical cache
 
     // Register with centralized cleanup system
     if (this.useCentralCleanup) {
@@ -72,13 +74,15 @@ class SmartCache extends Map {
   }
 
   /**
-   * Check if a key is expired
+   * Check if a key exists in cache
    * @param {string} key - Cache key
-   * @returns {boolean} True if expired
+   * @returns {boolean} True if key exists and cache is not destroyed
    */
-  isExpired(key) {
-    const expiryTime = this.expiryTimes.get(key)
-    return expiryTime && Date.now() > expiryTime
+  has(key) {
+    if (this.isDestroyed) {
+      return false
+    }
+    return super.has(key)
   }
 
   /**
@@ -100,6 +104,16 @@ class SmartCache extends Map {
     if (lruKey) {
       this.delete(lruKey)
     }
+  }
+
+  /**
+   * Check if a key is expired
+   * @param {string} key - Cache key
+   * @returns {boolean} True if expired
+   */
+  isExpired(key) {
+    const expiryTime = this.expiryTimes.get(key)
+    return expiryTime && Date.now() > expiryTime
   }
 
   /**
@@ -191,10 +205,10 @@ class SmartCache extends Map {
       clearInterval(this.cleanupInterval)
     }
 
-    // Cleanup every 5 minutes
+    // Use centralized cleanup interval
     this.cleanupInterval = setInterval(() => {
       this.cleanup()
-    }, 5 * 60 * 1000)
+    }, MEMORY_TIMING.CACHE_CLEANUP_INTERVAL)
   }
 
   /**
@@ -208,10 +222,16 @@ class SmartCache extends Map {
   }
 
   /**
-   * Destroy the cache and clean up resources
+   * Destroy the cache and clean up resources (skip if critical)
    */
   destroy() {
     if (this.isDestroyed) return
+
+    // Skip destruction if this is a critical cache
+    if (this.isCritical) {
+      logger.debug('Skipping destruction of critical cache')
+      return
+    }
 
     // Unregister from centralized cleanup
     if (this.useCentralCleanup) {

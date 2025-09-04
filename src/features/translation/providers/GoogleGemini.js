@@ -340,7 +340,7 @@ export class GeminiProvider extends BaseAIProvider {
       apiKeyLength: apiKey ? apiKey.length : 0,
       geminiModel,
       thinkingEnabled,
-      text: text.substring(0, 100) + '...'
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : '')
     });
 
     // Build API URL based on selected model

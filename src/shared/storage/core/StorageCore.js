@@ -2,7 +2,7 @@
  * StorageCore - Centralized Storage Management System
  * Provides unified API for browser extension storage with caching and event system
  * Compatible with both Chrome and Firefox through webextension-polyfill
- * 
+ *
  * This is the new unified storage system that replaces the old StorageManager
  */
 
@@ -15,11 +15,16 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import SmartCache from '@/core/memory/SmartCache.js';
+import { MEMORY_TIMING } from '@/core/memory/constants.js';
 
 class StorageCore extends ResourceTracker {
   constructor() {
     super('storage-core')
-    this.cache = new SmartCache({ maxSize: 200, defaultTTL: 60000 }); // 1 minute TTL
+    this.cache = new SmartCache({ 
+      maxSize: MEMORY_TIMING.MAX_CACHE_SIZE, 
+      defaultTTL: MEMORY_TIMING.CRITICAL_CACHE_TTL, 
+      isCritical: true 
+    }); // Critical storage cache with centralized timing
     this.listeners = new Map(); // event_name -> Set of callbacks
     this._isReady = false;
     this._readyPromise = null;
@@ -132,6 +137,9 @@ class StorageCore extends ResourceTracker {
 
       // Check cache first if requested
       if (useCache && keyList) {
+        // Ensure cache availability
+        this._ensureCache();
+        
         const cachedResult = {};
         const uncachedKeys = [];
 
@@ -230,6 +238,9 @@ class StorageCore extends ResourceTracker {
 
       // Update cache if requested (use plain data)
       if (updateCache) {
+        // Ensure cache availability
+        this._ensureCache();
+        
         for (const [key, value] of Object.entries(plainData)) {
           this.cache.set(key, value);
         }
@@ -312,16 +323,43 @@ class StorageCore extends ResourceTracker {
    * @returns {*} Cached value or default
    */
   getCached(key, defaultValue = undefined) {
+    // Ensure cache availability
+    this._ensureCache();
     return this.cache.has(key) ? this.cache.get(key) : defaultValue;
   }
 
   /**
-   * Check if key exists in cache
+   * Check if key exists in cache, recreating cache if destroyed
    * @param {string} key - Key to check
    * @returns {boolean} Whether key exists in cache
    */
   hasCached(key) {
+    // Ensure cache availability
+    this._ensureCache();
     return this.cache.has(key);
+  }
+
+  /**
+   * Ensure cache is available and recreate if destroyed
+   * Enhanced cache recreation with proper re-registration
+   * @private
+   */
+  _ensureCache() {
+    if (this.cache.isDestroyed) {
+      this.logger.debug('Cache was destroyed, recreating with enhanced settings...');
+      
+      // Create new cache with same settings
+      this.cache = new SmartCache({ 
+        maxSize: MEMORY_TIMING.MAX_CACHE_SIZE, 
+        defaultTTL: MEMORY_TIMING.CRITICAL_CACHE_TTL, 
+        isCritical: true 
+      });
+      
+      // Re-register with memory manager for proper tracking
+      this.trackCache(this.cache, { isCritical: true });
+      
+      this.logger.debug('Cache successfully recreated and re-registered');
+    }
   }
 
   /**

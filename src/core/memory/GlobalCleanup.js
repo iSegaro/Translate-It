@@ -5,6 +5,7 @@
 import { getMemoryManager } from './MemoryManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { MEMORY_TIMING } from './constants.js'
 import browser from 'webextension-polyfill'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GlobalCleanup')
@@ -31,7 +32,7 @@ class GlobalCleanup {
     this.gcInterval = setInterval(() => {
       logger.debug('Periodic garbage collection triggered')
       this.memoryManager.performGarbageCollection()
-    }, 5 * 60 * 1000) // 5 minutes
+    }, MEMORY_TIMING.GC_INTERVAL)
 
     // Track the GC interval
     this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
@@ -71,7 +72,7 @@ class GlobalCleanup {
       const connectHandler = () => {
         // Check if context is still valid
         if (this.isContextInvalid()) {
-          logger.debug('Extension context invalidated, cleaning up')
+          logger.debug('Extension context invalidated, cleaning up (skipping critical caches)')
           this.memoryManager.cleanupAll()
         }
       }
@@ -79,11 +80,11 @@ class GlobalCleanup {
       this.memoryManager.trackEventListener(browser.runtime.onConnect, 'connect', connectHandler, 'global-cleanup')
     }
 
-    // Periodic garbage collection (every 5 minutes)
+    // Periodic garbage collection using centralized timing
     this.gcInterval = setInterval(() => {
       logger.debug('Periodic garbage collection triggered')
       this.memoryManager.performGarbageCollection()
-    }, 5 * 60 * 1000)
+    }, MEMORY_TIMING.GC_INTERVAL)
 
     // Track the GC interval
     this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')

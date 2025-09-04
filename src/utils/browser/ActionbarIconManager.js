@@ -17,7 +17,7 @@ class ActionbarIconManager extends ResourceTracker {
     super('actionbar-icon-manager')
     this.currentProvider = null;
     this.isInitialized = false;
-    this.iconCache = new SmartCache({ maxSize: 50, defaultTTL: 1800000 }); // 30 minutes TTL
+    this.iconCache = new SmartCache({ maxSize: 50, defaultTTL: 1800000, isCritical: true }); // 30 minutes TTL, mark as critical
     
     // Provider icon mapping
     this.providerIcons = {

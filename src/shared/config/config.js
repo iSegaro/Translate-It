@@ -410,11 +410,13 @@ const getSettingValueAsync = async (key, defaultValue) => {
     // Try to get from cache first (synchronous and fast)
     if (storageManager.hasCached(key)) {
       const cachedValue = storageManager.getCached(key, defaultValue);
+      logger.debug(`[config] Using cached value for ${key}:`, cachedValue ? 'present' : 'not present');
       return cachedValue !== undefined ? cachedValue : defaultValue;
     }
     
     // If not cached, get from storage with default
     const result = await storageManager.get({ [key]: defaultValue });
+    logger.debug(`[config] Retrieved from storage for ${key}:`, result[key] ? 'present' : 'not present');
     return result[key];
   } catch (error) {
     const handler = ErrorHandler.getInstance();
