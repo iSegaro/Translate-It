@@ -212,6 +212,18 @@ export class TranslationOrchestrator extends ResourceTracker {
     if (!data.success) {
         this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
         
+        // Handle error properly for user feedback
+        const errorMessage = data.error?.message || 'Translation failed during streaming';
+        const error = new Error(errorMessage);
+        error.originalError = data.error;
+        
+        // Use centralized error handling to show error to user
+        await this.errorHandler.handle(error, {
+          context: 'select-element-streaming-translation',
+          type: ErrorTypes.TRANSLATION_FAILED,
+          showToast: true
+        });
+        
         // Clear the global translation in progress flag on error
         window.isTranslationInProgress = false;
         
@@ -280,31 +292,52 @@ export class TranslationOrchestrator extends ResourceTracker {
 
     this.logger.info("Translation stream finished for message:", messageId);
     
-    // Clear the global translation in progress flag
-    window.isTranslationInProgress = false;
-    
-    // Dismiss the "Translating..." notification on stream completion
-    if (this.statusNotification) {
-      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
-      this.statusNotification = null;
-      this.logger.debug("Dismissed translating notification on stream completion");
-    }
-    
-    // Finalize state, e.g., by storing all translations in stateManager
-    const allTranslations = new Map(request.cachedTranslations);
-    request.translatedSegments.forEach((value, key) => {
-        const { originalIndex } = request.originMapping[key];
-        const originalTextKey = request.textsToTranslate[originalIndex];
-        // This part is complex, for now just storing the translated segments is enough for revert
-        // A more sophisticated reassembly might be needed if we want to store the full translated block
-    });
-    this.stateManager.addTranslatedElement(request.element, request.translatedSegments);
+    try {
+      // Clear the global translation in progress flag
+      window.isTranslationInProgress = false;
+      
+      // Dismiss the "Translating..." notification on stream completion
+      if (this.statusNotification) {
+        pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+        this.statusNotification = null;
+        this.logger.debug("Dismissed translating notification on stream completion");
+      }
+      
+      // Finalize state, e.g., by storing all translations in stateManager
+      const allTranslations = new Map(request.cachedTranslations);
+      request.translatedSegments.forEach((value, key) => {
+          const { originalIndex } = request.originMapping[key];
+          const originalTextKey = request.textsToTranslate[originalIndex];
+          // This part is complex, for now just storing the translated segments is enough for revert
+          // A more sophisticated reassembly might be needed if we want to store the full translated block
+      });
+      this.stateManager.addTranslatedElement(request.element, request.translatedSegments);
 
-    this.translationRequests.delete(messageId);
-    
-    // Notify SelectElementManager to perform cleanup
-    if (window.selectElementManagerInstance) {
-      window.selectElementManagerInstance.performPostTranslationCleanup();
+      this.translationRequests.delete(messageId);
+      
+      // Notify SelectElementManager to perform cleanup
+      if (window.selectElementManagerInstance) {
+        window.selectElementManagerInstance.performPostTranslationCleanup();
+      }
+    } catch (error) {
+      this.logger.error("Error during stream end processing:", error);
+      
+      // Ensure cleanup happens even if there's an error
+      this.translationRequests.delete(messageId);
+      window.isTranslationInProgress = false;
+      
+      // Dismiss notification if it exists
+      if (this.statusNotification) {
+        pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+        this.statusNotification = null;
+      }
+      
+      // Show error to user
+      this.errorHandler.handleError(error, {
+        context: 'stream_end_processing',
+        messageId,
+        showToast: true
+      });
     }
   }
 
