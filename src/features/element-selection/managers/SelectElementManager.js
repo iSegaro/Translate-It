@@ -163,12 +163,19 @@ export class SelectElementManager extends ResourceTracker {
 
       // Start translation process immediately (don't await)
       this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes)
-        .catch(error => {
-          // Handle cancellation and other errors silently to avoid unhandled promise rejection
+        .catch(async (error) => {
+          // Handle cancellation and other errors properly
           if (error.message === 'Translation cancelled by user') {
             this.logger.debug('Translation cancelled by user - handled');
           } else {
             this.logger.error('Translation process failed', error);
+            // Handle translation errors through error handling service for proper UI feedback
+            if (!error.alreadyHandled) {
+              await this.errorHandlingService.handle(error, { 
+                type: ErrorTypes.TRANSLATION_FAILED, 
+                context: "select-element-translation" 
+              });
+            }
           }
         })
         .finally(() => {

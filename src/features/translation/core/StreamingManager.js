@@ -235,6 +235,9 @@ export class StreamingManager {
         timestamp: Date.now()
       }
     });
+
+    // Immediate cleanup for errors to prevent state corruption
+    this._immediateCleanup(messageId);
   }
 
   /**
@@ -258,6 +261,9 @@ export class StreamingManager {
       cancelled: true,
       reason: reason
     });
+
+    // Immediate cleanup for cancellations to prevent state corruption
+    this._immediateCleanup(messageId);
   }
 
   /**
@@ -322,6 +328,18 @@ export class StreamingManager {
       this.streamingResults.delete(messageId);
       logger.debug(`[StreamingManager] Cleaned up stream: ${messageId}`);
     }, 30000); // 30 second delay
+  }
+
+  /**
+   * Immediate cleanup for errors/cancellations to prevent state corruption
+   * @param {string} messageId - Message ID
+   * @private
+   */
+  _immediateCleanup(messageId) {
+    this.activeStreams.delete(messageId);
+    this.senderInfo.delete(messageId);
+    this.streamingResults.delete(messageId);
+    logger.debug(`[StreamingManager] Immediately cleaned up stream: ${messageId}`);
   }
 
   /**

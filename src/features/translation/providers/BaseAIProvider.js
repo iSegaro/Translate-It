@@ -99,12 +99,17 @@ export class BaseAIProvider extends BaseProvider {
         // Get rate limit manager
         const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
         
-        // Translate this batch
-        const batchResults = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController),
-          `streaming-batch-${batchIndex + 1}/${batches.length}`
-        );
+        // Translate this batch with timeout
+        const batchResults = await Promise.race([
+          rateLimitManager.executeWithRateLimit(
+            this.providerName,
+            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController),
+            `streaming-batch-${batchIndex + 1}/${batches.length}`
+          ),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Rate limit execution timeout after 30 seconds')), 30000)
+          )
+        ]);
 
         // Add results to collection
         allResults.push(...batchResults);
@@ -124,18 +129,14 @@ export class BaseAIProvider extends BaseProvider {
       } catch (error) {
         logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);
         
-        // On error, return original texts for this batch
-        const fallbackResults = batch;
-        allResults.push(...fallbackResults);
+        // Send error stream message to content script
+        await this._streamErrorResults(error, batchIndex, messageId, engine);
         
-        // Still stream the fallback results
-        await this._streamBatchResults(
-          fallbackResults,
-          batch, 
-          batchIndex,
-          messageId,
-          engine
-        );
+        // Send streaming end notification with error status
+        await this._sendStreamEnd(messageId, engine, { error: true });
+        
+        // Stop streaming on error - don't continue with other batches
+        throw error;
       }
     }
 
@@ -346,16 +347,18 @@ export class BaseAIProvider extends BaseProvider {
    * Send streaming end notification
    * @param {string} messageId - Message ID
    * @param {object} engine - Translation engine
+   * @param {object} options - Options (error: boolean)
    */
-  async _sendStreamEnd(messageId, engine) {
+  async _sendStreamEnd(messageId, engine, options = {}) {
     if (!engine || !messageId) return;
 
     try {
       const streamEndMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_END,
         {
-          success: true,
+          success: !options.error,
           completed: true,
+          error: options.error,
           provider: this.providerName,
           timestamp: Date.now()
         },
@@ -370,6 +373,41 @@ export class BaseAIProvider extends BaseProvider {
       }
     } catch (error) {
       logger.error(`[${this.providerName}] Failed to send stream end:`, error);
+    }
+  }
+
+  /**
+   * Send error stream message to content script
+   * @param {Error} error - The error that occurred
+   * @param {number} batchIndex - Index of the failed batch
+   * @param {string} messageId - Message ID
+   * @param {object} engine - Translation engine instance
+   */
+  async _streamErrorResults(error, batchIndex, messageId, engine) {
+    if (!engine || !messageId) return;
+    try {
+      const streamErrorMessage = MessageFormat.create(
+        MessageActions.TRANSLATION_STREAM_UPDATE,
+        {
+          success: false,
+          error: {
+            message: error.message || 'Translation failed',
+            type: error.type || 'TRANSLATION_ERROR'
+          },
+          batchIndex: batchIndex,
+          provider: this.providerName,
+          timestamp: Date.now()
+        },
+        'background-streaming',
+        { messageId }
+      );
+      const senderInfo = engine.getStreamingSender?.(messageId);
+      if (senderInfo && senderInfo.tab?.id) {
+        await browser.tabs.sendMessage(senderInfo.tab.id, streamErrorMessage);
+        logger.debug(`[${this.providerName}] Stream error sent to tab ${senderInfo.tab.id}`);
+      }
+    } catch (sendError) {
+      logger.error(`[${this.providerName}] Failed to send stream error:`, sendError);
     }
   }
 

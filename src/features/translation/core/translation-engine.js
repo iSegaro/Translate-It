@@ -1099,7 +1099,7 @@ export class TranslationEngine {
   /**
    * Cancel active translation by message ID
    */
-  cancelTranslation(messageId) {
+  async cancelTranslation(messageId) {
     if (messageId) {
       logger.debug(`[TranslationEngine] Marking translation as cancelled: ${messageId}`);
       this.cancelledRequests.add(messageId);
@@ -1108,6 +1108,14 @@ export class TranslationEngine {
         const abortController = this.activeTranslations.get(messageId);
         abortController.abort();
         logger.debug(`[TranslationEngine] Aborted translation for messageId: ${messageId}`);
+      }
+
+      // Cancel streaming session if active
+      try {
+        const { streamingManager } = await import("./StreamingManager.js");
+        await streamingManager.cancelStream(messageId, 'Translation cancelled by user');
+      } catch (error) {
+        logger.debug(`[TranslationEngine] StreamingManager cancel failed (might not be streaming): ${error.message}`);
       }
 
       return true;

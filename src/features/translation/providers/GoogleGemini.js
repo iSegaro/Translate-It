@@ -76,8 +76,18 @@ export class GeminiProvider extends BaseAIProvider {
         throw new Error('Batch result count mismatch');
       }
     } catch (error) {
-      logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
-      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, null, null, abortController);
+      logger.warn(`[${this.providerName}] Batch translation failed, trying fallback:`, error);
+      
+      // Try fallback, but if that fails too, throw the original error
+      try {
+        const fallbackResults = await this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, null, null, abortController);
+        logger.info(`[${this.providerName}] Fallback successful for ${batch.length} segments`);
+        return fallbackResults;
+      } catch (fallbackError) {
+        logger.error(`[${this.providerName}] Fallback also failed:`, fallbackError);
+        // Throw the original batch error, not fallback error, for better context
+        throw error;
+      }
     }
   }
 
@@ -127,6 +137,7 @@ export class GeminiProvider extends BaseAIProvider {
   }
 
   async _fallbackSingleRequests(batch, sl, tl, translateMode, engine, messageId, abortController) {
+    logger.debug(`[Gemini] Starting fallback for ${batch.length} segments`);
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
     for (let i = 0; i < batch.length; i++) {
@@ -134,32 +145,22 @@ export class GeminiProvider extends BaseAIProvider {
         throw new Error('Translation cancelled during fallback');
       }
       try {
-        const result = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          () => this._translateSingle(batch[i], sl, tl, translateMode, abortController),
-          `fallback-segment-${i + 1}/${batch.length}`
-        );
+        logger.debug(`[Gemini] Fallback processing segment ${i + 1}/${batch.length}: "${batch[i]}"`);
+        // Bypass rate limiting for fallback to avoid hanging
+        logger.debug(`[Gemini] Bypassing rate limit for fallback segment ${i + 1}`);
+        const result = await Promise.race([
+          this._translateSingle(batch[i], sl, tl, translateMode, abortController),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 10 seconds`)), 10000)
+          )
+        ]);
+        logger.debug(`[Gemini] Fallback segment ${i + 1} completed`);
         results.push(result || batch[i]);
       } catch (error) {
         logger.warn(`[Gemini] Fallback segment ${i + 1} failed:`, error);
         
-        // Handle different error types appropriately using centralized error management
-        if (this._isQuotaError(error) || error.type === ErrorTypes.QUOTA_EXCEEDED) {
-          await ErrorHandler.getInstance().handle(error, {
-            context: 'gemini-fallback-quota',
-            type: ErrorTypes.QUOTA_EXCEEDED
-          });
-          throw error; // Re-throw after handling
-        }
-        if (this._isRateLimitError(error) || error.type === ErrorTypes.RATE_LIMIT_REACHED) {
-          await ErrorHandler.getInstance().handle(error, {
-            context: 'gemini-fallback-rate-limit',
-            type: ErrorTypes.RATE_LIMIT_REACHED
-          });
-          throw error; // Re-throw after handling
-        }
-        
-        results.push(batch[i]); // Fallback to original text for other errors
+        // Throw error to be handled by system error management
+        throw error;
       }
     }
     return results;

@@ -32,7 +32,7 @@ export async function handleCancelTranslation(request, sender) {
     if (messageId) {
       logger.debug('[CancelTranslation] Attempting to cancel translation', { messageId });
       
-      const cancelled = translationEngine.cancelTranslation(messageId);
+      const cancelled = await translationEngine.cancelTranslation(messageId);
       if (cancelled) {
         logger.debug('[CancelTranslation] Successfully cancelled translation', { messageId });
       } else {

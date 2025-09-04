@@ -188,14 +188,10 @@ export class TranslationOrchestrator extends ResourceTracker {
 
       this.logger.debug("Sending translation request with advanced payload");
       
-      // Use safe messaging through ExtensionContextManager
-      const result = await ExtensionContextManager.safeSendMessage(translationRequest, 'select-element-translation');
+      // Use sendSmart for proper error propagation instead of safeSendMessage
+      const result = await sendSmart(translationRequest);
       
-      if (result === null) {
-        throw new Error('Extension context invalidated during translation request');
-      }
-
-      this.logger.debug("Translation request sent successfully");
+      this.logger.debug("Translation request sent successfully", result);
     } catch (error) {
       this.logger.error("Failed to send translation request", error);
       throw error;
