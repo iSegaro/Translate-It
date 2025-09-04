@@ -10,17 +10,18 @@ import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 // removed legacy createLogger import
 
 
-export class SubtitleHandler {
+export class SubtitleHandler extends ResourceTracker {
   constructor(translationHandler) {
+    super('subtitle-handler');
     this.translationHandler = translationHandler;
     this.subtitleIntegration = null;
     this.featureManager = translationHandler.featureManager;
     this.site = this.detectSite();
-    this.youtubeButtonInterval = null;
 
     if (this.site) {
       this.initialize();
@@ -37,7 +38,7 @@ export class SubtitleHandler {
   async initialize() {
   logger.debug('Initializing for', this.site, '...');
     if (!this.featureManager) {
-      setTimeout(() => this.initialize(), 200);
+      this.trackTimeout(() => this.initialize(), 200);
       return;
     }
 
@@ -71,7 +72,7 @@ export class SubtitleHandler {
       if (this.featureManager.isOn("EXTENSION_ENABLED") !== (settings.EXTENSION_ENABLED ?? true) ||
           this.featureManager.isOn("SUBTITLE_TRANSLATION") !== (settings.ENABLE_SUBTITLE_TRANSLATION ?? true) ||
           this.featureManager.isOn("SHOW_SUBTITLE_ICON") !== (settings.SHOW_SUBTITLE_ICON ?? true)) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => this.trackTimeout(resolve, 100));
       }
     } catch (error) {
   logger.error('Error checking storage, proceeding with current state:', error);
@@ -81,7 +82,7 @@ export class SubtitleHandler {
   initializeYouTubeUI() {
     if (!this.featureManager.isOn("SHOW_SUBTITLE_ICON")) return;
     this.injectYouTubeButtonStyles();
-    this.youtubeButtonInterval = setInterval(() => this.createYouTubeButton(), 1000);
+    this.youtubeButtonInterval = this.trackInterval(() => this.createYouTubeButton(), 1000);
   }
 
   injectYouTubeButtonStyles() {
@@ -108,7 +109,7 @@ export class SubtitleHandler {
       icon.src = browser.runtime.getURL("icons/extension_icon_48.png");
       icon.className = "translate-it-yt-icon";
       button.appendChild(icon);
-      button.addEventListener("click", () => this.toggleSubtitleSetting());
+      this.addEventListener(button, "click", () => this.toggleSubtitleSetting());
       controls.insertBefore(button, captionsButton);
       this.updateYouTubeButtonState();
     } catch (error) {
@@ -258,10 +259,6 @@ export class SubtitleHandler {
   }
 
   cleanupYouTubeUI() {
-    if (this.youtubeButtonInterval) {
-      clearInterval(this.youtubeButtonInterval);
-      this.youtubeButtonInterval = null;
-    }
     const button = document.getElementById("translate-it-yt-btn");
     if (button) button.remove();
     const style = document.getElementById("translate-it-yt-button-style");
@@ -271,5 +268,7 @@ export class SubtitleHandler {
   cleanup() {
     if (this.site === "youtube") this.cleanupYouTubeUI();
     this.stopSubtitleIntegration();
+    // ResourceTracker automatically handles cleanup of timers and event listeners
+    super.cleanup();
   }
 }
