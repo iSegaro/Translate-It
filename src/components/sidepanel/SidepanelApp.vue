@@ -95,6 +95,7 @@ import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useI18n } from '@/composables/shared/useI18n.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 // (helpers import removed: was empty / invalid)
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -112,6 +113,7 @@ const history = useHistory()
 const browserAPI = useBrowserAPI()
 const languages = useLanguages()
 const { t } = useI18n()
+const tracker = useResourceTracker('sidepanel-app')
 
 // Refs
 const historyListElement = ref(null)
@@ -396,7 +398,7 @@ onMounted(async () => {
     
     // ثبت listener برای پیام‌ها
     if (browserAPI.browser?.runtime?.onMessage) {
-      browserAPI.browser.runtime.onMessage.addListener.call(browserAPI.browser.runtime.onMessage, handleMessage)
+      tracker.addEventListener(browserAPI.browser.runtime.onMessage, 'addListener', handleMessage)
     }
     
     logger.debug('Initialization complete')
@@ -407,10 +409,8 @@ onMounted(async () => {
 
 // Cleanup
 onUnmounted(() => {
-  if (browserAPI.browser?.runtime?.onMessage) {
-    browserAPI.browser.runtime.onMessage.removeListener(handleMessage)
-  }
   logger.debug('Sidepanel Vue app unmounted')
+  // ResourceTracker automatically handles cleanup
 })
 </script>
 
