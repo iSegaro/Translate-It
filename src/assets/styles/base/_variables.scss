@@ -41,20 +41,29 @@
   --link-hover-color: #0c5dc0;
   --section-title-border: #dadce0;
   
-  // Component specific colors
-  --accent-color: #1967d2;
-  --accent-color-alpha: rgba(25, 103, 210, 0.1);
+    // Component specific colors
+  --accent-color: #8ab4f8;
+  --accent-color-alpha: rgba(138, 180, 248, 0.1);
   --placeholder-color: #9aa0a6;
   
   // Icon filters
-  --github-icon-filter: none;
-  --icon-filter: none;
-  --icon-opacity: 0.7;
+  --github-icon-filter: invert(1);
+  --icon-filter: invert(1);
+  --icon-opacity: 0.8;
   --icon-hover-opacity: 1;
   
   // Provider icon filtering
-  --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
-  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --provider-icon-active-filter: brightness(1.6) contrast(2.0) saturate(1.0);
+  --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
+  
+  // Additional color variables for components
+  --color-text: var(--text-color, #e8eaed);
+  --color-text-secondary: var(--placeholder-color, #9aa0a6);
+  --color-background: var(--bg-color, #202124);
+  --color-background-soft: var(--sidebar-bg-color, #303741);
+  --color-border: var(--border-color, #3c4043);
+  --color-primary: var(--link-color, #8ab4f8);
+  --color-error: #ef5350;
 }
 
 :root.theme-dark {
@@ -117,6 +126,17 @@
   --color-primary-alpha: rgba(88, 166, 255, 0.3);
   --color-surface-shadow: rgba(255, 255, 255, 0.1);
   --color-background-hover: rgba(255, 255, 255, 0.1);
+  
+  // Additional color variables for components
+  --color-text: var(--text-color, #e8eaed);
+  --color-text-secondary: var(--placeholder-color, #888);
+  --color-background: var(--bg-color, #202124);
+  --color-background-soft: var(--sidebar-bg-color, #303741);
+  --color-border: var(--border-color, #3c4043);
+  --color-primary: var(--link-color, #8ab4f8);
+  --color-error: #ef5350;
+  --color-code-block-bg: var(--bg-result-color, #0e0e0e);
+  --color-code-inline-bg: var(--language-controls-bg-color, #303741);
 }
 
 // Map theme variables to component variables
