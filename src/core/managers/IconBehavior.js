@@ -9,6 +9,7 @@ import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 export default function setupIconBehavior(
   icon,
@@ -22,23 +23,20 @@ export default function setupIconBehavior(
   // Initialize logger for this icon instance
   const logger = getScopedLogger(LOG_COMPONENTS.UI, 'IconManager');
 
+  // Create ResourceTracker for this icon instance
+  const tracker = new ResourceTracker('icon-behavior');
+
   let isCleanedUp = false;
-  let resizeObserver;
-  const rafIds = new Set();
 
   const cleanupIcon = () => {
     if (isCleanedUp) return;
     isCleanedUp = true;
 
-    rafIds.forEach((id) => cancelAnimationFrame(id));
-    resizeObserver?.disconnect();
-
-    icon.removeEventListener("click", clickHandler);
-    icon.removeEventListener("blur", blurHandler);
-    target.removeEventListener("blur", blurHandler);
+    // ResourceTracker handles cleanup of all tracked resources
+    tracker.cleanup();
 
     icon.classList.add("fade-out");
-    setTimeout(() => {
+    tracker.trackTimeout(() => {
       if (icon.parentNode) {
         icon.remove();
       }
@@ -97,7 +95,7 @@ export default function setupIconBehavior(
 
   const blurHandler = (e) => {
     if (!e.relatedTarget || !icon.contains(e.relatedTarget)) {
-      setTimeout(cleanupIcon, 50);
+      tracker.trackTimeout(cleanupIcon, 50);
     }
   };
 
@@ -123,7 +121,8 @@ export default function setupIconBehavior(
       icon.style.display = "block";
       icon.classList.add("fade-in");
     });
-    rafIds.add(id);
+    // Track the animation frame for cleanup
+    tracker.trackResource(`raf_${id}`, () => cancelAnimationFrame(id));
   };
 
   try {
@@ -143,10 +142,12 @@ export default function setupIconBehavior(
 
     resizeObserver = new ResizeObserver(updatePosition);
     resizeObserver.observe(target);
+    // Track the ResizeObserver for cleanup
+    tracker.trackResource('resizeObserver', () => resizeObserver.disconnect());
 
-    icon.addEventListener("click", clickHandler);
-    icon.addEventListener("blur", blurHandler);
-    target.addEventListener("blur", blurHandler);
+    tracker.addEventListener(icon, "click", clickHandler);
+    tracker.addEventListener(icon, "blur", blurHandler);
+    tracker.addEventListener(target, "blur", blurHandler);
 
     updatePosition();
 
