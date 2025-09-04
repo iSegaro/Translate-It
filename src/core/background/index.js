@@ -56,15 +56,20 @@ browser.runtime.onConnect.addListener((port) => {
         logger.debug('[Background] Popup port disconnected - popup closed, stopping TTS');
         // Stop all TTS when popup closes
         try {
-          const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
-          if (handler) {
-            await handler({ 
-              action: 'GOOGLE_TTS_STOP_ALL', 
-              data: { source: 'popup-port-disconnect' } 
-            });
-            logger.debug('[Background] TTS stopped successfully on popup close');
+          // Check if background service is initialized
+          if (backgroundService.initialized) {
+            const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
+            if (handler) {
+              await handler({ 
+                action: 'GOOGLE_TTS_STOP_ALL', 
+                data: { source: 'popup-port-disconnect' } 
+              });
+              logger.debug('[Background] TTS stopped successfully on popup close');
+            } else {
+              logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+            }
           } else {
-            logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+            logger.debug('[Background] Background service not initialized, skipping TTS stop on popup close');
           }
         } catch (error) {
           logger.error('[Background] Failed to stop TTS on popup close:', error);
@@ -88,15 +93,20 @@ browser.runtime.onConnect.addListener((port) => {
         logger.debug('[Background] Sidepanel port disconnected - sidepanel closed, stopping TTS');
         // Stop all TTS when sidepanel closes
         try {
-          const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
-          if (handler) {
-            await handler({ 
-              action: 'GOOGLE_TTS_STOP_ALL', 
-              data: { source: 'sidepanel-port-disconnect' } 
-            });
-            logger.debug('[Background] TTS stopped successfully on sidepanel close');
+          // Check if background service is initialized
+          if (backgroundService.initialized) {
+            const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
+            if (handler) {
+              await handler({ 
+                action: 'GOOGLE_TTS_STOP_ALL', 
+                data: { source: 'sidepanel-port-disconnect' } 
+              });
+              logger.debug('[Background] TTS stopped successfully on sidepanel close');
+            } else {
+              logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+            }
           } else {
-            logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+            logger.debug('[Background] Background service not initialized, skipping TTS stop on sidepanel close');
           }
         } catch (error) {
           logger.error('[Background] Failed to stop TTS on sidepanel close:', error);
@@ -127,6 +137,32 @@ browser.runtime.onConnect.addListener((port) => {
           port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) 
           } catch (e) {
             logger.error('[Background] Failed to send ACK:', e);
+          }
+
+          // Wait for background service to be initialized before processing messages
+          if (!backgroundService.initialized) {
+            logger.debug('[Background] Background service not yet initialized, waiting...');
+            
+            // Wait up to 5 seconds for initialization
+            let retries = 50;
+            while (!backgroundService.initialized && retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              retries--;
+            }
+            
+            if (!backgroundService.initialized) {
+              logger.error('[Background] Background service failed to initialize within timeout');
+              if (port && port.postMessage && !port._disconnected) {
+                port.postMessage({ 
+                  type: 'RESULT', 
+                  messageId: msg.messageId, 
+                  result: { success: false, error: 'Background service not ready' } 
+                });
+              }
+              return;
+            }
+            
+            logger.debug('[Background] Background service initialized, proceeding with message handling');
           }
 
           const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
