@@ -20,6 +20,10 @@ class MemoryMonitor {
       warning: 50 * 1024 * 1024, // 50MB
       critical: 100 * 1024 * 1024 // 100MB
     }
+    this.logThresholds = {
+      warning: this.thresholds.warning * 2, // 100MB for logging
+      critical: this.thresholds.critical * 2 // 200MB for logging
+    }
     this.monitorInterval = null
     this.isMonitoring = false
     this.useCentralMonitoring = options.useCentralMonitoring !== false
@@ -165,11 +169,17 @@ class MemoryMonitor {
     if (!import.meta.env.DEV) return;
     const current = this.getCurrentMemory()
 
+    // Log warnings at double thresholds
+    if (current > this.logThresholds.critical) {
+      logger.error(`Critical memory usage: ${(current / 1024 / 1024).toFixed(2)}MB`)
+    } else if (current > this.logThresholds.warning) {
+      logger.warn(`High memory usage: ${(current / 1024 / 1024).toFixed(2)}MB`)
+    }
+
+    // Cleanup actions at original thresholds
     if (current > this.thresholds.critical) {
-      logger.warn(`Critical memory usage: ${(current / 1024 / 1024).toFixed(2)}MB`)
       this.handleCriticalMemory()
     } else if (current > this.thresholds.warning) {
-      logger.warn(`High memory usage: ${(current / 1024 / 1024).toFixed(2)}MB`)
       this.handleWarningMemory()
     }
   }
