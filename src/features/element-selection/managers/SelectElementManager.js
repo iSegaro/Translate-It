@@ -120,7 +120,7 @@ export class SelectElementManager extends ResourceTracker {
     await this.elementHighlighter.deactivateUI();
     
     // Use ResourceTracker cleanup for automatic resource management
-    this.cleanup();
+    super.cleanup();
     
     this.logger.operation("Select element UI deactivated");
   }
@@ -230,13 +230,27 @@ export class SelectElementManager extends ResourceTracker {
   async cleanup() {
     this.logger.info("Cleaning up SelectElement manager");
     
-    // Perform translation revert and deactivation first
-    await this.revertTranslations();
-    await this.deactivate();
-    
-    // ResourceTracker cleanup will handle all tracked resources including services
-    // No need to manually cleanup services as they're tracked as resources
-    this.logger.info("SelectElement cleanup completed");
+    try {
+      // Perform translation revert and deactivation first
+      await this.revertTranslations();
+      await this.deactivate();
+      
+      // ResourceTracker cleanup will handle all tracked resources including services
+      super.cleanup();
+      
+      // Log memory statistics after cleanup
+      const memStats = this.getStats();
+      this.logger.info("SelectElement cleanup completed successfully", { memoryStats: memStats });
+    } catch (error) {
+      this.logger.error("Error during SelectElement cleanup", error);
+      // Ensure ResourceTracker cleanup still runs even if other operations fail
+      try {
+        super.cleanup();
+      } catch (cleanupError) {
+        this.logger.error("Critical: ResourceTracker cleanup failed", cleanupError);
+      }
+      throw error;
+    }
   }
   
   async _notifyDeactivation() {
