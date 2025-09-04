@@ -178,7 +178,8 @@ export class BaseAIProvider extends BaseProvider {
         results.push(result || texts[i]);
       } catch (error) {
         logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
-        results.push(texts[i]); // Return original text on failure
+        // Instead of returning original text, throw the error to be handled properly
+        throw error;
       }
     }
     

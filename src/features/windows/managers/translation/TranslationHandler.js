@@ -166,10 +166,10 @@ export class TranslationHandler {
           
           // Check for error first - error can be in data.error or directly in data
           if (message.data?.error || (message.data?.type && message.data?.message)) {
-            // Don't log error here - let port fallback handle logging to avoid duplicate error logs
-            // This prevents uncaught promise rejection when both messageListener and port fallback process the same error
-            this.logger.debug("Error detected in messageListener, will be handled by port fallback mechanism");
-            return; // Exit without resolving/rejecting - let port fallback handle it
+            this.logger.debug("Error detected in messageListener, rejecting promise with error");
+            const errorMessage = message.data?.error?.message || message.data?.message || 'Translation failed';
+            reject(new Error(errorMessage));
+            return;
           } else if (message.data?.translatedText) {
             this.logger.operation("Translation success received");
             resolve({ translatedText: message.data.translatedText });
