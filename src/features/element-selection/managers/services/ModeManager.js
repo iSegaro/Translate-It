@@ -151,6 +151,10 @@ export class ModeManager extends ResourceTracker {
     // Remove event listeners if needed
     this.state.isCtrlPressed = false;
     this.state.isActive = false;
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('ModeManager cleanup completed');
   }
 

@@ -37,6 +37,14 @@ export class SelectElementManager extends ResourceTracker {
     this.modeManager = new ModeManager();
     this.errorHandlingService = new ErrorHandlingService();
     
+    // Track services as resources for proper cleanup
+    this.trackResource('state-manager', () => this.stateManager?.cleanup());
+    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup());
+    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup());
+    this.trackResource('translation-orchestrator', () => this.translationOrchestrator?.cleanup());
+    this.trackResource('mode-manager', () => this.modeManager?.cleanup());
+    this.trackResource('error-handling-service', () => this.errorHandlingService?.cleanup());
+    
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
     this.handleClick = this.handleClick.bind(this);
@@ -72,6 +80,15 @@ export class SelectElementManager extends ResourceTracker {
     pageEventBus.emit('select-mode-activated');
     this.isActive = true;
     this.abortController = new AbortController();
+    
+    // Track AbortController as a custom resource
+    this.trackResource('abort-controller', () => {
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+    });
+    
     const options = { signal: this.abortController.signal, capture: true };
     
     // Use ResourceTracker for event listeners
@@ -96,10 +113,10 @@ export class SelectElementManager extends ResourceTracker {
   async deactivateUI() {
     if (!this.isActive) return;
     this.isActive = false;
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
+    
+    // Note: AbortController cleanup is handled by ResourceTracker
+    // No need to manually abort here as it's tracked as a resource
+    
     await this.elementHighlighter.deactivateUI();
     
     // Use ResourceTracker cleanup for automatic resource management
@@ -159,11 +176,8 @@ export class SelectElementManager extends ResourceTracker {
           this.performPostTranslationCleanup();
         });
 
-      // Deactivate UI after kicking off the translation
-      this.logger.info("[SelectElementManager] Text nodes collected for translation");
-      await this.deactivateUI();
-      await this._notifyDeactivation();
-      document.removeEventListener("click", this.handleClick, true); // Force remove listener
+      // The UI is deactivated within performPostTranslationCleanup, which is called in the .finally() block.
+      this.logger.info("[SelectElementManager] Text nodes collected for translation. Cleanup will occur upon completion.");
     } catch (error) {
       // Don't handle errors that are already handled
       if (!error.alreadyHandled) {
@@ -173,8 +187,6 @@ export class SelectElementManager extends ResourceTracker {
         // Just log that error was already handled
         this.logger.debug("Translation process failed (error already handled)", error.message);
       }
-    } finally {
-      this.isProcessingClick = false;
     }
   }
 
@@ -210,13 +222,13 @@ export class SelectElementManager extends ResourceTracker {
 
   async cleanup() {
     this.logger.info("Cleaning up SelectElement manager");
+    
+    // Perform translation revert and deactivation first
     await this.revertTranslations();
     await this.deactivate();
-    await this.elementHighlighter.cleanup();
-    await this.translationOrchestrator.cleanup();
-    await this.modeManager.cleanup();
-    await this.errorHandlingService.cleanup();
-    await this.stateManager.cleanup();
+    
+    // ResourceTracker cleanup will handle all tracked resources including services
+    // No need to manually cleanup services as they're tracked as resources
     this.logger.info("SelectElement cleanup completed");
   }
   

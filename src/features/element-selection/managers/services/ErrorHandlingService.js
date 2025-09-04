@@ -5,9 +5,11 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { errorMessages as ErrorMessages } from "@/shared/error-management/ErrorMessages.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class ErrorHandlingService {
+export class ErrorHandlingService extends ResourceTracker {
   constructor() {
+    super('error-handling-service')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ErrorHandlingService');
     this.errorHandler = ErrorHandler.getInstance();
   }
@@ -245,6 +247,9 @@ export class ErrorHandlingService {
    * Cleanup resources
    */
   async cleanup() {
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('ErrorHandlingService cleanup completed');
   }
 

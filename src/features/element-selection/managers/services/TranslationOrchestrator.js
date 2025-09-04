@@ -439,6 +439,10 @@ export class TranslationOrchestrator extends ResourceTracker {
   async cleanup() {
     this.cancelAllTranslations();
     this.translationRequests.clear();
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('TranslationOrchestrator cleanup completed');
   }
 

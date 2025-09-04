@@ -3,9 +3,11 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG, CACHE_CONFIG } from "../constants/selectElementConstants.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class TextExtractionService {
+export class TextExtractionService extends ResourceTracker {
   constructor() {
+    super('text-extraction-service')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TextExtractionService');
     this.config = { ...CONFIG };
     this.elementValidationCache = CACHE_CONFIG.ELEMENT_VALIDATION;
@@ -495,6 +497,10 @@ export class TextExtractionService {
   async cleanup() {
     this.elementValidationCache = new WeakMap();
     this.textContentCache = new WeakMap();
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('TextExtractionService cleanup completed');
   }
 

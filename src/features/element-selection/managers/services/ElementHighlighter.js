@@ -357,6 +357,9 @@ export class ElementHighlighter extends ResourceTracker {
     this.clearAllHighlights();
     this.removeGlobalStyles();
     this.enablePageInteractions();
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
   }
 
   /**

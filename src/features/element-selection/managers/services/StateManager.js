@@ -2,9 +2,11 @@ import { revertTranslations as revertTranslationsFromExtraction } from "../../..
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class StateManager {
+export class StateManager extends ResourceTracker {
   constructor() {
+    super('state-manager')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'StateManager');
     this.originalTexts = new Map(); // This will be used by applyTranslationsToNodes
     this.translatedElements = new Map(); // Keep track of top-level translated elements
@@ -103,6 +105,10 @@ export class StateManager {
     }
     this.originalTexts.clear();
     this.translatedElements.clear();
+    
+    // Use ResourceTracker cleanup for automatic resource management
+    super.cleanup();
+    
     this.logger.debug('StateManager cleanup completed');
   }
 
