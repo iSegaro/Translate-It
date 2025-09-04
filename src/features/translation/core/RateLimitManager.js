@@ -144,24 +144,8 @@ export class RateLimitManager {
   async executeWithRateLimit(providerName, requestFunction, context = 'unknown') {
     const state = this._initializeProvider(providerName);
     
-    // Fast-fail check: Test for deterministic errors before rate limiting
-    // This prevents unnecessary delays for configuration and validation errors
-    try {
-      const testError = await this._testForDeterministicErrors(requestFunction, providerName, context);
-      if (testError) {
-        // Deterministic error detected - throw immediately without rate limiting
-        logger.debug(`Fast-fail for deterministic error in ${providerName}: ${testError.message}`);
-        throw testError;
-      }
-    } catch (error) {
-      // If the test execution itself throws a deterministic error, fast-fail
-      if (ErrorClassifier.isDeterministicError(error)) {
-        logger.debug(`Fast-fail: Deterministic error detected for ${providerName}: ${error.message}`);
-        throw error;
-      }
-      // If it's a retryable error during testing, continue with rate limiting
-      logger.debug(`Test execution failed with retryable error, proceeding with rate limiting: ${error.message}`);
-    }
+    // Note: Fast-fail logic for deterministic errors is handled in the catch block
+    // to prevent duplicate API calls while still catching configuration errors immediately
     
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
@@ -218,7 +202,13 @@ export class RateLimitManager {
     } catch (error) {
       const responseTime = Date.now() - requestStartTime;
       
-      // Failure - update circuit breaker and record health
+      // Fast-fail for deterministic errors - don't update circuit breaker or health monitor
+      if (ErrorClassifier.isDeterministicError(error)) {
+        logger.debug(`Fast-fail: Deterministic error, skipping circuit breaker update for ${providerName}: ${error.message}`);
+        throw error;
+      }
+      
+      // Failure - update circuit breaker and record health (only for retryable errors)
       this._recordFailure(state, error, providerName);
       requestHealthMonitor.recordFailure(providerName, error, responseTime, { context });
       
@@ -516,37 +506,18 @@ export class RateLimitManager {
   }
   
   /**
-   * Test for deterministic errors without full request execution
-   * This allows fast-fail for configuration and validation errors
+   * Test for deterministic errors by attempting a lightweight validation
+   * This prevents duplicate API calls while catching configuration errors
    * @private
    */
   async _testForDeterministicErrors(requestFunction, providerName, context) {
-    try {
-      // For deterministic errors, we need to attempt the request to catch them
-      // But we'll use a timeout to prevent long waits for network errors
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Test timeout - likely network issue')), 1000);
-      });
-      
-      // Race between the actual request and timeout
-      const result = await Promise.race([
-        requestFunction(),
-        timeoutPromise
-      ]);
-      
-      // If request succeeds, no deterministic error
-      return null;
-      
-    } catch (error) {
-      // Check if this is a deterministic error
-      if (ErrorClassifier.isDeterministicError(error)) {
-        return error; // Return the deterministic error
-      }
-      
-      // For non-deterministic errors (network, timeout, etc.), return null
-      // This will cause the main execution to proceed with rate limiting
-      return null;
-    }
+    // Instead of executing the full request, we'll rely on ErrorClassifier
+    // to identify deterministic errors during the actual execution
+    // This prevents duplicate API calls
+    
+    // For now, we'll skip the test and let the actual request handle errors
+    // The ErrorClassifier will still catch deterministic errors during real execution
+    return null;
   }
 
   /**

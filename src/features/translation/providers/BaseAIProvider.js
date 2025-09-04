@@ -106,9 +106,11 @@ export class BaseAIProvider extends BaseProvider {
             () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId),
             `streaming-batch-${batchIndex + 1}/${batches.length}`
           ),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Rate limit execution timeout after 30 seconds')), 30000)
-          )
+          new Promise((_, reject) => {
+            // Dynamic timeout based on batch size: 5 seconds per segment + 30 seconds base
+            const timeoutMs = Math.max(60000, batch.length * 5000 + 30000);
+            setTimeout(() => reject(new Error(`Rate limit execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs);
+          })
         ]);
 
         // Add results to collection

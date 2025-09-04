@@ -16,6 +16,9 @@ import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import browser from "webextension-polyfill";
 
 export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
@@ -129,11 +132,22 @@ export class GeminiProvider extends BaseAIProvider {
 
   _fallbackParsing(result, expectedCount, originalBatch) {
     // A simple fallback: split the result by newlines.
-    // This is not robust but can be a last resort.
-    const lines = result.split('\\n').filter(line => line.trim() !== '');
+    // Preserve empty lines to maintain formatting for AI responses
+    const lines = result.split('\\n');
+    
+    // Filter out completely empty lines only if we have too many lines
+    if (lines.length > expectedCount) {
+      const nonEmptyLines = lines.filter(line => line.trim() !== '');
+      if (nonEmptyLines.length === expectedCount) {
+        return nonEmptyLines;
+      }
+    }
+    
+    // If line count matches, return as-is (preserving formatting)
     if (lines.length === expectedCount) {
       return lines;
     }
+    
     // If all else fails, return the original texts for this batch
     return originalBatch;
   }
