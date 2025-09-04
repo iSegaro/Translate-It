@@ -149,6 +149,15 @@ export class SelectElementManager extends ResourceTracker {
 
     const element = this.elementHighlighter.currentHighlighted || event.target;
 
+    // Immediately disable selection UI and highlights after click
+    this.logger.debug("Disabling selection UI immediately after click");
+    
+    // Clear highlights first
+    pageEventBus.emit('clear-all-highlights');
+    
+    // Disable selection mode immediately to provide instant user feedback
+    await this.deactivateSelectionUIOnly();
+
     try {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
       if (originalTextsMap.size === 0) {
@@ -158,6 +167,9 @@ export class SelectElementManager extends ResourceTracker {
           type: "warning",
         });
         this.isProcessingClick = false;
+        window.isTranslationInProgress = false;
+        // Re-activate selection if no text found
+        this.reactivateSelectionMode();
         return;
       }
 
@@ -194,6 +206,10 @@ export class SelectElementManager extends ResourceTracker {
         // Just log that error was already handled
         this.logger.debug("Translation process failed (error already handled)", error.message);
       }
+      
+      // Reset state on error
+      this.isProcessingClick = false;
+      window.isTranslationInProgress = false;
     }
   }
 
@@ -202,10 +218,54 @@ export class SelectElementManager extends ResourceTracker {
     await this.translationOrchestrator.cancelAllTranslations();
   }
 
+  /**
+   * Deactivate selection UI only (without full cleanup)
+   * Used immediately after click to provide instant user feedback
+   */
+  async deactivateSelectionUIOnly() {
+    this.logger.debug("Deactivating selection UI only (immediate feedback)");
+    
+    // Disable selection state immediately
+    this.isActive = false;
+    
+    // Deactivate UI elements
+    await this.elementHighlighter.deactivateUI();
+    
+    this.logger.debug("Selection UI deactivated immediately");
+  }
+
+  /**
+   * Remove selection-related event listeners immediately after click
+   */
+  removeSelectionEventListeners() {
+    // Note: Event listeners are managed by ResourceTracker, 
+    // but we can disable the selection behavior immediately
+    this.isActive = false;
+    this.logger.debug("Selection event listeners logically disabled");
+  }
+
+  /**
+   * Re-activate selection mode (used when no text is found)
+   */
+  reactivateSelectionMode() {
+    this.logger.debug("Re-activating selection mode");
+    this.isActive = true;
+    
+    // Clear any pending state
+    this.isProcessingClick = false;
+    window.isTranslationInProgress = false;
+    
+    // Re-enable page interactions
+    this.elementHighlighter.addGlobalStyles();
+    this.elementHighlighter.disablePageInteractions();
+    
+    this.logger.debug("Selection mode re-activated");
+  }
+
   performPostTranslationCleanup() {
     this.logger.debug("Performing post-translation cleanup");
     
-    // Clear any remaining highlights
+    // Clear any remaining highlights (redundant but safe)
     pageEventBus.emit('clear-all-highlights');
     
     // Ensure UI is fully deactivated
@@ -215,8 +275,9 @@ export class SelectElementManager extends ResourceTracker {
       });
     }
     
-    // Reset processing state
+    // Reset processing state and translation flag
     this.isProcessingClick = false;
+    window.isTranslationInProgress = false;
     
     this.logger.debug("Post-translation cleanup completed");
   }
