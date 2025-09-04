@@ -142,15 +142,11 @@ export class SimpleMarkdown {
           continue;
         }
 
-        if (!currentSection || currentSection.tagName !== "P") {
-          this._finishSection(container, currentSection, []);
-          currentSection = document.createElement("p");
-          listItems = [];
-        }
-
-        if (currentSection.textContent) {
-          currentSection.appendChild(document.createTextNode(" "));
-        }
+        // Always create a new paragraph for each non-empty line
+        this._finishSection(container, currentSection, []);
+        currentSection = document.createElement("p");
+        listItems = [];
+        
         currentSection.appendChild(this._parseInline(trimmed));
       }
     }
