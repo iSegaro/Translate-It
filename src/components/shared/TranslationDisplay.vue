@@ -401,6 +401,26 @@ onMounted(() => {
   max-width: 100%;
 }
 
+/* Markdown list styles - override global reset */
+.translation-content .simple-markdown ul {
+  list-style: disc !important;
+  margin-left: 20px !important;
+  margin-bottom: 8px !important;
+  padding-left: 0 !important;
+}
+
+.translation-content .simple-markdown ol {
+  list-style: decimal !important;
+  margin-left: 20px !important;
+  margin-bottom: 8px !important;
+  padding-left: 0 !important;
+}
+
+.translation-content .simple-markdown li {
+  margin-bottom: 4px !important;
+  list-style-position: outside !important;
+}
+
 /* Sidepanel content adjustments */
 .sidepanel-mode .translation-content {
   height: 100%;
