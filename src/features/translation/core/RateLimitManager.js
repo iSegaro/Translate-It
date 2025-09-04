@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { requestHealthMonitor } from './RequestHealthMonitor.js';
 import { getProviderRateLimit } from './ProviderConfigurations.js';
+import { ErrorClassifier } from './ErrorClassifier.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -142,6 +143,25 @@ export class RateLimitManager {
    */
   async executeWithRateLimit(providerName, requestFunction, context = 'unknown') {
     const state = this._initializeProvider(providerName);
+    
+    // Fast-fail check: Test for deterministic errors before rate limiting
+    // This prevents unnecessary delays for configuration and validation errors
+    try {
+      const testError = await this._testForDeterministicErrors(requestFunction, providerName, context);
+      if (testError) {
+        // Deterministic error detected - throw immediately without rate limiting
+        logger.debug(`Fast-fail for deterministic error in ${providerName}: ${testError.message}`);
+        throw testError;
+      }
+    } catch (error) {
+      // If the test execution itself throws a deterministic error, fast-fail
+      if (ErrorClassifier.isDeterministicError(error)) {
+        logger.debug(`Fast-fail: Deterministic error detected for ${providerName}: ${error.message}`);
+        throw error;
+      }
+      // If it's a retryable error during testing, continue with rate limiting
+      logger.debug(`Test execution failed with retryable error, proceeding with rate limiting: ${error.message}`);
+    }
     
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
@@ -495,6 +515,40 @@ export class RateLimitManager {
     }
   }
   
+  /**
+   * Test for deterministic errors without full request execution
+   * This allows fast-fail for configuration and validation errors
+   * @private
+   */
+  async _testForDeterministicErrors(requestFunction, providerName, context) {
+    try {
+      // For deterministic errors, we need to attempt the request to catch them
+      // But we'll use a timeout to prevent long waits for network errors
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Test timeout - likely network issue')), 1000);
+      });
+      
+      // Race between the actual request and timeout
+      const result = await Promise.race([
+        requestFunction(),
+        timeoutPromise
+      ]);
+      
+      // If request succeeds, no deterministic error
+      return null;
+      
+    } catch (error) {
+      // Check if this is a deterministic error
+      if (ErrorClassifier.isDeterministicError(error)) {
+        return error; // Return the deterministic error
+      }
+      
+      // For non-deterministic errors (network, timeout, etc.), return null
+      // This will cause the main execution to proceed with rate limiting
+      return null;
+    }
+  }
+
   /**
    * Reset all providers (for testing)
    */
