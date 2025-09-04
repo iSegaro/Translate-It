@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineExpose } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -227,47 +227,37 @@ const handleProviderChange = (provider) => {
   // Provider change is handled automatically by the ProviderSelector
 }
 
-const clearStorage = () => {
-  clearTranslation()
-  lastTranslation.value = null
-}
-
-const revertTranslation = () => {
-  if (lastTranslation.value) {
-    sourceText.value = lastTranslation.value.target || ''
-    translatedText.value = lastTranslation.value.source || ''
+const clearFields = async () => {
+  logger.debug("🧹 Clearing fields and resetting languages");
+  clearTranslation();
+  lastTranslation.value = null;
+  try {
+    const savedSource = await getSourceLanguageAsync();
+    const savedTarget = await getTargetLanguageAsync();
     
-    // Swap languages too
-    const tempSource = lastTranslation.value.targetLanguage
-    const tempTarget = lastTranslation.value.sourceLanguage
-    
-    if (tempSource && tempTarget) {
-      sourceLanguage.value = tempSource
-      targetLanguage.value = tempTarget
-      settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', tempSource)
-      settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', tempTarget)
+    if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
+      sourceLanguage.value = 'Auto-Detect';
+    } else {
+      sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect';
     }
+    
+    targetLanguage.value = getLanguageDisplayName(savedTarget) || settingsStore.settings.TARGET_LANGUAGE || 'English';
+    
+    logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget);
+  } catch (error) {
+    logger.error("❌ Failed to reset languages:", error);
   }
-}
+};
+
+// Expose the clearFields method to the parent component
+defineExpose({
+  clearFields
+});
 
 
 // Event listeners
 onMounted(async () => {
   logger.debug("[SidepanelMainContent] Component mounting...");
-  
-  // Listen for global events from header component with automatic cleanup
-  tracker.addEventListener(document, 'clear-storage', clearStorage)
-  tracker.addEventListener(document, 'revert-translation', revertTranslation)
-  tracker.addEventListener(document, 'translate-request', (_event) => {
-    logger.debug("🔔 Translate request received from header");
-    if (sourceText.value?.trim()) {
-      handleTranslate()
-    }
-  })
-  tracker.addEventListener(document, 'languages-swapped', () => {
-    // Note: We only swap languages, not text content
-    // Text content should remain in their respective fields
-  })
   
   // Initialize language refs with saved settings (matching popup approach)
   try {
@@ -295,29 +285,6 @@ onMounted(async () => {
     sourceLanguage.value = 'Auto-Detect'
     targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
   }
-  
-  // Add clear-storage event listener to reset languages (matching popup approach)
-  document.addEventListener('clear-storage', async () => {
-    logger.debug("🔄 Clear storage event - resetting languages to saved settings");
-    try {
-      const savedSource = await getSourceLanguageAsync()
-      const savedTarget = await getTargetLanguageAsync()
-      
-      // Handle source language - if it's auto/AUTO_DETECT_VALUE, use 'Auto-Detect'
-      if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
-        sourceLanguage.value = 'Auto-Detect'
-      } else {
-        sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect'
-      }
-      
-      // Handle target language
-      targetLanguage.value = getLanguageDisplayName(savedTarget) || 'English'
-      
-      logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget)
-    } catch (error) {
-      logger.error("❌ Failed to reset languages:", error)
-    }
-  })
   
   // Initialize translation data
   await loadLastTranslation()

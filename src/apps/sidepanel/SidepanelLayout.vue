@@ -13,8 +13,8 @@
     <!-- Content area -->
     <div class="content-area">
       <!-- Main Content -->
-      <SidepanelMainContent v-if="!useEnhancedVersion" />
-      <EnhancedSidepanelMainContent v-else />
+      <SidepanelMainContent ref="mainContentRef" v-if="!useEnhancedVersion" />
+      <EnhancedSidepanelMainContent ref="mainContentRef" v-else />
 
       <!-- History Panel -->
       <SidepanelHistory 
@@ -69,6 +69,9 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 const translationStore = useTranslationStore()
 const { handleError } = useErrorHandler()
 
+// Template refs
+const mainContentRef = ref(null);
+
 // Shared state between components
 const isHistoryVisible = ref(false)
 
@@ -109,13 +112,12 @@ watch(isHistoryVisible, (newVal) => {
 
 // Handle clear fields event from toolbar
 const handleClearFields = () => {
-  // Clear translation store
-  translationStore.currentTranslation = null;
-  translationStore.clearError();
-  
-  // Emit clear-fields event to main content component
-  const event = new CustomEvent('clear-fields')
-  document.dispatchEvent(event)
+  logger.debug('Layout received clear-fields event, calling child component');
+  if (mainContentRef.value && typeof mainContentRef.value.clearFields === 'function') {
+    mainContentRef.value.clearFields();
+  } else {
+    logger.warn('Could not find clearFields method on main content component');
+  }
 }
 
 // Handle history item selection
