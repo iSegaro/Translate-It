@@ -119,7 +119,7 @@ export class BaseTranslateProvider extends BaseProvider {
     }
     
     // Fall back to traditional translation (original implementation)
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, abortController);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
   }
 
   /**
@@ -213,17 +213,14 @@ export class BaseTranslateProvider extends BaseProvider {
       } catch (error) {
         logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
         
-        // On error, return original texts for this chunk
-        const fallbackResults = chunk.texts;
-        allResults.push(...fallbackResults);
+        // Send error stream message to content script
+        await this._streamChunkError(error, chunkIndex, messageId);
         
-        // Still stream the fallback results
-        await this._streamChunkResults(
-          fallbackResults,
-          chunk.texts, 
-          chunkIndex,
-          messageId
-        );
+        // Send streaming end notification with error status
+        await this._sendStreamEnd(messageId, { error: true });
+        
+        // Stop streaming on error - don't continue with other chunks
+        throw error;
       }
     }
 
@@ -322,11 +319,12 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Send streaming end notification
    * @param {string} messageId - Message ID
+   * @param {object} options - Options (error: boolean)
    */
-  async _sendStreamEnd(messageId) {
+  async _sendStreamEnd(messageId, options = {}) {
     try {
       // Complete the stream
-      await streamingManager.completeStream(messageId, true);
+      await streamingManager.completeStream(messageId, !options.error, options);
       
       logger.debug(`[${this.providerName}] Streaming session completed`);
     } catch (error) {

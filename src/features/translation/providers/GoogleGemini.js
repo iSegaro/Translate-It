@@ -50,9 +50,11 @@ export class GeminiProvider extends BaseAIProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
+   * @param {object} engine - Translation engine instance (optional)
+   * @param {string} messageId - Message ID (optional)
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null) {
     // For single text, use individual translation
     if (batch.length === 1) {
       const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController);
@@ -80,7 +82,7 @@ export class GeminiProvider extends BaseAIProvider {
       
       // Try fallback, but if that fails too, throw the original error
       try {
-        const fallbackResults = await this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, null, null, abortController);
+        const fallbackResults = await this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
         logger.info(`[${this.providerName}] Fallback successful for ${batch.length} segments`);
         return fallbackResults;
       } catch (fallbackError) {
@@ -146,16 +148,25 @@ export class GeminiProvider extends BaseAIProvider {
       }
       try {
         logger.debug(`[Gemini] Fallback processing segment ${i + 1}/${batch.length}: "${batch[i]}"`);
-        // Bypass rate limiting for fallback to avoid hanging
-        logger.debug(`[Gemini] Bypassing rate limit for fallback segment ${i + 1}`);
+        // Manual delay for fallback to prevent overload but avoid RateLimitManager hanging
+        logger.debug(`[Gemini] Adding manual delay for fallback segment ${i + 1}`);
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between fallback segments
+        }
         const result = await Promise.race([
           this._translateSingle(batch[i], sl, tl, translateMode, abortController),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 10 seconds`)), 10000)
+            setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 8 seconds`)), 8000)
           )
         ]);
         logger.debug(`[Gemini] Fallback segment ${i + 1} completed`);
-        results.push(result || batch[i]);
+        const translatedResult = result || batch[i];
+        results.push(translatedResult);
+        
+        // Stream the result immediately for this segment
+        if (engine && messageId) {
+          await this._streamFallbackResult([translatedResult], [batch[i]], i, messageId, engine);
+        }
       } catch (error) {
         logger.warn(`[Gemini] Fallback segment ${i + 1} failed:`, error);
         
@@ -164,6 +175,40 @@ export class GeminiProvider extends BaseAIProvider {
       }
     }
     return results;
+  }
+
+  /**
+   * Stream fallback result to content script
+   * @param {string[]} result - Translated result for this segment
+   * @param {string[]} original - Original text for this segment
+   * @param {number} segmentIndex - Index of this segment in the batch
+   * @param {string} messageId - Message ID
+   * @param {object} engine - Translation engine instance
+   */
+  async _streamFallbackResult(result, original, segmentIndex, messageId, engine) {
+    try {
+      const streamMessage = MessageFormat.create(
+        MessageActions.TRANSLATION_STREAM_UPDATE,
+        {
+          success: true,
+          data: result,
+          originalData: original,
+          batchIndex: segmentIndex,
+          provider: this.providerName,
+          timestamp: Date.now()
+        },
+        'background-streaming',
+        { messageId }
+      );
+
+      const senderInfo = engine.getStreamingSender?.(messageId);
+      if (senderInfo && senderInfo.tab?.id) {
+        await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
+        logger.debug(`[Gemini] Fallback result streamed for segment ${segmentIndex + 1}`);
+      }
+    } catch (error) {
+      logger.error(`[Gemini] Failed to stream fallback result for segment ${segmentIndex + 1}:`, error);
+    }
   }
 
   _isQuotaError(error) {

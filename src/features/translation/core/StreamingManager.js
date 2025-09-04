@@ -156,6 +156,51 @@ export class StreamingManager {
   }
 
   /**
+   * Stream batch error to content script
+   * @param {string} messageId - Message ID
+   * @param {Error} error - The error that occurred
+   * @param {number} batchIndex - Index of the failed batch
+   */
+  async streamBatchError(messageId, error, batchIndex) {
+    const streamInfo = this.activeStreams.get(messageId);
+    const senderInfo = this.senderInfo.get(messageId);
+
+    if (!streamInfo || !senderInfo) {
+      logger.warn(`[StreamingManager] Cannot stream error - missing info for messageId: ${messageId}`);
+      return;
+    }
+
+    try {
+      // Create stream error message
+      const streamErrorMessage = MessageFormat.create(
+        MessageActions.TRANSLATION_STREAM_UPDATE,
+        {
+          success: false,
+          error: {
+            message: error.message || 'Translation failed',
+            type: error.type || 'TRANSLATION_ERROR'
+          },
+          batchIndex: batchIndex,
+          provider: streamInfo.providerName,
+          timestamp: Date.now()
+        },
+        'background-streaming',
+        { messageId }
+      );
+
+      // Send to content script
+      if (senderInfo.tab?.id) {
+        await browser.tabs.sendMessage(senderInfo.tab.id, streamErrorMessage);
+        logger.debug(`[StreamingManager] Streamed error for batch ${batchIndex} to tab ${senderInfo.tab.id}`);
+      } else {
+        logger.warn(`[StreamingManager] No tab ID for streaming error messageId: ${messageId}`);
+      }
+    } catch (sendError) {
+      logger.error(`[StreamingManager] Failed to stream error for batch ${batchIndex}:`, sendError);
+    }
+  }
+
+  /**
    * Complete streaming session
    * @param {string} messageId - Message ID
    * @param {boolean} success - Whether translation was successful

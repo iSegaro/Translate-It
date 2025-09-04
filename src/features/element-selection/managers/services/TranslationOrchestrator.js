@@ -283,14 +283,18 @@ export class TranslationOrchestrator extends ResourceTracker {
   }
 
   async handleStreamEnd(message) {
-    const { messageId } = message;
+    const { messageId, data } = message;
     const request = this.translationRequests.get(messageId);
     if (!request) {
       this.logger.debug("Received stream end for already completed message:", messageId);
       return;
     }
 
-    this.logger.info("Translation stream finished for message:", messageId);
+    this.logger.info("Translation stream finished for message:", messageId, { 
+      success: data?.success, 
+      error: data?.error,
+      completed: data?.completed 
+    });
     
     try {
       // Clear the global translation in progress flag
@@ -301,6 +305,31 @@ export class TranslationOrchestrator extends ResourceTracker {
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
         this.logger.debug("Dismissed translating notification on stream completion");
+      }
+
+      // Check if stream ended with error
+      if (data?.error || !data?.success) {
+        this.logger.warn(`Stream ended with error for messageId: ${messageId}`, data?.error);
+        
+        // Handle error properly for user feedback
+        const errorMessage = data?.error?.message || 'Translation failed during streaming';
+        const error = new Error(errorMessage);
+        error.originalError = data?.error;
+        
+        // Use centralized error handling to show error to user
+        await this.errorHandler.handle(error, {
+          context: 'select-element-streaming-translation-end',
+          type: ErrorTypes.TRANSLATION_FAILED,
+          showToast: true
+        });
+        
+        // Notify SelectElementManager to perform cleanup
+        if (window.selectElementManagerInstance) {
+          window.selectElementManagerInstance.performPostTranslationCleanup();
+        }
+        
+        this.translationRequests.delete(messageId);
+        return;
       }
       
       // Finalize state, e.g., by storing all translations in stateManager

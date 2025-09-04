@@ -103,7 +103,7 @@ export class BaseAIProvider extends BaseProvider {
         const batchResults = await Promise.race([
           rateLimitManager.executeWithRateLimit(
             this.providerName,
-            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController),
+            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId),
             `streaming-batch-${batchIndex + 1}/${batches.length}`
           ),
           new Promise((_, reject) => 
@@ -419,9 +419,11 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
+   * @param {object} engine - Translation engine instance (optional)
+   * @param {string} messageId - Message ID (optional)
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null) {
     // Default implementation: translate each text individually
     // Subclasses should override this for batch API calls
     const results = [];

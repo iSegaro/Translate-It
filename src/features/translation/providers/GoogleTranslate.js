@@ -241,7 +241,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       } catch (error) {
         logger.error(`[Google] Chunk ${i + 1} failed:`, error);
         // Fallback for failed chunks
-        translatedChunks.push({ translatedSegments: chunk.map(() => ''), candidateText: '' });
+        // translatedChunks.push({ translatedSegments: chunk.map(() => ''), candidateText: '' });
+        // Instead of returning empty strings, throw the error to be handled properly
+        throw error;
       }
     }
     const allTranslated = translatedChunks.flatMap(chunk => chunk.translatedSegments);

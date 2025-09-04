@@ -17,21 +17,21 @@ export const PROVIDER_CONFIGURATIONS = {
   Gemini: {
     rateLimit: {
       maxConcurrent: 1,
-      delayBetweenRequests: 5000, // 5 seconds between requests
+      delayBetweenRequests: 8000, // 8 seconds between requests (increased for 503 overload)
       burstLimit: 1,
-      burstWindow: 5000,
+      burstWindow: 10000, // Increased burst window
       adaptiveBackoff: {
         enabled: true,
-        baseMultiplier: 2,
-        maxDelay: 45000, // 45 seconds max delay
-        resetAfterSuccess: 3
+        baseMultiplier: 3, // More aggressive backoff
+        maxDelay: 60000, // 60 seconds max delay
+        resetAfterSuccess: 5 // Wait more successes before reducing backoff
       }
     },
     batching: {
       strategy: 'smart', // Use smart batching
-      optimalSize: 25, // Larger batches for efficiency
-      maxComplexity: 400, // Higher complexity threshold
-      singleBatchThreshold: 20 // Use single batch for ≤20 segments
+      optimalSize: 15, // Reduced batch size for 503 overload prevention  
+      maxComplexity: 250, // Reduced complexity threshold
+      singleBatchThreshold: 12 // Use single batch for ≤12 segments
     },
     streaming: {
       enabled: true,
@@ -43,13 +43,15 @@ export const PROVIDER_CONFIGURATIONS = {
         'requests_per_minute',
         'tokens_per_minute', 
         'requests_per_day',
-        'concurrent_requests'
+        'concurrent_requests',
+        'model_overloaded'
       ],
       retryStrategies: {
         'requests_per_minute': { delay: 60000, temporary: true },
         'tokens_per_minute': { delay: 60000, temporary: true },
         'requests_per_day': { delay: 86400000, temporary: false },
-        'concurrent_requests': { delay: 5000, temporary: true }
+        'concurrent_requests': { delay: 8000, temporary: true },
+        'model_overloaded': { delay: 15000, temporary: true } // 503 overload errors
       },
       enableCircuitBreaker: true
     },
