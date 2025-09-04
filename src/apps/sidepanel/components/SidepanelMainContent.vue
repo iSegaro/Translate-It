@@ -63,28 +63,30 @@
       />
 
       <!-- Translation Display -->
-      <TranslationDisplay
-        ref="translationResultRef"
-        :content="translatedText"
-        :language="currentTargetLanguage"
-        :is-loading="isTranslating"
-        :error="translationError"
-        :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"
-        :copy-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
-        :copy-alt="t('SIDEPANEL_COPY_TARGET_ALT_ICON', 'Copy Result')"
-        :tts-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Speak translation')"
-        :tts-alt="t('SIDEPANEL_VOICE_TARGET_ALT_ICON', 'Voice Target')"
-        mode="sidepanel"
-        :enable-markdown="true"
-        :show-fade-in-animation="true"
-      />
+      <div class="output-container">
+        <TranslationDisplay
+          ref="translationResultRef"
+          :content="translatedText"
+          :language="currentTargetLanguage"
+          :is-loading="isTranslating"
+          :error="translationError"
+          :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"
+          :copy-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
+          :copy-alt="t('SIDEPANEL_COPY_TARGET_ALT_ICON', 'Copy Result')"
+          :tts-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Speak translation')"
+          :tts-alt="t('SIDEPANEL_VOICE_TARGET_ALT_ICON', 'Voice Target')"
+          mode="sidepanel"
+          :enable-markdown="true"
+          :show-fade-in-animation="true"
+        />
+      </div>
     </form>
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, defineExpose } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -453,12 +455,15 @@ onMounted(async () => {
   padding: 42px 8px 8px 8px;
 }
 
-.translation-form :deep(.translation-display.sidepanel-mode) {
+
+.output-container {
   margin: 6px 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
+
 
 .translation-form :deep(.result-content) {
   flex: 1;
