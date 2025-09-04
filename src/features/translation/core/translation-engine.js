@@ -409,6 +409,7 @@ export class TranslationEngine {
             let consecutiveFailures = 0;
             const MAX_CONSECUTIVE_FAILURES = 3;
             let adaptiveDelay = 0;
+            let hasErrors = false;
             
             for (let i = 0; i < batches.length; i++) {
                 if (this.isCancelled(messageId)) {
@@ -554,6 +555,7 @@ export class TranslationEngine {
 
                 } catch (error) {
                     consecutiveFailures++;
+                    hasErrors = true;
                     logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
                     
                     const streamUpdateMessage = MessageFormat.create(
@@ -590,7 +592,7 @@ export class TranslationEngine {
         } finally {
             const streamEndMessage = MessageFormat.create(
                 MessageActions.TRANSLATION_STREAM_END,
-                { success: true },
+                { success: !hasErrors },
                 'background-stream',
                 { messageId: messageId }
               );
@@ -1224,9 +1226,18 @@ export class TranslationEngine {
       };
 
     } catch (error) {
-      // Handle streaming error
+      // Handle streaming error - streaming manager already sent error to UI
       await streamingManager.handleStreamError(messageId, error);
-      throw error;
+      
+      // For streaming translations, don't throw - streaming manager handles the error
+      // Return a success indicator since streaming was initiated (even if it failed)
+      return {
+        success: true,
+        streaming: true,
+        messageId: messageId,
+        provider: provider,
+        timestamp: Date.now()
+      };
     } finally {
       // Cleanup
       if (this.streamingSenders) {

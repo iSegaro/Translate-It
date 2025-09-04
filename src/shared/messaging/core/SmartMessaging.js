@@ -147,7 +147,8 @@ async function sendViaPort(message, timeout) {
       clearTimeout(timeoutId)
       try { port.onMessage.removeListener(onMessage) } catch {}
       try { port.onDisconnect.removeListener(onDisconnect) } catch {}
-      try { port.disconnect() } catch {}
+      // Don't disconnect port on timeout to allow background processing to continue
+      // try { port.disconnect() } catch {}
     }
 
     const onMessage = (response) => {

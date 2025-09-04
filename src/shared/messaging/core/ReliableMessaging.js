@@ -169,7 +169,10 @@ export async function sendReliable(message, opts = {}) {
           totalTimeout
         })
         cleanup()
-        circuitBreaker.onFailure()
+        // Don't call circuitBreaker.onFailure() for TRANSLATE timeouts to allow background processing
+        if (message.action !== 'TRANSLATE') {
+          circuitBreaker.onFailure()
+        }
         reject(new Error('no-response'))
       }, totalTimeout)
 
@@ -182,7 +185,8 @@ export async function sendReliable(message, opts = {}) {
         clearTimeout(to)
         try { port.onMessage.removeListener(onMsg) } catch {}
         try { port.onDisconnect.removeListener(onDisconnect) } catch {}
-        try { port.disconnect() } catch {}
+        // Don't disconnect port on timeout to allow background processing to continue
+        // try { port.disconnect() } catch {}
       }
 
       const onMsg = (m) => {

@@ -59,6 +59,23 @@ export class TranslationOrchestrator extends ResourceTracker {
   }
 
   /**
+   * Show timeout notification to user
+   * @param {string} messageId - Message ID
+   */
+  async showTimeoutNotification(messageId) {
+    const timeoutMessage = await getTranslationString('ERRORS_TRANSLATION_TIMEOUT');
+    
+    // Use pageEventBus to show notification
+    pageEventBus.emit('show-notification', {
+      type: 'warning',
+      title: 'Translation Timeout',
+      message: timeoutMessage || 'Translation is taking longer than expected. Please wait or try again.',
+      duration: 10000, // Show for 10 seconds
+      id: `timeout-${messageId}`
+    });
+  }
+
+  /**
    * Calculate dynamic timeout based on the number of segments to translate
    * @param {number} segmentCount - Number of translation segments
    * @returns {number} - Timeout in milliseconds
@@ -143,7 +160,9 @@ export class TranslationOrchestrator extends ResourceTracker {
         cachedTranslations,
         translatedSegments: new Map(),
         status: 'pending',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        hasErrors: false,
+        lastError: null
       });
 
       await this.sendTranslationRequest(messageId, jsonPayload);
@@ -172,6 +191,18 @@ export class TranslationOrchestrator extends ResourceTracker {
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
 
+      // Parse JSON to count segments for dynamic timeout calculation
+      let segmentCount = 1; // Default fallback
+      try {
+        const parsedPayload = JSON.parse(jsonPayload);
+        segmentCount = Array.isArray(parsedPayload) ? parsedPayload.length : 1;
+      } catch (e) {
+        this.logger.warn("Failed to parse JSON payload for segment count, using default timeout");
+      }
+
+      // Calculate dynamic timeout based on segment count
+      const dynamicTimeout = this.calculateDynamicTimeout(segmentCount);
+
       const translationRequest = {
         action: MessageActions.TRANSLATE,
         data: {
@@ -186,14 +217,48 @@ export class TranslationOrchestrator extends ResourceTracker {
         messageId,
       };
 
-      this.logger.debug("Sending translation request with advanced payload");
+      this.logger.debug("Sending translation request with advanced payload", {
+        messageId,
+        segmentCount,
+        dynamicTimeout,
+        payloadSize: jsonPayload.length
+      });
       
-      // Use sendSmart for proper error propagation instead of safeSendMessage
-      const result = await sendSmart(translationRequest);
+      // Use sendSmart with dynamic timeout for proper error propagation
+      const result = await sendSmart(translationRequest, { timeout: dynamicTimeout });
       
       this.logger.debug("Translation request sent successfully", result);
     } catch (error) {
       this.logger.error("Failed to send translation request", error);
+      
+      // Check if this is a timeout error
+      const isTimeoutError = error.message && (
+        error.message.includes('timeout') || 
+        error.message.includes('Port messaging timeout')
+      );
+      
+      if (isTimeoutError) {
+        this.logger.warn("Translation request timed out, but background processing may continue", {
+          messageId,
+          dynamicTimeout,
+          segmentCount
+        });
+        
+        // Update request status to timeout but don't delete it
+        const request = this.translationRequests.get(messageId);
+        if (request) {
+          request.status = 'timeout';
+          request.timeoutAt = Date.now();
+          
+          // Show timeout notification to user
+          await this.showTimeoutNotification(messageId);
+        }
+        
+        // Don't throw error for timeout - let streaming continue in background
+        return;
+      }
+      
+      // For non-timeout errors, throw as before
       throw error;
     }
   }
@@ -212,17 +277,13 @@ export class TranslationOrchestrator extends ResourceTracker {
     if (!data.success) {
         this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
         
-        // Handle error properly for user feedback
-        const errorMessage = data.error?.message || 'Translation failed during streaming';
-        const error = new Error(errorMessage);
-        error.originalError = data.error;
-        
-        // Use centralized error handling to show error to user
-        await this.errorHandler.handle(error, {
-          context: 'select-element-streaming-translation',
-          type: ErrorTypes.TRANSLATION_FAILED,
-          showToast: true
-        });
+        // Mark request as having errors, but don't show error notification yet
+        // The final error handling will be done in handleStreamEnd
+        const request = this.translationRequests.get(messageId);
+        if (request) {
+          request.hasErrors = true;
+          request.lastError = data.error;
+        }
         
         // Clear the global translation in progress flag on error
         window.isTranslationInProgress = false;
@@ -251,6 +312,12 @@ export class TranslationOrchestrator extends ResourceTracker {
     if (!request) {
       this.logger.debug("Received stream update for already completed message:", messageId);
       return;
+    }
+
+    // If this request was previously timed out, dismiss timeout notification
+    if (request.status === 'timeout') {
+      pageEventBus.emit('dismiss_notification', { id: `timeout-${messageId}` });
+      this.logger.debug("Dismissed timeout notification as streaming update received");
     }
 
     // Keep notification during streaming - will be dismissed in handleStreamEnd
@@ -307,14 +374,26 @@ export class TranslationOrchestrator extends ResourceTracker {
         this.logger.debug("Dismissed translating notification on stream completion");
       }
 
-      // Check if stream ended with error
-      if (data?.error || !data?.success) {
-        this.logger.warn(`Stream ended with error for messageId: ${messageId}`, data?.error);
+      // If this was a previously timed out request, show success notification
+      if (request.status === 'timeout') {
+        pageEventBus.emit('show-notification', {
+          type: 'success',
+          title: 'Translation Completed',
+          message: 'Translation completed successfully after timeout.',
+          duration: 5000,
+          id: `success-${messageId}`
+        });
+        this.logger.debug("Showed success notification for previously timed out request");
+      }
+
+      // Check if stream ended with error OR if there were errors during streaming
+      if (data?.error || !data?.success || request.hasErrors) {
+        this.logger.warn(`Stream ended with error for messageId: ${messageId}`, data?.error || request.lastError);
         
         // Handle error properly for user feedback
-        const errorMessage = data?.error?.message || 'Translation failed during streaming';
+        const errorMessage = data?.error?.message || request.lastError?.message || 'Translation failed during streaming';
         const error = new Error(errorMessage);
-        error.originalError = data?.error;
+        error.originalError = data?.error || request.lastError;
         
         // Use centralized error handling to show error to user
         await this.errorHandler.handle(error, {
@@ -362,7 +441,7 @@ export class TranslationOrchestrator extends ResourceTracker {
       }
       
       // Show error to user
-      this.errorHandler.handleError(error, {
+      this.errorHandler.handle(error, {
         context: 'stream_end_processing',
         messageId,
         showToast: true
