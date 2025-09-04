@@ -71,14 +71,15 @@ export class SimpleMarkdown {
         listItems = [];
       }
       // List items
-      else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      else if (/^\s*([-*•])\s+/.test(trimmed)) {
         if (!currentSection || currentSection.tagName !== "UL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ul");
           listItems = [];
         }
         const li = document.createElement("li");
-        li.appendChild(this._parseInline(trimmed.substring(2)));
+        const content = trimmed.replace(/^\s*([-*•])\s+/, '');
+        li.appendChild(this._parseInline(content));
         listItems.push(li);
       } else if (/^\d+\.\s/.test(trimmed)) {
         if (!currentSection || currentSection.tagName !== "OL") {

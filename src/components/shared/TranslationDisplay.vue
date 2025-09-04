@@ -56,7 +56,7 @@
         contentClass
       ]"
       :dir="textDirection.dir"
-      :style="{ 
+      :style="{
         textAlign: textDirection.textAlign,
         direction: textDirection.dir 
       }"
@@ -262,7 +262,11 @@ const renderedContent = computed(() => {
   if (props.enableMarkdown) {
     try {
       const markdownElement = SimpleMarkdown.render(props.content)
-      return markdownElement ? markdownElement.innerHTML : props.content.replace(/\n/g, '<br>')
+      if (markdownElement) {
+        // Wrap innerHTML in simple-markdown div for CSS targeting
+        return `<div class="simple-markdown">${markdownElement.innerHTML}</div>`
+      }
+      return props.content.replace(/\n/g, '<br>')
     } catch (error) {
   logger.warn('[TranslationDisplay] Markdown rendering failed:', error)
       return props.content.replace(/\n/g, '<br>')
@@ -386,7 +390,6 @@ onMounted(() => {
   font-family: inherit;
   font-size: 14px;
   box-sizing: border-box;
-  /* direction and text-align are set via inline styles for RTL support */
   min-height: 50px;
   background-color: var(--bg-result-color, #ffffff);
   color: var(--text-color, #212529);
@@ -394,32 +397,57 @@ onMounted(() => {
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
   overflow-y: auto;
   overflow-x: hidden;
-  max-width: 100%;
 }
 
-/* Markdown list styles - override global reset */
-.translation-content .simple-markdown ul {
-  list-style: disc !important;
-  margin-left: 20px !important;
-  margin-bottom: 8px !important;
-  padding-left: 0 !important;
+/*
+  UNIFIED MARKDOWN LIST SOLUTION
+  - This single set of rules works across all modes (Popup, Sidepanel, WindowsManager).
+  - It bypasses native browser list rendering (which is buggy in some extension contexts)
+    by creating markers manually with the ::before pseudo-element.
+*/
+.translation-content :deep(ul),
+.translation-content :deep(ol) {
+  list-style: none !important;
+  padding: 0 0 0 2em !important; /* Create space for our manual markers */
+  margin: 8px 0 !important;
 }
 
-.translation-content .simple-markdown ol {
-  list-style: decimal !important;
-  margin-left: 20px !important;
-  margin-bottom: 8px !important;
-  padding-left: 0 !important;
+.translation-content :deep(li) {
+  position: relative !important;
+  padding-left: 0.5em !important; /* Space between marker and text */
+  margin-bottom: 6px !important;
 }
 
-.translation-content .simple-markdown li {
-  margin-bottom: 4px !important;
-  list-style-position: outside !important;
+/* Manual bullet for unordered lists */
+.translation-content :deep(ul > li::before) {
+  content: '•' !important;
+  position: absolute !important;
+  left: -1em !important; /* Position in the ul's padding */
+  top: 0 !important;
+  color: inherit !important;
+  font-weight: bold;
 }
+
+/* Manual numbers for ordered lists */
+.translation-content :deep(ol) {
+  counter-reset: list-counter; /* Initialize counter */
+}
+.translation-content :deep(ol > li) {
+  counter-increment: list-counter; /* Increment counter for each li */
+}
+.translation-content :deep(ol > li::before) {
+  content: counter(list-counter) '.' !important; /* Display counter and dot */
+  position: absolute !important;
+  left: -1.5em !important; /* Adjust position for numbers */
+  top: 0 !important;
+  color: inherit !important;
+  font-weight: normal;
+  text-align: right;
+  width: 1em;
+}
+
 
 /* Sidepanel content adjustments */
 .sidepanel-mode .translation-content {
@@ -428,16 +456,6 @@ onMounted(() => {
   border: none;
   border-radius: 0;
   padding: 42px 14px 12px 14px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.sidepanel-mode {
-  overflow: visible;
-}
-
-.sidepanel-mode .display-toolbar {
-  overflow: visible;
 }
 
 /* Selection window adjustments */
@@ -452,25 +470,11 @@ onMounted(() => {
 
 /* Popup mode specific adjustments */
 .popup-mode .translation-content {
-  max-width: 100%;
   height: 100%;
   flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
   font-size: 13px;
   padding: 40px 8px 8px 8px;
 }
-
-/* Content states */
-/* .translation-content.loading-dim {
-  opacity: 1;
-  transition: none !important;
-} */
-
-/* Fade-in animation removed as requested */
-/* .translation-content.fade-in {
-  animation: fadeInWithSlide 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
-} */
 
 /* Message styling */
 .translation-content :deep(.placeholder-message) {
@@ -537,21 +541,6 @@ onMounted(() => {
   background: #5a6268;
 }
 
-/* Responsive error actions for different modes */
-.popup-mode .translation-content :deep(.error-actions) {
-  flex-direction: column;
-  gap: 4px;
-}
-
-.popup-mode .translation-content :deep(.error-action) {
-  font-size: 10px;
-  padding: 3px 6px;
-}
-
-.selection-mode .translation-content :deep(.error-actions) {
-  display: none; /* Hide actions in selection mode to keep it minimal */
-}
-
 .translation-content :deep(.loading-message) {
   color: var(--accent-color, #1967d2);
   font-style: italic;
@@ -561,7 +550,7 @@ onMounted(() => {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-/* Markdown styling */
+/* General Markdown styling */
 .translation-content :deep(h1),
 .translation-content :deep(h2),
 .translation-content :deep(h3) {
@@ -576,18 +565,6 @@ onMounted(() => {
 
 .translation-content :deep(p) {
   margin-bottom: 8px;
-}
-
-.translation-content :deep(ul),
-.translation-content :deep(ol) {
-  margin: 8px 0;
-  padding-inline-start: 20px;
-  padding-inline-end: 8px;
-}
-
-.translation-content :deep(li) {
-  margin-bottom: 4px;
-  line-height: 1.5;
 }
 
 .translation-content :deep(code) {
@@ -638,23 +615,6 @@ onMounted(() => {
   padding: 2px;
 }
 
-/* Selection mode toolbar */
-.selection-mode .display-toolbar {
-  top: 8px;
-  left: 12px;
-}
-
-/* RTL adjustments for toolbar */
-html[dir="rtl"] .display-toolbar {
-  left: auto;
-  right: 12px;
-}
-
-html[dir="rtl"] .selection-mode .display-toolbar {
-  left: auto;
-  right: 12px;
-}
-
 /* Loading overlay */
 .loading-overlay {
   position: absolute;
@@ -670,12 +630,6 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   justify-content: center;
 }
 
-.loading-spinner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .spinner {
   width: 28px;
   height: 28px;
@@ -683,57 +637,6 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   border-top: 3px solid var(--accent-color, #1967d2);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
-}
-
-/* Dark theme spinner styling handled by unified theme variables */
-:global(.theme-dark) .translation-display .spinner {
-  border-color: var(--header-border-color, #5f6368);
-  border-top-color: var(--accent-color, #58a6ff);
-}
-
-:global(.theme-dark) .translation-display .translation-content .loading-message {
-  color: var(--accent-color, #58a6ff);
-}
-
-/* Enhanced Display Toolbar */
-.display-toolbar {
-  position: absolute;
-  top: 6px;
-  left: 12px;
-  z-index: 10;
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(4px);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.sidepanel-mode .display-toolbar {
-  background: rgba(0, 0, 0, 0.02);
-  overflow: visible;
-}
-
-.sidepanel-mode .display-toolbar .action-button {
-  overflow: visible;
-}
-
-.selection-mode .display-toolbar {
-  left: 8px;
-}
-
-html[dir="rtl"] .display-toolbar {
-  left: auto;
-  right: 12px;
-}
-
-html[dir="rtl"] .sidepanel-mode .display-toolbar {
-  left: auto;
-  right: 18px;
-}
-
-html[dir="rtl"] .selection-mode .display-toolbar {
-  left: auto;
-  right: 8px;
 }
 
 /* Animations */
@@ -745,18 +648,6 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   0%, 100% { opacity: 0.8; }
   50% { opacity: 0.4; }
 }
-
-/* Fade-in animation removed as requested */
-/* @keyframes fadeInWithSlide {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-} */
 
 /* Custom scrollbar */
 .translation-content::-webkit-scrollbar {
@@ -776,8 +667,29 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   background: var(--toolbar-link-color);
 }
 
-.translation-content {
-  scrollbar-width: thin;
-  scrollbar-color: var(--header-border-color) transparent;
+/* --- RTL Specific Overrides for Manual Bullets --- */
+
+/* When the content direction is RTL, reset left padding and add right padding */
+.translation-content[dir="rtl"] :deep(ul),
+.translation-content[dir="rtl"] :deep(ol) {
+  padding-left: 0 !important;
+  padding-right: 2em !important; /* Space for bullets on the right */
+}
+
+.translation-content[dir="rtl"] :deep(li) {
+  padding-left: 0 !important;
+  padding-right: 0.5em !important; /* Space between bullet and text */
+}
+
+/* Position the bullet on the right for RTL */
+.translation-content[dir="rtl"] :deep(ul > li::before) {
+  left: auto !important; /* Unset the left property */
+  right: -1.5em !important; /* Position on the right */
+}
+
+.translation-content[dir="rtl"] :deep(ol > li::before) {
+  left: auto !important; /* Unset the left property */
+  right: -2em !important; /* Position on the right */
+  text-align: left; /* Ensure number itself is not reversed */
 }
 </style>

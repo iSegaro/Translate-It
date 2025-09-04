@@ -39,18 +39,6 @@ body.options-context {
   margin: 0; /* Ensure no default margin */
 }
 
-body.options-context #app {
-  /* The layout is now handled by the body flex container and the OptionsLayout component. */
-  /* Previous styles were causing conflicts and have been removed. */
-}
-
-/* Sidepanel context (full viewport) - only applied in sidepanel.js */
-body.sidepanel-context {
-  width: 100% !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-}
-
 body.sidepanel-context #app {
   width: 100% !important;
   height: 100% !important;
