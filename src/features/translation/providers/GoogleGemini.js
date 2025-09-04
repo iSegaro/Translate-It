@@ -25,6 +25,7 @@ export class GeminiProvider extends BaseAIProvider {
   static description = "Google Gemini AI";
   static displayName = "Google Gemini";
   static reliableJsonMode = false;
+
   static supportsDictionary = true;
   
   // AI Provider capabilities - Current optimized settings
@@ -34,8 +35,19 @@ export class GeminiProvider extends BaseAIProvider {
   static maxComplexity = 400;
   static supportsImageTranslation = true;
 
+  // Configuration caching to prevent storage race conditions
   constructor() {
     super("Gemini");
+    this._configCache = {
+      apiKey: null,
+      geminiModel: null,
+      thinkingEnabled: null,
+      lastUpdated: 0,
+      cacheTTL: 120000 // 2 minutes cache
+    };
+    
+    // Listen for storage changes to invalidate cache
+    this._setupStorageListener();
   }
 
   /**
@@ -301,14 +313,117 @@ export class GeminiProvider extends BaseAIProvider {
 
 
   /**
+   * Get cached configuration or load from storage
+   * Prevents race conditions during concurrent batch processing
+   */
+  async _getCachedConfig() {
+    const now = Date.now();
+    const cache = this._configCache;
+    
+    // Check if cache is still valid and has a valid API key
+    if (cache.lastUpdated && 
+        (now - cache.lastUpdated) < cache.cacheTTL && 
+        cache.apiKey && 
+        cache.apiKey.length > 0) {
+      logger.debug(`[Gemini] Using cached configuration`);
+      return {
+        apiKey: cache.apiKey,
+        geminiModel: cache.geminiModel,
+        thinkingEnabled: cache.thinkingEnabled
+      };
+    }
+    
+    // Load fresh configuration
+    logger.debug(`[Gemini] Loading fresh configuration from storage`);
+    try {
+      const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
+        getApiKeyAsync(),
+        getGeminiModelAsync(),
+        getGeminiThinkingEnabledAsync(),
+      ]);
+      
+      // Validate API key before caching
+      if (!apiKey || apiKey.length === 0) {
+        logger.warn(`[Gemini] API key is missing or empty from storage`);
+        // Don't update cache with invalid data, but still return what we got
+        return { apiKey, geminiModel, thinkingEnabled };
+      }
+      
+      // Update cache only if we have a valid configuration
+      cache.apiKey = apiKey;
+      cache.geminiModel = geminiModel;
+      cache.thinkingEnabled = thinkingEnabled;
+      cache.lastUpdated = now;
+      
+      logger.debug(`[Gemini] Configuration cached:`, {
+        apiKeyPresent: !!apiKey,
+        apiKeyLength: apiKey ? apiKey.length : 0,
+        geminiModel,
+        thinkingEnabled
+      });
+      
+      return { apiKey, geminiModel, thinkingEnabled };
+    } catch (error) {
+      logger.error(`[Gemini] Error loading configuration:`, error);
+      // Return cached data if available, even if expired
+      if (cache.apiKey) {
+        logger.debug(`[Gemini] Using expired cache due to configuration load error`);
+        return {
+          apiKey: cache.apiKey,
+          geminiModel: cache.geminiModel,
+          thinkingEnabled: cache.thinkingEnabled
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Setup storage change listener to invalidate cache when settings change
+   */
+  _setupStorageListener() {
+    if (browser && browser.storage && browser.storage.onChanged) {
+      browser.storage.onChanged.addListener((changes) => {
+        // Check if any Gemini-related settings changed
+        const geminiKeys = ['apiKey', 'geminiModel', 'geminiThinkingEnabled'];
+        const hasGeminiChanges = Object.keys(changes).some(key => 
+          geminiKeys.some(geminiKey => key.includes(geminiKey))
+        );
+        
+        if (hasGeminiChanges) {
+          logger.debug(`[Gemini] Storage change detected, invalidating cache`);
+          this._invalidateConfigCache();
+        }
+      });
+      logger.debug(`[Gemini] Storage change listener setup complete`);
+    }
+  }
+
+  /**
+   * Invalidate configuration cache (useful when settings change)
+   */
+  _invalidateConfigCache() {
+    logger.debug(`[Gemini] Configuration cache invalidated`);
+    this._configCache.lastUpdated = 0;
+    this._configCache.apiKey = null;
+    this._configCache.geminiModel = null;
+    this._configCache.thinkingEnabled = null;
+  }
+
+  /**
    * Single text translation - extracted from original translate method
    */
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
-      getApiKeyAsync(),
-      getGeminiModelAsync(),
-      getGeminiThinkingEnabledAsync(),
-    ]);
+    const { apiKey, geminiModel, thinkingEnabled } = await this._getCachedConfig();
+
+    // Detailed logging for debugging
+    logger.debug(`[Gemini] Using configuration for translation:`, {
+      apiKeyPresent: !!apiKey,
+      apiKeyLength: apiKey ? apiKey.length : 0,
+      geminiModel,
+      thinkingEnabled,
+      text: text.substring(0, 100) + '...'
+    });
 
     // Build API URL based on selected model
     let apiUrl;
@@ -483,10 +598,7 @@ export class GeminiProvider extends BaseAIProvider {
   async translateImage(imageData, sourceLang, targetLang, translateMode) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    const [apiKey, geminiModel] = await Promise.all([
-      getApiKeyAsync(),
-      getGeminiModelAsync(),
-    ]);
+    const { apiKey, geminiModel } = await this._getCachedConfig();
 
     // Build API URL based on selected model
     let apiUrl;
