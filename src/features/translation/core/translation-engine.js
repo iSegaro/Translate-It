@@ -270,6 +270,38 @@ export class TranslationEngine {
       data.mode = TranslationMode.Selection; // Ensure data object is also updated
     }
 
+    // Check for text length limits in non-SelectElement modes
+    const isSelectElementMode = mode === TranslationMode.Select_Element;
+    const TEXT_LENGTH_LIMITS = {
+      REGULAR_MODE_WARNING: 10000,    // Warn for texts > 10k chars in regular modes
+      REGULAR_MODE_MAX: 50000,        // Hard limit for texts in regular modes
+      SELECT_ELEMENT_MAX: 500000      // Much higher limit for Select Element mode
+    };
+
+    if (!isSelectElementMode && text.length > TEXT_LENGTH_LIMITS.REGULAR_MODE_WARNING) {
+      if (text.length > TEXT_LENGTH_LIMITS.REGULAR_MODE_MAX) {
+        logger.error(`[TranslationEngine] Text too long for ${mode} mode: ${text.length} characters (max: ${TEXT_LENGTH_LIMITS.REGULAR_MODE_MAX})`);
+        return {
+          success: false,
+          error: `Text too long for translation (${text.length} characters). Maximum allowed: ${TEXT_LENGTH_LIMITS.REGULAR_MODE_MAX} characters. For very long texts, please use the "Select Element" feature instead.`,
+          translatedText: text,
+          provider: provider,
+          mode: mode
+        };
+      } else {
+        logger.warn(`[TranslationEngine] Large text detected in ${mode} mode: ${text.length} characters. Consider using Select Element mode for better performance.`);
+      }
+    } else if (isSelectElementMode && text.length > TEXT_LENGTH_LIMITS.SELECT_ELEMENT_MAX) {
+      logger.error(`[TranslationEngine] Text too long even for Select Element mode: ${text.length} characters (max: ${TEXT_LENGTH_LIMITS.SELECT_ELEMENT_MAX})`);
+      return {
+        success: false,
+        error: `Text too long for translation (${text.length} characters). Maximum allowed: ${TEXT_LENGTH_LIMITS.SELECT_ELEMENT_MAX} characters.`,
+        translatedText: text,
+        provider: provider,
+        mode: mode
+      };
+    }
+
     // Get original source and target languages from config for language swapping logic
     const [originalSourceLang, originalTargetLang] = await Promise.all([
       getSourceLanguageAsync(),
@@ -1098,16 +1130,37 @@ export class TranslationEngine {
     }
 
     const providerType = providerInstance.constructor.type; // "ai" or "translate"
+    const providerName = providerInstance.providerName || providerInstance.constructor.name;
+
+    // Special case: only Select_Element mode should use streaming for very long texts
+    const isSelectElementMode = mode === TranslationMode.Select_Element;
 
     if (providerType === "ai") {
-      // AI providers: stream for longer texts or specific modes (e.g., select element)
-      const shouldStream = text.length > 500 || mode === TranslationMode.Selection;
-      return shouldStream;
+      // AI providers: stream for longer texts, but mainly for Select Element mode
+      if (isSelectElementMode) {
+        return text.length > 500; // Enable streaming for Select Element with long texts
+      } else {
+        // For other modes (sidepanel, popup, etc.), limit text length to prevent streaming issues
+        if (text.length > 10000) {
+          logger.warn(`[TranslationEngine] Text too long for non-SelectElement mode: ${text.length} characters. Consider using Select Element mode for long texts.`);
+          return false; // Don't stream, will be handled by standard translation with chunking
+        }
+        return false; // No streaming for regular translation modes
+      }
     } else {
-      // Traditional providers: only stream for very long texts that require chunking
-      // This prevents unnecessary streaming for short texts that can be handled in a single request
-      const shouldStream = text.length > 500; // Use a high threshold for traditional providers
-      return shouldStream;
+      // Traditional providers: Only for Select Element mode and very long texts
+      if (isSelectElementMode && text.length > 2000) {
+        // Check if provider actually supports streaming
+        const providerSupportsStreaming = providerInstance.constructor.supportsStreaming !== false;
+        if (!providerSupportsStreaming) {
+          logger.debug(`[TranslationEngine] Provider ${providerName} doesn't support streaming, using standard translation`);
+          return false;
+        }
+        return true;
+      }
+      
+      // For non-SelectElement modes, never use streaming for traditional providers
+      return false;
     }
   }
 
