@@ -156,7 +156,7 @@ $border-style: solid;
     :deep(h1), :deep(h2), :deep(h3), :deep(h4), :deep(h5), :deep(h6) {
       color: var(--color-text) !important;
       margin-top: 0 !important;
-      margin-bottom: 8px !important;
+      margin-bottom: 4px !important; // کاهش فاصله بعد از headers
       padding-bottom: 0 !important;
       font-weight: bold !important;
       line-height: 1.2 !important;
@@ -170,33 +170,41 @@ $border-style: solid;
     :deep(h6) { font-size: 0.75rem !important; }
 
     :deep(p) {
-      margin-bottom: 12px !important;
+      margin-bottom: 8px !important; // کاهش فاصله پاراگراف‌ها
       color: var(--color-text) !important;
       line-height: 1.6 !important;
     }
 
     :deep(ul), :deep(ol) {
-      margin-bottom: 12px !important;
-      padding-left: 16px !important;
+      margin-bottom: 8px !important; // کاهش فاصله لیست‌ها
+      padding-left: 24px !important; // افزایش padding برای بهتر دیده شدن bullet های سطح اول
       color: var(--color-text) !important;
-      list-style-type: disc !important; // For ul
+      list-style-type: disc !important;
+      list-style-position: outside !important; // اطمینان از موقعیت bullet
     }
 
     :deep(ol) {
-      list-style-type: decimal !important; // For ol
+      list-style-type: decimal !important;
+    }
+
+    :deep(li) {
+      margin-bottom: 2px !important; // کاهش فاصله بین آیتم‌های لیست
+      color: var(--color-text) !important;
+      line-height: 1.4 !important;
+      padding-left: 4px !important; // کمی padding برای بهتر دیده شدن متن
     }
 
     :deep(ul ul), :deep(ol ol), :deep(ul ol), :deep(ol ul) {
       margin-bottom: 0 !important;
-      padding-left: 20px !important;
+      padding-left: 28px !important; // افزایش padding برای لیست‌های تو در تو
     }
 
     :deep(ul ul) {
       list-style-type: circle !important;
     }
 
-    :deep(ul ul ul) {
-      list-style-type: square !important;
+    :deep(ul ul ul), :deep(ol ol ol) {
+      padding-left: 32px !important; // padding بیشتر برای لیست‌های سطح سوم
     }
 
     :deep(li) {
