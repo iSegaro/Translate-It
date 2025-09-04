@@ -152,6 +152,8 @@ $border-style: solid;
     // Ensure all text is visible
     color: var(--color-text);
     line-height: 1.6;
+    direction: ltr !important; // Force left-to-right for markdown content
+    text-align: left !important; // Force left alignment
 
     :deep(h1), :deep(h2), :deep(h3), :deep(h4), :deep(h5), :deep(h6) {
       color: var(--color-text) !important;
@@ -173,14 +175,18 @@ $border-style: solid;
       margin-bottom: 8px !important; // کاهش فاصله پاراگراف‌ها
       color: var(--color-text) !important;
       line-height: 1.6 !important;
+      direction: ltr !important;
+      text-align: left !important;
     }
 
     :deep(ul), :deep(ol) {
       margin-bottom: 8px !important; // کاهش فاصله لیست‌ها
       padding-left: 24px !important; // افزایش padding برای بهتر دیده شدن bullet های سطح اول
+      padding-right: 0 !important; // اطمینان از عدم padding سمت راست
       color: var(--color-text) !important;
       list-style-type: disc !important;
       list-style-position: outside !important; // اطمینان از موقعیت bullet
+      direction: ltr !important; // Force LTR for lists
     }
 
     :deep(ol) {
@@ -197,6 +203,8 @@ $border-style: solid;
     :deep(ul ul), :deep(ol ol), :deep(ul ol), :deep(ol ul) {
       margin-bottom: 0 !important;
       padding-left: 28px !important; // افزایش padding برای لیست‌های تو در تو
+      padding-right: 0 !important;
+      direction: ltr !important;
     }
 
     :deep(ul ul) {
@@ -205,6 +213,8 @@ $border-style: solid;
 
     :deep(ul ul ul), :deep(ol ol ol) {
       padding-left: 32px !important; // padding بیشتر برای لیست‌های سطح سوم
+      padding-right: 0 !important;
+      direction: ltr !important;
     }
 
     :deep(li) {
@@ -266,6 +276,8 @@ $border-style: solid;
       margin: 12px 0 !important;
       color: var(--color-text-secondary) !important;
       font-style: italic !important;
+      direction: ltr !important;
+      text-align: left !important;
     }
 
     :deep(table) {
@@ -274,6 +286,7 @@ $border-style: solid;
       margin-bottom: 12px !important;
       font-size: 0.875rem !important;
       color: var(--color-text) !important;
+      direction: ltr !important;
     }
 
     :deep(th), :deep(td) {
@@ -281,6 +294,7 @@ $border-style: solid;
       padding: 4px 8px !important;
       text-align: left !important;
       color: var(--color-text) !important;
+      direction: ltr !important;
     }
 
     :deep(th) {
