@@ -226,79 +226,6 @@ export class GeminiProvider extends BaseAIProvider {
     }
   }
 
-  _isQuotaError(error) {
-    if (!error.message) return false;
-    
-    const message = error.message.toLowerCase();
-    return (
-      message.includes('quota') ||
-      message.includes('limit exceeded') ||
-      message.includes('resource_exhausted') ||
-      message.includes('requests per minute') ||
-      message.includes('rate limit')
-    );
-  }
-
-  _isRateLimitError(error) {
-    if (!error.message) return false;
-    
-    const message = error.message.toLowerCase();
-    return (
-      error.status === 429 ||
-      message.includes('429') ||
-      message.includes('too many requests') ||
-      message.includes('rate limit') ||
-      message.includes('throttled')
-    );
-  }
-
-  /**
-   * Parse error details from Gemini response
-   */
-  _parseErrorDetails(error) {
-    const details = {
-      quotaType: 'unknown',
-      retryAfter: null,
-      isTemporary: false
-    };
-    
-    if (!error.message) return details;
-    
-    const message = error.message.toLowerCase();
-    
-    // Determine quota/rate limit type
-    if (message.includes('requests per minute')) {
-      details.quotaType = 'requests_per_minute';
-      details.retryAfter = 60000; // 1 minute
-      details.isTemporary = true;
-    } else if (message.includes('requests per day')) {
-      details.quotaType = 'requests_per_day';
-      details.retryAfter = 24 * 60 * 60 * 1000; // 24 hours
-      details.isTemporary = false;
-    } else if (message.includes('tokens per minute')) {
-      details.quotaType = 'tokens_per_minute';
-      details.retryAfter = 60000;
-      details.isTemporary = true;
-    } else if (message.includes('concurrent requests')) {
-      details.quotaType = 'concurrent_requests';
-      details.retryAfter = 5000; // 5 seconds
-      details.isTemporary = true;
-    } else if (this._isRateLimitError(error)) {
-      details.quotaType = 'rate_limit';
-      details.retryAfter = 30000; // 30 seconds
-      details.isTemporary = true;
-    }
-    
-    // Try to extract retry-after from headers if available
-    if (error.headers && error.headers['retry-after']) {
-      const retryAfter = parseInt(error.headers['retry-after']);
-      if (!isNaN(retryAfter)) {
-        details.retryAfter = retryAfter * 1000; // Convert seconds to milliseconds
-      }
-    }
-    
-    return details;
-  }
 
 
   /**
@@ -425,26 +352,6 @@ export class GeminiProvider extends BaseAIProvider {
       logger.info('_executeApiCall completed with result:', result);
       return result;
     } catch (error) {
-      // Enhanced error handling with detailed analysis using centralized error management
-      const errorDetails = this._parseErrorDetails(error);
-      
-      if (this._isQuotaError(error)) {
-        logger.error(`[Gemini] Quota exceeded: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms, temporary: ${errorDetails.isTemporary}`);
-        await ErrorHandler.getInstance().handle(error, {
-          context: 'gemini-translation-quota',
-          type: ErrorTypes.QUOTA_EXCEEDED
-        });
-        throw error; // Re-throw after handling
-      }
-      
-      if (this._isRateLimitError(error)) {
-        logger.warn(`[Gemini] Rate limit hit: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms`);
-        await ErrorHandler.getInstance().handle(error, {
-          context: 'gemini-translation-rate-limit',
-          type: ErrorTypes.RATE_LIMIT_REACHED
-        });
-        throw error; // Re-throw after handling
-      }
       
       // If thinking-related error occurs, retry without thinking config
       if (
@@ -474,22 +381,10 @@ export class GeminiProvider extends BaseAIProvider {
           logger.info('[Gemini] Fallback without thinking config successful:', fallbackResult);
           return fallbackResult;
         } catch (fallbackError) {
-          const fallbackErrorDetails = this._parseErrorDetails(fallbackError);
-          
-          if (this._isQuotaError(fallbackError)) {
-            await ErrorHandler.getInstance().handle(fallbackError, {
-              context: 'gemini-translation-fallback-quota',
-              type: ErrorTypes.QUOTA_EXCEEDED
-            });
-            throw fallbackError; // Re-throw after handling
-          }
-          if (this._isRateLimitError(fallbackError)) {
-            await ErrorHandler.getInstance().handle(fallbackError, {
-              context: 'gemini-translation-fallback-rate-limit',
-              type: ErrorTypes.RATE_LIMIT_REACHED
-            });
-            throw fallbackError; // Re-throw after handling
-          }
+          // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
+          await ErrorHandler.getInstance().handle(fallbackError, {
+            context: 'gemini-translation-fallback'
+          });
           
           // Re-throw fallback error with enhanced context
           fallbackError.context = `${this.providerName.toLowerCase()}-translation-fallback`;
@@ -498,6 +393,11 @@ export class GeminiProvider extends BaseAIProvider {
         }
       }
 
+      // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'gemini-translation'
+      });
+      
       logger.error('[Gemini] Translation failed with error:', error);
       error.context = `${this.providerName.toLowerCase()}-translation`;
       error.provider = this.providerName;
@@ -594,16 +494,15 @@ export class GeminiProvider extends BaseAIProvider {
         abortController: abortController
       });
 
-      logger.info('image translation completed with result:', result
-      );
+      logger.info('image translation completed with result:', result);
       return result;
     } catch (error) {
       logger.error('image translation failed with error:', error);
+      // Let ErrorHandler automatically detect and handle all error types
       await ErrorHandler.getInstance().handle(error, {
-        context: 'gemini-image-translation',
-        type: ErrorTypes.TRANSLATION_FAILED
+        context: 'gemini-image-translation'
       });
-      throw error; // Re-throw after handling
+      throw error;
     }
   }
 
