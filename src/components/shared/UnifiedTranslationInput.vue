@@ -21,16 +21,6 @@
       />
     </div>
 
-    <!-- Select Element Status (Sidepanel specific) -->
-    <div
-      v-if="isSelecting && mode === 'sidepanel'"
-      class="selection-status"
-    >
-      <div class="selection-indicator">
-        <div class="selection-spinner" />
-        <span>{{ selectElementMessage }}</span>
-      </div>
-    </div>
 
     <!-- Enhanced Source Text Input Section -->
     <div class="enhanced-input-section">
@@ -232,16 +222,6 @@ const props = defineProps({
   ttsResultTitle: {
     type: String,
     default: 'Speak translation'
-  },
-  selectElementMessage: {
-    type: String,
-    default: 'Click on any element on the webpage to translate...'
-  },
-  
-  // Selection Mode (for sidepanel)
-  isSelecting: {
-    type: Boolean,
-    default: false
   },
   
   // Custom Provider Selector Mode
@@ -504,35 +484,6 @@ defineExpose({
   gap: 8px;
 }
 
-/* Selection Status (Sidepanel) */
-.selection-status {
-  background: #e3f2fd;
-  border: 1px solid #90caf9;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 8px;
-}
-
-.selection-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #1976d2;
-  font-size: 14px;
-}
-
-.selection-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #90caf9;
-  border-top: 2px solid #1976d2;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
 
 /* Enhanced Input Section */
 .enhanced-input-section {
@@ -651,10 +602,6 @@ defineExpose({
 
 /* Dark theme support */
 /* Theme-specific styles now handled by unified theme variables in _variables.scss */
-.theme-dark .selection-status {
-  background: #1a1a2e;
-  border-color: #16213e;
-}
 
 .theme-dark .status-message.success {
   color: #4caf50;

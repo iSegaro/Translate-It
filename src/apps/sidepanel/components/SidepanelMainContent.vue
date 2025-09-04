@@ -26,16 +26,6 @@
       </div>
     </div>
 
-    <!-- Select Element Status -->
-    <div
-      v-if="isSelecting"
-      class="selection-status"
-    >
-      <div class="selection-indicator">
-        <div class="selection-spinner" />
-        <span>{{ t('SIDEPANEL_SELECT_ELEMENT_MESSAGE', 'Click on any element on the webpage to translate...') }}</span>
-      </div>
-    </div>
 
     <!-- Translation Form (similar to popup structure) -->
     <form
@@ -88,7 +78,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -114,7 +103,6 @@ const tracker = useResourceTracker('sidepanel-main-content')
 const settingsStore = useSettingsStore()
 
 // Composables
-const selectElement = useSelectElementTranslation();
 const { t } = useUnifiedI18n();
 const translation = useUnifiedTranslation('sidepanel');
 const { handleError } = useErrorHandler()
@@ -145,7 +133,6 @@ const canTranslateFromForm = ref(false)
 const lastTranslation = ref(null)
 
 // Computed
-const isSelecting = computed(() => selectElement.isSelectModeActive.value);
 
 // Watch canTranslate and emit changes
 watch(canTranslate, (newValue) => {
@@ -400,30 +387,6 @@ onMounted(async () => {
   min-width: auto;
 }
 
-.selection-status {
-  padding: 12px;
-  background: var(--color-info-bg);
-  border: 1px solid var(--color-info);
-  border-radius: 6px;
-  margin: 6px 12px;
-}
-
-.selection-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-info);
-  font-size: 14px;
-}
-
-.selection-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-info);
-  border-top: 2px solid transparent;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
