@@ -132,7 +132,7 @@ $border-style: solid;
   border: $border-width $border-style var(--color-border);
   border-radius: $border-radius-base;
   background-color: var(--color-background-soft);
-  max-height: 60vh;
+  // max-height: 60vh;
   overflow-y: auto;
   line-height: 1.6;
   color: var(--color-text);
