@@ -102,11 +102,26 @@ export class RateLimitManager {
   
   /**
    * Check if provider can make a request immediately
+   * @param {string} providerName - Provider name
+   * @param {string} context - Request context (e.g., "segment-1/2", "standard")
    */
-  canMakeRequest(providerName) {
+  canMakeRequest(providerName, context = 'standard', translateMode = null) {
     const state = this._initializeProvider(providerName);
     const now = Date.now();
     
+    // Determine if this is a multi-segment Select Element operation
+    const isMultiSegmentSelectElement = this._isMultiSegmentSelectElement(context, translateMode);
+    
+    // For non-multi-segment operations, allow immediate execution (no rate limiting)
+    if (!isMultiSegmentSelectElement) {
+      // Still respect concurrent limit for all operations
+      if (state.activeRequests >= state.config.maxConcurrent) {
+        return false;
+      }
+      return true;
+    }
+    
+    // Apply full rate limiting only for multi-segment Select Element operations
     // Check concurrent limit
     if (state.activeRequests >= state.config.maxConcurrent) {
       return false;
@@ -149,7 +164,7 @@ export class RateLimitManager {
    * Execute a request with rate limiting
    * Returns a Promise that resolves when the request can be made
    */
-  async executeWithRateLimit(providerName, requestFunction, context = 'unknown') {
+  async executeWithRateLimit(providerName, requestFunction, context = 'standard', translateMode = null) {
     const state = this._initializeProvider(providerName);
     
     // Note: Fast-fail logic for deterministic errors is handled in the catch block
@@ -173,7 +188,7 @@ export class RateLimitManager {
     const startTime = Date.now();
     
     // Wait for our turn
-    await this._waitForSlot(providerName);
+    await this._waitForSlot(providerName, context, translateMode);
     
     const waitTime = Date.now() - startTime;
     if (waitTime > 0) {
@@ -238,13 +253,42 @@ export class RateLimitManager {
   }
   
   /**
+   * Determine if the context represents a multi-segment Select Element operation
+   * @param {string} context - Request context
+   * @returns {boolean} - True if multi-segment Select Element
+   * @private
+   */
+  _isMultiSegmentSelectElement(context, translateMode = null) {
+    if (!context || typeof context !== 'string') {
+      return false;
+    }
+    
+    // Match various patterns: "segment-X/Y", "batch-X/Y", "streaming-chunk-X/Y", etc.
+    const segmentMatch = context.match(/^(segment|batch|streaming-chunk|chunk|streaming-batch)-(\d+)\/(\d+)$/);
+    if (!segmentMatch) {
+      return false;
+    }
+    
+    const totalSegments = parseInt(segmentMatch[3], 10);
+    
+    // Only apply delays for multi-segment operations in Select Element mode
+    if (translateMode) {
+      return totalSegments > 1 && translateMode === 'select_element';
+    }
+    
+    // If mode is not provided, apply conservative approach: any multi-segment operation
+    // This maintains backwards compatibility
+    return totalSegments > 1;
+  }
+  
+  /**
    * Wait for an available slot to make a request
    */
-  async _waitForSlot(providerName) {
+  async _waitForSlot(providerName, context = 'standard', translateMode = null) {
     return new Promise((resolve) => {
       const state = this._initializeProvider(providerName);
       
-      if (this.canMakeRequest(providerName)) {
+      if (this.canMakeRequest(providerName, context, translateMode)) {
         resolve();
         return;
       }
@@ -253,7 +297,9 @@ export class RateLimitManager {
       state.requestQueue.push({
         resolve,
         timestamp: Date.now(),
-        providerName
+        providerName,
+        context,
+        translateMode
       });
       
       // Start processing queue if not already processing
@@ -279,7 +325,7 @@ export class RateLimitManager {
       while (state.requestQueue.length > 0) {
         const queueItem = state.requestQueue[0];
         
-        if (this.canMakeRequest(providerName)) {
+        if (this.canMakeRequest(providerName, queueItem.context, queueItem.translateMode)) {
           // Remove from queue and resolve
           state.requestQueue.shift();
           queueItem.resolve();
@@ -349,7 +395,7 @@ export class RateLimitManager {
       burstLimit: state.config.burstLimit,
       maxConcurrent: state.config.maxConcurrent,
       lastRequestTime: state.lastRequestTime,
-      canMakeRequest: this.canMakeRequest(providerName),
+      canMakeRequest: this.canMakeRequest(providerName, 'status'),
       // Circuit breaker stats
       consecutiveFailures: state.consecutiveFailures,
       isCircuitOpen: state.isCircuitOpen,

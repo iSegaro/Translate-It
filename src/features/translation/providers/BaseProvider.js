@@ -362,7 +362,8 @@ export class BaseProvider {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
           () => translateChunk(chunk),
-          context
+          context,
+          null // translateMode not available in this generic method
         );
         
         translatedChunks.push(result);

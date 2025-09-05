@@ -455,7 +455,8 @@ export class TranslationEngine {
                                 });
                             }
                         },
-                        `batch-${i + 1}/${batches.length}`
+                        `batch-${i + 1}/${batches.length}`,
+                        mode
                     );
 
                     // Success - reset consecutive failures and reduce adaptive delay

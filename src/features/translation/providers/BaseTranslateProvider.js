@@ -193,7 +193,8 @@ export class BaseTranslateProvider extends BaseProvider {
         const chunkResults = await rateLimitManager.executeWithRateLimit(
           this.providerName,
           () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController),
-          `streaming-chunk-${chunkIndex + 1}/${chunks.length}`
+          `streaming-chunk-${chunkIndex + 1}/${chunks.length}`,
+          translateMode
         );
 
         // Add results to collection
@@ -388,7 +389,8 @@ export class BaseTranslateProvider extends BaseProvider {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
           () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController),
-          chunkContext
+          chunkContext,
+          translateMode
         );
 
         allResults.push(...(result || chunk.texts.map(() => '')));

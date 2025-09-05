@@ -111,7 +111,8 @@ export class BaseAIProvider extends BaseProvider {
           rateLimitManager.executeWithRateLimit(
             this.providerName,
             () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId),
-            `streaming-batch-${batchIndex + 1}/${batches.length}`
+            `streaming-batch-${batchIndex + 1}/${batches.length}`,
+            translateMode
           ),
           this._createBatchTimeoutPromise(batch.length)
         ]);
@@ -179,7 +180,8 @@ export class BaseAIProvider extends BaseProvider {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
           () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController),
-          `segment-${i + 1}/${texts.length}`
+          `segment-${i + 1}/${texts.length}`,
+          translateMode
         );
         results.push(result || texts[i]);
       } catch (error) {
