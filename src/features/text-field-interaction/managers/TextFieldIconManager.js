@@ -87,18 +87,41 @@ export class TextFieldIconManager extends ResourceTracker {
   }
 
   /**
-   * Check if element is editable (input, textarea, contenteditable)
+   * Check if element is editable (text input, textarea, contenteditable)
    * @param {Element} element - Element to check
    * @returns {boolean} Whether element is editable
    */
   isEditableElement(element) {
     if (!element) return false;
     
-    return (
-      element.isContentEditable ||
-      ["INPUT", "TEXTAREA"].includes(element.tagName) ||
-      (element.closest && element.closest('[contenteditable="true"]'))
-    );
+    // Check for contenteditable elements
+    if (element.isContentEditable || (element.closest && element.closest('[contenteditable="true"]'))) {
+      return true;
+    }
+    
+    // Check for textarea elements
+    if (element.tagName === "TEXTAREA") {
+      return true;
+    }
+    
+    // Check for input elements, but only text-based types
+    if (element.tagName === "INPUT") {
+      const inputType = (element.type || '').toLowerCase();
+      
+      // List of text-based input types that should show the translation icon
+      const textInputTypes = [
+        'text',
+        'search',
+        'textarea'
+      ];
+      
+      // If no type specified, default to text
+      const effectiveType = inputType || 'text';
+      
+      return textInputTypes.includes(effectiveType);
+    }
+    
+    return false;
   }
 
   /**
