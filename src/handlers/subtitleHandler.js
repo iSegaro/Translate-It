@@ -106,7 +106,7 @@ export class SubtitleHandler extends ResourceTracker {
       button.className = "ytp-button translate-it-yt-button";
       button.title = "Toggle Translate-It Subtitles";
       const icon = document.createElement("img");
-      icon.src = browser.runtime.getURL("icons/extension_icon_48.png");
+      icon.src = browser.runtime.getURL("assets/icons/extension/extension_icon_48.png");
       icon.className = "translate-it-yt-icon";
       button.appendChild(icon);
       this.addEventListener(button, "click", () => this.toggleSubtitleSetting());
