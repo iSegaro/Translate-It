@@ -157,13 +157,27 @@ export class TranslationEngine {
 
     try {
       let result;
-      // Context-specific optimizations (but all will include history except SelectElement)
-      if (context === "popup") {
-        result = await this.translateWithPriority(data, sender);
-      } else if (context === "selection") {
-        result = await this.translateWithCache(data, sender);
+      // Check cache first for all contexts to improve performance
+      const cacheKey = this.generateCacheKey(data);
+      if (this.cache.has(cacheKey)) {
+        const cached = this.cache.get(cacheKey);
+        logger.debug(`[TranslationEngine] Cache hit for ${cacheKey}`);
+        result = {
+          ...cached,
+          fromCache: true,
+        };
       } else {
-        result = await this.executeTranslation(data, sender);
+        // Context-specific optimizations (but all will include history except SelectElement)
+        if (context === "popup") {
+          result = await this.translateWithPriority(data, sender);
+        } else if (context === "selection") {
+          result = await this.translateWithCache(data, sender);
+        } else {
+          result = await this.executeTranslation(data, sender);
+        }
+        
+        // Cache the result for future requests
+        this.cacheResult(cacheKey, result);
       }
 
       // Centralized history addition for all modes except SelectElement
@@ -211,15 +225,7 @@ export class TranslationEngine {
    * Execute translation with priority (for popup)
    */
   async translateWithPriority(data, sender) {
-    // Check cache first for instant response
-    const cacheKey = this.generateCacheKey(data);
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
-      return {
-        ...cached,
-        fromCache: true,
-      };
-    }
+    // Note: Cache checking is now done at higher level
     return await this.executeTranslation(data, sender);
   }
 
@@ -227,17 +233,9 @@ export class TranslationEngine {
    * Execute translation with cache checking (for selection)
    */
   async translateWithCache(data, sender) {
-    const cacheKey = this.generateCacheKey(data);
-    // Return cached result if available
-    if (this.cache.has(cacheKey)) {
-      return {
-        ...this.cache.get(cacheKey),
-        fromCache: true,
-      };
-    }
+    // Note: Cache checking is now done at higher level
     const result = await this.executeTranslation(data, sender);
-    // Cache the result
-    this.cacheResult(cacheKey, result);
+    // Note: Caching is now done at higher level
     return result;
   }
 
