@@ -91,6 +91,9 @@ function formatMessage(component, level, message, data) {
 
   const prefix = `[${timestamp}] ${component}:`;
 
+  // TODO: احتمال داره که اینجا مشکل داشته باشه و نیازی به این شرط نباشه، بدون بررسی های دقیق این شرط رو بعدا اضافه کرده ام
+  // TODO: اگه مشکل در لاگ ها وجود داشته باشه ، باید این شرط رو بررسی کرد
+  // If data is an Error, log it directly to preserve stack trace
   if (data instanceof Error) {
     return [prefix, message, data];
   }
