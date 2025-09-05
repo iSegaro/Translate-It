@@ -403,13 +403,13 @@ export class TranslationEngine {
     const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
+    let hasErrors = false; // Move hasErrors to function scope
 
     (async () => {
         try {
             let consecutiveFailures = 0;
             const MAX_CONSECUTIVE_FAILURES = 3;
             let adaptiveDelay = 0;
-            let hasErrors = false;
             
             for (let i = 0; i < batches.length; i++) {
                 if (this.isCancelled(messageId)) {
