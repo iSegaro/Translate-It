@@ -1,5 +1,5 @@
 // src/providers/implementations/BingTranslateProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -17,17 +17,23 @@ const langNameToCodeMap = {
   afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
 };
 
-export class BingTranslateProvider extends BaseProvider {
+export class BingTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Bing Translator";
   static displayName = "Microsoft Bing";
-  static reliableJsonMode = true;
+  static reliableJsonMode = false;
   static supportsDictionary = false;
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
   static CHAR_LIMIT = 1000;
   static CHUNK_SIZE = 25; // Bing's segment limit per request
+  
+  // BaseTranslateProvider capabilities
+  static supportsStreaming = true;
+  static chunkingStrategy = 'character_limit';
+  static characterLimit = 1000; // Bing's character limit
+  static maxChunksPerBatch = 25; // Bing's chunk size
 
   constructor() {
     super("BingTranslate");
@@ -44,134 +50,49 @@ export class BingTranslateProvider extends BaseProvider {
     return normalized;
   }
 
-  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
-    logger.debug(`[Bing] _batchTranslate: engine is ${engine === this ? 'this' : engine}`);
+  /**
+   * Translate a single chunk of texts using Bing's API
+   * @param {string[]} chunkTexts - Texts in this chunk
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts for this chunk
+   */
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+    const context = `${this.providerName.toLowerCase()}-translate-chunk`;
+    
     try {
-      if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
-      const tokenData = await this._getBingAccessToken(engine, messageId, abortController);
-      if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
-
-      const indexedTexts = texts.map((text, index) => ({ index, text }));
-      const finalResults = new Array(texts.length);
-
-      const initialBatches = [];
-      let currentBatch = [];
-      let currentBatchLen = 0;
-
-      for (const item of indexedTexts) {
-        if (!item.text?.trim()) {
-          finalResults[item.index] = "";
-          continue;
-        }
-        if (item.text.length > BingTranslateProvider.CHAR_LIMIT) {
-          if (currentBatch.length > 0) initialBatches.push(currentBatch);
-          initialBatches.push([item]);
-          currentBatch = [];
-          currentBatchLen = 0;
-          continue;
-        }
-        const prospectiveLen = currentBatchLen + item.text.length + (currentBatch.length > 0 ? TEXT_DELIMITER.length : 0);
-        if (currentBatch.length > 0 && (currentBatch.length >= BingTranslateProvider.CHUNK_SIZE || prospectiveLen > BingTranslateProvider.CHAR_LIMIT)) {
-          initialBatches.push(currentBatch);
-          currentBatch = [];
-          currentBatchLen = 0;
-        }
-        currentBatch.push(item);
-        currentBatchLen += item.text.length + (currentBatch.length > 1 ? TEXT_DELIMITER.length : 0);
-      }
-      if (currentBatch.length > 0) initialBatches.push(currentBatch);
-
-      // Import rate limiting manager
-      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-
-      const processingQueue = [...initialBatches];
-      let processedCount = 0;
+      // Get Bing access token
+      const tokenData = await this._getBingAccessToken(abortController);
       
-      while (processingQueue.length > 0) {
-        logger.debug(`[Bing] Loop start. Aborted: ${engine.isCancelled(messageId)}`);
-        if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
-
-        const batch = processingQueue.shift();
-        const textsOnly = batch.map(item => item.text);
-        processedCount++;
-        const context = `batch-${processedCount}/${initialBatches.length}`;
-
-        try {
-          // Execute with rate limiting
-          const translatedSegments = await rateLimitManager.executeWithRateLimit(
-            this.providerName,
-            () => this._translateChunk(textsOnly, sl, tl, tokenData, abortController),
-            context
-          );
-
-          if (translatedSegments !== null) {
-            if (translatedSegments.length === batch.length) {
-              batch.forEach((item, i) => { finalResults[item.index] = translatedSegments[i]; });
-            } else {
-              batch.forEach(item => finalResults[item.index] = item.text);
-            }
-          } else {
-            if (batch.length > 1) {
-              const mid = Math.ceil(batch.length / 2);
-              processingQueue.unshift(batch.slice(mid), batch.slice(0, mid));
-            } else {
-              const failedItem = batch[0];
-              logger.error(`[Bing] Segment could not be translated: "${failedItem.text.substring(0, 100)}"...`);
-              finalResults[failedItem.index] = failedItem.text;
-            }
-          }
-        } catch (error) {
-          logger.warn(`[Bing] Batch ${context} failed with rate limiting:`, error);
-          
-          // Handle batch splitting even on rate limit failures
-          if (batch.length > 1) {
-            const mid = Math.ceil(batch.length / 2);
-            processingQueue.unshift(batch.slice(mid), batch.slice(0, mid));
-          } else {
-            const failedItem = batch[0];
-            logger.error(`[Bing] Single item failed: "${failedItem.text.substring(0, 100)}"...`);
-            finalResults[failedItem.index] = failedItem.text;
-          }
-        }
+      if (abortController?.signal.aborted) {
+        throw new Error('Translation cancelled by user');
       }
-      return finalResults;
-    } catch (error) {
-      if (error.type) throw error;
-      if (error.message?.includes("token")) {
-        error.type = ErrorTypes.API_KEY_MISSING;
-      } else if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
-        error.type = ErrorTypes.API_QUOTA_EXCEEDED;
-      } else {
-        error.type = ErrorTypes.API;
-      }
-      error.context = `${this.providerName.toLowerCase()}-translation-error`;
-      logger.error('[Bing] Translation error:', error);
-      throw error;
-    }
-  }
 
-  async _translateChunk(chunk, sl, tl, tokenData, abortController) {
-    if (abortController?.signal.aborted) {
-      throw new Error('Translation cancelled by user');
-    }
-    try {
-      const textToTranslate = chunk.join(TEXT_DELIMITER);
+      const textToTranslate = chunkTexts.join(TEXT_DELIMITER);
       const formData = new URLSearchParams({
-        text: textToTranslate, fromLang: sl, to: tl, token: tokenData.token, key: tokenData.key,
+        text: textToTranslate, 
+        fromLang: sourceLang, 
+        to: targetLang, 
+        token: tokenData.token, 
+        key: tokenData.key,
       });
+
       const url = new URL(BingTranslateProvider.bingBaseUrl);
       url.searchParams.set("IG", tokenData.IG);
       url.searchParams.set("IID", tokenData.IID?.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
       url.searchParams.set("isVertical", "1");
 
-      logger.debug(`[Bing] _translateChunk execute. Aborted: ${abortController?.signal.aborted}`);
       const result = await this._executeApiCall({
         url: url.toString(),
         fetchOptions: {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": navigator.userAgent },
-          body: formData,
-          signal: abortController?.signal,
+          headers: { 
+            "Content-Type": "application/x-www-form-urlencoded", 
+            "User-Agent": navigator.userAgent 
+          },
+          body: formData.toString(), // Convert URLSearchParams to string
         },
         extractResponse: (data) => {
           if (data?.statusCode === 400) {
@@ -179,36 +100,75 @@ export class BingTranslateProvider extends BaseProvider {
             err.name = 'BingApiError';
             throw err;
           }
+          
           const targetText = data?.[0]?.translations?.[0]?.text;
-          if (typeof targetText !== 'string') return chunk.map(() => "");
-          return targetText.split(TEXT_DELIMITER).map(t => t.trim());
+          if (typeof targetText !== 'string') {
+            return chunkTexts.map(() => "");
+          }
+          
+          const translatedSegments = targetText.split(TEXT_DELIMITER).map(t => t.trim());
+          
+          // Validate segment count match
+          if (translatedSegments.length !== chunkTexts.length) {
+            logger.warn("[Bing] Translated segment count mismatch after splitting.", { 
+              expected: chunkTexts.length, 
+              got: translatedSegments.length 
+            });
+            // For Bing, return the full translation as single segment if mismatch
+            return [targetText];
+          }
+          
+          return translatedSegments;
         },
-        context: `${this.providerName.toLowerCase()}-chunk-translate`,
+        context,
         abortController,
       });
-      return result || chunk.map(() => "");
+
+      return result || chunkTexts.map(() => "");
+      
     } catch (error) {
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
-        logger.warn(`[Bing] A batch failed, likely due to content/size. Will attempt to split. Batch size: ${chunk.length}`);
-        return null; // Signal failure to _batchTranslate
+        logger.warn(`[Bing] Chunk translation failed, will be handled by fallback. Chunk size: ${chunkTexts.length}`);
+        // Let BaseTranslateProvider handle the error and fallback
+        throw error;
       }
+      
+      // Handle token-related errors and other errors with proper typing
+      if (!error.type) {
+        if (error.message?.includes("token")) {
+          error.type = ErrorTypes.API_KEY_MISSING;
+        } else if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
+          error.type = ErrorTypes.API_QUOTA_EXCEEDED;
+        } else {
+          error.type = ErrorTypes.API;
+        }
+      }
+      
+      error.context = context;
       throw error;
     }
   }
 
-  async _getBingAccessToken(engine, messageId, abortController) {
+  async _getBingAccessToken(abortController) {
     try {
-      if (engine.isCancelled(messageId)) {
+      if (abortController?.signal.aborted) {
         throw new Error('Translation cancelled');
       }
-      if (!BingTranslateProvider.bingAccessToken || Date.now() - BingTranslateProvider.bingAccessToken.tokenTs > BingTranslateProvider.bingAccessToken.tokenExpiryInterval) {
+      
+      if (!BingTranslateProvider.bingAccessToken || 
+          Date.now() - BingTranslateProvider.bingAccessToken.tokenTs > BingTranslateProvider.bingAccessToken.tokenExpiryInterval) {
         logger.debug('[Bing] Fetching new access token...');
-        const response = await fetch(BingTranslateProvider.bingTokenUrl, { signal: abortController?.signal });
+        
+        const response = await fetch(BingTranslateProvider.bingTokenUrl, { 
+          signal: abortController?.signal 
+        });
+        
         if (!response.ok) {
           const err = new Error(`Failed to fetch token page: ${response.status}`);
           err.type = ErrorTypes.API_KEY_MISSING;
           throw err;
         }
+        
         const data = await response.text();
 
         const igMatch = data.match(/IG:"([^"]+)"/);
@@ -217,7 +177,7 @@ export class BingTranslateProvider extends BaseProvider {
 
         if (!igMatch || !iidMatch || !paramsMatch) {
           logger.error('[Bing] Failed to extract token parameters. HTML might have changed.');
-          logger.debug('[Bing] Fetched HTML for token:', data);
+          logger.debug('[Bing] Fetched HTML for token:', data.substring(0, 1000));
           throw new Error("Failed to extract token parameters from Bing translator page");
         }
 
@@ -235,8 +195,10 @@ export class BingTranslateProvider extends BaseProvider {
           tokenExpiryInterval: interval,
           count: 0,
         };
+        
         logger.debug('[Bing] New access token obtained successfully.');
       }
+      
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
       logger.error(`[Bing] Failed to get access token:`, error);
