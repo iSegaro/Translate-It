@@ -41,7 +41,7 @@ class ActionbarIconManager extends ResourceTracker {
     try {
       // Get current provider
       const storedProvider = await storageManager.get('TRANSLATION_API');
-      this.currentProvider = storedProvider || 'google';
+      this.currentProvider = storedProvider.TRANSLATION_API || 'google';
 
       logger.debug(`🎯 Simple icon manager initialized for: ${this.currentProvider}`);
 
