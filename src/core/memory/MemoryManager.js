@@ -300,7 +300,7 @@ class MemoryManager {
       if (elementListeners.has(event)) {
         const eventHandlers = elementListeners.get(event);
         if (this.isHandlerTracked(eventHandlers, handler)) {
-          logger.warn(`Handler already tracked for ${event} on ${this.getElementDescription(element)}`);
+          logger.debug(`Handler already tracked for ${event} on ${this.getElementDescription(element)}`);
           return;
         }
       }
