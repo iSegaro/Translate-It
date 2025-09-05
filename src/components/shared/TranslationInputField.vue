@@ -238,7 +238,7 @@ onMounted(async () => {
   position: absolute;
   top: 6px;
   left: 12px;
-  z-index: 10;
+  /* z-index: 10; */
   opacity: 0.4;
   transition: opacity 0.2s ease;
   background: rgba(255, 255, 255, 0.05);

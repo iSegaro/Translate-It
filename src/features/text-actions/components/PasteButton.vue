@@ -1,42 +1,41 @@
 <template>
-  <button
-    type="button"
-    class="action-button paste-button"
-    :class="[
-      `size-${size}`,
-      `variant-${variant}`,
-      { 'disabled': !canPaste, 'pasting': isPasting }
-    ]"
+  <BaseActionButton
+    :size="size"
+    :variant="variant"
     :disabled="!canPaste"
     :title="title"
     :aria-label="ariaLabel"
+    :label="label"
+    :show-label="showLabel"
+    :custom-classes="['paste-button', { 'pasting': isPasting }]"
     @click="handlePaste"
   >
-    <img 
-      :src="iconSrc" 
-      :alt="iconAlt"
-      class="button-icon"
-      style="width: 16px !important; height: 16px !important; object-fit: contain;"
-    >
-    <span
-      v-if="showLabel"
-      class="button-label"
-    >{{ label }}</span>
-    
-    <!-- Success feedback -->
-    <Transition name="feedback">
-      <div
-        v-if="showFeedback"
-        class="paste-feedback"
+    <template #icon>
+      <img 
+        :src="iconSrc" 
+        :alt="iconAlt"
+        class="button-icon"
+        style="width: 16px !important; height: 16px !important; object-fit: contain;"
       >
-        ✓ {{ feedbackText }}
-      </div>
-    </Transition>
-  </button>
+    </template>
+    
+    <template #feedback>
+      <!-- Success feedback -->
+      <Transition name="feedback">
+        <div
+          v-if="showFeedback"
+          class="paste-feedback"
+        >
+          ✓ {{ feedbackText }}
+        </div>
+      </Transition>
+    </template>
+  </BaseActionButton>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import BaseActionButton from './BaseActionButton.vue'
 import { usePasteAction } from '@/features/text-actions/composables/usePasteAction.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -145,91 +144,9 @@ const handlePaste = async () => {
 </script>
 
 <style scoped>
-.action-button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.action-button:hover {
-  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
-}
-
-.action-button:active {
-  transform: scale(0.95);
-}
-
-.action-button.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.action-button.pasting {
+/* Paste button specific styles */
+.paste-button.pasting {
   opacity: 0.7;
-}
-
-/* Size variants */
-.size-sm {
-  padding: 2px;
-  min-width: 20px;
-  min-height: 20px;
-}
-
-.size-sm .button-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.size-md {
-  padding: 6px;
-  min-width: 32px;
-  min-height: 32px;
-}
-
-.size-md .button-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.size-lg {
-  padding: 8px;
-  min-width: 40px;
-  min-height: 40px;
-}
-
-.size-lg .button-icon {
-  width: 24px;
-  height: 24px;
-}
-
-/* Variant styles */
-.variant-primary {
-  background-color: var(--primary-color, #007bff);
-  color: white;
-  border: 1px solid var(--primary-color, #007bff);
-}
-
-.variant-primary:hover {
-  background-color: var(--primary-color-hover, #0056b3);
-}
-
-.variant-secondary {
-  background-color: transparent;
-  color: var(--text-color, #333);
-  border: 1px solid transparent;
-  margin: 0 2px;
-}
-
-.variant-secondary:hover {
-  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
-  border-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
 }
 
 /* Button elements */
@@ -237,13 +154,6 @@ const handlePaste = async () => {
   flex-shrink: 0;
   object-fit: contain;
   filter: var(--icon-filter);
-}
-
-.button-label {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 /* Feedback animation */

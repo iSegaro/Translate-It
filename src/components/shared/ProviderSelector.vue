@@ -37,7 +37,7 @@
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="dropdown-menu"
+      class="provider-dropdown-menu"
       @click.stop
     >
       <div
@@ -84,7 +84,7 @@
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="dropdown-menu"
+      class="provider-dropdown-menu"
       @click.stop
     >
       <div
@@ -124,7 +124,7 @@
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="dropdown-menu dropdown-menu-right"
+      class="provider-dropdown-menu"
       @click.stop
     >
       <div
@@ -269,6 +269,7 @@ const toggleDropdown = () => {
     newState: !isDropdownOpen.value,
     mode: props.mode
   })
+  
   isDropdownOpen.value = !isDropdownOpen.value
 }
 
@@ -340,7 +341,7 @@ onUnmounted(() => {
 .split-translate-button-container {
   position: relative;
   flex-shrink: 0;
-  z-index: 100; /* Ensure dropdown is above other elements */
+  z-index: 100;
 }
 
 .split-translate-button {
@@ -421,6 +422,7 @@ onUnmounted(() => {
 /* Regular Button Styles */
 .provider-button-container {
   position: relative;
+  z-index: 100;
 }
 
 .provider-button {
@@ -448,6 +450,17 @@ onUnmounted(() => {
 /* Icon Only Mode Styles */
 .provider-icon-only-container {
   position: relative;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.provider-icon-only-container .provider-dropdown-menu {
+  left: 100%;
+  right: auto;
+  top: 0;
+  margin-left: 4px;
+  margin-top: 0;
 }
 
 .provider-icon-button {
@@ -488,9 +501,12 @@ onUnmounted(() => {
 .dropdown-menu-right {
   right: 0;
   left: auto;
+  top: 100%;
+  margin-top: 2px;
   background-color: var(--color-background, #ffffff) !important;
   border: 1px solid var(--color-border, #e5e7eb) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  z-index: 9999 !important;
 }
 
 /* Enhanced dropdown items for icon-only mode */
@@ -556,21 +572,44 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-/* Dropdown Menu */
-.dropdown-menu {
+/* Provider Dropdown Menu */
+.provider-dropdown-menu {
   position: absolute;
   top: 100%;
   left: 0;
+  margin-top: 2px;
   background: var(--bg-color, white);
   border: 1px solid var(--header-border-color);
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1001;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
   min-width: 160px;
-  margin-top: 2px;
   max-height: 300px;
   overflow-y: auto;
   display: block;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Icon-only dropdown opens to the left */
+.icon-only-dropdown {
+  right: 100% !important;
+  left: auto !important;
+  top: 0 !important;
+  margin-right: 8px !important;
+  margin-top: 0 !important;
+}
+
+/* Specific styling for dropdown in icon-only mode */
+.dropdown-menu-right {
+  /* For icon-only mode, use fixed width */
+  width: 200px;
+  min-width: 200px;
+  /* Align to the right if needed */
+  right: 0 !important;
+  left: auto !important;
+  top: 100% !important;
+  margin-top: 2px !important;
 }
 
 .dropdown-item {
@@ -588,7 +627,9 @@ onUnmounted(() => {
 }
 
 .dropdown-item:hover {
-  background-color: var(--toolbar-link-hover-bg-color);
+  background-color: var(--toolbar-link-hover-bg-color) !important;
+  opacity: 1 !important;
+  filter: none !important;
 }
 
 .dropdown-item.active {

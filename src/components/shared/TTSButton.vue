@@ -1,96 +1,92 @@
 <template>
-  <button
-    type="button"
-    :class="buttonClasses"
+  <BaseActionButton
+    :size="size"
+    :variant="variant"
     :disabled="disabled || tts.ttsState.value === 'loading' || !text || !text.trim()"
     :title="buttonTitle"
+    :label="buttonLabel"
+    :show-label="showLabel"
+    :custom-classes="ttsButtonClasses"
     @click="handleClick"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
   >
-    <!-- Icon Container -->
-    <div class="icon-container">
-      <!-- Idle State Icon -->
-      <svg
-        v-if="tts.ttsState.value === 'idle'"
-        class="tts-icon"
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-      >
-        <path
-          fill="currentColor"
-          d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
-        />
-      </svg>
+    <template #icon>
+      <!-- Icon Container -->
+      <div class="icon-container">
+        <!-- Idle State Icon -->
+        <svg
+          v-if="tts.ttsState.value === 'idle'"
+          class="tts-icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path
+            fill="currentColor"
+            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+          />
+        </svg>
 
-      <!-- Loading State Icon with Animation -->
-      <svg
-        v-else-if="tts.ttsState.value === 'loading'"
-        class="tts-icon loading-spin"
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-      >
-        <path
-          fill="currentColor"
-          d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
-        />
-        <path
-          fill="currentColor"
-          opacity="0.5"
-          d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
-        />
-      </svg>
+        <!-- Loading State Icon with Animation -->
+        <svg
+          v-else-if="tts.ttsState.value === 'loading'"
+          class="tts-icon loading-spin"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path
+            fill="currentColor"
+            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
+          />
+          <path
+            fill="currentColor"
+            opacity="0.5"
+            d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+          />
+        </svg>
 
-      <!-- Playing State Icon (Stop) -->
-      <svg
-        v-else-if="tts.ttsState.value === 'playing'"
-        class="tts-icon"
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-      >
-        <path
-          fill="currentColor"
-          d="M6 6h12v12H6z"
-        />
-      </svg>
+        <!-- Playing State Icon (Stop) -->
+        <svg
+          v-else-if="tts.ttsState.value === 'playing'"
+          class="tts-icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path
+            fill="currentColor"
+            d="M6 6h12v12H6z"
+          />
+        </svg>
 
-      <!-- Error State Icon -->
-      <svg
-        v-else-if="tts.ttsState.value === 'error'"
-        class="tts-icon error-icon"
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-      >
-        <path
-          fill="currentColor"
-          d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
-        />
-        <circle
-          fill="currentColor"
-          cx="20"
-          cy="6"
-          r="3"
-        />
-      </svg>
+        <!-- Error State Icon -->
+        <svg
+          v-else-if="tts.ttsState.value === 'error'"
+          class="tts-icon error-icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path
+            fill="currentColor"
+            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
+          />
+          <circle
+            fill="currentColor"
+            cx="20"
+            cy="6"
+            r="3"
+          />
+        </svg>
 
-    </div>
-
-    <!-- Optional Text Label -->
-    <span
-      v-if="showLabel"
-      class="tts-label"
-    >
-      {{ buttonLabel }}
-    </span>
-  </button>
+      </div>
+    </template>
+  </BaseActionButton>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import BaseActionButton from '@/features/text-actions/components/BaseActionButton.vue'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -136,21 +132,14 @@ const emit = defineEmits([
   'state-changed'
 ])
 
-// State
-const isHovered = ref(false)
-
 // TTS Composable
 const tts = useTTSSmart()
 
 // Computed Properties
-const buttonClasses = computed(() => [
+const ttsButtonClasses = computed(() => [
   'tts-button',
-  `tts-button--${props.size}`,
-  `tts-button--${props.variant}`,
   `tts-button--${tts.ttsState.value}`,
   {
-    'tts-button--hovered': isHovered.value,
-    'tts-button--disabled': props.disabled || !props.text || !props.text.trim(),
     'tts-button--has-label': props.showLabel
   }
 ])
@@ -235,14 +224,6 @@ const handleClick = async () => {
   }
 }
 
-const handleMouseEnter = () => {
-  isHovered.value = true
-}
-
-const handleMouseLeave = () => {
-  isHovered.value = false
-}
-
 // Watch for state changes and emit events
 watch(() => tts.ttsState.value, (newState, oldState) => {
   if (oldState !== undefined) {
@@ -259,79 +240,9 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 </script>
 
 <style scoped>
-/* Base Button Styles */
+/* TTS Button specific styles */
 .tts-button {
-  position: relative !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border: none !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  font-family: inherit !important;
-  font-weight: 500 !important;
-  outline: none !important;
-  overflow: visible !important; /* Allow progress ring to be visible outside */
-  white-space: nowrap !important;
-  user-select: none !important; /* Match Copy/Paste button styling */
-  /* Ensure component isolation and create new stacking context */
-  isolation: isolate !important;
-  z-index: auto !important;
-  contain: layout style !important;
-}
-
-.tts-button:focus {
-  outline: 2px solid var(--focus-color, #007bff);
-  outline-offset: 2px;
-}
-
-/* Size Variants */
-.tts-button--sm {
-  padding: 4px 6px;
-  min-height: 24px;
-  font-size: 12px;
-  gap: 4px;
-}
-
-.tts-button--md {
-  padding: 6px 8px;
-  min-height: 32px;
-  font-size: 14px;
-  gap: 6px;
-}
-
-.tts-button--lg {
-  padding: 8px 12px;
-  min-height: 40px;
-  font-size: 16px;
-  gap: 8px;
-}
-
-/* Color Variants - Primary */
-.tts-button--primary {
-  background: transparent;
-  color: var(--color-text, #333);
-  border: 1px solid transparent;
-}
-
-.tts-button--primary:hover:not(:disabled) {
-  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--color-surface-shadow, rgba(0, 0, 0, 0.1));
-}
-
-/* Color Variants - Secondary */
-.tts-button--secondary {
-  background: transparent;
-  color: var(--color-text, #333);
-  border: 1px solid transparent;
-}
-
-.tts-button--secondary:hover:not(:disabled) {
-  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--color-surface-shadow, rgba(0, 0, 0, 0.1));
+  /* No additional styling needed - BaseActionButton handles it */
 }
 
 /* State-specific Styles */
@@ -340,67 +251,31 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 }
 
 .tts-button--playing {
-  border-color: var(--color-error, #dc3545) !important;
-  background: transparent;
-}
-
-.tts-button--primary.tts-button--playing {
-  background: transparent;
+  border-color: var(--color-error, #dc3545);
 }
 
 .tts-button--error {
-  border-color: var(--color-error, #dc3545) !important;
-  background: transparent;
-}
-
-.tts-button--primary.tts-button--error {
-  background: transparent;
-}
-
-.tts-button--error:hover:not(:disabled) {
-  transform: scale(1.05);
-}
-
-/* Disabled State */
-.tts-button--disabled,
-.tts-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed !important;
-  transform: none !important; /* Override any transform on disabled state */
-}
-
-/* Active/Pressed State */
-.tts-button:active:not(:disabled) {
-  transform: scale(0.95);
+  border-color: var(--color-error, #dc3545);
 }
 
 /* Icon Container */
 .icon-container {
-  position: relative !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  /* Create isolated stacking context */
-  isolation: isolate !important;
-  z-index: 1 !important;
-  contain: layout !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* TTS Icon */
 .tts-icon {
   transition: all 0.2s ease;
   flex-shrink: 0;
-  /* Note: Filter removed to prevent conflicts with SVG color inheritance */
-  /* filter: var(--icon-filter); */
-  color: inherit !important;
+  color: inherit;
 }
 
 /* Ensure SVG paths inherit proper color */
 .tts-icon path {
-  fill: currentColor !important;
-  stroke: none !important;
+  fill: currentColor;
+  stroke: none;
 }
 
 .loading-spin {
@@ -416,49 +291,8 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   color: currentColor;
 }
 
-
-/* Label */
-.tts-label {
-  font-weight: 500;
-  user-select: none;
-}
-
-/* Hover Effects */
-.tts-button--hovered .tts-icon {
-  transform: scale(1.1);
-}
-
-/* Focus visible for accessibility */
-.tts-button:focus-visible {
-  outline: 2px solid var(--focus-color, #007bff);
-  outline-offset: 2px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .tts-button--lg {
-    padding: 6px 10px;
-    min-height: 36px;
-    font-size: 15px;
-  }
-  
-  .tts-button--md {
-    padding: 5px 7px;
-    min-height: 30px;
-    font-size: 13px;
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .tts-button {
-    border-width: 2px;
-  }
-}
-
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .tts-button,
   .tts-icon {
     transition: none;
   }

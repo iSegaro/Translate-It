@@ -340,85 +340,19 @@ const handleTTSStateChanged = (data) => {
   display: inline-flex;
 }
 
-/* Mode-specific styles */
-.mode-input {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 2px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(4px);
-  /* Performance optimization for animations */
-  overflow: visible;
-  will-change: transform;
-}
-
-.mode-output {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-  padding: 1px;
-  /* Performance optimization for animations */
-  overflow: visible;
-  will-change: transform;
-}
-
-.mode-inline {
-  background: transparent;
-  padding: 0;
-}
-
+/* Mode-specific styles - simplified */
+.mode-input,
+.mode-output,
 .mode-floating {
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 6px;
-  padding: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(8px);
+  border-radius: 4px;
+  padding: 2px;
 }
 
+.mode-inline,
 .mode-sidepanel {
   background: transparent;
-  border-radius: 4px;
-  padding: 2px 8px;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: visible;
-  min-height: 28px;
-}
-
-.mode-sidepanel.position-top-right,
-.mode-sidepanel.position-top-left,
-.mode-sidepanel.position-bottom-right,
-.mode-sidepanel.position-bottom-left {
-  max-width: calc(100% - 24px);
-}
-
-/* Responsive button adjustments for constrained spaces */
-.mode-sidepanel :deep(.action-button) {
-  min-width: auto;
-  flex-shrink: 1;
-}
-
-.mode-sidepanel .toolbar-left,
-.mode-sidepanel .toolbar-right {
-  gap: 2px;
-}
-
-/* Performance optimizations for popup modes */
-.mode-input :deep(.tts-button),
-.mode-output :deep(.tts-button) {
-  will-change: transform;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-.mode-input :deep(.progress-ring),
-.mode-output :deep(.progress-ring) {
-  will-change: transform;
-  backface-visibility: hidden;
-}
-
-.mode-input :deep(.tts-icon),
-.mode-output :deep(.tts-icon) {
-  will-change: transform;
+  padding: 2px;
 }
 
 /* Content-based visibility - Removed to always show toolbar with full opacity
@@ -426,18 +360,10 @@ const handleTTSStateChanged = (data) => {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .mode-input {
-    background: rgba(0, 0, 0, 0.3);
-    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.05);
-  }
-  
-  .mode-output {
-    background: rgba(255, 255, 255, 0.05);
-  }
-  
+  .mode-input,
+  .mode-output,
   .mode-floating {
-    background: rgba(0, 0, 0, 0.95);
-    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.9);
   }
 }
 </style>
