@@ -48,8 +48,6 @@
         :paste-alt="t('SIDEPANEL_PASTE_SOURCE_ALT_ICON', 'Paste')"
         :auto-translate-on-paste="autoTranslateOnPaste"
         @translate="handleTranslate"
-        @input="handleSourceInput"
-        @keydown="handleKeydown"
       />
 
       <!-- Translation Display -->
