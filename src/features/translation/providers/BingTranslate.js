@@ -26,14 +26,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
-  static CHAR_LIMIT = 1000;
-  static CHUNK_SIZE = 25; // Bing's segment limit per request
+  static CHAR_LIMIT = 800; // Reduced from 1000 to avoid API limits
+  static CHUNK_SIZE = 15; // Reduced from 25 to avoid API limits
   
   // BaseTranslateProvider capabilities
   static supportsStreaming = true;
   static chunkingStrategy = 'character_limit';
-  static characterLimit = 1000; // Bing's character limit
-  static maxChunksPerBatch = 25; // Bing's chunk size
+  static characterLimit = 800; // Bing's character limit - reduced for reliability
+  static maxChunksPerBatch = 15; // Bing's chunk size - reduced for reliability
 
   constructor() {
     super("BingTranslate");
@@ -63,6 +63,19 @@ export class BingTranslateProvider extends BaseTranslateProvider {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
     
     try {
+      // Validate chunk size before processing
+      if (chunkTexts.length > this.constructor.maxChunksPerBatch) {
+        logger.info(`[Bing] Chunk too large (${chunkTexts.length} > ${this.constructor.maxChunksPerBatch}), splitting`);
+        // Split into smaller sub-chunks
+        const results = [];
+        for (let i = 0; i < chunkTexts.length; i += this.constructor.maxChunksPerBatch) {
+          const subChunk = chunkTexts.slice(i, i + this.constructor.maxChunksPerBatch);
+          const subResults = await this._translateChunk(subChunk, sourceLang, targetLang, translateMode, abortController);
+          results.push(...subResults);
+        }
+        return results;
+      }
+      
       // Get Bing access token
       const tokenData = await this._getBingAccessToken(abortController);
       
@@ -71,6 +84,23 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       }
 
       const textToTranslate = chunkTexts.join(TEXT_DELIMITER);
+      
+      // Additional size validation
+      if (textToTranslate.length > this.constructor.characterLimit * 2) {
+        logger.info(`[Bing] Text too long (${textToTranslate.length} chars), may cause API error`);
+        // Try to split by reducing chunk size
+        if (chunkTexts.length > 1) {
+          const midPoint = Math.ceil(chunkTexts.length / 2);
+          const firstHalf = chunkTexts.slice(0, midPoint);
+          const secondHalf = chunkTexts.slice(midPoint);
+          
+          const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController);
+          const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController);
+          
+          return [...firstResults, ...secondResults];
+        }
+      }
+      
       const formData = new URLSearchParams({
         text: textToTranslate, 
         fromLang: sourceLang, 
@@ -106,16 +136,46 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
-          const translatedSegments = targetText.split(TEXT_DELIMITER).map(t => t.trim());
+          let translatedSegments = targetText.split(TEXT_DELIMITER).map(t => t.trim());
           
           // Validate segment count match
           if (translatedSegments.length !== chunkTexts.length) {
-            logger.warn("[Bing] Translated segment count mismatch after splitting.", { 
+            logger.debug("[Bing] Translated segment count mismatch after splitting.", { 
               expected: chunkTexts.length, 
               got: translatedSegments.length 
             });
-            // For Bing, return the full translation as single segment if mismatch
-            return [targetText];
+            
+            // Try alternative splitting strategies
+            if (translatedSegments.length === 1 && chunkTexts.length > 1) {
+              // If we got one big translation but expected multiple, try to split by common patterns
+              const text = translatedSegments[0];
+              
+              // Try splitting by "---" (delimiter might have been translated)
+              const altSplit1 = text.split(/\n*---\n*/);
+              if (altSplit1.length === chunkTexts.length) {
+                translatedSegments = altSplit1.map(t => t.trim());
+                logger.debug("[Bing] Successfully recovered segments using alternative splitting");
+              } else {
+                // Try splitting by double newlines
+                const altSplit2 = text.split(/\n\n+/);
+                if (altSplit2.length === chunkTexts.length) {
+                  translatedSegments = altSplit2.map(t => t.trim());
+                  logger.debug("[Bing] Successfully recovered segments using newline splitting");
+                } else {
+                  // Last resort: distribute text evenly
+                  logger.debug("[Bing] Using fallback: returning original text count with empty strings");
+                  translatedSegments = chunkTexts.map((_, index) => index === 0 ? text : "");
+                }
+              }
+            } else if (translatedSegments.length > chunkTexts.length) {
+              // If we got too many segments, take only what we need
+              translatedSegments = translatedSegments.slice(0, chunkTexts.length);
+            } else {
+              // If we got fewer segments than expected, pad with empty strings
+              while (translatedSegments.length < chunkTexts.length) {
+                translatedSegments.push("");
+              }
+            }
           }
           
           return translatedSegments;
