@@ -275,12 +275,13 @@ onMounted(async () => {
 }
 
 .sidepanel-wrapper .translation-textarea {
-  height: 140px;
+  min-height: 140px; /* Use min-height instead of fixed height */
+  max-height: 400px; /* Add a max-height to constrain resizing */
   padding: 42px 14px 12px 14px;
   font-size: 15px;
   line-height: 1.7;
   border-radius: 5px;
-  resize: none;
+  resize: vertical; /* Enable vertical resizing */
 }
 
 html[dir="rtl"] .sidepanel-wrapper .translation-textarea {
