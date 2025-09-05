@@ -77,7 +77,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     url.searchParams.set("id", `${uuid}-0-0`);
     url.searchParams.set("srv", "android");
 
-    const result = await this._executeApiCall({
+    const result = await this._executeWithErrorHandling({
       url: url.toString(),
       fetchOptions: {
         method: "POST",
@@ -101,117 +101,6 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     return result || chunkTexts.map(() => '');
   }
 
-  /**
-   * Traditional batch processing (fallback) - preserves original implementation
-   * @param {string[]} texts - Texts to translate
-   * @param {string} sl - Source language
-   * @param {string} tl - Target language
-   * @param {AbortController} abortController - Cancellation controller
-   * @returns {Promise<string[]>} - Translated texts
-   */
-  async _traditionalBatchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
-    const context = `${this.providerName.toLowerCase()}-translate`;
-    try {
-      const lang = sl === "auto" ? tl : `${sl}-${tl}`;
-      logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
-
-      const chunks = [];
-      let currentChunk = [];
-      let currentCharCount = 0;
-
-      for (const text of texts) {
-        if (currentChunk.length > 0 && currentCharCount + text.length > YandexTranslateProvider.CHAR_LIMIT) {
-          chunks.push(currentChunk);
-          currentChunk = [];
-          currentCharCount = 0;
-        }
-        currentChunk.push(text);
-        currentCharCount += text.length;
-      }
-      if (currentChunk.length > 0) {
-        chunks.push(currentChunk);
-      }
-
-      // Import rate limiting manager
-      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-
-      // Process chunks sequentially with rate limiting
-      const translatedChunks = [];
-      for (let i = 0; i < chunks.length; i++) {
-        // Check for cancellation
-        if (abortController && abortController.signal.aborted) {
-          const cancelError = new Error('Translation cancelled by user');
-          cancelError.name = 'AbortError';
-          throw cancelError;
-        }
-
-        const chunk = chunks[i];
-        const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
-
-        try {
-          // Execute chunk translation with rate limiting
-          const result = await rateLimitManager.executeWithRateLimit(
-            this.providerName,
-            async () => {
-              const uuid = this._generateUuid();
-              const formData = new URLSearchParams();
-              formData.append('lang', lang);
-              chunk.forEach(text => formData.append('text', text || ''));
-
-              const url = new URL(YandexTranslateProvider.mainUrl);
-              url.searchParams.set("id", `${uuid}-0-0`);
-              url.searchParams.set("srv", "android");
-
-              return await this._executeApiCall({
-                url: url.toString(),
-                fetchOptions: {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": navigator.userAgent,
-                  },
-                  body: formData,
-                },
-                extractResponse: (data) => {
-                  if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunk.length) {
-                    logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
-                    return chunk.map(() => '');
-                  }
-                  return data.text;
-                },
-                context: chunkContext,
-                abortController,
-              });
-            },
-            chunkContext
-          );
-
-          translatedChunks.push(result || chunk.map(() => ''));
-        } catch (error) {
-          logger.error(`[Yandex] Chunk ${i + 1} failed:`, error);
-          // Fallback for failed chunks
-          translatedChunks.push(chunk.map(() => ''));
-        }
-      }
-      return translatedChunks.flat();
-
-    } catch (error) {
-      if (error.type) {
-        throw error;
-      }
-      if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
-        error.type = ErrorTypes.API_QUOTA_EXCEEDED;
-      } else if (error.message?.includes("403") || error.message?.includes("401")) {
-        error.type = ErrorTypes.API_KEY_MISSING;
-      } else {
-        error.type = ErrorTypes.API;
-      }
-      error.context = `${this.providerName.toLowerCase()}-translation-error`;
-      logger.error('Translation error:', error);
-      throw error;
-    }
-  }
-
   async detect_with_yandex(text, hintLangs = []) {
     logger.debug(`Yandex: Detecting language for text: "${text.substring(0, 50)}..."`);
 
@@ -230,7 +119,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     }
 
     try {
-      const result = await this._executeApiCall({
+      const result = await this._executeWithErrorHandling({
         url: url.toString(),
         fetchOptions: {
           method: "POST",

@@ -214,7 +214,7 @@ export class BaseTranslateProvider extends BaseProvider {
         logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
         
         // Send error stream message to content script
-        await this._streamChunkError(error, chunkIndex, messageId);
+        await this._streamChunkError(error, chunkIndex, messageId, engine);
         
         // Send streaming end notification with error status
         await this._sendStreamEnd(messageId, { error: true });
@@ -317,6 +317,27 @@ export class BaseTranslateProvider extends BaseProvider {
   }
 
   /**
+   * Stream error for a chunk
+   * @param {Error} error - Error that occurred
+   * @param {number} chunkIndex - Index of failed chunk
+   * @param {string} messageId - Message ID
+   * @param {object} engine - Translation engine instance
+   */
+  async _streamChunkError(error, chunkIndex, messageId, engine = null) {
+    try {
+      // Use streamingManager for error streaming
+      await streamingManager.streamError(messageId, error, {
+        chunkIndex,
+        provider: this.providerName
+      });
+      
+      logger.debug(`[${this.providerName}] Error streamed for chunk ${chunkIndex + 1}`);
+    } catch (streamError) {
+      logger.error(`[${this.providerName}] Failed to stream error for chunk ${chunkIndex + 1}:`, streamError);
+    }
+  }
+
+  /**
    * Send streaming end notification
    * @param {string} messageId - Message ID
    * @param {object} options - Options (error: boolean)
@@ -342,8 +363,68 @@ export class BaseTranslateProvider extends BaseProvider {
    * @returns {Promise<string[]>} - Translated texts
    */
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
-    // This should call the original _batchTranslate implementation
-    // Will be overridden by subclasses to preserve existing functionality
-    throw new Error(`_traditionalBatchTranslate not implemented by ${this.providerName}`);
+    // Default implementation with chunking and rate limiting
+    const context = `${this.providerName.toLowerCase()}-traditional-batch`;
+    const chunks = this._createChunks(texts);
+    const allResults = [];
+
+    // Import rate limiting manager
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+
+    // Process chunks sequentially
+    for (let i = 0; i < chunks.length; i++) {
+      // Check for cancellation
+      if (abortController && abortController.signal.aborted) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
+      }
+
+      const chunk = chunks[i];
+      const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
+
+      try {
+        // Execute chunk translation with rate limiting
+        const result = await rateLimitManager.executeWithRateLimit(
+          this.providerName,
+          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController),
+          chunkContext
+        );
+
+        allResults.push(...(result || chunk.texts.map(() => '')));
+      } catch (error) {
+        logger.error(`[${this.providerName}] Chunk ${i + 1} failed:`, error);
+        // Enhanced error handling - throw to be handled by system error management
+        throw error;
+      }
+    }
+
+    return allResults;
+  }
+
+  /**
+   * Execute API call with enhanced error handling (similar to BaseAIProvider)
+   * @param {Object} params - Parameters for API call
+   * @returns {Promise<any>} - API response
+   */
+  async _executeWithErrorHandling(params) {
+    try {
+      return await this._executeApiCall(params);
+    } catch (error) {
+      // Import ErrorHandler for centralized error management
+      const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
+      
+      // Let the centralized error handler manage the error
+      const errorHandler = ErrorHandler.getInstance();
+      await errorHandler.handle(error, {
+        context: params.context,
+        provider: this.providerName,
+        maxRetries: 2
+      });
+      
+      // If ErrorHandler returns, it means the error was handled (e.g., retried successfully)
+      // Otherwise, it would have thrown the error
+      throw error;
+    }
   }
 }

@@ -6,7 +6,6 @@ import {
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
 import { TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
@@ -70,7 +69,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     const textToTranslate = chunkTexts.join(RELIABLE_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
-    const result = await this._executeApiCall({
+    const result = await this._executeWithErrorHandling({
       url: `${apiUrl}?${queryParams.toString()}`,
       fetchOptions: {
         method: "POST",
@@ -120,148 +119,6 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     }
 
     return result?.translatedSegments || chunkTexts;
-  }
-
-  /**
-   * Traditional batch processing (fallback) - preserves original implementation
-   * @param {string[} texts - Texts to translate
-   * @param {string} sl - Source language
-   * @param {string} tl - Target language
-   * @param {string} translateMode - Translation mode
-   * @param {AbortController} abortController - Cancellation controller
-   * @returns {Promise<string[]>} - Translated texts
-   */
-  async _traditionalBatchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
-    const context = `${this.providerName.toLowerCase()}-translate`;
-    const isDictionaryEnabled = await getEnableDictionaryAsync();
-    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
-    const shouldIncludeDictionary = isDictionaryEnabled && texts.length === 1 && translateMode !== TranslationMode.Field;
-
-    const chunks = [];
-    let currentChunk = [];
-    let currentCharCount = 0;
-
-    for (const text of texts) {
-      const prospectiveCharCount = currentCharCount + text.length + RELIABLE_DELIMITER.length;
-      if (currentChunk.length > 0 && prospectiveCharCount > GoogleTranslateProvider.CHAR_LIMIT) {
-        chunks.push(currentChunk);
-        currentChunk = [];
-        currentCharCount = 0;
-      }
-      currentChunk.push(text);
-      currentCharCount += text.length + RELIABLE_DELIMITER.length;
-    }
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
-
-    // Import rate limiting manager
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-
-    // Process chunks sequentially with rate limiting instead of Promise.all
-    const translatedChunks = [];
-    for (let i = 0; i < chunks.length; i++) {
-      // Check for cancellation
-      if (abortController && abortController.signal.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
-        cancelError.name = 'AbortError';
-        throw cancelError;
-      }
-
-      const chunk = chunks[i];
-      const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
-
-      try {
-        // Execute chunk translation with rate limiting
-        const result = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          async () => {
-            const apiUrl = await getGoogleTranslateUrlAsync();
-            const queryParams = new URLSearchParams({
-              client: 'gtx',
-              sl: sl,
-              tl: tl,
-              dt: 't',
-            });
-
-            if (shouldIncludeDictionary && chunk.length === 1) {
-              queryParams.append('dt', 'bd');
-            }
-
-            const textToTranslate = chunk.join(RELIABLE_DELIMITER);
-            const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
-
-            return await this._executeApiCall({
-              url: `${apiUrl}?${queryParams.toString()}`,
-              fetchOptions: {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                },
-                body: requestBody,
-              },
-              extractResponse: (data) => {
-                if (!data?.[0]?.[0]?.[0]) {
-                  return { translatedSegments: chunk.map(() => ''), candidateText: '' };
-                }
-
-                const translatedText = data[0].map(segment => segment[0]).join('');
-                const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
-
-                if (translatedSegments.length !== chunk.length) {
-                  logger.warn("[Google] Translated segment count mismatch after splitting.", { 
-                    expected: chunk.length, 
-                    got: translatedSegments.length 
-                  });
-                  return { translatedSegments: [translatedText], candidateText: '' };
-                }
-
-                let candidateText = "";
-                if (shouldIncludeDictionary && data[1]) {
-                  candidateText = data[1].map((dict) => {
-                    const pos = dict[0] || "";
-                    const terms = dict[1] || [];
-                    return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-                  }).join("");
-                }
-
-                return {
-                  translatedSegments,
-                  candidateText: candidateText.trim(),
-                };
-              },
-              context: chunkContext,
-              abortController,
-            });
-          },
-          chunkContext
-        );
-
-        translatedChunks.push(result || { translatedSegments: chunk.map(() => ''), candidateText: '' });
-      } catch (error) {
-        logger.error(`[Google] Chunk ${i + 1} failed:`, error);
-        // Fallback for failed chunks
-        // translatedChunks.push({ translatedSegments: chunk.map(() => ''), candidateText: '' });
-        // Instead of returning empty strings, throw the error to be handled properly
-        throw error;
-      }
-    }
-    const allTranslated = translatedChunks.flatMap(chunk => chunk.translatedSegments);
-
-    if (texts.length !== allTranslated.length) {
-        logger.error("[Google] Final translated text count does not match original count.",{
-            original: texts.length,
-            translated: allTranslated.length
-        });
-        return texts;
-    }
-
-    if (texts.length === 1 && translatedChunks[0]?.candidateText) {
-        const formattedDictionary = this._formatDictionaryAsMarkdown(translatedChunks[0].candidateText);
-        return [`${allTranslated[0]}\n\n${formattedDictionary}`];
-    }
-
-    return allTranslated;
   }
 
   _formatDictionaryAsMarkdown(candidateText) {
