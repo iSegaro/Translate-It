@@ -74,6 +74,14 @@ export function useUITransition(options = {}) {
     const transitioningClass = 'transitioning'
     
     if (add) {
+      // Remove any existing transition type classes before adding new ones
+      const existingTypeClasses = Array.from(container.classList)
+        .filter(cls => cls.endsWith('-transition') && cls !== typeClass)
+      
+      existingTypeClasses.forEach(cls => {
+        container.classList.remove(cls)
+      })
+      
       container.classList.add(baseClass, typeClass, transitioningClass)
       
       // Apply custom shimmer color if provided
@@ -87,14 +95,18 @@ export function useUITransition(options = {}) {
       if (customShimmerColor) {
         container.style.removeProperty('--ui-transition-shimmer-color')
       }
+      
+      // Note: We keep the type class for potential reuse, but remove transitioning state
     }
   }
 
   // Start transition animation
   const startTransition = async (newValue = null) => {
+    // Stop any existing transition first
     if (isTransitioning.value) {
-      logger.debug('Transition already in progress, queuing new transition')
-      return
+      logger.debug('Stopping existing transition before starting new one')
+      stopTransition()
+      await nextTick() // Wait for cleanup
     }
 
     const currentId = ++transitionId.value
@@ -138,6 +150,12 @@ export function useUITransition(options = {}) {
         // Remove CSS classes
         applyTransitionClasses(container, false)
         
+        // Additional cleanup: ensure no lingering transition classes
+        if (container) {
+          const typeClass = `${transitionType}-transition`
+          container.classList.remove(typeClass)
+        }
+        
         await nextTick()
         onTransitionEnd(displayValue.value)
       }, duration)
@@ -148,7 +166,16 @@ export function useUITransition(options = {}) {
       // Reset state on error
       isTransitioning.value = false
       pendingValue.value = null
-      applyTransitionClasses(container, false)
+      
+      // Ensure CSS classes are removed
+      if (container) {
+        const baseClass = 'ui-transition-container'
+        const typeClass = `${transitionType}-transition`
+        const transitioningClass = 'transitioning'
+        
+        container.classList.remove(baseClass, typeClass, transitioningClass)
+        container.style.removeProperty('--ui-transition-shimmer-color')
+      }
     }
   }
 
@@ -165,8 +192,19 @@ export function useUITransition(options = {}) {
     pendingValue.value = null
     transitionId.value++
     
-    // Remove CSS classes
-    applyTransitionClasses(container, false)
+    // Remove CSS classes completely
+    if (container) {
+      const baseClass = 'ui-transition-container'
+      const typeClass = `${transitionType}-transition`
+      const transitioningClass = 'transitioning'
+      
+      container.classList.remove(baseClass, typeClass, transitioningClass)
+      
+      // Clean up custom properties
+      if (customShimmerColor) {
+        container.style.removeProperty('--ui-transition-shimmer-color')
+      }
+    }
   }
 
   // Reset transition to initial state
@@ -178,6 +216,19 @@ export function useUITransition(options = {}) {
       } catch (error) {
         logger.warn('Failed to reset display value:', error.message)
       }
+    }
+    
+    // Ensure container is clean
+    const container = getContainer()
+    if (container) {
+      const baseClass = 'ui-transition-container'
+      const typeClass = `${transitionType}-transition`
+      const transitioningClass = 'transitioning'
+      
+      container.classList.remove(baseClass, typeClass, transitioningClass)
+      
+      // Clean up all transition-related custom properties
+      container.style.removeProperty('--ui-transition-shimmer-color')
     }
   }
 
