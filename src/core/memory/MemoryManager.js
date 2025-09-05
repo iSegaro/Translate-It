@@ -249,7 +249,7 @@ class MemoryManager {
    */
   trackResource(resourceId, cleanupFn, groupId = 'default') {
     if (this.resources.has(resourceId)) {
-      console.warn(`Resource ${resourceId} already tracked`)
+      console.debug(`Resource ${resourceId} already tracked`)
       return
     }
 
