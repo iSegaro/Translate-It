@@ -118,7 +118,37 @@ export class TextFieldIconManager extends ResourceTracker {
       // If no type specified, default to text
       const effectiveType = inputType || 'text';
       
-      return textInputTypes.includes(effectiveType);
+      // Check if it's a text-based type
+      if (!textInputTypes.includes(effectiveType)) {
+        return false;
+      }
+      
+      // Additional filtering: Exclude authentication-related fields
+      const name = (element.name || '').toLowerCase();
+      const placeholder = (element.placeholder || '').toLowerCase();
+      const id = (element.id || '').toLowerCase();
+      const autocomplete = (element.autocomplete || '').toLowerCase();
+      
+      // List of authentication-related keywords to exclude
+      const authKeywords = [
+        'email', 'mail', 'username', 'user', 'login', 'signin',
+        'password', 'pass', 'pwd', 'auth', 'credential',
+        'account', 'register', 'signup'
+      ];
+      
+      // Check if any authentication keyword is present in element attributes
+      const hasAuthKeyword = authKeywords.some(keyword => 
+        name.includes(keyword) || 
+        placeholder.includes(keyword) || 
+        id.includes(keyword) ||
+        autocomplete.includes(keyword)
+      );
+      
+      if (hasAuthKeyword) {
+        return false;
+      }
+      
+      return true;
     }
     
     return false;
