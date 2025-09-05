@@ -114,7 +114,7 @@ export class SubtitleHandler extends ResourceTracker {
       .translate-it-yt-icon {
         width: 18px;
         height: 18px;
-        filter: brightness(0) invert(1);
+        // filter: brightness(0) invert(1);
       }
       .translate-it-yt-button.translate-it-active .translate-it-yt-icon {
         filter: brightness(0) invert(0);
