@@ -39,6 +39,7 @@ import { correctTextDirection } from '@/utils/text/textDetection.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
 
 
@@ -54,7 +55,7 @@ const props = defineProps({
   },
   language: {
     type: String,
-    default: 'Auto-Detect'
+    default: AUTO_DETECT_VALUE
   },
   rows: {
     type: Number,

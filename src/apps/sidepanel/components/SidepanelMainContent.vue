@@ -82,7 +82,6 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -124,51 +123,29 @@ const translationResultRef = ref(null)
 const autoTranslateOnPaste = ref(false)
 const canTranslateFromForm = ref(false)
 
-// Local state
-const lastTranslation = ref(null)
-
-// Computed
-
 // Watch canTranslate and emit changes
 watch(canTranslate, (newValue) => {
   canTranslateFromForm.value = newValue
 }, { immediate: true })
 
-// Watch for source text changes
-watch(sourceText, (newValue, oldValue) => {
-  if (oldValue !== undefined && newValue !== oldValue) {
-    logger.debug("📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
-  }
-}, { deep: true })
-
-// Watch for language changes
+// Watch for language changes to log them
 watch(sourceLanguage, (newValue, oldValue) => {
-  logger.debug("🌍 Source language changed:", oldValue, "→", newValue);
+  logger.debug("🌍 Source language code changed:", oldValue, "→", newValue);
 }, { immediate: true })
 
 watch(targetLanguage, (newValue, oldValue) => {
-  logger.debug("🌍 Target language changed:", oldValue, "→", newValue);
+  logger.debug("🌍 Target language code changed:", oldValue, "→", newValue);
 }, { immediate: true })
 
-// Reactive language values - these will update when settings change
+// Reactive language values for other parts of the UI that might need them
 const currentSourceLanguage = computed(() => {
-  const lang = settingsStore.settings.SOURCE_LANGUAGE
-  return lang
+  return sourceLanguage.value;
 })
 const currentTargetLanguage = computed(() => {
-  const lang = settingsStore.settings.TARGET_LANGUAGE
-  return lang
+  return targetLanguage.value;
 })
 
 // Methods
-const handleSourceInput = (_event) => {
-  // Handled by TranslationInputField component
-}
-
-const handleKeydown = (_event) => {
-  // Handled by TranslationInputField component
-}
-
 const handleTranslate = async () => {
   logger.debug("🎯 Translation button clicked");
   
@@ -179,25 +156,10 @@ const handleTranslate = async () => {
   
   try {
     logger.info("🚀 Starting translation process...");
-    logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
     
-    // Get current language values from language selector
-    const sourceLanguageValue = sourceLanguage.value;
-    const targetLanguageValue = targetLanguage.value;
+    // Values are taken directly from the composable's refs
+    await triggerTranslation(sourceLanguage.value, targetLanguage.value)    
     
-    logger.debug("🌍 Languages:", sourceLanguageValue, "→", targetLanguageValue);
-    
-    // Store last translation for revert functionality
-    lastTranslation.value = {
-      source: sourceText.value,
-      target: translatedText.value,
-      sourceLanguage: sourceLanguageValue,
-      targetLanguage: targetLanguageValue
-    }
-    
-    // Use composable translation function with current language values
-    logger.debug("📡 Triggering translation...");
-    await triggerTranslation(sourceLanguageValue, targetLanguageValue)    
     logger.info("✅ Translation completed successfully");
 
   } catch (error) {
@@ -208,14 +170,11 @@ const handleTranslate = async () => {
 
 const handleProviderChange = (provider) => {
   logger.info("[SidepanelMainContent] 🔄 Provider changed to:", provider);
-  // Provider change is handled automatically by the ProviderSelector
 }
 
 const clearFields = async () => {
   logger.debug("🧹 Clearing fields and resetting languages");
-  clearTranslation();
-  lastTranslation.value = null;
-  // Language reset is now handled by the composable or by simply clearing
+  await clearTranslation();
 };
 
 // Expose the clearFields method to the parent component
@@ -227,10 +186,8 @@ defineExpose({
 // Event listeners
 onMounted(async () => {
   logger.debug("[SidepanelMainContent] Component mounting...");
-  
   // Language initialization is now handled by useUnifiedTranslation.
-  
-  // Initialize translation data
+  // Load last translation if any
   await loadLastTranslation()
 });
 </script>
@@ -363,6 +320,32 @@ onMounted(async () => {
   border-radius: 4px;
   background-color: var(--color-textarea-background);
   padding: 5px;
+  margin: 6px 12px;
+}
+
+.translation-form :deep(.translation-textarea) {
+  min-height: 120px;
+  max-height: 200px;
+  font-size: 13px;
+  padding: 42px 8px 8px 8px;
+}
+
+
+.output-container {
+  margin: 6px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+
+.translation-form :deep(.result-content) {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  font-size: 13px;
+  height: 100%;
   margin: 6px 12px;
 }
 

@@ -86,7 +86,7 @@ const props = defineProps({
   },
   language: {
     type: String,
-    default: 'English'
+    default: 'fa'
   },
   
   // State
@@ -182,7 +182,7 @@ const props = defineProps({
   // Target language for TTS
   targetLanguage: {
     type: String,
-    default: 'auto'
+    default: 'fa'
   },
   
   // Enhanced popup-specific props

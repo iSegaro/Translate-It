@@ -14,7 +14,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/config/constants.js";
+import { getLanguageCode } from "@/utils/i18n/languages.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
 
@@ -25,36 +26,49 @@ export function useUnifiedTranslation(context = 'popup') {
     throw new Error(`Invalid context: ${context}. Must be one of: ${validContexts.join(', ')}`);
   }
 
-  // State
+  // --- State ---
   const sourceText = ref("");
   const translatedText = ref("");
   const sourceLanguage = ref(AUTO_DETECT_VALUE);
-  const targetLanguage = ref("English");
+  const targetLanguage = ref(DEFAULT_TARGET_LANGUAGE);
   const isTranslating = ref(false);
   const lastTranslation = ref(null);
   
-  // Context-specific state
-  const pendingRequests = ref(new Set()); // For sidepanel race condition management
-  const loadingStartTime = ref(null); // For sidepanel minimum loading duration
-  const MINIMUM_LOADING_DURATION = 100; // Minimum 100ms to show spinner
+  const pendingRequests = ref(new Set());
+  const loadingStartTime = ref(null);
+  const MINIMUM_LOADING_DURATION = 100;
 
-  // Store
+  // --- Stores & Composables ---
   const settingsStore = useSettingsStore();
   const translationStore = useTranslationStore();
-
-  // Browser API (popup uses useBrowserAPI, sidepanel uses direct browser)
   const browserAPI = context === 'popup' ? useBrowserAPI() : null;
-  
-  // Error management
   const errorManager = useTranslationError(context);
 
-  // Computed
+  // --- Computed Properties ---
   const hasTranslation = computed(() => Boolean(translatedText.value?.trim()));
   const canTranslate = computed(
     () => Boolean(sourceText.value?.trim()) && !isTranslating.value
   );
 
-  // Translation mode determination (common logic)
+  // --- Language Management ---
+  const resetLanguagesToDefaults = async () => {
+    try {
+      const [savedSource, savedTarget] = await Promise.all([
+        getSourceLanguageAsync(),
+        getTargetLanguageAsync()
+      ]);
+      sourceLanguage.value = getLanguageCode(savedSource) || AUTO_DETECT_VALUE;
+      targetLanguage.value = getLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
+      logger.debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
+    } catch (error) {
+      logger.error(`[${context}] Failed to reset languages:`, error);
+      // Fallback to hardcoded defaults in case of storage error
+      sourceLanguage.value = AUTO_DETECT_VALUE;
+      targetLanguage.value = DEFAULT_TARGET_LANGUAGE;
+    }
+  };
+
+  // --- Translation Logic ---
   const getTranslationMode = (text) => {
     const baseMode = context === 'popup' ? TranslationMode.Popup_Translate : TranslationMode.Sidepanel_Translate;
     const isDictionaryCandidate = isSingleWordOrShortPhrase(text);
@@ -66,10 +80,7 @@ export function useUnifiedTranslation(context = 'popup') {
     return baseMode;
   };
 
-  // Create translation request data (common logic)
   const createTranslationRequest = (sourceLang, targetLang, messageId) => {
-    const sourceLanguageValue = sourceLang || sourceLanguage.value;
-    const targetLanguageValue = targetLang || targetLanguage.value;
     const currentProvider = settingsStore.settings.TRANSLATION_API || (context === 'popup' ? 'google-translate' : 'google');
     const mode = getTranslationMode(sourceText.value);
 
@@ -81,15 +92,14 @@ export function useUnifiedTranslation(context = 'popup') {
       data: {
         text: sourceText.value,
         provider: currentProvider,
-        sourceLanguage: sourceLanguageValue,
-        targetLanguage: targetLanguageValue,
+        sourceLanguage: sourceLang || sourceLanguage.value,
+        targetLanguage: targetLang || targetLanguage.value,
         mode: mode,
         options: {}
       }
     };
   };
 
-  // Handle translation success (common logic)
   const handleTranslationSuccess = (resultData) => {
     translatedText.value = resultData.translatedText;
     errorManager.clearError();
@@ -104,14 +114,12 @@ export function useUnifiedTranslation(context = 'popup') {
     logger.info(`[${context}] Translation updated successfully`);
   };
 
-  // Handle translation error (common logic)
   const handleTranslationError = (error, messageId = null) => {
     const errorMessage = error?.message || error?.type || error || "Translation failed";
     errorManager.handleError(errorMessage);
     translatedText.value = "";
     lastTranslation.value = null;
     
-    // Clean up pending request if provided
     if (messageId && context === 'sidepanel') {
       pendingRequests.value.delete(messageId);
     }
@@ -119,25 +127,20 @@ export function useUnifiedTranslation(context = 'popup') {
     logger.error(`[${context}] Translation error:`, errorMessage);
   };
 
-  // Ensure minimum loading duration (sidepanel-specific)
   const ensureMinimumLoadingDuration = async () => {
     if (context === 'sidepanel' && loadingStartTime.value) {
       const elapsed = Date.now() - loadingStartTime.value;
       const remaining = Math.max(0, MINIMUM_LOADING_DURATION - elapsed);
-      
       if (remaining > 0) {
         await new Promise(resolve => setTimeout(resolve, remaining));
       }
-      
       loadingStartTime.value = null;
     }
   };
 
-  // Main translation method
   const triggerTranslation = async (sourceLang = null, targetLang = null) => {
     if (!canTranslate.value) return false;
 
-    // Set loading state and clear previous results
     isTranslating.value = true;
     if (context === 'sidepanel') {
       loadingStartTime.value = Date.now();
@@ -145,91 +148,64 @@ export function useUnifiedTranslation(context = 'popup') {
     errorManager.clearError();
     translatedText.value = "";
 
-    // Force UI update for sidepanel
-    if (context === 'sidepanel') {
-      await nextTick();
-    }
+    if (context === 'sidepanel') await nextTick();
 
     try {
       const messageId = generateMessageId(context);
       const requestData = createTranslationRequest(sourceLang, targetLang, messageId);
       
-      logger.debug(`[${context}] Translation request:`, {
-        sourceLang: requestData.data.sourceLanguage,
-        targetLang: requestData.data.targetLanguage,
-        provider: requestData.data.provider
-      });
+      logger.debug(`[${context}] Translation request:`, requestData.data);
 
-      // Track request for sidepanel
       if (context === 'sidepanel') {
         pendingRequests.value.add(messageId);
       }
 
-      // Send translation request using smart messaging
-      try {
-        const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
-        const timeoutOptions = context === 'sidepanel' ? {
-          totalTimeout: 20000,
-          retries: 1
-        } : {};
+      const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
+      const timeoutOptions = context === 'sidepanel' ? { totalTimeout: 20000, retries: 1 } : {};
+      
+      const response = await sendSmart(requestData, timeoutOptions);
+
+      if (response && (response.result || response.data || response.translatedText)) {
+        let resultData = response.result || response.data || response;
         
-        const response = await sendSmart(requestData, timeoutOptions);
-
-        // Handle direct response (mainly for sidepanel)
-        if (response && (response.result || response.data || response.translatedText)) {
-          let resultData = response.result || response.data || response;
-          
-          if (resultData.success === false && resultData.error) {
-            handleTranslationError(resultData.error, messageId);
-          } else if (resultData.translatedText) {
-            handleTranslationSuccess(resultData);
-            
-            // Clean up for sidepanel
-            if (context === 'sidepanel') {
-              pendingRequests.value.delete(messageId);
-              await ensureMinimumLoadingDuration();
-            }
+        if (resultData.success === false && resultData.error) {
+          handleTranslationError(resultData.error, messageId);
+        } else if (resultData.translatedText) {
+          handleTranslationSuccess(resultData);
+          if (context === 'sidepanel') {
+            pendingRequests.value.delete(messageId);
+            await ensureMinimumLoadingDuration();
           }
-          
-          isTranslating.value = false;
-          return true;
-        } else if (response && response.success === false && response.error) {
-          handleTranslationError(response.error, messageId);
-          isTranslating.value = false;
-          return false;
         }
-
-        // For popup, response might come via message listener
-        if (context === 'popup') {
-          logger.operation('Translation request sent. Waiting for result...');
-          return true;
-        }
-
-      } catch (error) {
-        logger.error(`[${context}] Failed to send translation request:`, error);
-        handleTranslationError(error, messageId);
         isTranslating.value = false;
-        await ensureMinimumLoadingDuration();
+        return true;
+      } else if (response && response.success === false && response.error) {
+        handleTranslationError(response.error, messageId);
+        isTranslating.value = false;
         return false;
       }
 
+      if (context === 'popup') {
+        logger.operation('Translation request sent. Waiting for result...');
+      }
       return true;
 
     } catch (error) {
-      logger.error(`[${context}] Translation error:`, error);
-      await errorManager.handleError(error);
+      logger.error(`[${context}] Failed to send/process translation request:`, error);
+      handleTranslationError(error);
       isTranslating.value = false;
       await ensureMinimumLoadingDuration();
       return false;
     }
   };
 
-  // Common utility methods
-  const clearTranslation = () => {
+  // --- Public Methods ---
+  const clearTranslation = async () => {
     sourceText.value = "";
     translatedText.value = "";
     errorManager.clearError();
     lastTranslation.value = null;
+    await resetLanguagesToDefaults();
   };
 
   const loadLastTranslation = () => {
@@ -239,135 +215,73 @@ export function useUnifiedTranslation(context = 'popup') {
     }
   };
 
-  // Internal methods for specific UI operations
-  const _setTranslationResult = (text) => {
-    translatedText.value = text;
-    errorManager.clearError();
-  };
-
-  const _setSourceText = (text) => {
-    sourceText.value = text;
-  };
-
-  // Watch for changes in translation store (for history selection)
+  // --- Lifecycle & Watchers ---
   watch(() => translationStore.currentTranslation, (newTranslation) => {
     if (newTranslation) {
       logger.debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
       sourceText.value = newTranslation.sourceText || '';
       translatedText.value = newTranslation.translatedText || '';
-      sourceLanguage.value = newTranslation.sourceLanguage || AUTO_DETECT_VALUE;
-      targetLanguage.value = newTranslation.targetLanguage || 'English';
+      sourceLanguage.value = getLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
+      targetLanguage.value = getLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
       errorManager.clearError();
     }
   }, { deep: true });
 
-  // Message listener setup
   let messageListener = null;
 
   onMounted(async () => {
-    // Load initial languages
-    try {
-      const [savedSource, savedTarget] = await Promise.all([
-        getSourceLanguageAsync(),
-        getTargetLanguageAsync()
-      ]);
-      sourceLanguage.value = savedSource || AUTO_DETECT_VALUE;
-      targetLanguage.value = savedTarget || 'English';
-      logger.debug(`[${context}] Initial languages loaded:`, { source: sourceLanguage.value, target: targetLanguage.value });
-    } catch (error) {
-      logger.error(`[${context}] Failed to load initial languages:`, error);
-    }
+    await resetLanguagesToDefaults();
 
-    // Create context-specific message listener
     messageListener = (message) => {
       if (context === 'popup') {
-        // Popup message handling logic
         logger.debug(`[${context}] Raw message received:`, message);
-        
-        let resultData = null;
-        if (message.result) {
-          resultData = message.result;
-        } else if (message.data) {
-          resultData = message.data;
-        } else if (message.translatedText) {
-          resultData = message;
-        }
+        let resultData = message.result || message.data || (message.translatedText ? message : null);
 
         if (resultData && (resultData.translatedText || resultData.success === false)) {
           isTranslating.value = false;
-
           if (resultData.success === false && resultData.error) {
             handleTranslationError(resultData.error);
           } else if (resultData.translatedText) {
             handleTranslationSuccess(resultData);
           } else {
-            logger.warn(`[${context}] Unexpected message data structure:`, resultData);
             handleTranslationError("Unexpected response format");
           }
         }
-        
       } else if (context === 'sidepanel') {
-        // Sidepanel message handling logic
-        if (message.action !== MessageActions.TRANSLATION_RESULT_UPDATE) {
+        if (message.action !== MessageActions.TRANSLATION_RESULT_UPDATE || (message.context && message.context !== MessagingContexts.SIDEPANEL)) {
           return;
         }
-
-        // Only process messages for this context
-        if (message.context && message.context !== MessagingContexts.SIDEPANEL) {
-          return;
-        }
-
-        // Check if this message is for a pending request
         const messageId = message.messageId;
-        if (messageId && !pendingRequests.value.has(messageId)) {
-          return;
-        }
+        if (messageId && !pendingRequests.value.has(messageId)) return;
+        if (messageId) pendingRequests.value.delete(messageId);
 
-        // Remove from pending requests
-        if (messageId) {
-          pendingRequests.value.delete(messageId);
-        }
-
-        // Handle the result with minimum loading duration
         nextTick(async () => {
           await ensureMinimumLoadingDuration();
           isTranslating.value = false;
-
           if (message.data.success === false && message.data.error) {
             handleTranslationError(message.data.error);
-          } else if (message.data.success !== false && message.data.translatedText) {
+          } else if (message.data.translatedText) {
             handleTranslationSuccess(message.data);
           } else {
-            logger.warn(`[${context}] Unexpected message data structure:`, message.data);
-            handleTranslationError("Unexpected response format");
+            handleTranslationError("Unexpected response format in sidepanel");
           }
         });
       }
     };
 
-    // Register listener based on context
-    if (context === 'popup' && browserAPI) {
-      browserAPI.onMessage.addListener(messageListener);
-    } else if (context === 'sidepanel') {
-      browser.runtime.onMessage.addListener(messageListener);
-    }
+    const messageTarget = context === 'popup' && browserAPI ? browserAPI.onMessage : browser.runtime.onMessage;
+    messageTarget.addListener(messageListener);
   });
 
-  // Cleanup on unmount
   onUnmounted(() => {
     if (messageListener) {
       try {
-        if (context === 'popup' && browserAPI) {
-          browserAPI.onMessage.removeListener(messageListener);
-        } else if (context === 'sidepanel') {
-          browser.runtime.onMessage.removeListener(messageListener);
-        }
+        const messageTarget = context === 'popup' && browserAPI ? browserAPI.onMessage : browser.runtime.onMessage;
+        messageTarget.removeListener(messageListener);
       } catch (err) {
         logger.warn(`[${context}] Failed to remove message listener:`, err);
       }
     }
-
-    // Clean up pending requests for sidepanel
     if (context === 'sidepanel') {
       pendingRequests.value.clear();
     }
@@ -383,27 +297,18 @@ export function useUnifiedTranslation(context = 'popup') {
     hasTranslation,
     canTranslate,
     lastTranslation,
-
-    // Error management (from errorManager)
+    // Error management
     translationError: errorManager.errorMessage,
     hasError: errorManager.hasError,
     canRetry: errorManager.canRetry,
     canOpenSettings: errorManager.canOpenSettings,
-
     // Methods
     triggerTranslation,
     clearTranslation,
     loadLastTranslation,
-
-    // Internal methods (prefixed with _ to indicate internal use)
-    _setTranslationResult,
-    _setSourceText,
-
-    // Error methods
     getRetryCallback: errorManager.getRetryCallback,
     getSettingsCallback: errorManager.getSettingsCallback,
-    
-    // Context information
+    // Context
     context
   };
 }

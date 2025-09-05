@@ -111,23 +111,26 @@ import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
-import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/shared/config/config.js'
-import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('popup-app')
-
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
+const { 
+  sourceLanguage,
+  targetLanguage,
+  clearTranslation
+} = useUnifiedTranslation('popup');
 
 // TTS Global Manager for lifecycle management
 const ttsGlobal = useTTSGlobal({ 
@@ -141,10 +144,6 @@ const loadingText = ref('Initializing...')
 const hasError = ref(false)
 const errorMessage = ref('')
 const canTranslateFromForm = ref(false)
-
-// Language state management - matching sidepanel approach
-const sourceLanguage = ref(AUTO_DETECT_VALUE)
-const targetLanguage = ref('Farsi')
 
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
@@ -202,31 +201,10 @@ const initialize = async () => {
       useEnhancedVersion.value = savedVersion === 'true'
     }
     
-    // Initialize language refs with saved settings (matching sidepanel approach)
-    try {
-      const savedSource = await getSourceLanguageAsync()
-      const savedTarget = await getTargetLanguageAsync()
-      sourceLanguage.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || AUTO_DETECT_VALUE
-      targetLanguage.value = getLanguageDisplayName(savedTarget) || settings.TARGET_LANGUAGE || 'English'
-      logger.debug("✅ Languages initialized from settings:", savedSource, "→", savedTarget)
-    } catch (err) {
-      logger.warn("Error loading language settings:", err)
-      sourceLanguage.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect'
-      targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
-    }
-    
     // Add clear-storage event listener to reset languages using ResourceTracker
     tracker.addEventListener(document, 'clear-storage', async () => {
-      logger.debug("🔄 Clear storage event - resetting languages to saved settings");
-      try {
-        const savedSource = await getSourceLanguageAsync()
-        const savedTarget = await getTargetLanguageAsync()
-        sourceLanguage.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect'
-        targetLanguage.value = getLanguageDisplayName(savedTarget) || 'English'
-        logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget)
-      } catch (error) {
-        logger.error("❌ Failed to reset languages:", error)
-      }
+      logger.debug("🔄 Clear storage event - resetting languages via composable");
+      await clearTranslation();
     })
     
     logger.debug('[PopupApp] Popup initialized successfully', {
@@ -407,6 +385,65 @@ const retryLoading = () => {
   cursor: pointer;
   font-weight: 500;
   transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: var(--toolbar-link-hover-bg-color);
+}
+
+.enhanced-version-toggle {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  background: rgba(var(--color-bg-secondary-rgb), 0.9);
+  border: 1px solid rgba(var(--color-border-rgb), 0.3);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(var(--color-bg-secondary-rgb), 1);
+    border-color: rgba(var(--color-border-rgb), 0.5);
+    transform: scale(1.05);
+  }
+  
+  span {
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+  
+  .iconify {
+    font-size: 12px;
+    color: var(--color-primary);
+  }
+}
+
+.language-controls {
+  display: flex;
+  align-items: center;
+  padding:3px 6px 3px 12px;
+  margin: 0;
+  gap: 4px;
+  background: var(--language-controls-bg-color);
+  min-height: 36px;
+  box-sizing: border-box;
+}
+</style>
+
+<style scoped lang="scss">
+@use '@/assets/styles/base/variables' as *;
+
+.extension-popup {
+  width: $popup-width;
+  max-height: $popup-max-height;
+  overflow-y: auto;
 }
 
 .retry-button:hover {

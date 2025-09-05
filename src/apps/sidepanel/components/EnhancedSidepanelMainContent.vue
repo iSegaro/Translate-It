@@ -60,8 +60,6 @@ import { useSelectElementTranslation } from "@/features/translation/composables/
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'EnhancedSidepanelMainContent');
@@ -106,8 +104,6 @@ const handleTranslate = (data) => {
 onMounted(() => {
   logger.debug("[EnhancedSidepanelMainContent] Component mounted");
   
-  // Language loading is now handled by useUnifiedTranslation
-  
   // Load last translation through unified composable
   try {
     loadLastTranslation();
@@ -115,7 +111,6 @@ onMounted(() => {
     logger.error("[EnhancedSidepanelMainContent] Translation loading failed:", error);
   }
 });
-
 </script>
 
 <style scoped>
