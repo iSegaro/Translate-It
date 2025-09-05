@@ -91,6 +91,10 @@ function formatMessage(component, level, message, data) {
 
   const prefix = `[${timestamp}] ${component}:`;
 
+  if (data instanceof Error) {
+    return [prefix, message, data];
+  }
+
   if (data && typeof data === "object") {
     return [prefix, message, JSON.stringify(data, null, 2)];
   }
