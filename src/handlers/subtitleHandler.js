@@ -89,7 +89,37 @@ export class SubtitleHandler extends ResourceTracker {
     if (document.getElementById("translate-it-yt-button-style")) return;
     const style = document.createElement("style");
     style.id = "translate-it-yt-button-style";
-    style.textContent = `...`; // Styles remain the same
+    style.textContent = `
+      .translate-it-yt-button {
+        width: 36px;
+        height: 36px;
+        border-radius: 2px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 2px;
+        transition: background-color 0.2s;
+        opacity: 0.8;
+      }
+      .translate-it-yt-button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        opacity: 1;
+      }
+      .translate-it-yt-button.translate-it-active {
+        background: rgba(0, 123, 255, 0.2);
+      }
+      .translate-it-yt-icon {
+        width: 18px;
+        height: 18px;
+        filter: brightness(0) invert(1);
+      }
+      .translate-it-yt-button.translate-it-active .translate-it-yt-icon {
+        filter: brightness(0) invert(0);
+      }
+    `;
     document.head.appendChild(style);
   }
 
