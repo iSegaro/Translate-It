@@ -461,6 +461,8 @@ onUnmounted(() => {
   top: 0;
   margin-left: 4px;
   margin-top: 0;
+  width: 200px;
+  min-width: 200px;
 }
 
 .provider-icon-button {
@@ -591,26 +593,7 @@ onUnmounted(() => {
   filter: none !important;
 }
 
-/* Icon-only dropdown opens to the left */
-.icon-only-dropdown {
-  right: 100% !important;
-  left: auto !important;
-  top: 0 !important;
-  margin-right: 8px !important;
-  margin-top: 0 !important;
-}
 
-/* Specific styling for dropdown in icon-only mode */
-.dropdown-menu-right {
-  /* For icon-only mode, use fixed width */
-  width: 200px;
-  min-width: 200px;
-  /* Align to the right if needed */
-  right: 0 !important;
-  left: auto !important;
-  top: 100% !important;
-  margin-top: 2px !important;
-}
 
 .dropdown-item {
   display: flex;
