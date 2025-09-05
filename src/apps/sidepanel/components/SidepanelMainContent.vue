@@ -82,8 +82,6 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 // Components
@@ -104,28 +102,25 @@ const settingsStore = useSettingsStore()
 
 // Composables
 const { t } = useUnifiedI18n();
-const translation = useUnifiedTranslation('sidepanel');
-const { handleError } = useErrorHandler()
-
-// Refs
-const sourceInputRef = ref(null)
-const translationResultRef = ref(null)
-
-// State from composables
 const {
   sourceText,
   translatedText,
+  sourceLanguage,
+  targetLanguage,
   isTranslating,
   translationError,
   canTranslate,
   triggerTranslation,
   clearTranslation,
   loadLastTranslation
-} = translation
+} = useUnifiedTranslation('sidepanel');
+const { handleError } = useErrorHandler()
 
-// Language state management - matching popup approach
-const sourceLanguage = ref(AUTO_DETECT_VALUE)
-const targetLanguage = ref('English')
+// Refs
+const sourceInputRef = ref(null)
+const translationResultRef = ref(null)
+
+// Language state management
 const autoTranslateOnPaste = ref(false)
 const canTranslateFromForm = ref(false)
 
@@ -220,22 +215,7 @@ const clearFields = async () => {
   logger.debug("🧹 Clearing fields and resetting languages");
   clearTranslation();
   lastTranslation.value = null;
-  try {
-    const savedSource = await getSourceLanguageAsync();
-    const savedTarget = await getTargetLanguageAsync();
-    
-    if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
-      sourceLanguage.value = 'Auto-Detect';
-    } else {
-      sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect';
-    }
-    
-    targetLanguage.value = getLanguageDisplayName(savedTarget) || settingsStore.settings.TARGET_LANGUAGE || 'English';
-    
-    logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget);
-  } catch (error) {
-    logger.error("❌ Failed to reset languages:", error);
-  }
+  // Language reset is now handled by the composable or by simply clearing
 };
 
 // Expose the clearFields method to the parent component
@@ -248,32 +228,7 @@ defineExpose({
 onMounted(async () => {
   logger.debug("[SidepanelMainContent] Component mounting...");
   
-  // Initialize language refs with saved settings (matching popup approach)
-  try {
-    const savedSource = await getSourceLanguageAsync()
-    const savedTarget = await getTargetLanguageAsync()
-    
-    // Handle source language - if it's auto/AUTO_DETECT_VALUE, use 'Auto-Detect'
-    if (savedSource === 'auto' || savedSource === AUTO_DETECT_VALUE || !savedSource) {
-      sourceLanguage.value = 'Auto-Detect'
-    } else {
-      sourceLanguage.value = getLanguageDisplayName(savedSource) || 'Auto-Detect'
-    }
-    
-    // Handle target language
-    targetLanguage.value = getLanguageDisplayName(savedTarget) || settingsStore.settings.TARGET_LANGUAGE || 'English'
-    
-    logger.debug("✅ Languages initialized from settings:", {
-      savedSource,
-      savedTarget,
-      sourceLanguageValue: sourceLanguage.value,
-      targetLanguageValue: targetLanguage.value
-    })
-  } catch (err) {
-    logger.warn("Error loading language settings:", err)
-    sourceLanguage.value = 'Auto-Detect'
-    targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
-  }
+  // Language initialization is now handled by useUnifiedTranslation.
   
   // Initialize translation data
   await loadLastTranslation()

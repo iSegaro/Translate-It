@@ -1,7 +1,8 @@
 // Unified translation composable for both popup and sidepanel
 // Combines the logic from usePopupTranslation and useSidepanelTranslation
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { useTranslationStore } from "@/features/translation/stores/translation.js";
 import { useBrowserAPI } from "@/composables/core/useBrowserAPI.js";
 import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
@@ -12,6 +13,8 @@ import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
+import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
 
@@ -25,6 +28,8 @@ export function useUnifiedTranslation(context = 'popup') {
   // State
   const sourceText = ref("");
   const translatedText = ref("");
+  const sourceLanguage = ref(AUTO_DETECT_VALUE);
+  const targetLanguage = ref("English");
   const isTranslating = ref(false);
   const lastTranslation = ref(null);
   
@@ -35,6 +40,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
   // Store
   const settingsStore = useSettingsStore();
+  const translationStore = useTranslationStore();
 
   // Browser API (popup uses useBrowserAPI, sidepanel uses direct browser)
   const browserAPI = context === 'popup' ? useBrowserAPI() : null;
@@ -62,8 +68,8 @@ export function useUnifiedTranslation(context = 'popup') {
 
   // Create translation request data (common logic)
   const createTranslationRequest = (sourceLang, targetLang, messageId) => {
-    const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
-    const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
+    const sourceLanguageValue = sourceLang || sourceLanguage.value;
+    const targetLanguageValue = targetLang || targetLanguage.value;
     const currentProvider = settingsStore.settings.TRANSLATION_API || (context === 'popup' ? 'google-translate' : 'google');
     const mode = getTranslationMode(sourceText.value);
 
@@ -75,8 +81,8 @@ export function useUnifiedTranslation(context = 'popup') {
       data: {
         text: sourceText.value,
         provider: currentProvider,
-        sourceLanguage: sourceLanguage,
-        targetLanguage: targetLanguage,
+        sourceLanguage: sourceLanguageValue,
+        targetLanguage: targetLanguageValue,
         mode: mode,
         options: {}
       }
@@ -243,10 +249,35 @@ export function useUnifiedTranslation(context = 'popup') {
     sourceText.value = text;
   };
 
+  // Watch for changes in translation store (for history selection)
+  watch(() => translationStore.currentTranslation, (newTranslation) => {
+    if (newTranslation) {
+      logger.debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
+      sourceText.value = newTranslation.sourceText || '';
+      translatedText.value = newTranslation.translatedText || '';
+      sourceLanguage.value = newTranslation.sourceLanguage || AUTO_DETECT_VALUE;
+      targetLanguage.value = newTranslation.targetLanguage || 'English';
+      errorManager.clearError();
+    }
+  }, { deep: true });
+
   // Message listener setup
   let messageListener = null;
 
-  onMounted(() => {
+  onMounted(async () => {
+    // Load initial languages
+    try {
+      const [savedSource, savedTarget] = await Promise.all([
+        getSourceLanguageAsync(),
+        getTargetLanguageAsync()
+      ]);
+      sourceLanguage.value = savedSource || AUTO_DETECT_VALUE;
+      targetLanguage.value = savedTarget || 'English';
+      logger.debug(`[${context}] Initial languages loaded:`, { source: sourceLanguage.value, target: targetLanguage.value });
+    } catch (error) {
+      logger.error(`[${context}] Failed to load initial languages:`, error);
+    }
+
     // Create context-specific message listener
     messageListener = (message) => {
       if (context === 'popup') {
@@ -346,6 +377,8 @@ export function useUnifiedTranslation(context = 'popup') {
     // State
     sourceText,
     translatedText,
+    sourceLanguage,
+    targetLanguage,
     isTranslating,
     hasTranslation,
     canTranslate,

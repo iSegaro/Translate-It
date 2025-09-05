@@ -57,7 +57,6 @@
 import { ref, computed, onMounted } from "vue";
 
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
-import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 
@@ -76,17 +75,18 @@ const selectElement = useSelectElementTranslation();
 const { t } = useUnifiedI18n();
 
 // Translation composable
-const translation = useUnifiedTranslation('sidepanel');
+const { 
+  sourceLanguage: sourceLang, 
+  targetLanguage: targetLang,
+  loadLastTranslation
+} = useUnifiedTranslation('sidepanel');
 
 // State
-const sourceLang = ref(AUTO_DETECT_VALUE);
-const targetLang = ref("English");
 const autoTranslateOnPaste = ref(false);
 const canTranslate = ref(false);
 
 // Computed
 const isSelecting = computed(() => selectElement.isSelectModeActive.value);
-
 
 // Event Handlers for UnifiedTranslationInput
 const handleCanTranslateChange = (newCanTranslate) => {
@@ -106,20 +106,11 @@ const handleTranslate = (data) => {
 onMounted(() => {
   logger.debug("[EnhancedSidepanelMainContent] Component mounted");
   
-  // Load saved languages asynchronously (non-blocking)
-  Promise.all([
-    getSourceLanguageAsync(),
-    getTargetLanguageAsync()
-  ]).then(([sourceLanguage, targetLanguage]) => {
-    sourceLang.value = sourceLanguage;
-    targetLang.value = targetLanguage;
-  }).catch(error => {
-    logger.error("[EnhancedSidepanelMainContent] Language loading failed:", error);
-  });
+  // Language loading is now handled by useUnifiedTranslation
   
   // Load last translation through unified composable
   try {
-    translation.loadLastTranslation();
+    loadLastTranslation();
   } catch (error) {
     logger.error("[EnhancedSidepanelMainContent] Translation loading failed:", error);
   }
