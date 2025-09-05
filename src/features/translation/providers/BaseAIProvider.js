@@ -9,6 +9,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translation/utils/timeoutCalculator.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
@@ -20,6 +22,10 @@ export class BaseAIProvider extends BaseProvider {
   static optimalBatchSize = 15;
   static maxComplexity = 300;
   static supportsImageTranslation = false;
+  
+  // Batch processing strategy - to be overridden by subclasses
+  static batchStrategy = 'json'; // 'json' or 'numbered'
+  static errorHandlingLevel = 'standard'; // 'standard' or 'advanced'
 
   constructor(providerName) {
     super(providerName);
@@ -433,14 +439,54 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {Promise<string[]>} - Translated texts
    */
   async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null) {
-    // Default implementation: translate each text individually
-    // Subclasses should override this for batch API calls
-    const results = [];
-    for (const text of batch) {
-      const result = await this._translateSingle(text, sourceLang, targetLang, translateMode, abortController);
-      results.push(result || text);
+    // Check if provider supports batch translation
+    const batchStrategy = this.constructor.batchStrategy || 'single';
+    
+    // Single text fallback
+    if (batch.length === 1) {
+      const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController);
+      return [result || batch[0]];
     }
-    return results;
+    
+    // Use strategy pattern based on provider configuration
+    try {
+      let result;
+      
+      if (batchStrategy === 'json') {
+        // JSON batch strategy (used by Gemini, OpenAI)
+        const batchPrompt = this._buildBatchPrompt(batch, sourceLang, targetLang);
+        result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
+        
+        // Parse JSON batch result
+        const parsedResults = this._parseBatchResult(result, batch.length, batch);
+        if (parsedResults.length === batch.length) {
+          logger.debug(`[${this.providerName}] JSON batch translation successful: ${batch.length} segments`);
+          return parsedResults;
+        } else {
+          throw new Error('JSON batch result count mismatch');
+        }
+        
+      } else if (batchStrategy === 'numbered') {
+        // Numbered batch strategy (used by OpenRouter, DeepSeek, WebAI)
+        const batchPrompt = this._buildNumberedBatchPrompt(batch, sourceLang, targetLang, translateMode);
+        result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
+        
+        // Parse numbered batch result
+        const parsedResults = this._parseNumberedBatchResult(result, batch.length);
+        if (parsedResults.length === batch.length) {
+          logger.debug(`[${this.providerName}] Numbered batch translation successful: ${batch.length} segments`);
+          return parsedResults;
+        } else {
+          throw new Error('Numbered batch result count mismatch');
+        }
+      }
+      
+      throw new Error(`Unknown batch strategy: ${batchStrategy}`);
+      
+    } catch (error) {
+      logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
+      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+    }
   }
 
   /**
@@ -524,5 +570,181 @@ Important: Return only the JSON array with translated texts, no additional text 
     // If all else fails, return the original texts for this batch
     logger.warn(`[${this.providerName}] Fallback parsing failed, returning original texts`);
     return originalBatch;
+  }
+
+  /**
+   * Parse numbered batch results (for numbered strategy providers)
+   * @param {string} result - API response
+   * @param {number} expectedCount - Expected number of results
+   * @param {string[]} originalBatch - Original texts for fallback
+   * @returns {string[]} - Parsed results
+   */
+  _parseNumberedBatchResult(result, expectedCount, originalBatch) {
+    if (!result) return originalBatch;
+    
+    // Split by lines and process numbered format
+    const rawLines = result.split('\n');
+    const lines = [];
+    
+    for (let line of rawLines) {
+      line = line.trim();
+      if (!line) continue;
+      
+      // Check if line starts with number format like "1. ", "2. ", etc.
+      const numberMatch = line.match(/^(\d+)\.\s*(.*)$/);
+      if (numberMatch) {
+        const content = numberMatch[2].trim();
+        if (content) {
+          lines.push(content);
+        }
+      }
+    }
+    
+    logger.debug(`[${this.providerName}] Parsed ${lines.length} translations from numbered response (expected: ${expectedCount})`);
+    
+    // If we got the expected number of translations, return them
+    if (lines.length === expectedCount) {
+      logger.info(`[${this.providerName}] Successfully parsed numbered response: ${lines.length} translations`);
+      return lines;
+    } else {
+      logger.warn(`[${this.providerName}] Numbered response parsing failed. Expected: ${expectedCount}, Got: ${lines.length}`);
+      return this._fallbackParsing(result, expectedCount, originalBatch);
+    }
+  }
+
+  /**
+   * Build numbered batch prompt (for numbered strategy providers)
+   * @param {string[]} textBatch - Batch of texts
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @returns {string} - Numbered batch prompt
+   */
+  _buildNumberedBatchPrompt(textBatch, sourceLang, targetLang) {
+    const numberedText = textBatch.map((text, index) => `${index + 1}. ${text}`).join('\n');
+    return numberedText + '\n\nPlease return the translations in the same order, one per line, numbered 1. 2. 3. etc.';
+  }
+
+  /**
+   * Enhanced fallback to individual requests with streaming support (from Gemini)
+   * @param {string[]} batch - Batch of texts to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {object} engine - Translation engine instance
+   * @param {string} messageId - Message ID
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+    logger.debug(`[${this.providerName}] Starting fallback for ${batch.length} segments`);
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    const results = [];
+    
+    for (let i = 0; i < batch.length; i++) {
+      if (abortController && abortController.signal.aborted) {
+        throw new Error('Translation cancelled during fallback');
+      }
+      
+      try {
+        logger.debug(`[${this.providerName}] Fallback processing segment ${i + 1}/${batch.length}: "${batch[i]}"`);
+        
+        // Manual delay for fallback to prevent overload
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between fallback segments
+        }
+        
+        const result = await Promise.race([
+          this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 8 seconds`)), 8000)
+          )
+        ]);
+        
+        logger.debug(`[${this.providerName}] Fallback segment ${i + 1} completed`);
+        const translatedResult = result || batch[i];
+        results.push(translatedResult);
+        
+        // Stream the result immediately for this segment
+        if (engine && messageId) {
+          await this._streamFallbackResult([translatedResult], [batch[i]], i, messageId, engine);
+        }
+      } catch (error) {
+        logger.warn(`[${this.providerName}] Fallback segment ${i + 1} failed:`, error);
+        
+        // Throw error to be handled by system error management
+        throw error;
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Stream fallback result to content script (from Gemini)
+   * @param {string[]} result - Translated result for this segment
+   * @param {string[]} original - Original text for this segment
+   * @param {number} segmentIndex - Index of this segment in the batch
+   * @param {string} messageId - Message ID
+   * @param {object} engine - Translation engine instance
+   */
+  async _streamFallbackResult(result, original, segmentIndex, messageId, engine) {
+    try {
+      const { MessageFormat } = await import('@/shared/messaging/core/MessagingCore.js');
+      const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+      
+      const streamMessage = MessageFormat.create(
+        MessageActions.TRANSLATION_STREAM_UPDATE,
+        {
+          success: true,
+          data: result,
+          originalData: original,
+          batchIndex: segmentIndex,
+          provider: this.providerName,
+          timestamp: Date.now()
+        },
+        'background-streaming',
+        { messageId }
+      );
+
+      const senderInfo = engine.getStreamingSender?.(messageId);
+      if (senderInfo && senderInfo.tab?.id) {
+        await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
+        logger.debug(`[${this.providerName}] Fallback result streamed for segment ${segmentIndex + 1}`);
+      }
+    } catch (error) {
+      logger.error(`[${this.providerName}] Failed to stream fallback result for segment ${segmentIndex + 1}:`, error);
+    }
+  }
+
+  /**
+   * Abstract method for getting provider configuration
+   * Must be implemented by subclasses
+   * @returns {Promise<Object>} - Provider configuration
+   * @protected
+   */
+  async _getConfig() {
+    throw new Error(`_getConfig method must be implemented by ${this.constructor.name}`);
+  }
+ 
+  /**
+   * Enhanced API call execution with centralized error handling (from Gemini)
+   * @param {Object} params - API call parameters
+   * @returns {Promise<any>} - API response
+   * @protected
+   */
+  async _executeWithErrorHandling(params) {
+    try {
+      return await this._executeApiCall(params);
+    } catch (error) {
+      // Let ErrorHandler automatically detect and handle all error types
+      await ErrorHandler.getInstance().handle(error, {
+        context: params.context || `${this.providerName.toLowerCase()}-translation`
+      });
+      
+      logger.error(`[${this.providerName}] API call failed:`, error);
+      error.context = params.context || `${this.providerName.toLowerCase()}-translation`;
+      error.provider = this.providerName;
+      throw error;
+    }
   }
 }
