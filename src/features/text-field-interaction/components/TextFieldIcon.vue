@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, defineExpose } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 // Use the new Vue composable for automatic cleanup
