@@ -12,13 +12,13 @@ import { YandexTranslateProvider } from "./YandexTranslate.js";
 
 export function registerAllProviders() {
   providerRegistry.register("google", GoogleTranslateProvider);
+  providerRegistry.register("yandex", YandexTranslateProvider);
   providerRegistry.register("gemini", GeminiProvider);
   providerRegistry.register("openai", OpenAIProvider);
   providerRegistry.register("openrouter", OpenRouterProvider);
-  providerRegistry.register("bing", BingTranslateProvider);
-  providerRegistry.register("browser", browserTranslateProvider);
   providerRegistry.register("deepseek", DeepSeekProvider);
   providerRegistry.register("webai", WebAIProvider);
+  providerRegistry.register("bing", BingTranslateProvider);
+  providerRegistry.register("browser", browserTranslateProvider);
   providerRegistry.register("custom", CustomProvider);
-  providerRegistry.register("yandex", YandexTranslateProvider);
 }
