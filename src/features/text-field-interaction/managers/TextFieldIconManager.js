@@ -11,6 +11,9 @@ import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { PositionCalculator } from '../utils/PositionCalculator.js';
+import { ElementAttachment } from '../utils/ElementAttachment.js';
+import { textFieldIconConfig } from '../config/positioning.js';
 
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
@@ -26,8 +29,9 @@ export class TextFieldIconManager extends ResourceTracker {
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
     
-    // Track active icons and timeouts
+    // Track active icons and their attachments
     this.activeIcons = new Map();
+    this.iconAttachments = new Map();
     this.cleanupTimeouts = new Map();
     
     // Only log once during first initialization
@@ -129,12 +133,8 @@ export class TextFieldIconManager extends ResourceTracker {
       const id = (element.id || '').toLowerCase();
       const autocomplete = (element.autocomplete || '').toLowerCase();
       
-      // List of authentication-related keywords to exclude
-      const authKeywords = [
-        'email', 'mail', 'username', 'user', 'login', 'signin',
-        'password', 'pass', 'pwd', 'auth', 'credential',
-        'account', 'register', 'signup'
-      ];
+      // List of authentication-related keywords to exclude (from config)
+      const authKeywords = textFieldIconConfig.detection.authKeywords;
       
       // Check if any authentication keyword is present in element attributes
       const hasAuthKeyword = authKeywords.some(keyword => 
@@ -266,22 +266,40 @@ export class TextFieldIconManager extends ResourceTracker {
     // Generate a unique ID for the icon
     const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Calculate icon position - use fixed positioning relative to viewport  
-    const rect = element.getBoundingClientRect();
-    const position = {
-      top: rect.top + 5,
-      left: rect.left + rect.width - 5,
-    };
+    // Calculate optimal position using the new positioning system
+    const optimalPosition = PositionCalculator.calculateOptimalPosition(
+      element,
+      null, // Use default icon size
+      { checkCollisions: true }
+    );
 
+    this.logger.debug('Calculated optimal position:', {
+      placement: optimalPosition.placement,
+      position: { top: optimalPosition.top, left: optimalPosition.left },
+      isFallback: optimalPosition.isFallback
+    });
 
-    // Emit event to UI Host to add the icon
-    pageEventBus.emit('add-field-icon', { id: iconId, position });
+    // Emit event to UI Host to add the icon with enhanced data
+    pageEventBus.emit('add-field-icon', { 
+      id: iconId, 
+      position: optimalPosition,
+      targetElement: element,
+      attachmentMode: 'smart'
+    });
 
-    // Track the created icon
-    this.trackIcon({ id: iconId, element, position }, element);
+    // Track the created icon with enhanced data
+    this.trackIcon({ 
+      id: iconId, 
+      element, 
+      position: optimalPosition,
+      created: Date.now()
+    }, element);
 
-    this.logger.debug('Icon event emitted and tracked successfully');
-    return { id: iconId, element, position };
+    // Create attachment for position management
+    this.createIconAttachment(iconId, element);
+
+    this.logger.debug('Smart icon created and tracked successfully');
+    return { id: iconId, element, position: optimalPosition };
   }
 
   /**
@@ -339,32 +357,92 @@ export class TextFieldIconManager extends ResourceTracker {
   }
 
   /**
+   * Create attachment for icon to manage its lifecycle
+   * @param {string} iconId - Icon ID
+   * @param {Element} targetElement - Target element
+   */
+  createIconAttachment(iconId, targetElement) {
+    // Callback function to handle icon position updates
+    const iconUpdateCallback = (updateData) => {
+      this.handleIconUpdate(updateData);
+    };
+
+    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback);
+    
+    // Attach the icon to the element
+    attachment.attach();
+    
+    // Store the attachment for later cleanup
+    this.iconAttachments.set(iconId, attachment);
+    
+    this.logger.debug('Created attachment for icon:', iconId);
+  }
+
+  /**
+   * Handle icon position updates from ElementAttachment
+   * @param {Object} updateData - Update data from attachment
+   */
+  handleIconUpdate(updateData) {
+    const { iconId, position, visible, reason } = updateData;
+    
+    this.logger.debug('Received icon update:', {
+      iconId,
+      reason,
+      visible,
+      placement: position?.placement
+    });
+
+    // Emit update event to UI Host
+    if (position) {
+      pageEventBus.emit('update-field-icon-position', {
+        id: iconId,
+        position,
+        visible: visible !== false
+      });
+    } else if (visible !== undefined) {
+      pageEventBus.emit('update-field-icon-visibility', {
+        id: iconId,
+        visible
+      });
+    }
+  }
+
+  /**
    * Track created icon for lifecycle management
-   * @param {Element} icon - Created icon element
+   * @param {Object} iconData - Icon data
    * @param {Element} targetElement - Target element the icon is for
    */
   trackIcon(iconData, targetElement) {
     this.activeIcons.set(targetElement, {
       id: iconData.id,
-      created: Date.now(),
+      created: iconData.created || Date.now(),
+      position: iconData.position,
       targetElement
     });
 
     this.logger.debug('Tracking new icon', {
       targetTag: targetElement.tagName,
       iconId: iconData.id || 'no-id',
+      placement: iconData.position?.placement,
       totalTracked: this.activeIcons.size
     });
   }
 
   /**
-   * Cleanup all icons and timeouts
+   * Cleanup all icons and attachments
    */
   cleanup() {
-    this.logger.debug('Starting cleanup');
+    this.logger.debug('Starting enhanced cleanup');
 
     // Clear all cleanup timeouts (ResourceTracker will handle this)
     this.cleanupTimeouts.clear();
+
+    // Cleanup all attachments
+    for (const [iconId, attachment] of this.iconAttachments.entries()) {
+      this.logger.debug('Cleaning up attachment for icon:', iconId);
+      attachment.detach();
+    }
+    this.iconAttachments.clear();
 
     // Emit event to UI Host to remove all icons
     pageEventBus.emit('remove-all-field-icons');
@@ -375,11 +453,11 @@ export class TextFieldIconManager extends ResourceTracker {
     // Call parent cleanup to handle ResourceTracker resources
     super.cleanup();
 
-    this.logger.debug('Cleanup completed');
+    this.logger.debug('Enhanced cleanup completed');
   }
 
   /**
-   * Cleanup specific element's icon
+   * Cleanup specific element's icon and attachment
    * @param {Element} element - Element to cleanup
    */
   cleanupElement(element) {
@@ -389,6 +467,14 @@ export class TextFieldIconManager extends ResourceTracker {
     // Remove from tracking
     const iconData = this.activeIcons.get(element);
     if (iconData) {
+      // Cleanup attachment first
+      const attachment = this.iconAttachments.get(iconData.id);
+      if (attachment) {
+        this.logger.debug('Cleaning up attachment for element:', element.tagName);
+        attachment.detach();
+        this.iconAttachments.delete(iconData.id);
+      }
+
       // Emit event to UI Host to remove specific icon
       pageEventBus.emit('remove-field-icon', { id: iconData.id });
       this.activeIcons.delete(element);
@@ -397,25 +483,30 @@ export class TextFieldIconManager extends ResourceTracker {
   }
 
   /**
-   * Get information about tracked icons
+   * Get information about tracked icons and attachments
    * @returns {Object} Icon information
    */
   getIconsInfo() {
     const icons = [];
     for (const [element, data] of this.activeIcons.entries()) {
+      const attachment = this.iconAttachments.get(data.id);
       icons.push({
         id: data.id,
         targetTag: element.tagName,
         targetId: element.id || 'no-id',
         created: data.created,
         age: Date.now() - data.created,
-        iconConnected: true // Always true as it's managed by Vue
+        position: data.position,
+        placement: data.position?.placement,
+        iconConnected: true, // Always true as it's managed by Vue
+        attachmentStatus: attachment ? attachment.getStatus() : null
       });
     }
 
     return {
       initialized: this.initialized,
       activeIconsCount: this.activeIcons.size,
+      activeAttachmentsCount: this.iconAttachments.size,
       pendingTimeoutsCount: this.cleanupTimeouts.size,
       icons,
       dependencies: {
@@ -423,8 +514,51 @@ export class TextFieldIconManager extends ResourceTracker {
         notifier: !!this.notifier,
         strategies: !!this.strategies,
         featureManager: !!this.featureManager
+      },
+      positioningSystem: {
+        positionCalculator: 'PositionCalculator',
+        attachmentSystem: 'ElementAttachment',
+        smartPositioning: true
       }
     };
+  }
+
+  /**
+   * Force update all icon positions (useful after layout changes)
+   */
+  forceUpdateAllPositions() {
+    this.logger.debug('Force updating all icon positions');
+    
+    for (const [iconId, attachment] of this.iconAttachments.entries()) {
+      attachment.forceUpdate();
+    }
+  }
+
+  /**
+   * Get debug information for positioning system
+   * @param {Element} element - Optional specific element to debug
+   * @returns {Object} Debug information
+   */
+  getPositioningDebugInfo(element = null) {
+    if (element) {
+      return PositionCalculator.getDebugInfo(element);
+    }
+
+    const debugInfo = {
+      activeIcons: this.activeIcons.size,
+      activeAttachments: this.iconAttachments.size,
+      elements: []
+    };
+
+    for (const [targetElement, iconData] of this.activeIcons.entries()) {
+      debugInfo.elements.push({
+        iconId: iconData.id,
+        elementDebug: PositionCalculator.getDebugInfo(targetElement),
+        attachmentStatus: this.iconAttachments.get(iconData.id)?.getStatus()
+      });
+    }
+
+    return debugInfo;
   }
 
   /**
@@ -432,6 +566,6 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {string} Description
    */
   getDescription() {
-    return 'Manages text field translate icon creation and lifecycle in focused text fields';
+    return 'Enhanced text field translate icon manager with smart positioning and attachment system';
   }
 }

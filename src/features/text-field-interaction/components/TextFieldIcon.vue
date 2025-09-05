@@ -1,21 +1,23 @@
 <template>
-  <button
-    class="text-field-icon"
-    :class="{ 'is-hovering': isHovering, 'is-active': isActive }"
-    :style="styleObject"
-    @click="onClick"
-    @mousedown.prevent.stop
-    @mouseup.prevent.stop
-    @mouseenter="onMouseEnter"
-    @mouseleave="onMouseLeave"
-    @focus="onFocus"
-    @blur="onBlur"
-    @keydown="onKeydown"
-    :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
-    :aria-label="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
-    role="button"
-    tabindex="0"
-  >
+  <Transition name="icon" appear>
+    <button
+      v-show="visible"
+      class="text-field-icon"
+      :class="computedClasses"
+      :style="computedStyle"
+      @click="onClick"
+      @mousedown.prevent.stop
+      @mouseup.prevent.stop
+      @mouseenter="onMouseEnter"
+      @mouseleave="onMouseLeave"
+      @focus="onFocus"
+      @blur="onBlur"
+      @keydown="onKeydown"
+      :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
+      :aria-label="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
+      role="button"
+      tabindex="0"
+    >
     <svg
       class="text-field-icon__svg"
       viewBox="0 0 64 64"
@@ -32,11 +34,12 @@
       <g><path fill="#2d9397" d="M 44.5,48.5 C 45.8333,49.1667 45.8333,49.8333 44.5,50.5C 39.5,50.5 34.5,50.5 29.5,50.5C 34.5,49.8333 39.5,49.1667 44.5,48.5 Z"/></g>
       <g><path fill="#1c66c0" d="M 29.5,50.5 C 34.5,50.5 39.5,50.5 44.5,50.5C 41.5136,54.817 38.1803,58.817 34.5,62.5C 32.8346,58.505 31.1679,54.505 29.5,50.5 Z"/></g>
     </svg>
-  </button>
+    </button>
+  </Transition>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, defineExpose } from 'vue';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 // Use the new Vue composable for automatic cleanup
@@ -46,10 +49,13 @@ const props = defineProps({
   id: { type: String, required: true },
   position: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
-  size: { type: String, default: 'medium', validator: (value) => ['small', 'medium', 'large'].includes(value) }
+  visible: { type: Boolean, default: true },
+  size: { type: String, default: 'medium', validator: (value) => ['small', 'medium', 'large'].includes(value) },
+  targetElement: { type: Object, default: null }, // Reference to target element
+  attachmentMode: { type: String, default: 'smart' }
 });
 
-const emit = defineEmits(['click', 'hover', 'focus']);
+const emit = defineEmits(['click', 'hover', 'focus', 'position-updated']);
 
 const isHovering = ref(false);
 const isActive = ref(false);
@@ -61,12 +67,90 @@ const sizeMap = {
   large: { width: 32, height: 32, iconSize: 18 }
 };
 
+// Internal position state for smooth updates
+const internalPosition = ref({ ...props.position });
+const internalVisible = ref(props.visible);
+
 const currentSize = computed(() => sizeMap[props.size]);
 
-const styleObject = computed(() => ({
-  top: `${props.position.top}px`,
-  left: `${props.position.left}px`
+// Watch for position prop changes and animate to new position
+watch(() => props.position, (newPosition) => {
+  if (newPosition && (newPosition.top !== internalPosition.value.top || newPosition.left !== internalPosition.value.left)) {
+    internalPosition.value = { ...newPosition };
+    emit('position-updated', { id: props.id, position: newPosition });
+  }
+}, { deep: true });
+
+// Watch for visibility changes
+watch(() => props.visible, (newVisible) => {
+  internalVisible.value = newVisible;
+});
+
+const computedClasses = computed(() => ({
+  'is-hovering': isHovering.value,
+  'is-active': isActive.value,
+  'is-focused': isFocused.value,
+  'is-disabled': props.disabled,
+  [`placement-${props.position.placement}`]: props.position.placement,
+  [`size-${props.size}`]: true,
+  'smart-attached': props.attachmentMode === 'smart'
 }));
+
+const computedStyle = computed(() => {
+  const baseStyle = {
+    position: 'fixed',
+    top: `${internalPosition.value.top}px`,
+    left: `${internalPosition.value.left}px`,
+    width: `${currentSize.value.width}px`,
+    height: `${currentSize.value.height}px`,
+    zIndex: 2147483647,
+  };
+
+  // Add transform based on placement for better positioning
+  const placement = props.position.placement;
+  if (placement) {
+    const transforms = [];
+    
+    switch (placement) {
+      case 'top-right':
+        transforms.push('translate(-100%, 0)');
+        break;
+      case 'bottom-right':
+        transforms.push('translate(-100%, -100%)');
+        break;
+      case 'top-left':
+        transforms.push('translate(0, 0)');
+        break;
+      case 'bottom-left':
+        transforms.push('translate(0, -100%)');
+        break;
+      case 'inside-right':
+        transforms.push('translate(-50%, 0)');
+        break;
+      case 'inside-left':
+        transforms.push('translate(-50%, 0)');
+        break;
+      case 'inside-bottom-right':
+        transforms.push('translate(0, 0)');
+        break;
+      case 'inside-bottom-left':
+        transforms.push('translate(0, 0)');
+        break;
+      case 'inside-top-right':
+        transforms.push('translate(0, 0)');
+        break;
+      case 'inside-top-left':
+        transforms.push('translate(0, 0)');
+        break;
+    }
+    
+    if (transforms.length > 0) {
+      baseStyle.transform = transforms.join(' ');
+    }
+  }
+
+  return baseStyle;
+});
 
 const onClick = (event) => {
   if (props.disabled) return;
@@ -113,7 +197,39 @@ const onKeydown = (event) => {
   }
 };
 
+// Public methods for external control
+const updatePosition = (newPosition) => {
+  internalPosition.value = { ...newPosition };
+  emit('position-updated', { id: props.id, position: newPosition });
+};
+
+const show = () => {
+  internalVisible.value = true;
+};
+
+const hide = () => {
+  internalVisible.value = false;
+};
+
+const forceUpdate = () => {
+  // Force reactivity update
+  internalPosition.value = { ...internalPosition.value };
+};
+
+// Expose methods for parent components
+defineExpose({
+  updatePosition,
+  show,
+  hide,
+  forceUpdate,
+  getPosition: () => internalPosition.value,
+  isVisible: () => internalVisible.value
+});
+
 onMounted(() => {
+  // Initialize internal state
+  internalPosition.value = { ...props.position };
+  internalVisible.value = props.visible;
 });
 
 // Note: cleanup is now automatic via useResourceTracker
@@ -129,16 +245,16 @@ onMounted(() => {
   outline: none;
   font: inherit;
   
-  /* Positioning */
+  /* Positioning - handled by computedStyle */
   position: fixed;
   
-  /* Size */
+  /* Default size - overridden by computedStyle */
   width: 28px;
   height: 28px;
   
   /* Appearance */
-  background-color: #ff0000 !important; /* Red for debugging */
-  border: 3px solid #00ff00 !important;  /* Green border for debugging */
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
   border-radius: 50%;
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.1),
@@ -153,14 +269,15 @@ onMounted(() => {
   cursor: pointer;
   user-select: none;
   
-  /* Z-index */
-  z-index: 2147483647 !important;
+  /* Z-index - handled by computedStyle */
+  z-index: 2147483647;
   
-  /* Animation */
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Animation - smooth position transitions */
+  transition: 
+    all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    top 0.2s ease-out,
+    left 0.2s ease-out;
   opacity: 1;
-  transform: scale(1);
-  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .text-field-icon:disabled {
@@ -207,7 +324,71 @@ onMounted(() => {
   transform: scale(0.95);
 }
 
-/* Animations */
+/* Size variants */
+.text-field-icon.size-small {
+  width: 24px;
+  height: 24px;
+}
+
+.text-field-icon.size-medium {
+  width: 28px;
+  height: 28px;
+}
+
+.text-field-icon.size-large {
+  width: 32px;
+  height: 32px;
+}
+
+.text-field-icon.size-small .text-field-icon__svg {
+  width: 14px;
+  height: 14px;
+}
+
+.text-field-icon.size-medium .text-field-icon__svg {
+  width: 16px;
+  height: 16px;
+}
+
+.text-field-icon.size-large .text-field-icon__svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Placement-specific styles */
+.text-field-icon.placement-inside-right,
+.text-field-icon.placement-inside-left {
+  /* Inside placements have slightly different styling */
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+}
+
+/* Smart attachment indicator */
+.text-field-icon.smart-attached {
+  /* Visual indicator for smart positioning */
+  box-shadow: 
+    0 2px 8px rgba(66, 133, 244, 0.1),
+    0 1px 3px rgba(66, 133, 244, 0.08),
+    inset 0 0 0 1px rgba(66, 133, 244, 0.1);
+}
+
+/* Vue transitions */
+.icon-enter-active,
+.icon-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.icon-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+/* Animation keyframes */
 @keyframes slideInUp {
   from {
     opacity: 0;

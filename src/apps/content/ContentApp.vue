@@ -8,9 +8,14 @@
     <TextFieldIcon
       v-for="icon in activeIcons"
       :key="icon.id"
+      :ref="el => setIconRef(icon.id, el)"
       :id="icon.id"
       :position="icon.position"
+      :visible="icon.visible !== false"
+      :target-element="icon.targetElement"
+      :attachment-mode="icon.attachmentMode || 'smart'"
       @click="onIconClick"
+      @position-updated="onIconPositionUpdated"
     />
     
     <!-- WindowsManager Translation Windows -->
@@ -79,12 +84,31 @@ const tracker = useResourceTracker('content-app')
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
-const activeIcons = ref([]); // Stores { id, position } for each icon
+const activeIcons = ref([]); // Stores { id, position, visible, targetElement, attachmentMode } for each icon
+const iconRefs = ref(new Map()); // Stores Vue component references
+
+// Icon reference management
+const setIconRef = (iconId, el) => {
+  if (el) {
+    iconRefs.value.set(iconId, el);
+  } else {
+    iconRefs.value.delete(iconId);
+  }
+};
+
+const getIconRef = (iconId) => {
+  return iconRefs.value.get(iconId);
+};
 
 const onIconClick = (id) => {
   logger.info(`TextFieldIcon clicked: ${id}`);
   // Emit an event back to the content script to handle the click
   pageEventBus.emit('text-field-icon-clicked', { id });
+};
+
+const onIconPositionUpdated = (data) => {
+  logger.debug(`TextFieldIcon position updated:`, data);
+  // Optionally notify about position changes
 };
 
 const setupOutsideClickHandler = () => {
@@ -199,18 +223,67 @@ onMounted(() => {
     logger.info('Event: add-field-icon', detail);
     // Ensure no duplicate icons for the same ID
     if (!activeIcons.value.some(icon => icon.id === detail.id)) {
-      activeIcons.value.push(detail);
+      activeIcons.value.push({
+        id: detail.id,
+        position: detail.position,
+        visible: detail.visible !== false,
+        targetElement: detail.targetElement,
+        attachmentMode: detail.attachmentMode || 'smart'
+      });
     }
   });
 
   pageEventBus.on('remove-field-icon', (detail) => {
     logger.info('Event: remove-field-icon', detail);
-    activeIcons.value = activeIcons.value.filter(icon => icon.id !== detail.id);
+    const iconIndex = activeIcons.value.findIndex(icon => icon.id === detail.id);
+    if (iconIndex !== -1) {
+      // Clean up component reference
+      iconRefs.value.delete(detail.id);
+      // Remove from active icons
+      activeIcons.value.splice(iconIndex, 1);
+    }
   });
 
   pageEventBus.on('remove-all-field-icons', () => {
     logger.info('Event: remove-all-field-icons');
+    // Clear all component references
+    iconRefs.value.clear();
+    // Clear all icons
     activeIcons.value = [];
+  });
+
+  // Listen for enhanced TextFieldIcon events
+  pageEventBus.on('update-field-icon-position', (detail) => {
+    logger.debug('Event: update-field-icon-position', detail);
+    const icon = activeIcons.value.find(icon => icon.id === detail.id);
+    if (icon) {
+      icon.position = detail.position;
+      icon.visible = detail.visible !== false;
+      
+      // Update the component directly
+      const iconComponent = getIconRef(detail.id);
+      if (iconComponent && iconComponent.updatePosition) {
+        iconComponent.updatePosition(detail.position);
+      }
+    }
+  });
+
+  pageEventBus.on('update-field-icon-visibility', (detail) => {
+    logger.debug('Event: update-field-icon-visibility', detail);
+    const icon = activeIcons.value.find(icon => icon.id === detail.id);
+    if (icon) {
+      icon.visible = detail.visible;
+      
+      // Update the component directly
+      const iconComponent = getIconRef(detail.id);
+      if (iconComponent) {
+        if (detail.visible && iconComponent.show) {
+          iconComponent.show();
+        } else if (!detail.visible && iconComponent.hide) {
+          iconComponent.hide();
+        }
+      }
+    }
   });
 
   // Setup WindowsManager event listeners through composable

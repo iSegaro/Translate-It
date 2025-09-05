@@ -1,8 +1,8 @@
 @use '../base/variables' as *;
 @use '../base/mixins' as *;
 
-// TextFieldIcon component styles - for Shadow DOM injection
-// These styles are directly injected since scoped styles don't work in Shadow DOM
+// Enhanced TextFieldIcon component styles with smart positioning
+// Optimized for Shadow DOM with advanced positioning system
 
 .text-field-icon {
   // Button reset
@@ -13,10 +13,10 @@
   outline: none;
   font: inherit;
   
-  // Positioning
+  // Positioning - handled by Vue component computedStyle
   position: fixed;
   
-  // Size
+  // Default size - overridden by size classes
   width: 28px;
   height: 28px;
   
@@ -38,11 +38,13 @@
   // Z-index - highest possible for extension content
   z-index: $z-overlay + 1000000 !important;
   
-  // Animation
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  // Enhanced animations - smooth position transitions
+  transition: 
+    all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    top 0.2s ease-out,
+    left 0.2s ease-out,
+    transform 0.15s ease-out;
   opacity: 1;
-  transform: scale(1);
-  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 
   &:disabled {
     opacity: 0.5;
@@ -84,5 +86,201 @@
 
   .text-field-icon.is-active & {
     transform: scale(0.95);
+  }
+}
+
+// Size variants
+.text-field-icon {
+  &.size-small {
+    width: 24px;
+    height: 24px;
+
+    .text-field-icon__svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  &.size-medium {
+    width: 28px;
+    height: 28px;
+
+    .text-field-icon__svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &.size-large {
+    width: 32px;
+    height: 32px;
+
+    .text-field-icon__svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+// Placement-specific styles
+.text-field-icon {
+  // Inside placements - general styling
+  &.placement-inside-right,
+  &.placement-inside-left,
+  &.placement-inside-bottom-right,
+  &.placement-inside-bottom-left,
+  &.placement-inside-top-right,
+  &.placement-inside-top-left {
+    // Inside placements have slightly different styling
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(2px);
+    border-color: rgba(224, 224, 224, 0.8);
+    
+    // Subtle shadow to distinguish from content
+    box-shadow: 
+      0 1px 4px rgba(0, 0, 0, 0.12),
+      0 0 0 1px rgba(255, 255, 255, 0.8);
+  }
+
+  // Multiline-specific inside placements
+  &.placement-inside-bottom-right,
+  &.placement-inside-bottom-left {
+    // For multiline elements (textarea, WYSIWYG)
+    // Additional styling to avoid scrollbar conflicts
+    margin-right: 2px;
+    margin-bottom: 2px;
+    
+    // More subtle appearance in multiline contexts
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(200, 200, 200, 0.8);
+  }
+
+  &.placement-inside-top-right,
+  &.placement-inside-top-left {
+    // Top inside placements
+    margin-top: 2px;
+  }
+
+  // Outside placements
+  &.placement-top-right,
+  &.placement-bottom-right {
+    // Right-aligned placements
+    transform-origin: right center;
+  }
+
+  &.placement-top-left,
+  &.placement-bottom-left {
+    // Left-aligned placements
+    transform-origin: left center;
+  }
+
+  // Smart attachment indicator
+  &.smart-attached {
+    // Visual indicator for smart positioning
+    border-color: rgba(66, 133, 244, 0.3);
+    
+    // Different styling for inside vs outside placements
+    &:not([class*="inside"]) {
+      box-shadow: 
+        0 2px 8px rgba(66, 133, 244, 0.1),
+        0 1px 3px rgba(66, 133, 244, 0.08),
+        inset 0 0 0 1px rgba(66, 133, 244, 0.1);
+    }
+    
+    &[class*="inside"] {
+      box-shadow: 
+        0 1px 4px rgba(66, 133, 244, 0.15),
+        0 0 0 1px rgba(66, 133, 244, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+    }
+  }
+}
+
+// Vue transitions for enter/leave
+.icon-enter-active,
+.icon-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.icon-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .text-field-icon {
+    // Slightly larger on mobile for easier touch interaction
+    &.size-small { 
+      width: 28px; 
+      height: 28px; 
+      
+      .text-field-icon__svg { 
+        width: 16px; 
+        height: 16px; 
+      }
+    }
+    
+    &.size-medium { 
+      width: 32px; 
+      height: 32px; 
+      
+      .text-field-icon__svg { 
+        width: 18px; 
+        height: 18px; 
+      }
+    }
+    
+    &.size-large { 
+      width: 36px; 
+      height: 36px; 
+      
+      .text-field-icon__svg { 
+        width: 20px; 
+        height: 20px; 
+      }
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .text-field-icon {
+    border-width: 2px;
+    border-color: #000;
+    
+    &.is-hovering {
+      background-color: #000;
+      color: #fff;
+    }
+    
+    .text-field-icon__svg {
+      filter: contrast(2);
+    }
+  }
+}
+
+// Reduced motion preference
+@media (prefers-reduced-motion: reduce) {
+  .text-field-icon {
+    animation: none;
+    transition: none;
+  }
+  
+  .icon-enter-active,
+  .icon-leave-active {
+    transition: none;
+  }
+}
+
+// Print styles (hide icons)
+@media print {
+  .text-field-icon {
+    display: none !important;
   }
 }
