@@ -17,7 +17,9 @@ export const PROVIDER_CONFIGURATIONS = {
   Gemini: {
     rateLimit: {
       maxConcurrent: 1,
-      delayBetweenRequests: 8000, // 8 seconds between requests (increased for 503 overload)
+      delayBetweenRequests: 0, // No delay for first request, adaptive backoff handles errors
+      initialDelay: 0, // First request immediate
+      subsequentDelay: 8000, // 8 seconds between subsequent requests after errors
       burstLimit: 1,
       burstWindow: 10000, // Increased burst window
       adaptiveBackoff: {
@@ -67,7 +69,9 @@ export const PROVIDER_CONFIGURATIONS = {
   OpenAI: {
     rateLimit: {
       maxConcurrent: 2,
-      delayBetweenRequests: 1000, // 1 second between requests
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 1000, // 1 second between subsequent requests
       burstLimit: 3,
       burstWindow: 2000,
       adaptiveBackoff: {
@@ -113,7 +117,9 @@ export const PROVIDER_CONFIGURATIONS = {
   DeepSeek: {
     rateLimit: {
       maxConcurrent: 1,
-      delayBetweenRequests: 2000, // 2 seconds between requests
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 2000, // 2 seconds between subsequent requests
       burstLimit: 2,
       burstWindow: 3000,
       adaptiveBackoff: {
@@ -157,7 +163,9 @@ export const PROVIDER_CONFIGURATIONS = {
   OpenRouter: {
     rateLimit: {
       maxConcurrent: 2,
-      delayBetweenRequests: 1500, // 1.5 seconds
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 1500, // 1.5 seconds for subsequent requests
       burstLimit: 3,
       burstWindow: 3000,
       adaptiveBackoff: {
@@ -203,7 +211,9 @@ export const PROVIDER_CONFIGURATIONS = {
   WebAI: {
     rateLimit: {
       maxConcurrent: 2, // Standard concurrent requests
-      delayBetweenRequests: 1000, // Standard delay
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 1000, // Standard delay for subsequent requests // Standard delay
       burstLimit: 3,
       burstWindow: 2000,
       adaptiveBackoff: {
@@ -249,7 +259,9 @@ export const PROVIDER_CONFIGURATIONS = {
   GoogleTranslate: {
     rateLimit: {
       maxConcurrent: 2, // Moderate concurrent requests
-      delayBetweenRequests: 100, // Fast requests for free service
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 100, // Fast requests for free service
       burstLimit: 5,
       burstWindow: 1000,
       adaptiveBackoff: {
@@ -296,7 +308,9 @@ export const PROVIDER_CONFIGURATIONS = {
   YandexTranslate: {
     rateLimit: {
       maxConcurrent: 2, // Moderate concurrent requests
-      delayBetweenRequests: 150, // Slightly slower than Google
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 150, // Slightly slower than Google for subsequent requests
       burstLimit: 4,
       burstWindow: 1200,
       adaptiveBackoff: {
@@ -345,7 +359,9 @@ export const PROVIDER_CONFIGURATIONS = {
   Custom: {
     rateLimit: {
       maxConcurrent: 2, // Safe default
-      delayBetweenRequests: 1000,
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 1000, // Standard delay for subsequent requests
       burstLimit: 3,
       burstWindow: 2000,
       adaptiveBackoff: {

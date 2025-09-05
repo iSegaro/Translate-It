@@ -16,7 +16,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
  */
 const DEFAULT_RATE_LIMIT_CONFIG = {
   maxConcurrent: 2,
-  delayBetweenRequests: 1000,
+  delayBetweenRequests: 0, // No delay for first request
+  initialDelay: 0,
+  subsequentDelay: 1000, // 1 second for subsequent requests
   burstLimit: 3,
   burstWindow: 2000,
   adaptiveBackoff: {
@@ -110,13 +112,19 @@ export class RateLimitManager {
       return false;
     }
     
-    // Check time-based delay with adaptive backoff
-    let adjustedDelay = state.config.delayBetweenRequests;
+    // For first request (lastRequestTime = 0), allow immediate execution
+    if (state.lastRequestTime === 0) {
+      return true;
+    }
+    
+    // Check time-based delay with adaptive backoff for subsequent requests
+    const baseDelay = state.config.subsequentDelay || state.config.delayBetweenRequests;
+    let adjustedDelay = baseDelay;
     
     // Apply adaptive backoff if enabled
     if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
       adjustedDelay = Math.min(
-        state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+        baseDelay * state.currentBackoffMultiplier,
         state.config.adaptiveBackoff.maxDelay
       );
     }
@@ -280,10 +288,14 @@ export class RateLimitManager {
           const now = Date.now();
           const timeSinceLastRequest = now - state.lastRequestTime;
           
-          let adjustedDelay = state.config.delayBetweenRequests;
+          // Use appropriate delay based on request history
+          const baseDelay = state.lastRequestTime > 0 
+            ? (state.config.subsequentDelay || state.config.delayBetweenRequests)
+            : (state.config.initialDelay || state.config.delayBetweenRequests);
+          let adjustedDelay = baseDelay;
           if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
             adjustedDelay = Math.min(
-              state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+              baseDelay * state.currentBackoffMultiplier,
               state.config.adaptiveBackoff.maxDelay
             );
           }
@@ -317,10 +329,14 @@ export class RateLimitManager {
       time => (now - time) < state.config.burstWindow
     );
     
-    let adjustedDelay = state.config.delayBetweenRequests;
+    // Use appropriate delay for status reporting
+    const baseDelay = state.lastRequestTime > 0 
+      ? (state.config.subsequentDelay || state.config.delayBetweenRequests)
+      : (state.config.initialDelay || state.config.delayBetweenRequests);
+    let adjustedDelay = baseDelay;
     if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
       adjustedDelay = Math.min(
-        state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+        baseDelay * state.currentBackoffMultiplier,
         state.config.adaptiveBackoff.maxDelay
       );
     }
@@ -463,7 +479,7 @@ export class RateLimitManager {
         const oldMultiplier = state.currentBackoffMultiplier;
         state.currentBackoffMultiplier = Math.min(
           state.currentBackoffMultiplier * state.config.adaptiveBackoff.baseMultiplier,
-          state.config.adaptiveBackoff.maxDelay / state.config.delayBetweenRequests
+          state.config.adaptiveBackoff.maxDelay / (state.config.subsequentDelay || state.config.delayBetweenRequests)
         );
         state.successfulRequestsCount = 0; // Reset success counter
         
