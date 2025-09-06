@@ -3,6 +3,8 @@ import { MessageActions } from './MessageActions.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { isContextError } from '@/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'SmartMessaging')
 
@@ -183,9 +185,20 @@ async function sendViaPort(message, timeout) {
 
     const onDisconnect = () => {
       logger.debug('Port disconnected for:', message.messageId, { ackReceived })
+      
+      // Handle runtime.lastError using centralized system
+      const errorInfo = ExtensionContextManager.handleRuntimeLastError('SmartMessaging.onDisconnect')
+      
       if (!isResolved) {
-        cleanup()
-        reject(new Error('Port disconnected before receiving response'))
+        if (errorInfo?.isBackForwardCache) {
+          cleanup()
+          const cacheError = new Error('Page moved to back/forward cache')
+          cacheError.type = ErrorTypes.PAGE_MOVED_TO_CACHE
+          reject(cacheError)
+        } else {
+          cleanup()
+          reject(new Error('Port disconnected before receiving response'))
+        }
       }
     }
 

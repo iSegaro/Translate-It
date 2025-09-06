@@ -17,10 +17,12 @@ let _instance = null; // Singleton instance
 const SILENT = new Set([
   ErrorTypes.CONTEXT,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+  ErrorTypes.PAGE_MOVED_TO_CACHE,
 ]);
 const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.CONTEXT,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+  ErrorTypes.PAGE_MOVED_TO_CACHE,
   ErrorTypes.API,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_KEY_MISSING,

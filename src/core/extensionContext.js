@@ -187,20 +187,34 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Get appropriate error message for context errors with fallback
-   * @param {string} errorType - Error type
-   * @param {Object} fallbackMessages - Fallback messages map
-   * @returns {string} Error message
+   * Handle browser.runtime.lastError with appropriate context error handling
+   * @param {string} context - Context where the error occurred
+   * @returns {Object} Error information
    */
-  static getContextErrorMessage(errorType, fallbackMessages = {}) {
-    const defaultMessages = {
-      [ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]: 'Extension reloaded, please refresh page',
-      [ErrorTypes.CONTEXT]: 'Extension context lost',
-      [ErrorTypes.UNKNOWN]: 'An unknown error occurred'
-    };
+  static handleRuntimeLastError(context = 'unknown') {
+    if (!browser.runtime.lastError) return null
 
-    const messages = { ...defaultMessages, ...fallbackMessages };
-    return messages[errorType] || messages[ErrorTypes.UNKNOWN];
+    const errorMessage = browser.runtime.lastError.message
+    logger.debug(`[${context}] Clearing runtime.lastError:`, errorMessage)
+    
+    // Clear the error to prevent console warnings
+    browser.runtime.lastError = null
+
+    // Check if it's a back/forward cache error
+    const isBackForwardCache = errorMessage?.includes('back/forward cache') ||
+                              errorMessage?.includes('moved into back/forward cache')
+
+    if (isBackForwardCache) {
+      logger.debug(`[${context}] Back/forward cache disconnect detected - this is expected`)
+    } else {
+      logger.warn(`[${context}] Unexpected runtime.lastError:`, errorMessage)
+    }
+
+    return {
+      message: errorMessage,
+      isBackForwardCache,
+      context
+    }
   }
 }
 

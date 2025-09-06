@@ -38,6 +38,7 @@ export { backgroundService };
 
 // Setup port-based reliable messaging endpoint
 import browser from 'webextension-polyfill'
+import ExtensionContextManager from '@/core/extensionContext.js'
 browser.runtime.onConnect.addListener((port) => {
   try {
     logger.debug('[Background] Port connected:', port.name);
@@ -127,6 +128,9 @@ browser.runtime.onConnect.addListener((port) => {
     port.onDisconnect.addListener(() => {
       port._disconnected = true;
       logger.debug('[Background] Port disconnected:', port.name);
+      
+      // Handle runtime.lastError using centralized system
+      ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect')
     });
     port.onMessage.addListener(async (msg) => {
       try {
@@ -193,6 +197,9 @@ browser.runtime.onConnect.addListener((port) => {
 
       port.onDisconnect.addListener(() => {
         logger.debug('[Background] Port disconnected:', port.name);
+        
+        // Handle runtime.lastError using centralized system
+        ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect.lifecycle')
       });
     } catch (err) {
       logger.error('[Background] Error in onConnect handler:', err);

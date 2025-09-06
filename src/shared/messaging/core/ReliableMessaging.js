@@ -1,8 +1,9 @@
 import browser from 'webextension-polyfill'
-import { MessageActions } from './MessageActions.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { isContextError } from '@/core/extensionContext.js' // Add this import
+import { isContextError } from '@/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ReliableMessaging')
 
@@ -221,10 +222,22 @@ export async function sendReliable(message, opts = {}) {
           isResolved,
           action: message.action
         })
+        
+        // Handle runtime.lastError using centralized system
+        const errorInfo = ExtensionContextManager.handleRuntimeLastError('ReliableMessaging.onDisconnect')
+        
         if (!isResolved) {
-          cleanup()
-          circuitBreaker.onFailure()
-          reject(new Error('port-disconnected'))
+          if (errorInfo?.isBackForwardCache) {
+            logger.debug('sendReliable: Port disconnected due to back/forward cache, this is expected')
+            cleanup()
+            const cacheError = new Error('Page moved to back/forward cache')
+            cacheError.type = ErrorTypes.PAGE_MOVED_TO_CACHE
+            reject(cacheError)
+          } else {
+            cleanup()
+            circuitBreaker.onFailure()
+            reject(new Error('port-disconnected'))
+          }
         }
       }
 

@@ -1,4 +1,3 @@
-import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts } from '../core/MessagingCore.js'
 import { MessageActions } from '../core/MessageActions.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -6,6 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendReliable } from '../core/ReliableMessaging.js'
 import { sendSmart } from '../core/SmartMessaging.js'
 import { isContextError } from '@/core/extensionContext.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 
@@ -39,6 +39,12 @@ export function useMessaging(context) {
       // Use smart messaging for optimal performance
       return await sendSmart(message, options);
     } catch (error) {
+      // Handle back/forward cache disconnects gracefully
+      if (error.type === ErrorTypes.PAGE_MOVED_TO_CACHE || error.message?.includes('Page moved to back/forward cache')) {
+        logger.debug('sendMessage: Page moved to back/forward cache, operation cancelled gracefully');
+        return { success: false, error: 'Page moved to cache', cancelled: true };
+      }
+      
       // Handle context errors silently (they're expected when extension reloads)
       if (isContextError(error)) {
         logger.debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
