@@ -78,7 +78,12 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupHeader');
+
+// Resource tracker for memory management
+const tracker = useResourceTracker('popup-header');
 
 
 // Refs
@@ -262,7 +267,7 @@ onMounted(async () => {
     
     // Add native event listener for sidepanel button (Firefox compatibility)
     if (sidePanelButton.value && sidePanelButton.value.$el) {
-      sidePanelButton.value.$el.addEventListener('click', handleOpenSidePanelNative, true)
+      tracker.addEventListener(sidePanelButton.value.$el, 'click', handleOpenSidePanelNative, true)
     }
   } catch (error) {
     await handleError(error, 'PopupHeader-getExcludeStatus')

@@ -139,8 +139,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useScreenCapture } from '@/features/screen-capture/composables/useScreenCapture.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
+
+// Resource tracker for memory management
+const tracker = useResourceTracker('screen-selector')
 
 const props = defineProps({
   onSelect: {
@@ -292,10 +296,10 @@ const handleContextMenu = (event) => {
 
 // Lifecycle
 onMounted(() => {
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseleave', handleMouseLeave)
-  document.addEventListener('keydown', handleKeyDown)
-  document.addEventListener('contextmenu', handleContextMenu)
+  tracker.addEventListener(document, 'mousemove', handleMouseMove)
+  tracker.addEventListener(document, 'mouseleave', handleMouseLeave)
+  tracker.addEventListener(document, 'keydown', handleKeyDown)
+  tracker.addEventListener(document, 'contextmenu', handleContextMenu)
   
   // Focus the overlay to receive keyboard events
   document.body.style.overflow = 'hidden'

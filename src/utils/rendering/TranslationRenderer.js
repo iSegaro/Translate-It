@@ -5,14 +5,17 @@ import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationRenderer')
 
 /**
  * Universal Translation Content Renderer
  * Used by both Vue components and vanilla JS (like SelectionWindows)
  */
-export class TranslationRenderer {
+export class TranslationRenderer extends ResourceTracker {
   constructor(options = {}) {
+    super(); // Initialize ResourceTracker first
     this.options = {
       enableMarkdown: true,
       enableLabelFormatting: true,
@@ -155,7 +158,7 @@ export class TranslationRenderer {
     button.className = 'toolbar-button'
     button.title = title
     button.innerHTML = `<img src="/assets/icons/${icon}" alt="${title}" class="toolbar-icon" />`
-    button.addEventListener('click', handler)
+    this.addEventListener(button, 'click', handler)
     return button
   }
 

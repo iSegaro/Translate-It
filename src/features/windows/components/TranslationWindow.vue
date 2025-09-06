@@ -99,6 +99,7 @@ import { isContextError } from '@/core/extensionContext.js';
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -124,6 +125,9 @@ const tts = useTTSSmart();
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
+
+// Resource tracker for memory management
+const tracker = useResourceTracker(`translation-window-${props.id}`);
 
 // State  
 const isLoading = computed(() => {
@@ -326,7 +330,7 @@ const handleStartDrag = (event) => {
     }, 300);
   };
   
-  document.addEventListener('mouseup', customStopDrag, { once: true });
+  tracker.addEventListener(document, 'mouseup', customStopDrag, { once: true });
 };
 
 </script>

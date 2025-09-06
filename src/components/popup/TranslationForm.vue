@@ -54,7 +54,12 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupTranslationForm');
+
+// Resource tracker for memory management
+const tracker = useResourceTracker('popup-translation-form');
 
 // Props
 const props = defineProps({
@@ -195,15 +200,15 @@ onMounted(async () => {
   logger.debug("Component mounting...");
   
   // Listen for global events from header component
-  document.addEventListener('clear-storage', clearStorage)
-  document.addEventListener('revert-translation', revertTranslation)
-  document.addEventListener('translate-request', (_event) => {
+  tracker.addEventListener(document, 'clear-storage', clearStorage)
+  tracker.addEventListener(document, 'revert-translation', revertTranslation)
+  tracker.addEventListener(document, 'translate-request', (_event) => {
     logger.debug("🔔 Translate request received from header");
     if (sourceText.value.trim()) {
       handleTranslate()
     }
   })
-  document.addEventListener('languages-swapped', () => {
+  tracker.addEventListener(document, 'languages-swapped', () => {
     // Note: We only swap languages, not text content
     // Text content should remain in their respective fields
   })

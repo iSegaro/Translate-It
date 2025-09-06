@@ -21,6 +21,7 @@ class OffscreenResourceTracker {
   constructor() {
     this.timeouts = new Set();
     this.intervals = new Set();
+    this.eventListeners = new Map(); // Track event listeners: element -> {event, handler, options}
   }
 
   trackTimeout(callback, delay) {
@@ -39,6 +40,17 @@ class OffscreenResourceTracker {
     }
   }
 
+  addEventListener(element, event, handler, options = {}) {
+    // Store the listener info for cleanup
+    if (!this.eventListeners.has(element)) {
+      this.eventListeners.set(element, []);
+    }
+    this.eventListeners.get(element).push({ event, handler, options });
+
+    // Add the actual listener
+    element.addEventListener(event, handler, options);
+  }
+
   cleanup() {
     // Clear all tracked timeouts
     for (const timeoutId of this.timeouts) {
@@ -51,6 +63,14 @@ class OffscreenResourceTracker {
       clearInterval(intervalId);
     }
     this.intervals.clear();
+
+    // Clear all tracked event listeners
+    for (const [element, listeners] of this.eventListeners) {
+      for (const { event, handler, options } of listeners) {
+        element.removeEventListener(event, handler, options);
+      }
+    }
+    this.eventListeners.clear();
   }
 }
 
@@ -639,7 +659,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       const audioUrl = URL.createObjectURL(audioBlob);
       currentAudio.src = audioUrl;
       
-      currentAudio.addEventListener("ended", () => {
+      resourceTracker.addEventListener(currentAudio, "ended", () => {
           URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         isPlaying = false; // Reset playing state
@@ -650,7 +670,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         });
       });
 
-      currentAudio.addEventListener("error", (e) => {
+      resourceTracker.addEventListener(currentAudio, "error", (e) => {
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         isPlaying = false; // Reset playing state
@@ -932,7 +952,7 @@ function handleAudioPlayback(url, sendResponse) {
           return Promise.reject(new Error('Audio was stopped during fetch'));
         }
         
-        currentAudio.addEventListener("ended", () => {
+        resourceTracker.addEventListener(currentAudio, "ended", () => {
           logger.info("Audio playback ended");
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
@@ -943,7 +963,7 @@ function handleAudioPlayback(url, sendResponse) {
           });
         });
 
-        currentAudio.addEventListener("error", (e) => {
+        resourceTracker.addEventListener(currentAudio, "error", (e) => {
           logger.error("Audio playback error:", e);
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
@@ -953,7 +973,7 @@ function handleAudioPlayback(url, sendResponse) {
           });
         });
 
-        currentAudio.addEventListener("loadstart", () => {
+        resourceTracker.addEventListener(currentAudio, "loadstart", () => {
           logger.debug("Audio loading started");
         });
 
@@ -994,13 +1014,13 @@ function handleAudioPlayback(url, sendResponse) {
       // Fallback for non-Google TTS URLs
       currentAudio.src = url;
       
-      currentAudio.addEventListener("ended", () => {
+      resourceTracker.addEventListener(currentAudio, "ended", () => {
         console.log("[Offscreen] Audio playback ended");
         currentAudio = null;
         // Don't send response here anymore, already sent after play() starts
       });
 
-      currentAudio.addEventListener("error", (e) => {
+      resourceTracker.addEventListener(currentAudio, "error", (e) => {
         console.error("[Offscreen] Audio playback error:", e);
         currentAudio = null;
         safeResponse({
@@ -1009,7 +1029,7 @@ function handleAudioPlayback(url, sendResponse) {
         });
       });
 
-      currentAudio.addEventListener("loadstart", () => {
+      resourceTracker.addEventListener(currentAudio, "loadstart", () => {
         console.log("[Offscreen] Audio loading started");
       });
 
@@ -1072,14 +1092,14 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
     currentAudio = new Audio(audioUrl);
     currentAudio.crossOrigin = "anonymous";
 
-    currentAudio.addEventListener("ended", () => {
+    resourceTracker.addEventListener(currentAudio, "ended", () => {
       console.log("[Offscreen] Cached audio playback ended");
       URL.revokeObjectURL(audioUrl); // Clean up memory
       currentAudio = null;
       sendResponse({ success: true });
     });
 
-    currentAudio.addEventListener("error", (e) => {
+    resourceTracker.addEventListener(currentAudio, "error", (e) => {
       console.error("[Offscreen] Cached audio playback error:", e);
       URL.revokeObjectURL(audioUrl); // Clean up memory
       currentAudio = null;
@@ -1089,11 +1109,11 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
       });
     });
 
-    currentAudio.addEventListener("loadstart", () => {
+    resourceTracker.addEventListener(currentAudio, "loadstart", () => {
       console.log("[Offscreen] Cached audio loading started");
     });
 
-    currentAudio.addEventListener("canplaythrough", () => {
+    resourceTracker.addEventListener(currentAudio, "canplaythrough", () => {
       console.log("[Offscreen] Cached audio can play through");
     });
 
@@ -1117,7 +1137,7 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
 }
 
 // Cleanup resources when page unloads
-window.addEventListener('beforeunload', () => {
+resourceTracker.addEventListener(window, 'beforeunload', () => {
   logger.debug('Offscreen document unloading, cleaning up resources...');
   resourceTracker.cleanup();
   
