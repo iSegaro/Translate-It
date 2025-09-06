@@ -7,7 +7,6 @@
  */
 
 // Early debug to trace module evaluation order
-console.debug('[init] StorageCore module evaluating');
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
@@ -29,7 +28,8 @@ class StorageCore extends ResourceTracker {
     this._isReady = false;
     this._readyPromise = null;
     this._changeListener = null;
-  this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
+    this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
+    this.logger.init('StorageCore initialized');
     this._initializeAsync();
   }
 

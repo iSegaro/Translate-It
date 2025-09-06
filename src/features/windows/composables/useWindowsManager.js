@@ -3,8 +3,10 @@
  * Handles state management, event listening, and component lifecycle
  */
 
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 export function useWindowsManager() {
   // State
@@ -15,11 +17,7 @@ export function useWindowsManager() {
   const pageEventBus = window.pageEventBus;
   
   // Logger
-  const logger = {
-    info: (msg, ...args) => console.log(`[useWindowsManager] ${msg}`, ...args),
-    debug: (msg, ...args) => console.debug(`[useWindowsManager] ${msg}`, ...args),
-    error: (msg, ...args) => console.error(`[useWindowsManager] ${msg}`, ...args),
-  };
+  const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'useWindowsManager');
 
   /**
    * Event handlers
@@ -119,7 +117,7 @@ export function useWindowsManager() {
    * Component event handlers
    */
   const onTranslationIconClick = (detail) => {
-    console.log(`[useWindowsManager] onTranslationIconClick called with:`, detail);
+    logger.debug('onTranslationIconClick called with:', detail);
     logger.info('Translation icon clicked', detail);
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail);
   };

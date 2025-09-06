@@ -249,7 +249,7 @@ class MemoryManager {
    */
   trackResource(resourceId, cleanupFn, groupId = 'default') {
     if (this.resources.has(resourceId)) {
-      console.debug(`Resource ${resourceId} already tracked`)
+      this.logger.debug(`Resource ${resourceId} already tracked`)
       return
     }
 
@@ -427,7 +427,7 @@ class MemoryManager {
           }
         }
       } catch (error) {
-        console.error(`Error cleaning up resource ${resourceId}:`, error)
+        this.logger.error(`Error cleaning up resource ${resourceId}:`, error)
       }
     }
   }

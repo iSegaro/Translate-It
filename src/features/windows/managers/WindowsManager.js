@@ -20,8 +20,6 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-console.log('[LOG] WindowsManager.js loaded and evaluated');
-
 /**
  * Modular WindowsManager for translation windows and icons
  * Refactored to use specialized modules for better maintainability
@@ -35,7 +33,7 @@ export class WindowsManager extends ResourceTracker {
   }
 
   constructor(options = {}) {
-    console.log('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
+    logger.debug('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
     // Initialize ResourceTracker first
     super('windows-manager');
     
@@ -110,12 +108,12 @@ export class WindowsManager extends ResourceTracker {
     });
     // Listen for events from the Vue UI Host
     this.logger.debug('[LOG] WindowsManager: EventBus ICON_CLICKED listener registered');
-    console.log('[TEST] WindowsManager.js registering ICON_CLICKED listener on eventBus:', this.pageEventBus);
+    logger.debug('[TEST] WindowsManager.js registering ICON_CLICKED listener on eventBus:', this.pageEventBus);
     if (this.pageEventBus) {
       // Create bound handler to enable proper cleanup
       this._iconClickHandler = (payload) => {
-        console.log('[LOG] WindowsManager.js ICON_CLICKED handler triggered', payload);
-        console.log('[TEST] WindowsManager.js eventBus instance', this.pageEventBus);
+        logger.debug('[LOG] WindowsManager.js ICON_CLICKED handler triggered', payload);
+        logger.debug('[TEST] WindowsManager.js eventBus instance', this.pageEventBus);
         this._handleIconClickFromVue(payload);
       };
       
@@ -124,7 +122,7 @@ export class WindowsManager extends ResourceTracker {
       this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
       this.pageEventBus.on('translation-window-speak', this._handleSpeakRequest.bind(this));
       if (this.pageEventBus._listeners) {
-        console.log('[TEST] WindowsManager.js ICON_CLICKED listeners after registration:', this.pageEventBus._listeners[WINDOWS_MANAGER_EVENTS.ICON_CLICKED]);
+        logger.debug('[TEST] WindowsManager.js ICON_CLICKED listeners after registration:', this.pageEventBus._listeners[WINDOWS_MANAGER_EVENTS.ICON_CLICKED]);
       }
     } else {
       this.logger.warn('PageEventBus not available during setup');
@@ -541,7 +539,7 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false
       };
       
-      console.log('[WindowsManager] About to emit showWindow with:', windowPayload);
+      logger.debug('[WindowsManager] About to emit showWindow with:', windowPayload);
       WindowsManagerEvents.showWindow(windowPayload);
       
       this.logger.debug('Translation window updated with result', { windowId });
@@ -835,7 +833,7 @@ export class WindowsManager extends ResourceTracker {
    */
   _handleIconClickFromVue(detail) {
     this.logger.debug('[LOG] Icon click event received from UI Host', detail);
-    console.log('[DEBUG] WindowsManager icon click, current state:', {
+    logger.debug('[DEBUG] WindowsManager icon click, current state:', {
       isProcessing: this.state.isProcessing,
       isIconMode: this.state.isIconMode,
       isVisible: this.state.isVisible
@@ -862,11 +860,11 @@ export class WindowsManager extends ResourceTracker {
       if (this._lastDismissedIcon && 
           this._lastDismissedIcon.id === detail.id && 
           (now - this._lastDismissedIcon.timestamp) < recentDismissWindow) {
-        console.log('[DEBUG] Accepting recent click from dismissed icon:', detail.id);
+        logger.debug('[DEBUG] Accepting recent click from dismissed icon:', detail.id);
         // Temporarily restore icon mode for processing
         this.state.setIconMode(true);
       } else {
-        console.log('[DEBUG] Ignoring icon click - no longer in icon mode and not recent');
+        logger.debug('[DEBUG] Ignoring icon click - no longer in icon mode and not recent');
         return;
       }
     }

@@ -4,10 +4,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { shouldApplyRtl } from '@/utils/text/textDetection.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // State management for translated elements using direct DOM manipulation
 const translatedElementsMap = new Map(); // element -> {originalText, translationId}
@@ -16,6 +17,7 @@ let translationIdCounter = 0;
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('translation-overlay')
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationOverlay')
 
 // Generate unique IDs for translations
 const generateUniqueTranslationId = () => {
@@ -67,7 +69,7 @@ const applyTranslationsToNodes = (element, translationsMap) => {
   
   traverse(element);
   
-  console.log('Applied translation directly to DOM element:', element.tagName, 'with', translationsMap.size, 'translations');
+  logger.debug('Applied translation directly to DOM element:', element.tagName, 'with', translationsMap.size, 'translations');
 };
 
 // Revert translations (restore original text)
@@ -88,7 +90,7 @@ const revertTranslations = (element) => {
   originalTextsMap.delete(element);
   translatedElementsMap.delete(element);
   
-  console.log('Reverted translation for element:', element.tagName);
+  logger.debug('Reverted translation for element:', element.tagName);
 };
 
 // Clear all translations
@@ -100,12 +102,12 @@ const clearAllTranslations = () => {
   translatedElementsMap.clear();
   originalTextsMap.clear();
   
-  console.log('All translations cleared');
+  logger.debug('All translations cleared');
 };
 
 // Listen for translation events using direct DOM manipulation
 pageEventBus.on('show-translation', (detail) => {
-  console.log('Received show-translation event for', detail.element.tagName, 'with', detail.translations?.size || 0, 'translations');
+  logger.debug('Received show-translation event for', detail.element.tagName, 'with', detail.translations?.size || 0, 'translations');
   const { element, translations } = detail;
   
   // Apply translations directly to the DOM element
@@ -131,7 +133,7 @@ let currentUrl = window.location.href;
 const handleNavigationChange = () => {
   const newUrl = window.location.href;
   if (newUrl !== currentUrl) {
-    console.log('Navigation detected, cleaning up translations');
+    logger.debug('Navigation detected, cleaning up translations');
     // Clear all translations when navigation occurs
     clearAllTranslations();
     currentUrl = newUrl;

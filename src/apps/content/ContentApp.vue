@@ -58,14 +58,12 @@ import TextFieldIcon from '@/features/text-field-interaction/components/TextFiel
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const pageEventBus = window.pageEventBus;
 
-const logger = {
-  info: (msg, ...args) => console.log(`[ContentApp] ${msg}`, ...args),
-  debug: (msg, ...args) => console.debug(`[ContentApp] ${msg}`, ...args),
-  error: (msg, ...args) => console.error(`[ContentApp] ${msg}`, ...args),
-};
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentApp');
 
 // Use WindowsManager composable
 const {

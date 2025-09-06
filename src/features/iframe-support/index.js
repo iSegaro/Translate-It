@@ -1,4 +1,6 @@
 // IFrame Support System - Simplified Entry Point
+import { getScopedLogger } from '../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 
 // Export core managers that are actually used
 export { IFrameManager, iFrameManager } from './managers/IFrameManager.js';
@@ -55,10 +57,12 @@ export async function initializeIFrameSupport(options = {}) {
     enableLogging = true
   } = options;
   
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'IFrameSupport');
+  
   try {
     if (enableLogging) {
       const support = checkIFrameSupport();
-      console.log('🎯 IFrame support initialized', {
+      logger.info('IFrame support initialized', {
         isInIframe: support.isInIframe,
         frameDepth: support.frameDepth,
         canAccessParent: support.canAccessParent
@@ -70,7 +74,7 @@ export async function initializeIFrameSupport(options = {}) {
       info: checkIFrameSupport()
     };
   } catch (error) {
-    console.error('❌ Failed to initialize iframe support', error);
+    logger.error('Failed to initialize iframe support', error);
     
     return {
       success: false,

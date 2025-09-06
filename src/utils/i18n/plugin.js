@@ -1,5 +1,7 @@
 import { createI18n } from 'vue-i18n';
 import browser from 'webextension-polyfill';
+import { getScopedLogger } from '../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 
 import rawEn from '../../../_locales/en/messages.json';
 import rawFa from '../../../_locales/fa/messages.json';
@@ -38,7 +40,8 @@ export async function loadLocaleMessages(locale) {
       return messages[locale];
     }
   } catch (error) {
-    console.warn(`Failed to load locale ${locale}:`, error);
+    const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'i18n-plugin');
+    logger.warn(`Failed to load locale ${locale}:`, error);
   }
   
   return messages.en; // fallback to English

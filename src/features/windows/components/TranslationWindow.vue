@@ -97,6 +97,8 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import { isContextError } from '@/core/extensionContext.js';
 import browser from 'webextension-polyfill';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -120,10 +122,13 @@ const ttsGlobal = useTTSGlobal({
 // TTS Smart for actual TTS functionality with proper state management
 const tts = useTTSSmart();
 
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
+
 // State  
 const isLoading = computed(() => {
   const loading = props.isLoading || !props.initialTranslatedText;
-  console.log(`[TranslationWindow ${props.id}] Loading state:`, {
+  logger.debug('Loading state:', {
     propsIsLoading: props.isLoading,
     hasInitialText: !!props.initialTranslatedText,
     initialTextLength: props.initialTranslatedText?.length || 0,
@@ -142,7 +147,7 @@ const isSpeaking = computed(() => tts.ttsState.value === 'playing');
 // Add retry handler for TranslationDisplay
 const handleRetry = () => {
   // Emit retry event or perform retry logic
-  console.log('Retry requested for translation window:', props.id);
+  logger.info('Retry requested for translation window:', props.id);
 };
 const showOriginal = ref(false);
 
@@ -187,7 +192,7 @@ const loadingGifUrl = computed(() => {
   try {
     return browser.runtime.getURL('assets/icons/ui/loading.gif');
   } catch (error) {
-    console.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
+    logger.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
     // Fallback for development
     return '/src/assets/icons/ui/loading.gif';
   }
@@ -212,7 +217,7 @@ const windowStyle = computed(() => {
 onMounted(() => {
   // Register TTS instance with stop callback
   ttsGlobal.register(async () => {
-    console.log(`[TranslationWindow ${props.id}] TTS cleanup callback - window closing`)
+    logger.debug(`[TranslationWindow ${props.id}] TTS cleanup callback - window closing`)
     // Use direct message to background instead of calling stopAll() to avoid recursion
     try {
       await sendMessage({
@@ -222,9 +227,9 @@ onMounted(() => {
     } catch (error) {
       // Handle context errors silently as they're expected during extension reload
       if (isContextError(error)) {
-        console.debug(`[TranslationWindow ${props.id}] Extension context invalidated during cleanup - expected during extension reload`)
+        logger.debug(`[TranslationWindow ${props.id}] Extension context invalidated during cleanup - expected during extension reload`)
       } else {
-        console.debug(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
+        logger.debug(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
       }
     }
   });
@@ -239,7 +244,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   // Cleanup TTS when window is dismissed
-  console.log(`[TranslationWindow ${props.id}] Window unmounting - stopping TTS and cleaning up`);
+  logger.debug(`[TranslationWindow ${props.id}] Window unmounting - stopping TTS and cleaning up`);
   
   // Unregister from TTS global manager (this will automatically trigger cleanup)
   ttsGlobal.unregister();
@@ -261,21 +266,21 @@ const toggleShowOriginal = () => {
 // Header button handlers
 const handleCopy = async () => {
   if (!translatedText.value || translatedText.value.trim().length === 0) {
-    console.warn(`[TranslationWindow ${props.id}] No translation text to copy`);
+    logger.warn(`[TranslationWindow ${props.id}] No translation text to copy`);
     return;
   }
 
   try {
     await navigator.clipboard.writeText(translatedText.value);
-    console.log(`[TranslationWindow ${props.id}] Translation copied to clipboard`);
+    logger.debug(`[TranslationWindow ${props.id}] Translation copied to clipboard`);
   } catch (error) {
-    console.error(`[TranslationWindow ${props.id}] Failed to copy translation:`, error);
+    logger.error(`[TranslationWindow ${props.id}] Failed to copy translation:`, error);
   }
 };
 
 const handleTTS = async () => {
   if (!translatedText.value || translatedText.value.trim().length === 0) {
-    console.warn(`[TranslationWindow ${props.id}] No translation text for TTS`);
+    logger.warn(`[TranslationWindow ${props.id}] No translation text for TTS`);
     return;
   }
 
@@ -283,19 +288,19 @@ const handleTTS = async () => {
     if (tts.ttsState.value === 'playing') {
       // Stop TTS
       await tts.stop();
-      console.log(`[TranslationWindow ${props.id}] TTS stopped`);
+      logger.debug(`[TranslationWindow ${props.id}] TTS stopped`);
     } else {
       // Start TTS - register with global manager then speak
       await ttsGlobal.startTTS();
       const result = await tts.speak(translatedText.value, 'auto');
       if (result) {
-        console.log(`[TranslationWindow ${props.id}] TTS started`);
+        logger.debug(`[TranslationWindow ${props.id}] TTS started`);
       } else {
-        console.warn(`[TranslationWindow ${props.id}] TTS failed to start`);
+        logger.warn(`[TranslationWindow ${props.id}] TTS failed to start`);
       }
     }
   } catch (error) {
-    console.error(`[TranslationWindow ${props.id}] TTS failed:`, error);
+    logger.error(`[TranslationWindow ${props.id}] TTS failed:`, error);
   }
 };
 
@@ -305,7 +310,7 @@ const windowElement = ref(null);
 
 const handleStartDrag = (event) => {
   // Set global drag flags for outside click protection
-  console.log('[TranslationWindow] Setting drag flag to TRUE');
+  logger.debug('[TranslationWindow] Setting drag flag to TRUE');
   window.__TRANSLATION_WINDOW_IS_DRAGGING = true;
   
   // Use composable's drag handler
@@ -313,7 +318,7 @@ const handleStartDrag = (event) => {
   
   // Add our custom cleanup to mouseup
   const customStopDrag = () => {
-    console.log('[TranslationWindow] Setting drag flag to FALSE');
+    logger.debug('[TranslationWindow] Setting drag flag to FALSE');
     window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
     window.__TRANSLATION_WINDOW_JUST_DRAGGED = true;
     setTimeout(() => {

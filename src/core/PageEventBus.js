@@ -4,6 +4,9 @@
  * This is used for communication between our vanilla JS content scripts and the
  * in-page Vue UI Host application.
  */
+import { getScopedLogger } from '../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../shared/logging/logConstants.js';
+
 class EventBus {
   constructor() {
     // Only create the bus element if we are in a document context (e.g., content script)
@@ -32,6 +35,7 @@ export const pageEventBus = new EventBus();
 
 // Attach to window for global access (fix for cross-context event delivery)
 if (typeof window !== 'undefined') {
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'PageEventBus');
   window.pageEventBus = pageEventBus;
   
   // For iframe contexts, also ensure event bus is available in parent context
@@ -43,7 +47,7 @@ if (typeof window !== 'undefined') {
       }
     } catch (e) {
       // Cross-origin iframe, can't access parent - this is normal
-      console.debug('[PageEventBus] Cannot access parent window (cross-origin), using local event bus');
+      logger.debug('Cannot access parent window (cross-origin), using local event bus');
     }
   }
 }

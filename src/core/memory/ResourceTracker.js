@@ -3,6 +3,8 @@
  * Provides a convenient interface for tracking resources in classes
  */
 import { getMemoryManager } from './MemoryManager.js';
+import { getScopedLogger } from '../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 
 const isDevelopment = import.meta.env.DEV;
 
@@ -20,6 +22,7 @@ class ResourceTracker {
   constructor(groupId) {
     this.groupId = groupId;
     this.memoryManager = getMemoryManager();
+    this.logger = getScopedLogger(LOG_COMPONENTS.MEMORY, `ResourceTracker:${groupId}`);
     if (shouldEnableDebugging()) {
       this.resources = new Set();
     }
@@ -77,7 +80,7 @@ class ResourceTracker {
       element.addEventListener(event, handler);
     }
     else if (shouldEnableDebugging()) {
-      console.warn('Unsupported event target type:', element);
+      this.logger.warn('Unsupported event target type:', element);
     }
 
     // Let the memory manager handle the actual resource tracking

@@ -6,8 +6,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
-console.debug('[init] config.js module evaluating');
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
+logger.init('config.js module initialized');
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:

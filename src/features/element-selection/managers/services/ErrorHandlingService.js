@@ -204,7 +204,7 @@ export class ErrorHandlingService extends ResourceTracker {
     } catch (notificationError) {
       this.logger.warn('Failed to show notification:', notificationError);
       // Fallback to console log if notifications fail
-      console.error(`[Translate It] ${type.toUpperCase()}: ${message}`);
+      this.logger.error(`${type.toUpperCase()}: ${message}`);
     }
   }
 

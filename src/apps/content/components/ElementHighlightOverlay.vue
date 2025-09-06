@@ -15,12 +15,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const activeHighlights = ref([]);
 const showTooltip = ref(false);
 const tooltipText = ref('Click to translate');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementHighlightOverlay');
 
 // Generate unique IDs for highlights
 let highlightCounter = 0;
@@ -50,7 +53,7 @@ const generateId = () => `highlight-${Date.now()}-${highlightCounter++}`;
       activeHighlights.value.push(highlight);
     }
     
-    console.log('Highlight element added:', highlight);
+    logger.debug('Highlight element added:', highlight);
     
     // Also add the original highlight class to the element itself
     element.classList.add('translate-it-element-highlighted');

@@ -56,9 +56,12 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const openAccordion = ref('')
 const { t } = useI18n()
+const logger = getScopedLogger(LOG_COMPONENTS.OPTIONS, 'HelpTab')
 
 const toggleAccordion = (section) => {
   openAccordion.value = openAccordion.value === section ? '' : section
@@ -84,7 +87,7 @@ ${t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:'}
     const markdownElement = SimpleMarkdown.render(content)
     return markdownElement ? markdownElement.innerHTML : content.replace(/\n/g, '<br>')
   } catch (error) {
-    console.warn('[HelpTab] Markdown rendering failed:', error)
+    logger.warn('Shortcut help markdown rendering failed:', error)
     return content.replace(/\n/g, '<br>')
   }
 })
@@ -115,7 +118,7 @@ Your API keys are stored locally in your browser and are never shared with third
     const markdownElement = SimpleMarkdown.render(content)
     return markdownElement ? markdownElement.innerHTML : content.replace(/\n/g, '<br>')
   } catch (error) {
-    console.warn('[HelpTab] Markdown rendering failed:', error)
+    logger.warn('API keys help markdown rendering failed:', error)
     return content.replace(/\n/g, '<br>')
   }
 })

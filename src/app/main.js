@@ -1,6 +1,8 @@
 import { createApp } from 'vue';
 import ContentApp from '../apps/content/ContentApp.vue';
 import i18n from '@/utils/i18n/plugin.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // Import all necessary styles as raw strings using Vite's `?inline` feature.
 import combinedGlobalStyles from '../assets/styles/content-app-global.scss?inline';
@@ -60,7 +62,8 @@ function preloadVueStyles() {
     if (document.body.contains(tempContainer)) {
       document.body.removeChild(tempContainer);
     }
-    console.warn('[getAppCss] Could not extract Vue component styles:', error);
+    const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'preloadVueStyles');
+    logger.warn('Could not extract Vue component styles:', error);
     return '';
   }
 }
@@ -70,17 +73,18 @@ function preloadVueStyles() {
  * This includes both global styles and Vue component styles.
  */
 export function getAppCss() {
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'getAppCss');
   let allStyles = combinedGlobalStyles;
   
   // Extract Vue component styles
   const vueComponentStyles = extractVueComponentStyles();
   if (vueComponentStyles) {
     allStyles += '\n/* Vue Component Styles */\n' + vueComponentStyles;
-    console.log('[getAppCss] Extracted Vue styles:', vueComponentStyles.length, 'characters');
+    logger.debug('Extracted Vue styles:', vueComponentStyles.length, 'characters');
   }
   
-  console.log('[getAppCss] Total CSS length:', allStyles.length, 'characters');
-  console.log('[getAppCss] Global styles length:', combinedGlobalStyles.length, 'characters');
+  logger.debug('Total CSS length:', allStyles.length, 'characters');
+  logger.debug('Global styles length:', combinedGlobalStyles.length, 'characters');
   
   return allStyles;
 }
@@ -95,6 +99,7 @@ export function mountContentApp(rootElement) {
   const app = createApp(ContentApp);
   app.use(i18n);
   app.mount(rootElement);
-  console.log('[ContentApp main.js] Vue app mounted into shadow DOM.');
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'mountContentApp');
+  logger.info('Vue app mounted into shadow DOM.');
   return app;
 }
