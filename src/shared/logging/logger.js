@@ -30,17 +30,45 @@ export function isGlobalDebugEnabled() { return __runtimeDebugOverride; }
 // ERROR = 0 | WARN = 1 | INFO = 2 | DEBUG = 3
 // Keep noise low in UI & content paths while retaining Info for core/background workflows.
 const componentLogLevels = {
+  // لایه‌های اصلی (Core layers)
   Background: LOG_LEVELS.DEBUG,  // background handlers
-  Core: LOG_LEVELS.INFO,        // core handlers
-  Translation: LOG_LEVELS.INFO,
-  Messaging: LOG_LEVELS.DEBUG,
-  Providers: LOG_LEVELS.INFO,
-  Content: LOG_LEVELS.INFO,     // Windows Manager and content scripts
+  Core: LOG_LEVELS.DEBUG,        // core handlers
+  Content: LOG_LEVELS.DEBUG,     // Windows Manager and content scripts
+
+  // اپلیکیشن‌ها و UI (Apps and UI)
   UI: LOG_LEVELS.DEBUG,          // UI composables
+  Popup: LOG_LEVELS.INFO,        // Popup app
+  Sidepanel: LOG_LEVELS.INFO,    // Sidepanel app
+  Options: LOG_LEVELS.INFO,      // Options app
+
+  // Features
+  Translation: LOG_LEVELS.INFO,
+  TTS: LOG_LEVELS.INFO,          // TTS feature
+  ScreenCapture: LOG_LEVELS.INFO, // Screen capture feature
   ElementSelection: LOG_LEVELS.INFO, // Element selection feature
+  TextActions: LOG_LEVELS.INFO,  // Text actions feature
+  Subtitle: LOG_LEVELS.INFO,     // Subtitle feature
+  History: LOG_LEVELS.INFO,      // History feature
+  Settings: LOG_LEVELS.INFO,     // Settings feature
+  Windows: LOG_LEVELS.INFO,      // Windows feature
+
+  // سیستم‌های مشترک (Shared systems)
+  Messaging: LOG_LEVELS.DEBUG,
   Storage: LOG_LEVELS.WARN,
-  Capture: LOG_LEVELS.INFO,
   Error: LOG_LEVELS.INFO,
+  Config: LOG_LEVELS.INFO,       // Config system
+
+  // ابزارها و utilities (Tools and utilities)
+  Utils: LOG_LEVELS.DEBUG,       // Utilities
+  Browser: LOG_LEVELS.DEBUG,     // Browser utils
+  Text: LOG_LEVELS.DEBUG,        // Text utils
+  Framework: LOG_LEVELS.DEBUG,   // Framework utils
+
+  // Providers (زیرمجموعه Translation)
+  Providers: LOG_LEVELS.INFO,
+
+  // Legacy aliases (برای backward compatibility)
+  Capture: LOG_LEVELS.INFO,      // Legacy alias for SCREEN_CAPTURE
 };
 
 // Freeze the initial shape to avoid accidental structural mutation; values still updated via setter.
