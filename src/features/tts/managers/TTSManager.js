@@ -7,7 +7,7 @@ import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
-import { isContextError } from '@/core/extensionContext.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
@@ -45,11 +45,13 @@ export class TTSManager extends ResourceTracker {
           });
         }
       } catch (error) {
-        if (isContextError(error)) {
-          this.logger.debug(`[TTSManager ${windowId}] Extension context invalidated during cleanup - this is expected when extension reloads.`);
-        } else {
-          this.logger.error(`[TTSManager ${windowId}] Failed to stop TTS during cleanup:`, error);
-        }
+        // Use centralized error handling
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'tts-manager-cleanup',
+          component: 'TTSManager',
+          showToast: false,
+          showInUI: false
+        });
       }
     });
     
@@ -134,7 +136,13 @@ export class TTSManager extends ResourceTracker {
       this.logger.debug(`[TTSManager ${this.windowId}] Enhanced TTS request sent successfully`);
       return true;
     } catch (error) {
-      this.logger.error(`[TTSManager ${this.windowId}] Enhanced TTS failed:`, error);
+      // Use centralized error handling
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'tts-manager-speak',
+        component: 'TTSManager',
+        showToast: false,
+        showInUI: false
+      });
       throw error;
     }
   }
@@ -159,7 +167,13 @@ export class TTSManager extends ResourceTracker {
       this.ttsGlobal.updateActivity();
       return true;
     } catch (error) {
-      this.logger.error(`[TTSManager ${this.windowId}] Pause TTS failed:`, error);
+      // Use centralized error handling
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'tts-manager-pause',
+        component: 'TTSManager',
+        showToast: false,
+        showInUI: false
+      });
       return false;
     }
   }
@@ -184,7 +198,13 @@ export class TTSManager extends ResourceTracker {
       this.ttsGlobal.updateActivity();
       return true;
     } catch (error) {
-      this.logger.error(`[TTSManager ${this.windowId}] Resume TTS failed:`, error);
+      // Use centralized error handling
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'tts-manager-resume',
+        component: 'TTSManager',
+        showToast: false,
+        showInUI: false
+      });
       return false;
     }
   }
@@ -206,7 +226,13 @@ export class TTSManager extends ResourceTracker {
       
       return response?.status || 'idle';
     } catch (error) {
-      this.logger.error(`[TTSManager ${this.windowId}] Get TTS status failed:`, error);
+      // Use centralized error handling
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'tts-manager-status',
+        component: 'TTSManager',
+        showToast: false,
+        showInUI: false
+      });
       return 'error';
     }
   }
@@ -392,7 +418,13 @@ export class TTSManager extends ResourceTracker {
       this.logger.debug(`[TTSManager ${this.windowId}] TTS stopped (local cleanup completed)`);
       return true;
     } catch (error) {
-      this.logger.warn(`[TTSManager ${this.windowId}] Error stopping TTS:`, error);
+      // Use centralized error handling
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'tts-manager-stop',
+        component: 'TTSManager',
+        showToast: false,
+        showInUI: false
+      });
       return false;
     }
   }
@@ -434,7 +466,13 @@ export class TTSManager extends ResourceTracker {
         await this.speakTextUnified(textToSpeak.trim());
         this.logger.debug("TTS started via unified system");
       } catch (error) {
-        this.logger.warn("Error speaking text", error);
+        // Use centralized error handling
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'tts-manager-icon-click',
+          component: 'TTSManager',
+          showToast: false,
+          showInUI: false
+        });
         
         // Try fallback method
         try {
@@ -442,7 +480,13 @@ export class TTSManager extends ResourceTracker {
           await this.speakWithGoogleTTS(textToSpeak.trim(), language);
           this.logger.debug("TTS started via fallback method");
         } catch (fallbackError) {
-          this.logger.error("Both TTS methods failed", fallbackError);
+          // Use centralized error handling for fallback error too
+          await ErrorHandler.getInstance().handle(fallbackError, {
+            context: 'tts-manager-fallback',
+            component: 'TTSManager',
+            showToast: false,
+            showInUI: false
+          });
         }
       }
     });
