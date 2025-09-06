@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MEMORY_TIMING, TRANSLATION_MEMORY } from './constants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager');
+const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, 'MemoryManager');
 
 // Use Vite's import.meta.env for environment detection  
 const isDevelopment = import.meta.env.DEV;

@@ -1,6 +1,8 @@
 // src/composables/core/useResourceTracker.js
 import { onUnmounted, getCurrentInstance } from 'vue'
 import ResourceTracker from '../../core/memory/ResourceTracker.js'
+import { getScopedLogger } from '../../shared/logging/logger.js'
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js'
 
 // Environment detection
 const isDevelopment = import.meta.env.DEV;
@@ -24,6 +26,7 @@ const shouldEnableLogging = () => {
  */
 export function useResourceTracker(groupId) {
   const tracker = new ResourceTracker(groupId)
+  const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, `useResourceTracker:${groupId}`)
 
   // Only register onUnmounted if we're inside a component context
   const instance = getCurrentInstance()
@@ -33,13 +36,13 @@ export function useResourceTracker(groupId) {
       
       // Only log in development or when explicitly enabled
       if (shouldEnableLogging()) {
-        console.log(`🧹 Resources for group '${groupId}' cleaned up automatically`)
+        logger.debug('Resources cleaned up automatically')
       }
     })
   } else {
     // Only warn in development or when debugging is enabled
     if (shouldEnableLogging()) {
-      console.warn(`⚠️ useResourceTracker('${groupId}') called outside component context. Manual cleanup required.`)
+      logger.warn('Called outside component context. Manual cleanup required.')
     }
   }
 

@@ -7,7 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MEMORY_TIMING } from './constants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryMonitor')
+const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, 'MemoryMonitor')
 
 class MemoryMonitor {
   constructor(options = {}) {

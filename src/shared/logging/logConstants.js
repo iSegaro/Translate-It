@@ -9,9 +9,9 @@ export const LOG_LEVELS = {
 
 export const LOG_COMPONENTS = {
   // لایه‌های اصلی
-  BACKGROUND: 'Background',        // src/core/background/
-  CORE: 'Core',                   // src/core/ (به جز background و content-scripts)
+  BACKGROUND: 'Background',       // src/core/background/
   CONTENT: 'Content',             // src/core/content-scripts/
+  CORE: 'Core',                   // src/core/ (به جز background و content-scripts)
 
   // اپلیکیشن‌ها و UI
   UI: 'UI',                       // src/apps/ و src/components/
@@ -35,6 +35,7 @@ export const LOG_COMPONENTS = {
   STORAGE: 'Storage',             // src/shared/storage/
   ERROR: 'Error',                 // src/shared/error-management/
   CONFIG: 'Config',               // src/shared/config/
+  MEMORY: 'Memory',               // src/core/memory/
 
   // ابزارها و utilities
   UTILS: 'Utils',                 // src/utils/

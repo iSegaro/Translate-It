@@ -57,6 +57,7 @@ const componentLogLevels = {
   Storage: LOG_LEVELS.WARN,
   Error: LOG_LEVELS.INFO,
   Config: LOG_LEVELS.INFO,       // Config system
+  Memory: LOG_LEVELS.INFO,       // Memory management system
 
   // ابزارها و utilities (Tools and utilities)
   Utils: LOG_LEVELS.DEBUG,       // Utilities

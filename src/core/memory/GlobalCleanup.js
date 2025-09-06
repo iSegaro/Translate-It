@@ -8,7 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MEMORY_TIMING } from './constants.js'
 import browser from 'webextension-polyfill'
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GlobalCleanup')
+const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, 'GlobalCleanup')
 
 class GlobalCleanup {
   constructor(options = {}) {
