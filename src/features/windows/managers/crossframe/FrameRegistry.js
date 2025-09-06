@@ -24,7 +24,16 @@ export class FrameRegistry {
     if (!window.translateItFrameRegistry) {
       window.translateItFrameRegistry = new Set();
     }
-    window.translateItFrameRegistry.add(this.frameId);
+    
+    // Defensive check - ensure it's still a Set
+    if (window.translateItFrameRegistry && typeof window.translateItFrameRegistry.add === 'function') {
+      window.translateItFrameRegistry.add(this.frameId);
+    } else {
+      // Reinitialize if corrupted
+      window.translateItFrameRegistry = new Set();
+      window.translateItFrameRegistry.add(this.frameId);
+      this.logger.debug('Frame registry was corrupted, reinitialized');
+    }
 
     // Register with parent/top frames if in iframe
     if (this.isInIframe) {

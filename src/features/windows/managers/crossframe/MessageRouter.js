@@ -52,6 +52,10 @@ export class MessageRouter {
         this._handleWindowCreatedResponse(event);
         break;
         
+      case WindowsConfig.CROSS_FRAME.TEXT_SELECTION_WINDOW_REQUEST:
+        this._handleTextSelectionWindowRequest(event);
+        break;
+        
       default:
         // Unknown message type, ignore silently
         break;
@@ -166,6 +170,30 @@ export class MessageRouter {
 
     if (this.onWindowCreatedResponse) {
       this.onWindowCreatedResponse(event.data);
+    }
+  }
+
+  /**
+   * Handle text selection window request from iframe
+   * @param {MessageEvent} event - PostMessage event from iframe
+   */
+  _handleTextSelectionWindowRequest(event) {
+    // Only handle in main frame (parent)
+    if (this.frameRegistry.isInIframe) return;
+
+    const data = event.data;
+    
+    // Validate message data
+    if (!data || !data.selectedText || !data.position) {
+      this.logger.warn('Invalid text selection window request', data);
+      return;
+    }
+
+    // Call handler if set
+    if (this.onTextSelectionWindowRequest) {
+      this.onTextSelectionWindowRequest(data, event.source);
+    } else {
+      this.logger.warn('No onTextSelectionWindowRequest handler set');
     }
   }
 
@@ -300,6 +328,7 @@ export class MessageRouter {
     this.onWindowCreationRequest = handlers.onWindowCreationRequest;
     this.onWindowCreatedResponse = handlers.onWindowCreatedResponse;
     this.onBroadcastStateChange = handlers.onBroadcastStateChange;
+    this.onTextSelectionWindowRequest = handlers.onTextSelectionWindowRequest;
   }
 
   /**
@@ -311,5 +340,6 @@ export class MessageRouter {
     this.onWindowCreationRequest = null;
     this.onWindowCreatedResponse = null;
     this.onBroadcastStateChange = null;
+    this.onTextSelectionWindowRequest = null;
   }
 }

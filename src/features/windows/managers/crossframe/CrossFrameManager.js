@@ -40,7 +40,8 @@ export class CrossFrameManager {
       onOutsideClick: this._handleOutsideClick.bind(this),
       onWindowCreationRequest: this._handleWindowCreationRequest.bind(this),
       onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this),
-      onBroadcastStateChange: this._handleBroadcastStateChange.bind(this)
+      onBroadcastStateChange: this._handleBroadcastStateChange.bind(this),
+      onTextSelectionWindowRequest: this._handleTextSelectionWindowRequest.bind(this)
     });
   }
 
@@ -76,6 +77,22 @@ export class CrossFrameManager {
    */
   _handleBroadcastStateChange(enabled) {
     this._applyGlobalClickRelay(enabled);
+  }
+
+  /**
+   * Handle text selection window request from iframe
+   */
+  _handleTextSelectionWindowRequest(data, sourceWindow) {
+    this._logXF('Text selection window request received in CrossFrameManager', {
+      hasHandler: !!this.onTextSelectionWindowRequest,
+      data: data
+    });
+    
+    if (this.onTextSelectionWindowRequest) {
+      this.onTextSelectionWindowRequest(data, sourceWindow);
+    } else {
+      this._logXF('No handler set for text selection window request!');
+    }
   }
 
   /**
@@ -201,6 +218,7 @@ export class CrossFrameManager {
     this.onOutsideClick = handlers.onOutsideClick;
     this.onWindowCreationRequest = handlers.onWindowCreationRequest;
     this.onWindowCreatedResponse = handlers.onWindowCreatedResponse;
+    this.onTextSelectionWindowRequest = handlers.onTextSelectionWindowRequest;
   }
 
   /**
@@ -243,6 +261,7 @@ export class CrossFrameManager {
     this.onOutsideClick = null;
     this.onWindowCreationRequest = null;
     this.onWindowCreatedResponse = null;
+    this.onTextSelectionWindowRequest = null;
   }
 
   // Getters for compatibility

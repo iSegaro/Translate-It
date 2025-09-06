@@ -454,7 +454,13 @@ export class TranslationOrchestrator extends ResourceTracker {
 
     const request = this.translationRequests.get(messageId);
     if (!request) {
-      this.logger.warn("Received translation result for unknown message:", messageId);
+      this.logger.debug("Received translation result for unknown message (normal in multi-frame context):", messageId);
+      // IFRAME FIX: Even if request is not found, trigger cleanup if translation succeeded
+      // This handles the case where multiple SelectElementManager instances exist across frames
+      if (data?.success && this.isActive()) {
+        this.logger.debug("Triggering cleanup for unknown request due to successful translation");
+        this.triggerPostTranslationCleanup();
+      }
       return;
     }
     
@@ -583,5 +589,28 @@ export class TranslationOrchestrator extends ResourceTracker {
 
   getDebugInfo() {
     return { activeRequests: this.translationRequests.size };
+  }
+
+  /**
+   * Check if this orchestrator instance is active (has a SelectElementManager that's active)
+   */
+  isActive() {
+    // Check if SelectElementManager is accessible and active
+    if (window.selectElementManagerInstance) {
+      return window.selectElementManagerInstance.isActive;
+    }
+    return false;
+  }
+
+  /**
+   * Trigger post-translation cleanup through SelectElementManager
+   */
+  triggerPostTranslationCleanup() {
+    if (window.selectElementManagerInstance && typeof window.selectElementManagerInstance.performPostTranslationCleanup === 'function') {
+      this.logger.debug('Triggering SelectElementManager cleanup');
+      window.selectElementManagerInstance.performPostTranslationCleanup();
+    } else {
+      this.logger.warn('Cannot trigger cleanup: SelectElementManager not available');
+    }
   }
 }

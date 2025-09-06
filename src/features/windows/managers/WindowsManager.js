@@ -100,7 +100,8 @@ export class WindowsManager extends ResourceTracker {
     this.crossFrameManager.setEventHandlers({
       onOutsideClick: this._handleCrossFrameOutsideClick.bind(this),
       onWindowCreationRequest: this._handleWindowCreationRequest.bind(this),
-      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this)
+      onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this),
+      onTextSelectionWindowRequest: this._handleTextSelectionWindowRequest.bind(this)
     });
     // Click manager handlers
     this.clickManager.setHandlers({
@@ -383,16 +384,9 @@ export class WindowsManager extends ResourceTracker {
 
     this.logger.debug(`[LOG] _showWindow called: isInIframe=${this.crossFrameManager.isInIframe}, frameId=${this.crossFrameManager.frameId}, text=${selectedText}, position=${JSON.stringify(position)}`);
     
-    // Check if we need to create window in main document (iframe case)
-    if (this.crossFrameManager.isInIframe) {
-      this.logger.debug('Requesting window creation in main document (iframe detected)');
-      // Store context for when response comes back
-      this.state.setOriginalText(selectedText);
-      this.state.setTranslationCancelled(false);
-      this.state.setIconMode(false);
-      // Don't set visible yet - wait for response
-      return this.crossFrameManager.requestWindowCreation(selectedText, position);
-    }
+    // NEW: Create window directly in iframe using Vue UI Host
+    // The old cross-frame logic is no longer needed since each frame has its own Vue UI Host
+    this.logger.debug(`Creating window directly in current frame (${this.crossFrameManager.isInIframe ? 'iframe' : 'main-frame'})`);
 
     // PHASE 1: Show small loading window immediately
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -713,6 +707,57 @@ export class WindowsManager extends ResourceTracker {
       this.clickManager.addOutsideClickListener();
     } else {
       this.logger.error('Failed to create window in main document:', data.error);
+    }
+  }
+
+  /**
+   * Handle text selection window request from iframe
+   * @param {Object} data - Text selection data from iframe
+   * @param {Window} sourceWindow - Source iframe window
+   */
+  async _handleTextSelectionWindowRequest(data, sourceWindow) {
+    // Only handle in main frame
+    if (this.crossFrameManager.isInIframe) return;
+
+    try {
+      // Adjust position for iframe coordinates
+      let adjustedPosition = { ...data.position };
+      
+      const allIframes = document.querySelectorAll('iframe');
+
+      // Find iframe element by source window
+      let iframe = null;
+      
+      // Primary approach: Find by contentWindow (most reliable when possible)
+      iframe = Array.from(allIframes).find(frame => {
+        try {
+          return frame.contentWindow === sourceWindow;
+        } catch (e) {
+          // Cross-origin iframe, can't access contentWindow - this is normal
+          return false;
+        }
+      });
+      
+      // If contentWindow approach didn't work (cross-origin), we can't identify the exact iframe
+      // This is a limitation of cross-origin security, so we gracefully skip positioning adjustment
+      if (!iframe) {
+        this.logger.warn('Could not identify source iframe (likely cross-origin). Using original position without offset adjustment.');
+        // Use original position without iframe offset - this is the safest approach
+        adjustedPosition = { ...data.position, _isViewportRelative: false };
+      }
+      
+      if (iframe) {
+        const iframeRect = iframe.getBoundingClientRect();
+        adjustedPosition.x += iframeRect.left;
+        adjustedPosition.y += iframeRect.top;
+        // Mark as viewport-relative to prevent double scroll adjustment in Vue
+        adjustedPosition._isViewportRelative = true;
+      }
+
+      await this.show(data.selectedText, adjustedPosition);
+
+    } catch (error) {
+      this.logger.error('Failed to handle text selection window request from iframe:', error);
     }
   }
 

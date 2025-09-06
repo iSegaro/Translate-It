@@ -56,12 +56,22 @@ export function usePositioning(initialPosition, options = {}) {
     const originalX = pos.x ?? pos.left ?? 0;
     const originalY = pos.y ?? pos.top ?? 0;
     
-    // Convert absolute coordinates to viewport-relative for fixed positioning
-    const viewportPosition = {
-      x: originalX - window.scrollX,
-      y: originalY - window.scrollY
-    };
+    let viewportPosition;
     
+    // Check if position is already viewport-relative (iframe adjusted positions)
+    if (pos._isViewportRelative) {
+      // Position is already viewport-relative, don't subtract scroll
+      viewportPosition = {
+        x: originalX,
+        y: originalY
+      };
+    } else {
+      // Convert absolute coordinates to viewport-relative for fixed positioning
+      viewportPosition = {
+        x: originalX - window.scrollX,
+        y: originalY - window.scrollY
+      };
+    }
     
     currentPosition.value = clampToViewport(viewportPosition);
   }

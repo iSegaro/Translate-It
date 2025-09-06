@@ -31,12 +31,13 @@ export function isGlobalDebugEnabled() { return __runtimeDebugOverride; }
 // Keep noise low in UI & content paths while retaining Info for core/background workflows.
 const componentLogLevels = {
   Background: LOG_LEVELS.DEBUG,  // background handlers
-  Core: LOG_LEVELS.DEBUG,        // core handlers
-  Translation: LOG_LEVELS.DEBUG,
+  Core: LOG_LEVELS.INFO,        // core handlers
+  Translation: LOG_LEVELS.INFO,
   Messaging: LOG_LEVELS.DEBUG,
-  Providers: LOG_LEVELS.DEBUG,
-  Content: LOG_LEVELS.DEBUG,     // Windows Manager and content scripts
+  Providers: LOG_LEVELS.INFO,
+  Content: LOG_LEVELS.INFO,     // Windows Manager and content scripts
   UI: LOG_LEVELS.DEBUG,          // UI composables
+  ElementSelection: LOG_LEVELS.INFO, // Element selection feature
   Storage: LOG_LEVELS.WARN,
   Capture: LOG_LEVELS.INFO,
   Error: LOG_LEVELS.INFO,

@@ -16,6 +16,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
 import { actionbarIconManager } from '@/utils/browser/ActionbarIconManager.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
@@ -217,6 +218,14 @@ class LifecycleManager extends ResourceTracker {
         try {
           this.messageHandler.registerHandler(actionName, handlerFunction);
           logger.debug(`✅ Registered handler: ${actionName}`);
+          
+          if (actionName === MessageActions.SET_SELECT_ELEMENT_STATE) {
+            logger.debug('setSelectElementState handler registered', {
+              actionName,
+              handlerName: handlerFunction?.name,
+            });
+          }
+          
           registeredCount++;
         } catch (error) {
           logger.error(`❌ Failed to register handler for action: ${actionName}`, error);

@@ -33,6 +33,19 @@ export const pageEventBus = new EventBus();
 // Attach to window for global access (fix for cross-context event delivery)
 if (typeof window !== 'undefined') {
   window.pageEventBus = pageEventBus;
+  
+  // For iframe contexts, also ensure event bus is available in parent context
+  if (window !== window.top && window.parent) {
+    try {
+      // Try to share event bus with parent if possible (same origin)
+      if (!window.parent.pageEventBus) {
+        window.parent.pageEventBus = pageEventBus;
+      }
+    } catch (e) {
+      // Cross-origin iframe, can't access parent - this is normal
+      console.debug('[PageEventBus] Cannot access parent window (cross-origin), using local event bus');
+    }
+  }
 }
 
 // WindowsManager essential event constants

@@ -18,11 +18,16 @@ export class ContentMessageHandler extends ResourceTracker {
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageHandler');
     this.selectElementManager = null;
+    this.iFrameManager = null;
     this.errorHandler = ErrorHandler.getInstance();
   }
 
   setSelectElementManager(manager) {
     this.selectElementManager = manager;
+  }
+
+  setIFrameManager(manager) {
+    this.iFrameManager = manager;
   }
 
   initialize() {
@@ -39,6 +44,16 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
+    
+    // IFrame support handlers
+    this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
+    this.registerHandler(MessageActions.IFRAME_TRANSLATE_SELECTION, this.handleIFrameTranslateSelection.bind(this));
+    this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
+    this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
+    this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
+    this.registerHandler(MessageActions.IFRAME_INSERT_TEXT, this.handleIFrameInsertText.bind(this));
+    this.registerHandler(MessageActions.IFRAME_SYNC_REQUEST, this.handleIFrameSyncRequest.bind(this));
+    this.registerHandler(MessageActions.IFRAME_SYNC_RESPONSE, this.handleIFrameSyncResponse.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -68,14 +83,54 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleActivateSelectElementMode(message) {
+    this.logger.operation("🎯 ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!", {
+      hasSelectElementManager: !!this.selectElementManager,
+      messageData: message.data,
+      isInIframe: window !== window.top,
+      frameLocation: window.location.href
+    });
+    
     if (this.selectElementManager) {
-      return this.selectElementManager.activate();
+      this.logger.info("🚀 ContentMessageHandler: Calling selectElementManager.activate()");
+      this.logger.debug("🔍 SelectElementManager debug info:", {
+        hasActivateMethod: typeof this.selectElementManager.activate === 'function',
+        constructorName: this.selectElementManager.constructor.name,
+        keys: Object.keys(this.selectElementManager),
+        isActive: this.selectElementManager.isActive
+      });
+      
+      const result = await this.selectElementManager.activate();
+      
+      this.logger.info("✅ ContentMessageHandler: selectElementManager.activate() completed", {
+        result: result
+      });
+      
+      return result;
+    } else {
+      this.logger.error("❌ ContentMessageHandler: No selectElementManager available!");
     }
   }
 
   async handleDeactivateSelectElementMode(message) {
     if (this.selectElementManager) {
-      return this.selectElementManager.deactivate();
+      // Check if this is from background (to avoid circular messaging)
+      const fromBackground = message?.data?.fromBackground;
+      this.logger.debug('DEACTIVATE_SELECT_ELEMENT_MODE received', {
+        fromBackground: fromBackground,
+        isActive: this.selectElementManager.isActive,
+        isInIframe: window !== window.top,
+      });
+      
+      if (fromBackground) {
+        // Use forceDeactivate to avoid sending back to background
+        this.logger.debug('Using forceDeactivate (background-initiated)');
+        return this.selectElementManager.forceDeactivate();
+      } else {
+        this.logger.debug('Using regular deactivate (local-initiated)');
+        return this.selectElementManager.deactivate();
+      }
+    } else {
+      this.logger.warn("❌ ContentMessageHandler: No selectElementManager available for deactivation!");
     }
   }
 
@@ -208,9 +263,92 @@ export class ContentMessageHandler extends ResourceTracker {
     return await revertHandler.executeRevert();
   }
 
+  // IFrame support handlers
+  async handleIFrameActivateSelectElement(data) {
+    this.logger.debug('IFrame activate select element request', data);
+    if (this.selectElementManager) {
+      await this.selectElementManager.activate();
+      return { success: true };
+    }
+    return { success: false, error: 'SelectElementManager not available' };
+  }
+
+  async handleIFrameTranslateSelection(data) {
+    this.logger.debug('IFrame translate selection request', data);
+    // Delegate to WindowsManager through page event bus
+    pageEventBus.emit('iframe-translate-selection', data);
+    return { success: true };
+  }
+
+  async handleIFrameGetFrameInfo(data) {
+    this.logger.debug('IFrame get frame info request', data);
+    if (this.iFrameManager) {
+      return { 
+        success: true, 
+        frameInfo: this.iFrameManager.getFrameInfo() 
+      };
+    }
+    return { success: false, error: 'IFrameManager not available' };
+  }
+
+  async handleIFrameCoordinateOperation(data) {
+    this.logger.debug('IFrame coordinate operation request', data);
+    // Delegate to appropriate manager based on operation type
+    if (data.operation === 'select-element' && this.selectElementManager) {
+      return await this.handleIFrameActivateSelectElement(data);
+    }
+    return { success: false, error: 'Unsupported operation or manager not available' };
+  }
+
+  async handleIFrameDetectTextFields(data) {
+    this.logger.debug('IFrame detect text fields request', data);
+    // Basic text field detection
+    const textFields = document.querySelectorAll('input[type="text"], textarea, input[type="email"], input[type="url"], input[type="search"]');
+    const fieldInfo = Array.from(textFields).map(field => ({
+      id: field.id || null,
+      tagName: field.tagName,
+      type: field.type || null,
+      placeholder: field.placeholder || null,
+      visible: field.offsetWidth > 0 && field.offsetHeight > 0
+    }));
+    return { success: true, textFields: fieldInfo };
+  }
+
+  async handleIFrameInsertText(data) {
+    this.logger.debug('IFrame insert text request', data);
+    const { targetSelector, text } = data;
+    try {
+      const element = document.querySelector(targetSelector);
+      if (element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')) {
+        element.value = text;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        return { success: true };
+      }
+      return { success: false, error: 'Target element not found or not editable' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleIFrameSyncRequest(data) {
+    this.logger.debug('IFrame sync request', data);
+    if (this.iFrameManager) {
+      // Handle synchronization requests
+      return { success: true, response: 'sync-acknowledged' };
+    }
+    return { success: false, error: 'IFrameManager not available' };
+  }
+
+  async handleIFrameSyncResponse(data) {
+    this.logger.debug('IFrame sync response', data);
+    // Handle sync response - could be used for coordination
+    return { success: true };
+  }
+
   async cleanup() {
     this.handlers.clear();
     this.selectElementManager = null;
+    this.iFrameManager = null;
     
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();

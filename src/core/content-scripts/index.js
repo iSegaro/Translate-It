@@ -50,49 +50,101 @@ if (!access.isAccessible) {
   // Stop further execution by not initializing anything.
   // This prevents errors on pages like chrome://extensions or about:addons.
 } else {
-  // Only run in main frame (not in iframes)
-  if (window !== window.top) {
-    console.log('🚫 [Content Script] Running in iframe, skipping execution');
-    // Stop execution in iframe
-  } else if (window.translateItContentScriptLoaded) {
-    console.warn('🚨 [Content Script] Already loaded, preventing duplicate execution');
+  // Use async IIFE to handle initialization
+  (async () => {
+    // Initialize IFrameManager for enhanced iframe support
+    const { iFrameManager } = await import('@/features/iframe-support/managers/IFrameManager.js');
+    
+    // Determine execution mode based on frame context
+    const isInIframe = window !== window.top;
+    const executionMode = isInIframe ? 'iframe' : 'main-frame';
+  
+  if (window.translateItContentScriptLoaded) {
     // Stop further execution
   } else {
     window.translateItContentScriptLoaded = true;
     
-    console.log('🚀 [Content Script] ENTRY POINT REACHED');
     (async () => {
-      console.log('🚀 [Content Script] ASYNC FUNCTION STARTED');
-      logger.init("Content script loading...");
+      logger.init(`Content script loading in ${executionMode}...`);
 
-    // --- Inject Main DOM CSS ---
-    await injectMainDOMStyles();
+    // --- Inject Main DOM CSS (main frame only) ---
+    if (!isInIframe) {
+      await injectMainDOMStyles();
+    }
 
-    // --- Mount the Vue UI Host ---
+    // --- Mount the Vue UI Host (required for both main frame and iframe) ---
     try {
-      // Check if UI Host already exists
-      if (document.getElementById('translate-it-host')) {
-        console.warn('[Content Script] ⚠️ UI Host already exists, skipping mount');
+      // Check if UI Host already exists in current frame
+      const hostId = `translate-it-host-${isInIframe ? 'iframe' : 'main'}`;
+      if (document.getElementById(hostId)) {
       } else {
         const { mountContentApp, getAppCss } = await import("@/app/main.js");
         const { pageEventBus } = await import("@/core/PageEventBus.js");
         
-        // 2. Create the host element and shadow DOM.
+        // 2. Create the host element and shadow DOM with iframe awareness
         const hostElement = document.createElement('div');
-        hostElement.id = 'translate-it-host';
+        hostElement.id = hostId;
+        hostElement.setAttribute('data-frame-type', executionMode);
         hostElement.style.all = 'initial';
+        
+        // Enhanced z-index and positioning for iframe contexts
+        if (isInIframe) {
+          hostElement.style.position = 'fixed';
+          hostElement.style.top = '0';
+          hostElement.style.left = '0';
+          hostElement.style.width = '100vw';
+          hostElement.style.height = '100vh';
+          hostElement.style.pointerEvents = 'none';
+          hostElement.style.zIndex = '2147483647';
+        } else {
+          hostElement.style.position = 'relative';
+        }
+        
         document.body.appendChild(hostElement);
         const shadowRoot = hostElement.attachShadow({ mode: 'open' });
 
-        // 3. Inject the entire app's CSS into the shadow DOM.
+        // 3. Inject the entire app's CSS into the shadow DOM with iframe awareness
         const appStyles = getAppCss();
         const appStyleEl = document.createElement('style');
         appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
+        appStyleEl.setAttribute('data-frame-context', executionMode);
         
-        // Include all app styles (Google Fonts removed to avoid CSP issues)
+        // Include all app styles with iframe-specific adjustments
         appStyleEl.textContent = `
           /* App styles with Shadow DOM reset included */
           ${appStyles}
+          
+          /* IFrame-specific adjustments */
+          ${isInIframe ? `
+          :host {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            pointer-events: none !important;
+            z-index: 2147483647 !important;
+          }
+          
+          .translation-icon {
+            position: absolute !important;
+            z-index: 2147483647 !important;
+            pointer-events: all !important;
+          }
+          
+          .translation-window {
+            position: absolute !important;
+            z-index: 2147483646 !important;
+            pointer-events: all !important;
+          }
+          
+          /* Ensure all interactive elements have pointer-events */
+          .translation-icon *,
+          .translation-window *,
+          [data-vue-component] {
+            pointer-events: all !important;
+          }
+          ` : ''}
         `;
         shadowRoot.appendChild(appStyleEl);
         
@@ -102,7 +154,13 @@ if (!access.isAccessible) {
         shadowRoot.appendChild(appRoot);
         mountContentApp(appRoot);
 
-        logger.info('Vue UI Host mounted into Shadow DOM with all styles.');
+        logger.info(`Vue UI Host mounted into Shadow DOM with all styles (${executionMode})`, {
+          hostId,
+          isInIframe,
+          shadowRootMode: shadowRoot.mode,
+          hostElementPosition: hostElement.style.position,
+          hostElementZIndex: hostElement.style.zIndex
+        });
 
         // Emit a test event to confirm communication
         setTimeout(() => {
@@ -130,46 +188,68 @@ if (!access.isAccessible) {
       // Continue with initialization on error to avoid breaking functionality
     }
 
-    // Dynamically import modules only on accessible and non-excluded pages
+    // Dynamically import modules based on frame context
     const { vueBridge } = await import("@/core/managers/content/VueBridgeManager.js");
-    // TTS handler removed - using unified GOOGLE_TTS_SPEAK system
+    
+    // Import core systems for both main frame and iframe
     const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
     const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
     const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
-    const { shortcutManager } = await import("@/core/managers/content/shortcuts/ShortcutManager.js");
-    const { initializeSubtitleHandler } = await import("@/core/managers/content/SubtitleInitializer.js");
+    
+    // Import optional systems (main frame only or iframe-compatible)
+    let shortcutManager = null;
+    let subtitleInitializer = null;
+    
+    if (!isInIframe) {
+      // Main frame exclusive systems
+      const shortcutModule = await import("@/core/managers/content/shortcuts/ShortcutManager.js");
+      shortcutManager = shortcutModule.shortcutManager;
+      
+      const subtitleModule = await import("@/core/managers/content/SubtitleInitializer.js");
+      subtitleInitializer = subtitleModule.initializeSubtitleHandler;
+    }
 
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
     const eventCoordinator = translationHandler.eventCoordinator; // Use existing instance
 
-    // Store instances globally for handlers to access
+    // Store instances globally for handlers to access (with frame context)
     window.translationHandlerInstance = translationHandler;
     window.selectElementManagerInstance = selectElementManager;
+    window.iFrameManagerInstance = iFrameManager;
 
-    // Give ContentMessageHandler a reference to SelectElementManager
+    // Give ContentMessageHandler a reference to SelectElementManager and IFrameManager
     contentMessageHandler.setSelectElementManager(selectElementManager);
+    contentMessageHandler.setIFrameManager(iFrameManager);
 
-    // Initialize subtitle handler conditionally
-    await initializeSubtitleHandler(translationHandler);
+    // Initialize subtitle handler conditionally (main frame only)
+    if (subtitleInitializer && !isInIframe) {
+      await subtitleInitializer(translationHandler);
+    }
 
-    // Initialize all systems
+    // Initialize core systems (both main frame and iframe)
     selectElementManager.initialize();
     contentMessageHandler.initialize();
 
-    // Initialize TextFieldManager through EventCoordinator with proper dependencies
-    eventCoordinator.textFieldManager.initialize({
-      translationHandler: translationHandler,
-      notifier: translationHandler.notifier,
-      strategies: translationHandler.strategies,
-      featureManager: translationHandler.featureManager
-    });
+    // Initialize TextFieldManager through EventCoordinator with iframe support
+    if (eventCoordinator.textFieldManager) {
+      eventCoordinator.textFieldManager.initialize({
+        translationHandler: translationHandler,
+        notifier: translationHandler.notifier,
+        strategies: translationHandler.strategies,
+        featureManager: translationHandler.featureManager,
+        iFrameManager: iFrameManager,
+        isInIframe: isInIframe
+      });
+    }
 
-    // Initialize shortcut manager with required dependencies
-    shortcutManager.initialize({
-      translationHandler: translationHandler,
-      featureManager: translationHandler.featureManager
-    });
+    // Initialize shortcut manager (main frame only)
+    if (shortcutManager && !isInIframe) {
+      shortcutManager.initialize({
+        translationHandler: translationHandler,
+        featureManager: translationHandler.featureManager
+      });
+    }
 
     // Setup DOM event listeners for EventCoordinator (text selection, text fields)
     document.addEventListener('mouseup', eventCoordinator.handleEvent, { passive: true });
@@ -211,19 +291,27 @@ if (!access.isAccessible) {
       return false; // Let other handlers process
     });
 
-    // Final initialization summary
-    logger.init('Content script initialized', {
+    // Final initialization summary with iframe context
+    logger.init(`Content script initialized (${executionMode})`, {
+      frameId: iFrameManager.frameId,
+      isInIframe: isInIframe,
       messageHandlers: contentMessageHandler.getInfo?.()?.handlerCount || 0,
-      shortcuts: shortcutManager.getShortcutsInfo?.()?.shortcutCount || 0,
+      shortcuts: shortcutManager?.getShortcutsInfo?.()?.shortcutCount || 0,
       vueBridge: vueBridge.isInitialized,
-      ttsHandler: true  // Using unified GOOGLE_TTS_SPEAK system
+      ttsHandler: true,  // Using unified GOOGLE_TTS_SPEAK system
+      iFrameSupport: true,
+      registeredFrames: iFrameManager.getAllFrames().length
     });
 
-    // Initialize Memory Garbage Collector
+    // Initialize Memory Garbage Collector with frame context
     initializeGlobalCleanup();
     startMemoryMonitoring();
-    logger.debug("✅ [Content Script] Memory Garbage Collector initialized!");
+    logger.debug(`✅ [Content Script] Memory Garbage Collector initialized! (${executionMode})`);
+    
+    // Final iframe manager setup
+    logger.info(`🎯 [Content Script] IFrame support enabled - Frame ID: ${iFrameManager.frameId}`);
     
     })();
   }
+  })(); // Close first async IIFE
 }

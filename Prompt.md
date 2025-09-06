@@ -12,6 +12,7 @@
 - **Composables**: منطق business قابل استفاده مجدد
 - **Text Actions**: سیستم یکپارچه copy/paste و **TTS پیشرفته** با قابلیت Play/Pause/Resume/Stop
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
+- **IFrame Support**: سیستم ساده و مؤثر پشتیبانی از iframe با ResourceTracker integration و memory management یکپارچه
 - **Provider System**: 10+ سرویس ترجمه با معماری سلسله‌مراتبی (BaseProvider, BaseTranslateProvider, BaseAIProvider) و مدیریت Rate Limiting و Circuit Breaker.
 - **Error Management**: سیستم مدیریت خطای متمرکز
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
@@ -52,6 +53,7 @@
   - `text-actions/` - عملیات copy/paste/TTS
   - `subtitle/` - ترجمه زیرنویس ویدئوها
   - `windows/` - مدیریت UI رویداد-محور
+  - `iframe-support/` - سیستم ساده و مؤثر پشتیبانی از iframe با کامپوننت‌های ضروری
   - `history/` - مدیریت تاریخچه ترجمه
   - `settings/` - تنظیمات و configuration
 
@@ -108,6 +110,7 @@
 - **مقیاس‌پذیری**: افزودن feature جدید بدون تأثیر بر سایرین
 - **نگهداری آسان**: تغییرات محدود به feature مربوطه
 - **تست‌پذیری**: هر feature قابل تست مستقل
+- **IFrame Integration**: پشتیبانی ساده و مؤثر از iframe با ResourceTracker و ErrorHandler
 
 ### 🔧 Shared Systems  
 - **عدم تکرار**: سیستم‌های مشترک در یک مکان
@@ -128,4 +131,4 @@
 - **Cross-Browser**: کروم و فایرفاکس
 - **Build Tools**: Webpack، pnpm
 - **Polyfill**: webextension-polyfill برای سازگاری
-- **Modern Architecture**: Feature-based با 9 feature اصلی
+- **Modern Architecture**: Feature-based با 10 feature اصلی شامل iframe support

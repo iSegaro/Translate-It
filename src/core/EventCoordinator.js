@@ -39,16 +39,21 @@ export default class EventCoordinator {
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
-    // Initialize WindowsManager for text selection manager
-    this.logger.debug('Creating WindowsManager instance...');
-    this.windowsManager = new WindowsManager({});
-    this.logger.debug('WindowsManager instance created successfully');
+    // Initialize WindowsManager for text selection manager (main frame only)
+    if (window !== window.top) {
+      this.logger.debug('Skipping WindowsManager creation in iframe context');
+      this.windowsManager = null;
+    } else {
+      this.logger.debug('Creating WindowsManager instance in main frame...');
+      this.windowsManager = new WindowsManager({});
+      this.logger.debug('WindowsManager instance created successfully in main frame');
+    }
 
     // Note: UnifiedMessenger removed - SelectElementManager handles its own messaging
     
     // Initialize specialized managers
     this.textSelectionManager = new TextSelectionManager({
-      windowsManager: this.windowsManager,
+      windowsManager: this.windowsManager, // null in iframe, which is handled by TextSelectionManager
       notifier: translationHandler.notifier,
     });
 
@@ -96,11 +101,18 @@ export default class EventCoordinator {
    */
   @logMethod
   async handleEvent(event) {
-    // Skip most handling when SelectElementManager is active, but allow event to propagate
-    // Only skip text field and selection handling, let SelectElementManager handle clicks
+    // When SelectElementManager is active, only handle clicks if they're not handled by SelectElementManager
     if (this.selectElementManager?.isActive) {
-      this.logger.debug('SelectElementManager is active, allowing event to propagate to SelectElementManager.');
-      // Don't return here - let the event continue to SelectElementManager
+      this.logger.debug('SelectElementManager is active');
+      
+      // For click events, let SelectElementManager handle them directly - don't interfere
+      if (event.type === 'click') {
+        this.logger.debug('Click event detected while SelectElementManager active - letting SelectElementManager handle it');
+        return; // Exit early to avoid interference
+      }
+      
+      // For other events, skip most handling but allow event to continue
+      this.logger.debug('Non-click event - skipping text field and selection handling');
     }
     try {
       // Note: ESC key handling is managed by:

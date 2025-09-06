@@ -67,7 +67,8 @@ export class WindowsConfig {
     SET_BROADCAST_APPLY: 'translateit-set-broadcast-apply',
     OUTSIDE_CLICK: 'translateit-outside-click',
     CREATE_WINDOW_REQUEST: 'translateit-create-window-request',
-    WINDOW_CREATED: 'translateit-window-created'
+    WINDOW_CREATED: 'translateit-window-created',
+    TEXT_SELECTION_WINDOW_REQUEST: 'TEXT_SELECTION_WINDOW_REQUEST'
   };
 
   static STYLES = {

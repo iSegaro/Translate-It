@@ -21,13 +21,23 @@ import { StateManager } from "./services/StateManager.js";
 // Import constants
 import { KEY_CODES } from "./constants/selectElementConstants.js";
 
-export class SelectElementManager extends ResourceTracker {
+export class SelectElementManagerNew extends ResourceTracker {
   constructor() {
     super('select-element-manager')
     
     this.isActive = false;
     this.isProcessingClick = false;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElement');
+    
+    // Debug instance creation
+    this.instanceId = Math.random().toString(36).substring(7);
+    this.isInIframe = window !== window.top;
+    this.frameLocation = window.location.href;
+    this.logger.init("New SelectElementManager instance created", {
+      instanceId: this.instanceId,
+      isInIframe: this.isInIframe,
+      frameLocation: this.frameLocation,
+    });
     
     // Initialize services
     this.stateManager = new StateManager();
@@ -55,18 +65,26 @@ export class SelectElementManager extends ResourceTracker {
   }
 
   async initialize() {
+    this.logger.debug("SelectElementManager.initialize() started");
     try {
+      this.logger.debug("Setting up keyboard listeners");
       this.setupKeyboardListeners();
+      
+      this.logger.debug("Initializing services");
       await this.stateManager.initialize();
       await this.elementHighlighter.initialize();
       await this.textExtractionService.initialize();
       await this.translationOrchestrator.initialize();
       await this.modeManager.initialize();
       await this.errorHandlingService.initialize();
-      this.logger.debug('All services initialized');
+      
+      this.setupCrossFrameDeactivation();
+      
+      this.logger.debug("SelectElementManager.initialize() completed");
     } catch (error) {
-      this.logger.error("Initialization failed", error);
+      this.logger.error("SelectElementManager.initialize() failed", error);
       await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-manager-init" });
+      throw error;
     }
   }
 
@@ -74,14 +92,121 @@ export class SelectElementManager extends ResourceTracker {
     this.modeManager.setupKeyboardListeners();
   }
 
+  /**
+   * Setup cross-frame communication for deactivation
+   * Listen for deactivation messages from other frames
+   */
+  setupCrossFrameDeactivation() {
+    // Listen to pageEventBus for local frame communication (deactivation)
+    pageEventBus.on('deactivate-all-select-managers', () => {
+      if (this.isActive) {
+        this.forceDeactivate();
+      }
+    });
+    
+    pageEventBus.on('clear-all-highlights', () => {
+      this.elementHighlighter.clearAllHighlights();
+    });
+    
+    // Listen to window.postMessage for cross-origin iframe communication
+    const messageHandler = (event) => {
+      if (event.data && event.data.type === 'DEACTIVATE_ALL_SELECT_MANAGERS') {
+        if (this.isActive) {
+          this.forceDeactivate();
+        }
+      }
+    };
+    
+    this.addEventListener(window, 'message', messageHandler);
+    
+    this.logger.debug("Cross-frame deactivation listeners setup complete");
+  }
+
+  forceDeactivate() {
+    this.logger.debug("Force deactivating SelectElementManager (background-initiated)", {
+      instanceId: this.instanceId,
+      isActive: this.isActive,
+      isInIframe: this.isInIframe
+    });
+    
+    this.isActive = false;
+    this.isProcessingClick = false;
+    window.isTranslationInProgress = false;
+    
+    pageEventBus.emit('select-mode-deactivated');
+    // Remove event listeners immediately
+    this.removeSelectionEventListeners();
+    
+    // Clear highlights immediately
+    this.elementHighlighter.clearHighlight();
+    this.elementHighlighter.clearAllHighlights();
+    
+    // Deactivate UI without await to be synchronous
+    this.elementHighlighter.deactivateUI();
+    
+
+    
+    if (this.translationOrchestrator && typeof this.translationOrchestrator.cancelAllTranslations === 'function') {
+      try {
+        this.translationOrchestrator.cancelAllTranslations().catch(() => {});
+      } catch (e) {}
+    }
+    
+    this.logger.debug("Force deactivation completed - state fully reset");
+  }
+
   async activate() {
-    if (this.isActive) return;
-    this.logger.operation("Activating select element mode");
+    this.logger.operation("SelectElementManager.activate() entry point", {
+      instanceId: this.instanceId,
+      isActive: this.isActive,
+      isProcessingClick: this.isProcessingClick,
+      isInIframe: this.isInIframe,
+    });
+    
+    if (this.isActive) {
+      this.logger.warn("SelectElementManager already active, checking state.", {
+        instanceId: this.instanceId,
+        hasAbortController: !!this.abortController,
+        isAborted: this.abortController?.signal?.aborted,
+      });
+      
+      if (!this.abortController || this.abortController.signal.aborted) {
+        this.logger.debug("Re-initializing aborted/missing AbortController");
+        
+        this.abortController = new AbortController();
+        this.trackResource('abort-controller', () => {
+          if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+          }
+        });
+        
+        const options = { signal: this.abortController.signal, capture: true };
+        
+        this.logger.debug("Re-adding event listeners in early return");
+        this.addEventListener(document, "mouseover", this.handleMouseOver, options);
+        this.addEventListener(document, "mouseout", this.handleMouseOut, options);
+        this.addEventListener(document, "click", this.handleClick, options);
+        
+        this.logger.debug("Event listeners re-initialized for already active SelectElementManager");
+      }
+      
+      // Always ensure global styles and page interactions are set when activating
+      // This fixes cursor not changing on second activation
+      this.elementHighlighter.addGlobalStyles();
+      this.elementHighlighter.disablePageInteractions();
+      
+      return;
+    }
+    
+    this.logger.debug("Activating select element mode", {
+      isInIframe: this.isInIframe,
+      frameLocation: this.frameLocation
+    });
     pageEventBus.emit('select-mode-activated');
     this.isActive = true;
     this.abortController = new AbortController();
     
-    // Track AbortController as a custom resource
     this.trackResource('abort-controller', () => {
       if (this.abortController) {
         this.abortController.abort();
@@ -91,7 +216,7 @@ export class SelectElementManager extends ResourceTracker {
     
     const options = { signal: this.abortController.signal, capture: true };
     
-    // Use ResourceTracker for event listeners
+    this.logger.debug("Adding SelectElementManager event listeners");
     this.addEventListener(document, "mouseover", this.handleMouseOver, options);
     this.addEventListener(document, "mouseout", this.handleMouseOut, options);
     this.addEventListener(document, "click", this.handleClick, options);
@@ -101,33 +226,62 @@ export class SelectElementManager extends ResourceTracker {
     this.logger.operation("Select element mode activated");
   }
 
-  async deactivate() {
-    if (!this.isActive) return;
-    this.logger.operation("Deactivating select element mode");
-    pageEventBus.emit('select-mode-deactivated');
-    await this.translationOrchestrator.cancelAllTranslations();
-    await this.deactivateUI();
-    await this._notifyDeactivation();
+  deactivate({ fromBackground = false } = {}) {
+    this.logger.operation(
+      `Deactivating select element mode`,
+      {
+        instanceId: this.instanceId,
+        fromBackground,
+        isInIframe: this.isInIframe,
+      },
+    );
+
+    if (!fromBackground) {
+      this.logger.debug(
+        `Notifying background script to deactivate`,
+        { instanceId: this.instanceId },
+      );
+      this._notifyDeactivation().catch((error) => {
+        this.errorHandlingService.handleError(
+          error,
+          'Failed to send deactivation message',
+        );
+      });
+    }
+
+    if (!this.isActive) {
+      this.logger.debug(`deactivate() called but already inactive`, {
+        instanceId: this.instanceId,
+        isActive: this.isActive,
+        isInIframe: this.isInIframe,
+      });
+      return;
+    }
+
+    this.isActive = false;
+    this.deactivateSelectionUI();
+    this.translationOrchestrator.cancelAll();
+
+    this.logger.info('Select element UI deactivated');
+    this.cleanup();
   }
 
   async deactivateUI() {
     if (!this.isActive) return;
     this.isActive = false;
-    
-    // Note: AbortController cleanup is handled by ResourceTracker
-    // No need to manually abort here as it's tracked as a resource
-    
     await this.elementHighlighter.deactivateUI();
-    
-    // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
-    this.logger.operation("Select element UI deactivated");
+    this.logger.debug("Select element UI deactivated");
   }
 
   handleMouseOver(event) {
-    if (!this.isActive) return;
-    this.logger.debug("handleMouseOver triggered", { target: event.target.tagName, className: event.target.className });
+    if (!this.isActive) {
+      return;
+    }
+    this.logger.debug("handleMouseOver triggered", { 
+      target: event.target.tagName, 
+      instanceId: this.instanceId
+    });
     this.elementHighlighter.handleMouseOver(event.target);
   }
 
@@ -137,11 +291,21 @@ export class SelectElementManager extends ResourceTracker {
   }
 
   async handleClick(event) {
-    this.logger.debug("handleClick triggered", { target: event.target });
+    this.logger.operation("SelectElementManager handleClick called", { 
+      target: event.target.tagName,
+      isActive: this.isActive,
+      isProcessingClick: this.isProcessingClick,
+    });
 
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive || this.isProcessingClick) {
+      this.logger.warn("SelectElementManager handleClick ignored (already processing or inactive)", {
+        isActive: this.isActive,
+        isProcessingClick: this.isProcessingClick
+      });
+      return;
+    }
     this.isProcessingClick = true;
-    window.isTranslationInProgress = true; // Set flag immediately
+    window.isTranslationInProgress = true;
 
     event.preventDefault();
     event.stopPropagation();
@@ -149,39 +313,36 @@ export class SelectElementManager extends ResourceTracker {
 
     const element = this.elementHighlighter.currentHighlighted || event.target;
 
-    // Immediately disable selection UI and highlights after click
     this.logger.debug("Disabling selection UI immediately after click");
-    
-    // Clear highlights first
-    pageEventBus.emit('clear-all-highlights');
-    
-    // Disable selection mode immediately to provide instant user feedback
     await this.deactivateSelectionUIOnly();
+    pageEventBus.emit('clear-all-highlights');
 
     try {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
       if (originalTextsMap.size === 0) {
-        this.logger.info("No text found in selected element");
+        this.logger.operation("No text found in element, deactivating selection mode.", {
+          elementTag: element.tagName,
+        });
+        
         pageEventBus.emit('show-notification', {
           message: "No text found to translate.",
           type: "warning",
         });
         this.isProcessingClick = false;
         window.isTranslationInProgress = false;
-        // Re-activate selection if no text found
-        this.reactivateSelectionMode();
+        
+        this.logger.debug("Calling this.deactivate() to trigger cross-frame deactivation");
+        await this.deactivate();
+        this.logger.debug("this.deactivate() completed");
         return;
       }
 
-      // Start translation process immediately (don't await)
       this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes)
         .catch(async (error) => {
-          // Handle cancellation and other errors properly
           if (error.message === 'Translation cancelled by user') {
             this.logger.debug('Translation cancelled by user - handled');
           } else {
             this.logger.error('Translation process failed', error);
-            // Handle translation errors through error handling service for proper UI feedback
             if (!error.alreadyHandled) {
               await this.errorHandlingService.handle(error, { 
                 type: ErrorTypes.TRANSLATION_FAILED, 
@@ -191,19 +352,15 @@ export class SelectElementManager extends ResourceTracker {
           }
         })
         .finally(() => {
-          // Ensure cleanup after translation completes (success or failure)
           this.performPostTranslationCleanup();
         });
 
-      // The UI is deactivated within performPostTranslationCleanup, which is called in the .finally() block.
-      this.logger.info("[SelectElementManager] Text nodes collected for translation. Cleanup will occur upon completion.");
+      this.logger.info("Text nodes collected for translation. Cleanup will occur upon completion.");
     } catch (error) {
-      // Don't handle errors that are already handled
       if (!error.alreadyHandled) {
         this.logger.error("Element selection error", error);
         await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-click" });
       } else {
-        // Just log that error was already handled
         this.logger.debug("Translation process failed (error already handled)", error.message);
       }
       
@@ -218,19 +375,59 @@ export class SelectElementManager extends ResourceTracker {
     await this.translationOrchestrator.cancelAllTranslations();
   }
 
-  /**
-   * Deactivate selection UI only (without full cleanup)
-   * Used immediately after click to provide instant user feedback
-   */
   async deactivateSelectionUIOnly() {
     this.logger.debug("Deactivating selection UI only (immediate feedback)");
+
+    this._notifyDeactivation().catch((error) => {
+      this.errorHandlingService.handleError(
+        error,
+        'Failed to send deactivation message',
+      );
+    });
+    
+    // EMIT CROSS-FRAME DEACTIVATION EVENT TO ALL FRAMES
+    pageEventBus.emit('select-mode-deactivated');
+
+    // EMIT CROSS-FRAME DEACTIVATION EVENT TO ALL FRAMES
+    pageEventBus.emit('deactivate-all-select-managers');
+    pageEventBus.emit('clear-all-highlights');
+    
+    // Also send via window.postMessage for cross-origin iframe support
+    try {
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: 'DEACTIVATE_ALL_SELECT_MANAGERS',
+          source: 'translate-it-iframe'
+        }, '*');
+      }
+      // Also broadcast to child frames
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          iframe.contentWindow.postMessage({
+            type: 'DEACTIVATE_ALL_SELECT_MANAGERS', 
+            source: 'translate-it-main'
+          }, '*');
+        } catch {
+          // Cross-origin iframe, ignore
+        }
+      });
+    } catch {
+      // Ignore cross-origin errors
+    }
     
     // Disable selection state immediately
     this.isActive = false;
     
+    // Remove event listeners immediately to prevent re-highlighting
+    this.removeSelectionEventListeners();
+    
+    // Clear current highlight first (this is what was missing!)
+    this.elementHighlighter.clearHighlight();
+    
     // Deactivate UI elements
     await this.elementHighlighter.deactivateUI();
-    
+
     this.logger.debug("Selection UI deactivated immediately");
   }
 
@@ -238,28 +435,15 @@ export class SelectElementManager extends ResourceTracker {
    * Remove selection-related event listeners immediately after click
    */
   removeSelectionEventListeners() {
-    // Note: Event listeners are managed by ResourceTracker, 
-    // but we can disable the selection behavior immediately
+    // Remove specific selection-related event listeners via ResourceTracker
+    // Note: This will remove ALL event listeners for this SelectElementManager instance
+    // but that's exactly what we want after click to prevent re-highlighting
+    this.cleanup(); // This removes all event listeners tracked by ResourceTracker
+    
+    // Also disable the selection behavior flag
     this.isActive = false;
-    this.logger.debug("Selection event listeners logically disabled");
-  }
-
-  /**
-   * Re-activate selection mode (used when no text is found)
-   */
-  reactivateSelectionMode() {
-    this.logger.debug("Re-activating selection mode");
-    this.isActive = true;
     
-    // Clear any pending state
-    this.isProcessingClick = false;
-    window.isTranslationInProgress = false;
-    
-    // Re-enable page interactions
-    this.elementHighlighter.addGlobalStyles();
-    this.elementHighlighter.disablePageInteractions();
-    
-    this.logger.debug("Selection mode re-activated");
+    this.logger.debug("Selection event listeners physically removed via ResourceTracker.cleanup()");
   }
 
   performPostTranslationCleanup() {
@@ -268,10 +452,13 @@ export class SelectElementManager extends ResourceTracker {
     // Clear any remaining highlights (redundant but safe)
     pageEventBus.emit('clear-all-highlights');
     
-    // Ensure UI is fully deactivated
+    this._notifyDeactivation().catch(error => {
+      this.logger.warn('Error notifying background during post-translation cleanup:', error);
+    });
+    
     if (this.isActive) {
-      this.deactivateUI().catch(error => {
-        this.logger.warn('Error during post-translation UI cleanup:', error);
+      this.deactivate().catch(error => {
+        this.logger.warn('Error during post-translation cleanup:', error);
       });
     }
     
@@ -292,16 +479,15 @@ export class SelectElementManager extends ResourceTracker {
     this.logger.info("Cleaning up SelectElement manager");
     
     try {
-      // Perform translation revert and deactivation first
-      await this.revertTranslations();
-      await this.deactivate();
-      
+      // Perform translation revert
+      // await this.revertTranslations();
       // ResourceTracker cleanup will handle all tracked resources including services
       super.cleanup();
       
       // Log memory statistics after cleanup
       const memStats = this.getStats();
-      this.logger.info("SelectElement cleanup completed successfully", { memoryStats: memStats });
+      this.logger.info("SelectElement cleanup completed successfully");
+      this.logger.debug("SelectElement cleanup completed successfully", { memoryStats: memStats });
     } catch (error) {
       this.logger.error("Error during SelectElement cleanup", error);
       // Ensure ResourceTracker cleanup still runs even if other operations fail
@@ -316,13 +502,16 @@ export class SelectElementManager extends ResourceTracker {
   
   async _notifyDeactivation() {
     try {
+      this.logger.debug("Sending setSelectElementState(active: false) to background");
+      
       await sendSmart({
         action: MessageActions.SET_SELECT_ELEMENT_STATE,
         data: { active: false }
       });
-      this.logger.debug('Notified background: select element deactivated');
+      
+      this.logger.debug('Successfully notified background: select element deactivated');
     } catch (err) {
-      this.logger.warn('Failed to notify background about deactivation', err);
+      this.logger.error('Failed to notify background about deactivation', err);
     }
   }
 
@@ -331,8 +520,9 @@ export class SelectElementManager extends ResourceTracker {
   }
 }
 
+
 // Export singleton instance for backward compatibility
-export const selectElementManager = new SelectElementManager();
+export const selectElementManager = new SelectElementManagerNew();
 
 // Auto-initialize when script loads
 if (typeof document !== "undefined") {

@@ -7,6 +7,7 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SimpleMessageHandler');
 
@@ -42,6 +43,14 @@ class SimpleMessageHandler {
       const action = message?.action || message?.type;
       const context = message?.context;
       const handler = this.getHandlerForMessage(action, context);
+      
+      if (action === MessageActions.SET_SELECT_ELEMENT_STATE) {
+        logger.debug(`[${MessageActions.SET_SELECT_ELEMENT_STATE}] message received`, {
+          context,
+          handler: !!handler,
+          handlerName: handler?.name,
+        });
+      }
       
       if (handler) {
         

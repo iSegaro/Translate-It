@@ -112,34 +112,23 @@ const onIconPositionUpdated = (data) => {
 };
 
 const setupOutsideClickHandler = () => {
-  // Listen for clicks on the host document with automatic cleanup
-  tracker.addEventListener(document, 'click', (event) => {
-    // Check if click is outside all Vue components
-    const shadowHost = document.getElementById('translate-it-host');
-    if (!shadowHost) return;
-    
-    // If click is not on the shadow host or its children, it's an outside click
-    if (!shadowHost.contains(event.target)) {
-      // Dismiss all active windows and icons
-      if (translationWindows.value.length > 0) {
-        translationWindows.value.forEach(window => {
-          onTranslationWindowClose(window.id);
-        });
-      }
-      
-      if (translationIcons.value.length > 0) {
-        translationIcons.value.forEach(icon => {
-          onTranslationIconClose(icon.id);
-        });
-      }
-    }
-  }, true); // Use capture phase
+  // NOTE: Outside click handling is now managed by TextSelectionManager
+  // to avoid conflicts and ensure proper iframe support.
+  // This avoids double handling of outside clicks which was causing
+  // translation windows to close when clicked inside them.
 };
 
 logger.info('ContentApp script setup executed.');
 
 onMounted(() => {
-  logger.info('ContentApp component has been mounted into the Shadow DOM.');
+  const isInIframe = window !== window.top;
+  const executionMode = isInIframe ? 'iframe' : 'main-frame';
+  
+  logger.info(`ContentApp component has been mounted into the Shadow DOM (${executionMode})`, {
+    isInIframe,
+    frameLocation: window.location.href,
+    hasPageEventBus: !!window.pageEventBus
+  });
   
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();

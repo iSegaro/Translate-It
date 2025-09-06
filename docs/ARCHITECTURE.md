@@ -12,6 +12,7 @@
 - ✅ **Advanced State Management** - Pinia stores with reactive data
 - ✅ **Comprehensive Error Handling** - Unified error management system
 - ✅ **Cross-Frame Communication** - Advanced iframe support
+- ✅ **IFrame Support System** - Streamlined iframe functionality with ResourceTracker integration and essential components
 - ✅ **Text Actions System** - Unified copy/paste and advanced TTS (Play/Pause/Resume)
 - ✅ **Storage Management** - Centralized storage with caching
 - ✅ **Logging System** - Production-ready structured logging
@@ -40,6 +41,7 @@
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
+- **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
 
 ### Media Assets
 - **[Video Tutorials](Introduce.mp4)** - Introduction and feature overview
@@ -51,8 +53,9 @@
 1. **New Developers**: Start with [Architecture](ARCHITECTURE.md) → [Messaging System](MessagingSystem.md)
 2. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider System](#-provider-system)
 3. **UI Development**: [Windows Manager](WINDOWS_MANAGER.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
-4. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
-5. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
+4. **IFrame Integration**: [IFrame Support System](../features/iframe-support/README.md) → [Cross-Frame Communication](#-smart-messaging-system)
+5. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
+6. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
 
 ---
 
@@ -91,7 +94,7 @@
 │                   CONTENT LAYER                                │
 │  Content Scripts → UI Host System → Event-Based Communication  │
 │  Element Selection → Notifications → Text Field Icons          │
-│  Text Actions → Screen Capture → Context Integration           │
+│  Text Actions → Screen Capture → IFrame Support → Context Integration │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -186,6 +189,10 @@ src/
 │   │   ├── components/        # TranslationWindow
 │   │   ├── composables/       # useWindowsManager
 │   │   └── managers/          # Position, animation, theme managers
+│   ├── iframe-support/
+│   │   ├── managers/          # IFrameManager (core functionality)
+│   │   ├── composables/       # useIFrameSupport, useIFrameDetection (simplified)
+│   │   └── README.md          # Streamlined documentation
 │   ├── history/
 │   │   ├── stores/            # history.js store
 │   │   ├── composables/       # useHistory
@@ -1046,6 +1053,41 @@ Browser-Specific Player (Chrome: Offscreen, Firefox: Direct Audio)
 
 ---
 
+## 🖼️ IFrame Support System
+
+### Overview
+Streamlined iframe support system that provides essential iframe functionality while maintaining compatibility with existing Vue.js, ResourceTracker, Error Management, and Smart Messaging systems. The system has been simplified to include only actively used components. See [IFrame Support Documentation](../features/iframe-support/README.md) for complete details.
+
+**Key Features:**
+- **Essential Frame Management**: IFrameManager for frame registration and tracking
+- **ResourceTracker Integration**: Automatic memory management and cleanup for iframe resources
+- **Vue Composables**: Simple reactive iframe detection and positioning utilities
+- **Frame Registry**: Robust frame registration with corruption protection
+- **SelectElement Support**: Fixed to work properly in iframes with immediate UI deactivation
+
+**Core Components:**
+- **`IFrameManager.js`**: Core iframe management extending ResourceTracker
+- **`FrameRegistry.js`**: Frame registration and mapping system (via WindowsManager)
+- **`useIFrameSupport.js`**: Simplified Vue composables for iframe functionality
+
+**System Flow:**
+```
+Content Script Detection → IFrameManager → Frame Registration
+    ↓
+ResourceTracker Cleanup → SmartMessaging Integration
+    ↓
+Vue UI Host → Event-Based Communication → SelectElement Support
+```
+
+**Integration Benefits:**
+- **Zero Memory Leaks**: Full ResourceTracker integration
+- **Immediate UI Feedback**: SelectElement deactivates instantly in iframes
+- **Clean Logging**: Debug-level multi-frame context messages
+- **Error Handling**: Centralized error management with ExtensionContextManager
+- **Lightweight**: Only essential components, ~80% less code than original implementation
+
+---
+
 ## 📺 Subtitle Translation System
 
 ### Overview
@@ -1260,6 +1302,7 @@ This architecture provides a **comprehensive, modular, and scalable** foundation
 
 - **🎯 Complete Vue.js Integration**: Reactive components, composables, and Pinia stores
 - **🔧 Modular Design**: 18+ specialized systems working together seamlessly  
+- **🖼️ Streamlined IFrame Support**: Essential iframe functionality with ResourceTracker integration and simplified architecture
 - **⚡ Performance Optimized**: Intelligent caching, lazy loading, and efficient data flow
 - **🛡️ Production Ready**: Comprehensive error handling, logging, and context safety
 - **🌐 Cross-Browser Compatible**: Chrome and Firefox compatibility with automatic detection

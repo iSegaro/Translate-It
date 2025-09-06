@@ -301,6 +301,7 @@ export class ElementHighlighter extends ResourceTracker {
 
     // Re-enable page interactions
     this.enablePageInteractions();
+    
   }
 
   /**
