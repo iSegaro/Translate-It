@@ -7,7 +7,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TwitterStrategy');
 import PlatformStrategy from "./PlatformStrategy.js";
 
 import { delay} from "@/core/helpers.js";
-import { smartTextReplacement, smartDelay } from "@/utils/framework/framework-compat/index.js";
 
 export default class TwitterStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -137,67 +136,23 @@ export default class TwitterStrategy extends PlatformStrategy {
         }
       }
 
-      // 3. <<<<< بخش اصلاح شده: پردازش فیلد اصلی توییت >>>>>
+      // 3. <<<<< بخش کلیدی اصلاح شده: پردازش فیلد اصلی توییت >>>>>
       if (this.isTwitterElement(element)) {
         const tweetField = element.closest('[data-testid="tweetTextarea_0"]');
         if (tweetField) {
           tweetField.focus();
           
-          // روش سازگار با React و CSP توییتر
-          try {
-            logger.debug('Attempting innerText method for tweet field');
-            // استفاده از innerText برای سازگاری بهتر
-            tweetField.innerText = translatedText;
-            logger.debug('innerText set, dispatching events');
-            
-            // تنظیم کرسر در انتها
-            await smartDelay(50);
-            this.setCursorToEnd(tweetField);
-            
-            // ارسال رویدادهای متعدد برای اطمینان از trigger React
-            tweetField.dispatchEvent(new Event('input', { bubbles: true }));
-            tweetField.dispatchEvent(new Event('change', { bubbles: true }));
-            tweetField.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ' }));
-            tweetField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ' }));
-            
-            logger.debug('Events dispatched, checking result');
-            // بررسی نتیجه
-            if (tweetField.innerText === translatedText) {
-              logger.debug('innerText method successful');
-              await this.applyVisualFeedback(tweetField);
-              logger.init('Tweet field updated successfully.');
-              return true;
-            } else {
-              logger.warn('innerText method failed - content not set correctly', {
-                expected: translatedText,
-                actual: tweetField.innerText
-              });
-              throw new Error('Content not set correctly');
-            }
-          } catch (error) {
-            logger.error('innerText method failed, trying selection method', error);
-            
-            // fallback به روش selection
-            try {
-              const selection = window.getSelection();
-              const range = document.createRange();
-              range.selectNodeContents(tweetField);
-              selection.removeAllRanges();
-              selection.addRange(range);
-              selection.deleteContents();
-              
-              const textNode = document.createTextNode(translatedText);
-              range.insertNode(textNode);
-              selection.removeAllRanges();
-              
-              tweetField.dispatchEvent(new Event('input', { bubbles: true }));
-              await this.applyVisualFeedback(tweetField);
-              return true;
-            } catch (fallbackError) {
-              logger.error('Selection method also failed', fallbackError);
-              return false;
-            }
-          }
+          // ابتدا فیلد را پاک می‌کنیم
+          this.clearTweetField(tweetField);
+          await delay(50); // تاخیر کوتاه برای پردازش رویداد clear
+          
+          // متن جدید را paste می‌کنیم
+          await this.pasteText(tweetField, translatedText);
+          await this.applyVisualFeedback(tweetField);
+          // this.applyTextDirection(tweetField, translatedText);
+
+          logger.init('Tweet field updated successfully.');
+          return true; // گزارش موفقیت
         }
       }
 
