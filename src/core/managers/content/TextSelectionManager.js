@@ -5,6 +5,7 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { isUrlExcluded } from "@/utils/ui/exclusion.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
@@ -18,6 +19,12 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Initialize logger first
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionManager');
+
+    // Check if current URL is excluded from text selection features
+    this.isExcluded = isUrlExcluded(window.location.href);
+    if (this.isExcluded) {
+      this.logger.debug('TextSelectionManager: URL is excluded, functionality will be limited');
+    }
     
     // Generate frameId for cross-frame communication
     this.frameId = Math.random().toString(36).substring(7);
@@ -39,10 +46,13 @@ export class TextSelectionManager extends ResourceTracker {
     this.selectionTimeoutId = null;
     this.ctrlKeyPressed = false;
     
-    // **FIX FOR DISCORD**: Track last processed selection to prevent duplicate processing
+    // Track last processed selection to prevent duplicate processing
     this.lastProcessedText = null;
     this.lastProcessedTime = 0;
     this.selectionProcessingCooldown = 1000; // 1 second cooldown
+    
+    // Store last valid position for recovery when selection is cleared
+    this.lastValidPosition = null;
     
     // Track external window state (for iframe-created windows in main frame)
     this.hasExternalWindow = false;
@@ -116,7 +126,7 @@ export class TextSelectionManager extends ResourceTracker {
    */
   _isWindowVisible() {
     if (this.selectionWindows) {
-      return this.selectionWindows.isVisible;
+      return this.selectionWindows.state.isVisible;
     }
     
     // Check external window state (for iframe-created windows)
@@ -163,7 +173,7 @@ export class TextSelectionManager extends ResourceTracker {
     }
     this.logger.debug('Drag flag check:', { isDragging: window.__TRANSLATION_WINDOW_IS_DRAGGING });
     
-    // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
+    // Skip if we're in transition from selection icon to translation window
     // This prevents conflicts and duplicate selection windows during the transition
     if (state && state.preventTextFieldIconCreation === true) {
       this.logger.debug('Skipping handleTextSelection due to active selection window transition');
@@ -209,7 +219,7 @@ export class TextSelectionManager extends ResourceTracker {
     }
 
     if (selectedText) {
-      // **FIX FOR DISCORD**: Check if this is a duplicate selection event
+      // Check if this is a duplicate selection event
       // But allow processing if enough time has passed or if no selection window is visible
       const currentTime = Date.now();
       const isRecentDuplicate = selectedText === this.lastProcessedText && 
@@ -255,7 +265,7 @@ export class TextSelectionManager extends ResourceTracker {
           this.processSelectedText(selectedText, event);
         }, delay);
 
-        // **FIX FOR DISCORD**: Track this text as being processed
+        // Track this text as being processed
         this.lastProcessedText = selectedText;
         this.lastProcessedTime = currentTime;
 
@@ -369,7 +379,7 @@ export class TextSelectionManager extends ResourceTracker {
         }
         // Otherwise, allow dismissal logic to run
       } else {
-        // **FIX FOR DISCORD**: Clear tracking when no text is selected
+        // Clear tracking when no text is selected
         this.lastProcessedText = null;
         this.lastProcessedTime = 0;
 
@@ -391,7 +401,7 @@ export class TextSelectionManager extends ResourceTracker {
           this.logger.debug('Dismiss SelectionWindows - no text selected (outside click)');
           this._dismissWindow();
           
-          // **FIX FOR DISCORD**: Clear tracking when dismissing
+          // Clear tracking when dismissing
           this.lastProcessedText = null;
           this.lastProcessedTime = 0;
         }
@@ -443,25 +453,52 @@ export class TextSelectionManager extends ResourceTracker {
       hasWindowsManager: !!this.selectionWindows
     });
     
+    // Check if text is actually selected in DOM before processing
+    const currentSelection = window.getSelection();
+    const currentSelectedText = currentSelection ? currentSelection.toString().trim() : '';
+    
+    // If no current selection but we have text, it means selection was cleared
+    if (!currentSelectedText && selectedText) {
+      return;
+    }
+    
     // Check if extension context is valid before processing
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, skipping processSelectedText to preserve text selection');
       return;
     }
     
-    // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
+    // Skip if we're in transition from selection icon to translation window
     // This prevents conflicts with text field icon creation during the transition
     if (state && state.preventTextFieldIconCreation === true) {
       this.logger.debug('Skipping processSelectedText due to active selection window transition');
       return;
     }
     
+    // Prevent duplicate processing of same selection
+    const currentTime = Date.now();
+    if (this.lastProcessedText === selectedText && this.selectionWindows && this.selectionWindows.state.isVisible) {
+      // If same text is selected again within a short time, don't recreate
+      if (currentTime - this.lastProcessedTime < 2000) { // 2 second threshold
+        return;
+      }
+    }
+    
   const selection = window.getSelection();
   let position = { x: 0, y: 0 };
     
-    if (selection.rangeCount > 0) {
-  const range = selection.getRangeAt(0);
-  let rect = range.getBoundingClientRect();
+    // Check if we have a valid selection with ranges
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      let rect = range.getBoundingClientRect();
+      
+      // Check if rect is valid (not empty)
+      if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
+        // If we already have a visible window, don't show another one
+        if (this.selectionWindows && this.selectionWindows.state.isVisible) {
+          return;
+        }
+      }
   
   // Fix for TEXTAREA and INPUT fields where getBoundingClientRect returns zeros
   if (rect.width === 0 && rect.height === 0) {
@@ -587,28 +624,19 @@ export class TextSelectionManager extends ResourceTracker {
         y: targetY + window.scrollY
       };
 
-      this.logger.debug('Position after initial calculation', {
-        position,
-        mode: selectionTranslationMode,
-        usedCenterX: selectionTranslationMode === 'onClick',
-      });
 
-      this.logger.debug('Smart positioning completed in TextSelectionManager', {
-        finalPosition: position,
-        mode: selectionTranslationMode,
-        strategy: 'viewport-aware-calculation',
-        targetX,
-        targetY,
-        selectionRect: {
-          left: rect.left,
-          right: rect.right,
-          width: rect.width,
-          viewportWidth
-        }
-      });
+      
+      // Save valid position for future use
+      if (position.x > 0 || position.y > 0) {
+        this.lastValidPosition = { ...position };
+      }
+    } else {
+      // If no valid selection rect, try to use last valid position for same text
+      if (this.lastValidPosition && this.lastProcessedText === selectedText) {
+        position = { ...this.lastValidPosition };
+      }
     }
 
-    this.logger.debug('Final position before showing window', { position });
 
     // نمایش پاپ آپ با متن و موقعیت جدید
     if (this.selectionWindows) {
@@ -622,7 +650,12 @@ export class TextSelectionManager extends ResourceTracker {
         text: selectedText.substring(0, 30) + '...',
         position
       });
-      this.selectionWindows.show(selectedText, position);
+      await this.selectionWindows.show(selectedText, position);
+      
+      // Update tracking after successful show
+      this.lastProcessedText = selectedText;
+      this.lastProcessedTime = currentTime;
+      
     } else if (window !== window.top) {
       // Iframe: use cross-frame communication to request window creation in main frame
       this.logger.debug('Requesting window creation in main frame from iframe', { 
@@ -630,6 +663,11 @@ export class TextSelectionManager extends ResourceTracker {
         position
       });
       this._requestWindowCreationInMainFrame(selectedText, position);
+      
+      // Update tracking after successful request
+      this.lastProcessedText = selectedText;
+      this.lastProcessedTime = currentTime;
+      
     } else {
       this.logger.warn('SelectionWindows not available in main frame');
     }
@@ -648,7 +686,7 @@ export class TextSelectionManager extends ResourceTracker {
       this.selectionTimeoutId = null;
       this.logger.debug('Selection translation cancelled');
       
-      // **FIX FOR DISCORD**: Clear tracking when cancelling
+      // Clear tracking when cancelling
       this.lastProcessedText = null;
       this.lastProcessedTime = 0;
       
@@ -675,6 +713,12 @@ export class TextSelectionManager extends ResourceTracker {
    * @returns {Promise<boolean>} Whether Ctrl requirement is satisfied
    */
   async shouldProcessTextSelection(event) {
+    // Early return if URL is excluded
+    if (this.isExcluded) {
+      this.logger.debug('shouldProcessTextSelection: URL is excluded, skipping text selection processing');
+      return false;
+    }
+
     let settings;
     let selectionTranslationMode;
     
@@ -728,7 +772,7 @@ export class TextSelectionManager extends ResourceTracker {
     // Cancel any pending selection translation
     this.cancelSelectionTranslation();
     
-    // **FIX FOR DISCORD**: Clear tracking state
+    // Clear tracking state
     this.lastProcessedText = null;
     this.lastProcessedTime = 0;
     

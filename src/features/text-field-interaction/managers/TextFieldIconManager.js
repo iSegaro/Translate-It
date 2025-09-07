@@ -5,9 +5,9 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { isUrlExcluded_TEXT_FIELDS_ICON } from "@/utils/ui/exclusion.js";
 import { detectPlatform, Platform } from "@/utils/browser/platform.js";
 import { state } from "@/shared/config/config.js";
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -22,7 +22,6 @@ export class TextFieldIconManager extends ResourceTracker {
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
-    this.featureManager = options.featureManager;
     this.initialized = false;
     this.loggedInit = false; // Flag to prevent duplicate logging
     
@@ -159,9 +158,15 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Target element
    * @returns {boolean|null} Whether to process (null = skip silently)
    */
-  shouldProcessTextField(element) {
+  async shouldProcessTextField(element) {
+    // Get current settings from storage
+    const settings = await storageManager.get([
+      'EXTENSION_ENABLED',
+      'TRANSLATE_ON_TEXT_FIELDS'
+    ]);
+    
     // Basic validation
-    if (!this.featureManager?.isOn("EXTENSION_ENABLED")) {
+    if (!settings?.EXTENSION_ENABLED) {
       this.logger.debug('Skipping icon creation: Extension is disabled.');
       return null;
     }
@@ -178,22 +183,14 @@ export class TextFieldIconManager extends ResourceTracker {
       return null;
     }
 
-    // URL exclusion check
-    if (isUrlExcluded_TEXT_FIELDS_ICON(window.location.href)) {
-      this.logger.debug('Skipping icon creation: URL is excluded.');
-      return null;
-    }
-
     // Feature flag check
-    if (!this.featureManager?.isOn("TEXT_FIELDS")) {
-      this.logger.debug('Skipping icon creation: TEXT_FIELDS feature is disabled.');
+    if (!settings?.TRANSLATE_ON_TEXT_FIELDS) {
+      this.logger.debug('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
       return false;
     }
 
-    // **FIX FOR DISCORD**: Check if we should prevent text field icon creation
-    // This prevents conflicts when transitioning from selection icon to translation window
+    // Check if we should prevent text field icon creation
     if (state && state.preventTextFieldIconCreation === true) {
-      this.logger.debug('Skipping icon creation: preventTextFieldIconCreation flag is true.');
       return false;
     }
 
@@ -246,9 +243,9 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Target element
    * @returns {Element|null} Created icon element or null
    */
-  processEditableElement(element) {
+  async processEditableElement(element) {
     // Check if processing should continue
-    const shouldProcess = this.shouldProcessTextField(element);
+    const shouldProcess = await this.shouldProcessTextField(element);
     if (shouldProcess === null || shouldProcess === false) {
       return null;
     }

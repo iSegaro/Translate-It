@@ -1,5 +1,5 @@
 // Content script entry point for Vue build
-// Modern modular architecture with organized handlers and shortcuts
+// Modern modular architecture with smart feature management
 
 import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -7,6 +7,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { isDevelopmentMode } from '@/shared/utils/environment.js';
 // Import Main DOM CSS as raw string for injection
 import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 
@@ -14,9 +15,43 @@ import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
 import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 
+// Import Feature Manager for smart handler registration
+import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
+
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
+
+/**
+ * Legacy initialization fallback
+ * Used when FeatureManager fails to initialize
+ */
+async function initializeLegacyHandlers() {
+  logger.warn('Initializing legacy handlers as fallback...');
+  
+  try {
+    // Import legacy modules
+    const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
+    const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
+    const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
+    
+    // Initialize core systems
+    const translationHandler = getTranslationHandlerInstance();
+    
+    // Store instances globally
+    window.translationHandlerInstance = translationHandler;
+    window.selectElementManagerInstance = selectElementManager;
+    
+    // Basic initialization
+    await selectElementManager.initialize();
+    contentMessageHandler.initialize();
+    
+    logger.info('Legacy handlers initialized successfully');
+    
+  } catch (error) {
+    logger.error('Legacy initialization also failed:', error);
+  }
+}
 
 /**
  * Inject CSS for Main DOM (outside Shadow DOM)
@@ -172,136 +207,79 @@ if (!access.isAccessible) {
       logger.error('Failed to mount the Vue UI Host:', error);
     }
 
-    // Check if current page is excluded before initializing
+    // Initialize Smart Feature Management System
+    let featureManager = null;
     try {
-      const response = await sendSmart({
-        action: MessageActions.IS_Current_Page_Excluded,
-        data: { url: window.location.href }
-      });
+      logger.info('Initializing Smart Feature Management System...');
       
-      if (response?.excluded) {
-        logger.info(`Content script stopped: page ${window.location.hostname} is excluded`);
-        return; // Stop initialization if page is excluded
+      // Create and initialize FeatureManager
+      featureManager = new FeatureManager();
+      await featureManager.initialize();
+      
+      // Store for global access (mainly for debugging)
+      if (isDevelopmentMode()) {
+        window.featureManagerInstance = featureManager;
       }
-    } catch (error) {
-      logger.error('Failed to check page exclusion status:', error);
-      // Continue with initialization on error to avoid breaking functionality
-    }
-
-    // Dynamically import modules based on frame context
-    const { vueBridge } = await import("@/core/managers/content/VueBridgeManager.js");
-    
-    // Import core systems for both main frame and iframe
-    const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
-    const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
-    const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
-    
-    // Import optional systems (main frame only or iframe-compatible)
-    let shortcutManager = null;
-    let subtitleInitializer = null;
-    
-    if (!isInIframe) {
-      // Main frame exclusive systems
-      const shortcutModule = await import("@/core/managers/content/shortcuts/ShortcutManager.js");
-      shortcutManager = shortcutModule.shortcutManager;
       
-      const subtitleModule = await import("@/core/managers/content/SubtitleInitializer.js");
-      subtitleInitializer = subtitleModule.initializeSubtitleHandler;
-    }
-
-    // Initialize core systems
-    const translationHandler = getTranslationHandlerInstance();
-    const eventCoordinator = translationHandler.eventCoordinator; // Use existing instance
-
-    // Store instances globally for handlers to access (with frame context)
-    window.translationHandlerInstance = translationHandler;
-    window.selectElementManagerInstance = selectElementManager;
-    window.iFrameManagerInstance = iFrameManager;
-
-    // Give ContentMessageHandler a reference to SelectElementManager and IFrameManager
-    contentMessageHandler.setSelectElementManager(selectElementManager);
-    contentMessageHandler.setIFrameManager(iFrameManager);
-
-    // Initialize subtitle handler conditionally (main frame only)
-    if (subtitleInitializer && !isInIframe) {
-      await subtitleInitializer(translationHandler);
-    }
-
-    // Initialize core systems (both main frame and iframe)
-    selectElementManager.initialize();
-    contentMessageHandler.initialize();
-
-    // Initialize TextFieldManager through EventCoordinator with iframe support
-    if (eventCoordinator.textFieldManager) {
-      eventCoordinator.textFieldManager.initialize({
-        translationHandler: translationHandler,
-        notifier: translationHandler.notifier,
-        strategies: translationHandler.strategies,
-        featureManager: translationHandler.featureManager,
-        iFrameManager: iFrameManager,
-        isInIframe: isInIframe
+      logger.info('Smart Feature Management System initialized successfully', {
+        activeFeatures: featureManager.getActiveFeatures(),
+        frameType: executionMode,
+        debugMode: isDevelopmentMode()
       });
+      
+    } catch (error) {
+      logger.error('Failed to initialize Smart Feature Management System:', error);
+      
+      // Fallback to legacy initialization on error
+      logger.warn('Falling back to legacy initialization...');
+      await initializeLegacyHandlers();
     }
 
-    // Initialize shortcut manager (main frame only)
-    if (shortcutManager && !isInIframe) {
-      shortcutManager.initialize({
-        translationHandler: translationHandler,
-        featureManager: translationHandler.featureManager
-      });
-    }
 
-    // Setup DOM event listeners for EventCoordinator (text selection, text fields)
-    document.addEventListener('mouseup', eventCoordinator.handleEvent, { passive: true });
-    document.addEventListener('click', eventCoordinator.handleEvent, { passive: true });
-    document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
-    document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
-
-
-    // Setup message listener integration with existing system
+    // Setup message listener for settings changes and feature management
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-
-      // Handle exclusion updates immediately
-      if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
-        logger.info('Page excluded via popup - disabling extension functionality');
-        // Could add cleanup logic here if needed
+      // Handle settings changes that affect feature activation
+      if (message.action === MessageActions.SETTINGS_CHANGED) {
+        logger.debug('Settings changed, refreshing feature manager');
+        if (featureManager) {
+          featureManager.manualRefresh().catch(error => {
+            logger.error('Failed to refresh feature manager after settings change:', error);
+          });
+        }
         return Promise.resolve({ success: true });
       }
 
-      // Handle async message processing
-      const handleAsync = async () => {
-        try {
-          const wasHandled = await contentMessageHandler.handleMessage(message, sender, sendResponse);
-          return wasHandled; // Return the actual handling result
-        } catch (error) {
-          logger.error('Message handling error:', error);
-          if (sendResponse) {
-            sendResponse({ success: false, error: error.message });
-          }
-          return true; // Indicate handled (even if error)
+      // Handle exclusion updates immediately
+      if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
+        logger.info('Page excluded via popup - disabling all features');
+        if (featureManager) {
+          // Deactivate all features when page is excluded
+          featureManager.getActiveFeatures().forEach(feature => {
+            featureManager.deactivateFeature(feature).catch(error => {
+              logger.error(`Failed to deactivate feature ${feature}:`, error);
+            });
+          });
         }
-      };
-
-      // For async handlers, we need to return true and handle response manually
-      if (contentMessageHandler.handlers.has(message.action)) {
-        handleAsync();
-        return true; // Keep message channel open for async response
+        return Promise.resolve({ success: true });
       }
 
-      return false; // Let other handlers process
+      // Let individual feature handlers process their own messages
+      return false; // Continue to other message handlers
     });
 
-    // Final initialization summary with iframe context
-    logger.init(`Content script initialized (${executionMode})`, {
+    // Final initialization summary with feature management context
+    const initializationSummary = {
       frameId: iFrameManager.frameId,
       isInIframe: isInIframe,
-      messageHandlers: contentMessageHandler.getInfo?.()?.handlerCount || 0,
-      shortcuts: shortcutManager?.getShortcutsInfo?.()?.shortcutCount || 0,
-      vueBridge: vueBridge.isInitialized,
-      ttsHandler: true,  // Using unified GOOGLE_TTS_SPEAK system
+      executionMode: executionMode,
+      featureManagement: featureManager ? 'smart' : 'legacy',
+      activeFeatures: featureManager ? featureManager.getActiveFeatures() : [],
+      featureStatus: featureManager ? featureManager.getStatus() : null,
       iFrameSupport: true,
       registeredFrames: iFrameManager.getAllFrames().length
-    });
+    };
+
+    logger.init(`Content script initialized with Smart Feature Management (${executionMode})`, initializationSummary);
 
     // Initialize Memory Garbage Collector with frame context
     initializeGlobalCleanup();
@@ -310,6 +288,34 @@ if (!access.isAccessible) {
     
     // Final iframe manager setup
     logger.info(`🎯 [Content Script] IFrame support enabled - Frame ID: ${iFrameManager.frameId}`);
+    
+    // Optional: Initialize EventCoordinator for backward compatibility if needed
+    // Note: With Smart Handler Registration, EventCoordinator is mostly deprecated
+    // but kept for legacy support
+    if (featureManager && isDevelopmentMode()) {
+      try {
+        logger.debug('Initializing EventCoordinator for legacy compatibility...');
+        const EventCoordinator = (await import('@/core/EventCoordinator.js')).default;
+        const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
+        
+        const translationHandler = getTranslationHandlerInstance();
+        const eventCoordinator = new EventCoordinator(translationHandler, featureManager);
+        
+        // Setup minimal event listeners for backward compatibility
+        document.addEventListener('mouseup', eventCoordinator.handleEvent, { passive: true });
+        document.addEventListener('click', eventCoordinator.handleEvent, { passive: true });
+        document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
+        document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
+        document.addEventListener('keydown', eventCoordinator.handleKeyDown, { passive: true });
+        document.addEventListener('keyup', eventCoordinator.handleKeyUp, { passive: true });
+        
+        window.eventCoordinatorInstance = eventCoordinator;
+        logger.debug('EventCoordinator initialized for legacy compatibility');
+        
+      } catch (error) {
+        logger.warn('Failed to initialize EventCoordinator (non-critical):', error);
+      }
+    }
     
     })();
   }

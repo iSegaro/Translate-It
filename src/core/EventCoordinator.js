@@ -1,16 +1,20 @@
 /**
- * EventCoordinator - Lightweight event routing system
+ * EventCoordinator - Smart event routing system integrated with FeatureManager
  * 
- * Evolved from the legacy EventHandler to focus purely on coordination.
- * Routes events to appropriate specialized managers while maintaining
- * backward compatibility with existing integrations.
+ * Modernized to work with Smart Handler Registration system.
+ * Now acts as a lightweight coordinator that delegates to FeatureManager
+ * for handler management and feature activation.
  * 
  * Architecture:
- * - Text Selection → TextSelectionManager
- * - Text Fields → TextFieldManager  
- * - Select Element → SelectElementManager (fully delegated)
- * - Keyboard Shortcuts → ShortcutManager (handled in content-scripts)
- * - Error Handling → Centralized error boundary
+ * - FeatureManager → Handles all feature lifecycle
+ * - EventCoordinator → Routes events to active handlers only
+ * - Backward Compatibility → Maintains existing API surface
+ * 
+ * Key Changes:
+ * - No more manual exclusion checks
+ * - No more manager creation
+ * - Delegates to FeatureManager for handler access
+ * - Simplified event routing
  */
 
 import {
@@ -22,12 +26,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { logMethod } from "../core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
-import { WindowsManager as SelectionWindows } from '@/features/windows/managers/WindowsManager.js';
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { TextSelectionManager } from "@/core/managers/content/TextSelectionManager.js";
-import { TextFieldIconManager } from "@/features/text-field-interaction/managers/TextFieldIconManager.js";
-import { selectElementManager } from '@/features/element-selection/managers/SelectElementManager.js';
-import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
@@ -39,49 +38,23 @@ export default class EventCoordinator {
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
-    // Initialize WindowsManager for text selection manager (main frame only)
-    if (window !== window.top) {
-      this.logger.debug('Skipping WindowsManager creation in iframe context');
-      this.windowsManager = null;
-    } else {
-      this.logger.debug('Creating WindowsManager instance in main frame...');
-      this.windowsManager = new WindowsManager({});
-      this.logger.debug('WindowsManager instance created successfully in main frame');
-    }
-
-    // Note: UnifiedMessenger removed - SelectElementManager handles its own messaging
-    
-    // Initialize specialized managers
-    this.textSelectionManager = new TextSelectionManager({
-      windowsManager: this.windowsManager, // null in iframe, which is handled by TextSelectionManager
-      notifier: translationHandler.notifier,
-    });
-
-    this.textFieldManager = new TextFieldIconManager({
-      translationHandler: translationHandler,
-      notifier: translationHandler.notifier,
-      strategies: translationHandler.strategies,
-      featureManager: featureManager,
-    });
-
-    // Debug: Check if translation handler is properly set
-    this.logger.debug('TextFieldIconManager created with translationHandler:', {
-      hasTranslationHandler: !!this.textFieldManager.translationHandler,
-      hasProcessMethod: this.textFieldManager.translationHandler && 
-                       typeof this.textFieldManager.translationHandler.processTranslation_with_CtrlSlash === 'function'
-    });
 
     // Bind coordinator methods
     this.handleEvent = this.handleEvent.bind(this);
-
-    // Track Ctrl key state for coordination (minimal state)
-    this.ctrlKeyPressed = false;
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
 
-    this.selectElementManager = selectElementManager;
+    // Track Ctrl key state for coordination (minimal state)
+    this.ctrlKeyPressed = false;
 
-    this.logger.init('EventCoordinator initialized with specialized managers');
+    // Note: No more manager creation here!
+    // All managers are now handled by FeatureManager
+    // EventCoordinator just routes events to active handlers
+
+    this.logger.init('EventCoordinator initialized (Smart Handler Registration mode)', {
+      hasFeatureManager: !!this.featureManager,
+      featureManagerType: this.featureManager?.constructor?.name
+    });
   }
 
   /**
@@ -89,57 +62,41 @@ export default class EventCoordinator {
    */
   setFeatureManager(fm) {
     this.featureManager = fm;
-    // Update managers with new feature manager
-    if (this.textFieldManager) {
-      this.textFieldManager.featureManager = fm;
-    }
   }
 
   /**
    * Main event coordination method
-   * Routes events to appropriate managers based on event type and context
+   * Routes events to active handlers managed by FeatureManager
    */
   @logMethod
   async handleEvent(event) {
-    // When SelectElementManager is active, only handle clicks if they're not handled by SelectElementManager
-    if (this.selectElementManager?.isActive) {
-      this.logger.debug('SelectElementManager is active');
-      
-      // For click events, let SelectElementManager handle them directly - don't interfere
-      if (event.type === 'click') {
-        this.logger.debug('Click event detected while SelectElementManager active - letting SelectElementManager handle it');
-        return; // Exit early to avoid interference
-      }
-      
-      // For other events, skip most handling but allow event to continue
-      this.logger.debug('Non-click event - skipping text field and selection handling');
+    // If no FeatureManager available, skip all handling
+    if (!this.featureManager) {
+      this.logger.debug('No FeatureManager available, skipping event handling');
+      return;
     }
-    try {
-      // Note: ESC key handling is managed by:
-      // - SelectElementManager (for select mode cancellation)  
-      // - ShortcutManager/RevertShortcut (for translation revert)
-      // No need for EventCoordinator involvement
 
-      // Note: Select element clicks are handled directly by SelectElementManager
-      // No need for EventCoordinator involvement in select element mode
+    try {
+      // Get active feature handlers from FeatureManager
+      const selectElementHandler = this.featureManager.getFeatureHandler('selectElement');
+      const textSelectionHandler = this.featureManager.getFeatureHandler('textSelection');
+      const textFieldIconHandler = this.featureManager.getFeatureHandler('textFieldIcon');
+
+      // Check if select element is active (priority handling)
+      if (selectElementHandler?.isSelectElementActive?.()) {
+        this.logger.debug('Select element mode is active - skipping other event handling');
+        return; // Let SelectElementHandler manage its own events
+      }
 
       // === TEXT FIELD COORDINATION ===
-      // Skip text field handling when SelectElementManager is active
-      if (this.textFieldManager.isEditableElement(event.target) && !this.selectElementManager?.isActive) {
-        if (event.type === 'focus') {
-          await this.coordinateTextFieldFocus(event);
-        } else if (event.type === 'blur') {
-          await this.coordinateTextFieldBlur(event);
-        } else {
-          await this.coordinateTextFieldHandling(event);
-        }
+      if (textFieldIconHandler?.isActive && this.isEditableElement(event.target)) {
+        await this.coordinateTextFieldHandling(event, textFieldIconHandler);
         return;
       }
 
       // === TEXT SELECTION COORDINATION ===
-      // Skip text selection handling when SelectElementManager is active
-      if (this.isMouseUp(event) && !this.selectElementManager?.isActive) {
-        await this.coordinateTextSelection(event);
+      if (textSelectionHandler?.isActive && this.isMouseUp(event)) {
+        await this.coordinateTextSelection(event, textSelectionHandler);
         return;
       }
 
@@ -150,17 +107,30 @@ export default class EventCoordinator {
 
   /**
    * Coordinate text field handling
-   * Delegates to TextFieldManager with error boundary
+   * Delegates to active TextFieldIconHandler with error boundary
    */
-  async coordinateTextFieldHandling(event) {
+  async coordinateTextFieldHandling(event, textFieldIconHandler) {
     try {
       if (state.activeTranslateIcon) return;
 
-      event.stopPropagation();
       const target = event.target;
+      const textFieldManager = textFieldIconHandler.getTextFieldIconManager();
       
-      // Delegate to TextFieldManager
-      return await this.textFieldManager.processEditableElement(target);
+      if (!textFieldManager) {
+        this.logger.debug('No TextFieldIconManager available in handler');
+        return;
+      }
+
+      // Delegate based on event type
+      if (event.type === 'focus') {
+        return await textFieldManager.handleEditableFocus?.(target);
+      } else if (event.type === 'blur') {
+        return textFieldManager.handleEditableBlur?.(target);
+      } else {
+        event.stopPropagation();
+        return await textFieldManager.processEditableElement?.(target);
+      }
+      
     } catch (error) {
       this.logger.error('Error in text field coordination:', error);
       await this.handleCoordinationError(error, event, 'text-field-coordination');
@@ -168,49 +138,29 @@ export default class EventCoordinator {
   }
 
   /**
-   * Coordinate text field focus handling
-   * Delegates to TextFieldManager with error boundary
-   */
-  async coordinateTextFieldFocus(event) {
-    try {
-      const target = event.target;
-      
-      // Delegate to TextFieldManager focus handler
-      return await this.textFieldManager.handleEditableFocus(target);
-    } catch (error) {
-      this.logger.error('Error in text field focus coordination:', error);
-      await this.handleCoordinationError(error, event, 'text-field-focus-coordination');
-    }
-  }
-
-  /**
-   * Coordinate text field blur handling
-   * Delegates to TextFieldManager with error boundary
-   */
-  async coordinateTextFieldBlur(event) {
-    try {
-      const target = event.target;
-      
-      // Delegate to TextFieldManager blur handler
-      this.textFieldManager.handleEditableBlur(target);
-    } catch (error) {
-      this.logger.error('Error in text field blur coordination:', error);
-      await this.handleCoordinationError(error, event, 'text-field-blur-coordination');
-    }
-  }
-
-  /**
    * Coordinate text selection handling
-   * Delegates to TextSelectionManager with error boundary
+   * Delegates to active TextSelectionHandler with error boundary
    */
-  async coordinateTextSelection(event) {
+  async coordinateTextSelection(event, textSelectionHandler) {
     try {
+      const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+      
+      if (!textSelectionManager) {
+        this.logger.debug('No TextSelectionManager available in handler');
+        return;
+      }
+
       // Check if Ctrl requirement is satisfied
-      const shouldProcess = await this.textSelectionManager.shouldProcessTextSelection(event);
-      if (!shouldProcess) return;
+      if (typeof textSelectionManager.shouldProcessTextSelection === 'function') {
+        const shouldProcess = await textSelectionManager.shouldProcessTextSelection(event);
+        if (!shouldProcess) return;
+      }
 
       // Delegate to TextSelectionManager
-      await this.textSelectionManager.handleTextSelection(event);
+      if (typeof textSelectionManager.handleTextSelection === 'function') {
+        await textSelectionManager.handleTextSelection(event);
+      }
+      
     } catch (error) {
       this.logger.error('Error in text selection coordination:', error);
       await this.handleCoordinationError(error, event, 'text-selection-coordination');
@@ -230,9 +180,30 @@ export default class EventCoordinator {
     });
   }
 
-  // === UTILITY METHODS (kept for coordination) ===
+  // === UTILITY METHODS ===
   isMouseUp(event) {
     return event.type === "mouseup";
+  }
+
+  isEditableElement(element) {
+    if (!element) return false;
+    
+    const tagName = element.tagName?.toLowerCase();
+    const type = element.type?.toLowerCase();
+    
+    // Check for input elements
+    if (tagName === 'input') {
+      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
+      return !type || textTypes.includes(type);
+    }
+    
+    // Check for textarea
+    if (tagName === 'textarea') return true;
+    
+    // Check for contenteditable elements
+    if (element.contentEditable === 'true') return true;
+    
+    return false;
   }
 
   // === KEY STATE MANAGEMENT (minimal, for coordination only) ===
@@ -244,8 +215,15 @@ export default class EventCoordinator {
       event.metaKey
     ) {
       this.ctrlKeyPressed = true;
-      // Update TextSelectionManager key state
-      this.textSelectionManager.updateCtrlKeyState(true);
+      
+      // Update active TextSelectionManager key state if available
+      const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
+      if (textSelectionHandler?.isActive) {
+        const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+        if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
+          textSelectionManager.updateCtrlKeyState(true);
+        }
+      }
     }
   }
 
@@ -254,8 +232,15 @@ export default class EventCoordinator {
       // تأخیر کوتاه برای اطمینان از اینکه mouseup event پردازش شده
       setTimeout(() => {
         this.ctrlKeyPressed = false;
-        // Update TextSelectionManager key state
-        this.textSelectionManager.updateCtrlKeyState(false);
+        
+        // Update active TextSelectionManager key state if available
+        const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
+        if (textSelectionHandler?.isActive) {
+          const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+          if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
+            textSelectionManager.updateCtrlKeyState(false);
+          }
+        }
       }, 50);
     }
   }
@@ -263,11 +248,16 @@ export default class EventCoordinator {
   // === BACKWARD COMPATIBILITY METHODS ===
   
   /**
-   * @deprecated - Delegates to TextFieldManager.handleEditableFocus()
+   * @deprecated - Now delegated to FeatureManager handlers
    * Kept for backward compatibility
    */
   handleEditableFocus(element) {
-    return this.textFieldManager.handleEditableFocus(element);
+    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    if (textFieldHandler?.isActive) {
+      const manager = textFieldHandler.getTextFieldIconManager();
+      return manager?.handleEditableFocus?.(element) || null;
+    }
+    return null;
   }
 
   /**
@@ -275,23 +265,53 @@ export default class EventCoordinator {
    * Kept for backward compatibility
    */
   async handleEditableElement(event) {
-    return await this.coordinateTextFieldHandling(event);
+    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    if (textFieldHandler?.isActive) {
+      return await this.coordinateTextFieldHandling(event, textFieldHandler);
+    }
   }
 
   /**
-   * @deprecated - Delegates to TextFieldManager.handleEditableBlur()
+   * @deprecated - Now delegated to FeatureManager handlers
    * Kept for backward compatibility
    */
   handleEditableBlur(element) {
-    this.textFieldManager.handleEditableBlur(element);
+    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    if (textFieldHandler?.isActive) {
+      const manager = textFieldHandler.getTextFieldIconManager();
+      if (manager?.handleEditableBlur) {
+        manager.handleEditableBlur(element);
+      }
+    }
   }
 
   /**
-   * @deprecated - Text field processing now handled by TextFieldManager
+   * @deprecated - Now delegated to FeatureManager handlers
    * Kept for backward compatibility
    */
   _processEditableElement(element) {
-    return this.textFieldManager.processEditableElement(element);
+    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    if (textFieldHandler?.isActive) {
+      const manager = textFieldHandler.getTextFieldIconManager();
+      return manager?.processEditableElement?.(element) || null;
+    }
+    return null;
+  }
+
+  // === COMPATIBILITY GETTERS ===
+  get textSelectionManager() {
+    const handler = this.featureManager?.getFeatureHandler('textSelection');
+    return handler?.isActive ? handler.getTextSelectionManager() : null;
+  }
+
+  get textFieldManager() {
+    const handler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    return handler?.isActive ? handler.getTextFieldIconManager() : null;
+  }
+
+  get selectElementManager() {
+    const handler = this.featureManager?.getFeatureHandler('selectElement');
+    return handler?.isActive ? handler.getSelectElementManager() : null;
   }
 
   // === CACHE MANAGEMENT ===
