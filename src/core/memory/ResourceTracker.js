@@ -5,8 +5,9 @@
 import { getMemoryManager } from './MemoryManager.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
+import { isDevelopmentMode } from '../../shared/utils/environment.js';
 
-const isDevelopment = import.meta.env.DEV;
+const isDevelopment = isDevelopmentMode();
 
 // Helper function to check if debugging features should be enabled
 const shouldEnableDebugging = () => {

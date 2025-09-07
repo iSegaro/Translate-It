@@ -3,9 +3,10 @@ import { onUnmounted, getCurrentInstance } from 'vue'
 import ResourceTracker from '../../core/memory/ResourceTracker.js'
 import { getScopedLogger } from '../../shared/logging/logger.js'
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js'
+import { isDevelopmentMode } from '../../shared/utils/environment.js'
 
 // Environment detection
-const isDevelopment = import.meta.env.DEV;
+const isDevelopment = isDevelopmentMode();
 
 // Helper function to check if logging should be enabled
 const shouldEnableLogging = () => {

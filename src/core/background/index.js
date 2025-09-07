@@ -5,6 +5,7 @@ import { LifecycleManager } from "@/core/managers/core/LifecycleManager.js";
 import { registerAllProviders } from "@/features/translation/providers/register-providers.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { isDevelopmentMode } from '@/shared/utils/environment.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -25,7 +26,7 @@ backgroundService.initialize().then(() => {
   
   // Initialize Memory Garbage Collector
   initializeGlobalCleanup();
-  if (import.meta.env.DEV) {
+  if (isDevelopmentMode()) {
     startMemoryMonitoring();
   }
   logger.debug("✅ [Background] Memory Garbage Collector initialized!");

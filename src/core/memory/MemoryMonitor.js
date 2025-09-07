@@ -6,12 +6,13 @@ import { getMemoryManager } from './MemoryManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MEMORY_TIMING } from './constants.js'
+import { isDevelopmentMode } from '@/shared/utils/environment.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, 'MemoryMonitor')
 
 class MemoryMonitor {
   constructor(options = {}) {
-    if (!import.meta.env.DEV) {
+    if (!isDevelopmentMode()) {
       this.isMonitoring = false;
       return; // No-op in production
     }

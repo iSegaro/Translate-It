@@ -5,11 +5,12 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MEMORY_TIMING, TRANSLATION_MEMORY } from './constants.js';
+import { isDOMAvailable, isServiceWorker, isDevelopmentMode } from '@/shared/utils/environment.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, 'MemoryManager');
 
-// Use Vite's import.meta.env for environment detection  
-const isDevelopment = import.meta.env.DEV;
+// Use safe environment detection
+const isDevelopment = isDevelopmentMode();
 
 // Helper function to check if debugging features should be enabled
 const shouldEnableDebugging = () => {
@@ -61,7 +62,11 @@ class MemoryManager {
    * Uses a single observer for better performance
    */
   initDOMCleanupObserver() {
-    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return
+    // Skip DOM observer initialization in service worker context
+    if (isServiceWorker() || !isDOMAvailable() || typeof MutationObserver === 'undefined') {
+      logger.debug('Skipping DOM observer initialization (service worker or DOM not available)')
+      return
+    }
 
     // Avoid creating multiple observers
     if (this.globalObserver) {
@@ -98,11 +103,16 @@ class MemoryManager {
       }
     })
 
-    // Start observing the entire document
-    this.globalObserver.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true
-    })
+    // Start observing the entire document (only in content script context)
+    if (typeof document !== 'undefined' && (document.body || document.documentElement)) {
+      this.globalObserver.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+      })
+    } else {
+      logger.debug('Document not available (running in service worker), skipping DOM observer')
+      return
+    }
 
     logger.debug('Shared DOM cleanup observer initialized')
   }
@@ -249,7 +259,7 @@ class MemoryManager {
    */
   trackResource(resourceId, cleanupFn, groupId = 'default') {
     if (this.resources.has(resourceId)) {
-      this.logger.debug(`Resource ${resourceId} already tracked`)
+      logger.debug(`Resource ${resourceId} already tracked`)
       return
     }
 
@@ -427,7 +437,7 @@ class MemoryManager {
           }
         }
       } catch (error) {
-        this.logger.error(`Error cleaning up resource ${resourceId}:`, error)
+        logger.error(`Error cleaning up resource ${resourceId}:`, error)
       }
     }
   }
