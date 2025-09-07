@@ -95,12 +95,14 @@
             v-model="selectionTranslationMode"
             value="immediate"
             name="selectionTranslationMode"
+            :disabled="!translateOnTextSelection"
             :label="t('options_selection_mode_immediate') || 'Immediate'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
             value="onClick"
             name="selectionTranslationMode"
+            :disabled="!translateOnTextSelection"
             :label="t('options_selection_mode_onclick') || 'On Click'"
           />
         </div>
