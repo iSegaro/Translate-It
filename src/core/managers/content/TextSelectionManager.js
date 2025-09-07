@@ -262,6 +262,13 @@ export class TextSelectionManager extends ResourceTracker {
       }
 
       if (!this.selectionTimeoutId) {
+        // Check if we should process this text selection based on settings
+        const shouldProcess = await this.shouldProcessTextSelection(event);
+        if (!shouldProcess) {
+          this.logger.debug('Skipping text selection processing due to Ctrl requirement not met');
+          return;
+        }
+
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         let settings;
         let selectionTranslationMode;
@@ -726,15 +733,6 @@ export class TextSelectionManager extends ResourceTracker {
   }
 
   /**
-   * Check if mouse event is Ctrl+Click
-   * @param {MouseEvent} event - Mouse event
-   * @returns {boolean} Whether Ctrl key was pressed
-   */
-  isMouseUpCtrl(event) {
-    return isCtrlClick(event);
-  }
-
-  /**
    * Check if event requires Ctrl key for text selection
    * @param {MouseEvent} event - Mouse event
    * @returns {Promise<boolean>} Whether Ctrl requirement is satisfied
@@ -766,8 +764,12 @@ export class TextSelectionManager extends ResourceTracker {
     // فقط در حالت immediate باید Ctrl را چک کنیم
     if (selectionTranslationMode === "immediate") {
       const requireCtrl = await getRequireCtrlForTextSelectionAsync();
-      if (requireCtrl && !this.isMouseUpCtrl(event)) {
-        return false;
+      if (requireCtrl) {
+        // Check Ctrl key from event or from tracked state
+        const ctrlPressed = event.ctrlKey || event.metaKey || this.ctrlKeyPressed;
+        if (!ctrlPressed) {
+          return false;
+        }
       }
     }
 

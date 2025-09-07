@@ -140,5 +140,5 @@ export const getSelectedTextWithDash = () => {
  * @returns {boolean} Whether Ctrl/Meta key was pressed
  */
 export const isCtrlClick = (event) => {
-  return event.type === "mouseup" && (event.ctrlKey || event.metaKey);
+  return event.ctrlKey || event.metaKey;
 };
