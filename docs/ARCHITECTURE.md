@@ -20,6 +20,7 @@
 - ✅ **Cross-Browser Support** - Chrome and Firefox MV3
 - ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
 - ✅ **Smart Messaging System** - Intelligent routing eliminates 3+ second retry delays
+- ✅ **Smart Handler Registration System** - Feature-based exclusion with dynamic handler lifecycle management and real-time settings updates
 - ✅ **Memory Garbage Collector** - Advanced memory management system preventing memory leaks with support for DOM, Browser APIs, and custom event systems
 
 ---
@@ -36,6 +37,7 @@
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system preventing memory leaks
 
 ### Feature-Specific Documentation
+- **[Smart Handler Registration System](SMART_HANDLER_REGISTRATION_SYSTEM.md)** - Dynamic feature lifecycle management with exclusion logic
 - **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
@@ -51,11 +53,12 @@
 
 ### Getting Started
 1. **New Developers**: Start with [Architecture](ARCHITECTURE.md) → [Messaging System](MessagingSystem.md)
-2. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider System](#-provider-system)
-3. **UI Development**: [Windows Manager](WINDOWS_MANAGER.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
-4. **IFrame Integration**: [IFrame Support System](../features/iframe-support/README.md) → [Cross-Frame Communication](#-smart-messaging-system)
-5. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
-6. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
+2. **Feature Development**: [Smart Handler Registration](SMART_HANDLER_REGISTRATION_SYSTEM.md) → [Translation System](TRANSLATION_SYSTEM.md)
+3. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider System](#-provider-system)
+4. **UI Development**: [Windows Manager](WINDOWS_MANAGER.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
+5. **IFrame Integration**: [IFrame Support System](../features/iframe-support/README.md) → [Cross-Frame Communication](#-smart-messaging-system)
+6. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
+7. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
 
 ---
 
@@ -92,9 +95,9 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   CONTENT LAYER                                │
-│  Content Scripts → UI Host System → Event-Based Communication  │
-│  Element Selection → Notifications → Text Field Icons          │
-│  Text Actions → Screen Capture → IFrame Support → Context Integration │
+│  Content Scripts → Smart Feature Management → UI Host System   │
+│  Feature-Based Registration → Dynamic Handler Lifecycle        │
+│  Element Selection → Text Selection → Text Field Icons → Context Integration │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -175,8 +178,18 @@ src/
 │   │   └── utils/             # Image processing
 │   ├── element-selection/
 │   │   ├── managers/          # SelectElementManager
-│   │   ├── handlers/          # Selection handlers
+│   │   ├── handlers/          # SelectElementHandler
 │   │   └── utils/             # Selection utilities
+│   ├── text-selection/
+│   │   └── handlers/          # TextSelectionHandler
+│   ├── text-field-interaction/
+│   │   ├── managers/          # TextFieldIconManager
+│   │   └── handlers/          # TextFieldIconHandler
+│   ├── shortcuts/
+│   │   └── handlers/          # ShortcutHandler
+│   ├── exclusion/
+│   │   ├── core/              # ExclusionChecker
+│   │   └── composables/       # useExclusionChecker
 │   ├── text-actions/
 │   │   ├── composables/       # useCopyAction, usePasteAction
 │   │   └── components/        # ActionToolbar, CopyButton
@@ -186,6 +199,7 @@ src/
 │   │   └── stores/            # subtitle.js store
 │   ├── windows/
 │   │   ├── managers/          # WindowsManager (business logic)
+│   │   ├── handlers/          # WindowsManagerHandler
 │   │   ├── components/        # TranslationWindow
 │   │   ├── composables/       # useWindowsManager
 │   │   └── managers/          # Position, animation, theme managers
@@ -236,8 +250,8 @@ src/
 │   │   ├── MemoryMonitor.js   # Memory usage monitoring
 │   │   └── index.js           # Module exports
 │   ├── managers/              # Core managers
-│   │   ├── core/              # LifecycleManager, FeatureManager
-│   │   ├── content/           # Content-specific managers
+│   │   ├── core/              # LifecycleManager  
+│   │   ├── content/           # FeatureManager, TextSelectionManager
 │   │   └── browser-specific/  # Browser-specific managers
 │   ├── helpers.js             # Core helper functions
 │   ├── validation.js          # Data validation
@@ -931,6 +945,35 @@ export const useTranslationStore = defineStore('translation', {
 ### Content Scripts
 - `src/content-scripts/index.js` - Main content script entry
 - `src/managers/content/select-element/SelectElementManager.js` - Element selection manager
+
+---
+
+## 🎯 Smart Handler Registration System
+
+### Overview
+Dynamic feature lifecycle management system that only registers handlers when needed based on settings and URL exclusions. Provides real-time activation/deactivation without page refresh.
+
+See **[Smart Handler Registration System Documentation](SMART_HANDLER_REGISTRATION_SYSTEM.md)** for complete details.
+
+### Key Components
+- **ExclusionChecker** - Determines feature availability based on settings and URL rules
+- **FeatureManager** - Central orchestrator for handler lifecycle management  
+- **Feature Handlers** - Standardized handlers with activate/deactivate methods
+- **Real-Time Updates** - Settings changes immediately affect handler registration
+
+### Supported Features
+- `selectElement` - Element selection and translation
+- `textSelection` - Text selection handling
+- `textFieldIcon` - Text field icon management  
+- `shortcut` - Keyboard shortcut handling (Ctrl+/)
+- `contentMessageHandler` - Content script messaging
+- `windowsManager` - UI windows management
+
+### Benefits
+- **Memory Efficient** - Only active features consume resources
+- **Real-Time Updates** - No page refresh required for settings changes
+- **Error Isolation** - Feature failures don't affect other features
+- **ResourceTracker Integration** - Automatic cleanup and memory management
 
 ---
 

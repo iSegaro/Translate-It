@@ -19,7 +19,7 @@ export class TextSelectionHandler extends ResourceTracker {
   async activate() {
     if (this.isActive) {
       logger.debug('TextSelectionHandler already active');
-      return;
+      return true;
     }
 
     try {
@@ -43,6 +43,7 @@ export class TextSelectionHandler extends ResourceTracker {
       
       this.isActive = true;
       logger.info('TextSelectionHandler activated successfully');
+      return true;
       
     } catch (error) {
       const handler = ErrorHandler.getInstance();
@@ -51,14 +52,14 @@ export class TextSelectionHandler extends ResourceTracker {
         context: 'TextSelectionHandler-activate',
         showToast: false
       });
-      throw error;
+      return false;
     }
   }
 
   async deactivate() {
     if (!this.isActive) {
       logger.debug('TextSelectionHandler not active');
-      return;
+      return true;
     }
 
     try {
@@ -74,6 +75,7 @@ export class TextSelectionHandler extends ResourceTracker {
       
       this.isActive = false;
       logger.info('TextSelectionHandler deactivated successfully');
+      return true;
       
     } catch (error) {
       logger.error('Error deactivating TextSelectionHandler:', error);
@@ -81,8 +83,10 @@ export class TextSelectionHandler extends ResourceTracker {
       try {
         this.cleanup();
         this.isActive = false;
+        return true;
       } catch (cleanupError) {
         logger.error('Critical: TextSelectionHandler cleanup failed:', cleanupError);
+        return false;
       }
     }
   }

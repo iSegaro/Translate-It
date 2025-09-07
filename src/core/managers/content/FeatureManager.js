@@ -51,7 +51,8 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async evaluateAndRegisterFeatures() {
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
+    // Order matters: contentMessageHandler should be activated first
+    const features = ['contentMessageHandler', 'windowsManager', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut'];
     
     logger.debug('Evaluating features for registration:', features);
     
@@ -64,6 +65,26 @@ export class FeatureManager extends ResourceTracker {
     logger.debug('Feature evaluation complete', {
       activeFeatures: Array.from(this.activeFeatures)
     });
+
+    // Inject dependencies after all features are evaluated
+    this.injectDependencies();
+  }
+
+  injectDependencies() {
+    const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+    const selectElementHandler = this.featureHandlers.get('selectElement');
+
+    if (contentMessageHandler && selectElementHandler) {
+      const selectElementManager = selectElementHandler.getSelectElementManager();
+      if (selectElementManager) {
+        contentMessageHandler.setSelectElementManager(selectElementManager);
+        logger.debug('Injected SelectElementManager into ContentMessageHandler');
+      } else {
+        logger.warn('SelectElementManager not available from SelectElementHandler');
+      }
+    } else {
+      logger.warn('ContentMessageHandler or SelectElementHandler not active for dependency injection');
+    }
   }
 
   async shouldActivateFeature(featureName) {
@@ -89,11 +110,14 @@ export class FeatureManager extends ResourceTracker {
       // Load and initialize feature handler
       const handler = await this.loadFeatureHandler(featureName);
       if (handler) {
-        await handler.activate();
-        this.featureHandlers.set(featureName, handler);
-        this.activeFeatures.add(featureName);
-        
-        logger.info(`Feature ${featureName} activated successfully`);
+        const success = await handler.activate();
+        if (success !== false) { // Consider true or undefined as success
+          this.featureHandlers.set(featureName, handler);
+          this.activeFeatures.add(featureName);
+          logger.info(`Feature ${featureName} activated successfully`);
+        } else {
+          logger.warn(`Feature ${featureName} activation returned false - not registering`);
+        }
       }
       
     } catch (error) {
@@ -118,7 +142,10 @@ export class FeatureManager extends ResourceTracker {
       
       const handler = this.featureHandlers.get(featureName);
       if (handler && typeof handler.deactivate === 'function') {
-        await handler.deactivate();
+        const success = await handler.deactivate();
+        if (success === false) {
+          logger.warn(`Feature ${featureName} deactivation returned false, but proceeding with cleanup`);
+        }
       }
       
       this.featureHandlers.delete(featureName);
@@ -142,6 +169,11 @@ export class FeatureManager extends ResourceTracker {
       let HandlerClass;
       
       switch (featureName) {
+        case 'contentMessageHandler':
+          const { ContentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
+          HandlerClass = ContentMessageHandler;
+          break;
+
         case 'selectElement':
           const { SelectElementHandler } = await import('@/features/element-selection/handlers/selectElementModeHandler.js');
           HandlerClass = SelectElementHandler;
@@ -222,7 +254,8 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async reevaluateFeatures() {
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
+    // Order matters: contentMessageHandler should be evaluated first
+    const features = ['contentMessageHandler', 'windowsManager', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut'];
     
     logger.debug('Re-evaluating all features');
     

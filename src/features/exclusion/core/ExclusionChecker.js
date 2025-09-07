@@ -113,6 +113,10 @@ export class ExclusionChecker {
       'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION'
     };
     
+    if (featureName === 'contentMessageHandler') {
+      return true; // Core feature, always enabled
+    }
+
     const settingKey = featureSettingsMap[featureName];
     if (!settingKey) {
       logger.warn(`Unknown feature name: ${featureName}`);
@@ -144,7 +148,7 @@ export class ExclusionChecker {
       return { initialized: false };
     }
 
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
+    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
     const status = {
       initialized: true,
       url: this.currentUrl,

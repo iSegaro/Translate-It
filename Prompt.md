@@ -19,6 +19,7 @@
 - **Logging System**: سیستم log ساختارمند
 - **UI Host System**: اپلیکیشن متمرکز Vue برای مدیریت تمام UIهای درون-صفحه در Shadow DOM
 - **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته برای جلوگیری از memory leaks با پشتیبانی از DOM، Browser APIs و سیستم‌های event سفارشی
+- **Smart Handler Registration**: سیستم ثبت handler های هوشمند با فعال‌سازی و غیرفعال‌سازی پویا بر اساس تنظیمات و URL exclusion
 
 ## روش‌های ترجمه
 1. **انتخاب متن**: ترجمه متن انتخاب شده با نمایش آیکون یا کادر مستقیم
@@ -49,10 +50,14 @@
   - `translation/` - موتور ترجمه، شامل `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
   - `tts/` - سیستم Text-to-Speech پیشرفته با مدیریت وضعیت
   - `screen-capture/` - سیستم کپچر صفحه و OCR
-  - `element-selection/` - انتخاب و ترجمه المنت‌های DOM
+  - `element-selection/` - انتخاب و ترجمه المنت‌های DOM با SelectElementHandler
+  - `text-selection/` - مدیریت انتخاب متن با TextSelectionHandler
+  - `text-field-interaction/` - نمایش آیکون در فیلدهای متنی با TextFieldIconHandler
+  - `shortcuts/` - میانبرهای صفحه‌کلید با ShortcutHandler  
+  - `exclusion/` - سیستم **Smart Handler Registration** با ExclusionChecker
   - `text-actions/` - عملیات copy/paste/TTS
   - `subtitle/` - ترجمه زیرنویس ویدئوها
-  - `windows/` - مدیریت UI رویداد-محور
+  - `windows/` - مدیریت UI رویداد-محور با WindowsManagerHandler
   - `iframe-support/` - سیستم ساده و مؤثر پشتیبانی از iframe با کامپوننت‌های ضروری
   - `history/` - مدیریت تاریخچه ترجمه
   - `settings/` - تنظیمات و configuration
@@ -70,7 +75,7 @@
   - `background/` - service worker، handlers، lifecycle
   - `content-scripts/` - اسکریپت‌های محتوا
   - `memory/` - سیستم Memory Garbage Collector پیشرفته (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
-  - `managers/` - مدیریت‌کننده‌های هسته
+  - `managers/` - **FeatureManager** برای مدیریت چرخه حیات handler ها و TextSelectionManager
 
 ### 🛠️ Pure Utilities (ساده‌سازی شده)
 - **`src/utils/`**: ابزارهای خالص بدون منطق business
@@ -84,6 +89,7 @@
 
 ### مستندات اصلی
 - **`docs/ARCHITECTURE.md`**: معماری کامل پروژه و integration guide
+- **`docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`**: سیستم ثبت handler های هوشمند با مدیریت چرخه حیات پویا
 - **`docs/MessagingSystem.md`**: سیستم پیام‌رسانی بین کامپوننت‌ها
 - **`docs/TRANSLATION_SYSTEM.md`**: موتور ترجمه و provider ها
 - **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
@@ -118,6 +124,12 @@
 - **بهینه‌سازی**: caching و optimization متمرکز
 - **پایداری**: تغییرات کنترل شده در core systems
 
+### 🎯 Smart Handler Registration
+- **بهینه‌سازی حافظه**: فقط handler های ضروری فعال و منابع مصرف می‌کنند
+- **به‌روزرسانی Real-Time**: تغییرات تنظیمات بدون نیاز به refresh صفحه اعمال می‌شود
+- **مدیریت پویا**: فعال‌سازی و غیرفعال‌سازی خودکار بر اساس URL و تنظیمات
+- **جداسازی خطا**: اگر یک feature خراب شود، سایرین کار می‌کنند
+
 ### 📁 Clean Structure
 - **حداکثر 3 سطح عمق**: پیمایش آسان‌تر
 - **نام‌گذاری consistent**: قابل پیش‌بینی
@@ -131,4 +143,6 @@
 - **Cross-Browser**: کروم و فایرفاکس
 - **Build Tools**: Webpack، pnpm
 - **Polyfill**: webextension-polyfill برای سازگاری
-- **Modern Architecture**: Feature-based با 10 feature اصلی شامل iframe support
+- **Modern Architecture**: Feature-based با Smart Handler Registration System
+- **Dynamic Feature Management**: سیستم FeatureManager برای مدیریت چرخه حیات handlers
+- **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector یکپارچه

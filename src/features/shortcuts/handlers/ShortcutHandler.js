@@ -30,7 +30,7 @@ export class ShortcutHandler extends ResourceTracker {
   async activate() {
     if (this.isActive) {
       getLogger().debug('ShortcutHandler already active');
-      return;
+      return true;
     }
 
     try {
@@ -41,6 +41,7 @@ export class ShortcutHandler extends ResourceTracker {
       
       this.isActive = true;
       getLogger().info('ShortcutHandler activated successfully');
+      return true;
       
     } catch (error) {
       const handler = ErrorHandler.getInstance();
@@ -49,14 +50,14 @@ export class ShortcutHandler extends ResourceTracker {
         context: 'ShortcutHandler-activate',
         showToast: false
       });
-      throw error;
+      return false;
     }
   }
 
   async deactivate() {
     if (!this.isActive) {
       getLogger().debug('ShortcutHandler not active');
-      return;
+      return true;
     }
 
     try {
@@ -67,6 +68,7 @@ export class ShortcutHandler extends ResourceTracker {
       
       this.isActive = false;
       getLogger().info('ShortcutHandler deactivated successfully');
+      return true;
       
     } catch (error) {
       getLogger().error('Error deactivating ShortcutHandler:', error);
@@ -74,8 +76,10 @@ export class ShortcutHandler extends ResourceTracker {
       try {
         this.cleanup();
         this.isActive = false;
+        return true;
       } catch (cleanupError) {
         getLogger().error('Critical: ShortcutHandler cleanup failed:', cleanupError);
+        return false;
       }
     }
   }

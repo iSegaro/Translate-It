@@ -25,7 +25,7 @@ export class WindowsManagerHandler extends ResourceTracker {
   async activate() {
     if (this.isActive) {
       logger.debug('WindowsManager already active, skipping activation');
-      return;
+      return true;
     }
 
     try {
@@ -33,7 +33,7 @@ export class WindowsManagerHandler extends ResourceTracker {
       if (window !== window.top) {
         logger.debug('In iframe context - WindowsManager not needed, using cross-frame communication');
         this.isActive = true;
-        return;
+        return true;
       }
 
       // Create WindowsManager instance
@@ -46,10 +46,11 @@ export class WindowsManagerHandler extends ResourceTracker {
 
       this.isActive = true;
       logger.info('WindowsManager activated successfully');
+      return true;
       
     } catch (error) {
       logger.error('Failed to activate WindowsManager:', error);
-      throw error;
+      return false;
     }
   }
 
@@ -60,7 +61,7 @@ export class WindowsManagerHandler extends ResourceTracker {
   async deactivate() {
     if (!this.isActive) {
       logger.debug('WindowsManager not active, skipping deactivation');
-      return;
+      return true;
     }
 
     try {
@@ -69,8 +70,8 @@ export class WindowsManagerHandler extends ResourceTracker {
         await this.windowsManager.dismiss();
         
         // Clean up the instance
-        if (typeof this.windowsManager.cleanup === 'function') {
-          this.windowsManager.cleanup();
+        if (this.windowsManager && typeof this.windowsManager.destroy === 'function') {
+          this.windowsManager.destroy();
         }
         
         this.windowsManager = null;
@@ -83,12 +84,14 @@ export class WindowsManagerHandler extends ResourceTracker {
 
       this.isActive = false;
       logger.info('WindowsManager deactivated successfully');
+      return true;
       
     } catch (error) {
       logger.error('Failed to deactivate WindowsManager:', error);
       // Continue with deactivation even if cleanup failed
       this.isActive = false;
       this.windowsManager = null;
+      return false;
     }
   }
 

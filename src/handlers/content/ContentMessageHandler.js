@@ -37,6 +37,40 @@ export class ContentMessageHandler extends ResourceTracker {
     this.logger.init('Content message handler initialized');
   }
 
+  async activate() {
+    if (this.initialized) {
+      this.logger.debug('ContentMessageHandler already active');
+      return true;
+    }
+    
+    try {
+      this.initialize();
+      this.isActive = true;
+      this.logger.info('ContentMessageHandler activated successfully');
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to activate ContentMessageHandler:', error);
+      return false;
+    }
+  }
+
+  async deactivate() {
+    if (!this.initialized) {
+      this.logger.debug('ContentMessageHandler not active');
+      return true;
+    }
+    
+    try {
+      this.cleanup();
+      this.isActive = false;
+      this.logger.info('ContentMessageHandler deactivated successfully');
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to deactivate ContentMessageHandler:', error);
+      return false;
+    }
+  }
+
   registerHandlers() {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
@@ -64,25 +98,36 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleMessage(message, sender, sendResponse) {
+    this.logger.debug(`Handling message: ${message.action}`);
     const handler = this.handlers.get(message.action);
     if (handler) {
       try {
         const result = await handler(message, sender);
-        if (sendResponse) sendResponse({ success: true, data: result });
+        try {
+          if (sendResponse) sendResponse({ success: true, data: result });
+        } catch (e) {
+          this.logger.error(`Failed to send response for ${message.action}:`, e);
+        }
         return true; // Message was handled
       } catch (error) {
         // Don't log errors that are already handled
         if (!error.alreadyHandled) {
           this.logger.error(`Error handling ${message.action}`, error);
         }
-        if (sendResponse) sendResponse({ success: false, error: error.message });
+        try {
+          if (sendResponse) sendResponse({ success: false, error: error.message });
+        } catch (e) {
+          this.logger.error(`Failed to send error response for ${message.action}:`, e);
+        }
         return true; // Error was handled
       }
     }
+    this.logger.debug(`No handler for action: ${message.action}`);
     return false; // Message not handled
   }
 
   async handleActivateSelectElementMode(message) {
+    this.logger.debug(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
     this.logger.operation("🎯 ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!", {
       hasSelectElementManager: !!this.selectElementManager,
       messageData: message.data,

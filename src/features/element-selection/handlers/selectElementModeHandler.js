@@ -45,6 +45,7 @@ export class SelectElementHandler extends ResourceTracker {
       
       this.isActive = true;
       logger.info('SelectElementHandler activated successfully');
+      return true;
       
     } catch (error) {
       const handler = ErrorHandler.getInstance();
@@ -53,14 +54,14 @@ export class SelectElementHandler extends ResourceTracker {
         context: 'SelectElementHandler-activate',
         showToast: false
       });
-      throw error;
+      return false;
     }
   }
 
   async deactivate() {
     if (!this.isActive) {
       logger.debug('SelectElementHandler not active');
-      return;
+      return true;
     }
 
     try {
@@ -76,6 +77,7 @@ export class SelectElementHandler extends ResourceTracker {
       
       this.isActive = false;
       logger.info('SelectElementHandler deactivated successfully');
+      return true;
       
     } catch (error) {
       logger.error('Error deactivating SelectElementHandler:', error);
@@ -83,8 +85,10 @@ export class SelectElementHandler extends ResourceTracker {
       try {
         this.cleanup();
         this.isActive = false;
+        return true;
       } catch (cleanupError) {
         logger.error('Critical: SelectElementHandler cleanup failed:', cleanupError);
+        return false;
       }
     }
   }

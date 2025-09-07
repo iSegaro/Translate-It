@@ -15,7 +15,7 @@ const getLogger = () => {
 };
 
 export class TextFieldIconHandler extends ResourceTracker {
-  constructor() {
+  constructor(options = {}) {
     super('text-field-icon-handler');
     
     this.isActive = false;
@@ -23,20 +23,21 @@ export class TextFieldIconHandler extends ResourceTracker {
     this.focusHandler = null;
     this.blurHandler = null;
     this.inputHandler = null;
+    this.featureManager = options.featureManager;
   }
 
   async activate() {
     if (this.isActive) {
       getLogger().debug('TextFieldIconHandler already active');
-      return;
+      return true;
     }
 
     try {
       getLogger().debug('Activating TextFieldIconHandler');
       
-      // Create and initialize TextFieldIconManager
+      // Create and initialize TextFieldIconManager with translation handler
       this.textFieldIconManager = new TextFieldIconManager();
-      this.textFieldIconManager.initialize();
+      await this.initializeWithDependencies();
       
       // Setup event listeners for text field interactions
       this.setupTextFieldListeners();
@@ -51,6 +52,7 @@ export class TextFieldIconHandler extends ResourceTracker {
       
       this.isActive = true;
       getLogger().info('TextFieldIconHandler activated successfully');
+      return true;
       
     } catch (error) {
       const handler = ErrorHandler.getInstance();
@@ -59,14 +61,38 @@ export class TextFieldIconHandler extends ResourceTracker {
         context: 'TextFieldIconHandler-activate',
         showToast: false
       });
-      throw error;
+      return false;
+    }
+  }
+
+  async initializeWithDependencies() {
+    try {
+      // Import translation handler dynamically to avoid circular dependencies
+      const { getTranslationHandlerInstance } = await import('@/core/InstanceManager.js');
+      const translationHandler = getTranslationHandlerInstance();
+      
+      if (translationHandler) {
+        // Initialize with translation handler
+        this.textFieldIconManager.initialize({
+          translationHandler: translationHandler
+        });
+        getLogger().debug('TextFieldIconManager initialized with translationHandler');
+      } else {
+        // Fallback initialization without translation handler
+        this.textFieldIconManager.initialize();
+        getLogger().warn('TextFieldIconManager initialized without translationHandler - text field icons may not work correctly');
+      }
+    } catch (error) {
+      getLogger().error('Failed to initialize TextFieldIconManager with dependencies:', error);
+      // Fallback initialization
+      this.textFieldIconManager.initialize();
     }
   }
 
   async deactivate() {
     if (!this.isActive) {
       getLogger().debug('TextFieldIconHandler not active');
-      return;
+      return true;
     }
 
     try {
@@ -82,6 +108,7 @@ export class TextFieldIconHandler extends ResourceTracker {
       
       this.isActive = false;
       getLogger().info('TextFieldIconHandler deactivated successfully');
+      return true;
       
     } catch (error) {
       getLogger().error('Error deactivating TextFieldIconHandler:', error);
@@ -89,8 +116,10 @@ export class TextFieldIconHandler extends ResourceTracker {
       try {
         this.cleanup();
         this.isActive = false;
+        return true;
       } catch (cleanupError) {
         getLogger().error('Critical: TextFieldIconHandler cleanup failed:', cleanupError);
+        return false;
       }
     }
   }

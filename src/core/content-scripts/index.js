@@ -226,7 +226,43 @@ if (!access.isAccessible) {
         frameType: executionMode,
         debugMode: isDevelopmentMode()
       });
-      
+
+      // Setup the central message listener
+      browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        const messageHandler = featureManager.getFeatureHandler('contentMessageHandler');
+
+        // Check if the central handler has a specific handler for this action
+        if (messageHandler && messageHandler.handlers.has(message.action)) {
+          // If yes, let it handle the message and indicate an async response.
+          messageHandler.handleMessage(message, sender, sendResponse);
+          return true;
+        }
+
+        // Fallback for messages not handled by ContentMessageHandler
+        if (message.action === MessageActions.SETTINGS_CHANGED) {
+          logger.debug('Settings changed, refreshing feature manager');
+          featureManager.manualRefresh().catch(error => {
+            logger.error('Failed to refresh feature manager after settings change:', error);
+          });
+          // No async response needed, but we handled it.
+          return;
+        }
+
+        if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
+          logger.info('Page excluded via popup - disabling all features');
+          featureManager.getActiveFeatures().forEach(feature => {
+            featureManager.deactivateFeature(feature).catch(error => {
+              logger.error(`Failed to deactivate feature ${feature}:`, error);
+            });
+          });
+          // No async response needed, but we handled it.
+          return;
+        }
+
+        // Message was not handled by any part of this listener.
+        return false;
+      });
+
     } catch (error) {
       logger.error('Failed to initialize Smart Feature Management System:', error);
       
@@ -234,38 +270,6 @@ if (!access.isAccessible) {
       logger.warn('Falling back to legacy initialization...');
       await initializeLegacyHandlers();
     }
-
-
-    // Setup message listener for settings changes and feature management
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      // Handle settings changes that affect feature activation
-      if (message.action === MessageActions.SETTINGS_CHANGED) {
-        logger.debug('Settings changed, refreshing feature manager');
-        if (featureManager) {
-          featureManager.manualRefresh().catch(error => {
-            logger.error('Failed to refresh feature manager after settings change:', error);
-          });
-        }
-        return Promise.resolve({ success: true });
-      }
-
-      // Handle exclusion updates immediately
-      if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
-        logger.info('Page excluded via popup - disabling all features');
-        if (featureManager) {
-          // Deactivate all features when page is excluded
-          featureManager.getActiveFeatures().forEach(feature => {
-            featureManager.deactivateFeature(feature).catch(error => {
-              logger.error(`Failed to deactivate feature ${feature}:`, error);
-            });
-          });
-        }
-        return Promise.resolve({ success: true });
-      }
-
-      // Let individual feature handlers process their own messages
-      return false; // Continue to other message handlers
-    });
 
     // Final initialization summary with feature management context
     const initializationSummary = {

@@ -1049,43 +1049,7 @@ export class WindowsManager extends ResourceTracker {
     }
   }
 
-  /**
-   * Cleanup event listeners when WindowsManager is destroyed
-   */
-  destroy() {
-    if (this.pageEventBus && this._iconClickHandler) {
-      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
-    }
-  }
-
-  /**
-   * Remove element from DOM - deprecated (handled by Vue UI Host)
-   */
-  // _removeElement method removed - handled by Vue UI Host
-
-  /**
-   * Destroy WindowsManager instance
-   */
-  destroy() {
-    try {
-      this.dismiss(false);
-      
-      // Remove event listeners
-      window.removeEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
-      
-      // Cleanup all modules
-      this.crossFrameManager.cleanup();
-      this.translationHandler.cleanup();
-      this.ttsManager.cleanup();
-      this.dragHandler.cleanup();
-      this.clickManager.cleanup();
-      this.themeManager.cleanup();
-      
-      this.logger.debug('WindowsManager destroyed');
-    } catch (error) {
-      this.logger.warn('Error during WindowsManager destruction:', error);
-    }
-  }
+  
 
   // Backward compatibility getters
   get isVisible() {
