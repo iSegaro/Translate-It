@@ -164,7 +164,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     });
     
     if (this.isActive) {
-      this.logger.warn("SelectElementManager already active, checking state.", {
+      this.logger.debug("SelectElementManager already active, checking state.", {
         instanceId: this.instanceId,
         hasAbortController: !!this.abortController,
         isAborted: this.abortController?.signal?.aborted,
@@ -260,7 +260,11 @@ export class SelectElementManagerNew extends ResourceTracker {
 
     this.isActive = false;
     this.deactivateSelectionUI();
-    this.translationOrchestrator.cancelAll();
+    
+    // Only cancel if this is not during translation (to avoid interrupting ongoing translation)
+    if (!window.isTranslationInProgress) {
+      this.translationOrchestrator.cancelAllTranslations();
+    }
 
     this.logger.info('Select element UI deactivated');
     this.cleanup();
@@ -376,14 +380,10 @@ export class SelectElementManagerNew extends ResourceTracker {
   }
 
   async deactivateSelectionUIOnly() {
-    this.logger.debug("Deactivating selection UI only (immediate feedback)");
+    this.logger.debug("Deactivating selection UI only (immediate feedback) - NOT notifying background");
 
-    this._notifyDeactivation().catch((error) => {
-      this.errorHandlingService.handleError(
-        error,
-        'Failed to send deactivation message',
-      );
-    });
+    // DON'T notify background yet - we're just hiding the UI
+    // Background notification should only happen after translation is complete
     
     // EMIT CROSS-FRAME DEACTIVATION EVENT TO ALL FRAMES
     pageEventBus.emit('select-mode-deactivated');
@@ -416,11 +416,11 @@ export class SelectElementManagerNew extends ResourceTracker {
       // Ignore cross-origin errors
     }
     
-    // Disable selection state immediately
-    this.isActive = false;
+    // Keep selection active but disable highlighting
+    // this.isActive = false; // DON'T disable - keep it active for potential retry
     
-    // Remove event listeners immediately to prevent re-highlighting
-    this.removeSelectionEventListeners();
+    // Remove event listeners temporarily to prevent re-highlighting during translation
+    // this.removeSelectionEventListeners(); // DON'T remove - just disable highlighting
     
     // Clear current highlight first (this is what was missing!)
     this.elementHighlighter.clearHighlight();
