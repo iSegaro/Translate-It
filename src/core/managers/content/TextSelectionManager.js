@@ -7,7 +7,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isUrlExcluded } from "@/utils/ui/exclusion.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
-import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "@/utils/browser/events.js";
+import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -51,6 +51,10 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Store last valid position for recovery when selection is cleared
     this.lastValidPosition = null;
+    
+    // Track last selection context for proper dismissal
+    this.lastSelectionElement = null;
+    this.lastSelectionPosition = null;
     
     // Track external window state (for iframe-created windows in main frame)
     this.hasExternalWindow = false;
@@ -143,13 +147,26 @@ export class TextSelectionManager extends ResourceTracker {
   }
 
   /**
-   * Check if translation window is visible (works in both main frame and iframe)
+   * Check if translation window or icon is visible (works in both main frame and iframe)
    * @returns {boolean}
    */
   _isWindowVisible() {
     const windowsManager = this._getWindowsManager();
     if (windowsManager) {
-      return windowsManager.state.isVisible;
+      const isVisible = windowsManager.state.isVisible;
+      const isIconMode = windowsManager.state.isIconMode;
+      const result = isVisible || isIconMode;
+      
+      // Debug logging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug('_isWindowVisible debug:', {
+          isVisible,
+          isIconMode,
+          result
+        });
+      }
+      
+      return result;
     }
     
     // Check external window state (for iframe-created windows)
@@ -157,14 +174,60 @@ export class TextSelectionManager extends ResourceTracker {
       return true;
     }
     
-    // Fallback: check shadow DOM directly
+    // Fallback: check shadow DOM directly for both windows and icons
     const shadowHost = document.getElementById('translate-it-host');
     if (shadowHost && shadowHost.shadowRoot) {
       const activeWindows = shadowHost.shadowRoot.querySelectorAll('.translation-window');
-      return activeWindows.length > 0;
+      const activeIcons = shadowHost.shadowRoot.querySelectorAll('.translation-icon');
+      const result = activeWindows.length > 0 || activeIcons.length > 0;
+      
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug('_isWindowVisible fallback:', {
+          activeWindows: activeWindows.length,
+          activeIcons: activeIcons.length,
+          result
+        });
+      }
+      
+      return result;
     }
     
     return false;
+  }
+
+  /**
+   * Check if icon should be dismissed based on click position
+   * @param {MouseEvent} event - Mouse event
+   * @param {string} selectedText - Selected text
+   * @returns {boolean} Whether to dismiss the icon
+   */
+  _shouldDismissIcon(event, selectedText) {
+    // Only check when no text is selected and window/icon is visible
+    if (selectedText || !this._isWindowVisible()) {
+      return false;
+    }
+    
+    // Use existing icon position from WindowsManager if available
+    const windowsManager = this._getWindowsManager();
+    let iconPosition = null;
+    
+    if (windowsManager?.state?.iconClickContext?.position) {
+      iconPosition = windowsManager.state.iconClickContext.position;
+    } else if (this.lastSelectionPosition) {
+      iconPosition = this.lastSelectionPosition;
+    }
+    
+    if (!iconPosition || !event.clientX || !event.clientY) {
+      return false;
+    }
+    
+    // Check proximity to icon position (within 150px radius)
+    const distance = Math.hypot(
+      event.clientX - iconPosition.x,
+      event.clientY - iconPosition.y
+    );
+    
+    return distance <= 150;
   }
 
   /**
@@ -175,6 +238,9 @@ export class TextSelectionManager extends ResourceTracker {
     if (windowsManager) {
       windowsManager.dismiss();
     }
+    // Clear selection tracking after dismissal
+    this.lastSelectionElement = null;
+    this.lastSelectionPosition = null;
     // In iframe context, send dismiss message to main frame
     // This could be implemented later if needed
   }
@@ -206,6 +272,12 @@ export class TextSelectionManager extends ResourceTracker {
     
     const selectedText = getSelectedTextWithDash();
     const path = getEventPath(event);
+
+    // Check if icon should be dismissed based on proximity
+    if (this._shouldDismissIcon(event, selectedText)) {
+      this._dismissWindow();
+      return;
+    }
 
     // بررسی اینکه آیا کلیک در داخل پنجره ترجمه رخ داده است یا نه
     if (this._isWindowVisible()) {
@@ -269,6 +341,7 @@ export class TextSelectionManager extends ResourceTracker {
           return;
         }
 
+
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         let settings;
         let selectionTranslationMode;
@@ -305,6 +378,7 @@ export class TextSelectionManager extends ResourceTracker {
         this.addEventListener(document, "mousedown", this.cancelSelectionTranslation);
       }
     } else {
+      
       // **IMPORTANT**: When no text is selected (outside click), only allow dismissal if click is outside translation window
       let settings;
       let selectionTranslationMode;
@@ -428,9 +502,18 @@ export class TextSelectionManager extends ResourceTracker {
       // This should run for both onClick and immediate modes
       const windowVisible = this._isWindowVisible();
       
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug('Outside click check - window visible:', {
+          windowVisible,
+          target: event?.target?.tagName
+        });
+      }
+      
       if (windowVisible) {
-        // Only dismiss if we have our own windowsManager (not external windows from iframe)
-        if (this._getWindowsManager() && !this.hasExternalWindow) {
+        // If a window is visible and an outside click is detected, dismiss the window.
+        // This frame's TextSelectionManager takes responsibility for dismissing the window,
+        // even if it was created by a different frame (e.g., an iframe).
+        if (this._getWindowsManager()) {
           this.logger.debug('Dismiss SelectionWindows - no text selected (outside click)');
           this._dismissWindow();
           
@@ -438,7 +521,6 @@ export class TextSelectionManager extends ResourceTracker {
           this.lastProcessedText = null;
           this.lastProcessedTime = 0;
         }
-        // If window is external (iframe-created), let WindowsManager handle dismissal
       }
       
       // **IFRAME CROSS-FRAME FIX**: If in iframe, broadcast outside click to main frame
@@ -526,6 +608,17 @@ export class TextSelectionManager extends ResourceTracker {
       const range = selection.getRangeAt(0);
       let rect = range.getBoundingClientRect();
       
+      // Track the element and position where selection occurred for dismissal logic
+      this.lastSelectionElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+        ? range.commonAncestorContainer.parentElement 
+        : range.commonAncestorContainer;
+        
+      // Store the selection position for proximity-based dismissal
+      this.lastSelectionPosition = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+        
       // Check if rect is valid (not empty)
       if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
         // If we already have a visible window, don't show another one
@@ -804,6 +897,8 @@ export class TextSelectionManager extends ResourceTracker {
     // Clear tracking state
     this.lastProcessedText = null;
     this.lastProcessedTime = 0;
+    this.lastSelectionElement = null;
+    this.lastSelectionPosition = null;
     
     // Clear any remaining timeouts
     if (this.selectionTimeoutId) {
