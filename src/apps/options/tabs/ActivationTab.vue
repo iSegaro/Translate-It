@@ -44,12 +44,14 @@
             v-model="textFieldMode"
             value="copy"
             name="textFieldMode"
+            :disabled="!translateOnTextFields && !enableShortcutForTextFields"
             :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
           />
           <BaseRadio
             v-model="textFieldMode"
             value="replace"
             name="textFieldMode"
+            :disabled="!translateOnTextFields && !enableShortcutForTextFields"
             :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
           />
         </div>
@@ -57,7 +59,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox 
             v-model="replaceOnSpecialSites" 
-            :disabled="!extensionEnabled || textFieldMode !== 'copy'"
+            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) || textFieldMode !== 'copy'"
             :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
           />
         </div>
