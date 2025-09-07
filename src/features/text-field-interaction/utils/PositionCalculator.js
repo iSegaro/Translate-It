@@ -385,7 +385,7 @@ export class PositionCalculator {
     // Preserve original placement preference if possible
     const newOptions = {
       ...options,
-      preferredPlacement: currentPosition.placement
+      preferredPlacement: currentPosition?.placement
     };
 
     return this.calculateOptimalPosition(element, null, newOptions);
