@@ -1,6 +1,58 @@
 /**
- * Vue.js utility functions for the Translate-It extension
- * Provides shared utilities for Vue app configuration and CSP compatibility
+ * Vue.js Utility Functions for Browser Extension CSP Compatibility
+ *
+ * This module provides essential utilities for Vue.js applications running in browser extensions,
+ * with special handling for Content Security Policy (CSP) restrictions, particularly Trusted Types.
+ *
+ * ## 🎯 Purpose
+ * Browser extensions run in hostile environments where host pages may have strict CSP policies.
+ * Vue.js automatically tries to create Trusted Types policies, but these may violate the host page's CSP.
+ * This module provides comprehensive protection against such CSP violations.
+ *
+ * ## 🔧 Key Features
+ * - **Trusted Types CSP Compatibility**: Prevents TrustedTypePolicy creation errors
+ * - **Vue.js CSP Configuration**: Configures Vue to work within extension CSP restrictions
+ * - **Smart Fallback System**: Multiple layers of fallback for maximum compatibility
+ * - **Cross-Browser Support**: Works across different CSP configurations
+ *
+ * ## 🛡️ Trusted Types Handling Strategy
+ *
+ * ### The Problem
+ * - Vue.js automatically creates a Trusted Types policy named 'vue'
+ * - Host pages (like Microsoft OneDrive) have CSP that doesn't allow 'vue' policy
+ * - Content scripts inherit host page CSP restrictions
+ * - Result: "Refused to create a TrustedTypePolicy named 'vue'" error
+ *
+ * ### The Solution
+ * 1. **Early Monkey-Patching**: Intercept Trusted Types API before Vue loads
+ * 2. **Smart Redirection**: Redirect 'vue' policy requests to allowed policies
+ * 3. **Graceful Fallback**: Use no-op policies when no alternatives exist
+ * 4. **Vue Configuration**: Disable Trusted Types in Vue compiler options
+ *
+ * ### Fallback Priority
+ * 1. Use existing 'default' policy (most common)
+ * 2. Try other allowed policies (dompurify, nextjs, script-url#webpack, etc.)
+ * 3. Fall back to no-op policy (safe but minimal functionality)
+ *
+ * ## 📋 Usage
+ * ```javascript
+ * import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
+ *
+ * const app = configureVueForCSP(createApp(MyComponent));
+ * ```
+ *
+ * ## 🔍 Debugging
+ * Enable debug logging to see which fallback is being used:
+ * ```javascript
+ * // Check console for messages like:
+ * // "Using fallback policy: default"
+ * // "Creating no-op fallback policy for vue"
+ * ```
+ *
+ * ## 🚀 Future Considerations
+ * - Monitor CSP changes in major websites
+ * - Update fallback policy list as needed
+ * - Consider Vue.js updates that might change Trusted Types behavior
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
