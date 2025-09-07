@@ -7,6 +7,7 @@ import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.POPUP, 'popup');
 
@@ -34,7 +35,7 @@ async function initializeApp() {
     const { default: i18n } = await import('@/utils/i18n/plugin.js')
     
     // Create Vue app
-    const app = createApp(PopupApp)
+    const app = configureVueForCSP(createApp(PopupApp))
 
     // Use plugins (order matters: Pinia first, then i18n)
     app.use(pinia)

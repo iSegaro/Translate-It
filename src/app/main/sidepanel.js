@@ -9,6 +9,7 @@ import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { configureVueForCSP } from '@/shared/vue/vue-utils.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
 
@@ -54,7 +55,7 @@ async function initializeApp() {
 
     // Create Vue app
     logger.debug('🎨 Creating Vue app...')
-    const app = createApp(SidepanelApp)
+    const app = configureVueForCSP(createApp(SidepanelApp))
     logger.debug('✅ Vue app created successfully')
 
     // Use plugins (order matters: pinia first, then i18n)

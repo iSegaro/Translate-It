@@ -18,6 +18,10 @@ import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 // Import Feature Manager for smart handler registration
 import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 
+// Setup Trusted Types compatibility early
+import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
+setupTrustedTypesCompatibility();
+
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');

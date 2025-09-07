@@ -10,6 +10,7 @@ import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
@@ -84,7 +85,7 @@ async function initializeApp() {
 
     // Create Vue app
     logger.debug('🎨 Creating Vue app...')
-    const app = createApp(OptionsApp)
+    const app = configureVueForCSP(createApp(OptionsApp))
     logger.debug('✅ Vue app created successfully')
     
     // Add detailed debugging
