@@ -220,8 +220,10 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("could not establish connection") ||
     msg.includes("receiving end does not exist") ||
     msg.includes("message port closed") ||
+    msg.includes("page moved to back/forward cache") ||
     msg.includes("page-moved-to-cache") ||
-    msg.includes("page moved to cache")
+    msg.includes("page moved to cache") ||
+    msg.includes("back/forward cache")
   )
     return ErrorTypes.CONTEXT;
 
