@@ -461,7 +461,58 @@ export class TextSelectionManager extends ResourceTracker {
     
     if (selection.rangeCount > 0) {
   const range = selection.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
+  let rect = range.getBoundingClientRect();
+  
+  // Fix for TEXTAREA and INPUT fields where getBoundingClientRect returns zeros
+  if (rect.width === 0 && rect.height === 0) {
+    // Check if selection is within a form element
+    const activeElement = document.activeElement;
+    if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
+      // Use the element's bounding rect instead
+      const elementRect = activeElement.getBoundingClientRect();
+      
+      // Calculate approximate position based on cursor position in the element
+      let estimatedX = elementRect.left + 10; // Small offset from left
+      let estimatedY = elementRect.top + 10; // Small offset from top
+      
+      // For multiline elements, try to estimate cursor position
+      if (activeElement.tagName === 'TEXTAREA') {
+        // Use selection start to estimate vertical position
+        const cursorPosition = activeElement.selectionStart;
+        const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
+        const lines = textBeforeCursor.split('\n');
+        const lineHeight = 18; // Estimated line height
+        
+        estimatedY = elementRect.top + ((lines.length - 1) * lineHeight) + 10;
+        
+        // Estimate horizontal position based on last line length
+        const lastLineLength = lines[lines.length - 1].length;
+        const charWidth = 8; // Estimated character width
+        estimatedX = elementRect.left + (lastLineLength * charWidth) + 10;
+        
+        // Constrain to element bounds
+        estimatedX = Math.min(estimatedX, elementRect.right - 50);
+      }
+      
+      // Create a synthetic rect
+      rect = {
+        left: estimatedX,
+        right: estimatedX,
+        top: estimatedY,
+        bottom: estimatedY,
+        width: 0,
+        height: 0,
+        x: estimatedX,
+        y: estimatedY
+      };
+      
+      this.logger.debug('Fixed rect for form element:', {
+        original: 'empty rect',
+        fixed: rect,
+        elementTag: activeElement.tagName
+      });
+    }
+  }
 
   // Read current selection translation mode to decide how to place the icon/window
   let settings;
