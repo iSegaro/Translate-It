@@ -14,7 +14,8 @@ export const createContentConfig = (browser) => {
       vue({
         template: {
           compilerOptions: {
-            isCustomElement: (tag) => false,
+            // Allow translate-it- prefixed custom elements for CSP compatibility
+            isCustomElement: (tag) => tag.startsWith('translate-it-'),
             whitespace: 'preserve'
           }
         },

@@ -16,8 +16,8 @@ export const createBaseConfig = (browser, options = {}) => {
       vue({
         template: {
           compilerOptions: {
-            // Disable eval for Chrome MV3 compatibility
-            isCustomElement: (tag) => false,
+            // Allow translate-it- prefixed custom elements for CSP compatibility
+            isCustomElement: (tag) => tag.startsWith('translate-it-'),
             // Compile templates at build time
             whitespace: 'preserve'
           }

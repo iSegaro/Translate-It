@@ -141,17 +141,15 @@ export function configureVueForCSP(app) {
   // Setup Trusted Types compatibility first
   setupTrustedTypesCompatibility();
   
-  // Configure Vue to handle CSP restrictions
-  app.config.compilerOptions = {
-    ...(app.config.compilerOptions || {}),
-    isCustomElement: tag => tag.startsWith('translate-it-'),
-    // Completely disable Trusted Types to prevent CSP violations
-    trustedTypes: false
-  };
+  // Note: compilerOptions are now configured at build time in vite config
+  // Runtime compilerOptions are not supported in Vue runtime-only builds
 
-  // Disable CSP warnings in production
+  // Disable specific warnings in production
   app.config.warnHandler = (msg, instance, trace) => {
-    if (msg.includes('TrustedTypePolicy') || msg.includes('trusted-types')) {
+    if (msg.includes('TrustedTypePolicy') || 
+        msg.includes('trusted-types') ||
+        msg.includes('compilerOptions') ||
+        msg.includes('runtime compiler')) {
       return;
     }
     console.warn('[Vue warn]:', msg, trace);
