@@ -44,14 +44,14 @@
             v-model="textFieldMode"
             value="copy"
             name="textFieldMode"
-            :disabled="!translateOnTextFields && !enableShortcutForTextFields"
+            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
             :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
           />
           <BaseRadio
             v-model="textFieldMode"
             value="replace"
             name="textFieldMode"
-            :disabled="!translateOnTextFields && !enableShortcutForTextFields"
+            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
             :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
           />
         </div>
@@ -97,14 +97,14 @@
             v-model="selectionTranslationMode"
             value="immediate"
             name="selectionTranslationMode"
-            :disabled="!translateOnTextSelection"
+            :disabled="!extensionEnabled || !translateOnTextSelection"
             :label="t('options_selection_mode_immediate') || 'Immediate'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
             value="onClick"
             name="selectionTranslationMode"
-            :disabled="!translateOnTextSelection"
+            :disabled="!extensionEnabled || !translateOnTextSelection"
             :label="t('options_selection_mode_onclick') || 'On Click'"
           />
         </div>
