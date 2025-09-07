@@ -3,6 +3,7 @@ import ContentApp from '../apps/content/ContentApp.vue';
 import i18n from '@/utils/i18n/plugin.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
 // Import all necessary styles as raw strings using Vite's `?inline` feature.
 import combinedGlobalStyles from '../assets/styles/content-app-global.scss?inline';
@@ -45,7 +46,7 @@ function preloadVueStyles() {
   
   try {
     // Create and mount the app temporarily to trigger style injection
-    const tempApp = createApp(ContentApp);
+    const tempApp = configureVueForCSP(createApp(ContentApp));
     tempApp.use(i18n);
     const mountedApp = tempApp.mount(tempContainer);
     
@@ -96,7 +97,7 @@ export function getAppCss() {
  * @param {HTMLElement} rootElement - The element inside the shadow root to mount the Vue app.
  */
 export function mountContentApp(rootElement) {
-  const app = createApp(ContentApp);
+  const app = configureVueForCSP(createApp(ContentApp));
   app.use(i18n);
   app.mount(rootElement);
   const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'mountContentApp');

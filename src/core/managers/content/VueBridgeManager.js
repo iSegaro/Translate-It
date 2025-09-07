@@ -7,6 +7,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'VueBridgeManager');
 
@@ -69,7 +70,8 @@ class ContentScriptVueBridge extends ResourceTracker {
     if (!componentLoader) throw new Error(`Component ${componentName} not found`);
     const component = await componentLoader();
     const container = target || this.createContainer();
-    const app = createApp(component, props);
+    const app = configureVueForCSP(createApp(component, props));
+    
     app.use(this.pinia);
     app.config.globalProperties.$bridge = this;
     app.mount(container);
