@@ -109,7 +109,8 @@ export class ExclusionChecker {
       'selectElement': 'TRANSLATE_WITH_SELECT_ELEMENT',
       'textSelection': 'TRANSLATE_ON_TEXT_SELECTION', 
       'textFieldIcon': 'TRANSLATE_ON_TEXT_FIELDS',
-      'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS'
+      'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
+      'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION'
     };
     
     const settingKey = featureSettingsMap[featureName];
@@ -143,7 +144,7 @@ export class ExclusionChecker {
       return { initialized: false };
     }
 
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut'];
+    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
     const status = {
       initialized: true,
       url: this.currentUrl,

@@ -51,7 +51,7 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async evaluateAndRegisterFeatures() {
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut'];
+    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
     
     logger.debug('Evaluating features for registration:', features);
     
@@ -162,12 +162,17 @@ export class FeatureManager extends ResourceTracker {
           HandlerClass = ShortcutHandler;
           break;
           
+        case 'windowsManager':
+          const { WindowsManagerHandler } = await import('@/features/windows/handlers/WindowsManagerHandler.js');
+          HandlerClass = WindowsManagerHandler;
+          break;
+          
         default:
           logger.error(`Unknown feature: ${featureName}`);
           return null;
       }
       
-      return new HandlerClass();
+      return new HandlerClass({ featureManager: this });
       
     } catch (error) {
       logger.error(`Failed to load handler for feature ${featureName}:`, error);
@@ -217,7 +222,7 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async reevaluateFeatures() {
-    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut'];
+    const features = ['selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
     
     logger.debug('Re-evaluating all features');
     

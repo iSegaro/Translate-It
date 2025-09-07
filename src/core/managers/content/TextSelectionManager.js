@@ -10,7 +10,6 @@ import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } 
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
-import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 export class TextSelectionManager extends ResourceTracker {
@@ -29,15 +28,14 @@ export class TextSelectionManager extends ResourceTracker {
     // Generate frameId for cross-frame communication
     this.frameId = Math.random().toString(36).substring(7);
     
-    // Accept WindowsManager instance through dependency injection, or use null for iframe
+    // WindowsManager will be accessed through FeatureManager
+    // Accept FeatureManager instance for accessing WindowsManager
+    this.featureManager = options.featureManager;
     if (window !== window.top) {
-      // In iframe context, don't create WindowsManager - use cross-frame communication
-      this.selectionWindows = null;
-      this.logger.debug('TextSelectionManager in iframe - WindowsManager disabled, using cross-frame communication');
+      // In iframe context, don't use WindowsManager - use cross-frame communication
+      this.logger.debug('TextSelectionManager in iframe - using cross-frame communication');
     } else {
-      // In main frame, accept WindowsManager through dependency injection or create one
-      this.selectionWindows = options.windowsManager || new WindowsManager({});
-      this.logger.debug('TextSelectionManager in main frame - WindowsManager initialized');
+      this.logger.debug('TextSelectionManager in main frame - WindowsManager will be accessed via FeatureManager');
     }
     this.messenger = options.messenger;
     this.notifier = options.notifier;
@@ -67,6 +65,30 @@ export class TextSelectionManager extends ResourceTracker {
     this._setupExternalWindowTracking();
     
     this.logger.init('TextSelectionManager initialized');
+  }
+
+  /**
+   * Get WindowsManager instance from FeatureManager
+   * @returns {WindowsManager|null} WindowsManager instance or null
+   */
+  _getWindowsManager() {
+    if (window !== window.top) {
+      // In iframe context, no WindowsManager needed
+      return null;
+    }
+    
+    if (!this.featureManager) {
+      this.logger.debug('FeatureManager not available');
+      return null;
+    }
+    
+    const windowsHandler = this.featureManager.getFeatureHandler('windowsManager');
+    if (!windowsHandler || !windowsHandler.getIsActive()) {
+      this.logger.debug('WindowsManager handler not active');
+      return null;
+    }
+    
+    return windowsHandler.getWindowsManager();
   }
 
   /**
@@ -125,8 +147,9 @@ export class TextSelectionManager extends ResourceTracker {
    * @returns {boolean}
    */
   _isWindowVisible() {
-    if (this.selectionWindows) {
-      return this.selectionWindows.state.isVisible;
+    const windowsManager = this._getWindowsManager();
+    if (windowsManager) {
+      return windowsManager.state.isVisible;
     }
     
     // Check external window state (for iframe-created windows)
@@ -148,8 +171,9 @@ export class TextSelectionManager extends ResourceTracker {
    * Dismiss translation window (works in both main frame and iframe)
    */
   _dismissWindow() {
-    if (this.selectionWindows) {
-      this.selectionWindows.dismiss();
+    const windowsManager = this._getWindowsManager();
+    if (windowsManager) {
+      windowsManager.dismiss();
     }
     // In iframe context, send dismiss message to main frame
     // This could be implemented later if needed
@@ -163,7 +187,7 @@ export class TextSelectionManager extends ResourceTracker {
     this.logger.debug('handleTextSelection called', {
       eventType: event.type,
       isInIframe: window !== window.top,
-      hasWindowsManager: !!this.selectionWindows
+      hasWindowsManager: !!this._getWindowsManager()
     });
     
     // Skip if currently dragging a translation window
@@ -186,7 +210,8 @@ export class TextSelectionManager extends ResourceTracker {
     // بررسی اینکه آیا کلیک در داخل پنجره ترجمه رخ داده است یا نه
     if (this._isWindowVisible()) {
       let isInsideWindow = false;
-      const displayElement = this.selectionWindows?.displayElement;
+      const windowsManager = this._getWindowsManager();
+      const displayElement = windowsManager?.displayElement;
       if (displayElement && event.target) {
         // بررسی با contains و همچنین بررسی مسیر رویداد
         if (displayElement.contains(event.target)) {
@@ -277,7 +302,8 @@ export class TextSelectionManager extends ResourceTracker {
       let settings;
       let selectionTranslationMode;
       let isInsideWindow = false;
-      let displayElement = this.selectionWindows?.displayElement;
+      const windowsManager = this._getWindowsManager();
+      let displayElement = windowsManager?.displayElement;
       let windowElements = [];
       if (!displayElement) {
         windowElements = Array.from(document.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
@@ -396,8 +422,8 @@ export class TextSelectionManager extends ResourceTracker {
       const windowVisible = this._isWindowVisible();
       
       if (windowVisible) {
-        // Only dismiss if we have our own selectionWindows (not external windows from iframe)
-        if (this.selectionWindows && !this.hasExternalWindow) {
+        // Only dismiss if we have our own windowsManager (not external windows from iframe)
+        if (this._getWindowsManager() && !this.hasExternalWindow) {
           this.logger.debug('Dismiss SelectionWindows - no text selected (outside click)');
           this._dismissWindow();
           
@@ -450,7 +476,7 @@ export class TextSelectionManager extends ResourceTracker {
     this.logger.debug('processSelectedText called', { 
       text: selectedText.substring(0, 30) + '...',
       isInIframe: window !== window.top,
-      hasWindowsManager: !!this.selectionWindows
+      hasWindowsManager: !!this._getWindowsManager()
     });
     
     // Check if text is actually selected in DOM before processing
@@ -477,7 +503,8 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Prevent duplicate processing of same selection
     const currentTime = Date.now();
-    if (this.lastProcessedText === selectedText && this.selectionWindows && this.selectionWindows.state.isVisible) {
+    const windowsManager = this._getWindowsManager();
+    if (this.lastProcessedText === selectedText && windowsManager && windowsManager.state.isVisible) {
       // If same text is selected again within a short time, don't recreate
       if (currentTime - this.lastProcessedTime < 2000) { // 2 second threshold
         return;
@@ -495,7 +522,7 @@ export class TextSelectionManager extends ResourceTracker {
       // Check if rect is valid (not empty)
       if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
         // If we already have a visible window, don't show another one
-        if (this.selectionWindows && this.selectionWindows.state.isVisible) {
+        if (windowsManager && windowsManager.state.isVisible) {
           return;
         }
       }
@@ -639,18 +666,18 @@ export class TextSelectionManager extends ResourceTracker {
 
 
     // نمایش پاپ آپ با متن و موقعیت جدید
-    if (this.selectionWindows) {
+    if (windowsManager) {
       // Main frame: use WindowsManager directly
       if (!ExtensionContextManager.isValidSync()) {
         this.logger.debug('Extension context invalid, skipping window/icon creation to preserve text selection');
         return;
       }
       
-      this.logger.debug('Calling selectionWindows.show() in main frame', { 
+      this.logger.debug('Calling windowsManager.show() in main frame', { 
         text: selectedText.substring(0, 30) + '...',
         position
       });
-      await this.selectionWindows.show(selectedText, position);
+      await windowsManager.show(selectedText, position);
       
       // Update tracking after successful show
       this.lastProcessedText = selectedText;
@@ -795,7 +822,7 @@ export class TextSelectionManager extends ResourceTracker {
   getInfo() {
     return {
       initialized: true,
-      hasSelectionWindows: !!this.selectionWindows,
+      hasWindowsManager: !!this._getWindowsManager(),
       hasMessenger: !!this.messenger,
       activeTimeout: !!this.selectionTimeoutId,
       ctrlKeyPressed: this.ctrlKeyPressed,

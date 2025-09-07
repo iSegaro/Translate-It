@@ -8,11 +8,12 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionHandler');
 
 export class TextSelectionHandler extends ResourceTracker {
-  constructor() {
+  constructor(options = {}) {
     super('text-selection-handler');
     
     this.isActive = false;
     this.textSelectionManager = null;
+    this.featureManager = options.featureManager;
   }
 
   async activate() {
@@ -24,8 +25,10 @@ export class TextSelectionHandler extends ResourceTracker {
     try {
       logger.debug('Activating TextSelectionHandler');
       
-      // Create and initialize TextSelectionManager
-      this.textSelectionManager = new TextSelectionManager();
+      // Create and initialize TextSelectionManager with FeatureManager
+      this.textSelectionManager = new TextSelectionManager({
+        featureManager: this.featureManager
+      });
       
       // Setup event listeners for text selection
       this.setupSelectionListeners();
