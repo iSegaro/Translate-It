@@ -131,6 +131,18 @@ export const CONFIG = {
   NOTIFICATION_TEXT_DIRECTION: "rtl",
   NOTIFICATION_TEXT_ALIGNMENT: "right",
 
+  // --- Font Settings ---
+  TRANSLATION_FONT_FAMILY: "auto", // Auto-detect based on target language or custom font
+  TRANSLATION_FONT_SIZE: "14", // Font size in pixels
+  FONT_SIZE_OPTIONS: [
+    { value: "12", name: "Small (12px)" },
+    { value: "14", name: "Default (14px)" },
+    { value: "16", name: "Medium (16px)" },
+    { value: "18", name: "Large (18px)" },
+    { value: "20", name: "Extra Large (20px)" },
+    { value: "22", name: "XXL (22px)" }
+  ],
+
   // --- Regex & Language Specific ---
   // Matches Hebrew, Arabic and Persian ranges
   RTL_REGEX: /[\u0591-\u07FF\u0600-\u06FF]/,
@@ -691,4 +703,13 @@ export const getShowSubtitleIconAsync = async () => {
 
 export const getEnableScreenCaptureAsync = async () => {
   return getSettingValueAsync("ENABLE_SCREEN_CAPTURE", CONFIG.ENABLE_SCREEN_CAPTURE);
+};
+
+// --- Font Settings Getters ---
+export const getTranslationFontFamilyAsync = async () => {
+  return getSettingValueAsync("TRANSLATION_FONT_FAMILY", CONFIG.TRANSLATION_FONT_FAMILY);
+};
+
+export const getTranslationFontSizeAsync = async () => {
+  return getSettingValueAsync("TRANSLATION_FONT_SIZE", CONFIG.TRANSLATION_FONT_SIZE);
 };

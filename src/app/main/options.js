@@ -16,6 +16,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
 // Import route components (lazy loaded)
 const LanguagesTab = () => import('@/apps/options/tabs/LanguagesTab.vue')
+const AppearanceTab = () => import('@/apps/options/tabs/AppearanceTab.vue')
 const ActivationTab = () => import('@/apps/options/tabs/ActivationTab.vue')
 const PromptTab = () => import('@/apps/options/tabs/PromptTab.vue')
 const ApiTab = () => import('@/apps/options/tabs/ApiTab.vue')
@@ -72,6 +73,7 @@ async function initializeApp() {
       routes: [
         { path: '/', redirect: '/languages' },
         { path: '/languages', component: LanguagesTab, name: 'languages' },
+        { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/activation', component: ActivationTab, name: 'activation' },
         { path: '/prompt', component: PromptTab, name: 'prompt' },
         { path: '/api', component: ApiTab, name: 'api' },

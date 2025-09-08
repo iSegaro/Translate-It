@@ -1,9 +1,9 @@
 <template>
   <section class="languages-tab">
-  <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
+    <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
     
     <div class="setting-group">
-  <label>{{ t('source_language_label') || 'Source Language' }}</label>
+      <label>{{ t('source_language_label') || 'Source Language' }}</label>
       <LanguageDropdown
         v-model="sourceLanguage"
         :languages="sourceLanguages"
@@ -12,7 +12,7 @@
     </div>
     
     <div class="setting-group">
-  <label>{{ t('target_language_label') || 'Target Language' }}</label>
+      <label>{{ t('target_language_label') || 'Target Language' }}</label>
       <LanguageDropdown
         v-model="targetLanguage"
         :languages="targetLanguages"
@@ -65,6 +65,7 @@ watch(targetLanguage, (value) => {
   validateLanguages()
 })
 
+
 // Validation
 const validationError = ref('')
 
@@ -81,7 +82,10 @@ const validateLanguages = async () => {
   return isValid
 }
 
-// No need for extra watch logic; handled above
+const validateForm = async () => {
+  // Only validate languages in this tab
+  return await validateLanguages()
+}
 </script>
 
 <style lang="scss" scoped>
@@ -127,6 +131,21 @@ h2 {
   
   .language-dropdown {
     flex: 0 0 250px;
+  }
+}
+
+.font-settings {
+  flex-direction: column;
+  align-items: stretch;
+  border-top: 2px solid var(--color-border);
+  margin-top: $spacing-xl;
+  padding-top: $spacing-lg;
+  
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    margin: 0 0 $spacing-base 0;
+    color: var(--color-text);
   }
 }
 

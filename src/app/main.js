@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import ContentApp from '../apps/content/ContentApp.vue';
 import i18n from '@/utils/i18n/plugin.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -47,6 +48,7 @@ function preloadVueStyles() {
   try {
     // Create and mount the app temporarily to trigger style injection
     const tempApp = configureVueForCSP(createApp(ContentApp));
+    tempApp.use(createPinia());
     tempApp.use(i18n);
     const mountedApp = tempApp.mount(tempContainer);
     
@@ -98,6 +100,7 @@ export function getAppCss() {
  */
 export function mountContentApp(rootElement) {
   const app = configureVueForCSP(createApp(ContentApp));
+  app.use(createPinia());
   app.use(i18n);
   app.mount(rootElement);
   const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'mountContentApp');

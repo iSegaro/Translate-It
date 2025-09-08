@@ -47,6 +47,9 @@ function getDefaultSettings() {
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
     USE_MOCK: CONFIG.USE_MOCK ?? false,
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
+    // Font Settings
+    TRANSLATION_FONT_FAMILY: CONFIG.TRANSLATION_FONT_FAMILY || 'auto',
+    TRANSLATION_FONT_SIZE: CONFIG.TRANSLATION_FONT_SIZE || '14',
     // Migration & versioning flags
     VUE_MIGRATED: false,
     MIGRATION_DATE: null,
@@ -80,6 +83,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const sourceLanguage = computed(() => settings.value.SOURCE_LANGUAGE)
   const targetLanguage = computed(() => settings.value.TARGET_LANGUAGE)
   const selectedProvider = computed(() => settings.value.TRANSLATION_API)
+  
+  // Font settings getters
+  const fontFamily = computed(() => settings.value.TRANSLATION_FONT_FAMILY)
+  const fontSize = computed(() => settings.value.TRANSLATION_FONT_SIZE)
   
   // Actions
   let __loadInFlight = null;
@@ -385,6 +392,8 @@ export const useSettingsStore = defineStore('settings', () => {
     sourceLanguage,
     targetLanguage,
     selectedProvider,
+    fontFamily,
+    fontSize,
     
     // Actions
     loadSettings,

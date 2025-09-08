@@ -217,16 +217,39 @@ onMounted(async () => {
   await loadLastTranslation()
 })
 
+// Helper function to get the translation content element
+const getTranslationContentElement = () => {
+  const component = translationResultRef.value
+  let outputElement = null
+  
+  // In Vue 3, component refs work differently - try to get the element directly
+  if (component && typeof component === 'object') {
+    // If it's a component instance, try to access its root element
+    if (component.$el) {
+      outputElement = component.$el.querySelector('.result-content') || 
+                     component.$el.querySelector('.translation-content')
+    } else if (component.querySelector) {
+      // If it's a DOM element directly
+      outputElement = component.querySelector('.result-content') || 
+                     component.querySelector('.translation-content')
+    }
+  }
+  
+  // Fallback to document query
+  if (!outputElement) {
+    outputElement = document.querySelector('.result-content') || 
+                   document.querySelector('.translation-content')
+  }
+  
+  return outputElement
+}
+
 // Watch for translation changes and adjust popup size
 watch(translatedText, (newText, oldText) => {
   if (newText && newText !== oldText) {
     // Wait for DOM update and handle resize immediately with fade-in
     nextTick(() => {
-      // Get the result-content element directly from the component
-      const component = translationResultRef.value
-      const outputElement = component?.$el?.querySelector('.result-content') || 
-                           document.querySelector('.result-content')
-      
+      const outputElement = getTranslationContentElement()
       if (outputElement) {
         // Start resize immediately to synchronize with fade-in animation (600ms)
         popupResize.handleTranslationResult(outputElement)
@@ -234,9 +257,7 @@ watch(translatedText, (newText, oldText) => {
     })
   } else if (!newText && oldText) {
     // Reset output field when translation is cleared
-    const component = translationResultRef.value
-    const outputElement = component?.$el?.querySelector('.result-content') || 
-                         document.querySelector('.result-content')
+    const outputElement = getTranslationContentElement()
     if (outputElement) {
       popupResize.resetOutputField(outputElement)
     }

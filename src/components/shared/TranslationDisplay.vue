@@ -14,6 +14,7 @@
       },
       containerClass
     ]"
+    :style="cssVariables || {}"
   >
     <!-- Enhanced Actions Toolbar -->
     <ActionToolbar
@@ -55,10 +56,12 @@
         },
         contentClass
       ]"
-      :dir="textDirection.dir"
+      :dir="textDirection?.dir || 'ltr'"
       :style="{
-        textAlign: textDirection.textAlign,
-        direction: textDirection.dir 
+        ...(fontStyles || {}),
+        ...(cssVariables || {}),
+        textAlign: textDirection?.textAlign || 'left',
+        direction: textDirection?.dir || 'ltr'
       }"
       v-html="renderedContent"
     />
@@ -70,12 +73,9 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
+import { useFont } from '@/composables/shared/useFont.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-// Scoped logger
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
-
 
 // Props
 const props = defineProps({
@@ -212,6 +212,35 @@ const emit = defineEmits([
 const contentRef = ref(null)
 const containerRef = ref(null)
 // const showFadeIn = ref(false) // Disabled
+
+// Scoped logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
+
+// Font management with safe error handling
+let fontStyles = ref({})
+let cssVariables = ref({})
+
+try {
+  // Initialize useFont with target language
+  const { 
+    fontStyles: computedFontStyles, 
+    cssVariables: computedCssVariables 
+  } = useFont(computed(() => props.targetLanguage), {
+    enableSmartDetection: true,
+    fallbackFont: 'system',
+    enableCSSVariables: true
+  })
+  
+  fontStyles = computedFontStyles
+  cssVariables = computedCssVariables
+  
+  logger.debug('Font management initialized successfully')
+} catch (error) {
+  logger.warn('Font management not available, using fallback styles:', error)
+  // Fallback styles when useFont fails
+  fontStyles = computed(() => ({}))
+  cssVariables = computed(() => ({}))
+}
 
 // Computed
 const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)
@@ -387,8 +416,11 @@ onMounted(() => {
   width: 100%;
   padding: 32px 10px 10px 10px;
   border-radius: 3px;
-  font-family: inherit;
-  font-size: 14px;
+  /* Use CSS variables for font settings with fallbacks */
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, 14px);
+  direction: var(--translation-direction, ltr);
+  text-align: var(--translation-text-align, left);
   box-sizing: border-box;
   min-height: 50px;
   background-color: var(--bg-result-color, #ffffff);
@@ -493,6 +525,8 @@ onMounted(() => {
   background-color: rgba(220, 53, 69, 0.1);
   border-radius: 6px;
   line-height: 1.4;
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, 14px);
 }
 
 .translation-content :deep(.error-text) {
@@ -547,7 +581,19 @@ onMounted(() => {
   opacity: 0.8;
   text-align: center;
   padding: 16px;
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, 14px);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+.translation-content :deep(.placeholder-message) {
+  color: var(--text-secondary, #6c757d);
+  font-style: italic;
+  opacity: 0.7;
+  text-align: center;
+  padding: 16px;
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, 14px);
 }
 
 /* General Markdown styling */

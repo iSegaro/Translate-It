@@ -68,6 +68,7 @@
   },
 
   "languages_tab_title": { "message": "Languages" },
+  "appearance_tab_title": { "message": "Appearance" },
   "activation_tab_title": { "message": "Activation" },
   "prompt_tab_title": { "message": "Prompt" },
   "api_tab_title": { "message": "API Settings" },
@@ -553,5 +554,23 @@
   "prompt_text_help": { "message": "Enter the text you want to translate or process." },
   "export_success_plaintext": { "message": "Settings exported successfully (API keys saved in plain text)." },
   "import_error_generic": { "message": "Failed to import settings." },
-  "import_error_password": { "message": "Import failed: Incorrect password." }
+  "import_error_password": { "message": "Import failed: Incorrect password." },
+
+  "appearance_section_title": { "message": "Appearance" },
+  "font_settings_title": { "message": "Font Settings" },
+  "font_settings_description": { "message": "Customize the font and size for translation display" },
+  "font_family_label": { "message": "Font Family" },
+  "font_size_label": { "message": "Font Size" },
+  "font_preview_label": { "message": "Preview" },
+  "font_family_required": { "message": "Font family is required" },
+  "font_size_invalid": { "message": "Font size must be a valid number" },
+  "font_size_range_error": { "message": "Font size must be between 10 and 30 pixels" },
+  "font_family_update_error": { "message": "Failed to update font family" },
+  "font_size_update_error": { "message": "Failed to update font size" },
+  "font_validation_failed": { "message": "Font settings validation failed" },
+  "search_fonts_placeholder": { "message": "Search fonts..." },
+  "loading_fonts": { "message": "Loading fonts..." },
+  "no_fonts_found": { "message": "No fonts found" },
+  "system_font": { "message": "System" },
+  "font_loading_error": { "message": "Failed to load fonts" }
 }

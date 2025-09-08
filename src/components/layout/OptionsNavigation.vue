@@ -29,6 +29,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -43,6 +44,7 @@ const settingsStore = useSettingsStore()
 // Navigation items, labels are reactive to language changes
 const navigationItems = ref([
   { name: 'languages', labelKey: 'languages_tab_title' },
+  { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'prompt', labelKey: 'prompt_tab_title' },
   { name: 'api', labelKey: 'api_tab_title' },

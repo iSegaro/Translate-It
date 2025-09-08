@@ -71,6 +71,7 @@
   },
 
   "languages_tab_title": { "message": "زبان‌ها" },
+  "appearance_tab_title": { "message": "ظاهر" },
   "activation_tab_title": { "message": "روش‌های ترجمه" },
   "prompt_tab_title": { "message": "تنظیمات پرامپت" },
   "api_tab_title": { "message": "تنظیمات API" },
@@ -552,5 +553,23 @@
 
   "export_success_plaintext": { "message": "تنظیمات با موفقیت صادر شد (کلیدهای API به صورت متن ساده ذخیره شدند)." },
   "import_error_generic": { "message": "خطا در وارد کردن تنظیمات." },
-  "import_error_password": { "message": "وارد کردن تنظیمات با شکست مواجه شد: رمز عبور اشتباه است." }
+  "import_error_password": { "message": "وارد کردن تنظیمات با شکست مواجه شد: رمز عبور اشتباه است." },
+
+  "appearance_section_title": { "message": "ظاهر" },
+  "font_settings_title": { "message": "تنظیمات فونت" },
+  "font_settings_description": { "message": "فونت و اندازه نمایش ترجمه را سفارشی کنید" },
+  "font_family_label": { "message": "نوع فونت" },
+  "font_size_label": { "message": "اندازه فونت" },
+  "font_preview_label": { "message": "پیش‌نمایش" },
+  "font_family_required": { "message": "انتخاب نوع فونت الزامی است" },
+  "font_size_invalid": { "message": "اندازه فونت باید یک عدد معتبر باشد" },
+  "font_size_range_error": { "message": "اندازه فونت باید بین ۱۰ تا ۳۰ پیکسل باشد" },
+  "font_family_update_error": { "message": "خطا در به‌روزرسانی نوع فونت" },
+  "font_size_update_error": { "message": "خطا در به‌روزرسانی اندازه فونت" },
+  "font_validation_failed": { "message": "تأیید اعتبار تنظیمات فونت با شکست مواجه شد" },
+  "search_fonts_placeholder": { "message": "جستجوی فونت..." },
+  "loading_fonts": { "message": "در حال بارگذاری فونت‌ها..." },
+  "no_fonts_found": { "message": "هیچ فونتی یافت نشد" },
+  "system_font": { "message": "سیستمی" },
+  "font_loading_error": { "message": "خطا در بارگذاری فونت‌ها" }
 }
