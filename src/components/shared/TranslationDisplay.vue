@@ -455,7 +455,7 @@ onMounted(() => {
   flex-grow: 1;
   border: none;
   border-radius: 0;
-  padding: 42px 14px 12px 14px;
+  padding: 42px 5px 0px 5px;
 }
 
 /* Selection window adjustments */
