@@ -216,40 +216,8 @@ export function useSelectElementTranslation() {
     }
   });
 
-  // Also register a keydown listener in the sidepanel context so that
-  // when the user presses ESC while the sidepanel has focus, we forward
-  // the intent to deactivate select mode. This covers the case where
-  // the sidepanel UI steals focus and ESC wouldn't reach content script.
-  let _sidepanelEscHandler = null;
-  onMounted(() => {
-    _sidepanelEscHandler = (ev) => {
-      if (!ev) return;
-      if (ev.key === 'Escape' || ev.code === 'Escape') {
-        try {
-          // Always attempt to deactivate select mode when ESC pressed in sidepanel
-          // This ensures content script is instructed even if shared state is out-of-sync.
-          deactivateSelectMode().catch(() => {
-            // Ignore deactivation errors
-          });
-        } catch {
-          // Ignore errors during deactivation
-        }
-      }
-    };
-    try { 
-      window.addEventListener('keydown', _sidepanelEscHandler, { capture: true }) 
-    } catch {
-      // Ignore errors when adding event listener
-    }
-  });
-
-  onUnmounted(() => {
-    try { 
-      window.removeEventListener('keydown', _sidepanelEscHandler, { capture: true }) 
-    } catch {
-      // Ignore errors when removing event listener
-    }
-  });
+  // Note: ESC key handling is now managed by ShortcutManager for consistency
+  // No need for separate ESC listener in sidepanel - ShortcutManager handles all ESC events
 
   onUnmounted(() => {
     _selectStateSubscriberCount = Math.max(0, _selectStateSubscriberCount - 1);

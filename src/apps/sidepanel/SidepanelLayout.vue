@@ -150,24 +150,11 @@ const handleSidepanelClick = async () => {
   }
 }
 
-// Handle ESC key in sidepanel
-const handleKeyDown = async (event) => {
-  if (event.key !== 'Escape') return
-  if (isSelectModeActive.value) {
-    try {
-      event.preventDefault()
-      event.stopPropagation()
-      await deactivateSelectMode()
-    } catch (error) {
-      await handleError(error, 'sidepanel-esc-deactivate')
-    }
-  }
-}
+// Note: ESC key handling is now managed by ShortcutManager for consistency
+// No need for separate ESC listener in sidepanel - ShortcutManager handles all ESC events
 
-// Lifecycle management for ESC listener
+// Lifecycle management
 onMounted(() => {
-  tracker.addEventListener(document, 'keydown', handleKeyDown, { capture: true })
-  
   // Load saved version preference
   const savedVersion = localStorage.getItem('sidepanel-enhanced-version')
   if (savedVersion !== null) {

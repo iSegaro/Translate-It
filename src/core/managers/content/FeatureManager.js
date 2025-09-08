@@ -67,13 +67,15 @@ export class FeatureManager extends ResourceTracker {
     });
 
     // Inject dependencies after all features are evaluated
-    this.injectDependencies();
+    await this.injectDependencies();
   }
 
-  injectDependencies() {
+  async injectDependencies() {
     const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
     const selectElementHandler = this.featureHandlers.get('selectElement');
+    const shortcutHandler = this.featureHandlers.get('shortcut');
 
+    // Inject SelectElementManager into ContentMessageHandler
     if (contentMessageHandler && selectElementHandler) {
       const selectElementManager = selectElementHandler.getSelectElementManager();
       if (selectElementManager) {
@@ -84,6 +86,21 @@ export class FeatureManager extends ResourceTracker {
       }
     } else {
       logger.warn('ContentMessageHandler or SelectElementHandler not active for dependency injection');
+    }
+
+    // Inject TranslationHandler into ShortcutHandler
+    if (shortcutHandler && contentMessageHandler) {
+      try {
+        const translationHandler = await contentMessageHandler.getTranslationHandler?.();
+        if (translationHandler && typeof shortcutHandler.setTranslationHandler === 'function') {
+          shortcutHandler.setTranslationHandler(translationHandler);
+          logger.debug('Injected TranslationHandler into ShortcutHandler');
+        } else {
+          logger.warn('TranslationHandler not available for ShortcutHandler injection');
+        }
+      } catch (error) {
+        logger.error('Error injecting TranslationHandler into ShortcutHandler:', error);
+      }
     }
   }
 

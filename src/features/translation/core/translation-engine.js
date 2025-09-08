@@ -1125,6 +1125,40 @@ export class TranslationEngine {
   }
 
   /**
+   * Cancel all active translations
+   */
+  async cancelAllTranslations() {
+    logger.debug(`[TranslationEngine] Cancelling all active translations`, {
+      activeCount: this.activeTranslations.size
+    });
+    
+    let cancelledCount = 0;
+    
+    // Cancel all active translations
+    for (const [messageId, abortController] of this.activeTranslations) {
+      try {
+        this.cancelledRequests.add(messageId);
+        abortController.abort();
+        cancelledCount++;
+        logger.debug(`[TranslationEngine] Cancelled translation: ${messageId}`);
+      } catch (error) {
+        logger.warn(`[TranslationEngine] Error cancelling translation ${messageId}:`, error);
+      }
+    }
+    
+    // Cancel all streaming sessions
+    try {
+      const { streamingManager } = await import("./StreamingManager.js");
+      await streamingManager.cancelAllStreams('All translations cancelled by user');
+    } catch (error) {
+      logger.debug(`[TranslationEngine] StreamingManager cancelAll failed: ${error.message}`);
+    }
+    
+    logger.debug(`[TranslationEngine] Cancelled ${cancelledCount} active translations`);
+    return cancelledCount;
+  }
+
+  /**
    * Check if provider should use streaming for this request
    * @param {object} providerInstance - Provider instance
    * @param {string} text - Text to translate

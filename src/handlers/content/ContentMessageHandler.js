@@ -30,6 +30,20 @@ export class ContentMessageHandler extends ResourceTracker {
     this.iFrameManager = manager;
   }
 
+  /**
+   * Get the translation handler instance
+   * @returns {Promise<Object|null>} Translation handler instance
+   */
+  async getTranslationHandler() {
+    try {
+      const { getTranslationHandlerInstance } = await import('@/core/InstanceManager.js');
+      return getTranslationHandlerInstance();
+    } catch (error) {
+      this.logger.debug('Error getting translation handler:', error);
+      return null;
+    }
+  }
+
   initialize() {
     if (this.initialized) return;
     this.registerHandlers();

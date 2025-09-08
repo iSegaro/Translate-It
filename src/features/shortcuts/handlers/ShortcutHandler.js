@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { detectPlatform, Platform } from '@/utils/browser/platform.js';
+import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
 
 // Lazy logger initialization to prevent TDZ issues
 let logger = null;
@@ -15,12 +16,13 @@ const getLogger = () => {
 };
 
 export class ShortcutHandler extends ResourceTracker {
-  constructor() {
+  constructor(options = {}) {
     super('shortcut-handler');
     
     this.isActive = false;
     this.keydownHandler = null;
     this.translationHandler = null;
+    this.featureManager = options.featureManager;
     
     // Detect platform for proper key combination
     this.platform = detectPlatform();
@@ -36,7 +38,13 @@ export class ShortcutHandler extends ResourceTracker {
     try {
       getLogger().debug('Activating ShortcutHandler');
       
-      // Setup keyboard shortcut listeners
+      // Initialize ShortcutManager with dependencies
+      await shortcutManager.initialize({
+        translationHandler: this.translationHandler,
+        featureManager: this.featureManager
+      });
+      
+      // Setup keyboard shortcut listeners (for Ctrl+/)
       this.setupShortcutListeners();
       
       this.isActive = true;
@@ -63,6 +71,11 @@ export class ShortcutHandler extends ResourceTracker {
     try {
       getLogger().debug('Deactivating ShortcutHandler');
       
+      // Cleanup ShortcutManager
+      if (shortcutManager.initialized) {
+        shortcutManager.cleanup();
+      }
+      
       // ResourceTracker cleanup will handle all tracked resources
       this.cleanup();
       
@@ -74,6 +87,9 @@ export class ShortcutHandler extends ResourceTracker {
       getLogger().error('Error deactivating ShortcutHandler:', error);
       // Continue with cleanup even if error occurs
       try {
+        if (shortcutManager.initialized) {
+          shortcutManager.cleanup();
+        }
         this.cleanup();
         this.isActive = false;
         return true;
@@ -274,12 +290,19 @@ export class ShortcutHandler extends ResourceTracker {
     return this.platform !== Platform.UNKNOWN;
   }
 
+  // Method to set translation handler after initialization
+  setTranslationHandler(handler) {
+    this.translationHandler = handler;
+    getLogger().debug('Translation handler set for shortcuts');
+  }
+
   getStatus() {
     return {
       handlerActive: this.isActive,
       shortcutKey: this.getShortcutKey(),
       platform: this.platform,
-      supported: this.isShortcutSupported()
+      supported: this.isShortcutSupported(),
+      shortcutManagerInitialized: shortcutManager.initialized
     };
   }
 }

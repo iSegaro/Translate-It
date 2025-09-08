@@ -163,6 +163,7 @@ export class TranslationOrchestrator extends ResourceTracker {
         lastError: null
       });
 
+
       await this.sendTranslationRequest(messageId, jsonPayload);
       // Removed setupTranslationWaiting to handle streaming results
     } catch (error) {
@@ -173,7 +174,7 @@ export class TranslationOrchestrator extends ResourceTracker {
       if (!error.alreadyHandled) {
         this.logger.error("Translation process failed", error);
       }
-      this.translationRequests.delete(messageId);
+this.translationRequests.delete(messageId);
       // Dismiss the status notification on error
       if (this.statusNotification) {
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
@@ -185,6 +186,17 @@ export class TranslationOrchestrator extends ResourceTracker {
 
   async sendTranslationRequest(messageId, jsonPayload) {
     try {
+      // Check if translation was cancelled (no longer using global flag)
+      const request = this.translationRequests.get(messageId);
+      if (request && request.status === 'cancelled') {
+        this.logger.debug('[TranslationOrchestrator] Translation cancelled before sending request');
+        // Remove the request from our tracking since it won't be sent
+this.translationRequests.delete(messageId);
+        // Clear the translation in progress flag
+        window.isTranslationInProgress = false;
+        return;
+      }
+      
       const { getTranslationApiAsync, getTargetLanguageAsync } = await import("../../../../config.js");
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
@@ -311,6 +323,12 @@ export class TranslationOrchestrator extends ResourceTracker {
       this.logger.debug("Received stream update for already completed message:", messageId);
       return;
     }
+    
+    // Check if request was cancelled
+    if (request.status === 'cancelled') {
+      this.logger.debug("Ignoring stream update for cancelled message:", { messageId });
+      return;
+    }
 
     // If this request was previously timed out, dismiss timeout notification
     if (request.status === 'timeout') {
@@ -352,6 +370,14 @@ export class TranslationOrchestrator extends ResourceTracker {
     const request = this.translationRequests.get(messageId);
     if (!request) {
       this.logger.debug("Received stream end for already completed message:", messageId);
+      return;
+    }
+    
+    // Check if request was cancelled
+    if (request.status === 'cancelled') {
+      this.logger.debug("Ignoring stream end for cancelled message:", { messageId });
+      // Clean up cancelled request
+this.translationRequests.delete(messageId);
       return;
     }
 
@@ -465,7 +491,11 @@ export class TranslationOrchestrator extends ResourceTracker {
     }
     
     if (request.status !== 'pending') {
-      this.logger.debug("Received translation result for already processed message:", { messageId });
+      if (request.status === 'cancelled') {
+        this.logger.debug("Ignoring translation result for cancelled message:", { messageId });
+      } else {
+        this.logger.debug("Received translation result for already processed message:", { messageId, status: request.status });
+      }
       return;
     }
 
@@ -532,10 +562,10 @@ export class TranslationOrchestrator extends ResourceTracker {
    * @param {Map} translations - Map of original text to translated text
    */
   applyTranslationsToNodes(textNodes, translations) {
-    this.logger.debug("Applying translations directly to DOM nodes", {
-      textNodesCount: textNodes.length,
-      translationsSize: translations.size
-    });
+    // this.logger.debug("Applying translations directly to DOM nodes", {
+    //   textNodesCount: textNodes.length,
+    //   translationsSize: translations.size
+    // });
     
     // Create simple context for the extraction utility
     const context = {
@@ -547,9 +577,65 @@ export class TranslationOrchestrator extends ResourceTracker {
     // Use the existing applyTranslationsToNodes from extraction utilities
     applyTranslationsToNodes(textNodes, translations, context);
     
-    this.logger.debug("Translations applied directly to DOM nodes", {
-      appliedCount: translations.size
-    });
+    // this.logger.debug("Translations applied directly to DOM nodes", {
+    //   appliedCount: translations.size
+    // });
+  }
+
+  /**
+   * Cancel a specific translation by messageId
+   * @param {string} messageId - The messageId to cancel
+   */
+  async cancelTranslation(messageId) {
+    this.logger.debug(`Cancelling specific translation: ${messageId}`);
+    
+    const request = this.translationRequests.get(messageId);
+    if (!request) {
+      this.logger.debug(`No active request found for messageId: ${messageId}`);
+      return;
+    }
+    
+    if (request.status === 'pending') {
+      request.status = 'cancelled';
+      request.error = 'Translation cancelled by user';
+      this.logger.debug(`[TranslationOrchestrator] Cancelled specific request: ${messageId}`);
+      
+      // Send cancellation to background (will be handled by enhanced handleCancelTranslation)
+      try {
+        await sendSmart({
+          action: MessageActions.CANCEL_TRANSLATION,
+          data: { 
+            messageId,
+            reason: 'user_request',
+            context: 'translation-orchestrator'
+          }
+        });
+      } catch (err) {
+        this.logger.warn('Failed to send specific cancellation to background:', err);
+      }
+    }
+    
+    // Check if this was the only active request
+    const hasActiveRequests = Array.from(this.translationRequests.values())
+      .some(req => req.status === 'pending');
+      
+    if (!hasActiveRequests) {
+      window.isTranslationInProgress = false;
+      this.logger.debug('No more active translations - cleared global flag');
+    }
+  }
+
+  /**
+   * Get the currently active messageId (first pending request)
+   * @returns {string|null} - Active messageId or null if none
+   */
+  getActiveMessageId() {
+    for (const [messageId, request] of this.translationRequests) {
+      if (request.status === 'pending') {
+        return messageId;
+      }
+    }
+    return null;
   }
 
   cancelAllTranslations() {
@@ -558,10 +644,17 @@ export class TranslationOrchestrator extends ResourceTracker {
     // Clear the global translation in progress flag
     window.isTranslationInProgress = false;
 
+    this.logger.debug('[TranslationOrchestrator] Before cancellation:', {
+      requestsSize: this.translationRequests.size,
+      requestIds: Array.from(this.translationRequests.keys()),
+      requestStatuses: Array.from(this.translationRequests.values()).map(r => ({ id: r.messageId || 'unknown', status: r.status }))
+    });
+
     for (const [messageId, request] of this.translationRequests) {
       if (request.status === 'pending') {
         request.status = 'cancelled';
         request.error = 'Translation cancelled by user';
+        this.logger.debug('[TranslationOrchestrator] Cancelled request:', messageId);
         
         // Notify background to cancel the network request
         sendSmart({

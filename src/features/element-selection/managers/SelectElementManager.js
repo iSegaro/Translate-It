@@ -27,6 +27,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     
     this.isActive = false;
     this.isProcessingClick = false;
+    this.isHighlightingEnabled = true;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElement');
     
     // Debug instance creation
@@ -205,6 +206,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     });
     pageEventBus.emit('select-mode-activated');
     this.isActive = true;
+    this.isHighlightingEnabled = true;
     this.abortController = new AbortController();
     
     this.trackResource('abort-controller', () => {
@@ -279,7 +281,7 @@ export class SelectElementManagerNew extends ResourceTracker {
   }
 
   handleMouseOver(event) {
-    if (!this.isActive) {
+    if (!this.isActive || this.isHighlightingEnabled === false) {
       return;
     }
     this.logger.debug("handleMouseOver triggered", { 
@@ -290,7 +292,7 @@ export class SelectElementManagerNew extends ResourceTracker {
   }
 
   handleMouseOut(event) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isHighlightingEnabled === false) return;
     this.elementHighlighter.handleMouseOut(event.target);
   }
 
@@ -302,7 +304,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     });
 
     if (!this.isActive || this.isProcessingClick) {
-      this.logger.warn("SelectElementManager handleClick ignored (already processing or inactive)", {
+      this.logger.debug("SelectElementManager handleClick ignored (already processing or inactive)", {
         isActive: this.isActive,
         isProcessingClick: this.isProcessingClick
       });
@@ -379,18 +381,127 @@ export class SelectElementManagerNew extends ResourceTracker {
     await this.translationOrchestrator.cancelAllTranslations();
   }
 
+  /**
+   * Cancel a specific translation by messageId
+   * @param {string} messageId - The messageId to cancel
+   */
+  async cancelSpecificTranslation(messageId) {
+    this.logger.debug(`Cancelling specific translation: ${messageId}`);
+    
+    // 1. Cancel through TranslationOrchestrator
+    if (this.translationOrchestrator) {
+      await this.translationOrchestrator.cancelTranslation(messageId);
+    }
+    
+    // 2. Send to background for cleanup
+    await this.sendCancelToBackground(messageId);
+    
+    // 3. Reset state and deactivate (NO highlighting restore!)
+    this.resetCancelledTranslationState();
+  }
+
+  /**
+   * Send cancel signal to background for engine/streaming cleanup
+   * @param {string} messageId - The messageId to cancel
+   */
+  async sendCancelToBackground(messageId) {
+    try {
+      await sendSmart({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: { 
+          messageId,
+          reason: 'user_escape_key',
+          context: 'select-element'
+        }
+      });
+      this.logger.debug(`Cancel signal sent to background for messageId: ${messageId}`);
+    } catch (error) {
+      this.logger.debug('Background cancel failed, continuing with local cleanup:', error);
+    }
+  }
+
+  /**
+   * Reset state after translation cancellation - deactivate Select Element completely
+   */
+  resetCancelledTranslationState() {
+    // Clear translation flags
+    window.isTranslationInProgress = false;
+    this.isProcessingClick = false;
+    
+    // Deactivate Select Element completely (like ESC should do)
+    this.isActive = false;
+    this.isHighlightingEnabled = false;
+    
+    // Clear any existing highlights
+    pageEventBus.emit('clear-all-highlights');
+    if (this.elementHighlighter) {
+      this.elementHighlighter.clearAllHighlights();
+      this.elementHighlighter.clearHighlight();
+      this.elementHighlighter.deactivateUI();
+    }
+    
+    this.logger.debug('Translation cancelled - Select Element mode deactivated');
+  }
+
+  /**
+   * Get the active messageId from current translation
+   * @returns {string|null} - Active messageId or null if none
+   */
+  getActiveMessageId() {
+    if (this.translationOrchestrator) {
+      return this.translationOrchestrator.getActiveMessageId();
+    }
+    return null;
+  }
+
+  async deactivate() {
+    this.logger.debug("Deactivating SelectElementManager");
+    
+    if (!this.isActive) {
+      this.logger.debug("SelectElementManager already deactivated");
+      return;
+    }
+    
+    this.isActive = false;
+    
+    // Clear any ongoing translation processes
+    if (!window.isTranslationInProgress) {
+      this.translationOrchestrator.cancelAllTranslations();
+    }
+    
+    // Clean up UI
+    pageEventBus.emit('clear-all-highlights');
+    
+    // Notify background about deactivation
+    await this._notifyDeactivation().catch(error => {
+      this.logger.warn('Error notifying background during deactivation:', error);
+    });
+    
+    // Cleanup resources
+    this.cleanup();
+    
+    this.logger.info('SelectElementManager deactivated');
+  }
+
   async deactivateSelectionUIOnly() {
     this.logger.debug("Deactivating selection UI only (immediate feedback) - NOT notifying background");
 
     // DON'T notify background yet - we're just hiding the UI
     // Background notification should only happen after translation is complete
     
-    // EMIT CROSS-FRAME DEACTIVATION EVENT TO ALL FRAMES
-    pageEventBus.emit('select-mode-deactivated');
-
-    // EMIT CROSS-FRAME DEACTIVATION EVENT TO ALL FRAMES
-    pageEventBus.emit('deactivate-all-select-managers');
+    // Clear highlights immediately - both via event bus and directly
     pageEventBus.emit('clear-all-highlights');
+    
+    // Also clear highlights directly via elementHighlighter
+    if (this.elementHighlighter) {
+      try {
+        this.elementHighlighter.clearHighlight();
+        this.elementHighlighter.deactivateUI();
+        this.logger.debug('ElementHighlighter cleared and deactivated directly');
+      } catch (error) {
+        this.logger.debug('Error clearing ElementHighlighter:', error);
+      }
+    }
     
     // Also send via window.postMessage for cross-origin iframe support
     try {
@@ -419,8 +530,8 @@ export class SelectElementManagerNew extends ResourceTracker {
     // Keep selection active but disable highlighting
     // this.isActive = false; // DON'T disable - keep it active for potential retry
     
-    // Remove event listeners temporarily to prevent re-highlighting during translation
-    // this.removeSelectionEventListeners(); // DON'T remove - just disable highlighting
+    // Disable highlighting temporarily to prevent re-highlighting during translation
+    this.isHighlightingEnabled = false;
     
     // Clear current highlight first (this is what was missing!)
     this.elementHighlighter.clearHighlight();
@@ -516,7 +627,34 @@ export class SelectElementManagerNew extends ResourceTracker {
   }
 
   async handleTranslationResult(message) {
-      return this.translationOrchestrator.handleTranslationResult(message);
+    // Note: No longer checking window.translationCancelledByUser as it's removed
+    // Cancel status is now managed through proper messageId tracking
+    
+    // Check if we have a messageId to verify cancellation status
+    const messageId = message.messageId;
+    this.logger.debug('[SelectElementManager] handleTranslationResult called', {
+      messageId,
+      hasTranslationOrchestrator: !!this.translationOrchestrator,
+      hasRequests: !!this.translationOrchestrator?.translationRequests,
+      requestsSize: this.translationOrchestrator?.translationRequests?.size || 0
+    });
+    
+    if (messageId && this.translationOrchestrator) {
+      const request = this.translationOrchestrator.translationRequests?.get(messageId);
+      this.logger.debug('[SelectElementManager] Request check:', {
+        messageId,
+        hasRequest: !!request,
+        requestStatus: request?.status,
+        isCancelled: request?.status === 'cancelled'
+      });
+      
+      if (request && request.status === 'cancelled') {
+        this.logger.debug('[SelectElementManager] Ignoring translation result for cancelled request:', messageId);
+        return { success: false, reason: 'cancelled' };
+      }
+    }
+    
+    return this.translationOrchestrator.handleTranslationResult(message);
   }
 }
 
