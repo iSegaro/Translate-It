@@ -327,10 +327,7 @@ export class BaseTranslateProvider extends BaseProvider {
   async _streamChunkError(error, chunkIndex, messageId, engine = null) {
     try {
       // Use streamingManager for error streaming
-      await streamingManager.streamError(messageId, error, {
-        chunkIndex,
-        provider: this.providerName
-      });
+      await streamingManager.streamBatchError(messageId, error, chunkIndex);
       
       logger.debug(`[${this.providerName}] Error streamed for chunk ${chunkIndex + 1}`);
     } catch (streamError) {
