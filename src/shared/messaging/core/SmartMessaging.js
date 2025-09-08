@@ -186,18 +186,22 @@ async function sendViaPort(message, timeout) {
     const onDisconnect = () => {
       logger.debug('Port disconnected for:', message.messageId, { ackReceived })
       
-      // Handle runtime.lastError using centralized system
+      // Handle runtime.lastError using centralized error management
       const errorInfo = ExtensionContextManager.handleRuntimeLastError('SmartMessaging.onDisconnect')
       
       if (!isResolved) {
-        if (errorInfo?.isBackForwardCache) {
-          cleanup()
-          const cacheError = new Error('Page moved to back/forward cache')
-          cacheError.type = ErrorTypes.PAGE_MOVED_TO_CACHE
-          reject(cacheError)
+        cleanup()
+        
+        if (errorInfo?.isContextError) {
+          // Context errors are handled silently, create appropriate error type
+          const contextError = new Error(errorInfo.message || 'Port disconnected due to context error')
+          contextError.type = errorInfo.type
+          reject(contextError)
         } else {
-          cleanup()
-          reject(new Error('Port disconnected before receiving response'))
+          // Non-context port disconnection
+          const disconnectError = new Error('Port disconnected before receiving response')
+          disconnectError.type = ErrorTypes.CONNECTION_LOST
+          reject(disconnectError)
         }
       }
     }

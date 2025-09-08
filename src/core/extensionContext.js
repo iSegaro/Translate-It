@@ -187,33 +187,48 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Handle browser.runtime.lastError with appropriate context error handling
+   * Handle browser.runtime.lastError with centralized error management
    * @param {string} context - Context where the error occurred
-   * @returns {Object} Error information
+   * @returns {Object} Error information and handling result
    */
   static handleRuntimeLastError(context = 'unknown') {
     if (!browser.runtime.lastError) return null
 
     const errorMessage = browser.runtime.lastError.message
-    logger.debug(`[${context}] Clearing runtime.lastError:`, errorMessage)
     
-    // Clear the error to prevent console warnings
-    browser.runtime.lastError = null
+    // Use centralized error type detection
+    const errorType = matchErrorToType(errorMessage)
+    const isContextError = errorType === ErrorTypes.CONTEXT || 
+                          errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
 
-    // Check if it's a back/forward cache error
-    const isBackForwardCache = errorMessage?.includes('back/forward cache') ||
-                              errorMessage?.includes('moved into back/forward cache')
-
-    if (isBackForwardCache) {
-      logger.debug(`[${context}] Back/forward cache disconnect detected - this is expected`)
+    if (isContextError) {
+      // Use centralized context error handling (silent)
+      ExtensionContextManager.handleContextError(errorMessage, context)
+      
+      // Access runtime.lastError to clear console warnings
+      const _ = browser.runtime.lastError
+      
+      return {
+        message: errorMessage,
+        type: errorType,
+        context,
+        handledSilently: true,
+        isContextError: true
+      }
     } else {
-      logger.warn(`[${context}] Unexpected runtime.lastError:`, errorMessage)
-    }
-
-    return {
-      message: errorMessage,
-      isBackForwardCache,
-      context
+      // Non-context errors still logged as warnings
+      logger.warn(`[${context}] Runtime lastError (non-context):`, errorMessage)
+      
+      // Access runtime.lastError to clear console warnings
+      const _ = browser.runtime.lastError
+      
+      return {
+        message: errorMessage,
+        type: errorType,
+        context,
+        handledSilently: false,
+        isContextError: false
+      }
     }
   }
 }

@@ -126,13 +126,6 @@ browser.runtime.onConnect.addListener((port) => {
     }
     // Manual disconnected flag for port
     port._disconnected = false;
-    port.onDisconnect.addListener(() => {
-      port._disconnected = true;
-      logger.debug('[Background] Port disconnected:', port.name);
-      
-      // Handle runtime.lastError using centralized system
-      ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect')
-    });
     port.onMessage.addListener(async (msg) => {
       try {
         logger.debug('[Background] Port message received:', msg && msg.action, msg && msg.messageId);
@@ -197,10 +190,11 @@ browser.runtime.onConnect.addListener((port) => {
       });
 
       port.onDisconnect.addListener(() => {
+        port._disconnected = true;
         logger.debug('[Background] Port disconnected:', port.name);
         
         // Handle runtime.lastError using centralized system
-        ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect.lifecycle')
+        ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect.messaging')
       });
     } catch (err) {
       logger.error('[Background] Error in onConnect handler:', err);

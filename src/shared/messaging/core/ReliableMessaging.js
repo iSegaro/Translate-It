@@ -227,16 +227,19 @@ export async function sendReliable(message, opts = {}) {
         const errorInfo = ExtensionContextManager.handleRuntimeLastError('ReliableMessaging.onDisconnect')
         
         if (!isResolved) {
-          if (errorInfo?.isBackForwardCache) {
-            logger.debug('sendReliable: Port disconnected due to back/forward cache, this is expected')
-            cleanup()
-            const cacheError = new Error('Page moved to back/forward cache')
-            cacheError.type = ErrorTypes.PAGE_MOVED_TO_CACHE
-            reject(cacheError)
+          cleanup()
+          
+          if (errorInfo?.isContextError) {
+            // Context errors are handled silently, don't count as circuit breaker failures
+            const contextError = new Error(errorInfo.message || 'Port disconnected due to context error')
+            contextError.type = errorInfo.type
+            reject(contextError)
           } else {
-            cleanup()
+            // Regular port disconnection - count as failure for circuit breaker
             circuitBreaker.onFailure()
-            reject(new Error('port-disconnected'))
+            const disconnectError = new Error('Port disconnected')
+            disconnectError.type = ErrorTypes.CONNECTION_LOST
+            reject(disconnectError)
           }
         }
       }
