@@ -187,15 +187,14 @@ const selectedFontDescription = computed(() => {
 
 // Preview text based on target language
 const previewText = computed(() => {
-  const lang = props.targetLanguage?.toLowerCase()
-  
-  if (lang === 'farsi' || lang === 'persian' || lang === 'fa') {
-    return 'این متن نمونه‌ای برای پیش‌نمایش فونت است. Hello World!'
-  } else if (lang === 'arabic' || lang === 'ar') {
-    return 'هذا نص تجريبي لمعاينة الخط. Hello World!'
-  } else {
-    return 'This is a sample text for font preview. سلام دنیا!'
-  }
+  return [
+    'این متن نمونه‌ای برای پیش‌نمایش فونت است', // Farsi
+    'This is a sample text for font preview', // English
+    '这是一个用于字体预览的示例文本', // Chinese
+    'Este es un texto de muestra para la vista previa de la fuente', // Spanish
+    'これはフォントプレビュー用のサンプルテキストです', // Japanese
+    '이것은 글꼴 미리보기를 위한 샘플 텍스트입니다', // Korean
+  ].join('\n\n')
 })
 
 
@@ -346,7 +345,7 @@ const previewStyle = computed(() => ({
   fontSize: `${localFontSize.value}px`,
   lineHeight: '1.5',
   direction: isRTL(props.targetLanguage) ? 'rtl' : 'ltr',
-  textAlign: isRTL(props.targetLanguage) ? 'right' : 'left'
+  textAlign: 'center'
 }))
 
 // Helper function to detect RTL languages
