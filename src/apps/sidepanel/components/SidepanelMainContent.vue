@@ -56,6 +56,7 @@
           ref="translationResultRef"
           :content="translatedText"
           :language="currentTargetLanguage"
+          :target-language="currentTargetLanguage"
           :is-loading="isTranslating"
           :error="translationError"
           :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here...')"

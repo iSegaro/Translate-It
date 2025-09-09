@@ -43,7 +43,8 @@ export function useWindowsManager() {
       theme: detail.theme || 'light',
       isError: detail.isError || false,
       isLoading: detail.isLoading || false,
-      initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal')
+      initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal'),
+      targetLanguage: detail.targetLanguage || detail.to || 'auto' // Add target language support
     };
 
     if (existingWindowIndex >= 0) {

@@ -29,6 +29,7 @@
       :theme="window.theme"
       :is-loading="window.isLoading"
       :initial-size="window.initialSize"
+      :target-language="window.targetLanguage || 'auto'"
       @close="onTranslationWindowClose"
       @speak="onTranslationWindowSpeak"
     />

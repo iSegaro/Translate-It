@@ -74,7 +74,7 @@
         :error="errorMessage"
         :mode="'compact'"
         :placeholder="'Translation will appear here...'"
-        :target-language="'auto'"
+        :target-language="props.targetLanguage"
         :show-fade-in-animation="true"
         :enable-markdown="true"
         :show-toolbar="false"
@@ -107,7 +107,8 @@ const props = defineProps({
   initialTranslatedText: { type: String, default: '' },
   theme: { type: String, default: 'light' },
   isLoading: { type: Boolean, default: false },
-  initialSize: { type: String, default: 'normal' } // 'small' or 'normal'
+  initialSize: { type: String, default: 'normal' }, // 'small' or 'normal'
+  targetLanguage: { type: String, default: 'auto' } // Add target language prop
 });
 
 const emit = defineEmits(['close', 'speak']);

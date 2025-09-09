@@ -524,7 +524,8 @@ export class WindowsManager extends ResourceTracker {
         initialTranslatedText: result.translatedText,
         position: position,
         theme: theme,
-        isLoading: false
+        isLoading: false,
+        targetLanguage: result.targetLanguage || 'auto'
       };
       
       this.logger.debug('[WindowsManager] About to emit showWindow with:', windowPayload);

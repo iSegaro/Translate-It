@@ -28,6 +28,7 @@
       ref="translationResultRef"
       :content="translatedText"
       :language="currentTargetLanguage"
+      :target-language="currentTargetLanguage"
       :is-loading="isTranslating"
       :error="translationError"
       :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here...'"

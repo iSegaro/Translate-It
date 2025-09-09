@@ -96,7 +96,10 @@ export class TranslationHandler {
         }
         this.activeRequests.delete(messageId);
         
-        return { translatedText: ackOrResult.translatedText };
+        return { 
+          translatedText: ackOrResult.translatedText,
+          targetLanguage: payload.to 
+        };
       }
       
       if (ackOrResult && (ackOrResult.type === 'RESULT' || ackOrResult.result)) {
@@ -224,7 +227,10 @@ export class TranslationHandler {
       return true;
     } else if (message.data?.translatedText) {
       this.logger.operation("Translation success received");
-      request.resolve({ translatedText: message.data.translatedText });
+      request.resolve({ 
+        translatedText: message.data.translatedText,
+        targetLanguage: message.data.targetLanguage 
+      });
       return true;
     } else {
       this.logger.error("Unexpected message data - no error and no translatedText", message.data);
