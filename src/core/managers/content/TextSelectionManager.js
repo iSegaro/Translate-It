@@ -536,7 +536,7 @@ export class TextSelectionManager extends ResourceTracker {
           isInIframe: true,
           target: {
             tagName: event?.target?.tagName || 'UNKNOWN',
-            className: event?.target?.className?.substring(0, 50) || ''
+            className: (event?.target?.className ? String(event.target.className).substring(0, 50) : '') || ''
           }
         };
         
