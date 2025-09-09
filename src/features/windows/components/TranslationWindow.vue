@@ -91,7 +91,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
-import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
@@ -114,13 +113,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'speak']);
 const { sendMessage } = useMessaging('content');
 
-// TTS Global Manager for windows-manager lifecycle
-const ttsGlobal = useTTSGlobal({ 
-  type: 'windows-manager', 
-  name: `TranslationWindow-${props.id}`
-});
-
-// TTS Smart for actual TTS functionality with proper state management
+// TTS functionality with unified composable
 const tts = useTTSSmart();
 
 // Logger
@@ -219,27 +212,6 @@ const windowStyle = computed(() => {
 
 // When the component is mounted, start invisible and then animate in.
 onMounted(() => {
-  // Register TTS instance with stop callback
-  ttsGlobal.register(async () => {
-    logger.debug(`[TranslationWindow ${props.id}] TTS cleanup callback - window closing`)
-    // Use direct message to background instead of calling stopAll() to avoid recursion
-    try {
-      await sendMessage({
-        action: 'GOOGLE_TTS_STOP_ALL',
-        data: { source: 'translation-window-cleanup', windowId: props.id }
-      })
-    } catch (error) {
-      // Handle context errors silently as they're expected during extension reload
-      if (isContextError(error)) {
-        logger.debug(`[TranslationWindow ${props.id}] Extension context invalidated during cleanup - expected during extension reload`)
-      } else {
-        logger.debug(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
-      }
-    }
-  });
-
-  // TTS global manager is used for coordination between multiple windows/components
-
   // Use requestAnimationFrame to ensure the transition is applied after the initial render
   requestAnimationFrame(() => {
     isVisible.value = true;
@@ -250,8 +222,10 @@ onUnmounted(() => {
   // Cleanup TTS when window is dismissed
   logger.debug(`[TranslationWindow ${props.id}] Window unmounting - stopping TTS and cleaning up`);
   
-  // Unregister from TTS global manager (this will automatically trigger cleanup)
-  ttsGlobal.unregister();
+  // Stop any ongoing TTS
+  tts.stopAll().catch(error => {
+    logger.warn(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error);
+  });
   
   // Cleanup positioning composable
   cleanupPositioning();
@@ -294,8 +268,7 @@ const handleTTS = async () => {
       await tts.stop();
       logger.debug(`[TranslationWindow ${props.id}] TTS stopped`);
     } else {
-      // Start TTS - register with global manager then speak
-      await ttsGlobal.startTTS();
+      // Start TTS with unified composable
       const result = await tts.speak(translatedText.value, 'auto');
       if (result) {
         logger.debug(`[TranslationWindow ${props.id}] TTS started`);

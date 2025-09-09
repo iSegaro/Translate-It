@@ -18,6 +18,7 @@ export * from "./lifecycle/handleBackgroundReloadExtension.js";
 // Translation handlers
 export * from "@/features/translation/handlers/handleTranslate.js";
 export * from "@/features/translation/handlers/handleTranslateText.js";
+export * from "./translation/handleTranslationResult.js";
 export * from "@/features/translation/handlers/handleRevertTranslation.js";
 export * from "@/features/translation/handlers/handleCancelTranslation.js";
 
@@ -25,10 +26,11 @@ export * from "@/features/translation/handlers/handleCancelTranslation.js";
 export * from "@/features/tts/handlers/handleGoogleTTS.js";
 export * from "@/features/tts/handlers/handleOffscreenReady.js";
 
-// Element selection handlers
+// Element selection handlers  
 export * from "@/features/element-selection/handlers/handleActivateSelectElementMode.js";
 export * from "@/features/element-selection/handlers/handleSetSelectElementState.js";
 export * from "@/features/element-selection/handlers/handleGetSelectElementState.js";
+export * from "./selection/handleSelectElement.js";
 
 // Screen capture handlers
 export * from "@/features/screen-capture/handlers/handleStartAreaCapture.js";
@@ -68,3 +70,4 @@ export * from "./vue-integration/handleCaptureScreenArea.js";
 export * from "./vue-integration/handleUpdateContextMenu.js";
 export * from "./vue-integration/handleGetExtensionInfo.js";
 export * from "./vue-integration/handleLogError.js";
+export * from "./vue/handleVueBridge.js";

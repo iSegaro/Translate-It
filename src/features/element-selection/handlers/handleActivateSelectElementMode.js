@@ -21,7 +21,11 @@ const errorHandler = new ErrorHandler();
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
 export async function handleActivateSelectElementMode(message, sender) {
-  logger.debug('[Handler:activateSelectElementMode] Processing element selection activation:', message.data);
+  logger.debug('[Handler:activateSelectElementMode] Starting activation handler:', {
+    messageData: message.data,
+    senderTab: sender?.tab?.id,
+    senderUrl: sender?.url
+  });
   
   try {
     const { tabId } = message.data || {};
@@ -42,7 +46,9 @@ export async function handleActivateSelectElementMode(message, sender) {
     }
 
     // Check tab permissions before proceeding
+    logger.debug('[Handler:activateSelectElementMode] Checking tab access for:', targetTabId);
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    logger.debug('[Handler:activateSelectElementMode] Tab access result:', access);
     if (!access.isAccessible) {
       logger.warn(`[Handler:activateSelectElementMode] Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
       return {
@@ -92,19 +98,57 @@ export async function handleActivateSelectElementMode(message, sender) {
     );
 
     // Use direct browser.tabs.sendMessage for cross-browser compatibility
-    const response = await browser.tabs.sendMessage(targetTabId, contentMessage);
+    let response;
+    try {
+      response = await browser.tabs.sendMessage(targetTabId, contentMessage);
+      logger.debug(`Message sent to tab ${targetTabId}, response:`, response);
+    } catch (error) {
+      logger.error(`Failed to send message to tab ${targetTabId}:`, error);
+      return { 
+        success: false, 
+        message: 'Failed to communicate with tab - try refreshing the page',
+        tabId: targetTabId,
+        activated: false,
+        error: error.message
+      };
+    }
     
     // Check if tab communication actually succeeded
     const statusText = isActivating ? 'activated' : 'deactivated';
-    const wasSuccessful = response && !response.tabUnavailable && !response.gracefulFailure;
+    
+    // Handle different response types from content script
+    if (response === false) {
+      // Content script returned false - this usually means the page doesn't support the feature
+      // but the communication was successful. This is a valid response, not an error.
+      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned false - feature not supported on this page`, {
+        tabId: targetTabId,
+        url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : ''),
+        isRestrictedByUrl: access.isRestricted
+      });
+      
+      return {
+        success: false,
+        message: 'Feature not available on this page',
+        tabId: targetTabId,
+        activated: false,
+        isRestrictedPage: true,
+        tabUrl: access.fullUrl
+      };
+    }
+    
+    // Check for successful responses (true, {success: true}, {handled: true}, etc.)
+    const wasSuccessful = response === true || 
+                         (response && response.success === true) || 
+                         (response && response.handled === true) ||
+                         (response && typeof response === 'object' && response.activated === true);
     
     if (!wasSuccessful) {
-      // This case should now be rare, but kept as a fallback.
-      // The permission check above should catch most issues.
+      // Only treat as communication failure if response is undefined/null or indicates actual failure
       logger.warn(`⚠️ [activateSelectElementMode] Element selection mode communication FAILED for tab ${targetTabId}`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 50) + (access.fullUrl.length > 50 ? '...' : ''),
-        response
+        response,
+        responseType: typeof response
       });
       
       return { 
@@ -131,11 +175,15 @@ export async function handleActivateSelectElementMode(message, sender) {
       response
     };
   } catch (error) {
+    logger.error('Exception in handleActivateSelectElementMode:', error);
     errorHandler.handle(error, {
       type: ErrorTypes.SELECT_ELEMENT,
       context: "handleActivateSelectElementMode",
       messageData: message
     });
-    return { success: false, error: error.message || 'Element selection activation failed' };
+    
+    const response = { success: false, message: error.message || 'Element selection activation failed' };
+    logger.debug('Returning error response:', response);
+    return response;
   }
 }

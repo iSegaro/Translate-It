@@ -8,6 +8,7 @@ import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 // Import Main DOM CSS as raw string for injection
 import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 
@@ -231,41 +232,68 @@ if (!access.isAccessible) {
         debugMode: isDevelopmentMode()
       });
 
-      // Setup the central message listener
-      browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        const messageHandler = featureManager.getFeatureHandler('contentMessageHandler');
-
-        // Check if the central handler has a specific handler for this action
-        if (messageHandler && messageHandler.handlers.has(message.action)) {
-          // If yes, let it handle the message and indicate an async response.
-          messageHandler.handleMessage(message, sender, sendResponse);
-          return true;
-        }
-
-        // Fallback for messages not handled by ContentMessageHandler
-        if (message.action === MessageActions.SETTINGS_CHANGED) {
-          logger.debug('Settings changed, refreshing feature manager');
-          featureManager.manualRefresh().catch(error => {
-            logger.error('Failed to refresh feature manager after settings change:', error);
+      // Create content-specific MessageHandler instance
+      const contentMessageHandler = createMessageHandler();
+      
+      // Setup unified message handling with MessageHandler
+      // Register content-specific handlers
+      const contentMessageHandlerInstance = featureManager.getFeatureHandler('contentMessageHandler');
+      if (contentMessageHandlerInstance && contentMessageHandlerInstance.handlers) {
+        // Register all content message handlers with central handler
+        for (const [action, handler] of contentMessageHandlerInstance.handlers.entries()) {
+          contentMessageHandler.registerHandler(action, async (message, sender) => {
+            try {
+              // Call the handler directly - it returns the result
+              const result = await handler.call(contentMessageHandlerInstance, message, sender);
+              return result;
+            } catch (error) {
+              logger.error(`Error in content handler for ${action}:`, error);
+              throw error;
+            }
           });
-          // No async response needed, but we handled it.
-          return;
         }
+        logger.debug('Registered content message handlers:', Array.from(contentMessageHandlerInstance.handlers.keys()));
+      } else {
+        logger.warn('No contentMessageHandler found in featureManager or no handlers available');
+      }
+      
+      // Register feature management handlers
+      contentMessageHandler.registerHandler(MessageActions.SETTINGS_CHANGED, (message) => {
+        logger.debug('Settings changed, refreshing feature manager');
+        featureManager.manualRefresh().catch(error => {
+          logger.error('Failed to refresh feature manager after settings change:', error);
+        });
+        return { success: true };
+      });
 
-        if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
+      contentMessageHandler.registerHandler(MessageActions.Set_Exclude_Current_Page, (message) => {
+        if (message.data?.exclude) {
           logger.info('Page excluded via popup - disabling all features');
           featureManager.getActiveFeatures().forEach(feature => {
             featureManager.deactivateFeature(feature).catch(error => {
               logger.error(`Failed to deactivate feature ${feature}:`, error);
             });
           });
-          // No async response needed, but we handled it.
-          return;
         }
-
-        // Message was not handled by any part of this listener.
-        return false;
+        return { success: true };
       });
+      
+      // Register special handlers for TranslationHandler support
+      contentMessageHandler.registerHandler('HANDLE_TRANSLATION_RESULT', (message) => {
+        // This handles translation results from background for WindowsManager
+        const translationHandlerInstance = window.translationHandlerInstance;
+        if (translationHandlerInstance && translationHandlerInstance.handleTranslationResult) {
+          const handled = translationHandlerInstance.handleTranslationResult(message);
+          return { handled };
+        }
+        return { handled: false };
+      });
+
+      // Activate the content-specific message listener
+      if (!contentMessageHandler.isListenerActive) {
+        contentMessageHandler.listen();
+        logger.debug('Content MessageHandler activated');
+      }
 
     } catch (error) {
       logger.error('Failed to initialize Smart Feature Management System:', error);

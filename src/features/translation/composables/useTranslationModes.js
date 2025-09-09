@@ -11,6 +11,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
 
@@ -21,6 +22,7 @@ let _selectStateHandler = null;
 let _currentTabId = null;
 let _tabsActivatedHandler = null;
 let _selectStateSubscriberCount = 0;
+let _uiMessageHandler = null;
 
 const _registerSelectStateListener = async () => {
   if (_selectStateListenerRegistered) return;
@@ -39,8 +41,8 @@ const _registerSelectStateListener = async () => {
     logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
   }
 
-  // Register runtime message listener for background broadcasts
-  _selectStateHandler = (message, sender, sendResponse) => {
+  // Register handler with central MessageHandler for background broadcasts
+  _selectStateHandler = (message, sender) => {
     if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
       const { tabId, active } = message.data || {};
       try {
@@ -59,29 +61,35 @@ const _registerSelectStateListener = async () => {
       } catch (e) {
         logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
       }
-      // This listener does not send a response, so we don't return true.
-      // We have handled the message, so we don't return false/undefined either to avoid closing the channel for other listeners.
-      return;
+      return { success: true, handled: true };
     }
 
-    // IMPORTANT: If this is not the message we are looking for, we must return true
-    // to indicate that another listener will respond asynchronously. This prevents this
-    // listener from closing the message channel prematurely.
-    return true;
+    return false; // Not our message
   };
 
   try {
-    browser.runtime.onMessage.addListener(_selectStateHandler);
+    // Create UI-specific MessageHandler instance
+    // Only activate in sidepanel/popup context, not in background or content scripts
+    if (typeof window !== 'undefined' && (window.location?.pathname?.includes('sidepanel') || window.location?.pathname?.includes('popup'))) {
+      if (!_uiMessageHandler) {
+        _uiMessageHandler = createMessageHandler();
+      }
+      _uiMessageHandler.registerHandler(MessageActions.SELECT_ELEMENT_STATE_CHANGED, _selectStateHandler);
+      if (!_uiMessageHandler.isListenerActive) {
+        _uiMessageHandler.listen();
+        logger.debug('[useTranslationModes] UI MessageHandler activated');
+      }
+    }
   } catch (e) {
-    logger.warn('[useSelectElementTranslation] Could not register runtime.onMessage listener:', e);
+    logger.warn('[useSelectElementTranslation] Could not register with MessageHandler:', e);
   }
 };
 
 const _unregisterSelectStateListener = () => {
   if (!_selectStateListenerRegistered) return;
-  if (_selectStateHandler) {
+  if (_selectStateHandler && _uiMessageHandler) {
     try {
-      browser.runtime.onMessage.removeListener(_selectStateHandler);
+      _uiMessageHandler.unregisterHandler(MessageActions.SELECT_ELEMENT_STATE_CHANGED);
     } catch {
       // ignore
     }

@@ -22,7 +22,6 @@ export { AnimationManager } from './animation/AnimationManager.js';
 
 // Translation modules
 export { TranslationHandler } from './translation/TranslationHandler.js';
-export { TTSManager } from '../../../features/tts/managers/TTSManager.js';
 export { TranslationRenderer } from './translation/TranslationRenderer.js';
 
 // Interaction modules

@@ -6,6 +6,7 @@ import { registerAllProviders } from "@/features/translation/providers/register-
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -15,6 +16,7 @@ import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
 import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
+const errorHandler = ErrorHandler.getInstance();
 
 registerAllProviders();
 
@@ -58,7 +60,10 @@ browser.runtime.onConnect.addListener((port) => {
         logger.debug('[Background] Popup port disconnected - popup closed, stopping TTS');
         // Stop all TTS when popup closes
         try {
-          // Check if background service is initialized
+          if (!ExtensionContextManager.isValidSync()) {
+            return; // Context invalid, skip silently - handled by ExtensionContextManager
+          }
+
           if (backgroundService.initialized) {
             const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
             if (handler) {
@@ -74,7 +79,10 @@ browser.runtime.onConnect.addListener((port) => {
             logger.debug('[Background] Background service not initialized, skipping TTS stop on popup close');
           }
         } catch (error) {
-          logger.error('[Background] Failed to stop TTS on popup close:', error);
+          await errorHandler.handle(error, {
+            context: 'background-popup-port-disconnect',
+            showToast: false
+          });
         }
       });
       
@@ -95,7 +103,10 @@ browser.runtime.onConnect.addListener((port) => {
         logger.debug('[Background] Sidepanel port disconnected - sidepanel closed, stopping TTS');
         // Stop all TTS when sidepanel closes
         try {
-          // Check if background service is initialized
+          if (!ExtensionContextManager.isValidSync()) {
+            return; // Context invalid, skip silently - handled by ExtensionContextManager
+          }
+
           if (backgroundService.initialized) {
             const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
             if (handler) {
@@ -111,7 +122,10 @@ browser.runtime.onConnect.addListener((port) => {
             logger.debug('[Background] Background service not initialized, skipping TTS stop on sidepanel close');
           }
         } catch (error) {
-          logger.error('[Background] Failed to stop TTS on sidepanel close:', error);
+          await errorHandler.handle(error, {
+            context: 'background-sidepanel-port-disconnect',
+            showToast: false
+          });
         }
       });
       

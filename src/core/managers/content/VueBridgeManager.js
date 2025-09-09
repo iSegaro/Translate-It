@@ -31,7 +31,6 @@ class ContentScriptVueBridge extends ResourceTracker {
     if (this.isInitialized) return;
     try {
       await this.registerComponents();
-      this.setupMessageListener();
       this.isInitialized = true;
     } catch (error) {
       logger.error("[Vue Bridge] Failed to initialize:", error);
@@ -48,11 +47,16 @@ class ContentScriptVueBridge extends ResourceTracker {
     }
   }
 
-  setupMessageListener() {
-    this.messageHandler = (message, sender, sendResponse) => {
-      if (!MessageFormat.validate(message)) {
-        logger.warn("[Vue Bridge] Received invalid message format:", message);
-        return;
+  /**
+   * Get handler for central message handler registration
+   * This replaces the direct listener setup
+   */
+  getCentralHandler() {
+    return (message, sender, sendResponse) => {
+      // Simple validation - just check for action
+      if (!message || !message.action) {
+        logger.warn("[Vue Bridge] Received message without action:", message);
+        return false;
       }
 
       const handler = this.actionMap[message.action];
@@ -60,9 +64,9 @@ class ContentScriptVueBridge extends ResourceTracker {
         handler(message.data, sendResponse);
         return true; // Keep channel open for async response
       }
+      
+      return false; // Let other handlers process
     };
-
-    browser.runtime.onMessage.addListener(this.messageHandler);
   }
 
   async createMicroApp(componentName, props = {}, target = null) {

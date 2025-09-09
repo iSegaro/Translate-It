@@ -321,6 +321,12 @@ export class TranslationEngine {
     const messageId = data.messageId;
     const shouldUseStreaming = this._shouldUseStreamingForProvider(providerInstance, text, messageId, mode);
     
+    // Store sender info for streaming if messageId is available
+    if (messageId && sender) {
+      this.streamingSenders = this.streamingSenders || new Map();
+      this.streamingSenders.set(messageId, sender);
+    }
+    
     if (shouldUseStreaming) {
       logger.debug(`[TranslationEngine] Using streaming translation for provider: ${provider}`);
       return await this.executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang);

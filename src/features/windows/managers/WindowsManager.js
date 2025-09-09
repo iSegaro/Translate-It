@@ -8,11 +8,10 @@ import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
-import { TTSManager } from "@/features/tts/managers/TTSManager.js";
+import { useTTSSmart } from "@/features/tts/composables/useTTSSmart.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
-// - AnimationManager, TranslationRenderer
-// - DragHandler, TTSManager
+// - AnimationManager, TranslationRenderer, DragHandler
 import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
@@ -49,8 +48,8 @@ export class WindowsManager extends ResourceTracker {
     // Initialize core modules for business logic only
     this.state = new WindowsState(this.crossFrameManager.frameId);
     
-    // Initialize TTS request tracking
-    this._currentTTSRequest = null;
+    // Initialize TTS system with unified composable
+    this.tts = useTTSSmart();
     
     // Initialize translation business logic
     this.translationHandler = new TranslationHandler();
@@ -63,9 +62,6 @@ export class WindowsManager extends ResourceTracker {
     
     // Initialize theme management
     this.themeManager = new ThemeManager();
-    
-    // Initialize TTS management
-    this.ttsManager = new TTSManager();
     
     // UI-related modules removed - now handled by Vue UI Host
     // - factory, positionCalculator, smartPositioner
@@ -247,7 +243,7 @@ export class WindowsManager extends ResourceTracker {
       }
     }
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
-    this.dismiss(false, preserveSelection);
+    await this.dismiss(false, preserveSelection);
     
     // Reset the transition flag after using it
     this._isIconToWindowTransition = false;
@@ -344,30 +340,22 @@ export class WindowsManager extends ResourceTracker {
     this.logger.debug('Speak request received from UI Host', detail);
     if (!detail || !detail.text) return;
 
-    // Prevent duplicate requests by checking if already processing for this window
-    const requestKey = `${detail.id}-${detail.isSpeaking}`;
-    if (this._currentTTSRequest === requestKey) {
-      this.logger.debug('Duplicate TTS request ignored', requestKey);
-      return;
-    }
-    
-    this._currentTTSRequest = requestKey;
-    
     try {
       if (detail.isSpeaking) {
-        await this.ttsManager.speakTextUnified(detail.text);
+        // Use unified TTS composable
+        await this.tts.speak(detail.text, detail.language || 'auto');
+        this.logger.debug('TTS started via unified composable');
       } else {
-        this.ttsManager.stopCurrentTTS();
+        // Stop current TTS
+        await this.tts.stop();
+        this.logger.debug('TTS stopped via unified composable');
       }
     } catch (error) {
       this.logger.error('TTS error:', error);
-    } finally {
-      // Clear request tracking after a delay
-      setTimeout(() => {
-        if (this._currentTTSRequest === requestKey) {
-          this._currentTTSRequest = null;
-        }
-      }, 1000);
+      await this.errorHandler.handle(error, {
+        context: 'windows-manager-tts',
+        showToast: false
+      });
     }
   }
 
@@ -581,18 +569,18 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Handle cross-frame outside click
    */
-  _handleCrossFrameOutsideClick() {
+  async _handleCrossFrameOutsideClick() {
     if (this.state.hasActiveElements) {
-      this.dismiss(true);
+      await this.dismiss(true);
     }
   }
 
   /**
    * Handle outside click
    */
-  _handleOutsideClick() {
+  async _handleOutsideClick() {
     if (this.state.shouldPreventDismissal) return;
-    this.dismiss(true);
+    await this.dismiss(true);
   }
 
   /**
@@ -821,10 +809,14 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Cancel current translation
    */
-  cancelCurrentTranslation() {
-    this.dismiss();
+  async cancelCurrentTranslation() {
+    await this.dismiss();
     this.state.setTranslationCancelled(true);
-    this.ttsManager.stopCurrentTTS();
+    try {
+      await this.tts.stopAll();
+    } catch (error) {
+      this.logger.warn('Failed to stop TTS during translation cancellation:', error);
+    }
   }
 
   /**
@@ -913,7 +905,7 @@ export class WindowsManager extends ResourceTracker {
    * @param {boolean} withFadeOut - Whether to animate the dismissal
    * @param {boolean} preserveSelection - Whether to preserve text selection (for icon->window transitions)
    */
-  dismiss(withFadeOut = true, preserveSelection = false) {
+  async dismiss(withFadeOut = true, preserveSelection = false) {
     this.logger.debug('[LOG] WindowsManager.dismiss called', {
       withFadeOut,
       isIconMode: this.state.isIconMode,
@@ -975,17 +967,12 @@ export class WindowsManager extends ResourceTracker {
     }
 
     // Stop any ongoing TTS when dismissing
-    if (this.ttsManager) {
-      try {
-        this.ttsManager.stopCurrentTTS();
-        this.logger.debug('[TTS] TTS stopped during WindowsManager dismiss');
-      } catch (error) {
-        this.logger.warn('[TTS] Failed to stop TTS during dismiss:', error);
-      }
+    try {
+      await this.tts.stopAll();
+      this.logger.debug('[TTS] TTS stopped during WindowsManager dismiss');
+    } catch (error) {
+      this.logger.warn('[TTS] Failed to stop TTS during dismiss:', error);
     }
-    
-    // Clear TTS request tracking
-    this._currentTTSRequest = null;
 
     // Reset flags
     this._resetState();
@@ -1093,9 +1080,7 @@ export class WindowsManager extends ResourceTracker {
     if (this.themeManager && typeof this.themeManager.destroy === 'function') {
       this.themeManager.destroy();
     }
-    if (this.ttsManager && typeof this.ttsManager.destroy === 'function') {
-      this.ttsManager.destroy();
-    }
+    // TTS composable doesn't need explicit cleanup - handled by Vue lifecycle
     
     this.logger.debug('🗑️ WindowsManager destroyed');
   }

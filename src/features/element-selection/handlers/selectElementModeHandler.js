@@ -40,8 +40,7 @@ export class SelectElementHandler extends ResourceTracker {
         }
       });
       
-      // Setup message listener for background communication
-      this.setupMessageListener();
+      // Register handlers with central message handler will be done by FeatureManager
       
       this.isActive = true;
       logger.info('SelectElementHandler activated successfully');
@@ -93,38 +92,25 @@ export class SelectElementHandler extends ResourceTracker {
     }
   }
 
-  setupMessageListener() {
-    try {
-      this.messageListener = (message, sender, sendResponse) => {
-        // Only handle messages relevant to select element
-        if (!this.isSelectElementMessage(message.action)) {
-          return false; // Let other handlers process
-        }
+  /**
+   * Get handler for central message handler registration
+   * This replaces the direct listener setup
+   */
+  getCentralHandler() {
+    return (message, sender, sendResponse) => {
+      // Only handle messages relevant to select element
+      if (!this.isSelectElementMessage(message.action)) {
+        return false; // Let other handlers process
+      }
 
-        logger.debug('SelectElementHandler received message:', message.action);
-        
-        // Handle the message
-        this.handleMessage(message, sender, sendResponse);
-        
-        // Return true for async response
-        return true;
-      };
-
-      browser.runtime.onMessage.addListener(this.messageListener);
+      logger.debug('SelectElementHandler received message via central handler:', message.action);
       
-      // Track listener for cleanup
-      this.trackResource('message-listener', () => {
-        if (this.messageListener && browser.runtime.onMessage.hasListener(this.messageListener)) {
-          browser.runtime.onMessage.removeListener(this.messageListener);
-          this.messageListener = null;
-        }
-      });
-
-      logger.debug('Message listener setup complete');
+      // Handle the message
+      this.handleMessage(message, sender, sendResponse);
       
-    } catch (error) {
-      logger.error('Failed to setup message listener:', error);
-    }
+      // Return true for async response
+      return true;
+    };
   }
 
   isSelectElementMessage(action) {

@@ -1,18 +1,18 @@
-# Smart Messaging System - Practical Guide
+# Unified Messaging System - Practical Guide
 
-The extension's messaging system uses **Smart Messaging** for optimal performance with intelligent routing: direct `runtime.sendMessage` for fast actions and port-based messaging for slow operations.
+The extension's messaging system has been **unified and simplified** using `UnifiedMessaging.js` with intelligent timeout management, replacing the complex Smart Messaging architecture. The system now provides direct `runtime.sendMessage` with action-specific timeouts for optimal performance while maintaining simplicity and reliability.
 
 ## 🚀 Quick Start
 
 ### 1. In Vue Components
 
 ```javascript
-import { useMessaging } from '@/messaging/composables/useMessaging.js'
-import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 export default {
   setup() {
-    const { sendMessage, sendSmart, createMessage } = useMessaging('popup')
+    const { sendMessage, createMessage } = useMessaging('popup')
     
     const translateText = async (text) => {
       const message = createMessage(MessageActions.TRANSLATE, {
@@ -20,15 +20,15 @@ export default {
         targetLang: 'fa'
       })
       
-      // Smart messaging automatically routes to port for slow operations
+      // UnifiedMessaging automatically applies appropriate timeout
       const response = await sendMessage(message)
       return response.success ? response.data : null
     }
     
     const quickAction = async () => {
-      // For direct control, use sendSmart with options
+      // Settings operations use fast 3-second timeout
       const message = createMessage(MessageActions.GET_SETTINGS, {})
-      const response = await sendSmart(message, { usePortForAll: false })
+      const response = await sendMessage(message)
       return response
     }
     
@@ -40,87 +40,95 @@ export default {
 ### 2. In Content Scripts
 
 ```javascript
-import { sendSmart } from '@/messaging/core/SmartMessaging.js'
-import { MessageFormat, MessageActions } from '@/messaging/core/MessagingCore.js'
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+import { MessageFormat, MessageActions } from '@/shared/messaging/core/MessagingCore.js'
 
-// Send message with Smart Messaging
+// Send message with UnifiedMessaging
 const message = MessageFormat.create(
   MessageActions.TRANSLATE_SELECTION,
   { text: selectedText },
   'content'
 )
 
-// Smart messaging automatically handles routing
-const response = await sendSmart(message)
+// UnifiedMessaging handles timeout and error management
+const response = await sendMessage(message)
 
-// Receive message
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
-    // Perform action
-    sendResponse(MessageFormat.createSuccessResponse({ status: 'done' }))
-  }
+// Receive message with MessageHandler
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
+const messageHandler = createMessageHandler()
+
+messageHandler.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (message) => {
+  // Perform action
+  return { success: true, data: { status: 'done' } }
 })
+
+messageHandler.listen()
 ```
 
 ### 3. In Background Scripts
 
 ```javascript
-import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
 
-browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  switch (message.action) {
-    case MessageActions.TRANSLATE:
-      const result = await handleTranslation(message.data)
-      sendResponse(MessageFormat.createSuccessResponse(result))
-      break
-      
-    case MessageActions.GET_PROVIDERS:
-      const providers = await getAvailableProviders()
-      sendResponse(MessageFormat.createSuccessResponse(providers))
-      break
-  }
+// Using centralized MessageHandler (recommended)
+const messageHandler = createMessageHandler()
+
+messageHandler.registerHandler(MessageActions.TRANSLATE, async (message) => {
+  const result = await handleTranslation(message.data)
+  return { success: true, data: result }
 })
+
+messageHandler.registerHandler(MessageActions.GET_PROVIDERS, async (message) => {
+  const providers = await getAvailableProviders()
+  return { success: true, data: providers }
+})
+
+messageHandler.listen()
 ```
 
-## ⚡ Smart Messaging Features
+## ⚡ Unified Messaging Features
 
-### Intelligent Action Classification
+### Intelligent Timeout Management
 
-Smart Messaging automatically classifies actions as **Fast** or **Slow** for optimal routing:
+UnifiedMessaging automatically applies appropriate timeouts based on action complexity:
 
-**Fast Actions** (Direct `runtime.sendMessage`):
-- `GET_SETTINGS`, `SET_SETTINGS`
-- `GET_SELECT_ELEMENT_STATE`
-- `SHOW_NOTIFICATION`
-- `OPEN_SIDEPANEL`
-- Settings and UI state operations
+**Fast Actions** (3-second timeout):
+- `GET_SETTINGS`, `SET_SETTINGS` - 3000ms
+- `GET_SELECT_ELEMENT_STATE` - 2000ms  
+- `SHOW_NOTIFICATION` - 2000ms
+- `OPEN_SIDEPANEL` - 3000ms
+- UI and settings operations
 
-**Slow Actions** (Port-based messaging):
-- `TRANSLATE`, `TRANSLATE_SELECTION`
-- `GOOGLE_TTS_SPEAK`, `TTS_OPERATIONS`
-- `SCREEN_CAPTURE`, `OCR_PROCESS`
-- Translation and media processing
+**Medium Actions** (12-15 second timeout):
+- `TRANSLATE`, `TRANSLATE_SELECTION` - 12000-15000ms
+- `TRANSLATE_TEXT` - 12000ms
+- `TEST_PROVIDER` - 8000ms
+- Translation operations
+
+**Long Actions** (20+ second timeout):
+- `GOOGLE_TTS_SPEAK` - 20000ms
+- `SCREEN_CAPTURE` - 25000ms
+- `PROCESS_IMAGE_OCR` - 30000ms
+- Media processing operations
 
 ### Performance Benefits
 
-- **3+ second reduction** in retry delays
-- **Direct routing** for fast operations
-- **Port stability** for long operations
-- **No overcomplicated fallbacks**
+- **Eliminated race conditions** between competing listeners
+- **Action-specific timeouts** prevent unnecessary delays
+- **Centralized error handling** with ExtensionContextManager
+- **Simplified architecture** - no complex port fallbacks
 
 ### Usage Control
 
 ```javascript
-import { sendSmart } from '@/messaging/core/SmartMessaging.js'
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 
-// Automatic routing (recommended)
-const response = await sendSmart(message)
+// Default timeout based on action (recommended)
+const response = await sendMessage(message)
 
-// Force port usage for all actions
-const response = await sendSmart(message, { usePortForAll: true })
-
-// Custom timeout
-const response = await sendSmart(message, { timeout: 10000 })
+// Custom timeout override
+const response = await sendMessage(message, { timeout: 10000 })
 ```
 
 ## 📋 Message Actions
@@ -254,14 +262,14 @@ logger.error('Message failed:', error)
 ## 🏗️ File Structure
 
 ```
-src/messaging/
+src/shared/messaging/
 ├── core/
 │   ├── MessagingCore.js     # MessageFormat, Contexts, utilities
 │   ├── MessageActions.js    # All available actions  
-│   ├── SmartMessaging.js    # 🆕 Smart routing system
-│   └── ReliableMessaging.js # Legacy (backward compatibility)
+│   ├── UnifiedMessaging.js  # 🆕 Unified messaging system
+│   └── MessageHandler.js    # Centralized message handling
 ├── composables/
-│   └── useMessaging.js      # Vue composable (updated with Smart)
+│   └── useMessaging.js      # Vue composable (uses UnifiedMessaging)
 └── __tests__/
     └── MessagingCore.test.js
 ```
@@ -285,33 +293,44 @@ src/messaging/
 
 ## 🚀 Migration Guide
 
-### From ReliableMessaging to SmartMessaging
+### From SmartMessaging/ReliableMessaging to UnifiedMessaging
 
 **Old Code:**
 ```javascript
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
-const response = await sendReliable(message)
+import { sendSmart } from '@/messaging/core/SmartMessaging.js'
+const response = await sendSmart(message)
 ```
 
 **New Code:**
 ```javascript
-import { sendSmart } from '@/messaging/core/SmartMessaging.js'
-const response = await sendSmart(message) // Automatic routing!
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+const response = await sendMessage(message) // Automatic timeout management!
 ```
 
-**useMessaging Integration:**
+### MessageHandler Migration
+
+**Old Code:**
 ```javascript
-// Already updated - no changes needed
-const { sendMessage } = useMessaging('popup')
-const response = await sendMessage(message) // Uses Smart internally
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Manual handling
+})
 ```
 
-### Backward Compatibility
+**New Code:**
+```javascript
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
+const messageHandler = createMessageHandler()
+messageHandler.registerHandler(action, handler)
+messageHandler.listen()
+```
 
-- `ReliableMessaging.js` still available for fallback
-- `useMessaging` composable updated but API unchanged
-- All existing code continues to work
+### Key Changes
+
+- **Eliminated race conditions**: Single unified messaging system
+- **Context-specific handlers**: No more listener conflicts  
+- **Centralized error handling**: ExtensionContextManager integration
+- **Simplified API**: Direct sendMessage() with automatic timeouts
 
 ---
 
-**Summary:** Smart Messaging provides **optimal performance** with **intelligent routing** - no more 3-retry delays! Use `sendSmart()` directly or `useMessaging()` composable for automatic smart routing. 🚀
+**Summary:** UnifiedMessaging provides **race-condition-free messaging** with **intelligent timeout management**. The new MessageHandler system ensures **single responsibility** and **context isolation**. 🚀

@@ -168,6 +168,17 @@ export class BaseTranslateProvider extends BaseProvider {
   async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
     
+    // Initialize streaming session if messageId is available
+    if (messageId && engine) {
+      try {
+        // Get sender info from engine if available
+        const sender = engine.streamingSenders?.get(messageId) || null;
+        streamingManager.initializeStream(messageId, sender, this, texts);
+      } catch (error) {
+        logger.error(`[${this.providerName}] Failed to initialize streaming session:`, error);
+      }
+    }
+    
     // Create chunks based on provider strategy
     const chunks = this._createChunks(texts);
     const allResults = [];

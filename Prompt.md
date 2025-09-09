@@ -4,13 +4,13 @@
 
 آن را با دقت بررسی کن تا ساختار Vue.js، composable ها، store ها، و ارتباط میان سیستم‌های مختلف را به‌خوبی درک کنی.
 
-بدون حذف هیچ‌یک از قابلیت‌های موجود، بهبودها و تغییرات را با رعایت الگوهای Vue.js و معماری فعلی اعمال کن.
+بدون حذف هیچ‌یک از قابلیت‌های موجود، بهبودها و تغییرات را با رعایت الگوهای Vue.js و معماری یکپارچه اعمال کن. سیستم TTS به‌طور کامل یکپارچه شده و از `useTTSSmart.js` به‌عنوان تنها منبع حقیقت استفاده می‌کند.
 
 ## ویژگی‌های کلیدی
 - **Vue.js Apps**: سه اپلیکیشن جداگانه (Popup، Sidepanel، Options)
 - **Pinia Stores**: مدیریت state راکتیو 
 - **Composables**: منطق business قابل استفاده مجدد
-- **Text Actions**: سیستم یکپارچه copy/paste و **TTS پیشرفته** با قابلیت Play/Pause/Resume/Stop
+- **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
 - **IFrame Support**: سیستم ساده و مؤثر پشتیبانی از iframe با ResourceTracker integration و memory management یکپارچه
 - **Provider System**: 10+ سرویس ترجمه با معماری سلسله‌مراتبی (BaseProvider, BaseTranslateProvider, BaseAIProvider) و مدیریت Rate Limiting و Circuit Breaker.
@@ -31,6 +31,16 @@
 7. **Context Menu**: دسترسی از منوی کلیک راست
 8. **Keyboard Shortcuts**: میانبرهای صفحه‌کلید
 
+## توسعه‌ی Provider ها
+سیستم از الگوی هرمی پرووایدرها استفاده می‌کند:
+- **`BaseProvider`**: کلاس پایه برای همه پرووایدرها
+- **`BaseTranslateProvider`**: پرووایدرهای ترجمه سنتی (Google، Yandex)
+- **`BaseAIProvider`**: پرووایدرهای هوش مصنوعی (OpenAI، Gemini)
+- **`RateLimitManager`**: مدیریت محدودیت نرخ و Circuit Breaker
+- **`StreamingManager`**: مدیریت استریمینگ بلادرنگ ترجمه
+
+برای پیاده‌سازی پرووایدر جدید، مستندات `docs/PROVIDERS.md` را مطالعه کنید.
+
 ## ساختار جدید پروژه (Feature-Based Architecture)
 
 ### 🎯 Vue Applications (Entry Points)
@@ -48,7 +58,7 @@
 ### 🏪 Feature-Based Organization (جدید)
 - **`src/features/`**: هر feature خودکفا و مستقل
   - `translation/` - موتور ترجمه، شامل `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
-  - `tts/` - سیستم Text-to-Speech پیشرفته با مدیریت وضعیت
+  - `tts/` - **سیستم TTS یکپارچه (2025)** - `useTTSSmart.js` به‌عنوان تنها منبع حقیقت با fallback زبان خودکار
   - `screen-capture/` - سیستم کپچر صفحه و OCR
   - `element-selection/` - انتخاب و ترجمه المنت‌های DOM با SelectElementHandler
   - `text-selection/` - مدیریت انتخاب متن با TextSelectionHandler
@@ -92,6 +102,7 @@
 - **`docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`**: سیستم ثبت handler های هوشمند با مدیریت چرخه حیات پویا
 - **`docs/MessagingSystem.md`**: سیستم پیام‌رسانی بین کامپوننت‌ها
 - **`docs/TRANSLATION_SYSTEM.md`**: موتور ترجمه و provider ها
+- **`docs/PROVIDERS.md`**: راهنمای کامل پیاده‌سازی provider ها با BaseProvider، RateLimitManager، و Circuit Breaker
 - **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
 - **`docs/STORAGE_MANAGER.md`**: مدیریت storage با caching
 - **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
@@ -100,7 +111,7 @@
 ### مستندات ویژگی‌ها  
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host
 - **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
-- **`docs/TTS_SYSTEM.md`**: سیستم **Text-to-Speech (TTS) پیشرفته** با مدیریت وضعیت کامل (Play/Pause/Resume)
+- **`docs/TTS_SYSTEM.md`**: سیستم **TTS یکپارچه (2025)** - منبع واحد حقیقت با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
 - **`docs/SELECT_ELEMENT_SYSTEM.md`**: سیستم انتخاب و ترجمه عناصر صفحه
 
@@ -146,3 +157,4 @@
 - **Modern Architecture**: Feature-based با Smart Handler Registration System
 - **Dynamic Feature Management**: سیستم FeatureManager برای مدیریت چرخه حیات handlers
 - **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector یکپارچه
+- **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با حذف 600+ خط کد تکراری، fallback زبان خودکار (فارسی→عربی)، و هماهنگی کامل بین تمام contexts

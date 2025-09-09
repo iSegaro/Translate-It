@@ -73,7 +73,30 @@ export function useTTSSmart() {
       progress.value = 0;
       currentTTSId.value = generateTTSId();
       
-      const language = getLanguageCodeForTTS(lang) || "en";
+      let language = getLanguageCodeForTTS(lang) || "en";
+      
+      // Fallback mapping for languages with limited Google TTS support
+      const ttsLanguageFallbacks = {
+        'fa': 'ar', // Persian → Arabic (similar script and phonetics)
+        'ps': 'ar', // Pashto → Arabic
+        'ku': 'ar', // Kurdish → Arabic  
+        'ur': 'ar', // Urdu → Arabic
+        'yi': 'he', // Yiddish → Hebrew
+        'mt': 'ar', // Maltese → Arabic
+        'hy': 'ru', // Armenian → Russian
+        'ka': 'ru', // Georgian → Russian
+        'az': 'tr', // Azerbaijani → Turkish
+        'kk': 'ru', // Kazakh → Russian
+        'ky': 'ru', // Kyrgyz → Russian
+        'uz': 'ru', // Uzbek → Russian
+        'tg': 'ru', // Tajik → Russian
+      };
+      
+      if (ttsLanguageFallbacks[language]) {
+        logger.debug(`[useTTSSmart] Using fallback language: ${language} → ${ttsLanguageFallbacks[language]}`);
+        language = ttsLanguageFallbacks[language];
+      }
+      
       logger.debug("[useTTSSmart] Speaking via GOOGLE_TTS_SPEAK:", text.substring(0, 50) + "...");
 
       // Use smart messaging for TTS (port-based for slow actions)

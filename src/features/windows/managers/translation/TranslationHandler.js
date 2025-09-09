@@ -9,7 +9,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
-import { ExtensionContextManager } from "@/core/extensionContext.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 /**
@@ -82,8 +82,22 @@ export class TranslationHandler {
         }
       })
 
-      // If sendMessage returned a RESULT directly (port fallback), use it
+      // Check if sendMessage returned the complete result directly
       this.logger.debug("sendMessage returned:", ackOrResult);
+      
+      if (ackOrResult && ackOrResult.translatedText) {
+        // Direct result from sendMessage - use it immediately
+        this.logger.operation("Translation completed successfully (direct result)");
+        
+        // Clean up the timeout and pending request
+        const request = this.activeRequests.get(messageId);
+        if (request && request.timeout) {
+          clearTimeout(request.timeout);
+        }
+        this.activeRequests.delete(messageId);
+        
+        return { translatedText: ackOrResult.translatedText };
+      }
       
       if (ackOrResult && (ackOrResult.type === 'RESULT' || ackOrResult.result)) {
         const final = ackOrResult.result || ackOrResult
@@ -101,6 +115,14 @@ export class TranslationHandler {
           throw new Error('Translation failed: No translated text received')
         }
         this.logger.operation("Translation completed successfully (via port fallback)");
+        
+        // Clean up the timeout and pending request
+        const request = this.activeRequests.get(messageId);
+        if (request && request.timeout) {
+          clearTimeout(request.timeout);
+        }
+        this.activeRequests.delete(messageId);
+        
         return { translatedText: final.translatedText }
       }
 
@@ -140,58 +162,23 @@ export class TranslationHandler {
 
   /**
    * Create promise that resolves when translation completes
+   * Uses central message handler instead of temporary listeners
    */
   _createTranslationPromise(messageId) {
     return new Promise((resolve, reject) => {
       // Set timeout
       const timeout = setTimeout(() => {
         this.activeRequests.delete(messageId);
-        if (messageListener) {
-          browser.runtime.onMessage.removeListener(messageListener);
-        }
         reject(new Error('Translation timeout'));
       }, WindowsConfig.TIMEOUTS.TRANSLATION_TIMEOUT);
 
-      // Create message listener
-      const messageListener = (message) => {
-        this.logger.debug(`Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
-        
-        if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
-            message.messageId === messageId) {
-          
-          this.logger.operation("Message matched! Processing translation result");
-          clearTimeout(timeout);
-          this.activeRequests.delete(messageId);
-          browser.runtime.onMessage.removeListener(messageListener);
-          
-          // Check for error first - error can be in data.error or directly in data
-          if (message.data?.error || (message.data?.type && message.data?.message)) {
-            this.logger.debug("Error detected in messageListener, rejecting promise with error");
-            const errorMessage = message.data?.error?.message || message.data?.message || 'Translation failed';
-            reject(new Error(errorMessage));
-            return;
-          } else if (message.data?.translatedText) {
-            this.logger.operation("Translation success received");
-            resolve({ translatedText: message.data.translatedText });
-          } else {
-            this.logger.error("Unexpected message data - no error and no translatedText", message.data);
-            // If no error object but also no translatedText, it's still an error
-            reject(new Error('No translated text in result'));
-          }
-        }
-      };
-
-      // Store request info
+      // Store request info for central handler to find
       this.activeRequests.set(messageId, {
         resolve,
         reject,
         timeout,
-        messageListener,
         startTime: Date.now()
       });
-
-      // Add listener
-      browser.runtime.onMessage.addListener(messageListener);
     });
   }
 
@@ -203,7 +190,6 @@ export class TranslationHandler {
     if (!request) return;
 
     clearTimeout(request.timeout);
-    browser.runtime.onMessage.removeListener(request.messageListener);
     this.activeRequests.delete(messageId);
     
     // Instead of rejecting with an error, resolve with a cancellation marker
@@ -211,6 +197,40 @@ export class TranslationHandler {
     request.resolve({ cancelled: true });
     
     this.logger.debug('Translation cancelled', { messageId });
+  }
+
+  /**
+   * Handle translation result from central message handler
+   * This method will be called by the central handler when TRANSLATION_RESULT_UPDATE is received
+   */
+  handleTranslationResult(message) {
+    const { messageId } = message;
+    const request = this.activeRequests.get(messageId);
+    
+    if (!request) {
+      this.logger.debug(`No active request found for messageId: ${messageId}`);
+      return false;
+    }
+
+    this.logger.operation("Message matched! Processing translation result");
+    clearTimeout(request.timeout);
+    this.activeRequests.delete(messageId);
+    
+    // Check for error first - error can be in data.error or directly in data
+    if (message.data?.error || (message.data?.type && message.data?.message)) {
+      this.logger.debug("Error detected in central handler, rejecting promise with error");
+      const errorMessage = message.data?.error?.message || message.data?.message || 'Translation failed';
+      request.reject(new Error(errorMessage));
+      return true;
+    } else if (message.data?.translatedText) {
+      this.logger.operation("Translation success received");
+      request.resolve({ translatedText: message.data.translatedText });
+      return true;
+    } else {
+      this.logger.error("Unexpected message data - no error and no translatedText", message.data);
+      request.reject(new Error('No translated text in result'));
+      return true;
+    }
   }
 
   /**

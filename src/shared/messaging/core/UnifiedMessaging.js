@@ -116,9 +116,20 @@ export async function sendMessage(message, options = {}) {
     }
 
     if (response.success === false) {
+      // Debug logging to understand response structure
+      logger.debug('Response with success=false received:', {
+        response,
+        responseKeys: Object.keys(response),
+        hasError: !!response.error,
+        hasMessage: !!response.message,
+        errorType: typeof response.error,
+        messageType: typeof response.message
+      });
+      
       // Re-create the error object from the response for a proper stack trace
-      const error = new Error(response.error?.message || 'An unknown error occurred');
-      Object.assign(error, response.error);
+      const errorMessage = response.error?.message || response.message || response.error || 'An unknown error occurred';
+      const error = new Error(errorMessage);
+      Object.assign(error, response.error || response);
       throw error;
     }
 
@@ -132,6 +143,7 @@ export async function sendMessage(message, options = {}) {
   } catch (error) {
     logger.error(`Message failed for ${message.action}:`, error.message);
 
+    // Extension context errors are handled automatically by ExtensionContextManager.isContextError
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, `UnifiedMessaging.${message.action}`);
     }

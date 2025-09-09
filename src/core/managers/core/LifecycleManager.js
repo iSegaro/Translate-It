@@ -10,7 +10,7 @@ import {
   handleGoogleTTSResume,
   handleGoogleTTSGetStatus,
 } from '@/features/tts/handlers/handleGoogleTTS.js';
-import { simpleMessageHandler } from "@/core/SimpleMessageHandler.js"; // This might need to be moved later
+import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
 import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -28,10 +28,10 @@ class LifecycleManager extends ResourceTracker {
     this.browser = null;
     this.translationEngine = null;
     this.featureLoader = featureLoader;
-    this.messageHandler = simpleMessageHandler;
+    this.messageHandler = createMessageHandler();
     this.dynamicIconManager = actionbarIconManager;
-    if (!this.messageHandler.initialized) {
-      this.messageHandler.initialize();
+    if (!this.messageHandler.isListenerActive) {
+      this.messageHandler.listen();
     }
   }
 
@@ -115,6 +115,7 @@ class LifecycleManager extends ResourceTracker {
       'translateText': Handlers.handleTranslateText,
       'revertTranslation': Handlers.handleRevertTranslation,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
+      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResult,
       
       // Subtitle handlers
       'subtitleTranslate': Handlers.handleSubtitleTranslate,
@@ -133,6 +134,7 @@ class LifecycleManager extends ResourceTracker {
       'deactivateSelectElementMode': Handlers.handleActivateSelectElementMode,
       'setSelectElementState': Handlers.handleSetSelectElementState,
       'getSelectElementState': Handlers.handleGetSelectElementState,
+      'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
       
       // Screen capture handlers
       'startAreaCapture': Handlers.handleStartAreaCapture,
@@ -166,7 +168,13 @@ class LifecycleManager extends ResourceTracker {
       'captureScreenArea': Handlers.handleCaptureScreenArea,
       'updateContextMenu': Handlers.handleUpdateContextMenu,
       'getExtensionInfo': Handlers.handleGetExtensionInfo,
-      'logError': Handlers.handleLogError
+      'logError': Handlers.handleLogError,
+      
+      // Vue Bridge handlers
+      'CREATE_VUE_MICRO_APP': Handlers.handleVueBridge,
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridge,
+      'START_SCREEN_CAPTURE': Handlers.handleVueBridge,
+      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridge
     };
     
     // Add browser-specific handlers
@@ -179,7 +187,6 @@ class LifecycleManager extends ResourceTracker {
     const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
     
     logger.debug(`📊 Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
-    logger.debug('📊 Handler registration stats:', this.messageHandler.getStats());
   }
 
   /**

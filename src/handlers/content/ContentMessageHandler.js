@@ -158,15 +158,20 @@ export class ContentMessageHandler extends ResourceTracker {
         isActive: this.selectElementManager.isActive
       });
       
-      const result = await this.selectElementManager.activate();
-      
-      this.logger.info("✅ ContentMessageHandler: selectElementManager.activate() completed", {
-        result: result
-      });
-      
-      return result;
+      try {
+        await this.selectElementManager.activate();
+        
+        this.logger.info("✅ ContentMessageHandler: selectElementManager.activate() completed successfully");
+        
+        // Always return a proper success response
+        return { success: true, activated: true };
+      } catch (error) {
+        this.logger.error("❌ ContentMessageHandler: selectElementManager.activate() failed:", error);
+        return { success: false, error: error.message, activated: false };
+      }
     } else {
       this.logger.error("❌ ContentMessageHandler: No selectElementManager available!");
+      return { success: false, error: "SelectElementManager not available", activated: false };
     }
   }
 
@@ -180,16 +185,24 @@ export class ContentMessageHandler extends ResourceTracker {
         isInIframe: window !== window.top,
       });
       
-      if (fromBackground) {
-        // Use forceDeactivate to avoid sending back to background
-        this.logger.debug('Using forceDeactivate (background-initiated)');
-        return this.selectElementManager.forceDeactivate();
-      } else {
-        this.logger.debug('Using regular deactivate (local-initiated)');
-        return this.selectElementManager.deactivate();
+      try {
+        if (fromBackground) {
+          // Use forceDeactivate to avoid sending back to background
+          this.logger.debug('Using forceDeactivate (background-initiated)');
+          await this.selectElementManager.forceDeactivate();
+        } else {
+          this.logger.debug('Using regular deactivate (local-initiated)');
+          await this.selectElementManager.deactivate();
+        }
+        
+        return { success: true, activated: false };
+      } catch (error) {
+        this.logger.error("❌ ContentMessageHandler: selectElementManager deactivation failed:", error);
+        return { success: false, error: error.message };
       }
     } else {
       this.logger.warn("❌ ContentMessageHandler: No selectElementManager available for deactivation!");
+      return { success: false, error: "SelectElementManager not available" };
     }
   }
 

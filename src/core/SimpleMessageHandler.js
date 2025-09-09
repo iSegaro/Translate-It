@@ -1,7 +1,11 @@
 /**
+ * @deprecated This file is deprecated and replaced by MessageHandler.js
  * Simple Message Handler - Promise-based cross-browser implementation.
  * Uses webextension-polyfill Promise API for seamless Chrome/Firefox compatibility.
  * Enhanced with context-aware routing for MessagingStandards integration
+ * 
+ * MIGRATION NOTE: All functionality has been moved to @/shared/messaging/core/MessageHandler.js
+ * This file is kept for backward compatibility and will be removed in future versions.
  */
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
