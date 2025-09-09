@@ -115,7 +115,7 @@ const adjustedPosition = transformPosition({ x: 100, y: 200 });
 ### After IFrame Support
 - ✅ **Complete iframe functionality** across all features
 - ✅ **Zero memory leaks** with ResourceTracker integration
-- ✅ **Optimized communication** with SmartMessaging
+- ✅ **Optimized communication** with UnifiedMessaging
 - ✅ **Proper error handling** with ExtensionContextManager
 - ✅ **Vue-integrated** reactive components
 - ✅ **Immediate UI feedback** with SelectElement mode instant deactivation
@@ -156,7 +156,7 @@ const result = await ExtensionContextManager.safeSendMessage(message, context);
 
 ```javascript
 // Optimized message passing
-const response = await sendSmart({
+const response = await sendMessage({
   action: MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT,
   data: { frameId, options }
 });

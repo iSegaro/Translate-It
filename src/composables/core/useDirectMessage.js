@@ -3,7 +3,7 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -24,9 +24,9 @@ export function useDirectMessage() {
 
       logger.debug("Sending direct message:", message);
 
-      // Use smart messaging for optimal routing
-      const response = await sendSmart(message);
-      logger.debug("Direct response received (smart):", response);
+      // Use unified messaging for optimal routing
+      const response = await sendMessage(message);
+      logger.debug("Direct response received:", response);
       return response;
     } catch (error) {
       logger.error("Direct message failed", error);

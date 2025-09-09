@@ -118,84 +118,9 @@ browser.runtime.onConnect.addListener((port) => {
       return;
     }
     
-    // Handle recognized messaging ports
-    const recognizedPorts = ['reliable-messaging', 'smart-messaging', 'translation'];
-    if (!port.name || !recognizedPorts.some(name => port.name.includes(name))) {
-      logger.debug('[Background] Ignoring unrecognized port:', port.name);
-      return;
-    }
-    // Manual disconnected flag for port
-    port._disconnected = false;
-    port.onMessage.addListener(async (msg) => {
-      try {
-        logger.debug('[Background] Port message received:', msg && msg.action, msg && msg.messageId);
-        
-        // Send immediate ACK for all port messages
-        try { 
-          port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) 
-          } catch (e) {
-            logger.error('[Background] Failed to send ACK:', e);
-          }
-
-          // Wait for background service to be initialized before processing messages
-          if (!backgroundService.initialized) {
-            logger.debug('[Background] Background service not yet initialized, waiting...');
-            
-            // Wait up to 5 seconds for initialization
-            let retries = 50;
-            while (!backgroundService.initialized && retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-              retries--;
-            }
-            
-            if (!backgroundService.initialized) {
-              logger.error('[Background] Background service failed to initialize within timeout');
-              if (port && port.postMessage && !port._disconnected) {
-                port.postMessage({ 
-                  type: 'RESULT', 
-                  messageId: msg.messageId, 
-                  result: { success: false, error: 'Background service not ready' } 
-                });
-              }
-              return;
-            }
-            
-            logger.debug('[Background] Background service initialized, proceeding with message handling');
-          }
-
-          const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
-
-          if (handler) {
-            const result = await handler(msg, port.sender);
-            // Check if port is disconnected before sending RESULT (manual flag)
-            if (port && port.postMessage && !port._disconnected) {
-              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
-              logger.debug('[Background] RESULT sent to port successfully');
-            } else {
-              logger.debug('[Background] Port disconnected before RESULT could be sent');
-            }
-          } else {
-            if (port && port.postMessage && !port._disconnected) {
-              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
-            }
-          }
-        } catch (err) {
-          logger.error('[Background] Error handling port message:', err);
-          try {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: err.message } });
-          } catch (e) {
-            logger.error('[Background] Failed to post error RESULT to port', e);
-          }
-        }
-      });
-
-      port.onDisconnect.addListener(() => {
-        port._disconnected = true;
-        logger.debug('[Background] Port disconnected:', port.name);
-        
-        // Handle runtime.lastError using centralized system
-        ExtensionContextManager.handleRuntimeLastError('Background.onDisconnect.messaging')
-      });
+    // Only handle lifecycle ports now (popup, sidepanel)
+    // All messaging is now handled via direct runtime.sendMessage through UnifiedMessaging
+    logger.debug('[Background] Unrecognized port connection:', port.name, '- ignoring as UnifiedMessaging handles all messaging');
     } catch (err) {
       logger.error('[Background] Error in onConnect handler:', err);
     }

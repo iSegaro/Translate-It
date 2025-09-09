@@ -25,63 +25,46 @@ class SimpleMessageHandler {
    */
   initialize() {
     if (this.initialized) {
+      logger.debug("Simple Message Handler is already initialized.");
       return;
     }
 
     logger.debug("🎧 [SimpleMessageHandler] Initializing Simple Message Handler...");
 
-    // Use callback pattern for Firefox MV3 compatibility
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      logger.debug(
-        "[SimpleMessageHandler] 🎯 Received message:",
-        message,
-        "from:",
-        sender?.tab?.id || 'unknown',
-      );
-
-      // Enhanced context-aware routing
       const action = message?.action || message?.type;
-      const context = message?.context;
-      const handler = this.getHandlerForMessage(action, context);
-      
-      if (action === MessageActions.SET_SELECT_ELEMENT_STATE) {
-        logger.debug(`[${MessageActions.SET_SELECT_ELEMENT_STATE}] message received`, {
-          context,
-          handler: !!handler,
-          handlerName: handler?.name,
-        });
+      if (!action) {
+        logger.warn("[SimpleMessageHandler] Message without action received.", message);
+        return false; // No action, no response expected.
       }
-      
+
+      const handler = this.getHandlerForMessage(action, message?.context);
+
       if (handler) {
+        logger.debug(`[SimpleMessageHandler] Handler found for ${action}, invoking.`);
         
-        // Check if handler uses callback pattern (3+ parameters)
-        if (handler.length >= 3) {
-          // Call handler directly with callback - it will handle sendResponse
-          handler(message, sender, sendResponse);
-          return true; // Keep message channel open
-        } else {
-            // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
-            handler(message, sender).then((result) => {
-              try {
-                sendResponse(result);
-              } catch (sendError) {
-                logger.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
-              }
-            }).catch((error) => {
-              logger.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
-              try {
-                sendResponse({ success: false, error: error.message || 'Handler error' });
-              } catch (sendError) {
-                logger.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
-              }
-            });
-            return true; // Keep message channel open for async response
-        }
+        const promise = Promise.resolve(handler(message, sender));
+
+        promise.then(response => {
+          logger.debug(`[SimpleMessageHandler] Handler for ${action} succeeded, sending response.`);
+          try {
+            sendResponse(response);
+          } catch (e) {
+            logger.warn(`[SimpleMessageHandler] Could not send response for ${action}: ${e.message}`);
+          }
+        }).catch(error => {
+          logger.error(`[SimpleMessageHandler] Handler for ${action} failed:`, error);
+          try {
+            sendResponse({ success: false, error: error.message || 'Handler error' });
+          } catch (e) {
+            logger.warn(`[SimpleMessageHandler] Could not send error response for ${action}: ${e.message}`);
+          }
+        });
+
+        return true; // Indicate that the response will be sent asynchronously.
       } else {
-        logger.debug(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);
-        logger.debug(`[SimpleMessageHandler] Available handlers:`, Array.from(this.handlers.keys()));
-        // No handler found - let other listeners handle it
-        return false;
+        logger.debug(`[SimpleMessageHandler] No handler for action: ${action}`);
+        return false; // No handler, no response expected.
       }
     });
 

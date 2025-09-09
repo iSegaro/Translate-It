@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 
-import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
+import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -406,7 +406,7 @@ export class SelectElementManagerNew extends ResourceTracker {
    */
   async sendCancelToBackground(messageId) {
     try {
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.CANCEL_TRANSLATION,
         data: { 
           messageId,
@@ -615,7 +615,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     try {
       this.logger.debug("Sending setSelectElementState(active: false) to background");
       
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.SET_SELECT_ELEMENT_STATE,
         data: { active: false }
       });

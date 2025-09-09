@@ -4,7 +4,7 @@
  */
 
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler');
@@ -116,7 +116,7 @@ async function handleOpenSidepanel(info, tab) {
   logger.debug('Sidepanel opened');
       } else {
         // Fallback - send message to background to handle
-        await sendSmart({
+        await sendMessage({
           action: MessageActions.OPEN_SIDE_PANEL,
           source: "context_menu",
           tabId: tab.id,
@@ -140,7 +140,7 @@ async function handleScreenCapture(info, tab) {
   logger.debug('Screen capture menu clicked');
 
     // Send message to background to start screen capture
-    await sendSmart({
+    await sendMessage({
       action: MessageActions.START_CAPTURE_SELECTION,
       source: "context_menu",
       tabId: tab.id,

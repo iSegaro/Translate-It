@@ -160,10 +160,10 @@ export function useUnifiedTranslation(context = 'popup') {
         pendingRequests.value.add(messageId);
       }
 
-      const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
       const timeoutOptions = context === 'sidepanel' ? { totalTimeout: 20000, retries: 1 } : {};
       
-      const response = await sendSmart(requestData, timeoutOptions);
+      const response = await sendMessage(requestData, timeoutOptions);
 
       if (response && (response.result || response.data || response.translatedText)) {
         let resultData = response.result || response.data || response;

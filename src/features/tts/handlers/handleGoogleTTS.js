@@ -45,11 +45,11 @@ const isLanguageSupported = (language) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSSpeak = async (request) => {
+export const handleGoogleTTSSpeak = async (message, sender) => {
   try {
-    logger.debug('[GoogleTTSHandler] 🎤 Processing Google TTS request:', request);
+    logger.debug('[GoogleTTSHandler] 🎤 Processing Google TTS request:', message);
     
-    const { text, language } = request.data || {};
+    const { text, language } = message.data || {};
     
     // Request deduplication - prevent duplicate requests with same text/language
     if (currentTTSRequest && text === lastTTSText && language === lastTTSLanguage) {
@@ -366,7 +366,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSStopAll = async () => {
+export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
     logger.debug('[GoogleTTSHandler] 🛑 Processing Google TTS Stop All request');
     
@@ -402,7 +402,7 @@ export const handleGoogleTTSStopAll = async () => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSPause = async () => {
+export const handleGoogleTTSPause = async (message, sender) => {
   try {
     logger.debug('[GoogleTTSHandler] ⏸️ Processing Google TTS Pause request');
     
@@ -433,7 +433,7 @@ export const handleGoogleTTSPause = async () => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSResume = async () => {
+export const handleGoogleTTSResume = async (message, sender) => {
   try {
     logger.debug('[GoogleTTSHandler] ▶️ Processing Google TTS Resume request');
     
@@ -464,7 +464,7 @@ export const handleGoogleTTSResume = async () => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSGetStatus = async () => {
+export const handleGoogleTTSGetStatus = async (message, sender) => {
   try {
     logger.debug('[GoogleTTSHandler] 📊 Processing Google TTS Get Status request');
     

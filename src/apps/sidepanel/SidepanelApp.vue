@@ -72,16 +72,23 @@ const hasError = ref(false)
 const errorMessage = ref('')
 
 // Message listener
-const handleMessage = (message) => {
+const handleMessage = (message, sender, sendResponse) => {
+  // Only handle specific sidepanel messages, let other messages be handled by background
   if (message.action === 'translationResult') {
     translationStore.setTranslation(message.data);
+    return false; // Don't keep channel open
   } else if (message.action === 'LANGUAGE_CHANGED') {
     logger.debug('Language changed from options:', message.payload.lang);
     changeLanguage(message.payload.lang);
+    return false; // Don't keep channel open  
   } else if (message.action === 'THEME_CHANGED') {
     logger.debug('Theme changed from options:', message.payload.theme);
     applyTheme(message.payload.theme).catch(error => logger.error('Failed to apply theme:', error));
+    return false; // Don't keep channel open
   }
+  
+  // Let other messages (like TRANSLATE) be handled by background service worker
+  return false;
 };
 
 // System theme change listener for auto mode

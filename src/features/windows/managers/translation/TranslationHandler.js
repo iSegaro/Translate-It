@@ -1,7 +1,7 @@
 // src/managers/content/windows/translation/TranslationHandler.js
 
 import browser from "webextension-polyfill";
-import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js"
+import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js"
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
@@ -68,7 +68,7 @@ export class TranslationHandler {
       this.logger.debug("Sending translation request", payload);
 
       // Send translation request using reliable messenger (retries + port fallback)
-      const ackOrResult = await sendSmart({
+      const ackOrResult = await sendMessage({
         action: MessageActions.TRANSLATE,
         context: 'content',
         messageId: messageId,
@@ -82,8 +82,8 @@ export class TranslationHandler {
         }
       })
 
-      // If sendSmart returned a RESULT directly (port fallback), use it
-      this.logger.debug("sendSmart returned:", ackOrResult);
+      // If sendMessage returned a RESULT directly (port fallback), use it
+      this.logger.debug("sendMessage returned:", ackOrResult);
       
       if (ackOrResult && (ackOrResult.type === 'RESULT' || ackOrResult.result)) {
         const final = ackOrResult.result || ackOrResult

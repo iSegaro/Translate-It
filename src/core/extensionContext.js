@@ -130,15 +130,15 @@ export class ExtensionContextManager {
    * @returns {Promise} Safe message sending promise
    */
   static async safeSendMessage(message, context = 'messaging') {
-    // Use reliable messaging (with retries and port fallback) where available
+    // Use unified messaging system
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
-        // Use dynamically imported sendReliable to avoid circular dependency.
+        // Use dynamically imported UnifiedMessaging to avoid circular dependency.
         try {
-          const { sendReliable } = await import('@/shared/messaging/core/ReliableMessaging.js');
-          return await sendReliable(msg);
+          const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+          return await sendMessage(msg);
         } catch (err) {
-          logger.debug('sendReliable failed in safeSendMessage:', err);
+          logger.debug('UnifiedMessaging failed in safeSendMessage:', err);
           throw err;
         }
       },

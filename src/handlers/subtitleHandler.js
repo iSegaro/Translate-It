@@ -9,7 +9,7 @@ import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 // removed legacy createLogger import
@@ -165,7 +165,7 @@ export class SubtitleHandler extends ResourceTracker {
         MessagingContexts.CONTENT
       );
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
       
       if (response.success && this.site === "youtube") {
         this.updateYouTubeButtonState(newValue);
@@ -221,7 +221,7 @@ export class SubtitleHandler extends ResourceTracker {
               MessagingContexts.CONTENT
             );
             
-            const response = await sendSmart(message);
+            const response = await sendMessage(message);
             return response.translatedText || text;
           } catch (error) {
             const errorType = matchErrorToType(error);

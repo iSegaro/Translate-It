@@ -12,7 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Capture');
 import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 // removed legacy createLogger import
@@ -52,7 +52,7 @@ export class ContentCaptureHandler extends ResourceTracker {
         MessagingContexts.CONTENT
       );
       
-      const fullCaptureResponse = await sendSmart(fullCaptureMessage);
+      const fullCaptureResponse = await sendMessage(fullCaptureMessage);
       if (!fullCaptureResponse || fullCaptureResponse.error) throw new Error(fullCaptureResponse.error || "Failed to capture full screen");
       
       const croppedImageData = await cropImageData(fullCaptureResponse.imageData, selectionData);
@@ -67,7 +67,7 @@ export class ContentCaptureHandler extends ResourceTracker {
         MessagingContexts.CONTENT
       );
       
-      await sendSmart(ocrMessage);
+      await sendMessage(ocrMessage);
       if (this.screenSelector) this.screenSelector.cleanup();
     } catch (error) {
       this.handleCaptureError(error, "area-completion");

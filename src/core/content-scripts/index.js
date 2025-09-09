@@ -6,7 +6,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
 // Import Main DOM CSS as raw string for injection
 import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';

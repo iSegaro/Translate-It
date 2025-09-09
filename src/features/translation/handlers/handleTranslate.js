@@ -3,7 +3,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -17,15 +17,9 @@ const errorHandler = new ErrorHandler();
  * @param {Object} sender - The sender object.
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleTranslate(message, sender, sendResponse) {
-  // Send immediate ACK to sender to indicate request received
-  try {
-    if (typeof sendResponse === 'function') {
-      try { sendResponse({ ack: true, messageId: message.messageId }) } catch (e) { /* ignore */ }
-    }
-  } catch (e) {
-    // ignore
-  }
+export async function handleTranslate(message, sender) {
+  // Note: For UnifiedMessaging, we need to return the actual result, not just ACK
+  // ACK is only needed for port-based messaging
 
   logger.info(`[Handler:TRANSLATE] 🔄 Starting: "${message.data?.text?.slice(0, 30)}..." → ${message.data?.provider} → ${message.data?.targetLanguage}`);
 
@@ -122,25 +116,24 @@ export async function handleTranslate(message, sender, sendResponse) {
       logger.debug("[Handler:TRANSLATE] No tab ID found in sender - response will be handled by port or original caller");
     }
 
-    // Return the actual translation result for port-based requests
-    if (result.success) {
-      return {
-        success: true,
-        messageId: message.messageId,
-        translatedText: result.translatedText,
-        sourceLanguage: result.sourceLanguage,
-        targetLanguage: result.targetLanguage,
-        provider: result.provider || message.data.provider,
-        timestamp: Date.now()
-      };
-    } else {
-      return {
-        success: false,
-        messageId: message.messageId,
-        error: result.error,
-        timestamp: Date.now()
-      };
-    }
+    // Return the actual translation result
+    const finalResult = result.success ? {
+      success: true,
+      messageId: message.messageId,
+      translatedText: result.translatedText,
+      sourceLanguage: result.sourceLanguage,
+      targetLanguage: result.targetLanguage,
+      provider: result.provider || message.data.provider,
+      timestamp: Date.now()
+    } : {
+      success: false,
+      messageId: message.messageId,
+      error: result.error,
+      timestamp: Date.now()
+    };
+
+    logger.debug('[Handler:TRANSLATE] Returning final result:', finalResult);
+    return finalResult;
 
   } catch (translationError) {
     logger.debug('[Handler:TRANSLATE] Caught error from translation engine:', translationError.message);
@@ -161,6 +154,7 @@ export async function handleTranslate(message, sender, sendResponse) {
     );
 
     logger.debug('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
+    
     return errorResponse;
   }
 }

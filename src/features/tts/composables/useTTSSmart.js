@@ -3,7 +3,7 @@ import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
@@ -88,7 +88,7 @@ export function useTTSSmart() {
         messageId: `tts-speak-${currentTTSId.value}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       // Handle empty or error responses
       if (!response) {
@@ -142,7 +142,7 @@ export function useTTSSmart() {
         messageId: `tts-pause-${currentTTSId.value}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
       
       if (!response?.success) {
         throw new Error(response?.error || 'Pause failed');
@@ -173,7 +173,7 @@ export function useTTSSmart() {
         messageId: `tts-resume-${currentTTSId.value}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
       
       if (!response?.success) {
         throw new Error(response?.error || 'Resume failed');
@@ -205,7 +205,7 @@ export function useTTSSmart() {
         messageId: `tts-stop-${currentTTSId.value || 'all'}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       // Stop polling
       if (completionPoller) {
@@ -245,7 +245,7 @@ export function useTTSSmart() {
         messageId: `tts-stop-all-${Date.now()}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       // Stop polling
       if (completionPoller) {
@@ -321,7 +321,7 @@ export function useTTSSmart() {
         messageId: `tts-status-${currentTTSId.value || 'unknown'}`
       };
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       const serverStatus = response?.status || 'idle';
       

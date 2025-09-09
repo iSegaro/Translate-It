@@ -6,7 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import SmartCache from '@/core/memory/SmartCache.js';
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 /**
@@ -14,7 +14,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
  * 
  * Features:
  * - Automatic resource management with ResourceTracker
- * - Cross-frame communication with SmartMessaging  
+ * - Cross-frame communication with UnifiedMessaging  
  * - Error handling with ExtensionContextManager
  * - Intelligent caching with SmartCache
  * - Memory leak prevention with Memory Garbage Collector
@@ -395,7 +395,7 @@ export class IFrameManager extends ResourceTracker {
   async _handleTranslationRequest(data) {
     try {
       // Use existing translation system
-      const response = await sendSmart({
+      const response = await sendMessage({
         action: MessageActions.TRANSLATE,
         data: {
           text: data.text,

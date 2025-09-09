@@ -7,7 +7,7 @@ import { useLanguages } from "@/composables/shared/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -40,28 +40,34 @@ const _registerSelectStateListener = async () => {
   }
 
   // Register runtime message listener for background broadcasts
-  _selectStateHandler = async (message) => {
-    try {
-      if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
-        const { tabId, active } = message.data || {};
-        // Update only if the broadcast refers to our current tab
-        try {
-          if (!_currentTabId) {
-            const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  _selectStateHandler = (message, sender, sendResponse) => {
+    if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
+      const { tabId, active } = message.data || {};
+      try {
+        if (!_currentTabId) {
+          browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
             if (tabs && tabs.length) _currentTabId = tabs[0].id;
+            if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
+              sharedIsSelectModeActive.value = !!active;
+            }
+          });
+        } else {
+          if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
+            sharedIsSelectModeActive.value = !!active;
           }
-        } catch {
-          // ignore
         }
-
-        if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
-          sharedIsSelectModeActive.value = !!active;
-          logger.debug('selectElementState changed (broadcast for current tab):', tabId, active);
-        }
+      } catch (e) {
+        logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
       }
-    } catch (e) {
-      logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
+      // This listener does not send a response, so we don't return true.
+      // We have handled the message, so we don't return false/undefined either to avoid closing the channel for other listeners.
+      return;
     }
+
+    // IMPORTANT: If this is not the message we are looking for, we must return true
+    // to indicate that another listener will respond asynchronously. This prevents this
+    // listener from closing the message channel prematurely.
+    return true;
   };
 
   try {
@@ -128,7 +134,7 @@ export function useSidepanelTranslation() {
         mode = TranslationMode.Dictionary_Translation;
       }
       
-      const response = await sendSmart({
+      const response = await sendMessage({
         action: MessageActions.TRANSLATE,
         messageId: messageId,
         context: 'sidepanel',
@@ -196,7 +202,7 @@ export function useSelectElementTranslation() {
           try {
             _currentTabId = activeInfo.tabId;
             // Query background directly for select element state for the new tab
-            const response = await sendSmart({
+            const response = await sendMessage({
               action: MessageActions.GET_SELECT_ELEMENT_STATE,
               context: 'sidepanel',
               timestamp: Date.now()
@@ -241,7 +247,7 @@ export function useSelectElementTranslation() {
 
     try {
       logger.debug('Activating select element mode');
-      const result = await sendSmart({
+      const result = await sendMessage({
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
@@ -273,7 +279,7 @@ export function useSelectElementTranslation() {
   const deactivateSelectMode = async () => {
     try {
       logger.debug('Deactivating select element mode');
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
@@ -342,7 +348,7 @@ export function useSidepanelActions() {
 
     try {
       logger.debug('Reverting translation');
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now()
@@ -362,7 +368,7 @@ export function useSidepanelActions() {
   const stopTTS = async () => {
     try {
       logger.debug('Stopping TTS');
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.TTS_STOP,
         context: 'sidepanel',
         timestamp: Date.now()

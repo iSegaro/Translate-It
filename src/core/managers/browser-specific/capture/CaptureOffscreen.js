@@ -3,7 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts, MessageActions } from "@/shared/messaging/core/MessagingCore.js";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -116,7 +116,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
           MessagingContexts.CAPTURE_MANAGER
         );
         
-        const response = await sendSmart(message);
+        const response = await sendMessage(message);
 
         if (!response || !response.success) {
           throw new Error(response?.error || "Failed to process capture in offscreen document");
@@ -154,7 +154,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "Failed to crop image in offscreen document");
@@ -193,7 +193,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await sendSmart(message);
+      const response = await sendMessage(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "OCR processing failed");

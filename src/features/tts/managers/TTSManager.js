@@ -5,7 +5,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -36,8 +36,8 @@ export class TTSManager extends ResourceTracker {
         });
         
         if (!response || !response.ack) {
-          // Fallback to sendSmart if direct messaging doesn't work
-          await sendSmart({
+          // Fallback to sendMessage if direct messaging doesn't work
+          await sendMessage({
             action: MessageActions.GOOGLE_TTS_STOP_ALL,
             data: { source: 'windows-manager-cleanup', windowId },
             context: 'tts-manager',
@@ -95,9 +95,9 @@ export class TTSManager extends ResourceTracker {
           return true;
         }
       } catch (directError) {
-        // If direct messaging fails, fall back to sendSmart
-        this.logger.debug(`[TTSManager ${this.windowId}] Direct messaging failed, trying sendSmart:`, directError.message);
-        const response = await sendSmart({
+        // If direct messaging fails, fall back to sendMessage
+        this.logger.debug(`[TTSManager ${this.windowId}] Direct messaging failed, trying sendMessage:`, directError.message);
+        const response = await sendMessage({
           action: MessageActions.GOOGLE_TTS_SPEAK,
           data: {
             text: text.trim(),
@@ -154,7 +154,7 @@ export class TTSManager extends ResourceTracker {
     try {
       this.logger.debug(`[TTSManager ${this.windowId}] Pausing TTS`);
       
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.GOOGLE_TTS_PAUSE,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
@@ -185,7 +185,7 @@ export class TTSManager extends ResourceTracker {
     try {
       this.logger.debug(`[TTSManager ${this.windowId}] Resuming TTS`);
       
-      await sendSmart({
+      await sendMessage({
         action: MessageActions.GOOGLE_TTS_RESUME,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
@@ -214,7 +214,7 @@ export class TTSManager extends ResourceTracker {
    */
   async getTTSStatus() {
     try {
-      const response = await sendSmart({
+      const response = await sendMessage({
         action: MessageActions.GOOGLE_TTS_GET_STATUS,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
@@ -386,9 +386,9 @@ export class TTSManager extends ResourceTracker {
           this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop ACK received`);
         }
       } catch (directError) {
-        // Fallback to sendSmart if direct messaging fails
+        // Fallback to sendMessage if direct messaging fails
         try {
-          await sendSmart({
+          await sendMessage({
             action: MessageActions.GOOGLE_TTS_STOP_ALL,
             data: { 
               instanceId: this.ttsGlobal.instanceId,
@@ -397,7 +397,7 @@ export class TTSManager extends ResourceTracker {
             context: 'tts-manager',
             messageId: `tts-stop-fallback-${this.windowId}-${Date.now()}`
           });
-          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent via sendSmart`);
+          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent via sendMessage`);
         } catch (bgError) {
           this.logger.warn(`[TTSManager ${this.windowId}] Background stop failed:`, bgError);
         }

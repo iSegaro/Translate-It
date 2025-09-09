@@ -53,10 +53,10 @@ export class RevertShortcut {
           
           // Approach 3: Direct background cancellation as additional safety measure
           try {
-            const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
+            const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
             const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
             
-            await sendSmart({
+            await sendMessage({
               action: MessageActions.CANCEL_TRANSLATION,
               data: { 
                 cancelAll: true,
@@ -94,10 +94,10 @@ export class RevertShortcut {
     // Priority 2: If Select Element Mode is active (but no translation in progress), deactivate it
     // Use instance-agnostic approach - let background decide if deactivation is needed
     try {
-      const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
       const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
       
-      const result = await sendSmart({
+      const result = await sendMessage({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         data: { 
           active: false,

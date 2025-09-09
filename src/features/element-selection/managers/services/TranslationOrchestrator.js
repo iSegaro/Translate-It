@@ -9,7 +9,7 @@ import { calculateDynamicTimeout } from "@/features/translation/utils/timeoutCal
 import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
-import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
+import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -234,8 +234,8 @@ this.translationRequests.delete(messageId);
         payloadSize: jsonPayload.length
       });
       
-      // Use sendSmart with dynamic timeout for proper error propagation
-      const result = await sendSmart(translationRequest, { timeout: dynamicTimeout });
+      // Use sendMessage with dynamic timeout for proper error propagation
+      const result = await sendMessage(translationRequest, { timeout: dynamicTimeout });
       
       this.logger.debug("Translation request sent successfully", result);
     } catch (error) {
@@ -602,7 +602,7 @@ this.translationRequests.delete(messageId);
       
       // Send cancellation to background (will be handled by enhanced handleCancelTranslation)
       try {
-        await sendSmart({
+        await sendMessage({
           action: MessageActions.CANCEL_TRANSLATION,
           data: { 
             messageId,
@@ -657,7 +657,7 @@ this.translationRequests.delete(messageId);
         this.logger.debug('[TranslationOrchestrator] Cancelled request:', messageId);
         
         // Notify background to cancel the network request
-        sendSmart({
+        sendMessage({
           action: MessageActions.CANCEL_TRANSLATION,
           messageId: messageId,
           data: { messageId: messageId }
