@@ -760,7 +760,8 @@ export class TextSelectionManager extends ResourceTracker {
         target: this.pendingSelection.target
       };
       
-      await this._processSelectionChangeEvent(pendingEvent);
+      // Pass the mouseup event as the source event
+      await this._processSelectionChangeEvent(pendingEvent, event);
       this.pendingSelection = null;
     }
   }
@@ -774,341 +775,147 @@ export class TextSelectionManager extends ResourceTracker {
   async processSelectedText(selectedText, sourceEvent = null, options = {}) {
     const { isFromDoubleClick = false } = options;
     this.logger.debug('processSelectedText called', {
-      text: selectedText.substring(0, 30) + '...',
+      text: selectedText.substring(0, 30) + '...', 
       isInIframe: window !== window.top,
       hasWindowsManager: !!this._getWindowsManager(),
-      isFromDoubleClick
+      isFromDoubleClick,
+      sourceEventType: sourceEvent?.type
     });
-    
-    // Check if text is actually selected in DOM before processing
-    const currentSelection = window.getSelection();
-    const currentSelectedText = currentSelection ? currentSelection.toString().trim() : '';
-    
-    this.logger.debug('processSelectedText selection check', {
-      currentSelectedText: !!currentSelectedText,
-      currentLength: currentSelectedText?.length || 0,
-      passedText: selectedText.substring(0, 30) + '...',
-      passedLength: selectedText.length
-    });
-    
-    // If no current selection but we have text, it means selection was cleared
-    if (!currentSelectedText && selectedText) {
-      this.logger.debug('Current selection cleared, but we have passed text - continuing anyway for double-click');
-      // Don't return early for double-click case - continue processing
-    }
-    
-    // Check if extension context is valid before processing
-    if (!ExtensionContextManager.isValidSync()) {
-      this.logger.debug('Extension context invalid, skipping processSelectedText to preserve text selection');
+
+    // Basic validation checks
+    if (!ExtensionContextManager.isValidSync() || (state && state.preventTextFieldIconCreation === true)) {
+      this.logger.debug('Skipping processSelectedText due to invalid context or active transition');
       return;
     }
-    
-    this.logger.debug('Extension context valid, continuing...');
-    
-    // Skip if we're in transition from selection icon to translation window
-    // This prevents conflicts with text field icon creation during the transition
-    if (state && state.preventTextFieldIconCreation === true) {
-      this.logger.debug('Skipping processSelectedText due to active selection window transition');
-      return;
-    }
-    
-    this.logger.debug('No active selection window transition, continuing...');
-    
-    // Prevent duplicate processing of same selection
-    const currentTime = Date.now();
+
     const windowsManager = this._getWindowsManager();
-    if (this.lastProcessedText === selectedText && windowsManager && windowsManager.state.isVisible) {
-      // If same text is selected again within a short time, don't recreate
-      if (currentTime - this.lastProcessedTime < 2000) { // 2 second threshold
-        this.logger.debug('Skipping duplicate processing of same text');
-        return;
-      }
-    }
-    
-    this.logger.debug('Duplicate processing check passed, continuing...');
-    
-  const selection = window.getSelection();
-  let position = { x: 0, y: 0 };
-    
-    // For double-click cases where selection is cleared, use sourceEvent position
-    if (sourceEvent && (!selection || selection.rangeCount === 0)) {
-      this.logger.debug('Using sourceEvent position for double-click', {
-        clientX: sourceEvent.clientX,
-        clientY: sourceEvent.clientY
-      });
-      
-      position = {
-        x: sourceEvent.clientX + window.scrollX,
-        y: sourceEvent.clientY + window.scrollY + 20 // Small offset below click
-      };
-      
-      // Skip normal position calculation and go directly to window show
-      if (this._getWindowsManager()) {
-        this.logger.debug('Calling windowsManager.show() with sourceEvent position', { 
-          text: selectedText.substring(0, 30) + '...',
-          position
-        });
-        await this._getWindowsManager().show(selectedText, position);
-        
-        // Update tracking after successful show
-        this.lastProcessedText = selectedText;
-        this.lastProcessedTime = Date.now();
-      }
+    const currentTime = Date.now();
+    if (this.lastProcessedText === selectedText && windowsManager?.state.isVisible && (currentTime - this.lastProcessedTime < 2000)) {
+      this.logger.debug('Skipping duplicate processing of same text');
       return;
     }
-    
-    // Check if we have a valid selection with ranges
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      let rect = range.getBoundingClientRect();
-      
-      // Track the element and position where selection occurred for dismissal logic
-      this.lastSelectionElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
-        ? range.commonAncestorContainer.parentElement 
-        : range.commonAncestorContainer;
-        
-      // Check if selection icon should be shown based on field type
-      const detection = await fieldDetector.detect(this.lastSelectionElement);
-      if (!detection.shouldShowSelectionIcon) {
-        this.logger.debug('Skipping selection icon display based on field type', {
-          fieldType: detection.fieldType,
-          elementTag: this.lastSelectionElement?.tagName
-        });
-        return;
+
+    // --- Position Calculation Logic ---
+    let position = null;
+    const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
+
+    // Strategy 1: Try site handler first (especially for Google Docs, Office Online, etc.)
+    if (sourceEvent) {
+      try {
+        const siteHandlerPosition = await this._calculatePositionUsingSiteHandler(sourceEvent, sourceEvent.target);
+        if (siteHandlerPosition) {
+          position = siteHandlerPosition;
+          this.logger.debug('Position calculated using site handler', position);
+        }
+      } catch (error) {
+        this.logger.debug('Site handler position calculation failed, falling back', error);
       }
-      
-      // Additional check: For professional editors and rich text editors, 
-      // ensure they follow selection strategy rules
-      if (detection.fieldType === 'professional-editor' || 
-          detection.fieldType === 'rich-text-editor') {
-        const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
-        
-        if (needsDoubleClick && !isFromDoubleClick) {
-          this.logger.debug('Skipping selection icon - double-click required', {
-            fieldType: detection.fieldType,
-            selectionStrategy: detection.selectionStrategy,
-            needsDoubleClick,
-            isFromDoubleClick,
-            elementTag: this.lastSelectionElement?.tagName
-          });
-          return;
+    }
+
+    // Strategy 2: Selection-based positioning for double-click and professional editors
+    const getPositionFromSelection = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return null;
+
+      let rect = selection.getRangeAt(0).getBoundingClientRect();
+
+      // Fix for TEXTAREA/INPUT where getBoundingClientRect is empty
+      if (rect.width === 0 && rect.height === 0) {
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
+          this.logger.debug('Selection rect is empty, attempting fallback for form element.', { tag: activeElement.tagName });
+          const elementRect = activeElement.getBoundingClientRect();
+          let estimatedX = elementRect.left + 10;
+          let estimatedY = elementRect.top + 10;
+
+          if (activeElement.tagName === 'TEXTAREA') {
+            const cursorPosition = activeElement.selectionStart;
+            const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
+            const lines = textBeforeCursor.split('\n');
+            const lineHeight = 18; // Estimated
+            estimatedY = elementRect.top + ((lines.length - 1) * lineHeight) + 10;
+            const lastLineLength = lines[lines.length - 1].length;
+            const charWidth = 8; // Estimated
+            estimatedX = elementRect.left + (lastLineLength * charWidth) + 10;
+            estimatedX = Math.min(estimatedX, elementRect.right - 50);
+          }
+          
+          rect = { left: estimatedX, right: estimatedX, top: estimatedY, bottom: estimatedY + 18, width: 0, height: 18 };
         }
       }
-        
-      // Store the selection position for proximity-based dismissal
-      this.lastSelectionPosition = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
+
+      if (!rect || (rect.width === 0 && rect.height === 0)) return null;
+
+      const selectionCenter = rect.left + rect.width / 2;
+      return {
+        x: selectionCenter - (iconSize / 2) + window.scrollX,
+        y: rect.bottom + WindowsConfig.POSITIONING.SELECTION_OFFSET + window.scrollY
       };
-        
-      // Check if rect is valid (not empty)
-      if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
-        // If we already have a visible window, don't show another one
-        if (windowsManager && windowsManager.state.isVisible) {
-          return;
-        }
-      }
-  
-  // Fix for TEXTAREA and INPUT fields where getBoundingClientRect returns zeros
-  if (rect.width === 0 && rect.height === 0) {
-    // Use site handler for position calculation first
-    try {
-      const sitePosition = await this._calculatePositionUsingSiteHandler(sourceEvent, targetElement);
-      if (sitePosition && (sitePosition.x !== 0 || sitePosition.y !== 0)) {
-        position = sitePosition;
-        this.logger.debug('Using site handler position calculation', position);
-        // Skip to the end of position calculation
-      } else {
-        // Site handler didn't provide position, try form element fallback
-        throw new Error('Site handler returned null or zero position');
-      }
-    } catch (error) {
-      this.logger.debug('Site handler position calculation failed, trying form element fallback:', error);
-      
-      // Fallback: Check if selection is within a form element
-      const activeElement = document.activeElement;
-      if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
-        
-        // Check if selection icon should be shown for this form element
-        const activeElementDetection = await fieldDetector.detect(activeElement);
-        if (!activeElementDetection.shouldShowSelectionIcon) {
-          this.logger.debug('Skipping selection icon for form element based on field type', {
-            fieldType: activeElementDetection.fieldType,
-            elementTag: activeElement.tagName
-          });
-          return;
-        }
-        
-        // Use the element's bounding rect instead
-        const elementRect = activeElement.getBoundingClientRect();
-        
-        // Calculate approximate position based on cursor position in the element
-        let estimatedX = elementRect.left + 10; // Small offset from left
-        let estimatedY = elementRect.top + 10; // Small offset from top
-        
-        // For multiline elements, try to estimate cursor position
-        if (activeElement.tagName === 'TEXTAREA') {
-          // Use selection start to estimate vertical position
-          const cursorPosition = activeElement.selectionStart;
-          const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
-          const lines = textBeforeCursor.split('\n');
-          const lineHeight = 18; // Estimated line height
-          
-          estimatedY = elementRect.top + ((lines.length - 1) * lineHeight) + 10;
-        
-          // Estimate horizontal position based on last line length
-          const lastLineLength = lines[lines.length - 1].length;
-          const charWidth = 8; // Estimated character width
-          estimatedX = elementRect.left + (lastLineLength * charWidth) + 10;
-          
-          // Constrain to element bounds
-          estimatedX = Math.min(estimatedX, elementRect.right - 50);
-        }
-        
-        // Create a synthetic rect
-        rect = {
-          left: estimatedX,
-          right: estimatedX,
-          top: estimatedY,
-          bottom: estimatedY,
-          width: 0,
-          height: 0,
-          x: estimatedX,
-          y: estimatedY
+    };
+
+    // Strategy 3: Mouse event-based positioning for drag selections
+    if (!position) {
+      if (isFromDoubleClick) {
+        this.logger.debug('Double-click detected, using selection-based positioning');
+        position = getPositionFromSelection();
+      } else if (sourceEvent && typeof sourceEvent.clientX === 'number') {
+        this.logger.debug('Drag selection, using mouse position from source event');
+        position = {
+          x: sourceEvent.clientX - (iconSize / 2) + window.scrollX,
+          y: sourceEvent.clientY + 15 + window.scrollY
         };
-        
-        this.logger.debug('Fixed rect for form element:', {
-          original: 'empty rect',
-          fixed: rect,
-          elementTag: activeElement.tagName
-        });
-      }
-    }
-  }
-
-  // Read current selection translation mode to decide how to place the icon/window
-  let settings;
-  let selectionTranslationMode;
-  
-  try {
-    settings = await getSettingsAsync();
-    selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
-  } catch (error) {
-    // If extension context is invalidated, don't process text selection
-    if (ExtensionContextManager.isContextError(error)) {
-      this.logger.debug('Extension context invalidated, skipping text selection processing in processSelectedText - RETURNING EARLY');
-      return;
-    } else {
-      // Re-throw non-context errors
-      throw error;
-    }
-  }
-      
-      this.logger.debug('Selection rect DEBUG', {
-        rect: {
-          left: rect.left,
-          right: rect.right,
-          top: rect.top,
-          bottom: rect.bottom,
-          width: rect.width,
-          height: rect.height
-        },
-        windowScroll: { x: window.scrollX, y: window.scrollY },
-        beforeCalculation: { x: 0, y: 0 }
-      });
-      
-      // محاسبه موقعیت با در نظر گیری viewport و جلوگیری از جابجایی زیاد
-      let targetX, targetY;
-      const viewportWidth = window.innerWidth;
-      const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
-      const popupWidth = WindowsConfig.POSITIONING.POPUP_WIDTH;
-      const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
-      
-      // محاسبه X موثر بر اساس نوع حالت
-      if (selectionTranslationMode === 'onClick') {
-        // برای آیکون: سعی کن در وسط متن قرار بگیری، اگر نمی‌شه کنار متن
-        const centerX = rect.left + (rect.width / 2);
-        const iconRight = centerX + iconSize;
-        
-        if (iconRight <= viewportWidth - margin) {
-          targetX = centerX; // وسط متن
-        } else if (rect.right + iconSize <= viewportWidth - margin) {
-          targetX = rect.right - iconSize; // سمت راست متن
-        } else {
-          targetX = rect.left; // سمت چپ متن
-        }
       } else {
-        // برای پنجره فوری: سعی کن نزدیک چپ متن باشی
-        const popupRight = rect.left + popupWidth;
-        
-        if (popupRight <= viewportWidth - margin) {
-          targetX = rect.left; // چپ متن
-        } else if (rect.right - popupWidth >= margin) {
-          targetX = rect.right - popupWidth; // راست متن منهای عرض پنجره
-        } else {
-          targetX = Math.max(margin, viewportWidth - popupWidth - margin); // آخرین گزینه
-        }
-      }
-      
-      targetY = rect.bottom + WindowsConfig.POSITIONING.SELECTION_OFFSET; // استفاده از config
-      
-      // rect from getBoundingClientRect() is viewport-relative
-      // Convert to absolute coordinates by adding scroll offset
-      position = {
-        x: targetX + window.scrollX,
-        y: targetY + window.scrollY
-      };
-
-
-      
-      // Save valid position for future use
-      if (position.x > 0 || position.y > 0) {
-        this.lastValidPosition = { ...position };
-      }
-    } else {
-      // If no valid selection rect, try to use last valid position for same text
-      if (this.lastValidPosition && this.lastProcessedText === selectedText) {
-        position = { ...this.lastValidPosition };
+        this.logger.debug('No mouse event, falling back to selection-based positioning');
+        position = getPositionFromSelection();
       }
     }
 
-
-    // نمایش پاپ آپ با متن و موقعیت جدید
-    if (windowsManager) {
-      // Main frame: use WindowsManager directly
-      if (!ExtensionContextManager.isValidSync()) {
-        this.logger.debug('Extension context invalid, skipping window/icon creation to preserve text selection');
-        return;
+    // Strategy 4: Fallback to iframe-aware position calculation
+    if (!position && window !== window.top && sourceEvent) {
+      this.logger.debug('Attempting iframe-aware position calculation');
+      try {
+        // Calculate position relative to iframe viewport
+        const iframeRect = window.frameElement?.getBoundingClientRect();
+        if (iframeRect && sourceEvent.clientX && sourceEvent.clientY) {
+          position = {
+            x: iframeRect.left + sourceEvent.clientX - (iconSize / 2),
+            y: iframeRect.top + sourceEvent.clientY + 15
+          };
+          this.logger.debug('Iframe position calculated', position);
+        }
+      } catch (error) {
+        this.logger.debug('Iframe position calculation failed', error);
       }
-      
-      this.logger.debug('Calling windowsManager.show() in main frame', { 
-        text: selectedText.substring(0, 30) + '...',
+    }
+
+    // Save valid position for future use
+    if (position && (position.x > 0 || position.y > 0)) {
+      this.lastValidPosition = { ...position };
+    } else if (this.lastValidPosition && this.lastProcessedText === selectedText) {
+      position = { ...this.lastValidPosition };
+      this.logger.debug('Using last valid position as fallback', position);
+    }
+
+    // --- Show Window/Icon ---
+    if (windowsManager && position) {
+      this.logger.debug('Calling windowsManager.show()', {
+        text: selectedText.substring(0, 30) + '...', 
         position
       });
       await windowsManager.show(selectedText, position);
-      
-      // Update tracking after successful show
       this.lastProcessedText = selectedText;
       this.lastProcessedTime = currentTime;
-      
-    } else if (window !== window.top) {
-      // Iframe: use cross-frame communication to request window creation in main frame
-      this.logger.debug('Requesting window creation in main frame from iframe', { 
-        text: selectedText.substring(0, 30) + '...',
+    } else if (window !== window.top && position) {
+      this.logger.debug('Requesting window creation in main frame', {
+        text: selectedText.substring(0, 30) + '...', 
         position
       });
       this._requestWindowCreationInMainFrame(selectedText, position);
-      
-      // Update tracking after successful request
       this.lastProcessedText = selectedText;
       this.lastProcessedTime = currentTime;
-      
     } else {
-      this.logger.warn('SelectionWindows not available in main frame');
+      this.logger.warn('SelectionWindows not available or position not calculated');
     }
-    
-    // حذف listener بعد از نمایش پاپ‌آپ
-    // ResourceTracker handles event listener cleanup automatically
   }
 
   /**
@@ -1194,7 +1001,7 @@ export class TextSelectionManager extends ResourceTracker {
         });
         
         // Force process the selection with calculated position
-        this.processSelectedText(selectedText, event, { isFromDoubleClick: true });
+        await this.processSelectedText(selectedText, event, { isFromDoubleClick: true });
         
         // Clear flags after successful processing
         this.doubleClickProcessing = false;
@@ -1208,7 +1015,7 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
-        this.processSelectedText(immediateText, event, { isFromDoubleClick: true });
+        await this.processSelectedText(immediateText, event, { isFromDoubleClick: true });
         
         // Clear flags after successful processing
         this.doubleClickProcessing = false;
@@ -1454,10 +1261,11 @@ export class TextSelectionManager extends ResourceTracker {
    * This method contains the core logic for handling selectionchange events
    * that was previously directly in handleTextSelection
    */
-  async _processSelectionChangeEvent(event) {
+  async _processSelectionChangeEvent(event, sourceMouseEvent = null) {
     this.logger.debug('_processSelectionChangeEvent called', {
       eventType: event.type,
-      hasSelection: !!event.selection
+      hasSelection: !!event.selection,
+      hasSourceMouseEvent: !!sourceMouseEvent
     });
 
     // Skip if currently processing double-click to avoid interference
@@ -1531,18 +1339,21 @@ export class TextSelectionManager extends ResourceTracker {
       }
     }
 
-    // Process selection directly (no timeout needed here)
+    // Process selection with a small delay to allow dblclick to take precedence
     const currentTime = Date.now();
     
     // Track this text as being processed
     this.lastProcessedText = selectedText;
     this.lastProcessedTime = currentTime;
 
-    this.processSelectedText(selectedText, event);
+    this.trackTimeout(() => {
+      if (this.doubleClickProcessing) {
+        this.logger.debug('Skipping delayed selection processing because a double-click was handled.');
+        return;
+      }
+      this.processSelectedText(selectedText, sourceMouseEvent || event);
+    }, 50); // 50ms delay to wait for a potential dblclick event
 
-    // Note: For double-click (immediate icon display), WindowsManager handles dismissal
-    // No additional listeners needed here
-    
-    this.logger.debug('Double-click processing complete, WindowsManager will handle dismissal');
+    this.logger.debug('Scheduled selection processing with 50ms delay');
   }
 }
