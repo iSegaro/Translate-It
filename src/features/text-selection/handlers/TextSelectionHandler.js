@@ -169,16 +169,6 @@ export class TextSelectionHandler extends ResourceTracker {
       
       // Use capture phase to catch events before they're prevented by Google Docs
       this.addEventListener(document, 'dblclick', doubleClickHandler, { capture: true });
-      this.addEventListener(document, 'dblclick', doubleClickHandler, { capture: false });
-      
-      // Also try to listen on window for iframe cases
-      this.addEventListener(window, 'dblclick', (event) => {
-        logger.debug('Window double-click event detected', {
-          target: event.target?.tagName,
-          url: window.location.hostname
-        });
-        doubleClickHandler(event);
-      }, { capture: true });
       
       // Selection Change Strategy: Use selectionchange for better detection
       let selectionTimeout = null;
