@@ -80,6 +80,8 @@ export class TextSelectionManager extends ResourceTracker {
     // Setup external window tracking for iframe-created windows
     this._setupExternalWindowTracking();
     
+    // Setup iframe dismiss listener for cross-frame communication
+    this._setupIframeDismissListener();
     
     this.logger.init('TextSelectionManager initialized');
   }
@@ -161,14 +163,29 @@ export class TextSelectionManager extends ResourceTracker {
         if (event.data && event.data.type === 'DISMISS_WINDOWS_MANAGER') {
           this.logger.debug('Received dismiss message from iframe', {
             frameId: event.data.frameId,
+            reason: event.data.reason,
             origin: event.origin
           });
           
           // Dismiss WindowsManager in main frame
           const windowsManager = this._getWindowsManager();
-          if (windowsManager && (windowsManager.isVisible || windowsManager.isIconMode)) {
-            this.logger.debug('Dismissing WindowsManager from iframe request');
-            windowsManager.dismiss();
+          if (windowsManager) {
+            this.logger.debug('WindowsManager state check', {
+              isVisible: windowsManager.isVisible,
+              isIconMode: windowsManager.isIconMode,
+              shouldDismiss: windowsManager.isVisible || windowsManager.isIconMode
+            });
+            
+            if (windowsManager.isVisible || windowsManager.isIconMode) {
+              this.logger.debug('Dismissing WindowsManager from iframe request', {
+                reason: event.data.reason
+              });
+              windowsManager.dismiss();
+            } else {
+              this.logger.debug('No active WindowsManager to dismiss');
+            }
+          } else {
+            this.logger.debug('WindowsManager not available in main frame');
           }
         }
       });
@@ -177,6 +194,73 @@ export class TextSelectionManager extends ResourceTracker {
     window.pageEventBus.on('windows-manager-dismiss-icon', () => {
       this.hasExternalWindow = false;
     });
+  }
+
+  /**
+   * Setup iframe dismiss listener for cross-frame communication
+   * Only needed in iframe context to send dismiss messages to main frame
+   */
+  _setupIframeDismissListener() {
+    // Only set up in iframe context
+    if (window === window.top) return;
+    
+    // Create bound handler
+    this._iframeDismissHandler = (event) => {
+      // In iframe, we don't have direct access to WindowsManager state
+      // So we'll send dismiss message whenever there's a mousedown
+      // and let the main frame decide if dismissal is needed
+      
+      const target = event.target;
+      
+      // Use similar logic as WindowsManager for UI detection
+      const vueUIHostMain = document.getElementById('translate-it-host-main');
+      const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
+      const vueUIHost = vueUIHostMain || vueUIHostIframe;
+      
+      const isInsideVueUIHost = vueUIHost && vueUIHost.contains(target);
+      
+      // Check legacy elements
+      const iconElement = document.getElementById('translate-it-icon');
+      const isInsideLegacyIcon = iconElement && iconElement.contains(target);
+      
+      const windowElements = document.querySelectorAll('.translation-window');
+      const isInsideLegacyWindow = Array.from(windowElements).some(element => 
+        element.contains(target)
+      );
+      
+      const isClickingOnTranslationUI = isInsideVueUIHost || isInsideLegacyIcon || isInsideLegacyWindow;
+      
+      if (isClickingOnTranslationUI) {
+        this.logger.debug('Mousedown on translation UI in iframe - not dismissing', {
+          target: target?.tagName,
+          className: target?.className
+        });
+        return;
+      }
+      
+      // Send dismiss message to main frame
+      this.logger.debug('Iframe mousedown detected - sending dismiss to main frame', {
+        target: target?.tagName,
+        className: target?.className,
+        eventType: event.type
+      });
+      
+      try {
+        window.parent.postMessage({
+          type: 'DISMISS_WINDOWS_MANAGER',
+          frameId: this.frameId,
+          timestamp: Date.now(),
+          reason: 'iframe-mousedown'
+        }, '*');
+      } catch (error) {
+        this.logger.warn('Failed to send dismiss message from iframe:', error);
+      }
+    };
+    
+    // Add listener with capture to catch drag start immediately
+    document.addEventListener('mousedown', this._iframeDismissHandler, { capture: true, passive: true });
+    
+    this.logger.debug('Iframe dismiss listener setup for cross-frame communication');
   }
 
   /**
