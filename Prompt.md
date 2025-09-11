@@ -112,6 +112,7 @@
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host
 - **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
 - **`docs/TTS_SYSTEM.md`**: سیستم **TTS یکپارچه (2025)** - منبع واحد حقیقت با fallback زبان خودکار و هماهنگی کراس-کانتکست
+- **`docs/TEXT_SELECTION_SYSTEM.md`**: سیستم **انتخاب متن اصولی (2025)** - معماری مدرن drag detection با جدا‌سازی استراتژی انتخاب، پشتیبانی از professional editors و سایت‌های مختلف
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
 - **`docs/SELECT_ELEMENT_SYSTEM.md`**: سیستم انتخاب و ترجمه عناصر صفحه
 

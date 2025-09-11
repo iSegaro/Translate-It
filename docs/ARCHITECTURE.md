@@ -42,6 +42,7 @@
 - **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
+- **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - **Principled drag detection (2025)** - Modern architecture with field detection, selection event strategies, and cross-platform editor support
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
@@ -99,7 +100,7 @@
 │                   CONTENT LAYER                                │
 │  Content Scripts → Smart Feature Management → UI Host System   │
 │  Feature-Based Registration → Dynamic Handler Lifecycle        │
-│  Element Selection → Text Selection → Text Field Icons → Context Integration │
+│  Principled Text Selection (2025) → Element Selection → Text Field Icons → Context Integration │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
