@@ -94,14 +94,15 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Element to check
    * @returns {boolean} Whether element should show text field icon
    */
-  isEditableElement(element) {
+  async isEditableElement(element) {
     if (!element) return false;
     
     // Use the new FieldDetector system - lazy import to avoid circular dependencies
     try {
       // Try to use fieldDetector if available
       if (typeof window !== 'undefined' && window.fieldDetector) {
-        return window.fieldDetector.detect(element).shouldShowTextFieldIcon;
+        const detection = await window.fieldDetector.detect(element);
+        return detection.shouldShowTextFieldIcon;
       }
       
       // Fallback to basic detection if FieldDetector not available
@@ -224,7 +225,7 @@ export class TextFieldIconManager extends ResourceTracker {
     }
 
     // Element validation
-    if (!this.isEditableElement(element)) {
+    if (!await this.isEditableElement(element)) {
       this.logger.debug('Skipping icon creation: Element is not editable.');
       return false;
     }
