@@ -495,61 +495,28 @@ export const handleGoogleTTSGetStatus = async (message, sender) => {
 
 // Offscreen document communication helpers for new actions
 /**
- * Stop TTS via offscreen document
+ * Stop TTS via offscreen document by closing it.
  */
 const stopWithOffscreenDocument = async () => {
   try {
     const browserAPI = await initializebrowserAPI();
-    
-    // Check if offscreen document exists first
+
     if (browserAPI.offscreen && typeof browserAPI.offscreen.hasDocument === 'function') {
-      const hasDocument = await browserAPI.offscreen.hasDocument();
-      if (!hasDocument) {
-        logger.debug('[GoogleTTSHandler] No offscreen document exists, stop considered successful');
-        return; // No document means nothing to stop
+      if (await browserAPI.offscreen.hasDocument()) {
+        logger.debug('[GoogleTTSHandler] Closing offscreen document to stop TTS.');
+        await browserAPI.offscreen.closeDocument();
+        // Reset the promise so a new document can be created next time.
+        offscreenDocumentPromise = null;
+      } else {
+        logger.debug('[GoogleTTSHandler] No offscreen document to close, stop is successful.');
       }
     }
-    
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        logger.warn('[GoogleTTSHandler] Offscreen TTS stop timeout - assuming success');
-        resolve(); // Assume success on timeout for stop operations
-      }, 2000); // Reduced timeout for stop operations
-
-      browserAPI.runtime.sendMessage({
-        action: 'handleTTSStop',
-        target: 'offscreen'
-      }).then((response) => {
-        clearTimeout(timeout);
-        
-        // Be more lenient with stop responses - undefined/null responses are OK
-        if (response === undefined || response === null || response?.success !== false) {
-          resolve();
-        } else {
-          logger.warn('[GoogleTTSHandler] Stop response indicates failure but continuing:', response);
-          resolve(); // Still resolve for stop operations
-        }
-      }).catch((err) => {
-        clearTimeout(timeout);
-        
-        // Handle connection errors gracefully - all are OK for stop operations
-        if (err.message && (
-          err.message.includes('Receiving end does not exist') ||
-          err.message.includes('Extension context invalidated') ||
-          err.message.includes('message port closed')
-        )) {
-          logger.debug('[GoogleTTSHandler] Offscreen document disconnected, stop considered successful');
-          resolve(); // Consider this a successful stop
-        } else {
-          logger.warn('[GoogleTTSHandler] Stop error but continuing:', err.message);
-          resolve(); // Still resolve for stop operations - better to assume success
-        }
-      });
-    });
   } catch (error) {
-    logger.warn('[GoogleTTSHandler] Stop setup error but continuing:', error.message);
-    // For stop operations, errors in setup should not fail the operation
-    return; // Consider successful
+    logger.debug('[GoogleTTSHandler] Error closing offscreen document:', error);
+    // Reset promise on error as well.
+    offscreenDocumentPromise = null;
+    // We don't re-throw because for a "stop" operation, we don't want to surface an error.
+    // The goal is to stop the audio, and if closing fails, the audio is likely already stopped.
   }
 };
 
