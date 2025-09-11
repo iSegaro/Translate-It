@@ -187,7 +187,10 @@ export class TextSelectionManager extends ResourceTracker {
     }
     
     // Fallback: check shadow DOM directly for both windows and icons
-    const shadowHost = document.getElementById('translate-it-host');
+    // Try both possible host IDs (main and iframe)
+    const shadowHostMain = document.getElementById('translate-it-host-main');
+    const shadowHostIframe = document.getElementById('translate-it-host-iframe');
+    const shadowHost = shadowHostMain || shadowHostIframe;
     if (shadowHost && shadowHost.shadowRoot) {
       const activeWindows = shadowHost.shadowRoot.querySelectorAll('.translation-window');
       const activeIcons = shadowHost.shadowRoot.querySelectorAll('.translation-icon');
@@ -481,7 +484,7 @@ export class TextSelectionManager extends ResourceTracker {
           isInsideWindow = true;
         }
         // اگر کلیک روی هاست translate-it-host بود و داخل آن translation-window یا aiwc-selection-popup-host وجود داشت و پنجره باز بود، dismiss نشود
-        if (!isInsideWindow && target.id === 'translate-it-host' && this._isWindowVisible()) {
+        if (!isInsideWindow && (target.id === 'translate-it-host-main' || target.id === 'translate-it-host-iframe') && this._isWindowVisible()) {
           let hostChildren = [];
           // اگر هاست دارای shadowRoot است، داخل آن جستجو کن
           if (target.shadowRoot) {
@@ -507,7 +510,10 @@ export class TextSelectionManager extends ResourceTracker {
       }
       // Additional check: if click is inside translate-it-host shadow DOM
       if (!isInsideWindow && event && event.target) {
-        const shadowHost = document.getElementById('translate-it-host');
+        // Try both possible host IDs (main and iframe)
+        const shadowHostMain = document.getElementById('translate-it-host-main');
+        const shadowHostIframe = document.getElementById('translate-it-host-iframe');
+        const shadowHost = shadowHostMain || shadowHostIframe;
         if (shadowHost && (shadowHost === event.target || shadowHost.contains(event.target))) {
           isInsideWindow = true;
           this.logger.debug('Click detected inside translate-it-host shadow DOM, NOT dismissing.');

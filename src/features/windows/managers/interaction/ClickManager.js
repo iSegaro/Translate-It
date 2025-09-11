@@ -108,12 +108,19 @@ export class ClickManager extends ResourceTracker {
     }
     
     // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
-    const vueUIHost = document.getElementById('translate-it-host');
+    // Try both possible host IDs (main and iframe)
+    const vueUIHostMain = document.getElementById('translate-it-host-main');
+    const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
+    const vueUIHost = vueUIHostMain || vueUIHostIframe;
+    
     this.logger.debug('Outside click check:', { 
       target: e.target.tagName, 
+      vueUIHostMainExists: !!vueUIHostMain,
+      vueUIHostIframeExists: !!vueUIHostIframe,
       vueUIHostExists: !!vueUIHost,
       isInsideVueHost: vueUIHost && vueUIHost.contains(e.target)
     });
+    
     if (vueUIHost && vueUIHost.contains(e.target)) {
       // Click is inside Vue UI Host, don't dismiss (let Vue components handle it)
       this.logger.debug('Click is inside Vue UI Host, not dismissing');
