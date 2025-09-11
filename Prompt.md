@@ -90,7 +90,10 @@
 ### 🛠️ Pure Utilities (ساده‌سازی شده)
 - **`src/utils/`**: ابزارهای خالص بدون منطق business
   - `browser/` - سازگاری مرورگر
-  - `text/` - پردازش متن
+  - `text/` - پردازش متن (شامل سیستم ماژولار Text Selection 2025)
+    - `core/` - FieldDetector، SelectionDetector، types مدرن
+    - `registry/` - SiteHandlerRegistry برای مدیریت site handlers
+    - `sites/` - Site-specific handlers (Zoho، Google، Microsoft، WPS، Notion)
   - `ui/` - ابزارهای UI
   - `framework/` - سازگاری فریمورک
 
@@ -112,7 +115,7 @@
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host
 - **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
 - **`docs/TTS_SYSTEM.md`**: سیستم **TTS یکپارچه (2025)** - منبع واحد حقیقت با fallback زبان خودکار و هماهنگی کراس-کانتکست
-- **`docs/TEXT_SELECTION_SYSTEM.md`**: سیستم **انتخاب متن اصولی (2025)** - معماری مدرن drag detection با جدا‌سازی استراتژی انتخاب، پشتیبانی از professional editors و سایت‌های مختلف
+- **`docs/TEXT_SELECTION_SYSTEM.md`**: سیستم **انتخاب متن ماژولار (2025)** - معماری مدرن با SiteHandlerRegistry، static imports، و پشتیبانی کامل از professional editors (Google Docs, Zoho Writer, WPS Office, Notion)
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
 - **`docs/SELECT_ELEMENT_SYSTEM.md`**: سیستم انتخاب و ترجمه عناصر صفحه
 

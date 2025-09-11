@@ -2,7 +2,14 @@
 
 ## نگاه کلی
 
-سیستم Text Selection یکی از بخش‌های کلیدی افزونه Translate-It است که مسئول تشخیص، مدیریت و پردازش انتخاب متن در صفحات وب می‌باشد. این سیستم با رویکرد اصولی و بر اساس drag detection، تجربه کاربری بهینه‌ای را برای ترجمه متن‌های انتخابی فراهم می‌کند.
+سیستم Text Selection یکی از بخش‌های کلیدی افزونه Translate-It است که مسئول تشخیص، مدیریت و پردازش انتخاب متن در صفحات وب می‌باشد. این سیستم با **معماری مدرن ماژولار (2025)** و بر اساس drag detection، تجربه کاربری بهینه‌ای را برای ترجمه متن‌های انتخابی فراهم می‌کند.
+
+### ✅ آپدیت‌های 2025:
+- **معماری ماژولار**: سیستم SiteHandlerRegistry برای مدیریت site-specific handlers
+- **Static Import Resolution**: حل مشکل dynamic import در bundle با استفاده از static imports
+- **Site Handler Classes**: ZohoWriterHandler، GoogleSuiteHandler، MicrosoftOfficeHandler و سایر handlers
+- **Field Detection Improvements**: سیستم بهبود یافته تشخیص نوع فیلد با async/await صحیح
+- **Professional Editor Support**: پشتیبانی کامل از Google Docs، Zoho Writer، WPS Office، Notion
 
 ## معماری
 
@@ -24,12 +31,29 @@
 - مدیریت state انتخاب و drag detection
 - پشتیبانی از iframe و cross-frame communication
 
-#### 3. **FieldDetector**
-`src/utils/text/FieldDetector.js`
+#### 3. **SiteHandlerRegistry** (جدید)
+`src/utils/text/registry/SiteHandlerRegistry.js`
 
-- تشخیص نوع فیلد (professional editor، rich text، regular content)
+- مدیریت مرکزی site-specific handlers
+- Static import برای همه handlers (حل مشکل dynamic import)
+- Caching و lifecycle management
+- Pattern matching برای hostname ها
+
+#### 4. **Site Handlers** (جدید)
+- **ZohoWriterHandler**: `src/utils/text/sites/ZohoWriterHandler.js`
+- **GoogleSuiteHandler**: `src/utils/text/sites/base/GoogleSuiteHandler.js`
+- **MicrosoftOfficeHandler**: `src/utils/text/sites/base/MicrosoftOfficeHandler.js`
+- **WPSHandler**: `src/utils/text/sites/WPSHandler.js`
+- **NotionHandler**: `src/utils/text/sites/NotionHandler.js`
+- **DefaultSiteHandler**: برای سایت‌های ناشناخته
+
+#### 5. **FieldDetector** (بهبود یافته)
+`src/utils/text/core/FieldDetector.js`
+
+- تشخیص نوع فیلد با استفاده از site handlers
 - تعیین selection strategy مناسب
-- پیکربندی site-specific برای وب‌سایت‌های مختلف
+- Async/await صحیح برای همه operations
+- Cache management برای بهبود performance
 
 ## استراتژی‌های Selection
 
@@ -170,34 +194,102 @@ selectionchange (isDragging = false) → پردازش فوری → نمایش ic
 dblclick → handleDoubleClick → processSelectedText → نمایش icon
 ```
 
-## Site Configuration
+## Site Configuration (معماری جدید)
 
-### 🌐 پیکربندی سایت‌ها
+### 🌐 SiteHandlerRegistry Configuration
 
 ```javascript
-const EditorConfigs = {
-  'docs.google.com': {
-    type: FieldTypes.PROFESSIONAL_EDITOR,
-    selectionMethod: 'iframe-based',
-    selectionEventStrategy: 'mouse-based',
-    selectionStrategy: 'double-click-required'
-  },
-  
-  'wps.com': {
-    type: FieldTypes.PROFESSIONAL_EDITOR,
-    selectionMethod: 'input-based',
-    selectionEventStrategy: 'mouse-based',
-    selectionStrategy: 'double-click-required'
-  },
-  
-  // Default for regular websites
-  'default': {
-    type: FieldTypes.REGULAR_INPUT,
-    selectionMethod: 'standard',
-    selectionEventStrategy: 'selection-based',
-    selectionStrategy: 'any-selection'
+// Site Handler Registry - Static Import Architecture
+import { ZohoWriterHandler } from "../sites/ZohoWriterHandler.js";
+import { GoogleSuiteHandler } from "../sites/base/GoogleSuiteHandler.js";
+import { MicrosoftOfficeHandler } from "../sites/base/MicrosoftOfficeHandler.js";
+
+registerSitePatterns() {
+  this._sitePatterns = {
+    // Zoho Writer
+    'writer.zoho.com': {
+      handlerClass: ZohoWriterHandler,
+      className: 'ZohoWriterHandler',
+      config: {
+        type: FieldTypes.PROFESSIONAL_EDITOR,
+        selectionMethod: 'zoho-writer',
+        selectors: ['.zw-line-div', '.zw-text-portion', '#editorpane'],
+        features: ['office-suite', 'cloud-sync', 'transparent-selection'],
+        selectionStrategy: 'double-click-required',
+        selectionEventStrategy: 'mouse-based'
+      }
+    },
+    
+    // Google Docs
+    'docs.google.com': {
+      handlerClass: GoogleSuiteHandler,
+      className: 'GoogleSuiteHandler',
+      config: {
+        type: FieldTypes.PROFESSIONAL_EDITOR,
+        selectionMethod: 'iframe-based',
+        selectors: ['[contenteditable="true"]', '.kix-page'],
+        selectionStrategy: 'double-click-required',
+        selectionEventStrategy: 'mouse-based'
+      }
+    },
+    
+    // Microsoft Office Online
+    'office.live.com': {
+      handlerClass: MicrosoftOfficeHandler,
+      className: 'MicrosoftOfficeHandler',
+      config: {
+        type: FieldTypes.PROFESSIONAL_EDITOR,
+        selectionMethod: 'iframe-based'
+      }
+    },
+    
+    // WPS Office
+    'wps.com': {
+      handlerClass: WPSHandler,
+      className: 'WPSHandler',
+      config: {
+        type: FieldTypes.PROFESSIONAL_EDITOR,
+        selectionMethod: 'input-based'
+      }
+    },
+    
+    // Notion
+    'notion.so': {
+      handlerClass: NotionHandler,
+      className: 'NotionHandler',
+      config: {
+        type: FieldTypes.PROFESSIONAL_EDITOR,
+        selectionMethod: 'content-editable',
+        selectors: ['[contenteditable="true"]', '.notion-text-block']
+      }
+    }
+  };
+}
+```
+
+### 🔧 Site Handler Architecture
+
+```javascript
+// Base Site Handler Pattern
+export class ZohoWriterHandler extends BaseSiteHandler {
+  constructor(hostname, config = {}) {
+    super(hostname, config);
   }
-};
+
+  async detectSelection(element, options = {}) {
+    // Site-specific selection logic
+    return new SiteHandlerResult({
+      success: !!selectedText,
+      text: selectedText,
+      metadata: { method: 'zoho-writer' }
+    });
+  }
+
+  async calculatePosition(element, options = {}) {
+    // Site-specific position calculation
+    return { x: position.x, y: position.y };
+  }
+}
 ```
 
 ## Integration با سیستم‌های دیگر
@@ -371,9 +463,33 @@ this.logger.debug('Selection detected', {
 
 ## مراجع
 
+### Core Components
 - **TextSelectionHandler**: `src/features/text-selection/handlers/TextSelectionHandler.js`
 - **TextSelectionManager**: `src/core/managers/content/TextSelectionManager.js`
-- **FieldDetector**: `src/utils/text/FieldDetector.js`
+- **SiteHandlerRegistry**: `src/utils/text/registry/SiteHandlerRegistry.js`
+- **FieldDetector**: `src/utils/text/core/FieldDetector.js` (modern version)
+- **SelectionDetector**: `src/utils/text/core/SelectionDetector.js`
+
+### Site Handlers
+- **BaseSiteHandler**: `src/utils/text/sites/base/BaseSiteHandler.js`
+- **ZohoWriterHandler**: `src/utils/text/sites/ZohoWriterHandler.js`
+- **GoogleSuiteHandler**: `src/utils/text/sites/base/GoogleSuiteHandler.js`
+- **MicrosoftOfficeHandler**: `src/utils/text/sites/base/MicrosoftOfficeHandler.js`
+- **WPSHandler**: `src/utils/text/sites/WPSHandler.js`
+- **NotionHandler**: `src/utils/text/sites/NotionHandler.js`
+
+### Legacy Support
+- **FieldDetector (Legacy)**: `src/utils/text/FieldDetector.js` (backward compatibility)
+- **SelectionDetector (Legacy)**: `src/utils/text/SelectionDetector.js` (backward compatibility)
+
+### Documentation
 - **WindowsManager**: `docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`
 - **Smart Handler Registration**: `docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`
 - **Error Management**: `docs/ERROR_MANAGEMENT_SYSTEM.md`
+
+### Key Improvements (2025)
+- ✅ **Static Import Resolution**: حل مشکل dynamic import در bundle
+- ✅ **Modular Architecture**: معماری ماژولار برای site handlers
+- ✅ **Professional Editor Support**: پشتیبانی کامل از Google Docs، Zoho Writer، و سایرین
+- ✅ **Async/Await Fixes**: تصحیح همه مشکلات async/await در field detection
+- ✅ **Enhanced Debugging**: سیستم debug پیشرفته برای troubleshooting

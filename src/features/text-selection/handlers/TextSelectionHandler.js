@@ -200,20 +200,24 @@ export class TextSelectionHandler extends ResourceTracker {
       
       // Selection Change Strategy: Use selectionchange for better detection
       let selectionTimeout = null;
-      const processSelection = () => {
+      const processSelection = async () => {
         if (!this.isActive || !this.textSelectionManager) return;
         
         const selection = window.getSelection();
         if (selection && selection.toString().trim()) {
           // Use smart field detection
           const contextElement = this.getSelectionContextElement(selection);
-          const detection = fieldDetector.detect(contextElement);
+          const detection = await fieldDetector.detect(contextElement);
           
           logger.debug('Selection detected via selectionchange', {
             text: selection.toString().substring(0, 30) + '...',
             fieldType: detection.fieldType,
             shouldShowIcon: detection.shouldShowSelectionIcon,
-            isFromDoubleClick: this._isFromRecentDoubleClick()
+            selectionStrategy: detection.selectionStrategy,
+            selectionEventStrategy: detection.selectionEventStrategy,
+            isFromDoubleClick: this._isFromRecentDoubleClick(),
+            elementTag: contextElement?.tagName,
+            elementClass: contextElement?.className
           });
           
           // For professional editors and rich text editors, check if we should process based on selection strategy
@@ -251,6 +255,12 @@ export class TextSelectionHandler extends ResourceTracker {
             // Route based on selection event strategy
             if (detection.selectionEventStrategy === 'selection-based') {
               // Use clean selectionchange events for regular webpage content
+              logger.debug('Calling handleTextSelection for selection-based strategy', {
+                fieldType: detection.fieldType,
+                selectionEventStrategy: detection.selectionEventStrategy,
+                text: selection.toString().substring(0, 30) + '...'
+              });
+              
               this.textSelectionManager.handleTextSelection({
                 type: 'selectionchange', 
                 selection: selection,
@@ -264,6 +274,12 @@ export class TextSelectionHandler extends ResourceTracker {
                 selectionEventStrategy: detection.selectionEventStrategy
               });
             }
+          } else {
+            logger.debug('Not showing selection icon', {
+              fieldType: detection.fieldType,
+              shouldShowSelectionIcon: detection.shouldShowSelectionIcon,
+              shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+            });
           }
         }
       };

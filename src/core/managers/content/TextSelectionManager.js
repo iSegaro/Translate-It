@@ -13,6 +13,7 @@ import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { fieldDetector, FieldTypes } from "@/utils/text/FieldDetector.js";
 import { selectionDetector } from "@/utils/text/SelectionDetector.js";
+import { siteHandlerRegistry } from "@/utils/text/registry/SiteHandlerRegistry.js";
 
 export class TextSelectionManager extends ResourceTracker {
   constructor(options = {}) {
@@ -389,7 +390,7 @@ export class TextSelectionManager extends ResourceTracker {
         
         if (contextElement) {
           const { fieldDetector } = await import('@/utils/text/FieldDetector.js');
-          const detection = fieldDetector.detect(contextElement);
+          const detection = await fieldDetector.detect(contextElement);
           
           if (detection.selectionEventStrategy === 'selection-based') {
             this.logger.debug('Ignoring mouseup event for selection-based strategy', {
@@ -865,7 +866,7 @@ export class TextSelectionManager extends ResourceTracker {
         : range.commonAncestorContainer;
         
       // Check if selection icon should be shown based on field type
-      const detection = fieldDetector.detect(this.lastSelectionElement);
+      const detection = await fieldDetector.detect(this.lastSelectionElement);
       if (!detection.shouldShowSelectionIcon) {
         this.logger.debug('Skipping selection icon display based on field type', {
           fieldType: detection.fieldType,
@@ -909,62 +910,78 @@ export class TextSelectionManager extends ResourceTracker {
   
   // Fix for TEXTAREA and INPUT fields where getBoundingClientRect returns zeros
   if (rect.width === 0 && rect.height === 0) {
-    // Check if selection is within a form element
-    const activeElement = document.activeElement;
-    if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
+    // Use site handler for position calculation first
+    try {
+      const sitePosition = await this._calculatePositionUsingSiteHandler(sourceEvent, targetElement);
+      if (sitePosition && (sitePosition.x !== 0 || sitePosition.y !== 0)) {
+        position = sitePosition;
+        this.logger.debug('Using site handler position calculation', position);
+        // Skip to the end of position calculation
+      } else {
+        // Site handler didn't provide position, try form element fallback
+        throw new Error('Site handler returned null or zero position');
+      }
+    } catch (error) {
+      this.logger.debug('Site handler position calculation failed, trying form element fallback:', error);
       
-      // Check if selection icon should be shown for this form element
-      const activeElementDetection = fieldDetector.detect(activeElement);
-      if (!activeElementDetection.shouldShowSelectionIcon) {
-        this.logger.debug('Skipping selection icon for form element based on field type', {
-          fieldType: activeElementDetection.fieldType,
+      // Fallback: Check if selection is within a form element
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
+        
+        // Check if selection icon should be shown for this form element
+        const activeElementDetection = await fieldDetector.detect(activeElement);
+        if (!activeElementDetection.shouldShowSelectionIcon) {
+          this.logger.debug('Skipping selection icon for form element based on field type', {
+            fieldType: activeElementDetection.fieldType,
+            elementTag: activeElement.tagName
+          });
+          return;
+        }
+        
+        // Use the element's bounding rect instead
+        const elementRect = activeElement.getBoundingClientRect();
+        
+        // Calculate approximate position based on cursor position in the element
+        let estimatedX = elementRect.left + 10; // Small offset from left
+        let estimatedY = elementRect.top + 10; // Small offset from top
+        
+        // For multiline elements, try to estimate cursor position
+        if (activeElement.tagName === 'TEXTAREA') {
+          // Use selection start to estimate vertical position
+          const cursorPosition = activeElement.selectionStart;
+          const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
+          const lines = textBeforeCursor.split('\n');
+          const lineHeight = 18; // Estimated line height
+          
+          estimatedY = elementRect.top + ((lines.length - 1) * lineHeight) + 10;
+        
+          // Estimate horizontal position based on last line length
+          const lastLineLength = lines[lines.length - 1].length;
+          const charWidth = 8; // Estimated character width
+          estimatedX = elementRect.left + (lastLineLength * charWidth) + 10;
+          
+          // Constrain to element bounds
+          estimatedX = Math.min(estimatedX, elementRect.right - 50);
+        }
+        
+        // Create a synthetic rect
+        rect = {
+          left: estimatedX,
+          right: estimatedX,
+          top: estimatedY,
+          bottom: estimatedY,
+          width: 0,
+          height: 0,
+          x: estimatedX,
+          y: estimatedY
+        };
+        
+        this.logger.debug('Fixed rect for form element:', {
+          original: 'empty rect',
+          fixed: rect,
           elementTag: activeElement.tagName
         });
-        return;
       }
-      // Use the element's bounding rect instead
-      const elementRect = activeElement.getBoundingClientRect();
-      
-      // Calculate approximate position based on cursor position in the element
-      let estimatedX = elementRect.left + 10; // Small offset from left
-      let estimatedY = elementRect.top + 10; // Small offset from top
-      
-      // For multiline elements, try to estimate cursor position
-      if (activeElement.tagName === 'TEXTAREA') {
-        // Use selection start to estimate vertical position
-        const cursorPosition = activeElement.selectionStart;
-        const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
-        const lines = textBeforeCursor.split('\n');
-        const lineHeight = 18; // Estimated line height
-        
-        estimatedY = elementRect.top + ((lines.length - 1) * lineHeight) + 10;
-        
-        // Estimate horizontal position based on last line length
-        const lastLineLength = lines[lines.length - 1].length;
-        const charWidth = 8; // Estimated character width
-        estimatedX = elementRect.left + (lastLineLength * charWidth) + 10;
-        
-        // Constrain to element bounds
-        estimatedX = Math.min(estimatedX, elementRect.right - 50);
-      }
-      
-      // Create a synthetic rect
-      rect = {
-        left: estimatedX,
-        right: estimatedX,
-        top: estimatedY,
-        bottom: estimatedY,
-        width: 0,
-        height: 0,
-        x: estimatedX,
-        y: estimatedY
-      };
-      
-      this.logger.debug('Fixed rect for form element:', {
-        original: 'empty rect',
-        fixed: rect,
-        elementTag: activeElement.tagName
-      });
     }
   }
 
@@ -1142,7 +1159,7 @@ export class TextSelectionManager extends ResourceTracker {
    * Handle double-click events to mark professional editor selections
    * @param {MouseEvent} event - Double-click event
    */
-  handleDoubleClick(event) {
+  async handleDoubleClick(event) {
     this.logger.debug('Double-click detected', {
       target: event.target?.tagName,
       timestamp: Date.now()
@@ -1153,10 +1170,10 @@ export class TextSelectionManager extends ResourceTracker {
     this.doubleClickProcessing = true;
     
     // Capture selection immediately to avoid interference
-    const immediateText = selectionDetector.detect(event.target);
+    const immediateText = await selectionDetector.detect(event.target);
     
     // Use smart retry mechanism based on field type detection
-    const detection = fieldDetector.detect(event.target);
+    const detection = await fieldDetector.detect(event.target);
     const maxAttempts = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 5 : 3;
     const initialDelay = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 150 : 100;
     
@@ -1336,6 +1353,59 @@ export class TextSelectionManager extends ResourceTracker {
    */
   updateCtrlKeyState(pressed) {
     this.ctrlKeyPressed = pressed;
+  }
+
+  /**
+   * Calculate position using site handler
+   * @param {MouseEvent} sourceEvent - The event that triggered selection
+   * @param {Element} element - Target element
+   * @returns {Promise<Object|null>} Position object with x,y coordinates
+   */
+  async _calculatePositionUsingSiteHandler(sourceEvent, element) {
+    try {
+      // Use the new modular selection detector for position calculation
+      const position = await selectionDetector.calculatePosition(element, {
+        sourceEvent,
+        forceRefresh: true
+      });
+      
+      if (position && (position.x !== 0 || position.y !== 0)) {
+        this.logger.debug('Site handler position calculation successful:', position);
+        return position;
+      }
+      
+      this.logger.debug('Site handler returned default position (0,0)');
+      return null;
+      
+    } catch (error) {
+      this.logger.debug('Site handler position calculation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * DEPRECATED: Calculate position for Zoho Writer selection icon
+   * This method is deprecated - position calculation is now handled by site handlers
+   * @param {MouseEvent} sourceEvent - The double-click event
+   * @returns {Object|null} Position object with x,y coordinates
+   * @deprecated Use _calculatePositionUsingSiteHandler instead
+   */
+  calculateZohoWriterPosition(sourceEvent) {
+    console.warn('DEPRECATED: calculateZohoWriterPosition is deprecated. Position calculation is now handled by site handlers.');
+    
+    // Fallback implementation for backward compatibility
+    try {
+      if (sourceEvent && sourceEvent.clientX && sourceEvent.clientY) {
+        return {
+          x: sourceEvent.clientX + window.scrollX,
+          y: sourceEvent.clientY + window.scrollY + 25
+        };
+      }
+    } catch (error) {
+      this.logger.debug('Legacy calculateZohoWriterPosition failed:', error);
+    }
+    
+    return null;
   }
 
   /**

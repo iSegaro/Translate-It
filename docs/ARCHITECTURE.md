@@ -14,6 +14,7 @@
 - ✅ **Cross-Frame Communication** - Advanced iframe support
 - ✅ **IFrame Support System** - Streamlined iframe functionality with ResourceTracker integration and essential components
 - ✅ **Unified TTS System (2025)** - Complete TTS unification with automatic language fallback and cross-context coordination
+- ✅ **Text Selection System (2025)** - Modular architecture with SiteHandlerRegistry, static imports, and professional editor support
 - ✅ **Storage Management** - Centralized storage with caching
 - ✅ **Logging System** - Production-ready structured logging
 - ✅ **Provider System** - 10+ translation providers with a hierarchical factory pattern (`BaseProvider`, `BaseTranslateProvider`, `BaseAIProvider`), integrated with `RateLimitManager` and `StreamingManager`.
@@ -42,7 +43,7 @@
 - **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
-- **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - **Principled drag detection (2025)** - Modern architecture with field detection, selection event strategies, and cross-platform editor support
+- **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - **Modular Architecture (2025)** - Static import system, site handler registry, professional editor support with drag detection
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
@@ -263,6 +264,22 @@ src/
 ├── 🛠️ utils/                 # Pure Utilities (Simplified)
 │   ├── browser/               # Browser compatibility
 │   ├── text/                  # Text processing utilities
+│   │   ├── core/              # Modern text processing (2025)
+│   │   │   ├── FieldDetector.js    # Modern field detection
+│   │   │   ├── SelectionDetector.js # Modern selection detection
+│   │   │   └── types.js            # Shared types and interfaces
+│   │   ├── registry/          # Site Handler Registry (2025)
+│   │   │   └── SiteHandlerRegistry.js # Handler management
+│   │   ├── sites/             # Site-specific handlers (2025)
+│   │   │   ├── base/               # Base handler classes
+│   │   │   │   ├── BaseSiteHandler.js    # Abstract base
+│   │   │   │   ├── GoogleSuiteHandler.js # Google Docs/Slides
+│   │   │   │   └── MicrosoftOfficeHandler.js # MS Office
+│   │   │   ├── ZohoWriterHandler.js    # Zoho Writer support
+│   │   │   ├── WPSHandler.js           # WPS Office support
+│   │   │   └── NotionHandler.js        # Notion workspace support
+│   │   ├── FieldDetector.js   # Legacy wrapper (backward compatibility)
+│   │   ├── SelectionDetector.js # Legacy wrapper (backward compatibility)
 │   │   ├── detection.js       # Text detection
 │   │   ├── extraction.js      # Text extraction
 │   │   ├── markdown.js        # Markdown processing

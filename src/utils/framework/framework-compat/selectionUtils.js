@@ -19,10 +19,9 @@ export function checkTextSelection(element) {
     const selection = window.getSelection();
     const hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
     
-    // TODO: Need to Check
-    // اضافی logging برای Reddit debugging
+    // Debug logging for Reddit-specific issues
     if (typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
-  logger.debug('Reddit selection check:', {
+      logger.debug('Reddit selection check:', {
         hasSelection,
         isCollapsed: selection?.isCollapsed,
         selectionText: selection?.toString(),
@@ -34,10 +33,9 @@ export function checkTextSelection(element) {
   } else if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
     const hasSelection = element.selectionStart !== element.selectionEnd;
     
-    // TODO: Need to Check
-    // اضافی logging برای Reddit debugging
+    // Debug logging for Reddit-specific issues
     if (typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
-  logger.debug('Reddit input/textarea selection check:', {
+      logger.debug('Reddit input/textarea selection check:', {
         hasSelection,
         selectionStart: element.selectionStart,
         selectionEnd: element.selectionEnd,
