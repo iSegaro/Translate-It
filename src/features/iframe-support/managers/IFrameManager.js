@@ -313,22 +313,83 @@ export class IFrameManager extends ResourceTracker {
    */
   async _handleNewIframe(iframe) {
     try {
+      // Check basic iframe properties first
+      if (!iframe || !iframe.tagName || iframe.tagName.toLowerCase() !== 'iframe') {
+        this.logger.debug('Invalid iframe element passed to _handleNewIframe');
+        return;
+      }
+
+      this.logger.debug('Handling new iframe', {
+        src: iframe.src || 'no src',
+        id: iframe.id || 'no id',
+        className: iframe.className || 'no class'
+      });
+
+      // Try to access iframe properties safely
+      let canAccessContent = false;
+      let contentWindow = null;
+      let contentDocument = null;
+      
+      try {
+        contentWindow = iframe.contentWindow;
+        contentDocument = iframe.contentDocument;
+        canAccessContent = !!(contentDocument && contentWindow);
+      } catch (accessError) {
+        this.logger.debug('Cannot access iframe content (cross-origin or security restriction)', {
+          src: iframe.src,
+          error: accessError.message
+        });
+        return; // Exit early if we can't access content
+      }
+
+      if (!canAccessContent) {
+        this.logger.debug('Iframe content not accessible, skipping injection', {
+          src: iframe.src
+        });
+        return;
+      }
+
       // Wait for iframe to load
-      await new Promise((resolve) => {
-        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Iframe load timeout after 5 seconds'));
+        }, 5000);
+
+        if (contentDocument && contentDocument.readyState === 'complete') {
+          clearTimeout(timeout);
           resolve();
         } else {
-          iframe.addEventListener('load', resolve, { once: true });
+          const onLoad = () => {
+            clearTimeout(timeout);
+            iframe.removeEventListener('load', onLoad);
+            resolve();
+          };
+          iframe.addEventListener('load', onLoad);
         }
       });
       
       // Check if content script needs to be injected
-      if (iframe.contentWindow && !iframe.contentWindow.translateItContentScriptLoaded) {
-        await this._injectContentScriptToIframe(iframe);
+      try {
+        if (contentWindow && !contentWindow.translateItContentScriptLoaded) {
+          await this._injectContentScriptToIframe(iframe);
+        } else {
+          this.logger.debug('Content script already loaded or window not accessible');
+        }
+      } catch (injectionError) {
+        this.logger.debug('Content script injection failed', {
+          error: injectionError.message,
+          src: iframe.src
+        });
+        // Don't throw - injection failure is not critical
       }
       
     } catch (error) {
-      this.logger.warn('Failed to handle new iframe', error);
+      this.logger.debug('Failed to handle new iframe', {
+        error: error.message,
+        name: error.name,
+        src: iframe?.src || 'unknown',
+        stack: error.stack?.substring(0, 200) + '...'
+      });
     }
   }
 
@@ -339,25 +400,67 @@ export class IFrameManager extends ResourceTracker {
     try {
       // Check if we can access iframe content (same-origin policy)
       const iframeDoc = iframe.contentDocument;
-      if (!iframeDoc) {
-        this.logger.debug('Cannot access iframe content (cross-origin)', {
-          src: iframe.src
+      const iframeWindow = iframe.contentWindow;
+      
+      if (!iframeDoc || !iframeWindow) {
+        this.logger.debug('Cannot access iframe content or window (cross-origin)', {
+          src: iframe.src,
+          hasDoc: !!iframeDoc,
+          hasWindow: !!iframeWindow
         });
         return;
       }
       
-      // Use browser.scripting.executeScript for MV3 compliance
-      if (browser.scripting && browser.scripting.executeScript) {
-        await browser.scripting.executeScript({
-          target: { 
-            frameIds: [iframe.contentWindow.frameId] 
-          },
-          files: ['src/core/content-scripts/index.js']
-        });
+      // Check if browser.scripting API is available
+      if (!browser.scripting || !browser.scripting.executeScript) {
+        this.logger.debug('browser.scripting API not available, skipping script injection');
+        return;
       }
+
+      // Get frameId for script injection
+      let frameId;
+      try {
+        // Try to get frameId from contentWindow or generate one
+        frameId = iframeWindow.frameId || Math.floor(Math.random() * 1000000);
+      } catch (frameIdError) {
+        this.logger.debug('Could not get iframe frameId', {
+          error: frameIdError.message,
+          src: iframe.src
+        });
+        return;
+      }
+
+      this.logger.debug('Attempting to inject content script to iframe', {
+        src: iframe.src,
+        frameId: frameId
+      });
+
+      // Use browser.scripting.executeScript for MV3 compliance
+      await browser.scripting.executeScript({
+        target: { 
+          frameIds: [frameId] 
+        },
+        files: ['src/core/content-scripts/index.js']
+      });
+
+      this.logger.debug('Content script injection completed successfully', {
+        src: iframe.src,
+        frameId: frameId
+      });
       
     } catch (error) {
-      this.logger.warn('Cannot inject script to iframe', error);
+      // More detailed error logging
+      this.logger.debug('Content script injection failed', {
+        error: error.message,
+        name: error.name,
+        src: iframe?.src || 'unknown',
+        code: error.code || 'no code',
+        // Don't include full stack trace to avoid noise
+        isSecurityError: error.name === 'SecurityError',
+        isDOMException: error instanceof DOMException
+      });
+
+      // Don't re-throw - script injection failure is not critical for iframe functionality
     }
   }
 
