@@ -327,10 +327,89 @@ export class WindowsManager extends ResourceTracker {
       iconId 
     });
     
-    // Add outside click listener
-    this.clickManager.addOutsideClickListener();
+    // Add immediate dismiss listener for any mousedown event (drag detection)
+    // This replaces the standard click listener for faster drag detection
+    this._addDismissListener();
+    
+    // Note: Using our custom mousedown listener instead of clickManager.addOutsideClickListener()
+    // for better drag detection and consistent dismiss logic
     
     this.logger.debug('Icon creation event emitted successfully', { iconId });
+  }
+
+  /**
+   * Add listener to immediately dismiss icon or window on any mousedown (drag start detection)
+   */
+  _addDismissListener() {
+    // Remove any existing listener first
+    this._removeDismissListener();
+    
+    // Create bound handler for reuse
+    this._dismissHandler = (event) => {
+      // Handle both icon mode and visible window mode
+      if (!this.state.isIconMode && !this.state.isVisible) return;
+      
+      const target = event.target;
+      
+      // Use the same logic as ClickManager for consistency
+      // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
+      const vueUIHostMain = document.getElementById('translate-it-host-main');
+      const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
+      const vueUIHost = vueUIHostMain || vueUIHostIframe;
+      
+      const isInsideVueUIHost = vueUIHost && vueUIHost.contains(target);
+      
+      // Also check legacy elements for compatibility
+      const iconElement = document.getElementById('translate-it-icon'); // WindowsConfig.IDS.ICON
+      const isInsideLegacyIcon = iconElement && iconElement.contains(target);
+      
+      const windowElements = document.querySelectorAll('.translation-window');
+      const isInsideLegacyWindow = Array.from(windowElements).some(element => 
+        element.contains(target)
+      );
+      
+      const isClickingOnTranslationUI = isInsideVueUIHost || isInsideLegacyIcon || isInsideLegacyWindow;
+      
+      if (isClickingOnTranslationUI) {
+        this.logger.debug('Mousedown on translation UI element - not dismissing', {
+          target: target?.tagName,
+          className: target?.className,
+          closestIcon: !!target?.closest('.translation-icon'),
+          closestWindow: !!target?.closest('.translation-window'),
+          isIconMode: this.state.isIconMode,
+          isVisible: this.state.isVisible
+        });
+        return;
+      }
+      
+      this.logger.debug('Mousedown detected - dismissing immediately', {
+        target: target?.tagName,
+        className: target?.className,
+        eventType: event.type,
+        isIconMode: this.state.isIconMode,
+        isVisible: this.state.isVisible
+      });
+      this.dismiss();
+    };
+    
+    // Add listener with capture to catch drag start immediately
+    document.addEventListener('mousedown', this._dismissHandler, { capture: true, passive: true });
+    
+    this.logger.debug('Added immediate dismiss listener', {
+      forIcon: this.state.isIconMode,
+      forWindow: this.state.isVisible
+    });
+  }
+
+  /**
+   * Remove dismiss listener
+   */
+  _removeDismissListener() {
+    if (this._dismissHandler) {
+      document.removeEventListener('mousedown', this._dismissHandler, { capture: true });
+      this._dismissHandler = null;
+      this.logger.debug('Removed dismiss listener');
+    }
   }
 
   /**
@@ -507,8 +586,11 @@ export class WindowsManager extends ResourceTracker {
         isLoading: true
       });
       
-      // Setup click listener for outside clicks
-      this.clickManager.addOutsideClickListener();
+      // Setup click listener for outside clicks (replaced with our faster mousedown listener)
+      // this.clickManager.addOutsideClickListener();
+      
+      // Add immediate dismiss listener for window dismissal (same as icon)
+      this._addDismissListener();
       
       this.logger.debug('Loading window creation event emitted', { windowId });
 
@@ -989,6 +1071,8 @@ export class WindowsManager extends ResourceTracker {
     
     if (removeListener) {
       this.clickManager.removeOutsideClickListener();
+      // Also remove the immediate dismiss listener
+      this._removeDismissListener();
     }
     // Icon animation and DOM cleanup now handled by Vue components
   }
@@ -1001,6 +1085,8 @@ export class WindowsManager extends ResourceTracker {
     
     // Note: Don't remove theme listeners here - keep them for future windows
     this.clickManager.removeOutsideClickListener();
+    // Also remove the immediate dismiss listener
+    this._removeDismissListener();
     
     this.state.setVisible(false);
     // Animation and DOM cleanup now handled by Vue components

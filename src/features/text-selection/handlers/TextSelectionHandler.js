@@ -157,8 +157,36 @@ export class TextSelectionHandler extends ResourceTracker {
         if (this.textSelectionManager && typeof this.textSelectionManager.handleDoubleClick === 'function') {
           this.textSelectionManager.handleDoubleClick(event);
         } else if (!this.textSelectionManager) {
-          // If manager is missing, we'll handle this when it's recreated
-          logger.debug('Manager missing during double-click - state preserved for recreation');
+          // If manager is missing, attempt to recreate it
+          logger.debug('Manager missing during double-click - attempting to recreate immediately');
+          
+          if (this.isActive) {
+            try {
+              this.textSelectionManager = new TextSelectionManager({
+                featureManager: this.featureManager
+              });
+              
+              // Restore preserved state
+              if (this.preservedState.lastDoubleClickTime > 0) {
+                this.textSelectionManager.lastDoubleClickTime = this.preservedState.lastDoubleClickTime;
+                this.textSelectionManager.doubleClickWindow = this.preservedState.doubleClickWindow;
+                this.textSelectionManager.doubleClickProcessing = this.preservedState.doubleClickProcessing;
+                
+                logger.debug('TextSelectionManager recreated with preserved state', {
+                  lastDoubleClickTime: this.textSelectionManager.lastDoubleClickTime,
+                  doubleClickProcessing: this.textSelectionManager.doubleClickProcessing
+                });
+              }
+              
+              // Now handle the double-click with recreated manager
+              if (typeof this.textSelectionManager.handleDoubleClick === 'function') {
+                this.textSelectionManager.handleDoubleClick(event);
+              }
+              
+            } catch (error) {
+              logger.error('Failed to recreate TextSelectionManager during double-click', error);
+            }
+          }
         }
         
         // Clear processing flag after reasonable delay to prevent deadlock
