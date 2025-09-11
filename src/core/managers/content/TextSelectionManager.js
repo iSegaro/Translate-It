@@ -771,11 +771,13 @@ export class TextSelectionManager extends ResourceTracker {
    * @param {string} selectedText - Selected text to translate
    * @param {MouseEvent} event - Original mouse event (optional)
    */
-  async processSelectedText(selectedText, sourceEvent = null) {
-    this.logger.debug('processSelectedText called', { 
+  async processSelectedText(selectedText, sourceEvent = null, options = {}) {
+    const { isFromDoubleClick = false } = options;
+    this.logger.debug('processSelectedText called', {
       text: selectedText.substring(0, 30) + '...',
       isInIframe: window !== window.top,
-      hasWindowsManager: !!this._getWindowsManager()
+      hasWindowsManager: !!this._getWindowsManager(),
+      isFromDoubleClick
     });
     
     // Check if text is actually selected in DOM before processing
@@ -880,7 +882,6 @@ export class TextSelectionManager extends ResourceTracker {
       if (detection.fieldType === 'professional-editor' || 
           detection.fieldType === 'rich-text-editor') {
         const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
-        const isFromDoubleClick = this.isFromDoubleClick || false;
         
         if (needsDoubleClick && !isFromDoubleClick) {
           this.logger.debug('Skipping selection icon - double-click required', {
@@ -1192,15 +1193,11 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
-        // Set double-click flag before processing
-        this.isFromDoubleClick = true;
-        
         // Force process the selection with calculated position
-        this.processSelectedText(selectedText, event);
+        this.processSelectedText(selectedText, event, { isFromDoubleClick: true });
         
         // Clear flags after successful processing
         this.doubleClickProcessing = false;
-        this.isFromDoubleClick = false;
         return true;
       } else if (immediateText && immediateText.trim() && attempt === 1) {
         // Use immediate capture if delayed capture fails
@@ -1211,14 +1208,10 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
-        // Set double-click flag before processing
-        this.isFromDoubleClick = true;
-        
-        this.processSelectedText(immediateText, event);
+        this.processSelectedText(immediateText, event, { isFromDoubleClick: true });
         
         // Clear flags after successful processing
         this.doubleClickProcessing = false;
-        this.isFromDoubleClick = false;
         return true;
       } else if (attempt < maxAttempts) {
         // Try again with adaptive delay based on field type
