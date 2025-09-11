@@ -91,30 +91,7 @@ export class RevertShortcut {
       }
     }
 
-    // Priority 2: If Select Element Mode is active (but no translation in progress), deactivate it
-    // Use instance-agnostic approach - let background decide if deactivation is needed
-    try {
-      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-      const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-      
-      const result = await sendMessage({
-        action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-        data: { 
-          active: false,
-          reason: 'esc_key_pressed',
-          context: 'revert-shortcut'
-        }
-      });
-      
-      // If background confirms deactivation occurred, return success
-      if (result && result.success) {
-        return { success: true, action: 'select_element_deactivated' };
-      }
-    } catch (error) {
-      // Deactivation failed, continue to revert logic
-    }
-
-    // Priority 3: If no active processes, try to revert completed translations
+    // Priority 2: If no active processes, try to revert completed translations
     logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
     
     // Check if there are any translations to revert with enhanced detection
