@@ -686,9 +686,28 @@ export function getSelectionEventStrategy(element) {
   const fieldType = classifyFieldType(element);
   const siteConfig = getSiteConfig();
   
-  // For professional and rich text editors, use site-specific event strategy
+  // For professional and rich text editors, check if element is actually inside editor
   if (fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
       fieldType === FieldTypes.RICH_TEXT_EDITOR) {
+    
+    // In iframe contexts (Google Docs, Word Online), check if element is inside actual editor
+    // If not, treat as regular content for better selection handling
+    if (siteConfig.selectors && element) {
+      const isInsideEditor = siteConfig.selectors.some(selector => {
+        try {
+          return element.matches && element.matches(selector) || 
+                 element.closest && element.closest(selector);
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      // If element is not inside actual editor, use selection-based strategy
+      if (!isInsideEditor) {
+        return 'selection-based';
+      }
+    }
+    
     return siteConfig.selectionEventStrategy || 'mouse-based';
   }
   
