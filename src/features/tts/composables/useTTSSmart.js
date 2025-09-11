@@ -247,7 +247,18 @@ export function useTTSSmart() {
       
       return true;
     } catch (error) {
-      logger.error("[useTTSSmart] Failed to stop TTS:", error);
+      // Use proper error management system
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      
+      // Handle TTS stop errors gracefully - these are usually expected
+      await ErrorHandler.getInstance().handle(error, {
+        type: ErrorTypes.TTS,
+        context: 'useTTSSmart-stop',
+        showToast: false, // Don't show toast for TTS stop errors
+        showInUI: false
+      });
+      
       // Still reset state on error
       ttsState.value = 'idle';
       currentTTSId.value = null;
@@ -262,7 +273,7 @@ export function useTTSSmart() {
     try {
       logger.debug("[useTTSSmart] Stopping all TTS instances");
       const message = {
-        action: MessageActions.TTS_STOP,
+        action: MessageActions.GOOGLE_TTS_STOP_ALL,
         data: {},
         context: 'tts-smart',
         messageId: `tts-stop-all-${Date.now()}`
@@ -286,7 +297,17 @@ export function useTTSSmart() {
       logger.debug("[useTTSSmart] All TTS instances stopped");
       return true;
     } catch (error) {
-      logger.error("[useTTSSmart] Failed to stop all TTS:", error);
+      // Use proper error management system
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      
+      // Handle TTS stop errors gracefully - these are usually expected
+      await ErrorHandler.getInstance().handle(error, {
+        type: ErrorTypes.TTS,
+        context: 'useTTSSmart-stopAll',
+        showToast: false, // Don't show toast for TTS stop errors
+        showInUI: false
+      });
       
       // Stop polling even on error
       if (completionPoller) {

@@ -145,7 +145,22 @@ export async function sendMessage(message, options = {}) {
 
     return response;
   } catch (error) {
-    logger.error(`Message failed for ${message.action}:`, error.message);
+    // Import ErrorMatcher to detect TTS-related errors
+    const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+    const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+    
+    const errorType = matchErrorToType(error);
+    
+    // Handle TTS stop errors silently - these are expected when offscreen document is closed
+    if (message.action && (message.action.includes('TTS_STOP') || message.action.includes('GOOGLE_TTS_STOP')) &&
+        (errorType === ErrorTypes.TTS_NO_RESPONSE || 
+         errorType === ErrorTypes.TTS_OFFSCREEN_CLOSED ||
+         errorType === ErrorTypes.CONTEXT ||
+         errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED)) {
+      logger.debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
+    } else {
+      logger.error(`Message failed for ${message.action}:`, error.message);
+    }
 
     // Extension context errors are handled automatically by ExtensionContextManager.isContextError
     if (ExtensionContextManager.isContextError(error)) {

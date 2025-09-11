@@ -239,9 +239,9 @@ class TTSGlobalManager {
   setupVisibilityChangeHandler() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        logger.debug('[TTSGlobalManager] Tab hidden - stopping TTS for popup/content/windows-manager components')
-        // Tab is now hidden - stop TTS for popup/content components (sidepanel persists)
-        this.stopInstancesByType(['popup', 'content', 'windows-manager'])
+        logger.debug('[TTSGlobalManager] Tab hidden - TTS will continue playing (only WindowsManager dismiss stops TTS)')
+        // Only stop TTS on actual tab/window close, not on focus loss or clicks
+        // TTS should only be stopped when WindowsManager is dismissed explicitly
       } else {
         logger.debug('[TTSGlobalManager] Tab visible again')
         // Tab is now visible - could potentially resume sidepanel TTS if needed

@@ -202,6 +202,22 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.HTTP_ERROR;
 
+  // TTS specific errors
+  if (
+    msg.includes("no response received for tts_stop") ||
+    msg.includes("no response received for google_tts_stop")
+  )
+    return ErrorTypes.TTS_NO_RESPONSE;
+
+  if (
+    msg.includes("offscreen document") ||
+    (msg.includes("tts") && (msg.includes("closed") || msg.includes("disconnected")))
+  )
+    return ErrorTypes.TTS_OFFSCREEN_CLOSED;
+
+  if (msg.includes("tts") && msg.includes("stop") && msg.includes("failed"))
+    return ErrorTypes.TTS_STOP_FAILED;
+
   // Extension Context Invalidated (specific case)
   if (
     msg.includes("extension context invalidated") ||
