@@ -11,6 +11,8 @@ import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { fieldDetector, FieldTypes } from "@/utils/text/FieldDetector.js";
+import { selectionDetector } from "@/utils/text/SelectionDetector.js";
 
 export class TextSelectionManager extends ResourceTracker {
   constructor(options = {}) {
@@ -44,6 +46,10 @@ export class TextSelectionManager extends ResourceTracker {
     this.selectionTimeoutId = null;
     this.ctrlKeyPressed = false;
     
+    // Mouse drag detection for principled selection handling
+    this.isDragging = false;
+    this.pendingSelection = null;
+    
     // Track last processed selection to prevent duplicate processing
     this.lastProcessedText = null;
     this.lastProcessedTime = 0;
@@ -59,8 +65,14 @@ export class TextSelectionManager extends ResourceTracker {
     // Track external window state (for iframe-created windows in main frame)
     this.hasExternalWindow = false;
     
+    // Double-click detection for professional editors
+    this.lastDoubleClickTime = 0;
+    this.doubleClickWindow = 500; // 500ms window to consider mouseup as part of double-click (increased for WPS)
+    this.doubleClickProcessing = false; // Flag to prevent interference during double-click processing
+    
     // Bind methods for event handlers
     this.handleTextSelection = this.handleTextSelection.bind(this);
+    this.handleDoubleClick = this.handleDoubleClick.bind(this);
     this.processSelectedText = this.processSelectedText.bind(this);
     this.cancelSelectionTranslation = this.cancelSelectionTranslation.bind(this);
     this._onOutsideClick = this._onOutsideClick.bind(this);
@@ -253,8 +265,58 @@ export class TextSelectionManager extends ResourceTracker {
     this.logger.debug('handleTextSelection called', {
       eventType: event.type,
       isInIframe: window !== window.top,
-      hasWindowsManager: !!this._getWindowsManager()
+      hasWindowsManager: !!this._getWindowsManager(),
+      doubleClickProcessing: this.doubleClickProcessing,
+      isProfessional: event.isProfessional
     });
+    
+    // Check selection event strategy compatibility for mouseup events
+    if (event?.type === 'mouseup') {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const contextElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+          ? range.commonAncestorContainer.parentElement 
+          : range.commonAncestorContainer;
+        
+        if (contextElement) {
+          const { fieldDetector } = await import('@/utils/text/FieldDetector.js');
+          const detection = fieldDetector.detect(contextElement);
+          
+          if (detection.selectionEventStrategy === 'selection-based') {
+            this.logger.debug('Ignoring mouseup event for selection-based strategy', {
+              fieldType: detection.fieldType,
+              strategy: detection.selectionEventStrategy,
+              elementTag: contextElement.tagName
+            });
+            return;
+          }
+        }
+      }
+    }
+    
+    // Principled approach: Handle selectionchange events based on drag state
+    if (event?.type === 'selectionchange') {
+      if (this.isDragging) {
+        // During drag: store pending selection but don't process
+        this.pendingSelection = {
+          selection: event.selection,
+          fieldType: event.fieldType,
+          target: event.target
+        };
+        return;
+      } else {
+        // Not dragging: process immediately (like keyboard selection)
+        await this._processSelectionChangeEvent(event);
+        return;
+      }
+    }
+    
+    // Skip if currently processing double-click to avoid interference
+    if (this.doubleClickProcessing && event.type !== 'selectionchange') {
+      this.logger.debug('Skipping handleTextSelection due to active double-click processing');
+      return;
+    }
     
     // Skip if currently dragging a translation window
     if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true) {
@@ -270,52 +332,48 @@ export class TextSelectionManager extends ResourceTracker {
       return;
     }
     
-    const selectedText = getSelectedTextWithDash();
-    const path = getEventPath(event);
+    // For non-selectionchange events, extract selected text and perform checks
+    if (event.type !== 'selectionchange') {
+      // Extract selected text based on event type
+      let selectedText;
+      if (event.type === 'selectionchange' && event.selection) {
+        selectedText = event.selection.toString().trim();
+      } else {
+        selectedText = getSelectedTextWithDash();
+      }
+      
+      const path = getEventPath(event);
+      
+      this.logger.debug('Selected text check', {
+        hasSelectedText: !!selectedText,
+        textLength: selectedText?.length || 0,
+        isFromDoubleClick: this._isFromRecentDoubleClick(),
+        eventType: event.type,
+        isProfessional: event.isProfessional
+      });
 
-    // Check if icon should be dismissed based on proximity
-    if (this._shouldDismissIcon(event, selectedText)) {
-      this._dismissWindow();
-      return;
-    }
+      // Check if icon should be dismissed based on proximity
+      if (this._shouldDismissIcon(event, selectedText)) {
+        this._dismissWindow();
+        return;
+      }
 
-    // بررسی اینکه آیا کلیک در داخل پنجره ترجمه رخ داده است یا نه
-    if (this._isWindowVisible()) {
-      let isInsideWindow = false;
-      const windowsManager = this._getWindowsManager();
-      const displayElement = windowsManager?.displayElement;
-      if (displayElement && event.target) {
-        // بررسی با contains و همچنین بررسی مسیر رویداد
-        if (displayElement.contains(event.target)) {
-          isInsideWindow = true;
-        } else if (typeof event.composedPath === 'function') {
-          const eventPath = event.composedPath();
-          if (eventPath.includes(displayElement)) {
-            isInsideWindow = true;
-          }
-        } else if (Array.isArray(path) && path.includes(displayElement)) {
-          isInsideWindow = true;
+      // For mouseup events, we need to check window clicks
+      // (This is only handled by mouseup events through _onOutsideClick)
+
+      // Skip text selection handling if select element mode is active in this tab
+      try {
+        // Prefer local content-script flag or selectElementManager instance if available
+        if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
+          return;
         }
+      } catch (error) {
+        // If check fails, continue with normal flow
+        this.logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
       }
-      if (isInsideWindow) {
-        // اگر کلیک داخل پنجره اتفاق افتاده باشد، عملیات متوقف می‌شود
-        this.logger.debug('Click detected inside translation window, not dismissing.');
-        return;
-      }
-    }
 
-    // Skip text selection handling if select element mode is active in this tab
-    try {
-      // Prefer local content-script flag or selectElementManager instance if available
-      if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
-        return;
-      }
-    } catch (error) {
-      // If check fails, continue with normal flow
-      this.logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
-    }
-
-    if (selectedText) {
+      // Process traditional mouseup events
+      if (selectedText) {
       // Check if this is a duplicate selection event
       // But allow processing if enough time has passed or if no selection window is visible
       const currentTime = Date.now();
@@ -376,8 +434,7 @@ export class TextSelectionManager extends ResourceTracker {
 
         // اضافه کردن listener برای لغو ترجمه در صورت کلیک using ResourceTracker
         this.addEventListener(document, "mousedown", this.cancelSelectionTranslation);
-      }
-    } else {
+      } else {
       
       // **IMPORTANT**: When no text is selected (outside click), only allow dismissal if click is outside translation window
       let settings;
@@ -553,6 +610,36 @@ export class TextSelectionManager extends ResourceTracker {
         }
       }
     }
+    }
+    }
+  }
+
+  /**
+   * Start drag detection (mousedown)
+   */
+  startDragDetection(event) {
+    this.isDragging = true;
+    this.pendingSelection = null;
+  }
+
+  /**
+   * End drag detection and process final selection (mouseup)
+   */
+  async endDragDetection(event) {
+    this.isDragging = false;
+    
+    // Process pending selection if exists
+    if (this.pendingSelection) {
+      const pendingEvent = {
+        type: 'selectionchange',
+        selection: this.pendingSelection.selection,
+        fieldType: this.pendingSelection.fieldType,
+        target: this.pendingSelection.target
+      };
+      
+      await this._processSelectionChangeEvent(pendingEvent);
+      this.pendingSelection = null;
+    }
   }
 
   /**
@@ -561,7 +648,7 @@ export class TextSelectionManager extends ResourceTracker {
    * @param {string} selectedText - Selected text to translate
    * @param {MouseEvent} event - Original mouse event (optional)
    */
-  async processSelectedText(selectedText) {
+  async processSelectedText(selectedText, sourceEvent = null) {
     this.logger.debug('processSelectedText called', { 
       text: selectedText.substring(0, 30) + '...',
       isInIframe: window !== window.top,
@@ -572,9 +659,17 @@ export class TextSelectionManager extends ResourceTracker {
     const currentSelection = window.getSelection();
     const currentSelectedText = currentSelection ? currentSelection.toString().trim() : '';
     
+    this.logger.debug('processSelectedText selection check', {
+      currentSelectedText: !!currentSelectedText,
+      currentLength: currentSelectedText?.length || 0,
+      passedText: selectedText.substring(0, 30) + '...',
+      passedLength: selectedText.length
+    });
+    
     // If no current selection but we have text, it means selection was cleared
     if (!currentSelectedText && selectedText) {
-      return;
+      this.logger.debug('Current selection cleared, but we have passed text - continuing anyway for double-click');
+      // Don't return early for double-click case - continue processing
     }
     
     // Check if extension context is valid before processing
@@ -583,6 +678,8 @@ export class TextSelectionManager extends ResourceTracker {
       return;
     }
     
+    this.logger.debug('Extension context valid, continuing...');
+    
     // Skip if we're in transition from selection icon to translation window
     // This prevents conflicts with text field icon creation during the transition
     if (state && state.preventTextFieldIconCreation === true) {
@@ -590,18 +687,50 @@ export class TextSelectionManager extends ResourceTracker {
       return;
     }
     
+    this.logger.debug('No active selection window transition, continuing...');
+    
     // Prevent duplicate processing of same selection
     const currentTime = Date.now();
     const windowsManager = this._getWindowsManager();
     if (this.lastProcessedText === selectedText && windowsManager && windowsManager.state.isVisible) {
       // If same text is selected again within a short time, don't recreate
       if (currentTime - this.lastProcessedTime < 2000) { // 2 second threshold
+        this.logger.debug('Skipping duplicate processing of same text');
         return;
       }
     }
     
+    this.logger.debug('Duplicate processing check passed, continuing...');
+    
   const selection = window.getSelection();
   let position = { x: 0, y: 0 };
+    
+    // For double-click cases where selection is cleared, use sourceEvent position
+    if (sourceEvent && (!selection || selection.rangeCount === 0)) {
+      this.logger.debug('Using sourceEvent position for double-click', {
+        clientX: sourceEvent.clientX,
+        clientY: sourceEvent.clientY
+      });
+      
+      position = {
+        x: sourceEvent.clientX + window.scrollX,
+        y: sourceEvent.clientY + window.scrollY + 20 // Small offset below click
+      };
+      
+      // Skip normal position calculation and go directly to window show
+      if (this._getWindowsManager()) {
+        this.logger.debug('Calling windowsManager.show() with sourceEvent position', { 
+          text: selectedText.substring(0, 30) + '...',
+          position
+        });
+        await this._getWindowsManager().show(selectedText, position);
+        
+        // Update tracking after successful show
+        this.lastProcessedText = selectedText;
+        this.lastProcessedTime = Date.now();
+      }
+      return;
+    }
     
     // Check if we have a valid selection with ranges
     if (selection && selection.rangeCount > 0) {
@@ -612,6 +741,35 @@ export class TextSelectionManager extends ResourceTracker {
       this.lastSelectionElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
         ? range.commonAncestorContainer.parentElement 
         : range.commonAncestorContainer;
+        
+      // Check if selection icon should be shown based on field type
+      const detection = fieldDetector.detect(this.lastSelectionElement);
+      if (!detection.shouldShowSelectionIcon) {
+        this.logger.debug('Skipping selection icon display based on field type', {
+          fieldType: detection.fieldType,
+          elementTag: this.lastSelectionElement?.tagName
+        });
+        return;
+      }
+      
+      // Additional check: For professional editors and rich text editors, 
+      // ensure they follow selection strategy rules
+      if (detection.fieldType === 'professional-editor' || 
+          detection.fieldType === 'rich-text-editor') {
+        const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
+        const isFromDoubleClick = this.isFromDoubleClick || false;
+        
+        if (needsDoubleClick && !isFromDoubleClick) {
+          this.logger.debug('Skipping selection icon - double-click required', {
+            fieldType: detection.fieldType,
+            selectionStrategy: detection.selectionStrategy,
+            needsDoubleClick,
+            isFromDoubleClick,
+            elementTag: this.lastSelectionElement?.tagName
+          });
+          return;
+        }
+      }
         
       // Store the selection position for proximity-based dismissal
       this.lastSelectionPosition = {
@@ -632,6 +790,16 @@ export class TextSelectionManager extends ResourceTracker {
     // Check if selection is within a form element
     const activeElement = document.activeElement;
     if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
+      
+      // Check if selection icon should be shown for this form element
+      const activeElementDetection = fieldDetector.detect(activeElement);
+      if (!activeElementDetection.shouldShowSelectionIcon) {
+        this.logger.debug('Skipping selection icon for form element based on field type', {
+          fieldType: activeElementDetection.fieldType,
+          elementTag: activeElement.tagName
+        });
+        return;
+      }
       // Use the element's bounding rect instead
       const elementRect = activeElement.getBoundingClientRect();
       
@@ -816,14 +984,115 @@ export class TextSelectionManager extends ResourceTracker {
       // Clear tracking when cancelling
       this.lastProcessedText = null;
       this.lastProcessedTime = 0;
-      
-      try {
-        // ResourceTracker handles event listener cleanup automatically
-      } catch {
-        // خطا در حذف
-      }
     }
   }
+
+  /**
+   * Handle double-click events to mark professional editor selections
+   * @param {MouseEvent} event - Double-click event
+   */
+  handleDoubleClick(event) {
+    this.logger.debug('Double-click detected', {
+      target: event.target?.tagName,
+      timestamp: Date.now()
+    });
+    
+    // Mark the time of double-click and set processing flag
+    this.lastDoubleClickTime = Date.now();
+    this.doubleClickProcessing = true;
+    
+    // Capture selection immediately to avoid interference
+    const immediateText = selectionDetector.detect(event.target);
+    
+    // Use smart retry mechanism based on field type detection
+    const detection = fieldDetector.detect(event.target);
+    const maxAttempts = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 5 : 3;
+    const initialDelay = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 150 : 100;
+    
+    const handleSelection = async (attempt = 1) => {
+      const selectedText = await selectionDetector.detectWithRetry(event.target, { 
+        maxAttempts: 1,
+        delay: 50 
+      });
+      
+      if (selectedText && selectedText.trim()) {
+        this.logger.debug('Text selected via double-click (delayed check)', {
+          text: selectedText.substring(0, 30) + '...',
+          target: event.target?.tagName,
+          method: 'smart-detection',
+          attempt: attempt,
+          fieldType: detection.fieldType
+        });
+        
+        // Set double-click flag before processing
+        this.isFromDoubleClick = true;
+        
+        // Force process the selection with calculated position
+        this.processSelectedText(selectedText, event);
+        
+        // Clear flags after successful processing
+        this.doubleClickProcessing = false;
+        this.isFromDoubleClick = false;
+        return true;
+      } else if (immediateText && immediateText.trim() && attempt === 1) {
+        // Use immediate capture if delayed capture fails
+        this.logger.debug('Text selected via double-click (immediate fallback)', {
+          text: immediateText.substring(0, 30) + '...',
+          target: event.target?.tagName,
+          method: 'immediate',
+          fieldType: detection.fieldType
+        });
+        
+        // Set double-click flag before processing
+        this.isFromDoubleClick = true;
+        
+        this.processSelectedText(immediateText, event);
+        
+        // Clear flags after successful processing
+        this.doubleClickProcessing = false;
+        this.isFromDoubleClick = false;
+        return true;
+      } else if (attempt < maxAttempts) {
+        // Try again with adaptive delay based on field type
+        const delay = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 75 * attempt : 50 * attempt;
+        this.logger.debug('Retrying text selection detection', {
+          attempt: attempt,
+          maxAttempts: maxAttempts,
+          delay: delay,
+          fieldType: detection.fieldType
+        });
+        setTimeout(() => handleSelection(attempt + 1), delay);
+        return false;
+      } else {
+        this.logger.debug('No text selected after double-click delay', {
+          target: event.target?.tagName,
+          attempts: attempt,
+          fieldType: detection.fieldType
+        });
+        this.doubleClickProcessing = false; // Clear flag after all attempts failed
+        return false;
+      }
+    };
+    
+    // Start with initial delay for complex editors
+    setTimeout(() => handleSelection(1), initialDelay);
+    
+    // Clear processing flag after maximum possible delay to prevent deadlock
+    setTimeout(() => {
+      this.doubleClickProcessing = false;
+    }, 500);
+  }
+
+  /**
+   * Check if current mouseup is part of a recent double-click
+   * @returns {boolean} True if this mouseup is from double-click
+   */
+  _isFromRecentDoubleClick() {
+    const timeSinceDoubleClick = Date.now() - this.lastDoubleClickTime;
+    return timeSinceDoubleClick <= this.doubleClickWindow;
+  }
+
+
 
   /**
    * Check if event requires Ctrl key for text selection
@@ -871,12 +1140,43 @@ export class TextSelectionManager extends ResourceTracker {
 
 
   /**
-   * Handle outside click events (placeholder for future integration)
-   * @param {MouseEvent} event - Click event
+   * Handle outside mouse events for dismissing translation windows
+   * @param {MouseEvent} event - Mouse event (mousedown/click)
    */
-  _onOutsideClick() {
-    // This will be used for more advanced selection window integration
-    this.logger.debug('Outside click detected');
+  _onOutsideClick(event) {
+    // Only handle mouse events for dismissing windows, not for text selection
+    if (!event) return;
+    
+    const windowsManager = this._getWindowsManager();
+    if (!windowsManager || !this._isWindowVisible()) {
+      return;
+    }
+    
+    // Check if mouse event is inside translation window
+    const displayElement = windowsManager.displayElement;
+    if (displayElement && event.target) {
+      if (displayElement.contains(event.target)) {
+        // Mouse event inside window, don't dismiss
+        this.logger.debug('Mouse event inside translation window - keeping open');
+        return;
+      }
+      
+      // Check composed path for shadow DOM elements
+      if (typeof event.composedPath === 'function') {
+        const eventPath = event.composedPath();
+        if (eventPath.includes(displayElement)) {
+          this.logger.debug('Mouse event in window path - keeping open');
+          return;
+        }
+      }
+    }
+    
+    // Mouse event outside window, dismiss it instantly
+    this.logger.debug('Outside mouse event detected - dismissing translation window', {
+      eventType: event.type,
+      target: event.target?.tagName
+    });
+    this._dismissWindow();
   }
 
   /**
@@ -900,11 +1200,16 @@ export class TextSelectionManager extends ResourceTracker {
     this.lastSelectionElement = null;
     this.lastSelectionPosition = null;
     
+    // Clear drag detection state
+    this.isDragging = false;
+    this.pendingSelection = null;
+    
     // Clear any remaining timeouts
     if (this.selectionTimeoutId) {
       this.clearTimer(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
     }
+    
     
     // Call ResourceTracker cleanup for automatic resource management
     super.cleanup();
@@ -922,10 +1227,106 @@ export class TextSelectionManager extends ResourceTracker {
       hasWindowsManager: !!this._getWindowsManager(),
       hasMessenger: !!this.messenger,
       activeTimeout: !!this.selectionTimeoutId,
+      isDragging: this.isDragging,
       ctrlKeyPressed: this.ctrlKeyPressed,
       lastProcessedText: this.lastProcessedText ? this.lastProcessedText.substring(0, 50) + '...' : null,
       lastProcessedTime: this.lastProcessedTime,
       timeSinceLastProcess: this.lastProcessedTime ? Date.now() - this.lastProcessedTime : null
     };
+  }
+
+  /**
+   * Process selectionchange events with proper debouncing
+   * This method contains the core logic for handling selectionchange events
+   * that was previously directly in handleTextSelection
+   */
+  async _processSelectionChangeEvent(event) {
+    this.logger.debug('_processSelectionChangeEvent called', {
+      eventType: event.type,
+      hasSelection: !!event.selection
+    });
+
+    // Skip if currently processing double-click to avoid interference
+    if (this.doubleClickProcessing) {
+      this.logger.debug('Skipping selectionchange processing due to active double-click processing');
+      return;
+    }
+    
+    // Skip if currently dragging a translation window
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true) {
+      this.logger.debug('Skipping selectionchange processing due to active window dragging');
+      return;
+    }
+    
+    // Skip if we're in transition from selection icon to translation window
+    if (state && state.preventTextFieldIconCreation === true) {
+      this.logger.debug('Skipping selectionchange processing due to active selection window transition');
+      return;
+    }
+    
+    // Extract selected text from selectionchange event
+    let selectedText;
+    if (event.selection) {
+      selectedText = event.selection.toString().trim();
+    } else {
+      const selection = window.getSelection();
+      selectedText = selection ? selection.toString().trim() : '';
+    }
+    
+    this.logger.debug('Selectionchange text check', {
+      hasSelectedText: !!selectedText,
+      textLength: selectedText?.length || 0
+    });
+
+    // If no text selected, dismiss any existing windows
+    if (!selectedText) {
+      this._dismissWindow();
+      return;
+    }
+
+    // Skip text selection handling if select element mode is active
+    try {
+      if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
+        return;
+      }
+    } catch (error) {
+      this.logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
+    }
+
+    // For selectionchange events, always use timeout-based processing (no immediate processing)
+    // Check if we should process this text selection based on settings
+    const shouldProcess = await this.shouldProcessTextSelection(event);
+    if (!shouldProcess) {
+      this.logger.debug('Skipping selectionchange processing due to Ctrl requirement not met');
+      return;
+    }
+
+    // Read settings for selection translation mode
+    let settings;
+    let selectionTranslationMode;
+    
+    try {
+      settings = await getSettingsAsync();
+      selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        this.logger.debug('Extension context invalidated, skipping selectionchange processing');
+        return;
+      } else {
+        throw error;
+      }
+    }
+
+    // Process selection directly (no timeout needed here)
+    const currentTime = Date.now();
+    
+    // Track this text as being processed
+    this.lastProcessedText = selectedText;
+    this.lastProcessedTime = currentTime;
+
+    this.processSelectedText(selectedText, event);
+
+    // Add listener for canceling translation on click
+    this.addEventListener(document, "mousedown", this.cancelSelectionTranslation);
   }
 }

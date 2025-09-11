@@ -19,6 +19,10 @@ import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 // Import Feature Manager for smart handler registration
 import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 
+// Import Field Detection System for global availability
+import { fieldDetector } from '@/utils/text/FieldDetector.js';
+import { selectionDetector } from '@/utils/text/SelectionDetector.js';
+
 // Setup Trusted Types compatibility early
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
@@ -325,33 +329,10 @@ if (!access.isAccessible) {
     // Final iframe manager setup
     logger.info(`🎯 [Content Script] IFrame support enabled - Frame ID: ${iFrameManager.frameId}`);
     
-    // Optional: Initialize EventCoordinator for backward compatibility if needed
-    // Note: With Smart Handler Registration, EventCoordinator is mostly deprecated
-    // but kept for legacy support
-    if (featureManager && isDevelopmentMode()) {
-      try {
-        logger.debug('Initializing EventCoordinator for legacy compatibility...');
-        const EventCoordinator = (await import('@/core/EventCoordinator.js')).default;
-        const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
-        
-        const translationHandler = getTranslationHandlerInstance();
-        const eventCoordinator = new EventCoordinator(translationHandler, featureManager);
-        
-        // Setup minimal event listeners for backward compatibility
-        document.addEventListener('mouseup', eventCoordinator.handleEvent, { passive: true });
-        document.addEventListener('click', eventCoordinator.handleEvent, { passive: true });
-        document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
-        document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
-        document.addEventListener('keydown', eventCoordinator.handleKeyDown, { passive: true });
-        document.addEventListener('keyup', eventCoordinator.handleKeyUp, { passive: true });
-        
-        window.eventCoordinatorInstance = eventCoordinator;
-        logger.debug('EventCoordinator initialized for legacy compatibility');
-        
-      } catch (error) {
-        logger.warn('Failed to initialize EventCoordinator (non-critical):', error);
-      }
-    }
+    // EventCoordinator disabled - modern FeatureManager system handles all events
+    // The EventCoordinator was causing duplicate event processing with the new selection event strategy system
+    // All event handling is now properly managed through TextSelectionHandler and other feature handlers
+    logger.debug('EventCoordinator disabled - using modern FeatureManager event handling');
     
     })();
   }

@@ -64,7 +64,7 @@ class ResourceTracker {
     return intervalId;
   }
 
-  addEventListener(element, event, handler) {
+  addEventListener(element, event, handler, options = null) {
     // The core tracking is now handled by MemoryManager, which is already environment-aware.
     // This method just needs to call the appropriate function on the element.
 
@@ -78,7 +78,11 @@ class ResourceTracker {
     }
     // Handle DOM EventTargets
     else if (element && typeof element.addEventListener === 'function') {
-      element.addEventListener(event, handler);
+      if (options) {
+        element.addEventListener(event, handler, options);
+      } else {
+        element.addEventListener(event, handler);
+      }
     }
     else if (shouldEnableDebugging()) {
       this.logger.warn('Unsupported event target type:', element);

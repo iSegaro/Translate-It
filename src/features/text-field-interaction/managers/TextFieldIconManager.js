@@ -90,11 +90,34 @@ export class TextFieldIconManager extends ResourceTracker {
   }
 
   /**
-   * Check if element is editable (text input, textarea, contenteditable)
+   * Check if element should show text field icon using new field detection system
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element should show text field icon
+   */
+  isEditableElement(element) {
+    if (!element) return false;
+    
+    // Use the new FieldDetector system - lazy import to avoid circular dependencies
+    try {
+      // Try to use fieldDetector if available
+      if (typeof window !== 'undefined' && window.fieldDetector) {
+        return window.fieldDetector.detect(element).shouldShowTextFieldIcon;
+      }
+      
+      // Fallback to basic detection if FieldDetector not available
+      return this._basicFieldDetection(element);
+    } catch (error) {
+      this.logger.debug('Error in field detection, using fallback:', error);
+      return this._basicFieldDetection(element);
+    }
+  }
+
+  /**
+   * Basic field detection fallback
    * @param {Element} element - Element to check
    * @returns {boolean} Whether element is editable
    */
-  isEditableElement(element) {
+  _basicFieldDetection(element) {
     if (!element) return false;
     
     // Check for contenteditable elements
