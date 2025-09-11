@@ -75,20 +75,11 @@ export class TextSelectionManager extends ResourceTracker {
     this.handleDoubleClick = this.handleDoubleClick.bind(this);
     this.processSelectedText = this.processSelectedText.bind(this);
     this.cancelSelectionTranslation = this.cancelSelectionTranslation.bind(this);
-    this.handleSelectionChangeForDismiss = this.handleSelectionChangeForDismiss.bind(this);
-    this.handleFocusForDismiss = this.handleFocusForDismiss.bind(this);
-    this.handleClickForDismiss = this.handleClickForDismiss.bind(this);
-    this.handleMouseUpForDismiss = this.handleMouseUpForDismiss.bind(this);
-    this.handleWindowBlurForDismiss = this.handleWindowBlurForDismiss.bind(this);
-    this.checkSelectionForDismiss = this.checkSelectionForDismiss.bind(this);
-    this.handleUnifiedClickInIframe = this.handleUnifiedClickInIframe.bind(this);
     this._onOutsideClick = this._onOutsideClick.bind(this);
     
     // Setup external window tracking for iframe-created windows
     this._setupExternalWindowTracking();
     
-    // Setup persistent dismiss handlers for iframe context
-    this._setupPersistentDismissHandlers();
     
     this.logger.init('TextSelectionManager initialized');
   }
@@ -144,31 +135,6 @@ export class TextSelectionManager extends ResourceTracker {
     }
   }
 
-  /**
-   * Setup persistent dismiss handlers for iframe context
-   * These handlers are always active to catch dismiss events even after recreation
-   */
-  _setupPersistentDismissHandlers() {
-    // Only set up in iframe context
-    if (window !== window.top) {
-      // Add persistent unified click handler for dismiss detection
-      this.addEventListener(document, "click", this.handleUnifiedClickInIframe, { capture: true });
-      
-      // Additional persistent handlers for iframe dismiss detection
-      this.addEventListener(document, "focusin", this.handleFocusForDismiss, { capture: true });
-      this.addEventListener(document, "selectionchange", this.handleSelectionChangeForDismiss);
-      this.addEventListener(document, "mouseup", this.handleMouseUpForDismiss, { capture: true });
-      // Disable blur handler as it's too aggressive and causes false dismissals
-      // this.addEventListener(window, "blur", this.handleWindowBlurForDismiss, { capture: true });
-      
-      // Use a timer to periodically check if selection has changed
-      this.dismissCheckInterval = this.trackInterval(() => {
-        this.checkSelectionForDismiss();
-      }, 500); // Check every 500ms
-      
-      this.logger.debug('Persistent dismiss handlers setup in iframe context');
-    }
-  }
 
   /**
    * Setup external window tracking for iframe-created windows
@@ -1085,294 +1051,8 @@ export class TextSelectionManager extends ResourceTracker {
     // Note: In main frame, WindowsManager's own dismiss listener will handle icon dismissal
   }
 
-  /**
-   * Handle selection change for dismissing icons in iframe when selection is cleared
-   */
-  handleSelectionChangeForDismiss() {
-    // Only run in iframe context
-    if (window === window.top) return;
-    
-    const selection = window.getSelection();
-    const hasSelection = selection && selection.toString().trim().length > 0;
-    
-    this.logger.debug('handleSelectionChangeForDismiss called', {
-      hasSelection,
-      selectionText: hasSelection ? selection.toString().substring(0, 20) + '...' : 'none',
-      isInIframe: true
-    });
-    
-    // If selection is cleared and we had processed text, send dismiss message
-    if (!hasSelection && this.lastProcessedText) {
-      this.logger.debug('Selection cleared in iframe, sending dismiss message to parent');
-      this.sendDismissMessage('selection-cleared');
-    }
-  }
 
-  /**
-   * Handle focus events on text input fields to dismiss icons in iframe context
-   */
-  handleFocusForDismiss(event) {
-    // Only run in iframe context AND only if we have processed text
-    if (window === window.top || !this.lastProcessedText) return;
-    
-    const target = event.target;
-    if (!target) return;
-    
-    // Only dismiss for specific text input elements, not for general focus events
-    const isSpecificTextInput = target.tagName === 'INPUT' || 
-                               target.tagName === 'TEXTAREA' ||
-                               // Be more specific about contenteditable - avoid the main editing surface
-                               (target.contentEditable === 'true' && 
-                                target.tagName !== 'DIV' &&
-                                !target.id?.includes('WACViewPanel'));
-    
-    this.logger.debug('handleFocusForDismiss processing', {
-      tagName: target.tagName,
-      className: target.className,
-      id: target.id,
-      isSpecificTextInput,
-      contentEditable: target.contentEditable,
-      hasProcessedText: !!this.lastProcessedText,
-      isInIframe: true
-    });
-    
-    // Only dismiss for specific text input focus, not general focus events
-    if (isSpecificTextInput) {
-      this.logger.debug('Specific text input focused in iframe, sending dismiss message to parent', {
-        targetElement: target.tagName,
-        className: target.className,
-        id: target.id
-      });
-      
-      this.sendDismissMessage('specific-text-input-focus', target);
-    }
-  }
 
-  /**
-   * Handle click events specifically for dismissing icons in iframe context
-   */
-  handleClickForDismiss(event) {
-    // Only run in iframe context
-    if (window === window.top) return;
-    
-    const target = event.target;
-    if (!target) return;
-    
-    // Debug: Log all click events in iframe to understand the interaction
-    this.logger.debug('Click event captured in iframe for dismiss check', {
-      tagName: target.tagName,
-      className: target.className,
-      id: target.id,
-      hasProcessedText: !!this.lastProcessedText,
-      eventType: event.type,
-      isInIframe: true
-    });
-    
-    // If we have processed text and there's a click, check if it's away from selection
-    if (this.lastProcessedText) {
-      // Get current selection to see if user clicked away
-      const selection = window.getSelection();
-      const hasSelection = selection && selection.toString().trim().length > 0;
-      
-      // If no selection after click, or clicked on different element, dismiss
-      const shouldDismiss = !hasSelection || 
-                           target.tagName !== 'SPAN' || 
-                           !target.classList.contains('NormalTextRun');
-      
-      if (shouldDismiss) {
-        this.logger.debug('Click away detected in iframe, sending dismiss message to parent', {
-          targetElement: target.tagName,
-          className: target.className,
-          hasSelection,
-          shouldDismiss
-        });
-        
-        this.sendDismissMessage('click-away', target);
-      }
-    }
-  }
-
-  /**
-   * Unified click handler for iframe context - combines cancel and dismiss logic
-   */
-  handleUnifiedClickInIframe(event) {
-    // Only run in iframe context
-    if (window === window.top) return;
-    
-    const target = event.target;
-    
-    this.logger.debug('Unified click handler in iframe', {
-      tagName: target?.tagName,
-      className: target?.className,
-      id: target?.id,
-      hasTimeout: !!this.selectionTimeoutId,
-      hasProcessedText: !!this.lastProcessedText,
-      eventType: event.type,
-      isInIframe: true
-    });
-    
-    // STEP 1: Handle cancelSelectionTranslation logic (always do this)
-    if (this.selectionTimeoutId) {
-      this.clearTimer(this.selectionTimeoutId);
-      this.selectionTimeoutId = null;
-      this.logger.debug('Selection translation cancelled in iframe');
-      
-      // Clear tracking when cancelling
-      this.lastProcessedText = null;
-      this.lastProcessedTime = 0;
-      return; // Exit early if we cancelled a pending selection
-    }
-    
-    // STEP 2: Handle dismiss logic ONLY if we have processed text
-    if (this.lastProcessedText) {
-      // Get current selection to see if user clicked away
-      const selection = window.getSelection();
-      const hasSelection = selection && selection.toString().trim().length > 0;
-      
-      // Be more specific about what constitutes a dismiss-worthy click
-      const isClickingAwayFromSelection = !hasSelection || 
-                                        (target?.tagName !== 'SPAN' || 
-                                         !target?.classList?.contains('NormalTextRun'));
-      
-      // Additional check: don't dismiss if clicking on Word Online UI elements that might be normal interaction
-      const isWordUIElement = target?.closest('[class*="Office"]') || 
-                             target?.closest('[class*="WA"]') ||
-                             target?.id?.includes('WA') ||
-                             target?.className?.includes('WA');
-      
-      if (isClickingAwayFromSelection && !isWordUIElement) {
-        this.logger.debug('Click away from selection detected, dismissing', {
-          targetElement: target?.tagName,
-          className: target?.className,
-          hasSelection,
-          isWordUIElement
-        });
-        
-        this.sendDismissMessage('click-away-from-selection', target);
-        return;
-      }
-    }
-    
-    // STEP 3: Don't send general dismiss messages for normal clicks
-    // Only log for debugging
-    this.logger.debug('Normal click in iframe, no action taken', {
-      targetElement: target?.tagName,
-      hasProcessedText: !!this.lastProcessedText
-    });
-  }
-
-  /**
-   * Handle mouseup events for dismiss detection in iframe context
-   */
-  handleMouseUpForDismiss(event) {
-    // Only run in iframe context AND only if we have processed text
-    if (window === window.top || !this.lastProcessedText) return;
-    
-    const target = event.target;
-    if (!target) return;
-    
-    this.logger.debug('MouseUp event captured in iframe for dismiss check', {
-      tagName: target.tagName,
-      className: target.className,
-      id: target.id,
-      hasProcessedText: !!this.lastProcessedText,
-      isInIframe: true
-    });
-    
-    // Use setTimeout to allow selection to settle
-    setTimeout(() => {
-      // Double-check we still have processed text
-      if (!this.lastProcessedText) return;
-      
-      const selection = window.getSelection();
-      const currentText = selection ? selection.toString().trim() : '';
-      
-      // Only dismiss if selection is completely cleared (not just changed)
-      const selectionCompletelyCleared = currentText.length === 0 && this.lastProcessedText.trim().length > 0;
-      
-      if (selectionCompletelyCleared) {
-        this.logger.debug('Selection completely cleared after mouseup, sending dismiss message', {
-          lastProcessedText: this.lastProcessedText.substring(0, 20) + '...',
-          targetElement: target.tagName
-        });
-        
-        this.sendDismissMessage('mouseup-selection-cleared', target);
-      }
-    }, 100); // Increased delay to let selection settle properly
-  }
-
-  /**
-   * Handle window blur events for dismiss detection in iframe context
-   */
-  handleWindowBlurForDismiss(event) {
-    // Only run in iframe context AND only if we have processed text
-    if (window === window.top || !this.lastProcessedText) return;
-    
-    this.logger.debug('Window blur event in iframe', {
-      hasProcessedText: !!this.lastProcessedText,
-      isInIframe: true
-    });
-    
-    // Add a delay to window blur to avoid dismissing when user clicks on WindowsManager
-    // If user is just clicking on translation UI, they'll be back to the iframe quickly
-    setTimeout(() => {
-      // Double-check that we still have processed text and haven't been cleared by other means
-      if (this.lastProcessedText && document.hasFocus && !document.hasFocus()) {
-        this.logger.debug('Window blur in iframe confirmed after delay, sending dismiss message');
-        this.sendDismissMessage('window-blur-delayed');
-      }
-    }, 300); // 300ms delay
-  }
-
-  /**
-   * Periodically check selection and dismiss if changed
-   */
-  checkSelectionForDismiss() {
-    // Only run in iframe context
-    if (window === window.top) return;
-    
-    // Only check if we have processed text
-    if (!this.lastProcessedText) return;
-    
-    const selection = window.getSelection();
-    const currentText = selection ? selection.toString().trim() : '';
-    
-    // Be more lenient with periodic checking - only dismiss if completely different text or no selection
-    const isCompletelyDifferent = currentText !== this.lastProcessedText.trim() && currentText.length === 0;
-    
-    if (isCompletelyDifferent) {
-      this.logger.debug('Periodic check: Selection completely cleared, sending dismiss message', {
-        lastProcessedText: this.lastProcessedText.substring(0, 20) + '...',
-        currentText: currentText.length === 0 ? 'empty' : currentText.substring(0, 20) + '...'
-      });
-      
-      this.sendDismissMessage('periodic-selection-cleared');
-    }
-  }
-
-  /**
-   * Send dismiss message to parent frame (helper method)
-   */
-  sendDismissMessage(reason, targetElement = null) {
-    try {
-      window.parent.postMessage({
-        type: 'DISMISS_WINDOWS_MANAGER',
-        frameId: this.frameId,
-        reason: reason,
-        targetElement: targetElement?.tagName,
-        targetClass: targetElement?.className,
-        timestamp: Date.now()
-      }, '*');
-      
-      // Clear tracking
-      this.lastProcessedText = null;
-      this.lastProcessedTime = 0;
-      
-      this.logger.debug('Dismiss message sent successfully', { reason });
-    } catch (error) {
-      this.logger.warn('Failed to send dismiss message:', error);
-    }
-  }
 
   /**
    * Handle double-click events to mark professional editor selections
@@ -1714,16 +1394,8 @@ export class TextSelectionManager extends ResourceTracker {
     this.processSelectedText(selectedText, event);
 
     // Note: For double-click (immediate icon display), WindowsManager handles dismissal
-    // No need to add cancelSelectionTranslation listeners here
+    // No additional listeners needed here
     
-    // In iframe, also listen for selection changes - if selection is cleared, dismiss the icon
-    if (window !== window.top) {
-      this.addEventListener(document, "selectionchange", this.handleSelectionChangeForDismiss);
-    }
-    
-    this.logger.debug('Double-click processing complete, WindowsManager will handle dismissal', {
-      isInIframe: window !== window.top,
-      addedSelectionListener: window !== window.top
-    });
+    this.logger.debug('Double-click processing complete, WindowsManager will handle dismissal');
   }
 }

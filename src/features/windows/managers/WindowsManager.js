@@ -328,11 +328,7 @@ export class WindowsManager extends ResourceTracker {
     });
     
     // Add immediate dismiss listener for any mousedown event (drag detection)
-    // This replaces the standard click listener for faster drag detection
     this._addDismissListener();
-    
-    // Note: Using our custom mousedown listener instead of clickManager.addOutsideClickListener()
-    // for better drag detection and consistent dismiss logic
     
     this.logger.debug('Icon creation event emitted successfully', { iconId });
   }
@@ -586,10 +582,7 @@ export class WindowsManager extends ResourceTracker {
         isLoading: true
       });
       
-      // Setup click listener for outside clicks (replaced with our faster mousedown listener)
-      // this.clickManager.addOutsideClickListener();
-      
-      // Add immediate dismiss listener for window dismissal (same as icon)
+      // Add immediate dismiss listener for window dismissal
       this._addDismissListener();
       
       this.logger.debug('Loading window creation event emitted', { windowId });
@@ -1070,8 +1063,7 @@ export class WindowsManager extends ResourceTracker {
     this.state.clearIconClickContext();
     
     if (removeListener) {
-      this.clickManager.removeOutsideClickListener();
-      // Also remove the immediate dismiss listener
+      // Remove the immediate dismiss listener
       this._removeDismissListener();
     }
     // Icon animation and DOM cleanup now handled by Vue components
@@ -1084,8 +1076,7 @@ export class WindowsManager extends ResourceTracker {
     this.logger.debug('[LOG] WindowsManager._cleanupWindow - simplified for Vue UI Host');
     
     // Note: Don't remove theme listeners here - keep them for future windows
-    this.clickManager.removeOutsideClickListener();
-    // Also remove the immediate dismiss listener
+    // Remove the immediate dismiss listener
     this._removeDismissListener();
     
     this.state.setVisible(false);
