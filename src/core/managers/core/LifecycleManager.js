@@ -124,7 +124,7 @@ class LifecycleManager extends ResourceTracker {
       
       // TTS handlers
       'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
-      'GOOGLE_TTS_STOP_ALL': handleGoogleTTSStopAll,
+      'TTS_STOP': handleGoogleTTSStopAll,
       'GOOGLE_TTS_PAUSE': handleGoogleTTSPause,
       'GOOGLE_TTS_RESUME': handleGoogleTTSResume,
       'GOOGLE_TTS_GET_STATUS': handleGoogleTTSGetStatus,

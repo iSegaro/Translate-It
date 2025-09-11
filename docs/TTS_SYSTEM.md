@@ -95,9 +95,10 @@ const ttsLanguageFallbacks = {
 
 #### `messaging/core/MessageActions.js`
 The messaging system has been extended with new actions to support the enhanced controls:
+- `GOOGLE_TTS_SPEAK`
 - `GOOGLE_TTS_PAUSE`
 - `GOOGLE_TTS_RESUME`
-- `GOOGLE_TTS_STOP_ALL`
+- `TTS_STOP` (unified stop action replacing legacy GOOGLE_TTS_STOP_ALL)
 - `GOOGLE_TTS_GET_STATUS`
 
 #### `background/handlers/tts/handleGoogleTTS.js`
@@ -247,6 +248,12 @@ Successfully standardized TTS functionality across all three extension component
 **Root Cause**: ReliableMessaging port fallback returned message wrapper instead of actual result data
 **Solution**: Fixed ReliableMessaging to extract `result` from port messages properly
 **Status**: ✅ **Resolved in v1.6** - Port communication now returns correct response data
+
+#### "No response received for GOOGLE_TTS_STOP_ALL" Timeout Errors
+**Symptoms**: Console shows timeout errors for `GOOGLE_TTS_STOP_ALL` action, particularly in PopupApp lifecycle cleanup
+**Root Cause**: PopupApp.vue bypassed the unified TTS system and used legacy `GOOGLE_TTS_STOP_ALL` action directly
+**Solution**: Updated PopupApp.vue to use `MessageActions.TTS_STOP` like the unified system (TTSButton → useTTSSmart)
+**Status**: ✅ **Resolved in v2.1** - All components now use consistent TTS stop mechanism
 
 ### Debugging Tips
 

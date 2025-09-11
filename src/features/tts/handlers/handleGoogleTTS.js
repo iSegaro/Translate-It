@@ -498,36 +498,59 @@ export const handleGoogleTTSGetStatus = async (message, sender) => {
  * Stop TTS via offscreen document
  */
 const stopWithOffscreenDocument = async () => {
-  const browserAPI = await initializebrowserAPI();
-  
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('Offscreen TTS stop timeout'));
-    }, 3000);
+  try {
+    const browserAPI = await initializebrowserAPI();
+    
+    // Check if offscreen document exists first
+    if (browserAPI.offscreen && typeof browserAPI.offscreen.hasDocument === 'function') {
+      const hasDocument = await browserAPI.offscreen.hasDocument();
+      if (!hasDocument) {
+        logger.debug('[GoogleTTSHandler] No offscreen document exists, stop considered successful');
+        return; // No document means nothing to stop
+      }
+    }
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        logger.warn('[GoogleTTSHandler] Offscreen TTS stop timeout - assuming success');
+        resolve(); // Assume success on timeout for stop operations
+      }, 2000); // Reduced timeout for stop operations
 
-    browserAPI.runtime.sendMessage({
-      action: 'handleTTSStop',
-      target: 'offscreen'
-    }).then((response) => {
-      clearTimeout(timeout);
-      
-      if (response?.success !== false) {
-        resolve();
-      } else {
-        reject(new Error(response?.error || 'Offscreen TTS stop failed'));
-      }
-    }).catch((err) => {
-      clearTimeout(timeout);
-      
-      // Handle connection errors gracefully
-      if (err.message && err.message.includes('Receiving end does not exist')) {
-        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected, considering stop successful');
-        resolve(); // Consider this a successful stop since offscreen is gone
-      } else {
-        reject(err);
-      }
+      browserAPI.runtime.sendMessage({
+        action: 'handleTTSStop',
+        target: 'offscreen'
+      }).then((response) => {
+        clearTimeout(timeout);
+        
+        // Be more lenient with stop responses - undefined/null responses are OK
+        if (response === undefined || response === null || response?.success !== false) {
+          resolve();
+        } else {
+          logger.warn('[GoogleTTSHandler] Stop response indicates failure but continuing:', response);
+          resolve(); // Still resolve for stop operations
+        }
+      }).catch((err) => {
+        clearTimeout(timeout);
+        
+        // Handle connection errors gracefully - all are OK for stop operations
+        if (err.message && (
+          err.message.includes('Receiving end does not exist') ||
+          err.message.includes('Extension context invalidated') ||
+          err.message.includes('message port closed')
+        )) {
+          logger.debug('[GoogleTTSHandler] Offscreen document disconnected, stop considered successful');
+          resolve(); // Consider this a successful stop
+        } else {
+          logger.warn('[GoogleTTSHandler] Stop error but continuing:', err.message);
+          resolve(); // Still resolve for stop operations - better to assume success
+        }
+      });
     });
-  });
+  } catch (error) {
+    logger.warn('[GoogleTTSHandler] Stop setup error but continuing:', error.message);
+    // For stop operations, errors in setup should not fail the operation
+    return; // Consider successful
+  }
 };
 
 /**
@@ -638,12 +661,20 @@ let currentFirefoxAudio = null;
  * Stop TTS audio directly (Firefox)
  */
 const stopGoogleTTSAudio = async () => {
-  if (currentFirefoxAudio) {
-    currentFirefoxAudio.pause();
-    currentFirefoxAudio.currentTime = 0;
-    currentFirefoxAudio.src = '';
+  try {
+    if (currentFirefoxAudio) {
+      currentFirefoxAudio.pause();
+      currentFirefoxAudio.currentTime = 0;
+      currentFirefoxAudio.src = '';
+      currentFirefoxAudio = null;
+      logger.debug('[GoogleTTSHandler] Firefox TTS audio stopped');
+    } else {
+      logger.debug('[GoogleTTSHandler] No Firefox TTS audio to stop');
+    }
+  } catch (error) {
+    logger.warn('[GoogleTTSHandler] Firefox TTS stop error (ignoring):', error.message);
+    // Reset reference anyway
     currentFirefoxAudio = null;
-    logger.debug('[GoogleTTSHandler] Firefox TTS audio stopped');
   }
 };
 

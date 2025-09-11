@@ -115,6 +115,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
@@ -228,10 +229,10 @@ onMounted(() => {
   // Register TTS instance with stop callback
   ttsGlobal.register(async () => {
     logger.debug('[PopupApp] TTS cleanup callback - stopping TTS due to popup lifecycle')
-    // Use direct message to background instead of calling stopAll() to avoid recursion
+    // Use TTS_STOP action like useTTSSmart composable does
     try {
       await sendMessage({
-        action: 'GOOGLE_TTS_STOP_ALL',
+        action: MessageActions.TTS_STOP,
         data: { source: 'popup-cleanup' }
       })
     } catch (error) {
