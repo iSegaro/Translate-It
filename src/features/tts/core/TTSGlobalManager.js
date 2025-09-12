@@ -400,7 +400,7 @@ class TTSGlobalManager {
     // Send stop message to background directly
     try {
       await browser.runtime.sendMessage({
-        action: MessageActions.GOOGLE_TTS_STOP_ALL,
+        action: MessageActions.TTS_STOP,
         data: {}
       })
       

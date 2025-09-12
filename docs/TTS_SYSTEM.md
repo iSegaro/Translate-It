@@ -94,15 +94,20 @@ const ttsLanguageFallbacks = {
 ### 4. Background & Messaging
 
 #### `messaging/core/MessageActions.js`
-The messaging system has been extended with new actions to support the enhanced controls:
+The messaging system has been optimized with unified actions to support the enhanced controls:
 - `GOOGLE_TTS_SPEAK`
 - `GOOGLE_TTS_PAUSE`
 - `GOOGLE_TTS_RESUME`
-- `TTS_STOP` (unified stop action replacing legacy GOOGLE_TTS_STOP_ALL)
+- `TTS_STOP` (unified smart stop action handling both specific and global stops)
 - `GOOGLE_TTS_GET_STATUS`
+- `GOOGLE_TTS_ENDED` (completion event for proper lifecycle management)
 
 #### `background/handlers/tts/handleGoogleTTS.js`
-The background handler has been upgraded to process the new actions, communicating with the appropriate browser-specific audio player (Offscreen for Chrome, direct audio for Firefox) to pause, resume, or stop playback.
+The background handler has been enhanced with smart stop logic and proper lifecycle management:
+- **Smart Stop Handler**: `handleGoogleTTSStopAll` now handles both specific TTS stops (with `ttsId`) and global stops (without `ttsId`)
+- **Persistent TTS ID**: `currentTTSId` now persists throughout audio playback and is only cleared when audio actually ends or is explicitly stopped
+- **Completion Event Handling**: `handleGoogleTTSEnded` ensures proper cleanup when TTS audio completes naturally
+- **Cross-Browser Audio Management**: Communicates with Offscreen documents (Chrome) or direct audio (Firefox) for precise control
 
 ## 🔄 State Management & Lifecycle Rules
 
@@ -116,6 +121,7 @@ The `TTSGlobalManager` enforces context-aware rules:
 - **Popup / Windows Manager**: TTS is automatically stopped if the component's UI is closed or hidden.
 - **Sidepanel**: TTS is allowed to persist even when the user switches to a different browser tab, as the sidepanel remains visible.
 - **Browser Close**: All TTS instances are stopped when the browser window is about to be unloaded.
+- **ID Persistence**: `currentTTSId` persists throughout audio playback duration, ensuring reliable stop functionality from any component.
 
 ## ⚠️ Error Handling and Recovery
 
@@ -177,6 +183,8 @@ The system has been enhanced to handle Chrome Manifest V3 messaging issues that 
 - **Race Condition Prevention**: Added null safety checks in offscreen audio handling
 - **Request Deduplication**: Enhanced `isProcessing` flags to prevent multiple simultaneous requests
 - **Port Messaging Fix**: Fixed ReliableMessaging to properly extract result data from port communication wrapper
+- **Smart Stop Logic**: Implemented unified `TTS_STOP` handler that differentiates between specific and global stops
+- **Persistent TTS ID Management**: Fixed `currentTTSId` lifecycle to persist during audio playback instead of being cleared prematurely
 
 ### Cross-Component Standardization
 Successfully standardized TTS functionality across all three extension components:
@@ -255,6 +263,16 @@ Successfully standardized TTS functionality across all three extension component
 **Solution**: Updated PopupApp.vue to use `MessageActions.TTS_STOP` like the unified system (TTSButton → useTTSSmart)
 **Status**: ✅ **Resolved in v2.1** - All components now use consistent TTS stop mechanism
 
+#### WindowsManager TTS Stop Button Not Working
+**Symptoms**: Clicking the TTS stop button in WindowsManager does not stop the audio, though window closure works correctly
+**Root Cause**: `currentTTSId` was being cleared prematurely in the `finally` block of the TTS speak handler, before audio actually finished playing
+**Solution**: 
+- Removed `currentTTSId` cleanup from `finally` block in `handleGoogleTTSSpeak`
+- Added `currentTTSId = null` in Firefox `audio.onended` handler
+- Created `handleGoogleTTSEnded` handler for Chrome completion events
+- Registered `GOOGLE_TTS_ENDED` message handler in LifecycleManager
+**Status**: ✅ **Resolved in v2.2** - TTS ID now persists throughout audio playback, enabling reliable stop functionality
+
 ### Debugging Tips
 
 1. **Check Extension Console**: Look for TTS-related logs with component prefixes
@@ -286,3 +304,7 @@ The unified system is considered healthy when:
 - ✅ **Error Recovery**: Failed languages automatically attempt fallback
 - ✅ **UnifiedMessaging**: Optimized timeouts (20s for TTS operations)
 - ✅ **Consistent UI**: Identical TTSButton behavior across all contexts
+- ✅ **Smart Stop Handler**: `TTS_STOP` handles both specific and global stops via `currentTTSId` matching
+- ✅ **Persistent ID Management**: `currentTTSId` persists during audio playback for reliable stop functionality
+- ✅ **Completion Event Handling**: `GOOGLE_TTS_ENDED` properly registered and handled for cleanup
+- ✅ **Cross-Browser Audio Cleanup**: Proper ID clearing in both Firefox (`onended`) and Chrome (event-driven)

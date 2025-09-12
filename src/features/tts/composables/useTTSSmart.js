@@ -273,7 +273,7 @@ export function useTTSSmart() {
     try {
       logger.debug("[useTTSSmart] Stopping all TTS instances");
       const message = {
-        action: MessageActions.GOOGLE_TTS_STOP_ALL,
+        action: MessageActions.TTS_STOP,
         data: {},
         context: 'tts-smart',
         messageId: `tts-stop-all-${Date.now()}`

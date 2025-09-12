@@ -65,15 +65,15 @@ browser.runtime.onConnect.addListener((port) => {
           }
 
           if (backgroundService.initialized) {
-            const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
+            const handler = backgroundService.messageHandler.getHandlerForMessage('TTS_STOP');
             if (handler) {
               await handler({ 
-                action: 'GOOGLE_TTS_STOP_ALL', 
+                action: 'TTS_STOP', 
                 data: { source: 'popup-port-disconnect' } 
               });
               logger.debug('[Background] TTS stopped successfully on popup close');
             } else {
-              logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+              logger.warn('[Background] No handler found for TTS_STOP');
             }
           } else {
             logger.debug('[Background] Background service not initialized, skipping TTS stop on popup close');
@@ -108,15 +108,15 @@ browser.runtime.onConnect.addListener((port) => {
           }
 
           if (backgroundService.initialized) {
-            const handler = backgroundService.messageHandler.getHandlerForMessage('GOOGLE_TTS_STOP_ALL');
+            const handler = backgroundService.messageHandler.getHandlerForMessage('TTS_STOP');
             if (handler) {
               await handler({ 
-                action: 'GOOGLE_TTS_STOP_ALL', 
+                action: 'TTS_STOP', 
                 data: { source: 'sidepanel-port-disconnect' } 
               });
               logger.debug('[Background] TTS stopped successfully on sidepanel close');
             } else {
-              logger.warn('[Background] No handler found for GOOGLE_TTS_STOP_ALL');
+              logger.warn('[Background] No handler found for TTS_STOP');
             }
           } else {
             logger.debug('[Background] Background service not initialized, skipping TTS stop on sidepanel close');

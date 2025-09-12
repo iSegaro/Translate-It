@@ -15,6 +15,7 @@ let offscreenDocumentPromise = null;
 let currentTTSRequest = null;
 let lastTTSText = null;
 let lastTTSLanguage = null;
+let currentTTSId = null;
 
 // Google TTS supported languages (major ones)
 const SUPPORTED_TTS_LANGUAGES = new Set([
@@ -125,6 +126,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     // Store current request info for deduplication
     lastTTSText = text;
     lastTTSLanguage = targetLanguage;
+    currentTTSId = message.data?.ttsId || null;
     
     // Create and store the request promise
     currentTTSRequest = (async () => {
@@ -136,8 +138,12 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
         
         logger.debug('[GoogleTTSHandler] ✅ Google TTS completed successfully');
         return { success: true, processedVia: 'background-google-tts' };
+      } catch (error) {
+        // Clear ID on error
+        currentTTSId = null;
+        throw error;
       } finally {
-        // Clear current request when done
+        // Clear current request when done, but keep currentTTSId until audio actually ends
         currentTTSRequest = null;
         lastTTSText = null;
         lastTTSLanguage = null;
@@ -153,6 +159,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     currentTTSRequest = null;
     lastTTSText = null;
     lastTTSLanguage = null;
+    currentTTSId = null;
     
     return {
       success: false,
@@ -338,6 +345,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
       audio.onended = () => {
         clearTimeout(timeout);
         currentFirefoxAudio = null; // Clear reference when ended
+        currentTTSId = null; // Clear TTS ID when audio actually ends
         logger.debug('[GoogleTTSHandler] Background Google TTS audio completed');
         resolve();
       };
@@ -368,12 +376,27 @@ const playGoogleTTSAudio = (ttsUrl) => {
  */
 export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
-    logger.debug('[GoogleTTSHandler] 🛑 Processing Google TTS Stop All request');
+    const { ttsId } = message.data || {};
+    const isSpecificStop = ttsId && ttsId !== 'all';
+    
+    logger.debug(`[GoogleTTSHandler] 🛑 Processing TTS Stop request - ${isSpecificStop ? `Specific: ${ttsId}` : 'All TTS'}`);
+    logger.debug(`[GoogleTTSHandler] 📊 Current TTS state - currentTTSId: ${currentTTSId}, isSpecificStop: ${isSpecificStop}`);
+    
+    // Check if we should stop this TTS
+    const shouldStop = !isSpecificStop || currentTTSId === ttsId;
+    
+    if (!shouldStop) {
+      logger.debug(`[GoogleTTSHandler] ⏭️ Skipping stop - requested ttsId ${ttsId} doesn't match current ${currentTTSId}`);
+      return { success: true, skipped: true, reason: 'No matching TTS instance' };
+    }
     
     // Clear any pending requests to prevent stuck states
     currentTTSRequest = null;
     lastTTSText = null;
     lastTTSLanguage = null;
+    if (!isSpecificStop) {
+      currentTTSId = null; // Only clear ID if stopping all
+    }
     
     const isChromiumBrowser = isChromium();
     
@@ -455,6 +478,29 @@ export const handleGoogleTTSResume = async (message, sender) => {
     return {
       success: false,
       error: error.message || 'Background Google TTS resume failed'
+    };
+  }
+};
+
+/**
+ * Handle Google TTS End notification
+ * @param {Object} request - Request object
+ * @returns {Promise<Object>} Response
+ */
+export const handleGoogleTTSEnded = async (message, sender) => {
+  try {
+    logger.debug('[GoogleTTSHandler] 🏁 Processing Google TTS End notification');
+    
+    // Clear the current TTS ID when audio ends
+    currentTTSId = null;
+    logger.debug('[GoogleTTSHandler] 🧹 Cleared currentTTSId on completion');
+    
+    return { success: true, action: 'cleared' };
+  } catch (error) {
+    logger.error('[GoogleTTSHandler] ❌ Google TTS end handling failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Background Google TTS end handling failed'
     };
   }
 };

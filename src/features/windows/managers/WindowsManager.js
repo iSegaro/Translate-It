@@ -9,6 +9,7 @@ import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
 import { useTTSSmart } from "@/features/tts/composables/useTTSSmart.js";
+import { TTSGlobalManager as globalTTSManager } from "@/features/tts/core/TTSGlobalManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
@@ -50,6 +51,7 @@ export class WindowsManager extends ResourceTracker {
     
     // Initialize TTS system with unified composable
     this.tts = useTTSSmart();
+    this.ttsManager = globalTTSManager;
     
     // Initialize translation business logic
     this.translationHandler = new TranslationHandler();

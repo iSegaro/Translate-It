@@ -9,6 +9,7 @@ import {
   handleGoogleTTSPause,
   handleGoogleTTSResume,
   handleGoogleTTSGetStatus,
+  handleGoogleTTSEnded,
 } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
 import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
@@ -125,10 +126,10 @@ class LifecycleManager extends ResourceTracker {
       // TTS handlers
       'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
       'TTS_STOP': handleGoogleTTSStopAll,
-      'GOOGLE_TTS_STOP_ALL': handleGoogleTTSStopAll,
       'GOOGLE_TTS_PAUSE': handleGoogleTTSPause,
       'GOOGLE_TTS_RESUME': handleGoogleTTSResume,
       'GOOGLE_TTS_GET_STATUS': handleGoogleTTSGetStatus,
+      'GOOGLE_TTS_ENDED': handleGoogleTTSEnded,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,

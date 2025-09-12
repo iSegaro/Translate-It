@@ -58,7 +58,6 @@ export class MessageActions {
   // TTS actions
   static GOOGLE_TTS_SPEAK = 'GOOGLE_TTS_SPEAK';
   static TTS_STOP = 'TTS_STOP';
-  static GOOGLE_TTS_STOP_ALL = 'GOOGLE_TTS_STOP_ALL';
   static GOOGLE_TTS_PAUSE = 'GOOGLE_TTS_PAUSE';
   static GOOGLE_TTS_RESUME = 'GOOGLE_TTS_RESUME';
   static GOOGLE_TTS_GET_STATUS = 'GOOGLE_TTS_GET_STATUS';
