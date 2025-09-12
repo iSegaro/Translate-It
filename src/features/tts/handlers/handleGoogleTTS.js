@@ -380,14 +380,20 @@ export const handleGoogleTTSStopAll = async (message, sender) => {
     const isSpecificStop = ttsId && ttsId !== 'all';
     
     logger.debug(`[GoogleTTSHandler] 🛑 Processing TTS Stop request - ${isSpecificStop ? `Specific: ${ttsId}` : 'All TTS'}`);
-    logger.debug(`[GoogleTTSHandler] 📊 Current TTS state - currentTTSId: ${currentTTSId}, isSpecificStop: ${isSpecificStop}`);
+    logger.debug(`[GoogleTTSHandler] TTS state - ID: ${currentTTSId}, specific: ${isSpecificStop}`);
     
     // Check if we should stop this TTS
     const shouldStop = !isSpecificStop || currentTTSId === ttsId;
     
     if (!shouldStop) {
-      logger.debug(`[GoogleTTSHandler] ⏭️ Skipping stop - requested ttsId ${ttsId} doesn't match current ${currentTTSId}`);
-      return { success: true, skipped: true, reason: 'No matching TTS instance' };
+      logger.debug(`[GoogleTTSHandler] Skipping stop - requested ttsId ${ttsId} doesn't match current ${currentTTSId}`);
+      return { 
+        success: true, 
+        skipped: true, 
+        reason: 'No matching TTS instance',
+        currentTTSId: currentTTSId,
+        requestedTtsId: ttsId
+      };
     }
     
     // Clear any pending requests to prevent stuck states

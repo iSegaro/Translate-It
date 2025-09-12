@@ -273,6 +273,19 @@ Successfully standardized TTS functionality across all three extension component
 - Registered `GOOGLE_TTS_ENDED` message handler in LifecycleManager
 **Status**: ✅ **Resolved in v2.2** - TTS ID now persists throughout audio playback, enabling reliable stop functionality
 
+#### WindowsManager TTS Stop Button Enhancement (v2.2)
+**Changes Implemented**: 
+- **Optimized Debug Logs**: Streamlined logging messages for better readability and reduced console noise
+- **Enhanced Error Reporting**: Added detailed debug information including current TTS ID when stop requests are skipped
+- **Improved Documentation**: Added comprehensive documentation for v2.2 changes and architecture decisions
+
+**Technical Details**:
+- Debug logs reduced from verbose emoji-heavy format to concise, readable format
+- Error responses now include `currentTTSId` for better debugging capabilities
+- Documentation updated with clear explanation of TTS ID lifecycle management
+
+**Status**: ✅ **Enhanced in v2.2.1** - Better debugging experience and improved error handling
+
 ### Debugging Tips
 
 1. **Check Extension Console**: Look for TTS-related logs with component prefixes
