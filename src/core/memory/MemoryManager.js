@@ -257,13 +257,19 @@ class MemoryManager {
    * @param {Function} cleanupFn - Function to cleanup the resource
    * @param {string} groupId - Group identifier for batch cleanup
    */
-  trackResource(resourceId, cleanupFn, groupId = 'default') {
+  trackResource(resourceId, cleanupFn, groupId = 'default', options = {}) {
     if (this.resources.has(resourceId)) {
       logger.debug(`Resource ${resourceId} already tracked`)
       return
     }
 
-    this.resources.set(resourceId, cleanupFn)
+    // Store resource info with critical flag
+    const resourceInfo = {
+      cleanupFn,
+      isCritical: options.isCritical || false
+    };
+    
+    this.resources.set(resourceId, resourceInfo)
 
     if (!this.groups.has(groupId)) {
       this.groups.set(groupId, new Set())
@@ -322,12 +328,27 @@ class MemoryManager {
       handler,
       element,
       event,
-      groupId
+      groupId,
+      isCritical: options.isCritical || false
     };
+
+    // Debug log for critical events
+    if (isDevelopment && handlerInfo.isCritical) {
+      logger.debug(`Tracking CRITICAL event listener: ${event} on ${this.getElementDescription(element)}`);
+    }
 
     // Create cleanup function
     const cleanupFn = () => {
       try {
+        // Debug log for all cleanup attempts (FORCE DEBUG FOR TESTING)
+        logger.debug(`Attempting to cleanup event listener: ${event} on ${this.getElementDescription(element)}, isCritical: ${handlerInfo.isCritical}`);
+
+        // Skip critical event listeners during cleanup
+        if (handlerInfo.isCritical) {
+          logger.debug(`Skipping critical event listener: ${event} on ${this.getElementDescription(element)}`);
+          return;
+        }
+
         // Handle custom event systems (like StorageCore with on/off methods)
         if (element && typeof element.off === 'function') {
           element.off(event, handler);
@@ -422,8 +443,17 @@ class MemoryManager {
    * @param {string} resourceId - Resource identifier
    */
   cleanupResource(resourceId) {
-    const cleanupFn = this.resources.get(resourceId)
-    if (cleanupFn) {
+    const resourceInfo = this.resources.get(resourceId)
+    if (resourceInfo) {
+      // Handle both old format (direct function) and new format (object with cleanupFn)
+      const cleanupFn = typeof resourceInfo === 'function' ? resourceInfo : resourceInfo.cleanupFn;
+      const isCritical = typeof resourceInfo === 'object' ? resourceInfo.isCritical : false;
+      
+      if (isCritical) {
+        logger.debug(`Skipping critical resource: ${resourceId}`);
+        return;
+      }
+      
       try {
         cleanupFn()
         this.resources.delete(resourceId)
@@ -795,7 +825,7 @@ class MemoryManager {
     if (!shouldEnableDebugging()) return;
     try {
       // Check if there's an active translation before cleaning up translation-related resources
-      const isTranslationActive = typeof window !== 'undefined' && window.isTranslationInProgress;
+      const isTranslationActive = typeof window !== 'undefined' && Boolean(window.isTranslationInProgress);
       
       // Cleanup all registered caches (safe to cleanup)
       this.registeredCaches.forEach(cache => {

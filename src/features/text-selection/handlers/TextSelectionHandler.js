@@ -53,7 +53,7 @@ export class TextSelectionHandler extends ResourceTracker {
       // Setup event listeners for text selection
       this.setupSelectionListeners();
       
-      // Track the manager for cleanup
+      // Track the manager for cleanup - mark as critical to prevent cleanup
       this.trackResource('text-selection-manager', () => {
         logger.debug('Cleaning up TextSelectionManager from ResourceTracker');
         if (this.textSelectionManager) {
@@ -72,7 +72,7 @@ export class TextSelectionHandler extends ResourceTracker {
           this.textSelectionManager.cleanup();
           this.textSelectionManager = null;
         }
-      });
+      }, { isCritical: true });
       
       this.isActive = true;
       logger.info('TextSelectionHandler activated successfully');
@@ -138,7 +138,7 @@ export class TextSelectionHandler extends ResourceTracker {
           url: window.location.hostname
         });
         
-        if (!this.isActive) return;
+        if (!this.isActive || !this.textSelectionManager) return;
         
         // Update preserved state first
         this.preservedState.lastDoubleClickTime = Date.now();
@@ -153,40 +153,9 @@ export class TextSelectionHandler extends ResourceTracker {
           url: window.location.hostname
         });
         
-        // Handle double-click for professional editor logic
-        if (this.textSelectionManager && typeof this.textSelectionManager.handleDoubleClick === 'function') {
+        // Handle double-click - manager guaranteed to exist due to critical protection
+        if (typeof this.textSelectionManager.handleDoubleClick === 'function') {
           this.textSelectionManager.handleDoubleClick(event);
-        } else if (!this.textSelectionManager) {
-          // If manager is missing, attempt to recreate it
-          logger.debug('Manager missing during double-click - attempting to recreate immediately');
-          
-          if (this.isActive) {
-            try {
-              this.textSelectionManager = new TextSelectionManager({
-                featureManager: this.featureManager
-              });
-              
-              // Restore preserved state
-              if (this.preservedState.lastDoubleClickTime > 0) {
-                this.textSelectionManager.lastDoubleClickTime = this.preservedState.lastDoubleClickTime;
-                this.textSelectionManager.doubleClickWindow = this.preservedState.doubleClickWindow;
-                this.textSelectionManager.doubleClickProcessing = this.preservedState.doubleClickProcessing;
-                
-                logger.debug('TextSelectionManager recreated with preserved state', {
-                  lastDoubleClickTime: this.textSelectionManager.lastDoubleClickTime,
-                  doubleClickProcessing: this.textSelectionManager.doubleClickProcessing
-                });
-              }
-              
-              // Now handle the double-click with recreated manager
-              if (typeof this.textSelectionManager.handleDoubleClick === 'function') {
-                this.textSelectionManager.handleDoubleClick(event);
-              }
-              
-            } catch (error) {
-              logger.error('Failed to recreate TextSelectionManager during double-click', error);
-            }
-          }
         }
         
         // Clear processing flag after reasonable delay to prevent deadlock
@@ -195,8 +164,8 @@ export class TextSelectionHandler extends ResourceTracker {
         }, 500);
       };
       
-      // Use capture phase to catch events before they're prevented by Google Docs
-      this.addEventListener(document, 'dblclick', doubleClickHandler, { capture: true });
+      // Use capture phase to catch events before they're prevented by Google Docs (CRITICAL)
+      this.addEventListener(document, 'dblclick', doubleClickHandler, { capture: true, critical: true });
       
       // Selection Change Strategy: Use selectionchange for better detection
       let selectionTimeout = null;
@@ -290,7 +259,7 @@ export class TextSelectionHandler extends ResourceTracker {
           clearTimeout(selectionTimeout);
         }
         selectionTimeout = setTimeout(processSelection, 50);
-      });
+      }, { critical: true });
       
       // Keyboard selection support
       this.addEventListener(document, 'keyup', (event) => {
@@ -319,23 +288,35 @@ export class TextSelectionHandler extends ResourceTracker {
         }
       });
 
-      // Mouse drag detection for principled selection handling
+      // Mouse drag detection for principled selection handling (CRITICAL)
       this.addEventListener(document, 'mousedown', (event) => {
-        if (!this.isActive || !this.textSelectionManager) return;
+        if (!this.isActive) return;
+        
+        // Manager guaranteed to exist due to critical protection, but add safety check
+        if (!this.textSelectionManager) {
+          logger.warn('Critical: TextSelectionManager unexpectedly missing in mousedown');
+          return;
+        }
         
         // Start drag detection
         this.textSelectionManager.startDragDetection(event);
         
         // Instant dismiss on mousedown for better UX
         this.textSelectionManager._onOutsideClick(event);
-      });
+      }, { critical: true });
       
       this.addEventListener(document, 'mouseup', (event) => {
-        if (!this.isActive || !this.textSelectionManager) return;
+        if (!this.isActive) return;
+        
+        // Manager guaranteed to exist due to critical protection, but add safety check
+        if (!this.textSelectionManager) {
+          logger.warn('Critical: TextSelectionManager unexpectedly missing in mouseup');
+          return;
+        }
         
         // End drag detection and process final selection
         this.textSelectionManager.endDragDetection(event);
-      });
+      }, { critical: true });
 
       logger.debug('Text selection listeners setup complete');
       
@@ -369,35 +350,6 @@ export class TextSelectionHandler extends ResourceTracker {
       isActive: this.isActive,
       hasManager: !!this.textSelectionManager
     });
-    
-    // If manager is missing but handler is active, try to recreate it
-    if (this.isActive && !this.textSelectionManager) {
-      logger.debug('Manager missing but handler active - attempting to recreate', {
-        preservedDoubleClickTime: this.preservedState.lastDoubleClickTime,
-        timeSinceLastDoubleClick: Date.now() - this.preservedState.lastDoubleClickTime
-      });
-      try {
-        this.textSelectionManager = new TextSelectionManager({
-          featureManager: this.featureManager
-        });
-        
-        // Restore preserved state
-        if (this.preservedState.lastDoubleClickTime > 0) {
-          this.textSelectionManager.lastDoubleClickTime = this.preservedState.lastDoubleClickTime;
-          this.textSelectionManager.doubleClickWindow = this.preservedState.doubleClickWindow;
-          this.textSelectionManager.doubleClickProcessing = this.preservedState.doubleClickProcessing;
-          logger.debug('Restored double-click state to recreated manager', {
-            restoredTime: this.preservedState.lastDoubleClickTime,
-            doubleClickProcessing: this.preservedState.doubleClickProcessing,
-            timeSinceDoubleClick: Date.now() - this.preservedState.lastDoubleClickTime
-          });
-        }
-        
-        logger.debug('TextSelectionManager recreated successfully with preserved state');
-      } catch (error) {
-        logger.error('Failed to recreate TextSelectionManager:', error);
-      }
-    }
     
     return this.textSelectionManager;
   }

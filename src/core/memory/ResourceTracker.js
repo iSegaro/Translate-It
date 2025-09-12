@@ -88,8 +88,14 @@ class ResourceTracker {
       this.logger.warn('Unsupported event target type:', element);
     }
 
+    // Extract critical flag from options
+    const trackingOptions = {};
+    if (options && typeof options === 'object' && options.critical) {
+      trackingOptions.isCritical = true;
+    }
+
     // Let the memory manager handle the actual resource tracking
-    this.memoryManager.trackEventListener(element, event, handler, this.groupId);
+    this.memoryManager.trackEventListener(element, event, handler, this.groupId, trackingOptions);
 
     if (shouldEnableDebugging()) {
       const resourceId = `event_${event}_${Date.now()}`;
@@ -97,11 +103,11 @@ class ResourceTracker {
     }
   }
 
-  trackResource(resourceId, cleanupFn) {
+  trackResource(resourceId, cleanupFn, options = {}) {
     if (shouldEnableDebugging()) {
       this.resources.add(resourceId);
     }
-    this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId);
+    this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId, options);
   }
 
   trackCache(cache, options = {}) {
