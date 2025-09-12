@@ -22,7 +22,7 @@
 - ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
 - ✅ **Unified Messaging System** - Race-condition-free messaging with intelligent timeout management
 - ✅ **Smart Handler Registration System** - Feature-based exclusion with dynamic handler lifecycle management and real-time settings updates
-- ✅ **Memory Garbage Collector** - Advanced memory management system preventing memory leaks with support for DOM, Browser APIs, and custom event systems
+- ✅ **Memory Garbage Collector** - Advanced memory management system preventing memory leaks with support for DOM, Browser APIs, custom event systems, and Critical Protection System
 
 ---
 
@@ -36,7 +36,7 @@
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
-- **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system preventing memory leaks
+- **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system with Critical Protection for essential resources
 
 ### Feature-Specific Documentation
 - **[Smart Handler Registration System](SMART_HANDLER_REGISTRATION_SYSTEM.md)** - Dynamic feature lifecycle management with exclusion logic
@@ -245,9 +245,9 @@ src/
 │   │   └── listeners/         # Event listeners
 │   ├── content-scripts/       # Content script entry
 │   │   └── index.js           # Content script entry
-│   ├── memory/                # Memory Garbage Collector System
-│   │   ├── MemoryManager.js   # Core memory management
-│   │   ├── ResourceTracker.js # Resource tracking mixin
+│   ├── memory/                # Memory Garbage Collector System with Critical Protection
+│   │   ├── MemoryManager.js   # Core memory management with critical resource support
+│   │   ├── ResourceTracker.js # Resource tracking mixin with critical protection
 │   │   ├── SmartCache.js      # TTL-based caching
 │   │   ├── GlobalCleanup.js   # Lifecycle cleanup hooks
 │   │   ├── MemoryMonitor.js   # Memory usage monitoring

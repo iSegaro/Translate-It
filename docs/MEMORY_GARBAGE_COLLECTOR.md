@@ -29,6 +29,7 @@ The **Memory Garbage Collector** is an advanced memory management system designe
 
 - ✅ **Multi-Event System Support**: Handles DOM, Browser APIs, and custom event systems
 - ✅ **Automatic Resource Tracking**: Tracks timers, event listeners, caches, and custom resources
+- ✅ **Critical Protection System**: Prevents cleanup of essential resources during garbage collection
 - ✅ **Smart Cleanup**: Environment-aware cleanup for service workers and content scripts
 - ✅ **Memory Monitoring**: Real-time memory usage tracking and leak detection
 - ✅ **TTL-Based Caching**: Intelligent cache management with automatic expiration
@@ -92,24 +93,33 @@ src/core/memory/
 The central coordinator that manages all resources and provides cleanup functionality.
 
 **Key Methods:**
-- `trackResource(id, cleanupFn, groupId)` - Track custom resources
+- `trackResource(id, cleanupFn, groupId, options)` - Track custom resources with critical protection
 - `trackTimer(timerId, groupId)` - Track timers
-- `trackEventListener(element, event, handler, groupId)` - Track event listeners
+- `trackEventListener(element, event, handler, groupId, options)` - Track event listeners with critical protection
 - `trackCache(cache, options, groupId)` - Track cache instances
 - `cleanupGroup(groupId)` - Cleanup resources by group
 - `getMemoryStats()` - Get memory usage statistics
+
+**Critical Protection:**
+- Resources marked with `isCritical: true` are protected from garbage collection
+- Essential event listeners (text selection, UI management) remain active
+- Critical caches and resources survive memory cleanup cycles
 
 ### ResourceTracker
 
 A mixin class that provides convenient methods for tracking resources in other classes.
 
 **Key Methods:**
-- `addEventListener(element, event, handler)` - Universal event listener tracking
+- `addEventListener(element, event, handler, options)` - Universal event listener tracking with critical support
 - `trackTimeout(callback, delay)` - Track timeouts
 - `trackInterval(callback, delay)` - Track intervals
-- `trackResource(id, cleanupFn)` - Track custom resources
+- `trackResource(id, cleanupFn, options)` - Track custom resources with critical protection
 - `trackCache(cache, options)` - Track cache instances
-- `cleanup()` - Cleanup all tracked resources
+- `cleanup()` - Cleanup all tracked resources (respects critical flags)
+
+**Critical Resource Support:**
+- `addEventListener(element, 'click', handler, { critical: true })` - Critical event listener
+- `trackResource('manager', cleanup, { isCritical: true })` - Critical resource
 
 ### SmartCache
 
@@ -184,6 +194,9 @@ class MyComponent extends ResourceTracker {
     // Track DOM event listeners
     this.addEventListener(window, 'resize', this.handleResize.bind(this))
 
+    // Track critical event listeners (protected from cleanup)
+    this.addEventListener(document, 'mousedown', this.handleClick.bind(this), { critical: true })
+
     // Track timers
     this.trackTimeout(() => {
       console.log('Timeout executed')
@@ -194,10 +207,16 @@ class MyComponent extends ResourceTracker {
       // Cleanup function
       this.disconnectAPI()
     })
+
+    // Track critical resources (protected from cleanup)
+    this.trackResource('essential-manager', () => {
+      this.manager.cleanup()
+      this.manager = null
+    }, { isCritical: true })
   }
 
   destroy() {
-    // Cleanup all tracked resources
+    // Cleanup all tracked resources (respects critical flags)
     this.cleanup()
   }
 }
@@ -312,6 +331,7 @@ The `useResourceTracker` is a Vue 3 Composition API composable that provides aut
 ### 🚀 Key Features
 
 - ✅ **Automatic Cleanup**: No manual cleanup required - uses `onUnmounted`
+- ✅ **Critical Protection Support**: Mark essential resources as critical
 - ✅ **Vue Integration**: Native Vue 3 Composition API support
 - ✅ **Zero Memory Leaks**: Prevents memory leaks in Vue components
 - ✅ **Simple API**: Drop-in replacement for manual ResourceTracker usage
@@ -417,11 +437,16 @@ Creates a new resource tracker instance with automatic cleanup.
 
 ##### `addEventListener(element, event, handler, options?)`
 
-Add event listener with automatic cleanup.
+Add event listener with automatic cleanup and optional critical protection.
 
 ```javascript
+// Regular event listener
 tracker.addEventListener(window, 'resize', handleResize)
 tracker.addEventListener(document, 'click', handleClick)
+
+// Critical event listener (protected from cleanup)
+tracker.addEventListener(document, 'mousedown', handleMouseDown, { critical: true })
+tracker.addEventListener(document, 'dblclick', handleDoubleClick, { capture: true, critical: true })
 ```
 
 ##### `trackTimeout(callback, delay)`
@@ -444,15 +469,21 @@ const intervalId = tracker.trackInterval(() => {
 }, 1000)
 ```
 
-##### `trackResource(id, cleanupFn)`
+##### `trackResource(id, cleanupFn, options?)`
 
-Add custom resource with automatic cleanup.
+Add custom resource with automatic cleanup and optional critical protection.
 
 ```javascript
+// Regular resource
 tracker.trackResource('api-connection', () => {
   // Cleanup logic
   disconnectAPI()
 })
+
+// Critical resource (protected from cleanup)
+tracker.trackResource('essential-manager', () => {
+  manager.cleanup()
+}, { isCritical: true })
 ```
 
 ##### `trackCache(cache, options?)`
@@ -634,12 +665,87 @@ The system includes comprehensive error handling:
 - **Memory Thresholds**: Alerts when memory usage exceeds limits
 - **Resource Leaks**: Detects and reports potential memory leaks
 
+## Critical Protection System
+
+### Overview
+
+The Critical Protection System prevents essential resources from being cleaned up during garbage collection cycles, ensuring stable operation of core functionality.
+
+### Features
+
+- **Event Listener Protection**: Critical event listeners survive memory cleanup
+- **Resource Protection**: Essential managers and components remain active
+- **Cache Protection**: Important caches are preserved during cleanup
+- **Backward Compatibility**: Existing code works without modification
+
+### Usage Examples
+
+#### Critical Event Listeners
+```javascript
+// Text selection handlers - must survive cleanup
+this.addEventListener(document, 'mousedown', handler, { critical: true })
+this.addEventListener(document, 'selectionchange', handler, { critical: true })
+this.addEventListener(document, 'dblclick', handler, { capture: true, critical: true })
+```
+
+#### Critical Resources
+```javascript
+// Essential managers - must survive cleanup
+this.trackResource('text-selection-manager', () => {
+  if (this.textSelectionManager) {
+    this.textSelectionManager.cleanup()
+    this.textSelectionManager = null
+  }
+}, { isCritical: true })
+```
+
+#### Critical Caches
+```javascript
+// Important caches - must survive cleanup
+this.trackCache(settingsCache, { isCritical: true })
+this.trackCache(providerCache, { isCritical: true })
+```
+
+### When to Use Critical Protection
+
+**Use for:**
+- Essential UI event handlers (text selection, drag detection)
+- Core system managers (TextSelectionManager, WindowsManager)
+- Configuration caches (settings, provider configs)
+- Critical timers (polling, health checks)
+
+**Don't use for:**
+- Temporary event listeners (modal interactions, tooltips)
+- One-time operations (API calls, animations)
+- Debug/development resources
+- Non-essential features
+
+### Implementation Details
+
+Critical resources are tracked with metadata:
+```javascript
+// MemoryManager storage structure
+const resourceInfo = {
+  cleanupFn: () => { /* cleanup logic */ },
+  isCritical: true  // Protected from cleanup
+}
+```
+
+During cleanup, the system checks the `isCritical` flag:
+```javascript
+if (resourceInfo.isCritical) {
+  logger.debug(`Skipping critical resource: ${resourceId}`)
+  return // Skip cleanup
+}
+```
+
 ## Performance Considerations
 
 - **WeakMap Usage**: Memory-efficient storage for event listeners
 - **Batch Cleanup**: Efficient group-based resource cleanup
 - **Lazy Initialization**: Components initialized only when needed
 - **Minimal Overhead**: Lightweight tracking with minimal performance impact
+- **Critical Protection**: Zero performance impact - simple flag checking
 
 ## Lifecycle Management
 
@@ -681,20 +787,21 @@ window.addEventListener('beforeunload', () => {
 ## API Reference
 
 ### MemoryManager API
-- `trackResource(id, cleanupFn, groupId?)`
+- `trackResource(id, cleanupFn, groupId?, options?)` - Options: `{ isCritical: boolean }`
 - `trackTimer(timerId, groupId?)`
-- `trackEventListener(element, event, handler, groupId?)`
+- `trackEventListener(element, event, handler, groupId?, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?, groupId?)`
-- `cleanupGroup(groupId)`
+- `cleanupGroup(groupId)` - Respects critical protection
+- `cleanupResource(resourceId)` - Skips critical resources
 - `getMemoryStats()`
 
 ### ResourceTracker API
-- `addEventListener(element, event, handler)`
+- `addEventListener(element, event, handler, options?)` - Options: `{ critical: boolean, ...DOMOptions }`
 - `trackTimeout(callback, delay)`
 - `trackInterval(callback, delay)`
-- `trackResource(id, cleanupFn)`
+- `trackResource(id, cleanupFn, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?)`
-- `cleanup()`
+- `cleanup()` - Respects critical protection
 - `getStats()`
 
 ### SmartCache API

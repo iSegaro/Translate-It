@@ -18,7 +18,7 @@
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
 - **Logging System**: سیستم log ساختارمند
 - **UI Host System**: اپلیکیشن متمرکز Vue برای مدیریت تمام UIهای درون-صفحه در Shadow DOM
-- **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته برای جلوگیری از memory leaks با پشتیبانی از DOM، Browser APIs و سیستم‌های event سفارشی
+- **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته با Critical Protection System برای جلوگیری از memory leaks و حفظ منابع حیاتی
 - **Smart Handler Registration**: سیستم ثبت handler های هوشمند با فعال‌سازی و غیرفعال‌سازی پویا بر اساس تنظیمات و URL exclusion
 
 ## روش‌های ترجمه
@@ -84,7 +84,7 @@
 - **`src/core/`**: زیرساخت اصلی
   - `background/` - service worker، handlers، lifecycle
   - `content-scripts/` - اسکریپت‌های محتوا
-  - `memory/` - سیستم Memory Garbage Collector پیشرفته (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
+  - `memory/` - سیستم Memory Garbage Collector پیشرفته با Critical Protection (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
   - `managers/` - **FeatureManager** برای مدیریت چرخه حیات handler ها و TextSelectionManager
 
 ### 🛠️ Pure Utilities (ساده‌سازی شده)
@@ -109,7 +109,7 @@
 - **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
 - **`docs/STORAGE_MANAGER.md`**: مدیریت storage با caching
 - **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
-- **`docs/MEMORY_GARBAGE_COLLECTOR.md`**: سیستم مدیریت حافظه پیشرفته و جلوگیری از memory leaks
+- **`docs/MEMORY_GARBAGE_COLLECTOR.md`**: سیستم مدیریت حافظه پیشرفته با Critical Protection System
 
 ### مستندات ویژگی‌ها  
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host
@@ -160,5 +160,5 @@
 - **Polyfill**: webextension-polyfill برای سازگاری
 - **Modern Architecture**: Feature-based با Smart Handler Registration System
 - **Dynamic Feature Management**: سیستم FeatureManager برای مدیریت چرخه حیات handlers
-- **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector یکپارچه
+- **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector با Critical Protection System یکپارچه
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با حذف 600+ خط کد تکراری، fallback زبان خودکار (فارسی→عربی)، و هماهنگی کامل بین تمام contexts
