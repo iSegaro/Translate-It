@@ -52,7 +52,7 @@ class MessageHandler {
 
     if (handler) {
       logger.debug(`Handler found for action: ${action}`);
-      const result = handler(normalizedMessage, sender);
+      const result = handler(normalizedMessage, sender, sendResponse);
 
       if (result instanceof Promise) {
         logger.debug(`Promise-based handler for ${action}. Waiting for resolution.`);
