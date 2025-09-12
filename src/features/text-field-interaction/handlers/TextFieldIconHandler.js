@@ -42,13 +42,13 @@ export class TextFieldIconHandler extends ResourceTracker {
       // Setup event listeners for text field interactions
       this.setupTextFieldListeners();
       
-      // Track the manager for cleanup
+      // Track the manager for cleanup - mark as critical to prevent cleanup
       this.trackResource('text-field-icon-manager', () => {
         if (this.textFieldIconManager) {
           this.textFieldIconManager.cleanup();
           this.textFieldIconManager = null;
         }
-      });
+      }, { isCritical: true });
       
       this.isActive = true;
       getLogger().info('TextFieldIconHandler activated successfully');
@@ -128,7 +128,13 @@ export class TextFieldIconHandler extends ResourceTracker {
     try {
       // Focus handler - show icon when text field is focused
       this.focusHandler = (event) => {
-        if (!this.isActive || !this.textFieldIconManager) return;
+        if (!this.isActive) return;
+        
+        // Manager guaranteed to exist due to critical protection, but add safety check
+        if (!this.textFieldIconManager) {
+          getLogger().warn('Critical: TextFieldIconManager unexpectedly missing in focus handler');
+          return;
+        }
         
         const element = event.target;
         if (this.textFieldIconManager.isEditableElement(element)) {
@@ -145,7 +151,13 @@ export class TextFieldIconHandler extends ResourceTracker {
 
       // Blur handler - hide icon when text field loses focus
       this.blurHandler = (event) => {
-        if (!this.isActive || !this.textFieldIconManager) return;
+        if (!this.isActive) return;
+        
+        // Manager guaranteed to exist due to critical protection, but add safety check
+        if (!this.textFieldIconManager) {
+          getLogger().warn('Critical: TextFieldIconManager unexpectedly missing in blur handler');
+          return;
+        }
         
         const element = event.target;
         if (this.textFieldIconManager.isEditableElement(element)) {
@@ -162,7 +174,13 @@ export class TextFieldIconHandler extends ResourceTracker {
 
       // Input handler - update icon position if needed on content changes
       this.inputHandler = (event) => {
-        if (!this.isActive || !this.textFieldIconManager) return;
+        if (!this.isActive) return;
+        
+        // Manager guaranteed to exist due to critical protection, but add safety check
+        if (!this.textFieldIconManager) {
+          getLogger().warn('Critical: TextFieldIconManager unexpectedly missing in input handler');
+          return;
+        }
         
         const element = event.target;
         if (this.textFieldIconManager.isEditableElement(element)) {
@@ -176,19 +194,19 @@ export class TextFieldIconHandler extends ResourceTracker {
         }
       };
 
-      // Register event listeners with capture to catch events early
-      this.addEventListener(document, 'focusin', this.focusHandler, { capture: true });
-      this.addEventListener(document, 'focusout', this.blurHandler, { capture: true });
-      this.addEventListener(document, 'input', this.inputHandler, { capture: true });
+      // Register critical event listeners - these must survive memory cleanup
+      this.addEventListener(document, 'focusin', this.focusHandler, { capture: true, critical: true });
+      this.addEventListener(document, 'focusout', this.blurHandler, { capture: true, critical: true });
+      this.addEventListener(document, 'input', this.inputHandler, { capture: true, critical: true });
       
-      // Also listen for resize events to update positions
+      // Also listen for resize events to update positions (critical for UI stability)
       this.addEventListener(window, 'resize', () => {
         if (this.textFieldIconManager) {
           this.textFieldIconManager.forceUpdateAllPositions();
         }
-      });
+      }, { critical: true });
 
-      // Listen for scroll events to update positions
+      // Listen for scroll events to update positions (critical for UI stability)
       this.addEventListener(document, 'scroll', () => {
         if (this.textFieldIconManager) {
           clearTimeout(this.scrollUpdateTimeout);
@@ -196,7 +214,7 @@ export class TextFieldIconHandler extends ResourceTracker {
             this.textFieldIconManager.forceUpdateAllPositions();
           }, 100);
         }
-      }, { passive: true });
+      }, { passive: true, critical: true });
 
       // Track timeouts for cleanup
       this.trackResource('position-update-timeout', () => {
