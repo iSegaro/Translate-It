@@ -56,6 +56,10 @@ export class TextSelectionManager extends ResourceTracker {
     this.lastProcessedTime = 0;
     this.selectionProcessingCooldown = 1000; // 1 second cooldown
     
+    // Track double-click context to prevent duplicate icon creation
+    this.lastDoubleClickText = null;
+    this.lastDoubleClickPosition = null;
+    
     // Store last valid position for recovery when selection is cleared
     this.lastValidPosition = null;
     
@@ -528,9 +532,9 @@ export class TextSelectionManager extends ResourceTracker {
         }
 
         // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
-        //    - برای حالت آیکون (onClick)، تأخیر کمتر (10ms)
+        //    - برای حالت آیکون (onClick)، تأخیر برای جلوگیری از مشکل دابل‌کلیک (300ms)
         //    - برای حالت پنجره فوری (immediate)، تأخیر پیش‌فرض (250ms)
-        const delay = selectionTranslationMode === "onClick" ? 10 : 250;
+        const delay = selectionTranslationMode === "onClick" ? 300 : 250;
 
         this.selectionTimeoutId = this.trackTimeout(() => {
           this.selectionTimeoutId = null;
@@ -977,6 +981,15 @@ export class TextSelectionManager extends ResourceTracker {
     this.lastDoubleClickTime = Date.now();
     this.doubleClickProcessing = true;
     
+    // Clear previous double-click tracking after timeout
+    if (this.doubleClickCleanupTimeout) {
+      clearTimeout(this.doubleClickCleanupTimeout);
+    }
+    this.doubleClickCleanupTimeout = setTimeout(() => {
+      this.lastDoubleClickText = null;
+      this.lastDoubleClickPosition = null;
+    }, 1000);
+    
     // Capture selection immediately to avoid interference
     const immediateText = await selectionDetector.detect(event.target);
     
@@ -1000,11 +1013,13 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
+        // Store double-click context for duplicate detection
+        this.lastDoubleClickText = selectedText;
+        
         // Force process the selection with calculated position
         await this.processSelectedText(selectedText, event, { isFromDoubleClick: true });
         
-        // Clear flags after successful processing
-        this.doubleClickProcessing = false;
+        // Don't clear flag here - let the main timeout handle it
         return true;
       } else if (immediateText && immediateText.trim() && attempt === 1) {
         // Use immediate capture if delayed capture fails
@@ -1015,10 +1030,12 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
+        // Store double-click context for duplicate detection
+        this.lastDoubleClickText = immediateText;
+        
         await this.processSelectedText(immediateText, event, { isFromDoubleClick: true });
         
-        // Clear flags after successful processing
-        this.doubleClickProcessing = false;
+        // Don't clear flag here - let the main timeout handle it
         return true;
       } else if (attempt < maxAttempts) {
         // Try again with adaptive delay based on field type
@@ -1045,10 +1062,10 @@ export class TextSelectionManager extends ResourceTracker {
     // Start with initial delay for complex editors
     setTimeout(() => handleSelection(1), initialDelay);
     
-    // Clear processing flag after maximum possible delay to prevent deadlock
+    // Clear processing flag after reasonable delay
     setTimeout(() => {
       this.doubleClickProcessing = false;
-    }, 500);
+    }, 300);
   }
 
   /**
@@ -1231,6 +1248,12 @@ export class TextSelectionManager extends ResourceTracker {
       this.selectionTimeoutId = null;
     }
     
+    // Clear double-click cleanup timeout
+    if (this.doubleClickCleanupTimeout) {
+      clearTimeout(this.doubleClickCleanupTimeout);
+      this.doubleClickCleanupTimeout = null;
+    }
+    
     
     // Call ResourceTracker cleanup for automatic resource management
     super.cleanup();
@@ -1316,6 +1339,16 @@ export class TextSelectionManager extends ResourceTracker {
     }
 
     // For selectionchange events, always use timeout-based processing (no immediate processing)
+    
+    // Check if this selection matches recent double-click to prevent duplicate icon creation
+    if (this.lastDoubleClickText && selectedText === this.lastDoubleClickText) {
+      const timeSinceDoubleClick = Date.now() - this.lastDoubleClickTime;
+      if (timeSinceDoubleClick < 500) { // Within 500ms of double-click
+        this.logger.debug('Skipping duplicate selectionchange processing - matches recent double-click');
+        return;
+      }
+    }
+    
     // Check if we should process this text selection based on settings
     const shouldProcess = await this.shouldProcessTextSelection(event);
     if (!shouldProcess) {
