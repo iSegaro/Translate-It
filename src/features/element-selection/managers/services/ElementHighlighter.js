@@ -46,6 +46,37 @@ export class ElementHighlighter extends ResourceTracker {
       return true;
     }
     
+    // Check if element is inside our Shadow DOM (content-app-container)
+    let currentElement = element;
+    while (currentElement) {
+      if (currentElement.classList && currentElement.classList.contains('content-app-container')) {
+        return true;
+      }
+      
+      // Check if we've reached the shadow root host
+      if (currentElement.host) {
+        // Check if the shadow root host has translate-it ID
+        if (currentElement.host.id && currentElement.host.id.includes('translate-it')) {
+          return true;
+        }
+      }
+      
+      // Move up to parent, but handle Shadow DOM boundary
+      currentElement = currentElement.parentElement || currentElement.parentNode?.host;
+    }
+    
+    // Check for Vue Sonner toast elements  
+    if (element.hasAttribute('data-sonner-toaster') ||
+        element.hasAttribute('data-sonner-toast') ||
+        element.hasAttribute('data-button') ||
+        element.hasAttribute('data-action') ||
+        element.closest('[data-sonner-toaster]') ||
+        element.closest('[data-sonner-toast]') ||
+        element.closest('[data-button]') ||
+        element.closest('button[data-action]')) {
+      return true;
+    }
+    
     return false;
   }
 

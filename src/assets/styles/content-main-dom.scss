@@ -15,6 +15,23 @@ html.AIWritingCompanion-disable-links body * {
   cursor: crosshair !important;
 }
 
+// Exception: Keep normal cursor for notification elements (Vue Sonner) and prevent select element interaction
+html.AIWritingCompanion-disable-links [data-sonner-toaster],
+html.AIWritingCompanion-disable-links [data-sonner-toaster] *,
+html.AIWritingCompanion-disable-links [data-sonner-toast],
+html.AIWritingCompanion-disable-links [data-sonner-toast] *,
+html.AIWritingCompanion-disable-links .sonner-toaster,
+html.AIWritingCompanion-disable-links .sonner-toaster *,
+html.AIWritingCompanion-disable-links .sonner-toast,
+html.AIWritingCompanion-disable-links .sonner-toast *,
+html.AIWritingCompanion-disable-links .content-app-container,
+html.AIWritingCompanion-disable-links .content-app-container * {
+  cursor: auto !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
 // Disable pointer events on interactive elements to prevent navigation - Maximum specificity
 html.AIWritingCompanion-disable-links a,
 html.AIWritingCompanion-disable-links button,

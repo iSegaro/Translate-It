@@ -17,20 +17,23 @@ export default class NotificationManager extends ResourceTracker {
    * Shows a notification.
    *
    * @param {string} message The message to display.
-   * @param {('error'|'warning'|'success'|'info'|'status'|'revert')} [type='info'] The type of notification.
-   * @param {number|null} [duration=4000] The duration in ms.
+   * @param {('error'|'warning'|'success'|'info'|'status'|'revert'|'select-element')} [type='info'] The type of notification.
+   * @param {number|null} [duration=4000] The duration in ms. Use Infinity for persistent notifications.
+   * @param {Object} [options={}] Additional options for the notification.
+   * @param {boolean} [options.persistent=false] Whether the notification should be persistent.
+   * @param {Array} [options.actions=[]] Array of action objects {label, eventName}.
    * @returns {string} A unique ID for the notification.
    */
-  show(message, type = 'info', duration = 4000) {
+  show(message, type = 'info', duration = 4000, options = {}) {
     const toastId = `${type}-${Date.now()}`;
     
     const detail = {
       id: toastId,
       message,
       type,
-      duration,
-      // onClick cannot be passed through the event bus, this would need a more complex implementation
-      // if click handlers are required from non-Vue modules.
+      duration: options.persistent ? Infinity : duration,
+      persistent: options.persistent || false,
+      actions: options.actions || []
     };
 
     pageEventBus.emit('show-notification', detail);
@@ -51,6 +54,44 @@ export default class NotificationManager extends ResourceTracker {
    */
   dismissAll() {
     pageEventBus.emit('dismiss_all_notifications');
+  }
+
+  /**
+   * Shows a persistent Select Element mode notification with Cancel button.
+   * @param {boolean} translationInProgress - Whether translation is currently in progress
+   * @returns {string} The notification ID.
+   */
+  showSelectElementNotification(translationInProgress = false) {
+    // Use a unified message that works for both selection and translation phases
+    const message = "Click on an element to translate it. Press ESC or click Cancel to exit.";
+    
+    const actions = [
+      { label: "Cancel", eventName: "cancel-select-element-mode" }
+    ];
+    
+    return this.show(message, 'select-element', 4000, {
+      persistent: true,
+      actions: actions
+    });
+  }
+
+  /**
+   * Updates the Select Element notification message for translation in progress
+   * @param {string} notificationId - The notification ID to update
+   */
+  updateSelectElementNotificationForTranslation(notificationId) {
+    // Don't create a new notification, just keep the existing one
+    // The user can still see the "Click Cancel to stop" functionality
+    // and the notification will be dismissed when translation completes
+    return notificationId;
+  }
+
+  /**
+   * Dismisses the Select Element notification by type.
+   */
+  dismissSelectElementNotification() {
+    // Since we don't store the specific ID, we'll emit a specific event
+    pageEventBus.emit('dismiss-select-element-notification');
   }
 
   cleanup() {

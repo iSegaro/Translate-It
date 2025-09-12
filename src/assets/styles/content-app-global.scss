@@ -8,3 +8,28 @@
 
 // Import vue-sonner styles for notifications
 @import 'vue-sonner/style.css';
+
+// Override cursor for notification elements to prevent select element interference
+[data-sonner-toaster],
+[data-sonner-toaster] *,
+[data-sonner-toast], 
+[data-sonner-toast] *,
+.sonner-toaster,
+.sonner-toaster *,
+.sonner-toast,
+.sonner-toast *,
+[data-testid="toaster"],
+[data-testid="toaster"] *,
+li[data-sonner-toast],
+li[data-sonner-toast] *,
+div[data-sonner-toast],
+div[data-sonner-toast] * {
+  cursor: auto !important;
+  pointer-events: auto !important;
+}
+
+// Force auto cursor for all children of content-app-container 
+.content-app-container,
+.content-app-container * {
+  cursor: auto !important;
+}

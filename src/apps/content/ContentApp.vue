@@ -4,7 +4,18 @@
     <!--{{ $t('app_welcome') }} -->
     
     <!-- This will host all in-page UI components -->
-    <Toaster rich-colors />
+    <Toaster 
+      rich-colors 
+      position="top-center"
+      expand
+      :toastOptions="{ 
+        style: { 
+          pointerEvents: 'auto',
+          cursor: 'auto',
+          zIndex: 2147483647
+        }
+      }"
+    />
     <TextFieldIcon
       v-for="icon in activeIcons"
       :key="icon.id"
@@ -132,6 +143,62 @@ onMounted(() => {
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
 
+  // Setup Shadow DOM click listener to intercept notification clicks
+  const shadowClickHandler = (event) => {
+    const target = event.target;
+    
+    // Get the path of elements from target to root
+    const path = event.composedPath ? event.composedPath() : [target];
+    
+    logger.debug('Shadow DOM click detected:', {
+      tagName: target.tagName,
+      className: target.className,
+      textContent: target.textContent?.slice(0, 20),
+      hasDataButton: target.hasAttribute('data-button'),
+      hasDataAction: target.hasAttribute('data-action'),
+      pathLength: path.length,
+      pathElements: path.slice(0, 5).map(el => el.tagName || el.constructor.name)
+    });
+
+    // Check if click is within any toast notification (more specific check)
+    const isInToast = path.some(element => {
+      if (!element.hasAttribute) return false;
+      return (
+        element.hasAttribute('data-sonner-toast') ||
+        element.hasAttribute('data-sonner-toaster') ||
+        (element.classList && (
+          element.classList.contains('sonner-toast') ||
+          element.classList.contains('sonner-toaster')
+        ))
+      );
+    });
+
+    // Only prevent clicks that are actually within toast notifications
+    if (isInToast) {
+      logger.info('Click detected within toast notification - preventing element selection');
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      // Check if it's specifically a Cancel action
+      const isCancelButton = path.some(element => {
+        return element.textContent && element.textContent.includes('Cancel');
+      });
+      
+      if (isCancelButton) {
+        logger.info('Cancel button clicked - triggering cancellation');
+        pageEventBus.emit('cancel-select-element-mode');
+      }
+      
+      return false;
+    }
+    
+    // For all other clicks, let them pass through normally
+  };
+
+  // Add click listener to shadow DOM
+  document.addEventListener('click', shadowClickHandler, { capture: true });
+
   const toastMap = {
     error: toast.error,
     warning: toast.warning,
@@ -139,6 +206,7 @@ onMounted(() => {
     info: toast.info,
     status: toast.loading,
     revert: toast,
+    'select-element': toast.info,
   };
 
   // Use a global Set to prevent duplicate notifications
@@ -175,9 +243,31 @@ onMounted(() => {
       });
     }
     
-    const { id, message, type, duration } = detail;
+    const { id, message, type, duration, actions, persistent } = detail;
     const toastFn = toastMap[type] || toast.info;
-    toastFn(message, { id, duration });
+    
+    const toastOptions = { 
+      id, 
+      duration: persistent ? Infinity : duration
+    };
+    
+    // Add action buttons if provided
+    if (actions && actions.length > 0) {
+      toastOptions.action = {
+        label: actions[0].label,
+        onClick: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          
+          logger.debug('Toast action clicked:', actions[0].eventName);
+          pageEventBus.emit(actions[0].eventName);
+          toast.dismiss(id);
+        }
+      };
+    }
+    
+    toastFn(message, toastOptions);
   });
 
   pageEventBus.on('dismiss_notification', (detail) => {
@@ -190,10 +280,22 @@ onMounted(() => {
     toast.dismiss();
   });
 
+  pageEventBus.on('dismiss-select-element-notification', () => {
+    logger.info('Received dismiss-select-element-notification event');
+    // Dismiss all select-element type notifications
+    const selectElementNotifications = Array.from(window.translateItShownNotifications || [])
+      .filter(key => key.startsWith('select-element-'));
+    selectElementNotifications.forEach(key => {
+      const id = key.split('-').slice(0, 3).join('-'); // Extract the ID part
+      toast.dismiss(id);
+    });
+  });
+
   // Test event to confirm communication
   pageEventBus.on('ui-host-mounted', () => {
     logger.info('Successfully received the ui-host-mounted test event!');
   });
+
 
   // Listen for Select Element Mode changes
   pageEventBus.on('select-mode-activated', () => {

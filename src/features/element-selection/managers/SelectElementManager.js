@@ -9,6 +9,7 @@ import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 // Import services
 import { ElementHighlighter } from "./services/ElementHighlighter.js";
@@ -28,6 +29,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     this.isActive = false;
     this.isProcessingClick = false;
     this.isHighlightingEnabled = true;
+    this.selectElementNotificationId = null;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElement');
     
     // Debug instance creation
@@ -47,6 +49,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     this.translationOrchestrator = new TranslationOrchestrator(this.stateManager);
     this.modeManager = new ModeManager();
     this.errorHandlingService = new ErrorHandlingService();
+    this.notificationManager = new NotificationManager();
     
     // Track services as resources for proper cleanup
     this.trackResource('state-manager', () => this.stateManager?.cleanup());
@@ -55,6 +58,7 @@ export class SelectElementManagerNew extends ResourceTracker {
     this.trackResource('translation-orchestrator', () => this.translationOrchestrator?.cleanup());
     this.trackResource('mode-manager', () => this.modeManager?.cleanup());
     this.trackResource('error-handling-service', () => this.errorHandlingService?.cleanup());
+    this.trackResource('notification-manager', () => this.notificationManager?.cleanup());
     
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
@@ -80,6 +84,7 @@ export class SelectElementManagerNew extends ResourceTracker {
       await this.errorHandlingService.initialize();
       
       this.setupCrossFrameDeactivation();
+      this.setupNotificationEventListeners();
       
       this.logger.debug("SelectElementManager.initialize() completed");
     } catch (error) {
@@ -91,6 +96,37 @@ export class SelectElementManagerNew extends ResourceTracker {
 
   setupKeyboardListeners() {
     this.modeManager.setupKeyboardListeners();
+  }
+
+  setupNotificationEventListeners() {
+    // Listen for cancel select element mode event from notification
+    pageEventBus.on('cancel-select-element-mode', () => {
+      this.logger.debug('Cancel select element mode requested from notification');
+      this.handleCancelFromNotification();
+    });
+    
+    this.logger.debug("Notification event listeners setup complete");
+  }
+
+  handleCancelFromNotification() {
+    this.logger.operation('Cancelling Select Element mode from notification button');
+    
+    // Immediately deactivate to prevent any handleClick from running
+    this.isActive = false;
+    
+    // Then call forceDeactivate for cleanup
+    this.forceDeactivate();
+  }
+
+  dismissSelectElementNotification() {
+    if (this.selectElementNotificationId) {
+      this.logger.debug('Dismissing Select Element notification', { notificationId: this.selectElementNotificationId });
+      this.notificationManager.dismiss(this.selectElementNotificationId);
+      this.selectElementNotificationId = null;
+    } else {
+      // Fallback: dismiss all select-element notifications
+      this.notificationManager.dismissSelectElementNotification();
+    }
   }
 
   /**
@@ -133,6 +169,9 @@ export class SelectElementManagerNew extends ResourceTracker {
     this.isActive = false;
     this.isProcessingClick = false;
     window.isTranslationInProgress = false;
+    
+    // Dismiss select element notification
+    this.dismissSelectElementNotification();
     
     pageEventBus.emit('select-mode-deactivated');
     // Remove event listeners immediately
@@ -206,6 +245,10 @@ export class SelectElementManagerNew extends ResourceTracker {
     });
     pageEventBus.emit('select-mode-activated');
     this.isActive = true;
+    
+    // Show select element notification
+    this.selectElementNotificationId = this.notificationManager.showSelectElementNotification();
+    this.logger.debug('Select Element notification shown', { notificationId: this.selectElementNotificationId });
     this.isHighlightingEnabled = true;
     this.abortController = new AbortController();
     
@@ -297,16 +340,55 @@ export class SelectElementManagerNew extends ResourceTracker {
   }
 
   async handleClick(event) {
+    // Get the path of elements from target to root
+    const path = event.composedPath ? event.composedPath() : [event.target];
+    
     this.logger.operation("SelectElementManager handleClick called", { 
       target: event.target.tagName,
       isActive: this.isActive,
       isProcessingClick: this.isProcessingClick,
+      targetClasses: event.target.className,
+      targetText: event.target.textContent?.slice(0, 50),
+      pathLength: path.length,
+      pathElements: path.slice(0, 3).map(el => el.tagName || 'Unknown')
     });
 
     if (!this.isActive || this.isProcessingClick) {
       this.logger.debug("SelectElementManager handleClick ignored (already processing or inactive)", {
         isActive: this.isActive,
         isProcessingClick: this.isProcessingClick
+      });
+      return;
+    }
+    
+    // Check if click is within any toast notification using event path (more specific)
+    const isInToast = path.some(element => {
+      if (!element.hasAttribute) return false;
+      return (
+        element.hasAttribute('data-sonner-toast') ||
+        element.hasAttribute('data-sonner-toaster') ||
+        (element.classList && (
+          element.classList.contains('sonner-toast') ||
+          element.classList.contains('sonner-toaster')
+        ))
+      );
+    });
+
+    // Only check for Cancel if we're actually in a toast
+    const isCancelButton = isInToast && path.some(element => {
+      return element.textContent && element.textContent.includes('Cancel');
+    });
+
+    if (isInToast) {
+      this.logger.debug('Notification element detected, ignoring click', {
+        isInToast,
+        isCancelButton,
+        targetText: event.target.textContent?.slice(0, 20),
+        pathElements: path.slice(0, 3).map(el => ({
+          tag: el.tagName || 'Unknown',
+          text: el.textContent?.slice(0, 20),
+          attributes: el.hasAttribute ? Array.from(el.attributes || []).map(a => a.name) : []
+        }))
       });
       return;
     }
@@ -322,13 +404,19 @@ export class SelectElementManagerNew extends ResourceTracker {
     this.logger.debug("Disabling selection UI immediately after click");
     await this.deactivateSelectionUIOnly();
     pageEventBus.emit('clear-all-highlights');
+    
+    // DON'T dismiss select element notification yet - keep it for cancellation during translation
 
     try {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
       if (originalTextsMap.size === 0) {
+        
         this.logger.operation("No text found in element, deactivating selection mode.", {
           elementTag: element.tagName,
         });
+        
+        // Dismiss select element notification first
+        this.dismissSelectElementNotification();
         
         pageEventBus.emit('show-notification', {
           message: "No text found to translate.",
@@ -342,6 +430,10 @@ export class SelectElementManagerNew extends ResourceTracker {
         this.logger.debug("this.deactivate() completed");
         return;
       }
+
+      // Update notification to show translation in progress
+      this.selectElementNotificationId = this.notificationManager.updateSelectElementNotificationForTranslation(this.selectElementNotificationId);
+      this.logger.debug('Select Element notification updated for translation', { notificationId: this.selectElementNotificationId });
 
       this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes)
         .catch(async (error) => {
@@ -370,7 +462,8 @@ export class SelectElementManagerNew extends ResourceTracker {
         this.logger.debug("Translation process failed (error already handled)", error.message);
       }
       
-      // Reset state on error
+      // Reset state on error and dismiss notification
+      this.dismissSelectElementNotification();
       this.isProcessingClick = false;
       window.isTranslationInProgress = false;
     }
@@ -559,6 +652,9 @@ export class SelectElementManagerNew extends ResourceTracker {
 
   performPostTranslationCleanup() {
     this.logger.debug("Performing post-translation cleanup");
+    
+    // Dismiss select element notification
+    this.dismissSelectElementNotification();
     
     // Clear any remaining highlights (redundant but safe)
     pageEventBus.emit('clear-all-highlights');
