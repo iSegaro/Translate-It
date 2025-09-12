@@ -136,6 +136,14 @@ export class TranslationOrchestrator extends ResourceTracker {
         return;
       }
 
+      // CACHE FIX: Also handle mixed case where some translations are cached
+      if (cachedTranslations.size > 0) {
+        this.logger.info("Found partial cached translations, applying cached ones first");
+        // Apply cached translations immediately
+        this.applyTranslationsToNodes(textNodes, cachedTranslations);
+        this.stateManager.addTranslatedElement(element, cachedTranslations);
+      }
+
       if (textsToTranslate.length === 0) {
         this.logger.info("No new texts to translate.");
         // Dismiss the status notification since there's nothing to translate
@@ -361,6 +369,11 @@ this.translationRequests.delete(messageId);
             const translationMap = new Map([[originalText, translatedText]]);
             this.applyTranslationsToNodes(nodesToUpdate, translationMap);
             request.translatedSegments.set(expandedIndex, translatedText);
+            
+            // CACHE FIX: Store streaming translations in the global cache for future retrieval
+            const { getTranslationCache } = await import("../../../../utils/text/extraction.js");
+            const translationCache = getTranslationCache();
+            translationCache.set(originalText, translatedText);
         }
     }
   }
