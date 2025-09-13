@@ -18,6 +18,7 @@ import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 
 // Import Feature Manager for smart handler registration
 import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Import Field Detection System for global availability
 import { fieldDetector } from '@/utils/text/FieldDetector.js';
@@ -34,14 +35,28 @@ setupTrustedTypesCompatibility();
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
 
+// Global extension context validation helper
+function validateExtensionContext(operation = 'unknown') {
+  if (!ExtensionContextManager.isValidSync()) {
+    logger.debug(`Extension context invalid - ${operation} skipped`);
+    return false;
+  }
+  return true;
+}
+
 
 /**
  * Legacy initialization fallback
  * Used when FeatureManager fails to initialize
  */
 async function initializeLegacyHandlers() {
+  // Validate extension context before legacy initialization
+  if (!validateExtensionContext('legacy-initialization')) {
+    return;
+  }
+
   logger.warn('Initializing legacy handlers as fallback...');
-  
+
   try {
     // Legacy initialization is now handled by FeatureManager
     // Import only what's needed for backward compatibility
@@ -83,7 +98,12 @@ async function initializeLegacyHandlers() {
     logger.info('Legacy handlers initialized successfully with proper message handling');
     
   } catch (error) {
-    logger.error('Legacy initialization also failed:', error);
+    // Handle context errors silently
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'legacy-initialization');
+    } else {
+      logger.error('Legacy initialization also failed:', error);
+    }
   }
 }
 
@@ -94,6 +114,11 @@ async function initializeLegacyHandlers() {
 async function injectMainDOMStyles() {
   // Check if already injected
   if (document.getElementById('translate-it-main-dom-styles')) {
+    return;
+  }
+
+  // Validate extension context before DOM operations
+  if (!validateExtensionContext('main-dom-css-injection')) {
     return;
   }
 
@@ -128,6 +153,10 @@ if (!access.isAccessible) {
 } else {
   // Use async IIFE to handle initialization
   (async () => {
+    // Validate extension context before any operations
+    if (!validateExtensionContext('content-script-initialization')) {
+      return;
+    }
     // Initialize IFrameManager for enhanced iframe support
     const { iFrameManager } = await import('@/features/iframe-support/managers/IFrameManager.js');
     
@@ -349,7 +378,6 @@ if (!access.isAccessible) {
     // The EventCoordinator was causing duplicate event processing with the new selection event strategy system
     // All event handling is now properly managed through TextSelectionHandler and other feature handlers
     logger.debug('EventCoordinator disabled - using modern FeatureManager event handling');
-    
     })();
   }
   })(); // Close first async IIFE
