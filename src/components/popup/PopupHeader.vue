@@ -22,10 +22,7 @@
         :alt="t('popup_select_element_alt_icon') || 'Select Element'"
         :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
-        :class="{ 
-          active: isSelectModeActive,
-          'select-error': selectElementError 
-        }"
+        :class="{ active: isSelectModeActive }"
         @click="handleSelectElement"
       />
       <IconButton
@@ -103,7 +100,6 @@ const { t } = useUnifiedI18n()
 
 // State
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
-const selectElementError = ref(false) // نشان‌دهنده خطا در select element
 
 // Methods
 const handleTranslatePage = async () => {
@@ -121,16 +117,13 @@ const handleTranslatePage = async () => {
       window.close()
     }
   } catch (error) {
-    logger.error('❌ Failed to translate page:', error)
+    logger.error('Failed to translate page:', error)
     await handleError(error, 'PopupHeader-translatePage')
   }
 }
 
 const handleSelectElement = async () => {
-  logger.debug('🎯 Select Element button clicked!')
-  
-  // Reset any previous error state
-  selectElementError.value = false
+  logger.debug('Select Element button clicked!')
   
   try {
     logger.debug('[PopupHeader] Select element button clicked')
@@ -140,24 +133,9 @@ const handleSelectElement = async () => {
       window.close()
     } else {
       logger.debug('[PopupHeader] Select element toggle failed, keeping popup open')
-      
-      // Show error state with red border
-      selectElementError.value = true
-      
-      // Reset error state after 1.5 seconds with smooth transition
-      setTimeout(() => {
-        selectElementError.value = false
-      }, 1500)
     }
   } catch (error) {
-    logger.error('❌ Select element toggle failed:', error)
-    
-    // Show error state for unexpected errors too
-    selectElementError.value = true
-    setTimeout(() => {
-      selectElementError.value = false
-    }, 1500)
-    
+    logger.error('Select element toggle failed:', error)
     await handleError(error, 'PopupHeader-selectElement')
   }
 }
@@ -169,7 +147,7 @@ const handleClearStorage = () => {
 }
 
 const handleRevert = async () => {
-  logger.debug('↩️ Revert button clicked!')
+  logger.debug('Revert button clicked!')
   try {
     logger.debug('[PopupHeader] Executing revert action')
     
@@ -187,7 +165,7 @@ const handleRevert = async () => {
     })
     
     if (response?.success) {
-      logger.debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      logger.debug(`[PopupHeader] Revert successful: ${response.revertedCount || 0} translations reverted`)
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
       await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
@@ -209,10 +187,10 @@ const handleOpenSettings = async () => {
   logger.debug('⚙️ Settings button clicked!')
   try {
     await browser.runtime.openOptionsPage()
-    logger.debug('✅ Options page opened successfully')
+    logger.debug('Options page opened successfully')
     window.close()
   } catch (error) {
-    logger.error('❌ Failed to open settings:', error)
+    logger.error('Failed to open settings:', error)
     await handleError(error, 'PopupHeader-openSettings')
   }
 }
@@ -239,10 +217,10 @@ const handleExcludeToggle = async () => {
         },
       })
       
-      logger.debug('✅ Page exclusion updated successfully')
+      logger.debug('Page exclusion updated successfully')
     }
   } catch (error) {
-    logger.error('❌ Failed to toggle exclusion:', error)
+    logger.error('Failed to toggle exclusion:', error)
     await handleError(error, 'PopupHeader-excludeToggle')
   }
 }

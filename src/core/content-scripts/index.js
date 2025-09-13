@@ -23,6 +23,9 @@ import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 import { fieldDetector } from '@/utils/text/FieldDetector.js';
 import { selectionDetector } from '@/utils/text/SelectionDetector.js';
 
+// Import Notification System
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
+
 // Setup Trusted Types compatibility early
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
@@ -30,6 +33,7 @@ setupTrustedTypesCompatibility();
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
+
 
 /**
  * Legacy initialization fallback
@@ -41,8 +45,9 @@ async function initializeLegacyHandlers() {
   try {
     // Import legacy modules
     const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
-    const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
+    const { selectElementManager } = await import("@/features/element-selection/managers/index.js");
     const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
+    const { createMessageHandler } = await import('@/shared/messaging/core/MessageHandler.js');
     
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
@@ -55,7 +60,36 @@ async function initializeLegacyHandlers() {
     await selectElementManager.initialize();
     contentMessageHandler.initialize();
     
-    logger.info('Legacy handlers initialized successfully');
+    // Set up message handler for proper communication with background script
+    const messageHandler = createMessageHandler();
+    
+    // Register all ContentMessageHandler handlers with the central message handler
+    if (contentMessageHandler.handlers) {
+      for (const [action, handler] of contentMessageHandler.handlers.entries()) {
+        messageHandler.registerHandler(action, async (message, sender) => {
+          try {
+            // Call the handler directly and return the result
+            const result = await handler.call(contentMessageHandler, message, sender);
+            return result;
+          } catch (error) {
+            logger.error(`Error in legacy content handler for ${action}:`, error);
+            throw error;
+          }
+        });
+      }
+      logger.debug('Registered legacy content message handlers:', Array.from(contentMessageHandler.handlers.keys()));
+    }
+    
+    // Activate the message listener
+    if (!messageHandler.isListenerActive) {
+      messageHandler.listen();
+      logger.debug('Legacy message handler activated');
+    }
+    
+    // Store message handler globally for cleanup
+    window.legacyMessageHandler = messageHandler;
+    
+    logger.info('Legacy handlers initialized successfully with proper message handling');
     
   } catch (error) {
     logger.error('Legacy initialization also failed:', error);
@@ -89,6 +123,13 @@ async function injectMainDOMStyles() {
 // --- Early exit for restricted pages ---
 const access = checkContentScriptAccess();
 
+logger.debug('Content script access check result:', {
+  isAccessible: access.isAccessible,
+  errorMessage: access.errorMessage,
+  url: window.location.href,
+  isInIframe: window !== window.top
+});
+
 if (!access.isAccessible) {
   logger.warn(`Content script execution stopped: ${access.errorMessage}`);
   // Stop further execution by not initializing anything.
@@ -104,6 +145,7 @@ if (!access.isAccessible) {
     const executionMode = isInIframe ? 'iframe' : 'main-frame';
   
   if (window.translateItContentScriptLoaded) {
+    logger.debug('Content script already loaded, stopping duplicate execution');
     // Stop further execution
   } else {
     window.translateItContentScriptLoaded = true;
@@ -206,6 +248,21 @@ if (!access.isAccessible) {
           hostElementZIndex: hostElement.style.zIndex
         });
 
+        // Initialize Notification System for Select Element
+        setTimeout(async () => {
+          try {
+            const notificationManager = new NotificationManager();
+            
+            // Initialize SelectElementNotificationManager for unified notification handling
+            const { getSelectElementNotificationManager } = await import('@/features/element-selection/SelectElementNotificationManager.js');
+            await getSelectElementNotificationManager(notificationManager);
+            
+            logger.debug('Notification System initialized for Select Element');
+          } catch (error) {
+            logger.error('Failed to initialize Notification System:', error);
+          }
+        }, 100);
+
         // Emit a test event to confirm communication
         setTimeout(() => {
           pageEventBus.emit('ui-host-mounted');
@@ -219,7 +276,7 @@ if (!access.isAccessible) {
     // Initialize Smart Feature Management System
     let featureManager = null;
     try {
-      logger.info('Initializing Smart Feature Management System...');
+      logger.info('🚀 [Content Script] Starting Smart Feature Management System initialization...');
       
       // Create and initialize FeatureManager
       featureManager = new FeatureManager();
@@ -236,75 +293,34 @@ if (!access.isAccessible) {
         debugMode: isDevelopmentMode()
       });
 
-      // Create content-specific MessageHandler instance
-      const contentMessageHandler = createMessageHandler();
-      
-      // Setup unified message handling with MessageHandler
-      // Register content-specific handlers
-      const contentMessageHandlerInstance = featureManager.getFeatureHandler('contentMessageHandler');
-      if (contentMessageHandlerInstance && contentMessageHandlerInstance.handlers) {
-        // Register all content message handlers with central handler
-        for (const [action, handler] of contentMessageHandlerInstance.handlers.entries()) {
-          contentMessageHandler.registerHandler(action, async (message, sender) => {
-            try {
-              // Call the handler directly - it returns the result
-              const result = await handler.call(contentMessageHandlerInstance, message, sender);
-              return result;
-            } catch (error) {
-              logger.error(`Error in content handler for ${action}:`, error);
-              throw error;
-            }
-          });
-        }
-        logger.debug('Registered content message handlers:', Array.from(contentMessageHandlerInstance.handlers.keys()));
-      } else {
-        logger.warn('No contentMessageHandler found in featureManager or no handlers available');
-      }
-      
-      // Register feature management handlers
-      contentMessageHandler.registerHandler(MessageActions.SETTINGS_CHANGED, (message) => {
-        logger.debug('Settings changed, refreshing feature manager');
-        featureManager.manualRefresh().catch(error => {
-          logger.error('Failed to refresh feature manager after settings change:', error);
-        });
-        return { success: true };
-      });
-
-      contentMessageHandler.registerHandler(MessageActions.Set_Exclude_Current_Page, (message) => {
-        if (message.data?.exclude) {
-          logger.info('Page excluded via popup - disabling all features');
-          featureManager.getActiveFeatures().forEach(feature => {
-            featureManager.deactivateFeature(feature).catch(error => {
-              logger.error(`Failed to deactivate feature ${feature}:`, error);
-            });
-          });
-        }
-        return { success: true };
-      });
-      
-      // Register special handlers for TranslationHandler support
-      contentMessageHandler.registerHandler('HANDLE_TRANSLATION_RESULT', (message) => {
-        // This handles translation results from background for WindowsManager
-        const translationHandlerInstance = window.translationHandlerInstance;
-        if (translationHandlerInstance && translationHandlerInstance.handleTranslationResult) {
-          const handled = translationHandlerInstance.handleTranslationResult(message);
-          return { handled };
-        }
-        return { handled: false };
-      });
-
-      // Activate the content-specific message listener
-      if (!contentMessageHandler.isListenerActive) {
-        contentMessageHandler.listen();
-        logger.debug('Content MessageHandler activated');
-      }
+      // FeatureManager handles all message handler registration through smart feature management
+      // ContentMessageHandler and other features are activated based on settings and exclusions
+      logger.debug('Smart feature management system will handle message handler registration');
 
     } catch (error) {
-      logger.error('Failed to initialize Smart Feature Management System:', error);
+      logger.error('❌ [Content Script] Smart Feature Management System failed:', error);
+      logger.error('❌ [Content Script] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        url: window.location.href
+      });
       
       // Fallback to legacy initialization on error
-      logger.warn('Falling back to legacy initialization...');
+      logger.warn('⚠️ [Content Script] Falling back to legacy initialization...');
       await initializeLegacyHandlers();
+    }
+    
+    logger.debug('Content script initialization complete', {
+      featureManagement: featureManager ? 'smart' : 'legacy',
+      activeFeatures: featureManager ? featureManager.getActiveFeatures() : []
+    });
+    
+    // Cleanup legacy message handler if smart initialization succeeded
+    if (featureManager && window?.legacyMessageHandler) {
+      logger.debug('Cleaning up legacy message handler - smart initialization succeeded');
+      window.legacyMessageHandler.stopListening();
+      window.legacyMessageHandler = null;
     }
 
     // Final initialization summary with feature management context

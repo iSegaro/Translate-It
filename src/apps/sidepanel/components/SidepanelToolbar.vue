@@ -5,11 +5,8 @@
         id="selectElementBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
-        :disabled="isSelectElementDebounced || isActivating"
-        :class="{ 
-          active: isSelectModeActive,
-          'select-error': selectElementError 
-        }"
+        :disabled="isActivating"
+        :class="{ active: isSelectModeActive }"
         @click="handleSelectElement"
       >
         <img
@@ -133,19 +130,8 @@ const { showVisualFeedback } = useUI()
 const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { handleError, handleConnectionError } = useErrorHandler()
 
-// Debounce logic
-const isSelectElementDebounced = ref(false)
-const selectElementError = ref(false) // Error state for Select Element button
-
 const handleSelectElement = async () => {
-  getLogger().debug('🎯 Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')
-  
-  if (isSelectElementDebounced.value) return
-  isSelectElementDebounced.value = true
-  setTimeout(() => { isSelectElementDebounced.value = false }, 500)
-
-  // Reset any previous error state
-  selectElementError.value = false
+  getLogger().debug('Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')
 
   try {
     // Send request and wait for confirmation from background/content script
@@ -153,50 +139,34 @@ const handleSelectElement = async () => {
       getLogger().debug('🔄 Deactivating select element mode...')
       const result = await deactivateSelectMode()
       if (result) {
-        getLogger().debug('✅ Select element mode deactivated successfully')
+        getLogger().debug('Select element mode deactivated successfully')
         // composable will update shared state; UI follows isSelectModeActive
         showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
       } else {
-        getLogger().debug('❌ Select element mode deactivation failed')
-        // Show error state with red background
-        selectElementError.value = true
-        // Reset error state after 1.5 seconds with smooth transition
-        setTimeout(() => {
-          selectElementError.value = false
-        }, 1500)
+        getLogger().debug('Select element mode deactivation failed')
+        showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
       }
     } else {
-      getLogger().debug('🔄 Activating select element mode...')
+      getLogger().debug('Activating select element mode...')
       const result = await activateSelectMode()
       if (result) {
-        getLogger().debug('✅ Select element mode activated successfully')
+        getLogger().debug('Select element mode activated successfully')
         // composable will update shared state; UI follows isSelectModeActive
         showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
       } else {
-        getLogger().debug('❌ Select element mode activation failed')
-        // Show error state with red background
-        selectElementError.value = true
-        // Reset error state after 1.5 seconds with smooth transition
-        setTimeout(() => {
-          selectElementError.value = false
-        }, 1500)
+        getLogger().debug('Select element mode activation failed')
+        showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
       }
     }
   } catch (error) {
-    getLogger().error('❌ Select element mode error:', error)
-    
-    // Show error state for unexpected errors too
-    selectElementError.value = true
-    setTimeout(() => {
-      selectElementError.value = false
-    }, 1500)
-    
+    getLogger().error('Select element mode error:', error)
+    showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
     await handleError(error, 'SidepanelToolbar-selectElement')
   }
 }
 
 const handleRevertAction = async () => {
-  getLogger().debug('↩️ Revert Action button clicked!')
+  getLogger().debug('Revert Action button clicked!')
   
   try {
     getLogger().debug('[SidepanelToolbar] Executing revert action')
@@ -217,7 +187,7 @@ const handleRevertAction = async () => {
     getLogger().debug('[SidepanelToolbar] Revert response:', response)
     
     if (response?.success) {
-      getLogger().debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      getLogger().debug(`[SidepanelToolbar] Revert successful: ${response.revertedCount || 0} translations reverted`)
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
@@ -259,10 +229,10 @@ const handleSettingsClick = async () => {
   getLogger().debug('⚙️ Settings button clicked!')
   try {
     await browser.runtime.openOptionsPage();
-    getLogger().debug('✅ Options page opened successfully')
+    getLogger().debug('Options page opened successfully')
     showVisualFeedback(document.getElementById('settingsBtn'), 'success')
   } catch (error) {
-    getLogger().error('❌ Failed to open options page:', error)
+    getLogger().error('Failed to open options page:', error)
     await handleError(error, 'SidepanelToolbar-openSettings')
     showVisualFeedback(document.getElementById('settingsBtn'), 'error')
   }
@@ -332,13 +302,7 @@ const handleSettingsClick = async () => {
       background-color: transparent;
     }
   }
-
-  // Disable transition during error animation for smooth keyframe animation
-  &.select-error {
-    transition: none !important;
-  }
 }
-
 /* Scoped styles for toolbar icons */
 .toolbar-icon {
   width: 20px;

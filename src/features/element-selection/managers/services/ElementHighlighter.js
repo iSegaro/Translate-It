@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { taggleLinks } from "@/core/helpers.js";
 import { UI_CONSTANTS } from "../constants/selectElementConstants.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { ToastElementDetector } from '@/shared/toast/ToastElementDetector.js';
 // pageEventBus import removed - no longer needed for Shadow DOM
 
 export class ElementHighlighter extends ResourceTracker {
@@ -31,53 +32,8 @@ export class ElementHighlighter extends ResourceTracker {
   isOurElement(element) {
     if (!element) return false;
     
-    // Check if element has our internal classes
-    if (element.classList && (
-      element.classList.contains('translate-it-element-highlighted') ||
-      element.classList.contains('content-app-container')
-    )) {
-      return true;
-    }
-    
-    // Check if element has our data attributes
-    if (element.hasAttribute('data-translate-it-highlighted') ||
-        element.hasAttribute('data-translate-id') ||
-        element.hasAttribute('data-translate-highlighted')) {
-      return true;
-    }
-    
-    // Check if element is inside our Shadow DOM (content-app-container)
-    let currentElement = element;
-    while (currentElement) {
-      if (currentElement.classList && currentElement.classList.contains('content-app-container')) {
-        return true;
-      }
-      
-      // Check if we've reached the shadow root host
-      if (currentElement.host) {
-        // Check if the shadow root host has translate-it ID
-        if (currentElement.host.id && currentElement.host.id.includes('translate-it')) {
-          return true;
-        }
-      }
-      
-      // Move up to parent, but handle Shadow DOM boundary
-      currentElement = currentElement.parentElement || currentElement.parentNode?.host;
-    }
-    
-    // Check for Vue Sonner toast elements  
-    if (element.hasAttribute('data-sonner-toaster') ||
-        element.hasAttribute('data-sonner-toast') ||
-        element.hasAttribute('data-button') ||
-        element.hasAttribute('data-action') ||
-        element.closest('[data-sonner-toaster]') ||
-        element.closest('[data-sonner-toast]') ||
-        element.closest('[data-button]') ||
-        element.closest('button[data-action]')) {
-      return true;
-    }
-    
-    return false;
+    // Use centralized toast and extension element detection
+    return ToastElementDetector.shouldExcludeFromSelection(element);
   }
 
   /**
@@ -85,6 +41,11 @@ export class ElementHighlighter extends ResourceTracker {
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
+    // Guard against invalid elements
+    if (!element || typeof element.hasAttribute !== 'function') {
+      return;
+    }
+    
     // Skip our own elements
     if (this.isOurElement(element)) {
       return;
@@ -93,7 +54,7 @@ export class ElementHighlighter extends ResourceTracker {
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
     
-    if (!bestElement || this.isOurElement(bestElement)) {
+    if (!bestElement || typeof bestElement.hasAttribute !== 'function' || this.isOurElement(bestElement)) {
       return;
     }
 

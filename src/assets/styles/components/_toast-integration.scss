@@ -1,0 +1,56 @@
+// Toast Integration Styles - Vue Sonner Integration
+// Centralized styles for toast integration with Select Element mode
+
+@use '../base/variables' as *;
+
+/* ==========================================================================
+   Toast Integration - Vue Sonner Compatibility
+   ========================================================================== */
+
+// Vue Sonner toast element cursor and interaction overrides
+// These ensure toast notifications work correctly during Select Element mode
+[data-sonner-toaster],
+[data-sonner-toaster] *,
+[data-sonner-toast], 
+[data-sonner-toast] *,
+.sonner-toaster,
+.sonner-toaster *,
+.sonner-toast,
+.sonner-toast *,
+[data-testid="toaster"],
+[data-testid="toaster"] *,
+li[data-sonner-toast],
+li[data-sonner-toast] *,
+div[data-sonner-toast],
+div[data-sonner-toast] * {
+  cursor: auto !important;
+  pointer-events: auto !important;
+}
+
+// Content app container and children cursor protection
+// Ensures our Shadow DOM elements maintain proper cursor behavior
+.content-app-container,
+.content-app-container * {
+  cursor: auto !important;
+}
+
+/* ==========================================================================
+   Main DOM Toast Integration (for injection into main DOM)
+   ========================================================================== */
+
+// Toast elements exception during Select Element mode (crosshair cursor active)
+html.AIWritingCompanion-disable-links [data-sonner-toaster],
+html.AIWritingCompanion-disable-links [data-sonner-toaster] *,
+html.AIWritingCompanion-disable-links [data-sonner-toast],
+html.AIWritingCompanion-disable-links [data-sonner-toast] *,
+html.AIWritingCompanion-disable-links .sonner-toaster,
+html.AIWritingCompanion-disable-links .sonner-toaster *,
+html.AIWritingCompanion-disable-links .sonner-toast,
+html.AIWritingCompanion-disable-links .sonner-toast *,
+html.AIWritingCompanion-disable-links .content-app-container,
+html.AIWritingCompanion-disable-links .content-app-container * {
+  cursor: auto !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: $z-overlay !important;
+}

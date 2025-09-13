@@ -192,14 +192,11 @@ export class ErrorHandlingService extends ResourceTracker {
    */
   async showNotification(message, type = 'error') {
     try {
-      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
-      ExtensionContextManager.safeSendMessage({
-        action: "show_notification",
-        payload: {
-          message,
-          type,
-          duration: 4000,
-        },
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      pageEventBus.emit('show-notification', {
+        message,
+        type,
+        duration: 4000,
       });
     } catch (notificationError) {
       this.logger.warn('Failed to show notification:', notificationError);

@@ -118,20 +118,59 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     // Handle different response types from content script
     if (response === false) {
-      // Content script returned false - this usually means the page doesn't support the feature
-      // but the communication was successful. This is a valid response, not an error.
-      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned false - feature not supported on this page`, {
+      // Content script returned false - legacy behavior
+      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned false - legacy response`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : ''),
-        isRestrictedByUrl: access.isRestricted
+        isRestrictedByUrl: access.isRestricted,
+        isAccessible: access.isAccessible
       });
       
+      // If tab is accessible but returned false, it's likely a legacy content script
+      // In this case, treat false as success for backwards compatibility
+      if (access.isAccessible && !access.isRestricted) {
+        logger.debug(`[activateSelectElementMode] Tab ${targetTabId} is accessible, treating false as success`);
+        return {
+          success: true,
+          message: isActivating ? "Select Element mode activated" : "Select Element mode deactivated",
+          tabId: targetTabId,
+          activated: isActivating,
+          isLegacyResponse: true,
+          tabUrl: access.fullUrl
+        };
+      } else {
+        // Tab is actually restricted
+        return {
+          success: false,
+          message: 'Feature not available on this page',
+          tabId: targetTabId,
+          activated: false,
+          isRestrictedPage: access.isRestricted,
+          isLegacyResponse: true,
+          tabUrl: access.fullUrl
+        };
+      }
+    }
+    
+    // Handle structured error response from content script
+    if (response && response.success === false && response.error) {
+      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned structured error`, {
+        tabId: targetTabId,
+        error: response.error,
+        errorType: response.errorType,
+        isCompatibilityIssue: response.isCompatibilityIssue,
+        url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : '')
+      });
+      
+      // Use the error information from content script
       return {
         success: false,
-        message: 'Feature not available on this page',
+        message: response.error,
         tabId: targetTabId,
         activated: false,
-        isRestrictedPage: true,
+        isRestrictedPage: access.isRestricted, // Use actual permission check, not content script's guess
+        isCompatibilityIssue: response.isCompatibilityIssue || false,
+        errorType: response.errorType,
         tabUrl: access.fullUrl
       };
     }

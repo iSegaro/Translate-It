@@ -27,7 +27,6 @@ export class MessageActions {
   static SET_SELECT_ELEMENT_STATE = 'setSelectElementState';
   static SELECT_ELEMENT_STATE_CHANGED = 'selectElementStateChanged';
   static PROCESS_SELECTED_ELEMENT = 'PROCESS_SELECTED_ELEMENT';
-  static ACTIVATE_SELECT_ELEMENT_MODE = 'ACTIVATE_SELECT_ELEMENT_MODE';
 
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';

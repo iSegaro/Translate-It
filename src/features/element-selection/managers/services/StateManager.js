@@ -113,6 +113,15 @@ export class StateManager extends ResourceTracker {
   }
 
   /**
+   * Clear all state data
+   */
+  clearState() {
+    this.originalTexts.clear();
+    this.translatedElements.clear();
+    this.logger.debug('StateManager state cleared');
+  }
+
+  /**
    * Get debugging information.
    * @returns {Object} Debug info.
    */

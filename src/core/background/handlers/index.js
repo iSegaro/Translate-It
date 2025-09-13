@@ -28,6 +28,7 @@ export * from "@/features/tts/handlers/handleOffscreenReady.js";
 
 // Element selection handlers  
 export * from "@/features/element-selection/handlers/handleActivateSelectElementMode.js";
+export * from "@/features/element-selection/handlers/handleDeactivateSelectElementMode.js";
 export * from "@/features/element-selection/handlers/handleSetSelectElementState.js";
 export * from "@/features/element-selection/handlers/handleGetSelectElementState.js";
 export * from "./selection/handleSelectElement.js";

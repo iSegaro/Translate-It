@@ -14,10 +14,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleSetSelec
 export async function handleSetSelectElementState(message, sender) {
   const activate = message?.data?.activate === true;
   const tabId = sender?.tab?.id || message?.data?.tabId;
+  const frameId = sender?.frameId;
 
   logger.operation('handleSetSelectElementState called', {
     activate,
     tabId,
+    frameId,
     from: sender?.tab?.id ? 'content' : 'internal',
   });
 
@@ -38,14 +40,16 @@ export async function handleSetSelectElementState(message, sender) {
           {
             mode: 'normal',
             activate: false,
-            fromBackground: true
+            fromBackground: true,
+            // Exclude the original requester frame to prevent self-deactivation
+            excludeFrameId: frameId
           },
           MessagingContexts.CONTENT
         );
         
         // Send to main frame and all iframe content scripts
         await browser.tabs.sendMessage(tabId, broadcastMessage);
-        logger.operation('Broadcasted deactivation to all frames in tab:', { tabId, activate });
+        logger.operation('Broadcasted deactivation to all frames in tab:', { tabId, activate, excludeFrameId: frameId });
       } catch (broadcastError) {
         logger.warn('Failed to broadcast deactivation to tab frames:', broadcastError);
       }

@@ -157,8 +157,7 @@ export default class TranslationHandler {
   @logMethod
   async processTranslation_with_CtrlSlash(params) {
     let statusNotification = null;
-    let toastId;
-    try {
+      try {
       if (!ExtensionContextManager.isValidSync()) {
         if (!params.target) {
           this.errorHandler.handle(new Error(ErrorTypes.CONTEXT), {
@@ -177,38 +176,17 @@ export default class TranslationHandler {
         "translating..."
       );
       
-      toastId = `status-${Date.now()}`;
-      ExtensionContextManager.safeSendMessage({
-        action: "show_notification",
-        payload: {
-          id: toastId,
-          message: statusMessage,
-          type: "status",
-        },
-      });
-
       state.translateMode = params.selectionRange
         ? TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      // Set fallback timeout to dismiss notification if translation takes too long or fails silently
-      const translationTimeout = await getTimeoutAsync();
-      this.logger.debug('Translation timeout from config:', translationTimeout);
-      const dismissTimeout = setTimeout(() => {
-        ExtensionContextManager.safeSendMessage({
-          action: "dismiss_notification",
-          payload: { id: toastId },
-        });
-      }, translationTimeout);
-      
       //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
         text: params.text,
         target: params.target,
         selectionRange: params.selectionRange,
         tabId: null,
-        toastId: toastId, // Pass toastId to be dismissed on completion
-        dismissTimeout: dismissTimeout, // Pass timeout to be cleared
+        // Don't pass toastId - let smartTranslationIntegration create and manage its own notification
       });
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
@@ -235,13 +213,7 @@ export default class TranslationHandler {
           actions: actions
         });
         
-        if (toastId) {
-            ExtensionContextManager.safeSendMessage({
-              action: "dismiss_notification",
-              payload: { id: toastId },
-            });
-        }
-        return;
+          return;
       }
 
       const handlerError = await this.errorHandler.handle(processed, {
@@ -250,16 +222,6 @@ export default class TranslationHandler {
         translationParams: params,
         isPrimary: true,
       });
-
-      if (toastId) {
-        ExtensionContextManager.safeSendMessage({
-          action: "dismiss_notification",
-          payload: { id: toastId },
-        });
-      }
-      if (params.dismissTimeout) {
-        clearTimeout(params.dismissTimeout);
-      }
 
       if (handlerError.isFinal || handlerError.suppressSecondary) return;
 

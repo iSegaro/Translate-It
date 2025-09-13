@@ -9,6 +9,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 
 export class ContentMessageHandler extends ResourceTracker {
   constructor() {
@@ -59,8 +60,39 @@ export class ContentMessageHandler extends ResourceTracker {
     
     try {
       this.initialize();
+      
+      // Connect to message handler for smart feature management
+      this.messageHandler = createMessageHandler();
+      
+      // Register all handlers with the central message handler
+      for (const [action, handler] of this.handlers.entries()) {
+        this.messageHandler.registerHandler(action, async (message, sender) => {
+          try {
+            const result = await handler.call(this, message, sender);
+            return result;
+          } catch (error) {
+            this.logger.error(`Error in content handler for ${action}:`, error);
+            throw error;
+          }
+        });
+      }
+      
+      // Activate the message listener
+      if (!this.messageHandler.isListenerActive) {
+        this.messageHandler.listen();
+        this.logger.debug('ContentMessageHandler message listener activated');
+      }
+      
+      // Track message handler for cleanup
+      this.trackResource('messageHandler', () => {
+        if (this.messageHandler) {
+          this.messageHandler.stopListening();
+          this.messageHandler = null;
+        }
+      });
+      
       this.isActive = true;
-      this.logger.info('ContentMessageHandler activated successfully');
+      this.logger.info('ContentMessageHandler activated successfully with smart message handling');
       return true;
     } catch (error) {
       this.logger.error('Failed to activate ContentMessageHandler:', error);
@@ -75,6 +107,7 @@ export class ContentMessageHandler extends ResourceTracker {
     }
     
     try {
+      // Cleanup will handle message handler through ResourceTracker
       this.cleanup();
       this.isActive = false;
       this.logger.info('ContentMessageHandler deactivated successfully');
@@ -142,36 +175,78 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async handleActivateSelectElementMode(message) {
     this.logger.debug(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
-    this.logger.operation("🎯 ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!", {
+    this.logger.operation("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!", {
       hasSelectElementManager: !!this.selectElementManager,
       messageData: message.data,
       isInIframe: window !== window.top,
-      frameLocation: window.location.href
+      frameLocation: window.location.href,
+      messageAction: message.action,
+      messageSource: message.source,
+      isActive: this.isActive,
+      hasMessageHandler: !!this.messageHandler,
+      initialized: this.initialized
     });
     
-    if (this.selectElementManager) {
-      this.logger.info("🚀 ContentMessageHandler: Calling selectElementManager.activate()");
-      this.logger.debug("🔍 SelectElementManager debug info:", {
-        hasActivateMethod: typeof this.selectElementManager.activate === 'function',
-        constructorName: this.selectElementManager.constructor.name,
-        keys: Object.keys(this.selectElementManager),
-        isActive: this.selectElementManager.isActive
+    try {
+      // Import unified SelectElementManager on-demand
+      const { getSelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
+      
+      // Get the manager instance
+      const selectElementManager = await getSelectElementManager();
+      
+      // Store reference for potential deactivate calls
+      this.selectElementManager = selectElementManager;
+      
+      this.logger.debug("ContentMessageHandler: Calling selectElementManager.activate()");
+      
+      // Activate the SelectElementManager
+      await selectElementManager.activate();
+      
+      this.logger.debug("ContentMessageHandler: selectElementManager.activate() completed successfully");
+      
+      // Always return a proper success response
+      return { success: true, activated: true };
+      
+    } catch (error) {
+      this.logger.error("ContentMessageHandler: SelectElementManager activation failed:", error);
+      // Clear reference on error
+      this.selectElementManager = null;
+      
+      // Use centralized error handling for better error classification
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      const errorHandler = ErrorHandler.getInstance();
+      
+      // Determine error type and provide meaningful response
+      let errorType = ErrorTypes.UNKNOWN;
+      let userMessage = "Failed to activate Select Element mode";
+      
+      // Check for specific error conditions
+      if (error.message.includes('Extension context')) {
+        errorType = ErrorTypes.CONTEXT;
+        userMessage = "Extension context invalidated. Please refresh the page.";
+      } else if (error.message.includes('permission') || error.message.includes('restricted')) {
+        errorType = ErrorTypes.PERMISSION;
+        userMessage = "Feature not available on this page";
+      } else if (error.message.includes('initialization') || error.message.includes('initialize')) {
+        errorType = ErrorTypes.INTEGRATION;
+        userMessage = "Feature initialization failed. Please refresh the page.";
+      }
+      
+      // Log the error with proper context
+      await errorHandler.handle(error, {
+        type: errorType,
+        context: "ContentMessageHandler-activateSelectElement",
+        showToast: false // Don't show toast for background-triggered actions
       });
       
-      try {
-        await this.selectElementManager.activate();
-        
-        this.logger.info("✅ ContentMessageHandler: selectElementManager.activate() completed successfully");
-        
-        // Always return a proper success response
-        return { success: true, activated: true };
-      } catch (error) {
-        this.logger.error("❌ ContentMessageHandler: selectElementManager.activate() failed:", error);
-        return { success: false, error: error.message, activated: false };
-      }
-    } else {
-      this.logger.error("❌ ContentMessageHandler: No selectElementManager available!");
-      return { success: false, error: "SelectElementManager not available", activated: false };
+      return { 
+        success: false, 
+        error: userMessage, 
+        activated: false,
+        errorType: errorType,
+        isCompatibilityIssue: true // Explicitly mark as compatibility issue, not restriction
+      };
     }
   }
 
@@ -179,9 +254,27 @@ export class ContentMessageHandler extends ResourceTracker {
     if (this.selectElementManager) {
       // Check if this is from background (to avoid circular messaging)
       const fromBackground = message?.data?.fromBackground;
+      const excludeFrameId = message?.data?.excludeFrameId;
+      
+      // Check if this deactivation should be ignored (self-deactivation prevention)
+      if (fromBackground && excludeFrameId !== undefined) {
+        // For main frame, frameId is 0 or undefined
+        const currentFrameId = window !== window.top ? (typeof browser !== 'undefined' ? (browser.runtime.id || 0) : 0) : 0;
+        
+        if (currentFrameId === excludeFrameId) {
+          this.logger.debug('Ignoring self-deactivation request', {
+            excludeFrameId,
+            currentFrameId,
+            isInIframe: window !== window.top
+          });
+          return { success: true, activated: this.selectElementManager.isSelectElementActive() };
+        }
+      }
+      
       this.logger.debug('DEACTIVATE_SELECT_ELEMENT_MODE received', {
         fromBackground: fromBackground,
-        isActive: this.selectElementManager.isActive,
+        excludeFrameId: excludeFrameId,
+        isActive: this.selectElementManager.isSelectElementActive(),
         isInIframe: window !== window.top,
       });
       
@@ -197,12 +290,12 @@ export class ContentMessageHandler extends ResourceTracker {
         
         return { success: true, activated: false };
       } catch (error) {
-        this.logger.error("❌ ContentMessageHandler: selectElementManager deactivation failed:", error);
+        this.logger.error("ContentMessageHandler: selectElementManager deactivation failed:", error);
         return { success: false, error: error.message };
       }
     } else {
-      this.logger.warn("❌ ContentMessageHandler: No selectElementManager available for deactivation!");
-      return { success: false, error: "SelectElementManager not available" };
+      this.logger.debug("ContentMessageHandler: Deactivate request received but selectElementManager is null - this is normal if not activated");
+      return { success: true, activated: false };
     }
   }
 

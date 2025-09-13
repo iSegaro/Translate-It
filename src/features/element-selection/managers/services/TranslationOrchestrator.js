@@ -96,7 +96,7 @@ export class TranslationOrchestrator extends ResourceTracker {
     return timeout;
   }
 
-  async processSelectedElement(element, originalTextsMap, textNodes) {
+  async processSelectedElement(element, originalTextsMap, textNodes, context = 'select-element') {
     this.logger.operation("Starting advanced translation process for selected element");
     
     // Check extension context before proceeding
@@ -111,16 +111,28 @@ export class TranslationOrchestrator extends ResourceTracker {
     // Set global flag to indicate translation is in progress
     window.isTranslationInProgress = true;
 
-    const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
-    this.statusNotification = `status-${messageId}`;
-    pageEventBus.emit('show-notification', {
-      id: this.statusNotification,
-      message: statusMessage,
-      type: "status",
-    });
+    // Only show status notification if not for SelectElement mode
+    // SelectElement mode has its own notification management
+    if (!context || context !== 'select-element') {
+      const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
+      this.statusNotification = `status-${messageId}`;
+      pageEventBus.emit('show-notification', {
+        id: this.statusNotification,
+        message: statusMessage,
+        type: "status",
+      });
+    } else {
+      this.logger.debug("Skipping status notification for SelectElement mode");
+      this.statusNotification = null;
+    }
 
     try {
       const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
+      this.logger.info("Cache separation result:", {
+        textsToTranslate: textsToTranslate,
+        cachedTranslations: Array.from(cachedTranslations.entries()),
+        originalTextsMap: Array.from(originalTextsMap.entries())
+      });
 
       if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
         this.logger.info("Applying translations from cache only.");
@@ -133,7 +145,7 @@ export class TranslationOrchestrator extends ResourceTracker {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
         }
-        return;
+        return { success: true, cached: true };
       }
 
       // CACHE FIX: Also handle mixed case where some translations are cached
@@ -145,13 +157,17 @@ export class TranslationOrchestrator extends ResourceTracker {
       }
 
       if (textsToTranslate.length === 0) {
-        this.logger.info("No new texts to translate.");
+        this.logger.info("No new texts to translate.", {
+          textsToTranslate: textsToTranslate,
+          cachedTranslations: Array.from(cachedTranslations.entries()),
+          originalTexts: Array.from(originalTextsMap.entries())
+        });
         // Dismiss the status notification since there's nothing to translate
         if (this.statusNotification) {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
         }
-        return;
+        return { success: true, noTexts: true };
       }
 
       const { expandedTexts, originMapping } = expandTextsForTranslation(textsToTranslate);
@@ -172,7 +188,7 @@ export class TranslationOrchestrator extends ResourceTracker {
       });
 
 
-      await this.sendTranslationRequest(messageId, jsonPayload);
+      await this.sendTranslationRequest(messageId, jsonPayload, context);
       // Removed setupTranslationWaiting to handle streaming results
     } catch (error) {
       // Clear the global translation in progress flag on error
@@ -190,9 +206,12 @@ this.translationRequests.delete(messageId);
       }
       throw error;
     }
+    
+    // Return a default success result for streaming translations
+    return { success: true, streaming: true };
   }
 
-  async sendTranslationRequest(messageId, jsonPayload) {
+  async sendTranslationRequest(messageId, jsonPayload, context = 'select-element') {
     try {
       // Check if translation was cancelled (no longer using global flag)
       const request = this.translationRequests.get(messageId);
@@ -231,7 +250,7 @@ this.translationRequests.delete(messageId);
           mode: TranslationMode.Select_Element,
           options: { rawJsonPayload: true },
         },
-        context: 'event-handler',
+        context: context,
         messageId,
       };
 

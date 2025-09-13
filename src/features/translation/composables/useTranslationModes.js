@@ -263,10 +263,10 @@ export function useSelectElementTranslation() {
       });
       
       // Check if activation actually succeeded
-      if (result && result.success === false) {
+      if (result === false || (result && result.success === false)) {
         // Handle graceful failures (e.g., restricted pages).
         // The background script now provides a user-friendly message.
-        const errorMsg = result.message || "Failed to activate select element mode";
+        const errorMsg = (result && result.message) || "Failed to activate select element mode";
         error.value = errorMsg;
         logger.debug('Select mode activation failed:', { errorMsg, result });
         return false;

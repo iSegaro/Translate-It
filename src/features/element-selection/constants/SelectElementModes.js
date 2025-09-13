@@ -26,16 +26,16 @@ export const SELECT_ELEMENT_MODES = Object.freeze({
  */
 export const SELECT_ELEMENT_DEFAULTS = Object.freeze({
   /** Default validation mode */
-  MODE: SELECT_ELEMENT_MODES.SMART,
+  MODE: SELECT_ELEMENT_MODES.SIMPLE,
   
   /** Base mode when Ctrl is not pressed */
-  BASE_MODE: SELECT_ELEMENT_MODES.SMART,
+  BASE_MODE: SELECT_ELEMENT_MODES.SIMPLE,
   
   /** Minimum text length to consider for translation */
-  MIN_TEXT_LENGTH: 8,
+  MIN_TEXT_LENGTH: 1,
   
   /** Minimum word count for meaningful content */
-  MIN_WORD_COUNT: 2,
+  MIN_WORD_COUNT: 1,
   
   /** Maximum element area for container validation */
   MAX_ELEMENT_AREA: 50000,

@@ -133,7 +133,7 @@ class LifecycleManager extends ResourceTracker {
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
-      'deactivateSelectElementMode': Handlers.handleActivateSelectElementMode,
+      'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementMode,
       'setSelectElementState': Handlers.handleSetSelectElementState,
       'getSelectElementState': Handlers.handleGetSelectElementState,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,

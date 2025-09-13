@@ -89,9 +89,9 @@ export class RevertHandler extends ResourceTracker {
   async revertVueTranslations() {
     try {
       // Import the singleton directly to ensure the correct instance is used
-      const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
+      const { selectElementManager } = await import("@/features/element-selection/managers/index.js");
       const revertedCount = await selectElementManager.revertTranslations();
-      logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementManager.`);
+      logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementService.`);
       return revertedCount;
     } catch (error) {
       logger.error('[RevertHandler] Error in Vue revert:', error);

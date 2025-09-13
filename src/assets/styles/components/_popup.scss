@@ -114,35 +114,6 @@ body.popup-context .toolbar-icon {
   animation: fadeIn 0.4s ease-in-out;
 }
 
-// Select Element Error State
-body.popup-context .select-error.toolbar-icon {
-  position: relative;
-  border-radius: $border-radius-sm;
-  filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
-  animation: error-pulse-red 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  will-change: background-color, filter;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-@keyframes error-pulse-red {
-  0% { 
-    background-color: transparent;
-    filter: var(--icon-filter);
-  }
-  15% { 
-    background-color: rgba(255, 0, 0, 0.5);
-    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
-  }
-  85% { 
-    background-color: rgba(255, 0, 0, 0.5);
-    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
-  }
-  100% { 
-    background-color: transparent;
-    filter: var(--icon-filter);
-  }
-}
 
 // Language controls in popup
 .language-controls {

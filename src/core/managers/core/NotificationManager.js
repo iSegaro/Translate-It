@@ -56,43 +56,8 @@ export default class NotificationManager extends ResourceTracker {
     pageEventBus.emit('dismiss_all_notifications');
   }
 
-  /**
-   * Shows a persistent Select Element mode notification with Cancel button.
-   * @param {boolean} translationInProgress - Whether translation is currently in progress
-   * @returns {string} The notification ID.
-   */
-  showSelectElementNotification(translationInProgress = false) {
-    // Use a unified message that works for both selection and translation phases
-    const message = "Click on an element to translate it. Press ESC or click Cancel to exit.";
-    
-    const actions = [
-      { label: "Cancel", eventName: "cancel-select-element-mode" }
-    ];
-    
-    return this.show(message, 'select-element', 4000, {
-      persistent: true,
-      actions: actions
-    });
-  }
-
-  /**
-   * Updates the Select Element notification message for translation in progress
-   * @param {string} notificationId - The notification ID to update
-   */
-  updateSelectElementNotificationForTranslation(notificationId) {
-    // Don't create a new notification, just keep the existing one
-    // The user can still see the "Click Cancel to stop" functionality
-    // and the notification will be dismissed when translation completes
-    return notificationId;
-  }
-
-  /**
-   * Dismisses the Select Element notification by type.
-   */
-  dismissSelectElementNotification() {
-    // Since we don't store the specific ID, we'll emit a specific event
-    pageEventBus.emit('dismiss-select-element-notification');
-  }
+  // Note: Select Element notification methods have been moved to NotificationSystem
+  // These methods are kept for backward compatibility but are deprecated
 
   cleanup() {
     // Use ResourceTracker cleanup for automatic resource management

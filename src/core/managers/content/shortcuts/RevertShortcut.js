@@ -1,6 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { selectElementManager } from '@/features/element-selection/managers/SelectElementManager.js';
+import { selectElementManager } from '@/features/element-selection/managers/index.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
 /**
