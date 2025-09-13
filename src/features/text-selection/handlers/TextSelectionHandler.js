@@ -11,18 +11,28 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionHandler');
 export class TextSelectionHandler extends ResourceTracker {
   constructor(options = {}) {
     super('text-selection-handler');
-    
+
     this.isActive = false;
     this.textSelectionManager = null;
     this.featureManager = options.featureManager;
-    
+
     // Preserve critical state across manager recreation
     this.preservedState = {
       lastDoubleClickTime: 0,
       doubleClickWindow: 200,
       doubleClickProcessing: false
     };
-    
+
+    // Flag to indicate when context menu is open
+    this.contextMenuOpen = false;
+
+    // Store selection before potential clearing
+    this.storedSelection = null;
+
+    // Flag to prevent creating new icons after restoring selection
+    this.restoringSelection = false;
+
+
   }
 
   async activate() {
@@ -167,13 +177,36 @@ export class TextSelectionHandler extends ResourceTracker {
       // Use capture phase to catch events before they're prevented by Google Docs (CRITICAL)
       this.addEventListener(document, 'dblclick', doubleClickHandler, { capture: true, critical: true });
       
+      // Helper to store current selection
+      const storeCurrentSelection = () => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          this.storedSelection = {
+            text: selection.toString(),
+            ranges: []
+          };
+
+          for (let i = 0; i < selection.rangeCount; i++) {
+            this.storedSelection.ranges.push(selection.getRangeAt(i).cloneRange());
+          }
+        }
+      };
+
       // Selection Change Strategy: Use selectionchange for better detection
       let selectionTimeout = null;
       const processSelection = async () => {
         if (!this.isActive || !this.textSelectionManager) return;
-        
+
+        // Skip processing if we're currently restoring selection
+        if (this.restoringSelection) {
+          return;
+        }
+
         const selection = window.getSelection();
         if (selection && selection.toString().trim()) {
+          // Store selection whenever we process it
+          storeCurrentSelection();
+
           // Use smart field detection
           const contextElement = this.getSelectionContextElement(selection);
           const detection = await fieldDetector.detect(contextElement);
@@ -264,10 +297,61 @@ export class TextSelectionHandler extends ResourceTracker {
       // Keyboard selection support
       this.addEventListener(document, 'keyup', (event) => {
         if (!this.isActive || !this.textSelectionManager) return;
-        
+
         // Handle keyboard selection (Shift+Arrow keys, Ctrl+A, etc.)
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
           setTimeout(processSelection, 100);
+        }
+      });
+
+
+      // Handle context menu to preserve selection and prevent dismissal
+      this.addEventListener(document, 'contextmenu', (event) => {
+        const selection = window.getSelection();
+        const selectionText = selection?.toString().trim();
+
+        if (!this.isActive) {
+          return;
+        }
+
+        // Use stored selection if current selection is empty
+        const rangesToRestore = this.storedSelection?.ranges || [];
+        const textToRestore = this.storedSelection?.text || '';
+
+        if (rangesToRestore.length > 0 && textToRestore) {
+          // Set flag to prevent new icon creation
+          this.restoringSelection = true;
+
+          // Restore selection immediately
+          try {
+            const currentSelection = window.getSelection();
+            currentSelection.removeAllRanges();
+            rangesToRestore.forEach(range => {
+              currentSelection.addRange(range);
+            });
+          } catch (error) {
+            logger.debug('Failed to restore selection:', error);
+          }
+
+          // Also try after delay to ensure it sticks
+          setTimeout(() => {
+            try {
+              const currentSelection = window.getSelection();
+              if (!currentSelection.toString().trim()) {
+                currentSelection.removeAllRanges();
+                rangesToRestore.forEach(range => {
+                  currentSelection.addRange(range);
+                });
+              }
+            } catch (error) {
+              logger.debug('Failed to restore selection (delayed):', error);
+            }
+          }, 50);
+
+          // Clear the flag after context menu has time to show
+          setTimeout(() => {
+            this.restoringSelection = false;
+          }, 200);
         }
       });
 
@@ -288,21 +372,37 @@ export class TextSelectionHandler extends ResourceTracker {
         }
       });
 
-      // Mouse drag detection for principled selection handling (CRITICAL)
+      // Store selection before any mousedown that might clear it
       this.addEventListener(document, 'mousedown', (event) => {
         if (!this.isActive) return;
-        
+
+        // Store current selection before it potentially gets cleared
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          this.storedSelection = {
+            text: selection.toString(),
+            ranges: []
+          };
+
+          for (let i = 0; i < selection.rangeCount; i++) {
+            this.storedSelection.ranges.push(selection.getRangeAt(i).cloneRange());
+          }
+        }
+
         // Manager guaranteed to exist due to critical protection, but add safety check
         if (!this.textSelectionManager) {
           logger.warn('Critical: TextSelectionManager unexpectedly missing in mousedown');
           return;
         }
-        
+
         // Start drag detection
         this.textSelectionManager.startDragDetection(event);
-        
-        // Instant dismiss on mousedown for better UX
-        this.textSelectionManager._onOutsideClick(event);
+
+        // Only dismiss on left click (button 0), ignore right-click and middle-click
+        if (event.button === 0) {
+          // Instant dismiss on mousedown for better UX
+          this.textSelectionManager._onOutsideClick(event);
+        }
       }, { critical: true });
       
       this.addEventListener(document, 'mouseup', (event) => {
@@ -328,7 +428,7 @@ export class TextSelectionHandler extends ResourceTracker {
   // Helper methods
   getSelectionContextElement(selection) {
     if (!selection || !selection.rangeCount) return null;
-    
+
     try {
       const range = selection.getRangeAt(0);
       const container = range.commonAncestorContainer;
@@ -338,6 +438,7 @@ export class TextSelectionHandler extends ResourceTracker {
       return null;
     }
   }
+
 
   _isFromRecentDoubleClick() {
     const timeSinceDoubleClick = Date.now() - this.preservedState.lastDoubleClickTime;

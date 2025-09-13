@@ -357,11 +357,13 @@ export class TextSelectionManager extends ResourceTracker {
 
   /**
    * Dismiss translation window (works in both main frame and iframe)
+   * @param {boolean} preserveSelection - Whether to preserve text selection when dismissing
    */
-  _dismissWindow() {
+  _dismissWindow(preserveSelection = false) {
     const windowsManager = this._getWindowsManager();
     if (windowsManager) {
-      windowsManager.dismiss();
+      // Pass preserveSelection parameter to maintain selection when needed
+      windowsManager.dismiss(true, preserveSelection);
     }
     // Clear selection tracking after dismissal
     this.lastSelectionElement = null;
@@ -932,7 +934,7 @@ export class TextSelectionManager extends ResourceTracker {
       isInIframe: window !== window.top,
       eventTarget: event?.target?.tagName
     });
-    
+
     // Only handle if we have a pending timeout - let WindowsManager handle icon dismissal
     if (!this.selectionTimeoutId) {
       this.logger.debug('No pending timeout, skipping cancelSelectionTranslation');
@@ -1149,7 +1151,7 @@ export class TextSelectionManager extends ResourceTracker {
   _onOutsideClick(event) {
     // Only handle mouse events for dismissing windows, not for text selection
     if (!event) return;
-    
+
     const windowsManager = this._getWindowsManager();
     if (!windowsManager || !this._isWindowVisible()) {
       return;
@@ -1175,11 +1177,15 @@ export class TextSelectionManager extends ResourceTracker {
     }
     
     // Mouse event outside window, dismiss it instantly
+    // Check if context menu is open and preserve selection accordingly
+    const shouldPreserveSelection = this.featureManager?.getFeatureHandler('textSelection')?.contextMenuOpen || false;
+
     this.logger.debug('Outside mouse event detected - dismissing translation window', {
       eventType: event.type,
-      target: event.target?.tagName
+      target: event.target?.tagName,
+      shouldPreserveSelection
     });
-    this._dismissWindow();
+    this._dismissWindow(shouldPreserveSelection);
   }
 
   /**
