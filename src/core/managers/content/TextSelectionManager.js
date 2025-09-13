@@ -1168,13 +1168,33 @@ export class TextSelectionManager extends ResourceTracker {
         this.logger.debug('Mouse event inside translation window - keeping open');
         return;
       }
-      
+
       // Check composed path for shadow DOM elements
       if (typeof event.composedPath === 'function') {
         const eventPath = event.composedPath();
         if (eventPath.includes(displayElement)) {
           this.logger.debug('Mouse event in window path - keeping open');
           return;
+        }
+      }
+    }
+
+    // Check if mouse event is on a translation icon
+    if (event.target) {
+      const translationIcon = event.target.closest('.translation-icon');
+      if (translationIcon) {
+        this.logger.debug('Mouse event on translation icon - not dismissing');
+        return;
+      }
+
+      // Check composed path for translation icons in shadow DOM
+      if (typeof event.composedPath === 'function') {
+        const eventPath = event.composedPath();
+        for (const element of eventPath) {
+          if (element.classList && element.classList.contains('translation-icon')) {
+            this.logger.debug('Mouse event on translation icon in path - not dismissing');
+            return;
+          }
         }
       }
     }
