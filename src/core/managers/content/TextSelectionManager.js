@@ -357,13 +357,11 @@ export class TextSelectionManager extends ResourceTracker {
 
   /**
    * Dismiss translation window (works in both main frame and iframe)
-   * @param {boolean} preserveSelection - Whether to preserve text selection when dismissing
    */
-  _dismissWindow(preserveSelection = false) {
+  _dismissWindow() {
     const windowsManager = this._getWindowsManager();
     if (windowsManager) {
-      // Pass preserveSelection parameter to maintain selection when needed
-      windowsManager.dismiss(true, preserveSelection);
+      windowsManager.dismiss();
     }
     // Clear selection tracking after dismissal
     this.lastSelectionElement = null;
@@ -1152,6 +1150,11 @@ export class TextSelectionManager extends ResourceTracker {
     // Only handle mouse events for dismissing windows, not for text selection
     if (!event) return;
 
+    // Only dismiss on left click (button 0), ignore right-click (button 2) and middle-click (button 1)
+    if (event.button !== 0) {
+      return;
+    }
+
     const windowsManager = this._getWindowsManager();
     if (!windowsManager || !this._isWindowVisible()) {
       return;
@@ -1177,15 +1180,11 @@ export class TextSelectionManager extends ResourceTracker {
     }
     
     // Mouse event outside window, dismiss it instantly
-    // Check if context menu is open and preserve selection accordingly
-    const shouldPreserveSelection = this.featureManager?.getFeatureHandler('textSelection')?.contextMenuOpen || false;
-
     this.logger.debug('Outside mouse event detected - dismissing translation window', {
       eventType: event.type,
-      target: event.target?.tagName,
-      shouldPreserveSelection
+      target: event.target?.tagName
     });
-    this._dismissWindow(shouldPreserveSelection);
+    this._dismissWindow();
   }
 
   /**

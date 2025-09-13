@@ -6,8 +6,8 @@
     :class="{ 'is-hovering': isHovering, 'is-active': isActive }"
     :style="dynamicStyle"
     @click="handleClick"
-    @mousedown.prevent.stop
-    @mouseup.prevent.stop
+    @mouseup.left.prevent.stop
+    @contextmenu.stop
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @focus="onFocus"

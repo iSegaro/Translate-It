@@ -346,7 +346,19 @@ export class WindowsManager extends ResourceTracker {
     this._dismissHandler = (event) => {
       // Handle both icon mode and visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
-      
+
+      // Only dismiss on left click when clicking outside selected text
+      // For right-click, only dismiss if not on selected text
+      if (event.button === 2) {
+        // Right-click: check if clicking on selected text
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          // If there's selected text, don't dismiss on right-click
+          this.logger.debug('[Selection] Right-click ignored - preserving selection');
+          return;
+        }
+      }
+
       const target = event.target;
       
       // Use the same logic as ClickManager for consistency
