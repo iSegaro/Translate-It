@@ -126,8 +126,8 @@ export function useTTSSmart() {
       progress.value = 0; // Reset progress, real progress will come from audio events
       logger.debug("[useTTSSmart] TTS started successfully");
 
-      // Start polling for completion as fallback for content script context
-      startCompletionPolling();
+      // Start safety timeout for completion (event-driven system with fallback)
+      startCompletionTimeout();
 
       return true;
     } catch (error) {
@@ -230,10 +230,10 @@ export function useTTSSmart() {
       
       const response = await sendMessage(message);
 
-      // Stop polling
-      if (completionPoller) {
-        clearInterval(completionPoller);
-        completionPoller = null;
+      // Clear any completion timeout (event-driven system)
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+        completionTimeout = null;
       }
 
       // Reset state regardless of response
@@ -281,10 +281,10 @@ export function useTTSSmart() {
       
       const response = await sendMessage(message);
 
-      // Stop polling
-      if (completionPoller) {
-        clearInterval(completionPoller);
-        completionPoller = null;
+      // Clear any completion timeout (event-driven system)
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+        completionTimeout = null;
       }
 
       // Reset local state
@@ -309,10 +309,10 @@ export function useTTSSmart() {
         showInUI: false
       });
       
-      // Stop polling even on error
-      if (completionPoller) {
-        clearInterval(completionPoller);
-        completionPoller = null;
+      // Clear any completion timeout even on error
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+        completionTimeout = null;
       }
       
       // Still reset local state
@@ -406,50 +406,24 @@ export function useTTSSmart() {
 
   const isAvailable = () => true;
 
-  // Polling mechanism for completion detection (fallback for content script)
-  let completionPoller = null;
-  
-  const startCompletionPolling = () => {
-    if (completionPoller) {
-      clearInterval(completionPoller);
+  // Emergency timeout for completion detection (event-driven system with safety net)
+  let completionTimeout = null;
+
+  const startCompletionTimeout = () => {
+    if (completionTimeout) {
+      clearTimeout(completionTimeout);
     }
-    
-    logger.debug("[useTTSSmart] Starting completion polling as fallback");
-    let pollCount = 0;
-    const maxPolls = 30; // 15 seconds maximum (500ms * 30)
-    
-    completionPoller = setInterval(async () => {
-      pollCount++;
-      
-      if (ttsState.value !== 'playing') {
-        logger.debug("[useTTSSmart] Stopping completion polling - state changed");
-        clearInterval(completionPoller);
-        completionPoller = null;
-        return;
-      }
-      
-      if (pollCount >= maxPolls) {
-        logger.warn("[useTTSSmart] Completion polling timeout - assuming completion");
+
+    logger.debug("[useTTSSmart] Starting completion safety timeout (30s)");
+
+    // Safety net: if no GOOGLE_TTS_ENDED event received within 30 seconds, assume completion
+    completionTimeout = setTimeout(() => {
+      if (ttsState.value === 'playing') {
+        logger.warn("[useTTSSmart] No completion event received within 30s - assuming completion");
         handleTTSCompletion();
-        clearInterval(completionPoller);
-        completionPoller = null;
-        return;
       }
-      
-      // Check TTS status via background
-      try {
-        const status = await getStatus();
-        
-        if (status.server === 'idle' && ttsState.value === 'playing') {
-          logger.debug("[useTTSSmart] Completion detected via polling");
-          handleTTSCompletion();
-          clearInterval(completionPoller);
-          completionPoller = null;
-        }
-      } catch (error) {
-        logger.debug("[useTTSSmart] Polling check skipped due to error:", error.message);
-      }
-    }, 500); // Poll every 500ms
+      completionTimeout = null;
+    }, 30000); // 30 second safety timeout
   };
   
   const handleTTSCompletion = () => {
@@ -471,18 +445,18 @@ export function useTTSSmart() {
     }
   };
 
-  // Listen for TTS completion messages from offscreen
+  // Listen for TTS completion messages from offscreen (event-driven system)
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message) => {
       if (message.action === 'GOOGLE_TTS_ENDED') {
         logger.debug("[useTTSSmart] TTS ended notification received - audio playback completed");
-        
-        // Stop polling since we received the event
-        if (completionPoller) {
-          clearInterval(completionPoller);
-          completionPoller = null;
+
+        // Clear safety timeout since we received the completion event
+        if (completionTimeout) {
+          clearTimeout(completionTimeout);
+          completionTimeout = null;
         }
-        
+
         handleTTSCompletion();
       }
     });

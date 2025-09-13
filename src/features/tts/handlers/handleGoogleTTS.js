@@ -16,6 +16,7 @@ let currentTTSRequest = null;
 let lastTTSText = null;
 let lastTTSLanguage = null;
 let currentTTSId = null;
+let currentTTSSender = null; // Store sender info for targeted event sending
 
 // Google TTS supported languages (major ones)
 const SUPPORTED_TTS_LANGUAGES = new Set([
@@ -127,6 +128,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     lastTTSText = text;
     lastTTSLanguage = targetLanguage;
     currentTTSId = message.data?.ttsId || null;
+    currentTTSSender = sender; // Store sender for targeted event sending
     
     // Create and store the request promise
     currentTTSRequest = (async () => {
@@ -160,6 +162,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     lastTTSText = null;
     lastTTSLanguage = null;
     currentTTSId = null;
+    currentTTSSender = null;
     
     return {
       success: false,
@@ -347,6 +350,17 @@ const playGoogleTTSAudio = (ttsUrl) => {
         currentFirefoxAudio = null; // Clear reference when ended
         currentTTSId = null; // Clear TTS ID when audio actually ends
         logger.debug('[GoogleTTSHandler] Background Google TTS audio completed');
+
+        // Send completion event for event-driven system (Firefox)
+        // Note: Firefox completion is handled here, Chrome uses offscreen document
+        initializebrowserAPI().then(browserAPI => {
+          browserAPI.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(() => {
+            logger.debug('[GoogleTTSHandler] Failed to send TTS ended notification (Firefox)');
+          });
+        }).catch(error => {
+          logger.debug('[GoogleTTSHandler] Could not send TTS ended event:', error.message);
+        });
+
         resolve();
       };
       
@@ -402,6 +416,7 @@ export const handleGoogleTTSStopAll = async (message, sender) => {
     lastTTSLanguage = null;
     if (!isSpecificStop) {
       currentTTSId = null; // Only clear ID if stopping all
+      currentTTSSender = null; // Clear sender when stopping all
     }
     
     const isChromiumBrowser = isChromium();
@@ -496,11 +511,43 @@ export const handleGoogleTTSResume = async (message, sender) => {
 export const handleGoogleTTSEnded = async (message, sender) => {
   try {
     logger.debug('[GoogleTTSHandler] 🏁 Processing Google TTS End notification');
-    
+
     // Clear the current TTS ID when audio ends
     currentTTSId = null;
     logger.debug('[GoogleTTSHandler] 🧹 Cleared currentTTSId on completion');
-    
+
+    // Send GOOGLE_TTS_ENDED event only to the original requester
+    if (currentTTSSender) {
+      try {
+        const browserAPI = await initializebrowserAPI();
+
+        if (currentTTSSender.tab?.id) {
+          // Content script request - send to specific tab
+          await browserAPI.tabs.sendMessage(currentTTSSender.tab.id, {
+            action: 'GOOGLE_TTS_ENDED',
+            source: 'background',
+            targetFrameId: currentTTSSender.frameId // Send to specific frame if available
+          });
+          logger.debug(`[GoogleTTSHandler] ✅ Sent GOOGLE_TTS_ENDED to content script in tab ${currentTTSSender.tab.id}`);
+        } else {
+          // Popup/Sidepanel request - send via runtime.sendMessage (global)
+          await browserAPI.runtime.sendMessage({
+            action: 'GOOGLE_TTS_ENDED',
+            source: 'background',
+            targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
+          });
+          logger.debug('[GoogleTTSHandler] ✅ Sent GOOGLE_TTS_ENDED to popup/sidepanel via runtime.sendMessage');
+        }
+      } catch (sendError) {
+        logger.debug('[GoogleTTSHandler] Could not send GOOGLE_TTS_ENDED to requester:', sendError.message);
+      }
+
+      // Clear sender after sending event
+      currentTTSSender = null;
+    } else {
+      logger.debug('[GoogleTTSHandler] No sender info stored - skipping event forwarding');
+    }
+
     return { success: true, action: 'cleared' };
   } catch (error) {
     logger.error('[GoogleTTSHandler] ❌ Google TTS end handling failed:', error);
