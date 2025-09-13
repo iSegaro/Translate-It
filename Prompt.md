@@ -13,6 +13,7 @@
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
 - **IFrame Support**: سیستم ساده و مؤثر پشتیبانی از iframe با ResourceTracker integration و memory management یکپارچه
+- **Toast Integration System (2025)**: سیستم اطلاع‌رسانی یکپارچه با ToastEventHandler، ToastElementDetector، و پشتیبانی از action buttons برای تعامل کاربر
 - **Provider System**: 10+ سرویس ترجمه با معماری سلسله‌مراتبی (BaseProvider, BaseTranslateProvider, BaseAIProvider) و مدیریت Rate Limiting و Circuit Breaker.
 - **Error Management**: سیستم مدیریت خطای متمرکز
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
@@ -60,11 +61,12 @@
   - `translation/` - موتور ترجمه، شامل `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
   - `tts/` - **سیستم TTS یکپارچه (2025)** - `useTTSSmart.js` به‌عنوان تنها منبع حقیقت با fallback زبان خودکار
   - `screen-capture/` - سیستم کپچر صفحه و OCR
-  - `element-selection/` - انتخاب و ترجمه المنت‌های DOM با SelectElementHandler
-  - `text-selection/` - مدیریت انتخاب متن با TextSelectionHandler
+  - `element-selection/` - **سیستم انتخاب عنصر بازطراحی شده (2025)** - SelectElementManager با معماری یکپارچه، Toast Integration، و سرویس‌های مجزا
+  - `text-selection/` - مدیریت انتخاب متن با TextSelectionHandler و FieldDetector بهبود یافته
   - `text-field-interaction/` - نمایش آیکون در فیلدهای متنی با TextFieldIconHandler
   - `shortcuts/` - میانبرهای صفحه‌کلید با ShortcutHandler  
   - `exclusion/` - سیستم **Smart Handler Registration** با ExclusionChecker
+  - `notifications/` - **سیستم اطلاع‌رسانی (2025)** - BaseNotification و مدیریت متمرکز notifications
   - `text-actions/` - عملیات copy/paste/TTS
   - `subtitle/` - ترجمه زیرنویس ویدئوها
   - `windows/` - مدیریت UI رویداد-محور با WindowsManagerHandler
@@ -79,6 +81,7 @@
   - `error-management/` - مدیریت خطای متمرکز
   - `logging/` - سیستم log ساختارمند  
   - `config/` - تنظیمات کلی
+  - `toast/` - **سیستم Toast Integration (2025)** - ToastEventHandler، ToastElementDetector، ToastIntegration، و constants برای مدیریت اطلاع‌رسانی یکپارچه
 
 ### 🏗️ Core Infrastructure
 - **`src/core/`**: زیرساخت اصلی
@@ -116,8 +119,9 @@
 - **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
 - **`docs/TTS_SYSTEM.md`**: سیستم **TTS یکپارچه (2025)** - منبع واحد حقیقت با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **`docs/TEXT_SELECTION_SYSTEM.md`**: سیستم **انتخاب متن ماژولار (2025)** - معماری مدرن با SiteHandlerRegistry، static imports، و پشتیبانی کامل از professional editors (Google Docs, Zoho Writer, WPS Office, Notion)
+- **`docs/TOAST_INTEGRATION_SYSTEM.md`**: **سیستم اطلاع‌رسانی یکپارچه (2025)** - معماری Toast Integration با ToastEventHandler، ToastElementDetector، و پشتیبانی از action buttons
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
-- **`docs/SELECT_ELEMENT_SYSTEM.md`**: سیستم انتخاب و ترجمه عناصر صفحه
+- **`docs/SELECT_ELEMENT_SYSTEM.md`**: **سیستم انتخاب عنصر بازطراحی شده (2025)** - معماری یکپارچه با Toast Integration، سرویس‌های مجزا، و مدیریت منابع هوشمند
 
 ### منابع اضافی
 - **`docs/Images/`**: تصاویر و diagram های معماری
@@ -144,6 +148,12 @@
 - **به‌روزرسانی Real-Time**: تغییرات تنظیمات بدون نیاز به refresh صفحه اعمال می‌شود
 - **مدیریت پویا**: فعال‌سازی و غیرفعال‌سازی خودکار بر اساس URL و تنظیمات
 - **جداسازی خطا**: اگر یک feature خراب شود، سایرین کار می‌کنند
+
+### 🎉 Toast Integration System (2025)
+- **Actionable Notifications**: Toast notifications با دکمه‌های تعاملی برای cancel و action
+- **Cross-Context Support**: کاربری یکپارچه در تمام contexts و iframe ها
+- **Event-Driven Architecture**: ارتباط هوشمند بین toast interactions و system responses
+- **Smart Detection**: ToastElementDetector برای تشخیص و استثناء المنت‌های extension
 
 ### 📁 Clean Structure
 - **حداکثر 3 سطح عمق**: پیمایش آسان‌تر

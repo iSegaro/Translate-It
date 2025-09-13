@@ -2,79 +2,342 @@
 
 ## 🎯 Overview
 
-The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content. The system is built on a modern, decoupled architecture that separates business logic from the user interface, ensuring high performance and maintainability.
+The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content. The system has been completely refactored to integrate with the modern toast notification system and follows a unified, service-oriented architecture.
 
 ## 🏗️ Architecture
 
-The system is fundamentally split into two distinct layers that communicate via an event bus, following the headless controller pattern.
+The system is built on a unified manager pattern with integrated toast notifications and decoupled services.
 
 ```
 +-------------------------+
 |   Browser UI (Popup)    |
 +-------------------------+
-            |
-            ▼ (Message: ACTIVATE_SELECT_ELEMENT_MODE)
+           |
+           ▼ (Message: ACTIVATE_SELECT_ELEMENT_MODE)
 +-------------------------+
 |   Background Script     |
 +-------------------------+
-            |
-            ▼ (Message to Content Script)
+           |
+           ▼ (Message to Content Script)
 +--------------------------------------------------------------------+
-|                               Content Script                       |
+|                          Content Script                           |
 |                                                                    |
-| +--------------------------+     (Events)     +--------------------+ |
-| | SelectElementManager.js  | ◀──────────────▶ |   UI Host System   | |
-| | (Headless Logic)         | (PageEventBus)   | (Vue UI in Shadow  | |
-| +--------------------------+                  +--------------------+ |
-|           |                                             |            |
-|           ▼ (DOM Inspection & Highlighting)             ▼ (Renders)  |
+| +--------------------------+      (Events)     +----------------+ |
+| |  SelectElementManager.js | ◀──────────────▶ |  Toast System  | |
+| |   (Unified Manager)      |    (Event Bus)    | (Notifications)| |
+| +--------------------------+                  +----------------+ |
+|           |                                              |       |
+|           ▼ (DOM Operations)                             ▼ (Shows) |
 | +--------------------------------------------------------------------+ |
 | |                            Webpage DOM                           | |
 | +--------------------------------------------------------------------+ |
 +--------------------------------------------------------------------+
 ```
 
-### 1. Logic Layer (`SelectElementManager.js`)
-This is the core of the system, running as a headless controller in the content script. It does **not** render any complex UI itself. Its responsibilities include:
-- **Activation & Deactivation**: Manages the lifecycle of the selection mode.
-- **Event Handling**: Listens to mouse events (`mouseover`, `click`) to track user interactions.
-- **Smart Element Detection**: Contains sophisticated logic to find the most relevant translatable element near the cursor, not just the element being hovered over.
-- **Service Orchestration**: Composed of smaller, specialized services for highlighting, text extraction, translation, and state management.
-- **Event Emission**: Communicates with the UI layer by emitting events to the `PageEventBus` (e.g., `select-mode-activated`).
+### Core Components
 
-### 2. UI Layer (`SelectModeToolbar.vue` within UI Host)
-The user interface for the selection mode is a Vue component rendered by the central `UI Host System`. 
-- **Event-Driven**: It listens for events from the `SelectElementManager` to know when to show or hide itself.
-- **Shadow DOM Isolation**: As part of the UI Host, it is rendered inside a Shadow DOM, making it completely immune to the host page's CSS styles.
-- **User Feedback**: It provides visual cues to the user, such as a toolbar or an overlay indicating that the selection mode is active.
+#### 1. **SelectElementManager.js** (Unified Manager)
+The central controller that manages the entire Select Element lifecycle:
+- **Singleton Pattern**: Single instance across the application
+- **Service Orchestration**: Manages all specialized services
+- **Resource Management**: Extends ResourceTracker for automatic cleanup
+- **Event Handling**: Coordinates mouse events and toast interactions
+- **Cross-Frame Support**: Works in both main page and iframes
 
-## ✨ Key Features
+#### 2. **Service Layer** (Decoupled Services)
+Each service has a single responsibility:
 
-- **Decoupled Architecture**: The separation of logic from UI makes the system robust and easy to maintain.
-- **Smart Element Detection**: Instead of a simple hover-to-select, the manager analyzes parent and child elements to identify the most meaningful block of content for translation.
-- **Multiple Selection Modes**: The `ModeManager` service supports different selection behaviors (e.g., a "Simple" mode that selects only the direct element, and a "Smart" mode that finds the best container). These modes can be toggled dynamically using the `Ctrl` key.
-- **Direct Highlighting**: For maximum performance, the highlight border around elements is applied directly via CSS classes by the `ElementHighlighter` service. This avoids the overhead of passing frequent updates to Vue.
-- **Asynchronous, Non-Blocking Translation**: Once an element is clicked, the selection UI disappears immediately, and the translation process runs in the background. This provides a fluid user experience.
-- **Revert-able Translations**: The `StateManager` service tracks all translated elements, allowing the user to revert the changes back to the original text.
+- **ElementHighlighter**: Visual feedback and highlighting
+- **TextExtractionService**: Text content extraction and validation
+- **TranslationOrchestrator**: Translation process coordination
+- **ModeManager**: Selection mode management (Simple/Smart)
+- **StateManager**: Translation state tracking and reverts
+- **ErrorHandlingService**: Centralized error management
 
-## 🔄 Event Flow (`PageEventBus`)
-The communication between the logic and UI layers relies on a simple set of events:
+#### 3. **Toast Integration System** (New)
+Integrated notification system for user feedback:
+- **ToastIntegration**: Central toast management
+- **ToastEventHandler**: Event handling for toast interactions
+- **ToastElementDetector**: Element detection for toast exclusion
+- **SelectElementNotificationManager**: Specialized notification handling
 
-- `select-mode-activated`: Fired by `SelectElementManager` when the mode becomes active. The UI Host listens to this to show the `SelectModeToolbar`.
-- `select-mode-deactivated`: Fired when the mode is turned off or an element has been selected. The UI Host listens to this to hide the toolbar.
-- `show-notification`: Used by various services within the manager to display status updates or errors (e.g., "No text found to translate").
-- `clear-all-highlights`: An event to command the `ElementHighlighter` to remove any active highlights from the page.
+## ✨ Key Features (2025 Update)
 
-## 🛠️ How It Works (User Flow)
+### 🎉 Toast Integration
+- **Real-time Notifications**: Users receive immediate feedback via toast notifications
+- **Actionable Toasts**: Toast notifications include cancel buttons for mode deactivation
+- **Cross-Context Support**: Works seamlessly across different browsing contexts
+- **Event-Driven**: Toast interactions trigger appropriate system responses
 
-1.  User clicks the "Select Element" action in the extension popup.
-2.  The background script sends a message to the content script to activate the mode.
-3.  `SelectElementManager.activate()` is called.
-4.  The manager attaches mouse listeners to the page and emits `select-mode-activated`.
-5.  The `UI Host` receives this event and renders the `SelectModeToolbar.vue` component, showing the user that selection mode is active.
-6.  As the user moves the mouse, `ElementHighlighter` analyzes elements and applies a CSS class to highlight valid targets.
-7.  The user clicks a highlighted element.
-8.  `SelectElementManager.handleClick()` takes over. It identifies the final target element and passes it to the `TranslationOrchestrator` to begin the translation process.
-9.  The manager immediately calls `deactivateUI()` and emits `select-mode-deactivated`.
-10. The `UI Host` hides the `SelectModeToolbar`.
-11. When the translation result arrives, `TranslationOrchestrator` applies the translated text directly to the DOM and registers the change with the `StateManager` so it can be reverted later.
+### 🔄 Unified Manager Architecture
+- **Single Responsibility**: One manager to rule all Select Element operations
+- **Service Composition**: Built from specialized, testable services
+- **Resource Tracking**: Automatic cleanup with ResourceTracker integration
+- **Singleton Pattern**: Ensures consistency across the application
+
+### 🛡️ Navigation Prevention
+- **Smart Blocking**: Prevents navigation on interactive elements during selection
+- **Content-Aware**: Allows translation of elements with text content
+- **Cross-Site**: Works consistently across all websites (Twitter, GitHub, etc.)
+
+### 🎨 Enhanced Visual Feedback
+- **Direct CSS Highlighting**: Maximum performance with direct DOM manipulation
+- **Global Styles**: Main DOM injection for crosshair cursor and link disabling
+- **Toast Styling**: Integrated toast styles with the main application
+
+## 🔄 Event Flow
+
+### Activation Flow
+1. User clicks "Select Element" in extension popup
+2. Background script sends activation message to content script
+3. `SelectElementManager.getInstance()` creates/returns singleton instance
+4. Manager activates services and attaches event listeners
+5. Toast notification appears with activation confirmation and cancel option
+6. UI behaviors activate (crosshair cursor, link disabling)
+
+### Selection Flow
+1. User hovers over elements → `ElementHighlighter` provides visual feedback
+2. User clicks on highlighted element
+3. `handleClick()` processes the selection:
+   - Prevents default navigation behavior
+   - Extracts text via `TextExtractionService`
+   - Initiates translation via `TranslationOrchestrator`
+   - Deactivates UI immediately
+4. Toast notification shows translation progress/completion
+5. Translation applied to DOM with state tracking for reverts
+
+### Deactivation Flow
+1. User clicks cancel button in toast notification OR
+2. User translates an element OR
+3. User presses Escape key
+4. `ToastEventHandler` detects cancel interaction
+5. `SelectElementManager.deactivate()` cleans up:
+   - Removes event listeners
+   - Clears highlights
+   - Disables toast notifications
+   - Resets UI behaviors
+6. System returns to normal state
+
+## 🔧 Service Details
+
+### ElementHighlighter Service
+```javascript
+// Visual feedback management
+class ElementHighlighter {
+  addGlobalStyles()           // Crosshair cursor and link disabling
+  handleMouseOver(element)    // Smart element highlighting
+  handleMouseOut(element)     // Highlight removal with timeout
+  findBestTextElement(start)  // Intelligent element selection
+  clearAllHighlights()        // Complete highlight cleanup
+}
+```
+
+### TextExtraction Service
+```javascript
+// Content extraction and validation
+class TextExtractionService {
+  extractText(element)        // Extract meaningful text content
+  validateText(text)          // Validate for translation
+  findBestContainer(element)  // Find optimal translation target
+}
+```
+
+### TranslationOrchestrator
+```javascript
+// Translation coordination
+class TranslationOrchestrator {
+  translateElement(element, text)  // Execute translation
+  applyTranslation(element, result) // Apply to DOM
+  handleTranslationError(error)    // Error management
+}
+```
+
+### StateManager
+```javascript
+// State tracking and reverts
+class StateManager {
+  trackTranslation(element, original, translated)  // Track changes
+  revertElement(element)                          // Revert to original
+  getTranslationHistory()                         // History management
+}
+```
+
+## 🛠️ Technical Implementation
+
+### Resource Management
+```javascript
+// Automatic cleanup with ResourceTracker
+class SelectElementManager extends ResourceTracker {
+  constructor() {
+    super('select-element-manager');
+    // Track all services for automatic cleanup
+    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup());
+    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup());
+    // ... other services
+  }
+}
+```
+
+### Toast Integration
+```javascript
+// Toast notification management
+class ToastIntegration {
+  showNotification(type, message, options = {}) {
+    // Display actionable toast notifications
+    return this.showToast(type, message, {
+      duration: options.persistent ? 0 : 5000,
+      actions: options.actions || [],
+      ...options
+    });
+  }
+}
+```
+
+### Navigation Prevention
+```javascript
+// Smart navigation blocking
+preventNavigationHandler(event) {
+  if (!this.isActive || this.isProcessingClick) return;
+  
+  const target = event.target;
+  const isInteractiveElement = this.isInteractiveElement(target);
+  
+  if (isInteractiveElement) {
+    const hasTextContent = this.hasTextContent(target);
+    
+    if (hasTextContent) {
+      // Allow elements with text content to be translated
+      return;
+    }
+    
+    // Block navigation on other interactive elements
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  }
+}
+```
+
+## 🎯 Usage Patterns
+
+### Basic Element Translation
+1. Activate Select Element mode
+2. Hover over desired element (visual highlight appears)
+3. Click element (immediate translation)
+4. View result with toast confirmation
+
+### Complex Content Translation
+1. Activate Select Element mode
+2. Hold Ctrl for Smart Mode (selects optimal container)
+3. Click on complex element (intelligent container selection)
+4. System handles nested content and styling
+
+### Mode Deactivation
+- **Method 1**: Click cancel button in toast notification
+- **Method 2**: Press Escape key
+- **Method 3**: Translate any element (auto-deactivation)
+- **Method 4**: Click outside any element (timeout-based)
+
+## 🔧 Configuration
+
+### Mode Types
+- **Simple Mode**: Direct element selection
+- **Smart Mode**: Intelligent container selection (Ctrl toggle)
+
+### Toast Options
+- **Activation Notifications**: Confirm mode activation
+- **Progress Notifications**: Translation status updates
+- **Error Notifications**: User-friendly error messages
+- **Completion Notifications**: Translation result confirmations
+
+## 📊 Performance Optimizations
+
+### Resource Efficiency
+- **Lazy Loading**: Services initialized on demand
+- **Automatic Cleanup**: ResourceTracker prevents memory leaks
+- **Event Debouncing**: Optimized mouse event handling
+- **CSS Caching**: Reused style calculations
+
+### User Experience
+- **Immediate Feedback**: Instant visual highlighting
+- **Non-Blocking**: Translation runs in background
+- **Smart Cancellation**: Multiple deactivation methods
+- **Cross-Site Consistency**: Works everywhere
+
+## 🔄 Integration Points
+
+### With Toast System
+```javascript
+// Seamless toast integration
+this.toastIntegration.showNotification('success', 'Select Element mode activated', {
+  actions: [
+    {
+      label: 'Cancel',
+      callback: () => this.deactivate(),
+      type: 'cancel'
+    }
+  ]
+});
+```
+
+### With Translation System
+```javascript
+// Integration with translation providers
+this.translationOrchestrator.translateElement(element, text)
+  .then(result => this.applyTranslation(element, result))
+  .catch(error => this.errorHandlingService.handleError(error));
+```
+
+### With State Management
+```javascript
+// State tracking for reverts
+this.stateManager.trackTranslation(element, originalText, translatedText);
+```
+
+## 🛡️ Error Handling
+
+### Comprehensive Error Management
+- **Validation Errors**: Invalid element or content detection
+- **Translation Errors**: Provider failures and rate limits
+- **DOM Errors**: Element manipulation issues
+- **Network Errors**: Extension context validation
+
+### User-Friendly Messages
+- **Toast Notifications**: Clear error communication
+- **Visual Feedback**: Highlight state management
+- **Graceful Degradation**: System remains functional on errors
+
+## 📈 Metrics and Monitoring
+
+### Debug Information
+```javascript
+getStatus() {
+  return {
+    isActive: this.isActive,
+    isProcessingClick: this.isProcessingClick,
+    hasHighlight: this.elementHighlighter?.currentHighlighted,
+    serviceStates: this.getServiceStates(),
+    notificationState: this.currentNotification?.getState()
+  };
+}
+```
+
+### Performance Tracking
+- **Activation Time**: Mode initialization speed
+- **Selection Accuracy**: Element detection success rate
+- **Translation Time**: Provider response metrics
+- **Error Rate**: System reliability metrics
+
+## 🚀 Future Enhancements
+
+### Planned Features
+- **Multi-Element Selection**: Batch translation capabilities
+- **Visual Translation**: Image and SVG content support
+- **Advanced AI Context**: Smart content understanding
+- **Collaborative Translation**: Multi-user features
+
+### Technical Improvements
+- **WebAssembly Integration**: Performance-critical operations
+- **Service Worker Support**: Background processing
+- **Advanced Caching**: Intelligent content caching
+- **Progressive Enhancement**: Graceful feature degradation

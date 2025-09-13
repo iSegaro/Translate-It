@@ -23,6 +23,7 @@
 - ✅ **Unified Messaging System** - Race-condition-free messaging with intelligent timeout management
 - ✅ **Smart Handler Registration System** - Feature-based exclusion with dynamic handler lifecycle management and real-time settings updates
 - ✅ **Memory Garbage Collector** - Advanced memory management system preventing memory leaks with support for DOM, Browser APIs, custom event systems, and Critical Protection System
+- ✅ **Toast Integration System (2025)** - Comprehensive toast notification system with Vue Sonner integration, actionable notifications, and cross-context support
 
 ---
 
@@ -37,6 +38,7 @@
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system with Critical Protection for essential resources
+- **[Toast Integration System](TOAST_INTEGRATION_SYSTEM.md)** - Comprehensive Vue Sonner toast integration with actionable notifications and event-driven architecture
 
 ### Feature-Specific Documentation
 - **[Smart Handler Registration System](SMART_HANDLER_REGISTRATION_SYSTEM.md)** - Dynamic feature lifecycle management with exclusion logic
@@ -92,8 +94,8 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
-│  Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager → Storage Manager → Error Handler            │
-│  Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector │
+│  Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager → Storage Manager → Error Handler → Toast Integration System │
+│  Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector → Toast Integration System │
 └─────────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -101,7 +103,7 @@
 │                   CONTENT LAYER                                │
 │  Content Scripts → Smart Feature Management → UI Host System   │
 │  Feature-Based Registration → Dynamic Handler Lifecycle        │
-│  Principled Text Selection (2025) → Element Selection → Text Field Icons → Context Integration │
+│  Principled Text Selection (2025) → Element Selection → Text Field Icons → Context Integration → Toast Notifications │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -210,6 +212,11 @@ src/
 │   │   ├── managers/          # IFrameManager (core functionality)
 │   │   ├── composables/       # useIFrameSupport, useIFrameDetection (simplified)
 │   │   └── README.md          # Streamlined documentation
+│   ├── notifications/           # Toast Integration System (2025)
+│   │   ├── NotificationSystem.js    # Main notification manager
+│   │   ├── handlers/               # Event handlers
+│   │   ├── types/                  # Notification types
+│   │   └── index.js                # Notification exports
 │   ├── history/
 │   │   ├── stores/            # history.js store
 │   │   ├── composables/       # useHistory
@@ -223,7 +230,13 @@ src/
 ├── 🔧 shared/                 # Shared Systems (Moved from top-level)
 │   ├── messaging/             # Smart messaging system
 │   │   ├── core/              # MessagingCore, SmartMessaging
-│   │   └── composables/       # useMessaging
+│   │   ├── composables/       # useMessaging
+│   │   └── toast/                 # Toast Integration System (2025)
+│   │       ├── ToastIntegration.js # Main toast controller
+│   │       ├── ToastEventHandler.js # Event interception
+│   │       ├── ToastElementDetector.js # Element detection
+│   │       ├── constants.js       # Toast configuration
+│   │       └── index.js            # Toast exports
 │   ├── storage/               # Storage management
 │   │   ├── core/              # StorageCore, SecureStorage
 │   │   └── composables/       # useStorage, useStorageItem
@@ -349,7 +362,56 @@ src/
 
 ---
 
-## 🔄 Unified Messaging System
+## 🎯 Shared Systems Architecture
+
+### Toast Integration System (2025)
+Comprehensive toast notification system providing **event-driven, actionable notifications** with Vue Sonner integration. See **[Toast Integration System Documentation](TOAST_INTEGRATION_SYSTEM.md)** for complete details.
+
+**Architecture**:
+```
+ToastIntegration (Main Controller)
+    ↓ (Manages events)
+ToastEventHandler (Event Interception)
+    ↓ (Detects elements)
+ToastElementDetector (Element Detection)
+    ↓ (Renders UI)
+Vue Sonner Toasts (Interactive Components)
+```
+
+**Key Features**:
+- **Actionable Notifications**: Interactive buttons with custom callbacks
+- **Cross-Context Support**: Works in main page, iframes, and Shadow DOM
+- **Smart Element Detection**: Intelligent exclusion of extension elements
+- **Event-Driven**: Decoupled architecture with event bus communication
+- **Error Handling**: Graceful degradation and comprehensive logging
+
+**Core Components**:
+- **ToastIntegration.js**: Main controller coordinating all toast operations
+- **ToastEventHandler.js**: Event interception with capture-phase processing
+- **ToastElementDetector.js**: Smart element detection and exclusion
+- **constants.js**: Centralized configuration and selectors
+
+**Usage Pattern**:
+```javascript
+// Initialize for a feature
+const toastIntegration = new ToastIntegration(eventBus)
+await toastIntegration.initialize({
+  onCancelClick: () => this.deactivate()
+})
+
+// Show actionable notification
+toastIntegration.showNotification('success', 'Mode activated', {
+  actions: [
+    {
+      label: 'Cancel',
+      callback: () => this.deactivate(),
+      type: 'cancel'
+    }
+  ]
+})
+```
+
+### Unified Messaging System
 
 ### Overview
 The Unified Messaging system provides **race-condition-free communication** between Vue components, background scripts, and content scripts with **intelligent timeout management**. See [Unified Messaging System Documentation](MessagingSystem.md) for complete details.
@@ -1383,6 +1445,7 @@ This architecture provides a **comprehensive, modular, and scalable** foundation
 - **🎯 Complete Vue.js Integration**: Reactive components, composables, and Pinia stores
 - **🔧 Modular Design**: 18+ specialized systems working together seamlessly  
 - **🖼️ Streamlined IFrame Support**: Essential iframe functionality with ResourceTracker integration and simplified architecture
+- **🔔 Toast Integration System**: Event-driven notifications with actionable buttons and cross-context support
 - **⚡ Performance Optimized**: Intelligent caching, lazy loading, and efficient data flow
 - **🛡️ Production Ready**: Comprehensive error handling, logging, and context safety
 - **🌐 Cross-Browser Compatible**: Chrome and Firefox compatibility with automatic detection
