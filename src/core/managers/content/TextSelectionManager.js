@@ -1013,6 +1013,15 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
+        // Check if we should show selection icon for this field type
+        if (!detection.shouldShowSelectionIcon) {
+          this.logger.debug('Not showing selection icon for double-click on regular field', {
+            fieldType: detection.fieldType,
+            shouldShowSelectionIcon: detection.shouldShowSelectionIcon
+          });
+          return true;
+        }
+        
         // Store double-click context for duplicate detection
         this.lastDoubleClickText = selectedText;
         
@@ -1029,6 +1038,15 @@ export class TextSelectionManager extends ResourceTracker {
           method: 'immediate',
           fieldType: detection.fieldType
         });
+        
+        // Check if we should show selection icon for this field type
+        if (!detection.shouldShowSelectionIcon) {
+          this.logger.debug('Not showing selection icon for double-click on regular field (immediate)', {
+            fieldType: detection.fieldType,
+            shouldShowSelectionIcon: detection.shouldShowSelectionIcon
+          });
+          return true;
+        }
         
         // Store double-click context for duplicate detection
         this.lastDoubleClickText = immediateText;
