@@ -709,12 +709,15 @@ this.trackCache(providerCache, { isCritical: true })
 ### When to Use Critical Protection
 
 **Use for:**
-- Essential UI event handlers (text selection, drag detection)
-- Core system managers (TextSelectionManager, WindowsManager)
+- Essential UI event handlers (text selection, element highlighting)
+- Core system managers (SelectElementManager, TextSelectionManager, WindowsManager)
+- Essential UI services (ToastIntegration, ElementHighlighter)
 - Configuration caches (settings, provider configs)
 - Critical timers (polling, health checks)
 
 **Don't use for:**
+- FeatureManager itself (should allow cleanup of non-critical handlers)
+- Optional features (TextFieldIconHandler, shortcut handlers)
 - Temporary event listeners (modal interactions, tooltips)
 - One-time operations (API calls, animations)
 - Debug/development resources

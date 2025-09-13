@@ -2,9 +2,9 @@
 // Single responsibility: Manage Select Element mode lifecycle and interactions
 
 import browser from "webextension-polyfill";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
@@ -47,13 +47,48 @@ class SelectElementManager extends ResourceTracker {
     this.modeManager = new ModeManager();
     this.errorHandlingService = new ErrorHandlingService();
     
-    // Track services for cleanup
-    this.trackResource('state-manager', () => this.stateManager?.cleanup());
-    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup());
-    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup());
-    this.trackResource('translation-orchestrator', () => this.translationOrchestrator?.cleanup());
-    this.trackResource('mode-manager', () => this.modeManager?.cleanup());
-    this.trackResource('error-handling-service', () => this.errorHandlingService?.cleanup());
+    // Track services for automatic cleanup with ResourceTracker
+    this.trackResource('element-highlighter', () => {
+      if (this.elementHighlighter) {
+        this.elementHighlighter.cleanup?.();
+        this.elementHighlighter = null;
+      }
+    }, { isCritical: true });
+
+    this.trackResource('text-extraction-service', () => {
+      if (this.textExtractionService) {
+        this.textExtractionService.cleanup?.();
+        this.textExtractionService = null;
+      }
+    }, { isCritical: true });
+
+    this.trackResource('translation-orchestrator', () => {
+      if (this.translationOrchestrator) {
+        this.translationOrchestrator.cleanup?.();
+        this.translationOrchestrator = null;
+      }
+    }, { isCritical: true });
+
+    this.trackResource('mode-manager', () => {
+      if (this.modeManager) {
+        this.modeManager.cleanup?.();
+        this.modeManager = null;
+      }
+    }, { isCritical: true });
+
+    this.trackResource('error-handling-service', () => {
+      if (this.errorHandlingService) {
+        this.errorHandlingService.cleanup?.();
+        this.errorHandlingService = null;
+      }
+    }, { isCritical: true });
+
+    this.trackResource('state-manager', () => {
+      if (this.stateManager) {
+        this.stateManager.cleanup?.();
+        this.stateManager = null;
+      }
+    }, { isCritical: true });
     
     // Event handlers
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -71,40 +106,7 @@ class SelectElementManager extends ResourceTracker {
     });
   }
   
-  // Singleton pattern
-  static instance = null;
-  static initializing = false;
-  
-  static async getInstance() {
-    if (!SelectElementManager.instance) {
-      if (SelectElementManager.initializing) {
-        // Wait for initialization to complete
-        while (SelectElementManager.initializing) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        return SelectElementManager.instance;
-      }
-      
-      SelectElementManager.initializing = true;
-      try {
-        SelectElementManager.instance = new SelectElementManager();
-        await SelectElementManager.instance.initialize();
-      } catch (error) {
-        SelectElementManager.instance = null;
-        throw error;
-      } finally {
-        SelectElementManager.initializing = false;
-      }
-    }
-    return SelectElementManager.instance;
-  }
-  
-  static clearInstance() {
-    if (SelectElementManager.instance) {
-      SelectElementManager.instance.cleanup();
-      SelectElementManager.instance = null;
-    }
-  }
+  // Note: Using ResourceTracker pattern directly - managed by FeatureManager
   
   async initialize() {
     if (this.isInitialized) {
@@ -140,8 +142,26 @@ class SelectElementManager extends ResourceTracker {
   }
   
   async activate() {
+    // This method is called by FeatureManager during initialization
+    // It should only initialize resources, NOT activate Select Element mode
+    if (this.isInitialized) {
+      this.logger.debug("SelectElementManager already initialized");
+      return true;
+    }
+
+    try {
+      await this.initialize();
+      this.logger.debug("SelectElementManager activated successfully (resources initialized)");
+      return true;
+    } catch (error) {
+      this.logger.error("Error activating SelectElementManager:", error);
+      return false;
+    }
+  }
+
+  async activateSelectElementMode() {
     if (this.isActive) {
-      this.logger.debug("SelectElementManager already active");
+      this.logger.debug("SelectElement mode already active");
       return;
     }
     
@@ -176,7 +196,10 @@ class SelectElementManager extends ResourceTracker {
       await this.notifyBackgroundActivation();
       
       this.logger.info("Select element mode activated successfully");
-      
+
+      // Return status object
+      return { isActive: this.isActive, instanceId: this.instanceId };
+
     } catch (error) {
       this.logger.error("Error activating SelectElementManager:", {
         error: error.message,
@@ -722,18 +745,18 @@ class SelectElementManager extends ResourceTracker {
   
   async cleanup() {
     this.logger.info("Cleaning up SelectElement manager");
-    
+
     try {
       // Deactivate if active
       if (this.isActive) {
         await this.deactivate();
       }
-      
-      // Clean up all tracked resources
-      super.cleanup();
-      
+
+      // ResourceTracker will handle all service cleanup automatically
+      this.cleanup();
+
       this.logger.info("SelectElement manager cleanup completed successfully");
-      
+
     } catch (error) {
       this.logger.error("Error during SelectElement manager cleanup:", error);
       throw error;
@@ -741,49 +764,11 @@ class SelectElementManager extends ResourceTracker {
   }
 }
 
-// Export lazy-initialized singleton getter
-export const getSelectElementManager = () => SelectElementManager.getInstance();
-
-// Export legacy-compatible sync getter (for non-async contexts)
-export const selectElementManager = {
-  async activate() {
-    const instance = await SelectElementManager.getInstance();
-    return instance.activate();
-  },
-  async deactivate(options) {
-    const instance = await SelectElementManager.getInstance();
-    return instance.deactivate(options);
-  },
-  async forceDeactivate() {
-    const instance = await SelectElementManager.getInstance();
-    return instance.forceDeactivate();
-  },
-  async cancelInProgressTranslation() {
-    const instance = await SelectElementManager.getInstance();
-    return instance.translationOrchestrator.cancelAllTranslations();
-  },
-  async revertTranslations() {
-    const instance = await SelectElementManager.getInstance();
-    return instance.revertTranslations();
-  },
-  getSelectElementManager() {
-    return SelectElementManager.getInstance();
-  },
-  isSelectElementActive() {
-    return SelectElementManager.instance?.isActive || false;
-  },
-  getStatus() {
-    return SelectElementManager.instance?.getStatus() || {
-      serviceActive: false,
-      isProcessingClick: false,
-      isInitialized: false,
-      instanceId: 'pending',
-      isInIframe: window !== window.top
-    };
-  }
-};
-
-// Export class
+// Export class for direct instantiation by FeatureManager
 export { SelectElementManager };
 
-// No auto-initialization - initialize only when needed
+// Legacy getSelectElementManager for backwards compatibility (deprecated)
+export const getSelectElementManager = () => {
+  console.warn('getSelectElementManager is deprecated. Use SelectElementManager directly.');
+  return new SelectElementManager();
+};

@@ -43,25 +43,16 @@ async function initializeLegacyHandlers() {
   logger.warn('Initializing legacy handlers as fallback...');
   
   try {
-    // Import legacy modules
+    // Legacy initialization is now handled by FeatureManager
+    // Import only what's needed for backward compatibility
     const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
-    const { selectElementManager } = await import("@/features/element-selection/managers/index.js");
-    const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
-    const { createMessageHandler } = await import('@/shared/messaging/core/MessageHandler.js');
-    
+
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
-    
-    // Store instances globally
+
+    // Store instances globally (for legacy compatibility)
     window.translationHandlerInstance = translationHandler;
-    window.selectElementManagerInstance = selectElementManager;
-    
-    // Basic initialization
-    await selectElementManager.initialize();
-    contentMessageHandler.initialize();
-    
-    // Set up message handler for proper communication with background script
-    const messageHandler = createMessageHandler();
+    // Note: selectElementManagerInstance is no longer available - use FeatureManager instead
     
     // Register all ContentMessageHandler handlers with the central message handler
     if (contentMessageHandler.handlers) {
@@ -280,12 +271,21 @@ if (!access.isAccessible) {
       
       // Create and initialize FeatureManager
       featureManager = new FeatureManager();
+
+      // FeatureManager manages handlers - individual handlers handle their own Critical Protection
+      featureManager.trackResource('feature-manager-core', () => {
+        logger.debug('FeatureManager core cleanup called');
+        // FeatureManager itself is not critical - individual handlers manage their own protection
+      });
+
       await featureManager.initialize();
-      
-      // Store for global access (mainly for debugging)
+
+      // Store for global access (mainly for debugging and memory protection)
       if (isDevelopmentMode()) {
         window.featureManagerInstance = featureManager;
       }
+      // Also store globally for memory protection
+      window.featureManager = featureManager;
       
       logger.info('Smart Feature Management System initialized successfully', {
         activeFeatures: featureManager.getActiveFeatures(),

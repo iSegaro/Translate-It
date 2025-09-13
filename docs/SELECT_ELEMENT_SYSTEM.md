@@ -40,9 +40,11 @@ The system is built on a unified manager pattern with integrated toast notificat
 The central controller that manages the entire Select Element lifecycle:
 - **Singleton Pattern**: Single instance across the application
 - **Service Orchestration**: Manages all specialized services
-- **Resource Management**: Extends ResourceTracker for automatic cleanup
+- **Resource Management**: Extends ResourceTracker for automatic cleanup with Critical Protection
 - **Event Handling**: Coordinates mouse events and toast interactions
 - **Cross-Frame Support**: Works in both main page and iframes
+- **FeatureManager Integration**: Integrated with smart feature management system
+- **Separate Activation Methods**: `activate()` for FeatureManager initialization, `activateSelectElementMode()` for actual functionality
 
 #### 2. **Service Layer** (Decoupled Services)
 Each service has a single responsibility:
@@ -90,10 +92,11 @@ Integrated notification system for user feedback:
 ### Activation Flow
 1. User clicks "Select Element" in extension popup
 2. Background script sends activation message to content script
-3. `SelectElementManager.getInstance()` creates/returns singleton instance
-4. Manager activates services and attaches event listeners
-5. Toast notification appears with activation confirmation and cancel option
-6. UI behaviors activate (crosshair cursor, link disabling)
+3. FeatureManager calls `activate()` on SelectElementManager for initialization
+4. When actual functionality is needed, ContentMessageHandler calls `activateSelectElementMode()`
+5. Manager activates services and attaches event listeners
+6. Toast notification appears with activation confirmation and cancel option
+7. UI behaviors activate (crosshair cursor, link disabling)
 
 ### Selection Flow
 1. User hovers over elements → `ElementHighlighter` provides visual feedback
@@ -166,14 +169,17 @@ class StateManager {
 
 ### Resource Management
 ```javascript
-// Automatic cleanup with ResourceTracker
+// Automatic cleanup with ResourceTracker and Critical Protection
 class SelectElementManager extends ResourceTracker {
   constructor() {
     super('select-element-manager');
-    // Track all services for automatic cleanup
-    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup());
-    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup());
-    // ... other services
+    // Track essential services with Critical Protection
+    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup(), { isCritical: true });
+    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup(), { isCritical: true });
+    this.trackResource('toast-integration', () => this.toastIntegration?.cleanup(), { isCritical: true });
+    // Track other services normally
+    this.trackResource('translation-orchestrator', () => this.translationOrchestrator?.cleanup());
+    this.trackResource('state-manager', () => this.stateManager?.cleanup());
   }
 }
 ```
@@ -317,7 +323,9 @@ getStatus() {
     isProcessingClick: this.isProcessingClick,
     hasHighlight: this.elementHighlighter?.currentHighlighted,
     serviceStates: this.getServiceStates(),
-    notificationState: this.currentNotification?.getState()
+    notificationState: this.currentNotification?.getState(),
+    featureManagement: this.featureManager?.isFeatureActive('selectElement') || false,
+    resourceTracking: this.getStats()
   };
 }
 ```

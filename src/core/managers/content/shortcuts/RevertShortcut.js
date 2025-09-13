@@ -1,8 +1,55 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { selectElementManager } from '@/features/element-selection/managers/index.js';
+// Note: Direct access to SelectElementManager is no longer available
+// We need to get it via FeatureManager or use alternative approaches
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
+
+/**
+ * Get active SelectElementManager via FeatureManager (if available)
+ * @returns {Object|null} Active SelectElementManager or null
+ */
+async function getActiveSelectElementManager() {
+  try {
+    // Try multiple sources for FeatureManager instance
+    let featureManager = window.featureManager || window.featureManagerInstance;
+
+    if (!featureManager) {
+      try {
+        const featureManagerModule = await import('@/core/managers/content/FeatureManager.js');
+        featureManager = featureManagerModule.default?.instance;
+      } catch (moduleError) {
+        logger.debug('Could not import FeatureManager module:', moduleError);
+      }
+    }
+
+    if (featureManager && featureManager.getFeatureHandler) {
+      const selectElementHandler = featureManager.getFeatureHandler('selectElement');
+      if (selectElementHandler && selectElementHandler.getSelectElementManager) {
+        const manager = selectElementHandler.getSelectElementManager();
+        if (manager) {
+          logger.debug('Found active SelectElementManager via FeatureManager');
+          return manager;
+        }
+      }
+    }
+
+    // Fallback: try legacy getSelectElementManager
+    try {
+      const { getSelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
+      const manager = getSelectElementManager();
+      logger.debug('Using legacy getSelectElementManager fallback');
+      return manager;
+    } catch (legacyError) {
+      logger.debug('Legacy getSelectElementManager not available:', legacyError);
+      return null;
+    }
+  } catch (error) {
+    logger.debug('Could not get active SelectElementManager:', error);
+    return null;
+  }
+}
+
 /**
  * Revert Shortcut - ESC key handler for reverting translations
  * Modular shortcut handler that integrates with RevertHandler
@@ -34,56 +81,52 @@ export class RevertShortcut {
     // Priority 1: If translation is in progress, cancel it first
     if (window.isTranslationInProgress) {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
-      
+
       try {
+        // Get active SelectElementManager
+        const selectElementManager = await getActiveSelectElementManager();
+
         // Try multiple approaches to ensure cancellation works
-        
-        // Approach 1: Get active messageId for specific cancellation
-        const activeMessageId = selectElementManager.getActiveMessageId();
-        
-        if (activeMessageId) {
-          // Cancel specific translation with proper state management
-          await selectElementManager.cancelSpecificTranslation(activeMessageId);
-          logger.debug(`[RevertShortcut] Cancelled specific translation: ${activeMessageId}`);
-        } else {
-          // Approach 2: Fallback to cancel all translations via SelectElementManager
-          logger.debug('[RevertShortcut] No specific messageId found, using cancel all approach');
-          await selectElementManager.cancelInProgressTranslation();
-          logger.debug('[RevertShortcut] Cancelled all translations via SelectElementManager');
-          
-          // Approach 3: Direct background cancellation as additional safety measure
-          try {
-            const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-            const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-            
-            await sendMessage({
-              action: MessageActions.CANCEL_TRANSLATION,
-              data: { 
-                cancelAll: true,
-                reason: 'esc_key_pressed',
-                context: 'revert-shortcut'
-              }
-            });
-            logger.debug('[RevertShortcut] Sent direct cancel-all to background');
-          } catch (directCancelError) {
-            logger.debug('[RevertShortcut] Direct background cancellation failed:', directCancelError);
+        if (selectElementManager) {
+          // Approach 1: Get active messageId for specific cancellation
+          const activeMessageId = selectElementManager.getActiveMessageId?.();
+
+          if (activeMessageId) {
+            // Cancel specific translation with proper state management
+            await selectElementManager.cancelSpecificTranslation?.(activeMessageId);
+            logger.debug(`[RevertShortcut] Cancelled specific translation: ${activeMessageId}`);
+          } else {
+            // Approach 2: Fallback to cancel all translations via SelectElementManager
+            logger.debug('[RevertShortcut] No specific messageId found, using cancel all approach');
+            await selectElementManager.translationOrchestrator?.cancelAllTranslations?.();
+            logger.debug('[RevertShortcut] Cancelled all translations via SelectElementManager');
           }
         }
-        
-        // Note: resetCancelledTranslationState() in SelectElementManager already:
-        // - Clears window.isTranslationInProgress
-        // - Deactivates Select Element mode
-        // - Disables highlighting
-        
+
+        // Approach 3: Direct background cancellation as primary method now
+        try {
+          const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+
+          await sendMessage({
+            action: MessageActions.CANCEL_TRANSLATION,
+            data: {
+              cancelAll: true,
+              reason: 'esc_key_pressed',
+              context: 'revert-shortcut'
+            }
+          });
+          logger.debug('[RevertShortcut] Sent direct cancel-all to background');
+        } catch (directCancelError) {
+          logger.debug('[RevertShortcut] Direct background cancellation failed:', directCancelError);
+        }
+
         return { success: true, action: 'cancelled' };
       } catch (error) {
         logger.error('[RevertShortcut] Error cancelling translation:', error);
         // Fallback: force clear state
         try {
           window.isTranslationInProgress = false;
-          if (selectElementManager.resetCancelledTranslationState) {
-            selectElementManager.resetCancelledTranslationState();
-          }
           return { success: true, action: 'cancelled_fallback' };
         } catch (fallbackError) {
           return { success: false, action: 'cancellation_failed', error: error.message };
@@ -101,7 +144,8 @@ export class RevertShortcut {
     
     try {
       // Check modern Vue translations in StateManager
-      hasModernTranslations = selectElementManager.stateManager?.hasTranslatedElements?.() || false;
+      const selectElementManager = await getActiveSelectElementManager();
+      hasModernTranslations = selectElementManager?.stateManager?.hasTranslatedElements?.() || false;
     } catch (error) {
       logger.debug('[RevertShortcut] Error checking modern translations:', error);
     }

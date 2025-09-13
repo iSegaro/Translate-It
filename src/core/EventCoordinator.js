@@ -78,14 +78,14 @@ export default class EventCoordinator {
 
     try {
       // Get active feature handlers from FeatureManager
-      const selectElementHandler = this.featureManager.getFeatureHandler('selectElement');
+      const selectElementManager = this.featureManager.getFeatureHandler('selectElement');
       const textSelectionHandler = this.featureManager.getFeatureHandler('textSelection');
       const textFieldIconHandler = this.featureManager.getFeatureHandler('textFieldIcon');
 
       // Check if select element is active (priority handling)
-      if (selectElementHandler?.isSelectElementActive?.()) {
+      if (selectElementManager?.isSelectElementActive?.()) {
         this.logger.debug('Select element mode is active - skipping other event handling');
-        return; // Let SelectElementHandler manage its own events
+        return; // Let SelectElementManager manage its own events
       }
 
       // === TEXT FIELD COORDINATION ===

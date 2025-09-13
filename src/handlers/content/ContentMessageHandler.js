@@ -21,6 +21,12 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.errorHandler = ErrorHandler.getInstance();
+
+    // CRITICAL: Protect ContentMessageHandler itself from Memory Garbage Collector
+    this.trackResource('content-message-handler-core', () => {
+      this.logger.debug('ContentMessageHandler core cleanup called - should not happen due to critical protection');
+      // This is critical and should not be cleaned up
+    }, { isCritical: true });
   }
 
   setSelectElementManager(manager) {
@@ -83,13 +89,15 @@ export class ContentMessageHandler extends ResourceTracker {
         this.logger.debug('ContentMessageHandler message listener activated');
       }
       
-      // Track message handler for cleanup
+      // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
       this.trackResource('messageHandler', () => {
-        if (this.messageHandler) {
+        this.logger.error('ContentMessageHandler messageHandler cleanup called - THIS SHOULD NOT HAPPEN!');
+        if (this.messageHandler && this.messageHandler.stopListening) {
+          this.logger.error('Stopping message handler listening - THIS IS THE PROBLEM!');
           this.messageHandler.stopListening();
           this.messageHandler = null;
         }
-      });
+      }, { isCritical: true });
       
       this.isActive = true;
       this.logger.info('ContentMessageHandler activated successfully with smart message handling');
@@ -186,31 +194,28 @@ export class ContentMessageHandler extends ResourceTracker {
       hasMessageHandler: !!this.messageHandler,
       initialized: this.initialized
     });
-    
+
     try {
-      // Import unified SelectElementManager on-demand
-      const { getSelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
-      
-      // Get the manager instance
-      const selectElementManager = await getSelectElementManager();
-      
-      // Store reference for potential deactivate calls
-      this.selectElementManager = selectElementManager;
-      
-      this.logger.debug("ContentMessageHandler: Calling selectElementManager.activate()");
-      
-      // Activate the SelectElementManager
-      await selectElementManager.activate();
-      
-      this.logger.debug("ContentMessageHandler: selectElementManager.activate() completed successfully");
-      
-      // Always return a proper success response
-      return { success: true, activated: true };
+      if (!this.selectElementManager) {
+        throw new Error('SelectElementManager not available - FeatureManager dependency injection may have failed');
+      }
+
+      this.logger.debug("ContentMessageHandler: Activating SelectElementManager directly");
+
+      // Initialize if not already initialized
+      if (!this.selectElementManager.isInitialized) {
+        await this.selectElementManager.initialize();
+      }
+
+      // Activate Select Element mode
+      const result = await this.selectElementManager.activateSelectElementMode();
+      this.logger.debug("ContentMessageHandler: SelectElementManager.activateSelectElementMode() completed");
+
+      // Return success result
+      return { success: true, activated: result.isActive, managerId: result.instanceId };
       
     } catch (error) {
-      this.logger.error("ContentMessageHandler: SelectElementManager activation failed:", error);
-      // Clear reference on error
-      this.selectElementManager = null;
+      this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
       
       // Use centralized error handling for better error classification
       const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
@@ -277,17 +282,11 @@ export class ContentMessageHandler extends ResourceTracker {
         isActive: this.selectElementManager.isSelectElementActive(),
         isInIframe: window !== window.top,
       });
-      
+
       try {
-        if (fromBackground) {
-          // Use forceDeactivate to avoid sending back to background
-          this.logger.debug('Using forceDeactivate (background-initiated)');
-          await this.selectElementManager.forceDeactivate();
-        } else {
-          this.logger.debug('Using regular deactivate (local-initiated)');
-          await this.selectElementManager.deactivate();
-        }
-        
+        // Deactivate the manager directly
+        await this.selectElementManager.deactivate({ fromBackground });
+
         return { success: true, activated: false };
       } catch (error) {
         this.logger.error("ContentMessageHandler: selectElementManager deactivation failed:", error);
@@ -300,22 +299,23 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleStreamUpdate(message) {
-    this.logger.debug('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', { 
-      messageId: message.messageId, 
+    this.logger.debug('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', {
+      messageId: message.messageId,
       success: message.data?.success,
       batchIndex: message.data?.batchIndex,
-      hasSelectElementManager: !!this.selectElementManager 
+      hasSelectElementManager: !!this.selectElementManager,
+      isActive: this.selectElementManager?.isSelectElementActive()
     });
-    
-    if (this.selectElementManager) {
+
+    if (this.selectElementManager && this.selectElementManager.translationOrchestrator) {
       return this.selectElementManager.translationOrchestrator.handleStreamUpdate(message);
     } else {
-      this.logger.warn('[ContentMessageHandler] No selectElementManager available for stream update');
+      this.logger.warn('[ContentMessageHandler] SelectElementManager not available for stream update');
     }
   }
 
   async handleStreamEnd(message) {
-    if (this.selectElementManager) {
+    if (this.selectElementManager && this.selectElementManager.translationOrchestrator) {
       return this.selectElementManager.translationOrchestrator.handleStreamEnd(message);
     }
   }
@@ -336,7 +336,7 @@ export class ContentMessageHandler extends ResourceTracker {
       case TranslationMode.Select_Element:
       case 'SelectElement': // Handle both enum and hardcoded string for robustness
         if (this.selectElementManager) {
-          this.logger.debug('Forwarding to SelectElementManager');
+          this.logger.debug('Forwarding to SelectElementHandler');
           return this.selectElementManager.handleTranslationResult(message);
         }
         break;
@@ -432,8 +432,13 @@ export class ContentMessageHandler extends ResourceTracker {
   async handleIFrameActivateSelectElement(data) {
     this.logger.debug('IFrame activate select element request', data);
     if (this.selectElementManager) {
-      await this.selectElementManager.activate();
-      return { success: true };
+      // Initialize if not already initialized
+      if (!this.selectElementManager.isInitialized) {
+        await this.selectElementManager.initialize();
+      }
+
+      const result = await this.selectElementManager.activateSelectElementMode();
+      return { success: true, activated: result.isActive, managerId: result.instanceId };
     }
     return { success: false, error: 'SelectElementManager not available' };
   }

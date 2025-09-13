@@ -2,7 +2,7 @@
 // Re-exports all components for easy importing
 
 // Unified Manager (Primary export)
-export { SelectElementManager, selectElementManager, getSelectElementManager } from '../SelectElementManager.js';
+export { SelectElementManager, getSelectElementManager } from '../SelectElementManager.js';
 export { SelectElementNotificationManager, getSelectElementNotificationManager } from '../SelectElementNotificationManager.js';
 
 // Core Services
@@ -20,6 +20,11 @@ export * from './utils/domHelpers.js';
 export * from './constants/selectElementConstants.js';
 
 // Legacy compatibility - map old service exports to new manager
-import { SelectElementManager as ManagerClass, selectElementManager as ManagerInstance } from '../SelectElementManager.js';
+import { SelectElementManager as ManagerClass } from '../SelectElementManager.js';
 export const SelectElementService = ManagerClass;
-export const selectElementService = ManagerInstance;
+// selectElementService is deprecated - use SelectElementManager instead
+export const selectElementService = {
+  activate: () => console.warn('selectElementService.activate() is deprecated. Use SelectElementManager instead.'),
+  deactivate: () => console.warn('selectElementService.deactivate() is deprecated. Use SelectElementManager instead.'),
+  getStatus: () => ({ deprecated: true })
+};

@@ -52,8 +52,8 @@ export class FeatureManager extends ResourceTracker {
 
   async evaluateAndRegisterFeatures() {
     // Order matters: contentMessageHandler should be activated first
-    // Note: selectElement is not included here - it's activated on-demand via ContentMessageHandler
-    const features = ['contentMessageHandler', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
+    // selectElement is managed directly by FeatureManager with its own Critical Protection
+    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
     
     logger.debug('Evaluating features for registration:', features);
     
@@ -73,10 +73,20 @@ export class FeatureManager extends ResourceTracker {
 
   async injectDependencies() {
     const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+    const selectElementManager = this.featureHandlers.get('selectElement');
     const shortcutHandler = this.featureHandlers.get('shortcut');
 
-    // Note: SelectElementService is injected on-demand by ContentMessageHandler
-    // No need to inject it here as it's not a managed feature
+    // Inject SelectElementManager into ContentMessageHandler for direct access
+    if (contentMessageHandler && selectElementManager) {
+      try {
+        if (typeof contentMessageHandler.setSelectElementManager === 'function') {
+          contentMessageHandler.setSelectElementManager(selectElementManager);
+          logger.debug('Injected SelectElementManager into ContentMessageHandler');
+        }
+      } catch (error) {
+        logger.error('Error injecting SelectElementManager into ContentMessageHandler:', error);
+      }
+    }
 
     // Inject TranslationHandler into ShortcutHandler
     if (shortcutHandler && contentMessageHandler) {
@@ -181,8 +191,10 @@ export class FeatureManager extends ResourceTracker {
           HandlerClass = ContentMessageHandler;
           break;
 
-        // selectElement is handled on-demand via ContentMessageHandler, not as a feature
-        // case 'selectElement':
+        case 'selectElement':
+          const { SelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
+          HandlerClass = SelectElementManager;
+          break;
           
         case 'textSelection':
           const { TextSelectionHandler } = await import('@/features/text-selection/handlers/TextSelectionHandler.js');
@@ -260,8 +272,8 @@ export class FeatureManager extends ResourceTracker {
 
   async reevaluateFeatures() {
     // Order matters: contentMessageHandler should be evaluated first
-    // Note: selectElement is not included here - it's activated on-demand via ContentMessageHandler
-    const features = ['contentMessageHandler', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
+    // selectElement is managed directly by FeatureManager with its own Critical Protection
+    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
     
     logger.debug('Re-evaluating all features');
     
