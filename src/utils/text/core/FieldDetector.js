@@ -223,11 +223,78 @@ export class FieldDetector {
         }
       }
       
+      // Check if element is inside a regular form field
+      const parentField = this._findParentFormField(element);
+      if (parentField) {
+        return FieldTypes.REGULAR_INPUT;
+      }
+      
     } catch (error) {
       this.logger.warn('Error classifying field type:', error);
     }
     
     return FieldTypes.UNKNOWN;
+  }
+
+  /**
+   * Find parent form field element
+   * @param {Element} element - Starting element
+   * @returns {Element|null} Parent form field or null
+   */
+  _findParentFormField(element) {
+    if (!element) return null;
+    
+    // Check common form field containers and class patterns
+    const fieldSelectors = [
+      'input[type="text"]',
+      'input[type="search"]', 
+      'input[type="email"]',
+      'input[type="url"]',
+      'input[type="tel"]',
+      'textarea',
+      'input:not([type])',  // input without type defaults to text
+    ];
+    
+    // Also check for common wrapper classes
+    const wrapperPatterns = [
+      /input/i,
+      /textfield/i,
+      /form-field/i,
+      /search/i,
+      /query/i,
+      /filter/i
+    ];
+    
+    // Check if element is inside a form field
+    for (const selector of fieldSelectors) {
+      try {
+        const field = element.closest(selector);
+        if (field) {
+          return field;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    // Check if any parent has input-related classes
+    let parent = element.parentElement;
+    while (parent && parent !== document.body) {
+      const className = parent.className || '';
+      const classString = typeof className === 'string' ? className : '';
+      
+      if (wrapperPatterns.some(pattern => pattern.test(classString))) {
+        // Check if this wrapper contains actual form fields
+        const hasFormFields = parent.querySelector('input, textarea');
+        if (hasFormFields) {
+          return parent;
+        }
+      }
+      
+      parent = parent.parentElement;
+    }
+    
+    return null;
   }
 
   /**
@@ -334,6 +401,11 @@ export class FieldDetector {
    * @returns {boolean} True if should show selection icon
    */
   _shouldShowSelectionIcon(fieldType) {
+    // Show selection icon for:
+    // - Professional editors (with double-click requirement)
+    // - Rich text editors (with double-click requirement) 
+    // - Regular content (UNKNOWN field type) - any selection is acceptable
+    // Regular input fields should NOT show selection icon
     return fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
            fieldType === FieldTypes.RICH_TEXT_EDITOR ||
            fieldType === FieldTypes.UNKNOWN;
