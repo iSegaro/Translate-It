@@ -59,6 +59,7 @@ class SelectElementManager extends ResourceTracker {
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.preventNavigationHandler = this.preventNavigationHandler.bind(this);
     
     // Notification management
     this.currentNotification = null;
@@ -277,6 +278,9 @@ class SelectElementManager extends ResourceTracker {
       document.addEventListener('mouseout', this.handleMouseOut, true);
       document.addEventListener('click', this.handleClick, true);
       
+      // Add global click prevention for navigation
+      document.addEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
+      
       this.logger.debug("Event listeners setup for SelectElementManager");
     }
   }
@@ -285,6 +289,7 @@ class SelectElementManager extends ResourceTracker {
     document.removeEventListener('mouseover', this.handleMouseOver, true);
     document.removeEventListener('mouseout', this.handleMouseOut, true);
     document.removeEventListener('click', this.handleClick, true);
+    document.removeEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
     
     this.logger.debug("Event listeners removed for SelectElementManager");
   }
@@ -308,6 +313,11 @@ class SelectElementManager extends ResourceTracker {
     
     try {
       this.isProcessingClick = true;
+      
+      // Prevent navigation and any default behavior
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
       
       // Extract text from clicked element
       const text = await this.textExtractionService.extractTextFromElement(event.target);
@@ -347,6 +357,124 @@ class SelectElementManager extends ResourceTracker {
     } finally {
       this.isProcessingClick = false;
     }
+  }
+  
+  /**
+   * Global navigation prevention handler - prevents navigation on all interactive elements
+   * @param {Event} event - Click event
+   */
+  preventNavigationHandler(event) {
+    if (!this.isActive || this.isProcessingClick) return;
+    
+    const target = event.target;
+    
+    // Check if the clicked element is an interactive element that could cause navigation
+    const isInteractiveElement = this.isInteractiveElement(target);
+    
+    if (isInteractiveElement) {
+      // Simple check for text content (sync)
+      const hasTextContent = this.hasTextContent(target);
+      
+      if (hasTextContent) {
+        // If element has text, let the main handleClick handle it
+        this.logger.debug('Interactive element has text content, deferring to main handler');
+        return;
+      }
+      
+      this.logger.debug('Preventing navigation on interactive element without text content:', {
+        tagName: target.tagName,
+        className: target.className,
+        href: target.href,
+        role: target.getAttribute('role'),
+        hasHref: !!target.href,
+        hasOnclick: !!target.onclick,
+        isLink: target.tagName === 'A' || target.getAttribute('role') === 'link'
+      });
+      
+      // Prevent the default navigation behavior
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      return false;
+    }
+  }
+  
+  /**
+   * Simple check for text content (sync)
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element has text content
+   */
+  hasTextContent(element) {
+    if (!element) return false;
+    
+    // Check immediate text content
+    const text = element.textContent || element.innerText || '';
+    if (text.trim().length > 10) return true; // Minimum threshold
+    
+    // Check children text content
+    const childrenText = Array.from(element.children)
+      .map(child => child.textContent || child.innerText || '')
+      .join(' ')
+      .trim();
+    
+    return childrenText.length > 10;
+  }
+  
+  /**
+   * Check if element is interactive and could cause navigation
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element is interactive
+   */
+  isInteractiveElement(element) {
+    if (!element || !element.tagName) return false;
+    
+    // Check tag name
+    const interactiveTags = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
+    if (interactiveTags.includes(element.tagName)) return true;
+    
+    // Check attributes that indicate interactivity
+    const hasHref = element.hasAttribute('href');
+    const hasOnclick = element.hasAttribute('onclick');
+    const hasRoleLink = element.getAttribute('role') === 'link';
+    const hasRoleButton = element.getAttribute('role') === 'button';
+    const isClickable = element.getAttribute('data-testid')?.toLowerCase().includes('click') || 
+                        element.getAttribute('data-testid')?.toLowerCase().includes('button');
+    
+    // Check if element is within a clickable container (like tweet articles)
+    const isInClickableContainer = this.isInClickableContainer(element);
+    
+    return hasHref || hasOnclick || hasRoleLink || hasRoleButton || isClickable || isInClickableContainer;
+  }
+  
+  /**
+   * Check if element is within a clickable container that might cause navigation
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element is in clickable container
+   */
+  isInClickableContainer(element) {
+    if (!element) return false;
+    
+    // Check common clickable containers
+    const clickableContainers = [
+      'article',                  // General article elements
+      '[role="article"]',        // Articles with role
+      '[data-testid*="tweet"]',  // Tweet containers
+      '[data-testid*="post"]',   // Post containers  
+      '[data-testid*="card"]',   // Card containers
+      '[data-testid*="cell"]',   // Cell containers
+      '[role="link"]',           // Link containers
+      '[aria-label*="tweet"]',   // Tweet by aria-label
+      '[aria-label*="post"]'      // Post by aria-label
+    ];
+    
+    return clickableContainers.some(selector => {
+      try {
+        return element.closest(selector);
+      } catch (e) {
+        return false;
+      }
+    });
   }
   
   async startTranslation(text, targetElement) {
