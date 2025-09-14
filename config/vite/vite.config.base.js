@@ -18,8 +18,10 @@ export const createBaseConfig = (browser, options = {}) => {
           compilerOptions: {
             // Allow translate-it- prefixed custom elements for CSP compatibility
             isCustomElement: (tag) => tag.startsWith('translate-it-'),
-            // Compile templates at build time
-            whitespace: 'preserve'
+            // Compile templates at build time to avoid runtime innerHTML usage
+            whitespace: 'preserve',
+            // Disable runtime compilation for CSP compliance
+            isRuntimeTemplateCompiled: true
           }
         }
       }),
