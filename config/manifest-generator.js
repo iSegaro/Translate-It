@@ -169,9 +169,7 @@ function generateFirefoxManifest(baseManifest) {
         id: 'translate-it@anthropic.com',
         strict_min_version: '112.0', // Firefox 112+ for background.type module support
         data_collection_permissions: {
-          web_api_stats: false,
-          interaction_data: false,
-          personally_identifiable_information: false
+          required: ["none"]
         }
       }
     },
