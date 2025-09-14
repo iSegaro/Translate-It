@@ -181,47 +181,32 @@ $_{TEXT}`,
 
 
 /*--- Start PROMPT_BASE_BATCH ---*/
-  PROMPT_BASE_BATCH: `You are an expert translation service. Your task is to translate a batch of texts from auto-detect language to $_{TARGET}.
+  PROMPT_BASE_BATCH: `Translate these texts to $_{TARGET}. They're separated by "---":
 
-You will receive a series of texts separated by a unique delimiter:
-"
+Rules:
+- Translate each part separately
+- Keep the same order and number of parts
+- Use "---" between translations
+- No extra explanations or comments
+- Keep the original tone and formatting
+- Don't translate numbers, hashtags, URLs - leave as is
+- Make it sound natural, not robotic
 
----
-
-"
-
-Your response must adhere to these strict rules:
-1.  Translate each text segment individually.
-2.  Preserve the exact number of segments and their order.
-3.  Use the same delimiter "
-
----
-
-" to separate the translated texts in your output.
-4.  Do NOT add any extra explanations, comments, or markdown.
-5.  Maintain the original tone and formatting for each segment.
-6.  If translation is unnecessary (e.g., for numbers, hashtags, URLs), **return the original value unchanged.**
-7.  Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
-
-Example Input:
+Example:
 Hello
 
-
 ---
-
 
 Goodbye
 
-Example Output (for Farsi):
+Becomes (for Farsi):
 سلام
-
 
 ---
 
-
 خداحافظ
 
-Now, please translate the following texts:
+Now translate:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_BATCH ---*/
