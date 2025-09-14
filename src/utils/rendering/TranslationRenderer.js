@@ -65,7 +65,8 @@ export class TranslationRenderer extends ResourceTracker {
       div.style.textAlign = isRtl ? 'right' : 'left'
     }
     
-    div.innerHTML = this.renderContent(params)
+    // Use DOM methods instead of innerHTML for security
+    this._setContentSafely(div, params)
     
     return div
   }
@@ -87,7 +88,8 @@ export class TranslationRenderer extends ResourceTracker {
       element.style.textAlign = isRtl ? 'right' : 'left'
     }
     
-    element.innerHTML = this.renderContent(params)
+    // Use DOM methods instead of innerHTML for security
+    this._setContentSafely(element, params)
   }
 
   /**
@@ -134,7 +136,7 @@ export class TranslationRenderer extends ResourceTracker {
 
     try {
       const markdownElement = SimpleMarkdown.render(content)
-      return markdownElement ? markdownElement.innerHTML : this._escapeHtml(content).replace(/\n/g, '<br>')
+      return markdownElement ? markdownElement.outerHTML : this._escapeHtml(content).replace(/\n/g, '<br>')
     } catch (error) {
       logger.warn('[TranslationRenderer] Markdown rendering failed:', error)
       return this._escapeHtml(content).replace(/\n/g, '<br>')
@@ -157,7 +159,14 @@ export class TranslationRenderer extends ResourceTracker {
     const button = document.createElement('button')
     button.className = 'toolbar-button'
     button.title = title
-    button.innerHTML = `<img src="/assets/icons/${icon}" alt="${title}" class="toolbar-icon" />`
+
+    // Create image element safely
+    const img = document.createElement('img')
+    img.src = `/assets/icons/${icon}`
+    img.alt = title
+    img.className = 'toolbar-icon'
+    button.appendChild(img)
+
     this.addEventListener(button, 'click', handler)
     return button
   }
@@ -166,6 +175,82 @@ export class TranslationRenderer extends ResourceTracker {
     const div = document.createElement('div')
     div.textContent = text
     return div.innerHTML
+  }
+
+  /**
+   * Safely set content using DOM methods instead of innerHTML
+   * @param {HTMLElement} element - Target element
+   * @param {Object} params - Content parameters
+   */
+  _setContentSafely(element, params) {
+    // Clear existing content
+    element.textContent = ''
+
+    if (params.error) {
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'error-message'
+      errorDiv.textContent = `⚠️ ${params.error}`
+      element.appendChild(errorDiv)
+      return
+    }
+
+    if (params.isLoading) {
+      const loadingDiv = document.createElement('div')
+      loadingDiv.className = 'loading-message'
+      loadingDiv.textContent = 'در حال ترجمه...'
+      element.appendChild(loadingDiv)
+      return
+    }
+
+    if (!params.content || !params.content.trim()) {
+      const placeholderDiv = document.createElement('div')
+      placeholderDiv.className = 'placeholder-message'
+      placeholderDiv.textContent = params.placeholder || 'Translation will appear here...'
+      element.appendChild(placeholderDiv)
+      return
+    }
+
+    // Handle content safely
+    if (!this.options.enableMarkdown) {
+      // Simple text with line breaks
+      const lines = params.content.split('\n')
+      lines.forEach((line, index) => {
+        if (index > 0) {
+          element.appendChild(document.createElement('br'))
+        }
+        const textNode = document.createTextNode(line)
+        element.appendChild(textNode)
+      })
+    } else {
+      // Markdown content - use the element directly from SimpleMarkdown
+      try {
+        const markdownElement = SimpleMarkdown.render(params.content)
+        if (markdownElement) {
+          element.appendChild(markdownElement)
+        } else {
+          // Fallback to escaped text
+          const lines = params.content.split('\n')
+          lines.forEach((line, index) => {
+            if (index > 0) {
+              element.appendChild(document.createElement('br'))
+            }
+            const textNode = document.createTextNode(line)
+            element.appendChild(textNode)
+          })
+        }
+      } catch (error) {
+        logger.warn('[TranslationRenderer] Markdown rendering failed:', error)
+        // Fallback to escaped text
+        const lines = params.content.split('\n')
+        lines.forEach((line, index) => {
+          if (index > 0) {
+            element.appendChild(document.createElement('br'))
+          }
+          const textNode = document.createTextNode(line)
+          element.appendChild(textNode)
+        })
+      }
+    }
   }
 }
 
