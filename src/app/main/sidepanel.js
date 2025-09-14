@@ -86,15 +86,32 @@ async function initializeApp() {
     logger.error('Failed to initialize sidepanel app:', error)
     logger.error('Error stack:', error.stack)
     
-    // Show simple error UI
-    document.getElementById('app').innerHTML = `
-      <div style="padding: 16px; color: red; font-family: monospace;">
-        <h3>Failed to load sidepanel</h3>
-        <p>Error: ${error.message}</p>
-        <p>Please check the browser console for more details.</p>
-        <button onclick="location.reload()" style="padding: 8px 16px; margin-top: 8px;">Reload</button>
-      </div>
-    `
+    // Show simple error UI using DOM methods
+    const appElement = document.getElementById('app')
+    appElement.textContent = '' // Clear existing content
+
+    const errorDiv = document.createElement('div')
+    errorDiv.style.cssText = 'padding: 16px; color: red; font-family: monospace;'
+
+    const title = document.createElement('h3')
+    title.textContent = 'Failed to load sidepanel'
+    errorDiv.appendChild(title)
+
+    const errorText = document.createElement('p')
+    errorText.textContent = `Error: ${error.message}`
+    errorDiv.appendChild(errorText)
+
+    const instruction = document.createElement('p')
+    instruction.textContent = 'Please check the browser console for more details.'
+    errorDiv.appendChild(instruction)
+
+    const reloadBtn = document.createElement('button')
+    reloadBtn.textContent = 'Reload'
+    reloadBtn.style.cssText = 'padding: 8px 16px; margin-top: 8px;'
+    reloadBtn.addEventListener('click', () => location.reload())
+    errorDiv.appendChild(reloadBtn)
+
+    appElement.appendChild(errorDiv)
   }
 }
 
