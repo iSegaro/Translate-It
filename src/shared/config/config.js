@@ -150,43 +150,33 @@ export const CONFIG = {
   // --- Prompt Templates ---
 
   /*--- Start PROMPT_BASE_FIELD ---*/
-  PROMPT_BASE_FIELD: `You are a professional translation service. Your task is to accurately and fluently translate text between $_{SOURCE} and $_{TARGET}, or from any other language into $_{TARGET}, depending on the input.
+  PROMPT_BASE_FIELD: `Translate the following text between $_{SOURCE} and $_{TARGET} languages:
 
-Strictly follow these instructions:
+- Detect the input language automatically
+- If input is in $_{SOURCE}, translate to $_{TARGET}
+- If input is in $_{TARGET}, translate to $_{SOURCE}
+- If input is in any other language, translate to $_{TARGET}
+- If text has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE}
 
-- Detect the input language.
-- If the input is in $_{SOURCE}, translate it into $_{TARGET}.
-- If the input is in $_{TARGET}, translate it into $_{SOURCE}.
-- If the input is in any other language, translate it into $_{TARGET}.
-- If the input is grammatically incorrect but written in $_{TARGET}, translate it into $_{SOURCE}, preserving the intended meaning.
+Provide a natural, fluent translation as if you were a native speaker. Keep the original formatting and structure.
 
-Translation quality requirements:
-- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
-- Prioritize clarity, tone, and readability over literal or word-for-word translation.
-- Maintain the original formatting, structure, and line breaks exactly.
-- Do **not** include any additional explanations, comments, markdown, or extra content.
-
-Output only the translated text:
-
-$_{TEXT}
-`,
+$_{TEXT}`,
 /*--- End PROMPT_BASE_FIELD ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
-  PROMPT_BASE_SELECT: `Act as a fluent and natural JSON translation service. The input is a JSON array where each object contains a "text" property.
+  PROMPT_BASE_SELECT: `Translate the JSON array below. Each object has a "text" field that needs translation.
 
-Your task:
-  1. Translate each "text" value according to the following user rules: $_{USER_RULES}
-  2. Preserve all fields. **Do not omit, modify, or skip any entries.**
-  3. If translation is unnecessary (e.g., for numbers, hashtags, URLs), **return the original value unchanged.**
-  4. Retain exact formatting, structure, and line breaks.
-  5. Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
-  6. Prioritize meaning and readability over strict word-for-word translation.
+Rules:
+- Follow these user rules: $_{USER_RULES}
+- Keep all fields exactly as they are
+- Don't translate numbers, hashtags, URLs - leave them unchanged
+- Keep the same JSON structure and formatting
+- Make translations sound natural, not word-for-word
+- Focus on the meaning, not literal translation
 
-Return **only** the translated JSON array. Do not include explanations, markdown, or any extra content.
+Return only the translated JSON array:
 
-$_{TEXT}
-`,
+$_{TEXT}`,
 /*--- End PROMPT_BASE_SELECT ---*/
 
 
@@ -238,34 +228,27 @@ $_{TEXT}
 
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
-  PROMPT_BASE_DICTIONARY: `You are a concise dictionary service. Translate the word/phrase into $_{TARGET} and provide only essential information.
+  PROMPT_BASE_DICTIONARY: `Translate this word/phrase to $_{TARGET} like a dictionary:
 
-Format your response as:
+Provide:
 - Main translation
-- Part of speech (if relevant): noun, verb, adjective, etc.
-- 2-3 most common synonyms or alternative meanings (if any)
+- Part of speech (noun, verb, etc.)
+- 2-3 common synonyms or other meanings
 
-Keep it brief and useful. Do not include examples, long definitions, or explanations.
+Keep it short and useful. No examples or long explanations.
 
-Now, please translate the following texts:
-$_{TEXT}
-`,
+$_{TEXT}`,
 /*--- End PROMPT_BASE_DICTIONARY ---*/
 
   /*--- Start PROMPT_BASE_POPUP_TRANSLATE ---*/
-  PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate the input text into $_{TARGET}, while strictly preserving its structure, formatting, and line breaks.
+  PROMPT_BASE_POPUP_TRANSLATE: `Translate this text to $_{TARGET}:
 
-Instructions:
-  - Automatically detect the input language.
-  - Translate the content into $_{TARGET}.
-  - Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical.
-  - Prioritize clarity, smooth flow, and accurate meaning, without changing the original structure or layout.
+- Auto-detect the input language
+- Keep the original formatting and line breaks
+- Make it sound natural, not word-for-word
+- Focus on clear meaning while preserving structure
 
-Return **only** the translated text. Do not include explanations, markdown, or any other content.
-
-Now, please translate the following texts:
-$_{TEXT}
-`,
+$_{TEXT}`,
   /*--- End PROMPT_BASE_POPUP_TRANSLATE ---*/
 
   /*--- Start PROMPT_BASE_SCREEN_CAPTURE ---*/
@@ -303,10 +286,10 @@ $_{TEXT}
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
   /*--- Start PROMPT_TEMPLATE ---*/
-  PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
-- If the input is in $_{TARGET}, translate it into $_{SOURCE} with the same level of fluency and clarity.
-- If the input is in any other language, translate it into $_{TARGET}, focusing on readability, tone, and meaning rather than literal translation.
-- If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
+  PROMPT_TEMPLATE: `- $_{SOURCE} to $_{TARGET}: Translate naturally, keeping the original tone
+- $_{TARGET} to $_{SOURCE}: Translate back fluently
+- Other languages to $_{TARGET}: Make it readable and natural
+- Bad grammar in $_{TARGET}: Fix it when translating to $_{SOURCE}`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   // --- Debugging Values ---
