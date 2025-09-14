@@ -34,14 +34,16 @@ export async function handleDeactivateSelectElementMode(message, sender) {
         {
           mode: 'normal',
           activate: false,
-          fromBackground: true
+          fromBackground: true,
+          // Mark this as an explicit deactivation request
+          isExplicitDeactivation: true
         },
         MessagingContexts.CONTENT
       );
-      
+
       // Send to main frame and all iframe content scripts
       await browser.tabs.sendMessage(tabId, broadcastMessage);
-      logger.operation('Broadcasted deactivation to all frames in tab:', { tabId });
+      logger.operation('Broadcasted explicit deactivation to all frames in tab:', { tabId });
     } catch (broadcastError) {
       logger.warn('Failed to broadcast deactivation to tab frames:', broadcastError);
     }

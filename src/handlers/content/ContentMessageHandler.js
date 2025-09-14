@@ -261,19 +261,16 @@ export class ContentMessageHandler extends ResourceTracker {
       const fromBackground = message?.data?.fromBackground;
       const excludeFrameId = message?.data?.excludeFrameId;
       
-      // Check if this deactivation should be ignored (self-deactivation prevention)
-      if (fromBackground && excludeFrameId !== undefined) {
-        // For main frame, frameId is 0 or undefined
-        const currentFrameId = window !== window.top ? (typeof browser !== 'undefined' ? (browser.runtime.id || 0) : 0) : 0;
-        
-        if (currentFrameId === excludeFrameId) {
-          this.logger.debug('Ignoring self-deactivation request', {
-            excludeFrameId,
-            currentFrameId,
-            isInIframe: window !== window.top
-          });
-          return { success: true, activated: this.selectElementManager.isSelectElementActive() };
-        }
+      // Check if this is an explicit deactivation request
+      const isExplicitDeactivation = message?.data?.isExplicitDeactivation;
+
+      // Only process deactivation if it's explicit or from non-background sources
+      if (fromBackground && !isExplicitDeactivation) {
+        this.logger.debug('Ignoring implicit deactivation from background', {
+          fromBackground,
+          isExplicitDeactivation
+        });
+        return { success: true, activated: this.selectElementManager.isSelectElementActive() };
       }
       
       this.logger.debug('DEACTIVATE_SELECT_ELEMENT_MODE received', {

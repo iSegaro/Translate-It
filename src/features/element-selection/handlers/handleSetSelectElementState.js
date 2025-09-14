@@ -31,8 +31,9 @@ export async function handleSetSelectElementState(message, sender) {
     setStateForTab(tabId, activate);
 
     // 🆕 BROADCAST STATE CHANGE TO ALL FRAMES IN THE TAB
-    // This ensures all SelectElementManager instances are synchronized
-    if (!activate) { // Only broadcast deactivation to prevent activation loops
+    // Only broadcast deactivation when it's an explicit deactivation request
+    // Don't broadcast when frames are reporting their state after activation
+    if (!activate && message?.data?.isExplicitDeactivation) {
       try {
         // Use the same message format as handleActivateSelectElementMode for consistency
         const broadcastMessage = MessageFormat.create(
@@ -41,15 +42,15 @@ export async function handleSetSelectElementState(message, sender) {
             mode: 'normal',
             activate: false,
             fromBackground: true,
-            // Exclude the original requester frame to prevent self-deactivation
-            excludeFrameId: frameId
+            // This is an explicit deactivation request (e.g., user clicked deactivate)
+            isExplicitDeactivation: true
           },
           MessagingContexts.CONTENT
         );
-        
-        // Send to main frame and all iframe content scripts
+
+        // Send to all frames in the tab
         await browser.tabs.sendMessage(tabId, broadcastMessage);
-        logger.operation('Broadcasted deactivation to all frames in tab:', { tabId, activate, excludeFrameId: frameId });
+        logger.operation('Broadcasted explicit deactivation to all frames in tab:', { tabId });
       } catch (broadcastError) {
         logger.warn('Failed to broadcast deactivation to tab frames:', broadcastError);
       }
