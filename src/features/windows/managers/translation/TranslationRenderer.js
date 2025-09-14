@@ -286,13 +286,25 @@ export class TranslationRenderer {
       const content = textNode.textContent;
       if (content.toLowerCase().includes(searchText.toLowerCase())) {
         const parent = textNode.parentNode;
-        const highlightedHTML = content.replace(
-          new RegExp(searchText, 'gi'),
-          '<mark>$&</mark>'
-        );
-        
+        // Create wrapper with safe DOM methods instead of innerHTML
         const wrapper = document.createElement('span');
-        wrapper.innerHTML = highlightedHTML;
+        const regex = new RegExp(searchText, 'gi');
+        const parts = content.split(regex);
+        const matches = content.match(regex) || [];
+
+        parts.forEach((part, index) => {
+          if (part) {
+            const textNode = document.createTextNode(part);
+            wrapper.appendChild(textNode);
+          }
+
+          if (index < matches.length) {
+            const mark = document.createElement('mark');
+            mark.textContent = matches[index];
+            wrapper.appendChild(mark);
+          }
+        });
+
         parent.replaceChild(wrapper, textNode);
       }
     });
