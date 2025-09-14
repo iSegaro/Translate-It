@@ -24,12 +24,12 @@ export function cleanText(text) {
 export function extractTextFromHTML(html) {
   if (!html) return '';
 
-  // Create a temporary element to parse HTML
-  const tempElement = document.createElement('div');
-  tempElement.innerHTML = html;
-  
+  // Use DOMParser for safe HTML parsing instead of innerHTML
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
   // Get text content and clean it
-  return cleanText(tempElement.textContent || '');
+  return cleanText(doc.body.textContent || '');
 }
 
 /**
