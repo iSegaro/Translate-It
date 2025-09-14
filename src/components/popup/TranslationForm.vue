@@ -9,6 +9,7 @@
       v-model="sourceText"
       :placeholder="t('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
       :language="currentSourceLanguage"
+      :source-language="currentSourceLanguage"
       :rows="2"
       :tabindex="1"
       :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
@@ -47,6 +48,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { usePopupResize } from '@/composables/ui/usePopupResize.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -118,13 +120,41 @@ watch(sourceText, (newValue, oldValue) => {
   }
 }, { deep: true })
 
-// Reactive language values - these will update when settings change
+// Helper function to detect if text is Persian
+const isPersianText = (text) => {
+  if (!text) return false
+  // Persian Unicode range: \u0600-\u06FF
+  const persianRegex = /[\u0600-\u06FF]/
+  return persianRegex.test(text)
+}
+
+// Reactive language values - use props first, then fallback to settings
 const currentSourceLanguage = computed(() => {
+  // If sourceLanguage prop is provided and not auto, use it
+  if (props.sourceLanguage && props.sourceLanguage !== AUTO_DETECT_VALUE) {
+    logger.debug('[TranslationForm] Using prop sourceLanguage:', props.sourceLanguage)
+    return props.sourceLanguage
+  }
+
+  // If auto-detect is selected, check if we can detect the text language
+  if (sourceText.value) {
+    if (isPersianText(sourceText.value)) {
+      logger.debug('[TranslationForm] Detected Persian text, using "fa"')
+      return 'fa'
+    }
+    // Add more language detections here if needed
+  }
+
+  // Fallback to settings
   const lang = settingsStore.settings.SOURCE_LANGUAGE
+  logger.debug('[TranslationForm] Using settings sourceLanguage:', lang)
   return lang
 })
+
 const currentTargetLanguage = computed(() => {
-  const lang = settingsStore.settings.TARGET_LANGUAGE
+  // Use prop if available, otherwise fallback to settings
+  const lang = props.targetLanguage || settingsStore.settings.TARGET_LANGUAGE
+  logger.debug('[TranslationForm] Using targetLanguage:', lang)
   return lang
 })
 

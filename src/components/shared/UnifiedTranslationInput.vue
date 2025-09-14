@@ -95,6 +95,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/config/constants.js'
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -264,20 +265,110 @@ const {
   translationError,
   hasError,
   triggerTranslation,
-  clearTranslation
+  clearTranslation,
+  sourceLanguage,
+  targetLanguage
 } = translationComposable
-
-// Language state
-const sourceLanguage = ref(props.initialSourceLanguage)
-const targetLanguage = ref(props.initialTargetLanguage)
 
 // Status state
 const statusMessage = ref('')
 const statusType = ref('')
 
+// Sync initial props with composable languages
+watch(() => props.initialSourceLanguage, (newLang, oldLang) => {
+  logger.debug(`[${props.mode}] 👁️ Source language watcher triggered:`, {
+    newLang,
+    oldLang,
+    currentComposableValue: sourceLanguage.value,
+    willUpdate: newLang && newLang !== sourceLanguage.value
+  })
+  if (newLang && newLang !== sourceLanguage.value) {
+    logger.debug(`[${props.mode}] 🔄 Updating sourceLanguage from ${sourceLanguage.value} to ${newLang}`)
+    sourceLanguage.value = newLang
+  }
+}, { immediate: true })
+
+watch(() => props.initialTargetLanguage, (newLang, oldLang) => {
+  logger.debug(`[${props.mode}] 👁️ Target language watcher triggered:`, {
+    newLang,
+    oldLang,
+    currentComposableValue: targetLanguage.value,
+    willUpdate: newLang && newLang !== targetLanguage.value
+  })
+  if (newLang && newLang !== targetLanguage.value) {
+    logger.debug(`[${props.mode}] 🔄 Updating targetLanguage from ${targetLanguage.value} to ${newLang}`)
+    targetLanguage.value = newLang
+  }
+}, { immediate: true })
+
+// Helper function to detect if text is Persian
+const isPersianText = (text) => {
+  if (!text) return false
+  // Persian Unicode range: \u0600-\u06FF
+  const persianRegex = /[\u0600-\u06FF]/
+  return persianRegex.test(text)
+}
+
 // Computed
-const currentSourceLanguage = computed(() => sourceLanguage.value || settingsStore.settings.SOURCE_LANGUAGE)
-const currentTargetLanguage = computed(() => targetLanguage.value || settingsStore.settings.TARGET_LANGUAGE)
+const currentSourceLanguage = computed(() => {
+  // For TTS, AUTO_DETECT_VALUE is not useful - use actual language from settings
+  const langValue = sourceLanguage.value
+  const initialLang = props.initialSourceLanguage
+
+  logger.debug(`[${props.mode}] 🔍 currentSourceLanguage computed called:`, {
+    sourceLanguageValue: langValue,
+    initialSourceLanguage: initialLang,
+    settingsSourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
+    isAutoDetect: langValue === AUTO_DETECT_VALUE,
+    stackTrace: new Error().stack.split('\n')[1]
+  })
+
+  // If initialSourceLanguage is explicitly set and not auto, use it
+  if (initialLang && initialLang !== AUTO_DETECT_VALUE) {
+    logger.debug(`[${props.mode}] Using explicit initial language:`, initialLang)
+    return initialLang
+  }
+
+  // Always check for AUTO_DETECT_VALUE first
+  if (!langValue || langValue === AUTO_DETECT_VALUE) {
+    const fallbackLang = settingsStore.settings.SOURCE_LANGUAGE
+
+    // If we have text, try to detect its language
+    if (props.modelValue) {
+      if (isPersianText(props.modelValue)) {
+        logger.debug(`[${props.mode}] Detected Persian text, using 'fa'`)
+        return 'fa'
+      }
+      // Add more language detections here if needed
+    }
+
+    logger.debug(`[${props.mode}] Using fallback language:`, { fallbackLang })
+    // If settings source language is also auto, use a real language
+    if (fallbackLang === AUTO_DETECT_VALUE || !fallbackLang) {
+      logger.debug(`[${props.mode}] Fallback is also auto, using default: fa`)
+      return 'fa' // Default to Persian for this extension
+    }
+    return fallbackLang
+  }
+
+  logger.debug(`[${props.mode}] Using direct language value:`, langValue)
+  return langValue
+})
+const currentTargetLanguage = computed(() => {
+  const langValue = targetLanguage.value
+  const initialLang = props.initialTargetLanguage
+
+  // If initialTargetLanguage is explicitly set, use it
+  if (initialLang) {
+    logger.debug(`[${props.mode}] Using explicit initial target language:`, initialLang)
+    return initialLang
+  }
+
+  if (!langValue) {
+    return settingsStore.settings.TARGET_LANGUAGE || 'fa'
+  }
+  return langValue
+})
 
 const toolbarMode = computed(() => {
   if (props.mode === 'sidepanel') return 'sidepanel'
@@ -421,16 +512,13 @@ if (props.mode === 'popup') {
 
 // Component lifecycle
 onMounted(() => {
-  logger.debug(`[${props.mode}] UnifiedTranslationInput mounted`)
-  
-  // Set initial language values from settings if not provided
-  if (!sourceLanguage.value || sourceLanguage.value === 'auto') {
-    sourceLanguage.value = settingsStore.settings.SOURCE_LANGUAGE
-  }
-  if (!targetLanguage.value) {
-    targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE
-  }
-  
+  logger.debug(`[${props.mode}] UnifiedTranslationInput mounted`, {
+    initialSourceLanguage: props.initialSourceLanguage,
+    initialTargetLanguage: props.initialTargetLanguage,
+    currentSourceLanguage: sourceLanguage.value,
+    currentTargetLanguage: targetLanguage.value
+  })
+
   // Auto-focus for popup mode
   if (props.mode === 'popup') {
     focusInput()

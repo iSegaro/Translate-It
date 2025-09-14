@@ -28,10 +28,22 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import UnifiedTranslationInput from '@/components/shared/UnifiedTranslationInput.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'EnhancedTranslationForm')
 
 // Props & Emits
+const props = defineProps({
+  sourceLanguage: {
+    type: String,
+    default: 'auto'
+  },
+  targetLanguage: {
+    type: String,
+    default: 'fa'
+  }
+})
+
 const emit = defineEmits(['can-translate-change'])
 
 // Stores & Composables
@@ -39,8 +51,31 @@ const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
 
 // Computed
-const currentSourceLanguage = computed(() => settingsStore.settings.SOURCE_LANGUAGE)
-const currentTargetLanguage = computed(() => settingsStore.settings.TARGET_LANGUAGE)
+const currentSourceLanguage = computed(() => {
+  const langValue = props.sourceLanguage
+  logger.debug('[EnhancedTranslationForm] currentSourceLanguage computed:', {
+    propsSourceLanguage: langValue,
+    settingsSourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
+    isAutoDetect: langValue === AUTO_DETECT_VALUE
+  })
+
+  // Always check for AUTO_DETECT_VALUE first
+  if (!langValue || langValue === AUTO_DETECT_VALUE) {
+    const fallbackLang = settingsStore.settings.SOURCE_LANGUAGE
+    logger.debug('[EnhancedTranslationForm] Using fallback language:', { fallbackLang })
+    // If settings source language is also auto, use a real language
+    if (fallbackLang === AUTO_DETECT_VALUE || !fallbackLang) {
+      logger.debug('[EnhancedTranslationForm] Fallback is also auto, using default: fa')
+      return 'fa' // Default to Persian for this extension
+    }
+    return fallbackLang
+  }
+
+  logger.debug('[EnhancedTranslationForm] Using direct language value:', langValue)
+  return langValue
+})
+
+const currentTargetLanguage = computed(() => props.targetLanguage || settingsStore.settings.TARGET_LANGUAGE)
 
 // Event Handlers
 const handleCanTranslateChange = (canTranslate) => {

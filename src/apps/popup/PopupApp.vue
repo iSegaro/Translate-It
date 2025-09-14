@@ -67,11 +67,11 @@
         />
         
         <!-- Enhanced TranslationForm with new ActionSystem -->
-        <EnhancedTranslationForm 
+        <EnhancedTranslationForm
           v-else
           :source-language="sourceLanguage"
           :target-language="targetLanguage"
-          @can-translate-change="canTranslateFromForm = $event" 
+          @can-translate-change="canTranslateFromForm = $event"
         />
       </div>
       

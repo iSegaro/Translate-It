@@ -51,7 +51,18 @@ export class LanguageSwappingService {
         
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+        logger.debug(`${providerName}: Language detection details:`, {
+          text: text.slice(0, 50),
+          detectedLang: mainDetection.language,
+          detectedLangCode,
+          sourceLang,
+          targetLang,
+          sourceNorm,
+          targetNorm,
+          targetLangCode,
+          originalSourceLang,
+          originalTargetLang
+        });
 
         if (detectedLangCode === targetLangCode) {
           let newTargetLang;
@@ -61,12 +72,8 @@ export class LanguageSwappingService {
           } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
             newTargetLang = originalSourceLang;
           } else {
-            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-            if (detectedLangCode !== originalTargetLangCode) {
-              newTargetLang = originalTargetLang;
-            } else {
-              newTargetLang = 'English';
-            }
+            // Use the current target language instead of defaulting to English
+            newTargetLang = targetLang;
           }
           
           logger.debug(`${providerName}: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
@@ -104,12 +111,8 @@ export class LanguageSwappingService {
       } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
         newTargetLang = originalSourceLang;
       } else {
-        const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-        if ("fa" !== originalTargetLangCode) {
-          newTargetLang = originalTargetLang;
-        } else {
-          newTargetLang = 'English';
-        }
+        // Use the current target language instead of defaulting to English
+        newTargetLang = targetLang;
       }
       
       logger.debug(`${providerName}: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);

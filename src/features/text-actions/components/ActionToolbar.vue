@@ -223,7 +223,10 @@ const handlePasteFailed = (error) => {
 
 // Enhanced TTS event handlers for new TTSButton
 const handleTTSStarted = (data) => {
-  logger.debug('[ActionToolbar] TTS started:', data.text.substring(0, 50) + '...')
+  logger.debug('[ActionToolbar] TTS started:', data.text.substring(0, 50) + '...', {
+    receivedLanguage: props.language,
+    passedToTTS: data.language
+  })
   emit('tts-started', data)
   // Backward compatibility
   emit('tts-speaking', data)

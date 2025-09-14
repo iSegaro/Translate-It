@@ -38,6 +38,7 @@
         v-model="sourceText"
         :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate...')"
         :language="currentSourceLanguage"
+        :source-language="currentSourceLanguage"
         :rows="6"
         :tabindex="1"
         :copy-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"
@@ -156,8 +157,8 @@ const handleTranslate = async () => {
   try {
     logger.info("🚀 Starting translation process...");
     
-    // Values are taken directly from the composable's refs
-    await triggerTranslation(sourceLanguage.value, targetLanguage.value)    
+    // Use computed values to handle AUTO_DETECT_VALUE correctly
+    await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value)    
     
     logger.info("✅ Translation completed successfully");
 
