@@ -21,30 +21,30 @@ export class FeatureManager extends ResourceTracker {
   async initialize() {
     try {
       logger.init('Initializing FeatureManager');
-      
+
       // Initialize exclusion checker
       await this.exclusionChecker.initialize();
-      
+
       // Evaluate and register features
       await this.evaluateAndRegisterFeatures();
-      
+
       // Setup settings change listener
       this.setupSettingsListener();
-      
+
       // Setup URL change detection for SPAs
       this.setupUrlChangeDetection();
-      
+
       this.initialized = true;
       logger.info('FeatureManager initialized successfully', {
         activeFeatures: Array.from(this.activeFeatures)
       });
-      
+
     } catch (error) {
       const handler = ErrorHandler.getInstance();
-      handler.handle(error, { 
-        type: ErrorTypes.SERVICE, 
+      handler.handle(error, {
+        type: ErrorTypes.SERVICE,
         context: 'FeatureManager-initialize',
-        showToast: false 
+        showToast: false
       });
       throw error;
     }
@@ -382,6 +382,7 @@ export class FeatureManager extends ResourceTracker {
     };
   }
 
+
   // Override cleanup to handle settings listener
   cleanup() {
     try {
@@ -389,7 +390,7 @@ export class FeatureManager extends ResourceTracker {
         storageManager.off('change', this.settingsListener);
         this.settingsListener = null;
       }
-      
+
       // Deactivate all features
       const activeFeatures = Array.from(this.activeFeatures);
       for (const feature of activeFeatures) {
@@ -397,10 +398,10 @@ export class FeatureManager extends ResourceTracker {
           logger.error(`Error deactivating feature ${feature} during cleanup:`, error);
         });
       }
-      
+
       super.cleanup();
       logger.debug('FeatureManager cleanup completed');
-      
+
     } catch (error) {
       logger.error('Error during FeatureManager cleanup:', error);
     }
