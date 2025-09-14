@@ -267,6 +267,16 @@ export class TextSelectionHandler extends ResourceTracker {
           setTimeout(() => {
             if (this.textSelectionManager) {
               const windowsManager = this.textSelectionManager._getWindowsManager();
+
+              // Don't dismiss if we're in window mode and a click was recently handled
+              // This prevents dismissing when clicking inside the translation window
+              if (windowsManager && windowsManager.state.isVisible &&
+                  windowsManager.state._lastClickWasInsideWindow) {
+                logger.debug('Selection cleared but click was inside window - not dismissing');
+                windowsManager.state._lastClickWasInsideWindow = false;
+                return;
+              }
+
               if (windowsManager && (windowsManager.state.isIconMode || windowsManager.state.isVisible)) {
                 logger.debug('Selection cleared, dismissing icon/window');
                 windowsManager.dismiss();

@@ -19,27 +19,30 @@ export class WindowsState {
     this.isVisible = false;
     this.isIconMode = false;
     this.pendingTranslationWindow = false;
-    
+
     // Translation states
     this.isTranslationCancelled = false;
     this.originalText = null;
-    
+
     // Drag states
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
-    
+
     // Cross-frame states
     this.isInIframe = window !== window.top;
     this._relayRequested = false;
     this._broadcastEnabled = false;
     this._relayEnabled = false;
-    
+
     // Context states
     this.iconClickContext = null;
     this.requestingFrameId = null;
     this.mainDocumentWindowId = null;
     this.activeWindowId = null;
     this.isProcessing = false;
+
+    // Click tracking
+    this._lastClickWasInsideWindow = false;
 
     this.logger.debug('WindowsState reset', { frameId: this.frameId });
   }

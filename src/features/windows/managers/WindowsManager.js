@@ -381,6 +381,11 @@ export class WindowsManager extends ResourceTracker {
       const isClickingOnTranslationUI = isInsideVueUIHost || isInsideLegacyIcon || isInsideLegacyWindow;
       
       if (isClickingOnTranslationUI) {
+        // If we're in window mode and clicking inside, set the flag
+        if (this.state.isVisible && !this.state.isIconMode) {
+          this.state._lastClickWasInsideWindow = true;
+        }
+
         this.logger.debug('Mousedown on translation UI element - not dismissing', {
           target: target?.tagName,
           className: target?.className,
@@ -1103,10 +1108,13 @@ export class WindowsManager extends ResourceTracker {
   _resetState() {
     this.state.setPendingTranslationWindow(false);
     this.state.setIconMode(false);
-    
+
     // Reset selection preservation flag
     this._isIconToWindowTransition = false;
-    
+
+    // Reset click tracking flag
+    this.state._lastClickWasInsideWindow = false;
+
     if (state && typeof state === 'object') {
       state.preventTextFieldIconCreation = false;
     }
