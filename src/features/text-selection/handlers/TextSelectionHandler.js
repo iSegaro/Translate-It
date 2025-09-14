@@ -289,6 +289,12 @@ export class TextSelectionHandler extends ResourceTracker {
                 return;
               }
 
+              // Don't dismiss if WindowsManager is in the middle of icon-to-window transition
+              if (windowsManager && windowsManager._isIconToWindowTransition) {
+                logger.debug('Selection cleared but WindowsManager is transitioning from icon to window - not dismissing');
+                return;
+              }
+
               if (windowsManager && (windowsManager.state.isIconMode || windowsManager.state.isVisible)) {
                 logger.debug('Selection cleared, dismissing icon/window');
                 windowsManager.dismiss();
