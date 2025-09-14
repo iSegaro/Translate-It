@@ -58,8 +58,21 @@ const NonProcessableKeywords = [
   'phone', 'mobile', 'tel', 'telephone', 'fax',
   // Sensitive data
   'ssn', 'social', 'credit', 'card', 'cvv', 'expiry',
+  // Numeric and data fields
+  'number', 'amount', 'quantity', 'price', 'cost', 'total', 'sum',
+  'count', 'age', 'year', 'month', 'day', 'date', 'time',
+  'percent', 'percentage', 'rate', 'ratio',
+  'zip', 'postal', 'code', 'id', 'identifier',
+  'latitude', 'longitude', 'coordinate',
+  'weight', 'height', 'width', 'depth', 'size',
+  'temperature', 'pressure', 'speed', 'distance',
+  'score', 'rating', 'grade', 'level',
+  // Technical identifiers
+  'serial', 'model', 'version', 'isbn', 'isbn',
+  'sku', 'upc', 'ean', 'barcode', 'qr',
+  'mac', 'ip', 'uuid', 'guid', 'hash',
   // Other non-processable fields
-  'zipcode', 'postal', 'code'
+  'zipcode', 'postal'
 ];
 
 /**
@@ -222,28 +235,25 @@ export class FieldDetector {
 
       // Regular form fields
       if (tagName === 'textarea') {
-        this.logger.debug('Element classified as REGULAR_INPUT (textarea)', {
-          tagName: tagName
-        });
+        // Check if textarea expects numeric-only content
+        if (this._hasNumericOnlyExpectations(element)) {
+          return FieldTypes.NON_PROCESSABLE;
+        }
         return FieldTypes.REGULAR_INPUT;
       } else if (tagName === 'input') {
         const type = (element.type || '').toLowerCase();
-        const textTypes = ['text', 'search', 'email', 'url', 'tel'];
 
-        this.logger.debug('Checking input element', {
-          tagName: tagName,
-          type: type,
-          hasType: !!type,
-          isInTextTypes: textTypes.includes(type),
-          textTypes: textTypes
-        });
+        // Note: Non-processable types are already checked in _isNonProcessableField
+        // which is called at the beginning of this method
+
+        const textTypes = ['text', 'search'];
 
         if (textTypes.includes(type) || !type) {
-          this.logger.debug('Element classified as REGULAR_INPUT (input)', {
-            tagName: tagName,
-            type: type,
-            reason: type ? 'in text types' : 'no type specified'
-          });
+          // For text inputs without explicit type, check if they actually expect text content
+          if (this._hasNumericOnlyExpectations(element)) {
+            return FieldTypes.NON_PROCESSABLE;
+          }
+
           return FieldTypes.REGULAR_INPUT;
         }
       }
@@ -483,13 +493,36 @@ export class FieldDetector {
     const id = (element.id || '').toLowerCase();
     const autocomplete = (element.autocomplete || '').toLowerCase();
     const type = (element.type || '').toLowerCase();
+    const inputmode = (element.inputmode || '').toLowerCase();
 
     // Check for non-processable input types
     const nonProcessableTypes = [
       'password', 'hidden', 'file', 'submit', 'reset', 'button', 'image',
-      'tel', 'email', 'url'  // These might need special handling
+      'tel', 'email', 'url', 'number', 'range', 'date', 'time', 'datetime-local',
+      'month', 'week', 'color', 'search'
     ];
     if (nonProcessableTypes.includes(type)) return true;
+
+    // Check for non-processable inputmodes
+    const nonProcessableInputModes = [
+      'decimal', 'numeric', 'tel', 'email', 'url', 'none'
+    ];
+    if (nonProcessableInputModes.includes(inputmode)) return true;
+
+    // Check for input patterns that suggest non-text content
+    const pattern = (element.pattern || '').toLowerCase();
+    if (pattern && (
+      pattern.includes('[0-9]') ||
+      pattern.includes('\\d') ||
+      pattern.match(/^[0-9\-\+\.\s]+$/) ||
+      pattern.match(/^[\d\-\+\.\s]+$/)
+    )) return true;
+
+    // Check if element has numeric-only content expectations
+    if (this._hasNumericOnlyExpectations(element)) return true;
+
+    // Check if element expects structured non-text content
+    if (this._hasStructuredContentExpectations(element)) return true;
 
     // Check for non-processable keywords
     return NonProcessableKeywords.some(keyword =>
@@ -498,6 +531,160 @@ export class FieldDetector {
       id.includes(keyword) ||
       autocomplete.includes(keyword)
     );
+  }
+
+  /**
+   * Check if element expects numeric-only content
+   * @param {Element} element - Element to check
+   * @returns {boolean} True if expects numeric content
+   */
+  _hasNumericOnlyExpectations(element) {
+    if (!element) return false;
+
+    const name = (element.name || '').toLowerCase();
+    const placeholder = (element.placeholder || '').toLowerCase();
+    const id = (element.id || '').toLowerCase();
+    const className = (element.className || '').toLowerCase();
+    const ariaLabel = (element.getAttribute('aria-label') || '').toLowerCase();
+
+    // Check if element has numeric-specific attributes
+    const min = element.getAttribute('min');
+    const max = element.getAttribute('max');
+    const step = element.getAttribute('step');
+
+    if (min !== null || max !== null || step !== null) {
+      // If element has min/max/step attributes, it's likely numeric
+      return true;
+    }
+
+    // Check for numeric-specific class names
+    const numericClasses = [
+      'numeric', 'number', 'decimal', 'integer', 'float',
+      'currency', 'money', 'amount', 'price', 'cost',
+      'quantity', 'count', 'percentage', 'percent'
+    ];
+
+    if (numericClasses.some(cls => className.includes(cls))) {
+      return true;
+    }
+
+    // Check placeholder for numeric hints
+    const numericPlaceholders = [
+      '0', '0.00', '0.0', '00.00', '000',
+      'enter number', 'enter amount', 'enter quantity',
+      'numeric', 'decimal', 'numbers only'
+    ];
+
+    if (numericPlaceholders.some(ph => placeholder.includes(ph))) {
+      return true;
+    }
+
+    // Check name for numeric patterns
+    const numericPatterns = [
+      /_num$/, /_number$/, /_qty$/, /_quantity$/, /_amount$/,
+      /_price$/, /_cost$/, /_total$/, /_count$/,
+      /_percent$/, /_rate$/, /_ratio$/,
+      /num_\d+/, /qty_\d+/, /amount_\d+/, /price_\d+/
+    ];
+
+    if (numericPatterns.some(pattern => pattern.test(name))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if element expects structured non-text content
+   * @param {Element} element - Element to check
+   * @returns {boolean} True if expects structured content
+   */
+  _hasStructuredContentExpectations(element) {
+    if (!element) return false;
+
+    const name = (element.name || '').toLowerCase();
+    const id = (element.id || '').toLowerCase();
+    const className = (element.className || '').toLowerCase();
+    const placeholder = (element.placeholder || '').toLowerCase();
+
+    // Check for date/time patterns
+    const datePatterns = [
+      /_date$/, /_time$/, /_datetime$/, /_timestamp$/,
+      /date_\d+/, /time_\d+/, /dt_\d+/, /ts_\d+$/,
+      /yyyy/, /mm\/dd/, /dd\/mm/, /hh:mm/
+    ];
+
+    if (datePatterns.some(pattern => pattern.test(name) || pattern.test(id))) {
+      return true;
+    }
+
+    // Check for coordinate patterns
+    const coordinatePatterns = [
+      /_lat$/, /_lng$/, /_long$/, /_coord$/,
+      /latitude/, /longitude/, /coordinate/,
+      /x_coord/, /y_coord/, /xy_\d+/
+    ];
+
+    if (coordinatePatterns.some(pattern => pattern.test(name) || pattern.test(id))) {
+      return true;
+    }
+
+    // Check for color patterns
+    const colorPatterns = [
+      /_color$/, /_colour$/, /_hex$/,
+      /color_\d+/, /hex_\d+/, /rgb_\d+/
+    ];
+
+    if (colorPatterns.some(pattern => pattern.test(name) || pattern.test(id))) {
+      return true;
+    }
+
+    // Check for IP address patterns
+    const ipPatterns = [
+      /_ip$/, /_ipv4$/, /_ipv6$/,
+      /ip_\d+/, /address_\d+/, /host_\d+/
+    ];
+
+    if (ipPatterns.some(pattern => pattern.test(name) || pattern.test(id))) {
+      return true;
+    }
+
+    // Check for file paths or URLs
+    const pathRegexPatterns = [
+      /_path$/, /_file$/, /_dir$/, /_folder$/,
+      /_url$/, /_link$/, /_href$/
+    ];
+
+    const pathKeywords = ['filepath', 'directory', 'filename'];
+
+    if (pathRegexPatterns.some(pattern => pattern.test(name) || pattern.test(id)) ||
+        pathKeywords.some(keyword =>
+          name.includes(keyword) ||
+          id.includes(keyword) ||
+          placeholder.includes(keyword)
+        )) {
+      return true;
+    }
+
+    // Check for code/programming patterns
+    const codeRegexPatterns = [
+      /_code$/, /_snippet$/, /_script$/,
+      /_html$/, /_css$/, /_js$/, /_json$/,
+      /_xml$/, /_sql$/, /_regex$/
+    ];
+
+    const codeKeywords = ['sourcecode', 'codeblock', 'markup'];
+
+    if (codeRegexPatterns.some(pattern => pattern.test(name) || pattern.test(id)) ||
+        codeKeywords.some(keyword =>
+          name.includes(keyword) ||
+          id.includes(keyword) ||
+          className.includes(keyword)
+        )) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -597,7 +784,6 @@ export class FieldDetector {
    * Cleanup field detector
    */
   cleanup() {
-    this.clearCache();
     this._initialized = false;
     this.logger.debug('FieldDetector cleaned up');
   }
