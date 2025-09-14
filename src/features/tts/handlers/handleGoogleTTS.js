@@ -8,6 +8,41 @@ import { isChromium } from '@/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
+/**
+ * Notify a sender that TTS has ended or been interrupted
+ * @param {Object} sender - Sender information
+ * @param {string} reason - Reason for ending ('completed', 'interrupted', 'error')
+ * @returns {Promise<void>}
+ */
+const notifyTTSEnded = async (sender, reason = 'completed') => {
+  try {
+    const browserAPI = await initializebrowserAPI();
+
+    if (sender.tab?.id) {
+      // Content script request - send to specific tab
+      await browserAPI.tabs.sendMessage(sender.tab.id, {
+        action: 'GOOGLE_TTS_ENDED',
+        source: 'background',
+        reason: reason,
+        targetFrameId: sender.frameId // Send to specific frame if available
+      });
+      logger.debug(`[GoogleTTSHandler] ✅ Notified content script in tab ${sender.tab.id} (${reason})`);
+    } else {
+      // Popup/Sidepanel request - send via runtime.sendMessage (global)
+      await browserAPI.runtime.sendMessage({
+        action: 'GOOGLE_TTS_ENDED',
+        source: 'background',
+        reason: reason,
+        targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
+      });
+      logger.debug(`[GoogleTTSHandler] ✅ Notified popup/sidepanel via runtime.sendMessage (${reason})`);
+    }
+  } catch (sendError) {
+    logger.debug(`[GoogleTTSHandler] Could not notify sender (${reason}):`, sendError.message);
+    throw sendError; // Re-throw for caller handling
+  }
+};
+
 // Use a global promise to ensure offscreen document is created only once.
 let offscreenDocumentPromise = null;
 
@@ -59,9 +94,20 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       return await currentTTSRequest;
     }
     
-    // If there's a different request in progress, wait for it to complete first
+    // If there's a different request in progress, notify previous sender and wait for completion
     if (currentTTSRequest) {
       logger.debug('[GoogleTTSHandler] ⏳ Waiting for current TTS request to complete');
+
+      // Send GOOGLE_TTS_ENDED to previous sender before starting new request
+      if (currentTTSSender) {
+        try {
+          logger.debug('[GoogleTTSHandler] 📤 Notifying previous sender of TTS interruption');
+          await notifyTTSEnded(currentTTSSender, 'interrupted');
+        } catch (notifyError) {
+          logger.debug('[GoogleTTSHandler] Could not notify previous sender:', notifyError.message);
+        }
+      }
+
       try {
         await currentTTSRequest;
       } catch {
@@ -410,6 +456,16 @@ export const handleGoogleTTSStopAll = async (message, sender) => {
       };
     }
     
+    // Send GOOGLE_TTS_ENDED to current sender before clearing (when stopping all)
+    if (!isSpecificStop && currentTTSSender) {
+      try {
+        logger.debug('[GoogleTTSHandler] 📤 Notifying current sender of TTS stop');
+        await notifyTTSEnded(currentTTSSender, 'stopped');
+      } catch (notifyError) {
+        logger.debug('[GoogleTTSHandler] Could not notify sender of stop:', notifyError.message);
+      }
+    }
+
     // Clear any pending requests to prevent stuck states
     currentTTSRequest = null;
     lastTTSText = null;
@@ -519,25 +575,7 @@ export const handleGoogleTTSEnded = async (message, sender) => {
     // Send GOOGLE_TTS_ENDED event only to the original requester
     if (currentTTSSender) {
       try {
-        const browserAPI = await initializebrowserAPI();
-
-        if (currentTTSSender.tab?.id) {
-          // Content script request - send to specific tab
-          await browserAPI.tabs.sendMessage(currentTTSSender.tab.id, {
-            action: 'GOOGLE_TTS_ENDED',
-            source: 'background',
-            targetFrameId: currentTTSSender.frameId // Send to specific frame if available
-          });
-          logger.debug(`[GoogleTTSHandler] ✅ Sent GOOGLE_TTS_ENDED to content script in tab ${currentTTSSender.tab.id}`);
-        } else {
-          // Popup/Sidepanel request - send via runtime.sendMessage (global)
-          await browserAPI.runtime.sendMessage({
-            action: 'GOOGLE_TTS_ENDED',
-            source: 'background',
-            targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
-          });
-          logger.debug('[GoogleTTSHandler] ✅ Sent GOOGLE_TTS_ENDED to popup/sidepanel via runtime.sendMessage');
-        }
+        await notifyTTSEnded(currentTTSSender, 'completed');
       } catch (sendError) {
         logger.debug('[GoogleTTSHandler] Could not send GOOGLE_TTS_ENDED to requester:', sendError.message);
       }
