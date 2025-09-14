@@ -117,12 +117,7 @@ class LifecycleManager extends ResourceTracker {
       'revertTranslation': Handlers.handleRevertTranslation,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
       'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResult,
-      
-      // Subtitle handlers
-      'subtitleTranslate': Handlers.handleSubtitleTranslate,
-      'subtitleToggle': Handlers.handleSubtitleToggle,
-      'subtitleStatus': Handlers.handleSubtitleStatus,
-      
+
       // TTS handlers
       'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
       'TTS_STOP': handleGoogleTTSStopAll,

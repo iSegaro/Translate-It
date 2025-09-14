@@ -4,7 +4,6 @@ import {
   getPromptBASESelectAsync,
   getPromptPopupTranslateAsync,
   getPromptBASEFieldAsync,
-  getPromptBASESubtitleAsync,
   getEnableDictionaryAsync,
   getPromptDictionaryAsync,
   getPromptBASEBatchAsync, // Import the new getter
@@ -77,8 +76,6 @@ export async function buildPrompt(
   if (isJsonMode) {
     // This handles reliable AI providers in Select_Element mode, as they get raw JSON.
     promptBase = await getPromptBASESelectAsync();
-  } else if (translateMode === TranslationMode.Subtitle) {
-    promptBase = await getPromptBASESubtitleAsync();
   } else if (
     translateMode === TranslationMode.Popup_Translate ||
     translateMode === TranslationMode.Sidepanel_Translate

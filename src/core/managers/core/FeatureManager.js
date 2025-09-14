@@ -12,7 +12,7 @@ import { storageManager } from "@/shared/storage/core/StorageCore.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
- *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SUBTITLE_TRANSLATION"|"SHOW_SUBTITLE_ICON"|"SCREEN_CAPTURE"} FeatureKey
+ *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SCREEN_CAPTURE"} FeatureKey
  */
 
 export default class FeatureManager extends ResourceTracker {
@@ -28,8 +28,6 @@ export default class FeatureManager extends ResourceTracker {
       TRANSLATE_WITH_SELECT_ELEMENT: "SELECT_ELEMENT",
       TRANSLATE_ON_TEXT_SELECTION: "TEXT_SELECTION",
       ENABLE_DICTIONARY: "DICTIONARY",
-      ENABLE_SUBTITLE_TRANSLATION: "SUBTITLE_TRANSLATION",
-      SHOW_SUBTITLE_ICON: "SHOW_SUBTITLE_ICON",
       ENABLE_SCREEN_CAPTURE: "SCREEN_CAPTURE",
     };
 
@@ -45,10 +43,6 @@ export default class FeatureManager extends ResourceTracker {
       TEXT_SELECTION:
         initialFlags.TEXT_SELECTION ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION,
       DICTIONARY: initialFlags.DICTIONARY ?? CONFIG.ENABLE_DICTIONARY,
-      SUBTITLE_TRANSLATION:
-        initialFlags.SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
-      SHOW_SUBTITLE_ICON:
-        initialFlags.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON,
       SCREEN_CAPTURE:
         initialFlags.SCREEN_CAPTURE ?? CONFIG.ENABLE_SCREEN_CAPTURE,
     };
