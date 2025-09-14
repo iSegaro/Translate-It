@@ -103,11 +103,14 @@ The messaging system has been optimized with unified actions to support the enha
 - `GOOGLE_TTS_ENDED` (completion event for proper lifecycle management)
 
 #### `background/handlers/tts/handleGoogleTTS.js`
-The background handler has been enhanced with smart stop logic and proper lifecycle management:
+The background handler has been enhanced with smart stop logic, proper lifecycle management, and event-driven notifications:
 - **Smart Stop Handler**: `handleGoogleTTSStopAll` now handles both specific TTS stops (with `ttsId`) and global stops (without `ttsId`)
 - **Persistent TTS ID**: `currentTTSId` now persists throughout audio playback and is only cleared when audio actually ends or is explicitly stopped
 - **Completion Event Handling**: `handleGoogleTTSEnded` ensures proper cleanup when TTS audio completes naturally
+- **Enhanced Notification System**: Added `notifyTTSEnded` function with reason-based notifications (completed, interrupted, stopped)
+- **Sender Tracking**: `currentTTSSender` tracks original requester for targeted event delivery
 - **Cross-Browser Audio Management**: Communicates with Offscreen documents (Chrome) or direct audio (Firefox) for precise control
+- **MessageActions Constants**: Uses `MessageActions.GOOGLE_TTS_ENDED` instead of hardcoded strings for maintainability
 
 ## 🔄 State Management & Lifecycle Rules
 
@@ -185,6 +188,10 @@ The system has been enhanced to handle Chrome Manifest V3 messaging issues that 
 - **Port Messaging Fix**: Fixed ReliableMessaging to properly extract result data from port communication wrapper
 - **Smart Stop Logic**: Implemented unified `TTS_STOP` handler that differentiates between specific and global stops
 - **Persistent TTS ID Management**: Fixed `currentTTSId` lifecycle to persist during audio playback instead of being cleared prematurely
+- **Event-Driven Completion (v2.3)**: Replaced polling mechanism with event-driven system using `GOOGLE_TTS_ENDED` events
+- **Enhanced Notification System (v2.3)**: Added `notifyTTSEnded` function for proper sender notifications with reasons
+- **30-Second Safety Timeout (v2.3)**: Added emergency timeout fallback for completion detection
+- **MessageActions Constants (v2.3)**: Replaced hardcoded strings with `MessageActions.GOOGLE_TTS_ENDED` for maintainability
 
 ### Cross-Component Standardization
 Successfully standardized TTS functionality across all three extension components:
@@ -286,6 +293,30 @@ Successfully standardized TTS functionality across all three extension component
 
 **Status**: ✅ **Enhanced in v2.2.1** - Better debugging experience and improved error handling
 
+### Major Improvements in v2.3 (Latest)
+
+The TTS system has been significantly enhanced with event-driven architecture and improved reliability:
+
+#### Event-Driven Completion System
+- **Eliminated Polling**: Replaced 500ms polling mechanism with event-driven `GOOGLE_TTS_ENDED` notifications
+- **30-Second Safety Timeout**: Added emergency fallback timeout for completion detection
+- **Improved Efficiency**: Reduced background checks and improved resource utilization
+
+#### Enhanced Notification System
+- **Reason-Based Notifications**: Added support for `completed`, `interrupted`, and `stopped` reasons
+- **Targeted Event Delivery**: `currentTTSSender` ensures events reach the original requester
+- **Proper Interruption Handling**: New TTS requests notify previous sender of interruption
+
+#### Code Quality Improvements
+- **MessageActions Constants**: Replaced hardcoded strings with `MessageActions.GOOGLE_TTS_ENDED`
+- **Unified Notification Function**: Centralized `notifyTTSEnded` function for consistent behavior
+- **Better Error Handling**: Enhanced error recovery and logging throughout the system
+
+#### Technical Details
+- **Firefox Support**: Direct audio completion events sent via `runtime.sendMessage`
+- **Chrome Support**: Offscreen document events properly forwarded to original requester
+- **Cross-Context Communication**: Proper handling between content scripts, popups, and sidepanels
+
 ### Debugging Tips
 
 1. **Check Extension Console**: Look for TTS-related logs with component prefixes
@@ -321,3 +352,7 @@ The unified system is considered healthy when:
 - ✅ **Persistent ID Management**: `currentTTSId` persists during audio playback for reliable stop functionality
 - ✅ **Completion Event Handling**: `GOOGLE_TTS_ENDED` properly registered and handled for cleanup
 - ✅ **Cross-Browser Audio Cleanup**: Proper ID clearing in both Firefox (`onended`) and Chrome (event-driven)
+- ✅ **Event-Driven System (v2.3)**: Polling eliminated, replaced with event-driven notifications
+- ✅ **MessageActions Constants (v2.3)**: All hardcoded strings replaced with constants
+- ✅ **Enhanced Notifications (v2.3)**: Reason-based notifications with proper sender tracking
+- ✅ **Safety Timeout (v2.3)**: 30-second emergency timeout for completion detection
