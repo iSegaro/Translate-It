@@ -34,42 +34,6 @@ function extractVueComponentStyles() {
   return vueStyles.join('\n');
 }
 
-// Function to create a temporary Vue app and extract its styles
-function preloadVueStyles() {
-  if (typeof document === 'undefined') return '';
-  
-  // Create a hidden container to mount Vue app temporarily
-  const tempContainer = document.createElement('div');
-  tempContainer.style.display = 'none';
-  tempContainer.style.position = 'absolute';
-  tempContainer.style.top = '-9999px';
-  document.body.appendChild(tempContainer);
-  
-  try {
-    // Create and mount the app temporarily to trigger style injection
-    const tempApp = configureVueForCSP(createApp(ContentApp));
-    tempApp.use(createPinia());
-    tempApp.use(i18n);
-    const mountedApp = tempApp.mount(tempContainer);
-    
-    // Extract styles after mounting
-    const extractedStyles = extractVueComponentStyles();
-    
-    // Cleanup
-    tempApp.unmount();
-    document.body.removeChild(tempContainer);
-    
-    return extractedStyles;
-  } catch (error) {
-    // Cleanup on error
-    if (document.body.contains(tempContainer)) {
-      document.body.removeChild(tempContainer);
-    }
-    const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'preloadVueStyles');
-    logger.warn('Could not extract Vue component styles:', error);
-    return '';
-  }
-}
 
 /**
  * This function returns the combined CSS for the entire Vue application.

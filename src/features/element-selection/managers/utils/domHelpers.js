@@ -8,7 +8,7 @@
 export function isElementConnected(element) {
   try {
     return element && element.isConnected && document.contains(element);
-  } catch (error) {
+    } catch {
     return false;
   }
 }
@@ -72,7 +72,7 @@ export function isElementVisible(element) {
       rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
       rect.right <= (window.innerWidth || document.documentElement.clientWidth)
     );
-  } catch (error) {
+    } catch {
     return false;
   }
 }
@@ -143,7 +143,7 @@ export function getComputedStyleValue(element, property) {
   try {
     const style = window.getComputedStyle(element);
     return style.getPropertyValue(property);
-  } catch (error) {
+    } catch {
     return '';
   }
 }
@@ -179,7 +179,7 @@ export function getElementPosition(element) {
       width: rect.width,
       height: rect.height
     };
-  } catch (error) {
+    } catch {
     return { top: 0, left: 0, width: 0, height: 0 };
   }
 }
@@ -247,7 +247,7 @@ export function generateElementId(element) {
       : '';
     
     return `${id}_${className}_${tag}_${position}_${Math.random().toString(36).substr(2, 9)}`;
-  } catch (error) {
+    } catch {
     // Fallback to simple ID
     return `element_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -289,7 +289,7 @@ export function safeFocus(element) {
     if (isFocusable(element)) {
       element.focus();
     }
-  } catch (error) {
+    } catch {
     // Silently fail focus operations
   }
 }
@@ -303,7 +303,7 @@ export function safeBlur(element) {
   
   try {
     element.blur();
-  } catch (error) {
+    } catch {
     // Silently fail blur operations
   }
 }

@@ -93,7 +93,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         selection.removeAllRanges();
         selection.addRange(range);
         
-      } catch (insertError) {
+            } catch {
         tweetField.textContent = trimmedText;
       }
 

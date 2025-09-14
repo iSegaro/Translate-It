@@ -11,8 +11,8 @@
       :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
       :aria-label="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
       role="button"
-      @click="onClick"
       tabindex="0"
+      @click="onClick"
       @mousedown.prevent.stop
       @mouseup.prevent.stop
       @mouseenter="onMouseEnter"

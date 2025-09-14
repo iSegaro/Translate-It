@@ -63,7 +63,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
     //   }
 
     //   return target.value || target.textContent?.trim?.() || "";
-    // } catch (error) {
+    //     // } catch {
     //   this.errorHandler.handle(error, {
     //     type: ErrorTypes.UI,
     //     context: "youtube-strategy-extractText",

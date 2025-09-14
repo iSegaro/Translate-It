@@ -359,7 +359,7 @@ export class ContentMessageHandler extends ResourceTracker {
           } else if (error) {
             try {
               errorMessage = JSON.stringify(error);
-            } catch (jsonError) {
+                        } catch {
               errorMessage = 'Translation failed';
             }
           } else {

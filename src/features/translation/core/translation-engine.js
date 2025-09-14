@@ -120,13 +120,13 @@ export class TranslationEngine {
       data.text.trim().length === 0
     ) {
       throw new Error(
-        `Invalid text: expected non-empty string, got \"${data.text}\"`, 
+        `Invalid text: expected non-empty string, got "${data.text}"`,
       );
     }
 
     if (!data.provider || typeof data.provider !== "string") {
       throw new Error(
-        `Invalid provider: expected string, got \"${data.provider}\"`, 
+        `Invalid provider: expected string, got "${data.provider}"`,
       );
     }
 

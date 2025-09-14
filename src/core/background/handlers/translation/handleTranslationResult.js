@@ -29,7 +29,7 @@ export async function handleTranslationResult(message, sender) {
           handled = true;
           break;
         }
-      } catch (error) {
+            } catch {
         // Tab might not have content script, ignore
       }
     }

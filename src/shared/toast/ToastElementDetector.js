@@ -154,7 +154,7 @@ export class ToastElementDetector {
   static shouldExcludeFromSelection(element) {
     try {
       return this.isWithinToast(element) || this.isExtensionElement(element);
-    } catch (error) {
+    } catch {
       // If any error occurs during element checking, exclude the element to be safe
       return true;
     }

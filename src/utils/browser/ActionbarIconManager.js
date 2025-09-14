@@ -149,7 +149,7 @@ class ActionbarIconManager extends ResourceTracker {
       const resolvedPath = browser.runtime.getURL(iconPath);
       const response = await fetch(resolvedPath);
       return response.ok ? await response.blob() : null;
-    } catch (error) {
+      } catch {
       logger.debug(`Failed to fetch: ${iconPath}`);
       return null;
     }

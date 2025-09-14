@@ -8,8 +8,8 @@
     :title="$t ? $t('translateSelectedText') : 'Translate selected text'"
     :aria-label="$t ? $t('translateSelectedText') : 'Translate selected text'"
     role="button"
-    @click="handleClick"
     tabindex="0"
+    @click="handleClick"
     @mouseup.left.prevent.stop
     @contextmenu.stop
     @mouseenter="onMouseEnter"

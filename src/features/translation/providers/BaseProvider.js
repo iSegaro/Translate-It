@@ -192,7 +192,7 @@ export class BaseProvider {
         let body = {};
         try {
           body = await response.json();
-        } catch (jsonError) {
+                } catch {
           // Ignore if body is not JSON
         }
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;

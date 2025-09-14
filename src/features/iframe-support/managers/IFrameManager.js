@@ -561,7 +561,7 @@ export class IFrameManager extends ResourceTracker {
         if (iframe.contentWindow && !excludeFrameIds.includes(iframe.contentWindow.frameId)) {
           iframe.contentWindow.postMessage(message, '*');
         }
-      } catch (error) {
+            } catch {
         // Ignore CORS errors for cross-origin iframes
       }
     });

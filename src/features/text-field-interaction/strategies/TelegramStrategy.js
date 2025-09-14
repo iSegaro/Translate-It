@@ -237,7 +237,7 @@ export default class TelegramStrategy extends PlatformStrategy {
     //   }
 
     //   return content.trim();
-    // } catch (error) {
+    //     // } catch {
     //   this.errorHandler.handle(error, {
     //     type: ErrorTypes.UI,
     //     context: "telegram-strategy-extractText",

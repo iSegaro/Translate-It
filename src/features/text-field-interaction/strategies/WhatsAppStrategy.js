@@ -102,7 +102,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
     //   if (!whatsappField || !this.validateField(whatsappField)) return "";
 
     //   return whatsappField.innerText?.trim?.() || "";
-    // } catch (error) {
+    //     // } catch {
     //   this.errorHandler.handle(error, {
     //     type: ErrorTypes.UI,
     //     context: "whatsapp-strategy-extractText",

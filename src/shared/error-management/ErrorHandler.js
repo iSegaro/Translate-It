@@ -122,7 +122,7 @@ export class ErrorHandler {
         } else {
           msg = genericMsg;
         }
-      } catch (msgError) {
+            } catch {
         // Fallback to original message
         msg = raw || 'An error occurred';
       }

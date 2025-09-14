@@ -20,7 +20,7 @@ function setStateForTab(tabId, active) {
       );
       // Use runtime.sendMessage to broadcast to all parts of the extension (sidepanel, content scripts, etc.)
       await browser.runtime.sendMessage(message);
-    } catch (error) {
+        } catch {
       // Ignore errors if no listeners are available
     }
   })();

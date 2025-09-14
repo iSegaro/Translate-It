@@ -191,7 +191,7 @@ class SystemFontDetector {
         }
       }
       return false
-    } catch (error) {
+        } catch {
       return false
     }
   }
@@ -222,7 +222,7 @@ class SystemFontDetector {
       
       // If widths differ, the font is available
       return Math.abs(testWidth - fallbackWidth) > 1
-    } catch (error) {
+        } catch {
       return false
     }
   }
@@ -235,7 +235,7 @@ class SystemFontDetector {
   _sanitizeFontValue(fontName) {
     return fontName.toLowerCase()
       .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9\-]/g, '')
+      .replace(/[^a-z0-9-]/g, '')
   }
 
   /**

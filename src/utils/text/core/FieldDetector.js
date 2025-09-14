@@ -4,7 +4,6 @@
  */
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { siteHandlerRegistry } from "../registry/SiteHandlerRegistry.js";
 import { 
   FieldTypes, 
@@ -12,8 +11,6 @@ import {
   SelectionStrategies,
   SelectionEventStrategies 
 } from "./types.js";
-
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FieldDetector');
 
 /**
  * Rich text editor detection patterns
@@ -75,10 +72,6 @@ const NonProcessableKeywords = [
   'zipcode', 'postal'
 ];
 
-/**
- * Legacy AuthKeywords for backward compatibility
- */
-const AuthKeywords = NonProcessableKeywords;
 
 
 /**
@@ -198,7 +191,7 @@ export class FieldDetector {
         const matchesSiteSelectors = siteConfig.selectors.some(selector => {
           try {
             return element.matches(selector) || element.closest(selector);
-          } catch (e) {
+          } catch {
             return false;
           }
         });
@@ -321,7 +314,7 @@ export class FieldDetector {
         if (field) {
           return field;
         }
-      } catch (e) {
+      } catch {
         continue;
       }
     }
@@ -365,7 +358,7 @@ export class FieldDetector {
     try {
       const handler = await siteHandlerRegistry.getHandler(hostname);
       return handler.constructor.name !== 'DefaultSiteHandler';
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -518,8 +511,8 @@ export class FieldDetector {
     if (pattern && (
       pattern.includes('[0-9]') ||
       pattern.includes('\\d') ||
-      pattern.match(/^[0-9\-\+\.\s]+$/) ||
-      pattern.match(/^[\d\-\+\.\s]+$/)
+      pattern.match(/^[0-9\-+.\s]+$/) ||
+      pattern.match(/^[\d\-+.\s]+$/)
     )) return true;
 
     // Check if element has numeric-only content expectations
