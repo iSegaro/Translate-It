@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
@@ -49,7 +49,6 @@ const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
 
 // Sync with settings on mount
-import { onMounted } from 'vue'
 onMounted(() => {
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
   targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'English'
@@ -65,27 +64,26 @@ watch(targetLanguage, (value) => {
   validateLanguages()
 })
 
-
 // Validation
 const validationError = ref('')
 
 const validateLanguages = async () => {
   clearErrors()
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
-  
+
   if (!isValid) {
     validationError.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage')
   } else {
     validationError.value = ''
   }
-  
+
   return isValid
 }
 
-const validateForm = async () => {
-  // Only validate languages in this tab
-  return await validateLanguages()
-}
+// Only validate languages in this tab
+defineExpose({
+  validate: validateLanguages
+})
 </script>
 
 <style lang="scss" scoped>

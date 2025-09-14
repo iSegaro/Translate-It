@@ -101,14 +101,14 @@ const handleProviderSelect = async (providerId) => {
       emit('providerSelected', providerId)
       emit('close')
       emit('update:isVisible', false)
-      
+
       // Visual feedback - assuming the button is the target
       const apiButton = document.getElementById('apiProviderBtn')
       if (apiButton) {
         showVisualFeedback(apiButton, 'success', 300)
       }
-      
-  logger.debug(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
+
+      logger.debug(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
     }
   } catch (error) {
     await handleError(error, 'sidepanel-api-dropdown-select-provider')
@@ -204,9 +204,7 @@ const setupEventListeners = () => {
 }
 
 // Cleanup event listeners - now handled automatically by useResourceTracker
-const cleanupEventListeners = () => {
   // No manual cleanup needed!
-}
 
 // Handle outside clicks
 const handleOutsideClick = (event) => {

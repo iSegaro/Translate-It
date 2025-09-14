@@ -77,10 +77,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -93,10 +91,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 // Resource tracker for automatic cleanup
-const tracker = useResourceTracker('sidepanel-main-content')
 
 // Stores
-const settingsStore = useSettingsStore()
 
 // Composables
 const { t } = useUnifiedI18n();

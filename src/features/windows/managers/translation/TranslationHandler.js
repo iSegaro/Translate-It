@@ -1,11 +1,8 @@
 // src/managers/content/windows/translation/TranslationHandler.js
 
-import browser from "webextension-polyfill";
-import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js"
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
@@ -28,9 +25,7 @@ export class TranslationHandler {
     try {
       let settings;
       
-      try {
-        settings = await getSettingsAsync();
-      } catch (error) {
+      settings = await getSettingsAsync().catch(error => {
         // If extension context is invalidated, use fallback values
         if (ExtensionContextManager.isContextError(error)) {
           this.logger.debug('Extension context invalidated, using fallback settings for translation');
@@ -43,8 +38,8 @@ export class TranslationHandler {
           // Re-throw non-context errors
           throw error;
         }
-      }
-      
+      });
+
       const translationMode = determineTranslationMode(selectedText, TranslationMode.Selection);
 
       // Generate unique messageId

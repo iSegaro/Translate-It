@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -72,7 +72,7 @@ const hasError = ref(false)
 const errorMessage = ref('')
 
 // Message listener
-const handleMessage = (message, sender, sendResponse) => {
+const handleMessage = (message, _sender, _sendResponse) => {
   // Only handle specific sidepanel messages, let other messages be handled by background
   if (message.action === 'translationResult') {
     translationStore.setTranslation(message.data);

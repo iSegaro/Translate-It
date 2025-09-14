@@ -46,7 +46,6 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { loadSettingsModules } from '@/features/settings/utils/settings-modules.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import browser from 'webextension-polyfill'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsApp');
 

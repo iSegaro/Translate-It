@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
@@ -86,9 +86,9 @@ import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
-const { t, changeLanguage, locale } = useUnifiedI18n()
+const { t, changeLanguage } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
-const { findLanguageByCode, getInterfaceLanguages } = useLanguages()
+const { getInterfaceLanguages } = useLanguages()
 const manifestVersion = ref('v0.0.0')
 
 const getFlagUrl = (code) => {

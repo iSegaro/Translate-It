@@ -2,7 +2,6 @@
 
 
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
-import { openOptionsPage } from "@/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
@@ -66,15 +65,9 @@ export class ErrorHandler {
     this.notifier = notifier || new NotificationManager();
     this.displayedErrors = new Set();
     this.handling = false;
-    this.openOptionsPageCallback = null; // Property to hold the callback
     this.debugMode = false; // Debug mode state
     this.errorListeners = new Set(); // For UI error state listeners
     _instance = this; // Set singleton instance
-  }
-
-  // Method to set the callback from outside
-  setOpenOptionsPageCallback(callback) {
-    this.openOptionsPageCallback = callback;
   }
 
   // Method to set debug mode

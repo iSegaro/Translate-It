@@ -71,9 +71,9 @@ export const addFirefoxSpecificHandlers = (handlerMappings, Handlers) => {
  */
 export const addBrowserSpecificHandlers = (handlerMappings, Handlers) => {
   logger.debug('🌐 Adding browser-specific handlers...');
-  
+
   addChromiumSpecificHandlers(handlerMappings, Handlers);
   addFirefoxSpecificHandlers(handlerMappings, Handlers);
-  
+
   logger.debug('✅ Browser-specific handlers added');
 };

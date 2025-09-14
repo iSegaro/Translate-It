@@ -204,7 +204,7 @@ export function setupGlobalErrorHandler(app, appName = 'vue-app') {
   }
   
   // Also handle unhandled promise rejections in Vue context
-  app.config.warnHandler = (msg, instance, trace) => {
+  app.config.warnHandler = (msg, instance) => {
     logger.warn(`[${appName}] Vue Warning:`, msg)
     logger.debug(`[${appName}] Vue warn instance summary:`, {
       componentName: instance?.type?.name || instance?.proxy?.$options?.name || null,

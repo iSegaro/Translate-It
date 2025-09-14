@@ -5,13 +5,8 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { 
-  SiteHandlerResult, 
-  SiteConfig, 
-  FieldTypes, 
-  SelectionMethods,
-  SelectionStrategies,
-  SelectionEventStrategies 
+import {
+  SiteConfig
 } from "../../core/types.js";
 
 export class BaseSiteHandler {
@@ -47,7 +42,7 @@ export class BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, options = {}) {
+  async detectSelection() {
     throw new Error('detectSelection() must be implemented by subclass');
   }
 
@@ -57,7 +52,7 @@ export class BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, options = {}) {
+  async calculatePosition() {
     throw new Error('calculatePosition() must be implemented by subclass');
   }
 
@@ -76,7 +71,7 @@ export class BaseSiteHandler {
    * @param {Element} element - Target element
    * @returns {string} Selected text
    */
-  getStandardSelection(element) {
+  getStandardSelection() {
     try {
       // Try window.getSelection()
       const selection = window.getSelection();
@@ -154,7 +149,7 @@ export class BaseSiteHandler {
    * @param {Object} options - Position options
    * @returns {Object} Position coordinates
    */
-  calculateStandardPosition(element, options = {}) {
+  calculateStandardPosition(element, options) {
     const { sourceEvent } = options;
 
     try {

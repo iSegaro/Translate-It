@@ -26,7 +26,7 @@ export class GoogleSuiteHandler extends BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, options = {}) {
+  async detectSelection(element, ) {
     try {
       let selectedText = '';
 
@@ -68,10 +68,10 @@ export class GoogleSuiteHandler extends BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, options = {}) {
+  async calculatePosition(element, ) {
     try {
       // Use standard position calculation
-      const position = this.calculateStandardPosition(element, options);
+      const position = this.calculateStandardPosition(element, );
       
       // Google Docs specific adjustments
       if (this.hostname === 'docs.google.com') {
@@ -104,7 +104,7 @@ export class GoogleSuiteHandler extends BaseSiteHandler {
               return iframeSelection.toString().trim();
             }
           }
-        } catch (e) {
+        } catch {
           // Cross-origin iframe, continue
         }
       }

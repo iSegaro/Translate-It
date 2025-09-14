@@ -10,7 +10,6 @@ import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import browser from "webextension-polyfill";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
@@ -31,7 +30,7 @@ function clearPendingNotificationData(context = 'cleanup') {
   logger.debug('Pending notification data cleared', { context });
 }
 
-export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId, dismissTimeout }) {
+export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId }) {
   logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
   
   if (!text) {

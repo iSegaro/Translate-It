@@ -26,7 +26,7 @@ export class MicrosoftOfficeHandler extends BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, options = {}) {
+  async detectSelection(element, ) {
     try {
       let selectedText = '';
 
@@ -68,9 +68,9 @@ export class MicrosoftOfficeHandler extends BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, options = {}) {
+  async calculatePosition(element, ) {
     try {
-      const position = this.calculateStandardPosition(element, options);
+      const position = this.calculateStandardPosition(element, );
       return position;
     } catch (error) {
       this.logger.error('Microsoft Office position calculation failed:', error);
@@ -96,7 +96,7 @@ export class MicrosoftOfficeHandler extends BaseSiteHandler {
               return iframeSelection.toString().trim();
             }
           }
-        } catch (e) {
+        } catch {
           // Cross-origin iframe, continue
         }
       }

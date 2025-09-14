@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, getCurrentInstance } from 'vue'
+import { ref } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import BaseInput from '@/components/base/BaseInput.vue'

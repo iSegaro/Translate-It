@@ -11,7 +11,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -21,11 +20,11 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
 
-const { t, locale } = useUnifiedI18n()
+const { locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 
 // Language transition animation
-const languageTransition = createLanguageTransition(
+createLanguageTransition(
   () => locale.value,
   {
     containerSelector: '.options-layout',
@@ -42,7 +41,7 @@ const languageTransition = createLanguageTransition(
 )
 
 // Theme transition animation
-const themeTransition = createThemeTransition(
+createThemeTransition(
   () => settingsStore.settings?.THEME,
   {
     containerSelector: '.options-layout',
@@ -58,17 +57,6 @@ const themeTransition = createThemeTransition(
   }
 )
 
-
-// RTL detection using unified i18n (reactive to language changes)
-const isRTL = computed(() => {
-  try {
-    const rtlValue = t('IsRTL') || 'false'
-    return rtlValue === 'true'
-  } catch (e) {
-    logger.debug('Failed to get RTL setting:', e.message)
-    return false
-  }
-})
 </script>
 
 <style lang="scss">

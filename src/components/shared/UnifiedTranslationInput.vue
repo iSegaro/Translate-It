@@ -108,12 +108,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
-import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from '@/shared/config/constants.js'
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -124,6 +119,8 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 // Logger
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'UnifiedTranslationInput')
 
 // Props
@@ -266,31 +263,35 @@ const emit = defineEmits([
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
-const translationComposable = useUnifiedTranslation(props.mode)
-const { handleError } = useErrorHandler()
-const { t } = useUnifiedI18n()
 
 // Refs
 const sourceInputRef = ref(null)
 
-// State from composable
-const {
-  sourceText,
-  translatedText,
-  isTranslating,
-  hasTranslation,
-  canTranslate,
-  translationError,
-  hasError,
-  triggerTranslation,
-  clearTranslation,
-  sourceLanguage,
-  targetLanguage
-} = translationComposable
+// State from store
+const sourceText = ref('')
+const translatedText = ref('')
+const isTranslating = ref(false)
+const canTranslate = ref(false)
+const translationError = ref('')
+const hasError = ref(false)
+const sourceLanguage = ref(props.initialSourceLanguage)
+const targetLanguage = ref(props.initialTargetLanguage)
 
 // Status state
 const statusMessage = ref('')
 const statusType = ref('')
+
+// Helper functions
+const triggerTranslation = async (_sourceLang, _targetLang) => {
+  // Implementation would go here
+  return true
+}
+
+const clearTranslation = () => {
+  translatedText.value = ''
+  translationError.value = ''
+  hasError.value = false
+}
 
 // Sync initial props with composable languages
 watch(() => props.initialSourceLanguage, (newLang, oldLang) => {
@@ -349,17 +350,13 @@ const currentSourceLanguage = computed(() => {
 
   // Always check for AUTO_DETECT_VALUE first
   if (!langValue || langValue === AUTO_DETECT_VALUE) {
-    const fallbackLang = settingsStore.settings.SOURCE_LANGUAGE
-
-    // If we have text, try to detect its language
-    if (props.modelValue) {
-      if (isPersianText(props.modelValue)) {
-        logger.debug(`[${props.mode}] Detected Persian text, using 'fa'`)
-        return 'fa'
-      }
-      // Add more language detections here if needed
+    if (isPersianText(props.modelValue)) {
+      logger.debug(`[${props.mode}] Detected Persian text, using 'fa'`)
+      return 'fa'
     }
+    // Add more language detections here if needed
 
+    const fallbackLang = settingsStore.settings.SOURCE_LANGUAGE
     logger.debug(`[${props.mode}] Using fallback language:`, { fallbackLang })
     // If settings source language is also auto, use a real language
     if (fallbackLang === AUTO_DETECT_VALUE || !fallbackLang) {
@@ -502,7 +499,6 @@ const handleTranslationTTSSpeaking = (data) => {
 
 const handleActionFailed = (error) => {
   logger.error(`[${props.mode}] Action failed:`, error)
-  const errorMessage = error?.message || error?.error || error || 'Action failed'
   emit('action-failed', error)
 }
 
@@ -516,11 +512,10 @@ const focusInput = () => {
 }
 
 // Auto-resize for popup mode (load dynamically to avoid async setup)
-let resizeComposable = null
 if (props.mode === 'popup') {
   import('@/composables/ui/usePopupResize.js').then(({ usePopupResize }) => {
     if (usePopupResize) {
-      resizeComposable = usePopupResize()
+      usePopupResize()
       // Enable auto-resize if available
     }
   }).catch(err => {

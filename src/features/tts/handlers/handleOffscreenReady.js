@@ -12,7 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'OffscreenReadyHandler');
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleOffscreenReady = async (request) => {
+export const handleOffscreenReady = async () => {
   try {
     logger.debug('[OffscreenReadyHandler] 📡 Offscreen document ready');
     

@@ -144,12 +144,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
-import { isContextError } from '@/core/extensionContext.js';
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -167,7 +166,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'speak']);
-const { sendMessage } = useMessaging('content');
+useMessaging('content');
 
 // TTS functionality with unified composable
 const tts = useTTSSmart();

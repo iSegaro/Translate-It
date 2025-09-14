@@ -147,15 +147,6 @@ export class RevertHandler extends ResourceTracker {
         }
       }
 
-      // Try to import FeatureManager as fallback
-      try {
-        const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-        // This might not work as FeatureManager needs to be instantiated, but let's try
-        logger.debug('[RevertHandler] FeatureManager imported but instance not available globally');
-      } catch (importError) {
-        logger.debug('[RevertHandler] Failed to import FeatureManager:', importError);
-      }
-
       return null;
     } catch (error) {
       logger.warn('[RevertHandler] Could not get SelectElementManager from FeatureManager:', error);

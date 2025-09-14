@@ -218,7 +218,7 @@ onUnmounted(() => {
 // Event listeners
 const setupEventListeners = () => {
   const eventName = `dismiss-icon-${props.id}`;
-  const wrappedHandler = (data) => {
+  const wrappedHandler = (_data) => {
     handleDismiss();
   };
   
@@ -248,7 +248,7 @@ const handleDismissAll = () => {
 
 // Public methods
 defineExpose({
-  updatePosition: (newPosition) => {
+  updatePosition: () => {
     // Position updates are handled via props reactivity in usePositioning
   },
   animateOut

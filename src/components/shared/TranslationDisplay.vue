@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
@@ -306,9 +306,9 @@ const renderedContent = computed(() => {
 })
 
 // Watchers
-watch(() => props.content, (newContent, oldContent) => {
+watch(() => props.content, () => {
   // Fade-in animation disabled as requested
-  // if (newContent && newContent !== oldContent && props.showFadeInAnimation && !props.isLoading) {
+  // if (newContent && newContent !== oldContent) {
   //   showFadeIn.value = true
   //   setTimeout(() => {
   //     showFadeIn.value = false

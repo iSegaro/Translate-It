@@ -3,7 +3,7 @@
  * Handles viewport clamping, position updates, and responsive positioning
  */
 
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 
 export function usePositioning(initialPosition, options = {}) {
   const {
@@ -32,7 +32,6 @@ export function usePositioning(initialPosition, options = {}) {
 
 
     // Prevent overflow right/bottom
-    let originalX = x, originalY = y;
     
     if (x + width > vw) x = vw - width - margin;
     if (x < margin) x = margin;

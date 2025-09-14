@@ -4,7 +4,7 @@
  */
 
 import { BaseSiteHandler } from "./base/BaseSiteHandler.js";
-import { SiteHandlerResult, FieldTypes, SelectionMethods } from "../core/types.js";
+import { FieldTypes, SiteHandlerResult } from "../core/types.js";
 
 export class ZohoWriterHandler extends BaseSiteHandler {
   constructor(hostname, config = {}) {
@@ -27,7 +27,7 @@ export class ZohoWriterHandler extends BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, options = {}) {
+  async detectSelection(element, ) {
     try {
       // Strategy 1: Temporarily enable selection visibility and try standard methods
       const originalStyle = this.enableSelectionVisibility();
@@ -70,8 +70,8 @@ export class ZohoWriterHandler extends BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, options = {}) {
-    const { sourceEvent } = options;
+  async calculatePosition(element, options) {
+    const { sourceEvent } = (options || {});
 
     try {
       // Strategy 1: Use sourceEvent coordinates if available

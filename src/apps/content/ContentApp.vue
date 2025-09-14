@@ -86,12 +86,11 @@ const {
   onTranslationWindowClose,
   onTranslationWindowSpeak,
   onTranslationIconClose,
-  setupEventListeners,
-  cleanupEventListeners
+  setupEventListeners
 } = useWindowsManager();
 
 // Resource tracker for automatic cleanup
-const tracker = useResourceTracker('content-app')
+useResourceTracker('content-app')
 
 // Toast integration
 let toastIntegration = null;
@@ -156,17 +155,17 @@ onMounted(() => {
   try {
     toastIntegration = ToastIntegration.createSingleton(pageEventBus);
     toastIntegration.initialize({
-      onCancelClick: (event) => {
+      onCancelClick: () => {
         logger.info('Cancel button clicked via ToastIntegration');
-        
+
         // Prevent multiple cancel requests in quick succession
         if (isCancelInProgress) {
           logger.debug('Cancel already in progress, ignoring duplicate request');
           return;
         }
-        
+
         isCancelInProgress = true;
-        
+
         // Emit event only once with proper error handling
         try {
           if (pageEventBus) {
@@ -176,7 +175,7 @@ onMounted(() => {
         } catch (error) {
           logger.warn('Error emitting cancel-select-element-mode event:', error);
         }
-        
+
         // Reset flag after a delay to prevent event loops
         if (cancelTimeout) clearTimeout(cancelTimeout);
         cancelTimeout = setTimeout(() => {
@@ -256,16 +255,16 @@ onMounted(() => {
     // Add action buttons if provided
     if (actions && actions.length > 0) {
       // Create the action handler
-      const actionHandler = (event) => {
+      const actionHandler = () => {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-        
+
         logger.debug('Toast action clicked:', actions[0].eventName);
         pageEventBus.emit(actions[0].eventName);
         toast.dismiss(id);
       };
-      
+
       toastOptions.action = {
         label: actions[0].label,
         onClick: actionHandler

@@ -26,7 +26,7 @@ export class NotionHandler extends BaseSiteHandler {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'NotionHandler');
   }
 
-  async detectSelection(element, options = {}) {
+  async detectSelection(element, ) {
     try {
       let selectedText = '';
       
@@ -68,14 +68,14 @@ export class NotionHandler extends BaseSiteHandler {
     }
   }
 
-  async calculatePosition(element, options = {}) {
+  async calculatePosition(element, ) {
     try {
       // Try Notion-specific position calculation
-      let position = await this._calculateNotionPosition(element, options);
+      let position = await this._calculateNotionPosition(element, );
       
       // Fallback to standard position calculation
       if (!position || (position.x === 0 && position.y === 0)) {
-        position = this.calculateStandardPosition(element, options);
+        position = this.calculateStandardPosition(element);
       }
 
       this.logger.debug('Notion position calculated:', position);
@@ -83,7 +83,7 @@ export class NotionHandler extends BaseSiteHandler {
 
     } catch (error) {
       this.logger.error('Notion position calculation failed:', error);
-      return this.calculateStandardPosition(element, options);
+      return this.calculateStandardPosition(element);
     }
   }
 

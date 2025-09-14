@@ -45,7 +45,7 @@ if (typeof window !== 'undefined') {
       if (!window.parent.pageEventBus) {
         window.parent.pageEventBus = pageEventBus;
       }
-    } catch (e) {
+    } catch {
       // Cross-origin iframe, can't access parent - this is normal
       logger.debug('Cannot access parent window (cross-origin), using local event bus');
     }

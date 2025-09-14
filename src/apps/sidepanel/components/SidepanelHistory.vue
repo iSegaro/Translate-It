@@ -97,7 +97,6 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useUI } from '@/composables/ui/useUI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { languageList } from '@/utils/i18n/languages.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -105,7 +104,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
 
 // Resource tracker for automatic cleanup
-const tracker = useResourceTracker('sidepanel-history')
 
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()

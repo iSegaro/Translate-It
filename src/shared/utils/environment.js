@@ -30,7 +30,7 @@ export function isDevelopmentMode() {
         return true; // Unpacked extensions don't have update_url
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore errors - might not be available in all contexts
   }
   

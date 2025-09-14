@@ -20,7 +20,7 @@ export class WPSHandler extends BaseSiteHandler {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WPSHandler');
   }
 
-  async detectSelection(element, options = {}) {
+  async detectSelection(element, ) {
     try {
       let selectedText = '';
       
@@ -65,7 +65,7 @@ export class WPSHandler extends BaseSiteHandler {
     }
   }
 
-  async calculatePosition(element, options = {}) {
+  async calculatePosition(element, options) {
     try {
       // Try WPS-specific position calculation
       let position = await this._calculateWPSPosition(element, options);

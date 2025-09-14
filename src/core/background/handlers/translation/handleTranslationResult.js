@@ -8,7 +8,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslationRes
  * Handle translation result updates and forward to appropriate handlers
  * This replaces the temporary listener pattern in TranslationHandler
  */
-export async function handleTranslationResult(message, sender) {
+export async function handleTranslationResult(message) {
   try {
     logger.debug('Handling TRANSLATION_RESULT_UPDATE:', message.messageId);
     

@@ -4,12 +4,13 @@
  */
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { siteHandlerRegistry } from "../registry/SiteHandlerRegistry.js";
-import { 
-  FieldTypes, 
+import {
+  FieldTypes,
   SiteConfig,
   SelectionStrategies,
-  SelectionEventStrategies 
+  SelectionEventStrategies
 } from "./types.js";
 
 /**
@@ -429,7 +430,7 @@ export class FieldDetector {
           try {
             return element.matches && element.matches(selector) || 
                    element.closest && element.closest(selector);
-          } catch (e) {
+          } catch {
             return false;
           }
         });
@@ -540,9 +541,7 @@ export class FieldDetector {
 
     const name = (element.name || '').toLowerCase();
     const placeholder = (element.placeholder || '').toLowerCase();
-    const id = (element.id || '').toLowerCase();
     const className = (element.className || '').toLowerCase();
-    const ariaLabel = (element.getAttribute('aria-label') || '').toLowerCase();
 
     // Check if element has numeric-specific attributes
     const min = element.getAttribute('min');
@@ -711,7 +710,7 @@ export class FieldDetector {
         if (element.closest && element.closest(selector)) {
           return true;
         }
-      } catch (e) {
+      } catch {
         // Invalid selector, continue
       }
     }

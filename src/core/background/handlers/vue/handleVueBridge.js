@@ -23,7 +23,7 @@ export async function handleVueBridge(message, sender) {
     }
     
     // Get the tab to send message to (use sender tab if available)
-    const tabId = sender?.tab?.id;
+    let tabId = sender?.tab?.id;
     if (!tabId) {
       // Get active tab if sender tab not available
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });

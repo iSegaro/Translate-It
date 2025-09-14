@@ -8,17 +8,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.SELECTION, 'handleSelectElement');
 /**
  * Handle select element related messages by forwarding to content scripts
  */
-export async function handleSelectElement(message, sender) {
+export async function handleSelectElement(message) {
   try {
     logger.debug('Handling select element message:', message.action);
     
-    const selectElementActions = [
-      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-      MessageActions.SET_SELECT_ELEMENT_STATE,
-      MessageActions.GET_SELECT_ELEMENT_STATE,
-      MessageActions.CANCEL_SELECT_ELEMENT_TRANSLATION
-    ];
-    
+        
     // Only forward certain actions to content scripts
     // SET_SELECT_ELEMENT_STATE should be handled directly by background
     const forwardActions = [

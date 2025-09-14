@@ -11,7 +11,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Capture');
 
 import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import browser from "webextension-polyfill";
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
@@ -130,13 +129,6 @@ export class ContentCaptureHandler extends ResourceTracker {
       data: { error: error.message, context, type: error.type || ErrorTypes.SCREEN_CAPTURE },
   }).catch(err => logger.error('Error sending capture error', err));
     this._showErrorNotification(`Screen capture ${context} failed. Please try again.`, error);
-  }
-
-  cleanup() {
-    if (this.screenSelector) this.screenSelector.cleanup();
-    if (this.capturePreview) this.capturePreview.cleanup();
-    if (this.captureResult) this.captureResult.cleanup();
-    this.screenSelector = this.capturePreview = this.captureResult = null;
   }
 
   _showErrorNotification(message, error) {

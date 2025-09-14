@@ -813,7 +813,7 @@ export class WindowsManager extends ResourceTracker {
       iframe = Array.from(allIframes).find(frame => {
         try {
           return frame.contentWindow === sourceWindow;
-        } catch (e) {
+        } catch {
           // Cross-origin iframe, can't access contentWindow - this is normal
           return false;
         }
@@ -1091,9 +1091,9 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Clean up window - simplified for event-only system
    */
-  async _cleanupWindow(withFadeOut) {
+  async _cleanupWindow() {
     this.logger.debug('[LOG] WindowsManager._cleanupWindow - simplified for Vue UI Host');
-    
+
     // Note: Don't remove theme listeners here - keep them for future windows
     // Remove the immediate dismiss listener
     this._removeDismissListener();

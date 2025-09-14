@@ -83,8 +83,6 @@ import { useSelectElementTranslation } from '@/features/translation/composables/
 import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
-import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 
 // Import icons
@@ -120,7 +118,6 @@ const props = defineProps({
 const emit = defineEmits(['historyToggle', 'clear-fields'])
 
 // Resource tracker for automatic cleanup
-const tracker = useResourceTracker('sidepanel-toolbar')
 
 // Composables
 const { t } = useUnifiedI18n()

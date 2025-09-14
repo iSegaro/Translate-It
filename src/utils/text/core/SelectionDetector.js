@@ -6,9 +6,8 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { siteHandlerRegistry } from "../registry/SiteHandlerRegistry.js";
-import { SiteHandlerResult, SelectionDetectionOptions } from "./types.js";
+import { SelectionDetectionOptions } from "./types.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectionDetector');
 
 /**
  * Modern SelectionDetector class with site handler integration

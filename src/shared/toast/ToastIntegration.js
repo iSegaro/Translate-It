@@ -63,9 +63,9 @@ export class ToastIntegration {
    * Default cancel button handler
    * @param {Event} event - Click event
    */
-  defaultCancelHandler(event) {
+  defaultCancelHandler() {
     this.logger.info('Default cancel handler triggered');
-    
+
     if (this.eventBus) {
       this.eventBus.emit('cancel-select-element-mode');
     }
@@ -75,7 +75,7 @@ export class ToastIntegration {
    * Default toast click handler
    * @param {Event} event - Click event
    */
-  defaultToastHandler(event) {
+  defaultToastHandler() {
     this.logger.debug('Default toast click handler triggered');
     // By default, just prevent the click from propagating
   }

@@ -435,7 +435,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSStopAll = async (message, sender) => {
+export const handleGoogleTTSStopAll = async (message) => {
   try {
     const { ttsId } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
@@ -503,7 +503,7 @@ export const handleGoogleTTSStopAll = async (message, sender) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSPause = async (message, sender) => {
+export const handleGoogleTTSPause = async () => {
   try {
     logger.debug('[GoogleTTSHandler] ⏸️ Processing Google TTS Pause request');
     
@@ -534,7 +534,7 @@ export const handleGoogleTTSPause = async (message, sender) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSResume = async (message, sender) => {
+export const handleGoogleTTSResume = async () => {
   try {
     logger.debug('[GoogleTTSHandler] ▶️ Processing Google TTS Resume request');
     
@@ -565,7 +565,7 @@ export const handleGoogleTTSResume = async (message, sender) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSEnded = async (message, sender) => {
+export const handleGoogleTTSEnded = async () => {
   try {
     logger.debug('[GoogleTTSHandler] 🏁 Processing Google TTS End notification');
 
@@ -602,7 +602,7 @@ export const handleGoogleTTSEnded = async (message, sender) => {
  * @param {Object} request - Request object
  * @returns {Promise<Object>} Response
  */
-export const handleGoogleTTSGetStatus = async (message, sender) => {
+export const handleGoogleTTSGetStatus = async () => {
   try {
     logger.debug('[GoogleTTSHandler] 📊 Processing Google TTS Get Status request');
     

@@ -13,7 +13,7 @@
 export * from "./core/SelectionDetector.js";
 
 // Import and re-export for backward compatibility
-import { selectionDetector as newSelectionDetector, SelectionDetector as NewSelectionDetector } from "./core/SelectionDetector.js";
+import { selectionDetector as newSelectionDetector } from "./core/SelectionDetector.js";
 
 // Legacy exports
 export const selectionDetector = newSelectionDetector;

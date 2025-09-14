@@ -125,9 +125,6 @@ export class DragHandler extends ResourceTracker {
 
     this.isDragging = false;
 
-    // Get appropriate document for cleanup
-    const topDocument = this.positionCalculator.getTopDocument();
-
     // Remove global listeners (ResourceTracker handles cleanup automatically)
     // topDocument.removeEventListener calls are now handled by ResourceTracker
 

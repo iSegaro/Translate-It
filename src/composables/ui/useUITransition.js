@@ -34,7 +34,6 @@ export function useUITransition(options = {}) {
     onTransitionStart = () => {},
     onTransitionMid = () => {},
     onTransitionEnd = () => {},
-    autoApplyClasses = true,
     customShimmerColor = null
   } = options
 

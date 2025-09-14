@@ -55,7 +55,6 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -112,7 +111,6 @@ const emit = defineEmits([
 
 // Composables
 const languages = useLanguages()
-const settingsStore = useSettingsStore()
 const { handleError } = useErrorHandler()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
