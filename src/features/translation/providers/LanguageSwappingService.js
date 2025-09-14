@@ -51,6 +51,7 @@ export class LanguageSwappingService {
         
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
+        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
         logger.debug(`${providerName}: Language detection details:`, {
           text: text.slice(0, 50),
           detectedLang: mainDetection.language,
