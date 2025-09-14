@@ -270,13 +270,13 @@ export class ContentMessageHandler extends ResourceTracker {
           fromBackground,
           isExplicitDeactivation
         });
-        return { success: true, activated: this.selectElementManager.isSelectElementActive() };
+        return { success: true, activated: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false };
       }
-      
+
       this.logger.debug('DEACTIVATE_SELECT_ELEMENT_MODE received', {
         fromBackground: fromBackground,
         excludeFrameId: excludeFrameId,
-        isActive: this.selectElementManager.isSelectElementActive(),
+        isActive: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false,
         isInIframe: window !== window.top,
       });
 
