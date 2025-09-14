@@ -140,9 +140,9 @@ function generateChromeManifest(baseManifest) {
     // Options page
     options_page: 'html/options.html',
     
-    // Content Security Policy for Chrome MV3 (no unsafe-eval allowed)
+    // Content Security Policy for Chrome MV3 (with Vue 3 compatibility)
     content_security_policy: {
-      extension_pages: 'script-src \'self\'; object-src \'self\';'
+      extension_pages: 'script-src \'self\' \'wasm-unsafe-eval\'; object-src \'self\';'
     }
   };
 }
@@ -172,6 +172,11 @@ function generateFirefoxManifest(baseManifest) {
           required: ["none"]
         }
       }
+    },
+
+    // Content Security Policy for Firefox with DOMPurify support
+    content_security_policy: {
+      extension_pages: "script-src 'self'; object-src 'self';"
     },
     
     // Firefox uses sidebar_action instead of side_panel
