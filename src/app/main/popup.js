@@ -53,7 +53,12 @@ async function initializeApp() {
   } catch (error) {
     logger.error('Failed to initialize popup app:', error)
     // Show error UI
-    document.getElementById('app').innerHTML = '<div style="padding: 16px; color: red;">Failed to load extension. Please try reloading.</div>'
+    const appElement = document.getElementById('app')
+    appElement.textContent = '' // Clear existing content
+    const errorDiv = document.createElement('div')
+    errorDiv.style.cssText = 'padding: 16px; color: red;'
+    errorDiv.textContent = 'Failed to load extension. Please try reloading.'
+    appElement.appendChild(errorDiv)
   }
 }
 
