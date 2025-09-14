@@ -188,8 +188,12 @@ class SelectElementManager extends ResourceTracker {
       this.elementHighlighter.disablePageInteractions();
       
       this.logger.debug("Setting up notification...");
-      // Show notification
-      this.showNotification();
+      // Show notification only in main frame to prevent duplicates in iframes
+      if (window === window.top) {
+        this.showNotification();
+      } else {
+        this.logger.debug("Skipping notification in iframe - will be handled by main frame");
+      }
       
       this.logger.debug("Notifying background script...");
       // Notify background script
@@ -240,8 +244,13 @@ class SelectElementManager extends ResourceTracker {
       this.elementHighlighter.clearHighlight();
       await this.elementHighlighter.deactivateUI();
       
-      // Dismiss notification
-      this.dismissNotification();
+      // Dismiss notification (only in main frame)
+      if (window === window.top) {
+        // Dismiss notification (only in main frame)
+      if (window === window.top) {
+        this.dismissNotification();
+      }
+      }
       
       // Cleanup state
       this.stateManager.clearState();
@@ -279,8 +288,10 @@ class SelectElementManager extends ResourceTracker {
       this.elementHighlighter.clearHighlight();
       await this.elementHighlighter.deactivateUI();
       
-      // Dismiss notification immediately
-      this.dismissNotification();
+      // Dismiss notification immediately (only in main frame)
+      if (window === window.top) {
+        this.dismissNotification();
+      }
       
       // Clear state
       this.stateManager.clearState();
@@ -300,10 +311,28 @@ class SelectElementManager extends ResourceTracker {
       document.addEventListener('mouseover', this.handleMouseOver, true);
       document.addEventListener('mouseout', this.handleMouseOut, true);
       document.addEventListener('click', this.handleClick, true);
-      
+
       // Add global click prevention for navigation
       document.addEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
-      
+
+      // Listen for deactivation requests from iframes (only in main frame)
+      if (window === window.top) {
+        this.iframeMessageHandler = (event) => {
+          // Verify the message is from our extension
+          if (event.data && event.data.type === 'translate-it-deactivate-select-element') {
+            this.logger.debug('Received deactivation request from iframe:', event.data);
+
+            // Deactivate this SelectElement instance
+            this.deactivate({ fromIframe: true }).catch(error => {
+              this.logger.error('Error deactivating from iframe request:', error);
+            });
+          }
+        };
+
+        window.addEventListener('message', this.iframeMessageHandler);
+        this.logger.debug("Added iframe message listener in main frame");
+      }
+
       this.logger.debug("Event listeners setup for SelectElementManager");
     }
   }
@@ -313,7 +342,14 @@ class SelectElementManager extends ResourceTracker {
     document.removeEventListener('mouseout', this.handleMouseOut, true);
     document.removeEventListener('click', this.handleClick, true);
     document.removeEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
-    
+
+    // Remove iframe message listener (only in main frame)
+    if (window === window.top && this.iframeMessageHandler) {
+      window.removeEventListener('message', this.iframeMessageHandler);
+      this.iframeMessageHandler = null;
+      this.logger.debug("Removed iframe message listener from main frame");
+    }
+
     this.logger.debug("Event listeners removed for SelectElementManager");
   }
   
@@ -504,8 +540,10 @@ class SelectElementManager extends ResourceTracker {
     try {
       this.logger.debug("Starting translation process");
       
-      // Update notification to show translation in progress
-      this.updateNotificationForTranslation();
+      // Update notification to show translation in progress (only in main frame)
+      if (window === window.top) {
+        this.updateNotificationForTranslation();
+      }
       
       // Create text nodes map and original texts map for translation
       const textNodes = [];
@@ -572,23 +610,47 @@ class SelectElementManager extends ResourceTracker {
   
   performPostTranslationCleanup() {
     this.logger.debug("Performing post-translation cleanup");
-    
-    // Dismiss notification
-    this.dismissNotification();
-    
+
+    // Dismiss notification (only in main frame)
+    if (window === window.top) {
+      this.dismissNotification();
+    }
+
     // Clear highlights
     this.elementHighlighter.clearHighlight();
-    
-    // Deactivate if still active
-    if (this.isActive) {
-      this.deactivate().catch(error => {
-        this.logger.warn('Error during post-translation cleanup:', error);
-      });
+
+    // If this is an iframe, notify main frame to deactivate all SelectElement instances
+    if (window !== window.top) {
+      this.logger.debug("Notifying main frame to deactivate SelectElement mode");
+      try {
+        // Send message to main frame to deactivate all instances
+        window.top.postMessage({
+          type: 'translate-it-deactivate-select-element',
+          source: 'iframe-translation-complete',
+          instanceId: this.instanceId
+        }, '*');
+      } catch (error) {
+        this.logger.warn('Failed to notify main frame:', error);
+        // Fallback: deactivate this iframe instance
+        if (this.isActive) {
+          this.deactivate().catch(error => {
+            this.logger.warn('Error during iframe deactivation:', error);
+          });
+        }
+      }
+    } else {
+      // This is main frame, deactivate directly
+      if (this.isActive) {
+        this.logger.debug("Deactivating main frame SelectElementManager after translation");
+        this.deactivate().catch(error => {
+          this.logger.warn('Error during post-translation cleanup:', error);
+        });
+      }
     }
-    
+
     // Reset processing state
     this.isProcessingClick = false;
-    
+
     this.logger.debug("Post-translation cleanup completed");
   }
   
@@ -722,7 +784,10 @@ class SelectElementManager extends ResourceTracker {
       this.removeEventListeners();
       this.elementHighlighter.clearHighlight();
       this.elementHighlighter.deactivateUI().catch(() => {});
-      this.dismissNotification();
+      // Dismiss notification (only in main frame)
+      if (window === window.top) {
+        this.dismissNotification();
+      }
     } catch (cleanupError) {
       this.logger.error("Critical error during cleanup:", cleanupError);
     }

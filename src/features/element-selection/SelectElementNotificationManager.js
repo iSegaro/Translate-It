@@ -109,6 +109,13 @@ class SelectElementNotificationManager extends ResourceTracker {
     }
 
     try {
+      // Only show notifications in the main frame (top window)
+      // This prevents duplicate notifications in iframes
+      if (window !== window.top) {
+        this.logger.debug('Select Element notification requested from iframe, ignoring (will be handled by main frame)');
+        return 'iframe-notification-skipped';
+      }
+
       // Create notification data (now async)
       const notificationData = await this.createNotificationData(data);
 
@@ -149,7 +156,13 @@ class SelectElementNotificationManager extends ResourceTracker {
       this.logger.debug('No active notification to update');
       return null;
     }
-    
+
+    // Only update notifications in the main frame
+    if (window !== window.top) {
+      this.logger.debug('Select Element notification update requested from iframe, ignoring');
+      return null;
+    }
+
     try {
       // Update notification based on status
       if (data.status === 'translating') {
@@ -219,11 +232,19 @@ class SelectElementNotificationManager extends ResourceTracker {
       });
       return;
     }
-    
+
+    // Only dismiss notifications in the main frame
+    // Skip if this is an iframe or if the notification was skipped (iframe notification)
+    if (window !== window.top || notificationId === 'iframe-notification-skipped') {
+      this.logger.debug('Notification dismissal requested from iframe or for skipped notification, ignoring');
+      this.currentNotification = null;
+      return;
+    }
+
     try {
       // Mark as inactive first
       this.currentNotification.isActive = false;
-      
+
       // Dismiss through notification manager
       this.notificationManager.dismiss(notificationId);
       
