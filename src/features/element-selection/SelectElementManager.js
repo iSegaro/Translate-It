@@ -179,6 +179,13 @@ class SelectElementManager extends ResourceTracker {
       this.setupEventListeners();
       
       this.logger.debug("Setting up UI behaviors...");
+      // Ensure all services are available (fallback mechanism)
+      const servicesAvailable = await this._ensureServicesAvailable();
+      if (!servicesAvailable) {
+        this.logger.error("Failed to ensure services availability - cannot activate");
+        return { isActive: false, error: "Services initialization failed" };
+      }
+
       // Setup UI behaviors (cursor and link disabling)
       this.elementHighlighter.addGlobalStyles();
       this.elementHighlighter.disablePageInteractions();
@@ -762,7 +769,69 @@ class SelectElementManager extends ResourceTracker {
       this.logger.error('Failed to notify background about deactivation', err);
     }
   }
-  
+
+  /**
+   * Ensure all required services are available - recreate if cleaned up by garbage collector
+   * This is a fallback mechanism when FeatureManager health checks don't catch the issue
+   * @returns {Promise<boolean>} Whether all services are available
+   */
+  async _ensureServicesAvailable() {
+    try {
+      let servicesRecreated = false;
+
+      if (!this.elementHighlighter) {
+        this.logger.debug("ElementHighlighter was cleaned up, recreating as fallback...");
+        this.elementHighlighter = new ElementHighlighter();
+        await this.elementHighlighter.initialize();
+        servicesRecreated = true;
+      }
+
+      if (!this.textExtractionService) {
+        this.logger.debug("TextExtractionService was cleaned up, recreating as fallback...");
+        this.textExtractionService = new TextExtractionService();
+        await this.textExtractionService.initialize();
+        servicesRecreated = true;
+      }
+
+      if (!this.stateManager) {
+        this.logger.debug("StateManager was cleaned up, recreating as fallback...");
+        this.stateManager = new StateManager();
+        await this.stateManager.initialize();
+        servicesRecreated = true;
+      }
+
+      if (!this.translationOrchestrator) {
+        this.logger.debug("TranslationOrchestrator was cleaned up, recreating as fallback...");
+        this.translationOrchestrator = new TranslationOrchestrator(this.stateManager);
+        await this.translationOrchestrator.initialize();
+        servicesRecreated = true;
+      }
+
+      if (!this.modeManager) {
+        this.logger.debug("ModeManager was cleaned up, recreating as fallback...");
+        this.modeManager = new ModeManager();
+        await this.modeManager.initialize();
+        servicesRecreated = true;
+      }
+
+      if (!this.errorHandlingService) {
+        this.logger.debug("ErrorHandlingService was cleaned up, recreating as fallback...");
+        this.errorHandlingService = new ErrorHandlingService();
+        await this.errorHandlingService.initialize();
+        servicesRecreated = true;
+      }
+
+      if (servicesRecreated) {
+        this.logger.info("SelectElement services recreated successfully as fallback");
+      }
+
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to ensure services availability:', error);
+      return false;
+    }
+  }
+
   // Utility Methods
   async revertTranslations() {
     this.logger.info("Starting translation revert process in SelectElementManager");
