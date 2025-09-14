@@ -19,7 +19,15 @@ export async function handleSelectElement(message, sender) {
       MessageActions.CANCEL_SELECT_ELEMENT_TRANSLATION
     ];
     
-    if (!selectElementActions.includes(message.action)) {
+    // Only forward certain actions to content scripts
+    // SET_SELECT_ELEMENT_STATE should be handled directly by background
+    const forwardActions = [
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      MessageActions.GET_SELECT_ELEMENT_STATE,
+      MessageActions.CANCEL_SELECT_ELEMENT_TRANSLATION
+    ];
+
+    if (!forwardActions.includes(message.action)) {
       return { success: false, error: 'Unknown select element action' };
     }
     
