@@ -6,10 +6,10 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+// import { getScopedLogger } from '@/shared/logging/logger.js';
+// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
+// const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
 export class WebAIProvider extends BaseAIProvider {
   static type = "ai";

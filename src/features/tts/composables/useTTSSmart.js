@@ -117,7 +117,7 @@ export function useTTSSmart() {
       if (!response) {
         throw new Error('No response from background service');
       }
-      
+
       if (!response.success && response.error) {
         throw new Error(response.error);
       }
@@ -166,7 +166,7 @@ export function useTTSSmart() {
       };
       
       const response = await sendMessage(message);
-      
+
       if (!response?.success) {
         throw new Error(response?.error || 'Pause failed');
       }
@@ -197,7 +197,7 @@ export function useTTSSmart() {
       };
       
       const response = await sendMessage(message);
-      
+
       if (!response?.success) {
         throw new Error(response?.error || 'Resume failed');
       }
@@ -228,7 +228,7 @@ export function useTTSSmart() {
         messageId: `tts-stop-${currentTTSId.value || 'all'}`
       };
       
-      const response = await sendMessage(message);
+      await sendMessage(message);
 
       // Clear any completion timeout (event-driven system)
       if (completionTimeout) {
@@ -279,7 +279,7 @@ export function useTTSSmart() {
         messageId: `tts-stop-all-${Date.now()}`
       };
       
-      const response = await sendMessage(message);
+      await sendMessage(message);
 
       // Clear any completion timeout (event-driven system)
       if (completionTimeout) {

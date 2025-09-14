@@ -1,8 +1,8 @@
-import browser from "webextension-polyfill";
+// import browser from "webextension-polyfill";
 import { applyTranslationsToNodes, expandTextsForTranslation, reassembleTranslations, separateCachedAndNewTexts } from "../../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
-import { getTimeoutAsync, TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "@/utils/messaging/messageId.js";
 import { calculateDynamicTimeout } from "@/features/translation/utils/timeoutCalculator.js";
@@ -212,6 +212,10 @@ this.translationRequests.delete(messageId);
   }
 
   async sendTranslationRequest(messageId, jsonPayload, context = 'select-element') {
+    // Parse JSON to count segments for dynamic timeout calculation
+    let segmentCount = 1; // Default fallback
+    let dynamicTimeout;
+
     try {
       // Check if translation was cancelled (no longer using global flag)
       const request = this.translationRequests.get(messageId);
@@ -223,22 +227,20 @@ this.translationRequests.delete(messageId);
         window.isTranslationInProgress = false;
         return;
       }
-      
+
       const { getTranslationApiAsync, getTargetLanguageAsync } = await import("../../../../config.js");
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
 
-      // Parse JSON to count segments for dynamic timeout calculation
-      let segmentCount = 1; // Default fallback
       try {
         const parsedPayload = JSON.parse(jsonPayload);
         segmentCount = Array.isArray(parsedPayload) ? parsedPayload.length : 1;
-      } catch (e) {
+      } catch {
         this.logger.warn("Failed to parse JSON payload for segment count, using default timeout");
       }
 
       // Calculate dynamic timeout based on segment count
-      const dynamicTimeout = this.calculateDynamicTimeout(segmentCount);
+      dynamicTimeout = this.calculateDynamicTimeout(segmentCount);
 
       const translationRequest = {
         action: MessageActions.TRANSLATE,
@@ -343,7 +345,7 @@ this.translationRequests.delete(messageId);
     // Ensure the translation in progress flag remains set during streaming
     window.isTranslationInProgress = true;
 
-    const { data: translatedBatch, originalData: originalBatch, batchIndex } = data;
+    const { data: translatedBatch, originalData: originalBatch, batchIndex: _batchIndex } = data; // eslint-disable-line no-unused-vars
     
     const request = this.translationRequests.get(messageId);
     if (!request) {
@@ -380,7 +382,8 @@ this.translationRequests.delete(messageId);
         }
 
         const { originalIndex } = originMapping[expandedIndex];
-        const originalTextKey = textsToTranslate[originalIndex];
+        // eslint-disable-next-line no-unused-vars
+        const _originalTextKey = textsToTranslate[originalIndex];
         
         const nodesToUpdate = textNodes.filter(node => node.textContent.trim() === originalText.trim());
 
@@ -468,10 +471,11 @@ this.translationRequests.delete(messageId);
       }
       
       // Finalize state, e.g., by storing all translations in stateManager
-      const allTranslations = new Map(request.cachedTranslations);
+      // eslint-disable-next-line no-unused-vars
+      const _allTranslations = new Map(request.cachedTranslations);
       request.translatedSegments.forEach((value, key) => {
           const { originalIndex } = request.originMapping[key];
-          const originalTextKey = request.textsToTranslate[originalIndex];
+          const __originalTextKey = request.textsToTranslate[originalIndex]; // eslint-disable-line no-unused-vars
           // This part is complex, for now just storing the translated segments is enough for revert
           // A more sophisticated reassembly might be needed if we want to store the full translated block
       });

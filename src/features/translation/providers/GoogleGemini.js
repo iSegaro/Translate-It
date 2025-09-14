@@ -13,12 +13,12 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
-import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
+// import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import browser from "webextension-polyfill";
+// import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+// import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
+// import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+// import browser from "webextension-polyfill";
 
 export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
@@ -422,7 +422,7 @@ export class GeminiProvider extends BaseAIProvider {
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: context,
-        abortController: abortController
+        // abortController: abortController
       });
 
       logger.info('image translation completed with result:', result);

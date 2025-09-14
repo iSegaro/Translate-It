@@ -10,7 +10,7 @@ import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translat
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+// import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
@@ -47,7 +47,7 @@ export class BaseAIProvider extends BaseProvider {
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
     }
-    
+
     // Fall back to traditional batch processing
     return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
   }
@@ -493,14 +493,14 @@ export class BaseAIProvider extends BaseProvider {
 
   /**
    * Abstract method for single text translation - must be implemented by subclasses
-   * @param {string} text - Text to translate
-   * @param {string} sourceLang - Source language
-   * @param {string} targetLang - Target language
-   * @param {string} translateMode - Translation mode
-   * @param {AbortController} abortController - Cancellation controller
+   * @param {string} _text - Text to translate
+   * @param {string} _sourceLang - Source language
+   * @param {string} _targetLang - Target language
+   * @param {string} _translateMode - Translation mode
+   * @param {AbortController} _abortController - Cancellation controller
    * @returns {Promise<string>} - Translated text
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  async _translateSingle(_text, _sourceLang, _targetLang, _translateMode, _abortController) {
     throw new Error(`_translateSingle method must be implemented by ${this.constructor.name}`);
   }
 
@@ -617,11 +617,11 @@ Important: Return only the JSON array with translated texts, no additional text 
   /**
    * Build numbered batch prompt (for numbered strategy providers)
    * @param {string[]} textBatch - Batch of texts
-   * @param {string} sourceLang - Source language
-   * @param {string} targetLang - Target language
+   * @param {string} _sourceLang - Source language
+   * @param {string} _targetLang - Target language
    * @returns {string} - Numbered batch prompt
    */
-  _buildNumberedBatchPrompt(textBatch, sourceLang, targetLang) {
+  _buildNumberedBatchPrompt(textBatch, _sourceLang, _targetLang) {
     const numberedText = textBatch.map((text, index) => `${index + 1}. ${text}`).join('\n');
     return numberedText + '\n\nPlease return the translations in the same order, one per line, numbered 1. 2. 3. etc.';
   }
@@ -639,7 +639,7 @@ Important: Return only the JSON array with translated texts, no additional text 
    */
   async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     logger.debug(`[${this.providerName}] Starting fallback for ${batch.length} segments`);
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    // const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
     
     for (let i = 0; i < batch.length; i++) {

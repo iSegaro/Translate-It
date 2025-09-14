@@ -10,7 +10,7 @@ import SmartCache from '@/core/memory/SmartCache'
 describe('Centralized Memory Management System', () => {
   let memoryManager
   let monitor
-  let cleanup
+  let _cleanup // eslint-disable-line no-unused-vars
 
   beforeEach(() => {
     // Initialize with centralized system enabled

@@ -3,7 +3,7 @@
  * Provides reactive state and methods for handling field shortcuts like Ctrl+/
  */
 
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useTextFieldInteractionStore } from '../stores/textFieldInteraction.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -156,7 +156,7 @@ export function useFieldShortcuts() {
    * @param {Element} targetElement - Target element (optional)
    * @returns {Promise<Object>} Execution result
    */
-  const triggerShortcut = async (targetElement = null) => {
+  const triggerShortcut = async (_targetElement = null) => { // eslint-disable-line no-unused-vars
     if (!canExecuteShortcuts.value) {
       throw new Error('Shortcuts system not ready');
     }

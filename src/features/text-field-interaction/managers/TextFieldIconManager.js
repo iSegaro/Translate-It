@@ -554,7 +554,7 @@ export class TextFieldIconManager extends ResourceTracker {
   forceUpdateAllPositions() {
     this.logger.debug('Force updating all icon positions');
     
-    for (const [iconId, attachment] of this.iconAttachments.entries()) {
+    for (const [, attachment] of this.iconAttachments.entries()) {
       attachment.forceUpdate();
     }
   }

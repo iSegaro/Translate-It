@@ -42,7 +42,7 @@ function getFrameDepth() {
       currentWindow = currentWindow.parent;
       if (depth > 10) break; // Safety check
     }
-  } catch (e) {
+  } catch {
     // Cross-origin frame access error
   }
   

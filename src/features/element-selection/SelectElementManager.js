@@ -1,7 +1,5 @@
 // SelectElementManager - Unified Manager for Select Element functionality
 // Single responsibility: Manage Select Element mode lifecycle and interactions
-
-import browser from "webextension-polyfill";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
@@ -19,8 +17,6 @@ import { ErrorHandlingService } from "./managers/services/ErrorHandlingService.j
 
 // Constants
 import { KEY_CODES } from "./managers/constants/selectElementConstants.js";
-
-const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementManager');
 
 class SelectElementManager extends ResourceTracker {
   constructor() {
@@ -530,7 +526,7 @@ class SelectElementManager extends ResourceTracker {
     return clickableContainers.some(selector => {
       try {
         return element.closest(selector);
-      } catch (e) {
+      } catch {
         return false;
       }
     });

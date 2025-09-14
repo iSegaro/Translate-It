@@ -4,6 +4,10 @@
  */
 import { getMemoryManager } from './MemoryManager.js'
 import { MEMORY_TIMING } from './constants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SmartCache')
 
 class SmartCache extends Map {
   constructor(options = {}) {
@@ -166,7 +170,7 @@ class SmartCache extends Map {
     let expiredCount = 0
     let totalTTL = 0
 
-    for (const [key, expiryTime] of this.expiryTimes) {
+    for (const [, expiryTime] of this.expiryTimes) {
       if (now > expiryTime) {
         expiredCount++
       } else {

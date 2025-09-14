@@ -1,4 +1,4 @@
-import { revertTranslations as revertTranslationsFromExtraction } from "../../../../utils/text/extraction.js";
+// import { revertTranslations as revertTranslationsFromExtraction } from "../../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -62,7 +62,7 @@ export class StateManager extends ResourceTracker {
    * @param {HTMLElement} element - The element to generate ID for
    * @returns {string} Unique element ID
    */
-  _generateElementId(element) {
+  _generateElementId(_element) { // eslint-disable-line no-unused-vars
     return `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 

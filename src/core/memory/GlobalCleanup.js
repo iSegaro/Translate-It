@@ -54,7 +54,7 @@ class GlobalCleanup {
    */
   setupHooks() {
     // Check if we're in a window environment (content script) or service worker (background)
-    const globalObject = typeof window !== 'undefined' ? window : self
+    // const globalObject = typeof window !== 'undefined' ? window : self
 
     // Before unload cleanup (only available in window environments)
     if (typeof window !== 'undefined') {

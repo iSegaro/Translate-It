@@ -129,7 +129,7 @@ export class ShortcutHandler extends ResourceTracker {
     }
   }
 
-  handleTranslationShortcut(event) {
+  handleTranslationShortcut() {
     try {
       const activeElement = document.activeElement;
       

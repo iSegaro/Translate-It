@@ -206,7 +206,7 @@ export class ExtensionContextManager {
       ExtensionContextManager.handleContextError(errorMessage, context)
       
       // Access runtime.lastError to clear console warnings
-      const _ = browser.runtime.lastError
+      void browser.runtime.lastError
       
       return {
         message: errorMessage,
@@ -220,7 +220,7 @@ export class ExtensionContextManager {
       logger.warn(`[${context}] Runtime lastError (non-context):`, errorMessage)
       
       // Access runtime.lastError to clear console warnings
-      const _ = browser.runtime.lastError
+      void browser.runtime.lastError
       
       return {
         message: errorMessage,

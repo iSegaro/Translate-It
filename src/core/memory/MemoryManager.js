@@ -187,9 +187,8 @@ class MemoryManager {
    * Set up automatic cleanup for DOM elements when they're removed
    * Uses the shared DOM observer for better performance
    * @param {Element} element
-   * @param {string} resourceId
    */
-  setupDOMElementCleanup(element, resourceId) {
+  setupDOMElementCleanup(element, _resourceId) { // eslint-disable-line no-unused-vars
     if (!this.isDOMElement(element) || element === window || element === document) return
     if (typeof MutationObserver === 'undefined') return
 
@@ -225,7 +224,7 @@ class MemoryManager {
       for (const handlerInfo of handlers) {
         try {
           // Find and cleanup the resource
-          for (const [resourceId, cleanupFn] of this.resources) {
+          for (const [resourceId] of this.resources) {
             if (resourceId.includes(handlerInfo.id)) {
               this.cleanupResource(resourceId)
               break
@@ -257,7 +256,7 @@ class MemoryManager {
    * @param {Function} cleanupFn - Function to cleanup the resource
    * @param {string} groupId - Group identifier for batch cleanup
    */
-  trackResource(resourceId, cleanupFn, groupId = 'default', options = {}) {
+  trackResource(resourceId, cleanupFn, groupId = 'default') {
     if (this.resources.has(resourceId)) {
       logger.debug(`Resource ${resourceId} already tracked`)
       return
@@ -266,9 +265,9 @@ class MemoryManager {
     // Store resource info with critical flag
     const resourceInfo = {
       cleanupFn,
-      isCritical: options.isCritical || false
+      isCritical: false
     };
-    
+
     this.resources.set(resourceId, resourceInfo)
 
     if (!this.groups.has(groupId)) {
@@ -427,7 +426,7 @@ class MemoryManager {
    * @param {Object} options - Cache options
    * @param {string} groupId - Group identifier
    */
-  trackCache(cache, options = {}, groupId = 'default') {
+  trackCache(cache, groupId = 'default') {
     this.caches.add(cache)
 
     const resourceId = `cache_${Date.now()}`
@@ -678,9 +677,9 @@ class MemoryManager {
   }
 
   /**
-   * Detect potential memory leaks with enhanced event listener monitoring
+   * Detect potential memory leaks - ENHANCED VERSION
    */
-  detectMemoryLeaks() {
+  detectMemoryLeaksEnhanced() {
     if (!isDevelopment) return [];
     const stats = this.getMemoryStats();
     const warnings = [];
@@ -726,9 +725,8 @@ class MemoryManager {
       if (this.eventListeners.has(element)) {
         const elementListeners = this.eventListeners.get(element);
         if (elementListeners.has(eventType)) {
-          const handlers = elementListeners.get(eventType);
           // Find and cleanup resources for this specific event
-          for (const [resourceId, cleanupFn] of this.resources) {
+          for (const [resourceId] of this.resources) {
             if (resourceId.includes(`event_${eventType}`) && resourceId.includes(this.getElementDescription(element))) {
               this.cleanupResource(resourceId);
               cleanupCount++;
@@ -738,7 +736,7 @@ class MemoryManager {
       }
     } else if (eventType) {
       // Clean up all listeners of a specific event type
-      for (const [resourceId, cleanupFn] of this.resources) {
+      for (const [resourceId] of this.resources) {
         if (resourceId.startsWith(`event_${eventType}`)) {
           this.cleanupResource(resourceId);
           cleanupCount++;
@@ -746,7 +744,7 @@ class MemoryManager {
       }
     } else {
       // Clean up all event listeners
-      for (const [resourceId, cleanupFn] of this.resources) {
+      for (const [resourceId] of this.resources) {
         if (resourceId.startsWith('event_')) {
           this.cleanupResource(resourceId);
           cleanupCount++;
@@ -918,7 +916,7 @@ class MemoryManager {
       return { trend: 'insufficient-data' };
     }
 
-    const recent = this.measurements.slice(-10);
+    // const recent = this.measurements.slice(-10);
     const first = this.measurements[0].used;
     const last = this.measurements[this.measurements.length - 1].used;
     const change = last - first;
@@ -933,15 +931,15 @@ class MemoryManager {
   }
 
   /**
-   * Generate detailed memory report
+   * Generate detailed memory report - ENHANCED VERSION
    * @returns {Object} Memory report
    */
-  generateReport() {
+  generateReportEnhanced() {
     if (!isDevelopment) return {};
     const current = this.getCurrentMemory();
     const trend = this.getTrendAnalysis();
     const managerStats = this.getMemoryStats();
-    const leaks = this.detectMemoryLeaks();
+    const leaks = this.detectMemoryLeaksEnhanced();
 
     return {
       timestamp: new Date().toISOString(),

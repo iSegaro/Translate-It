@@ -64,7 +64,7 @@ export function isMostlyNonLatin(text) {
   if (!text) return false;
   
   const latinPattern = /[a-zA-Z]/g;
-  const nonLatinPattern = /[^\x00-\x7F]/g;
+  const nonLatinPattern = /[^\u0000-\u007F]/g; // eslint-disable-line no-control-regex
   
   const latinCount = (text.match(latinPattern) || []).length;
   const nonLatinCount = (text.match(nonLatinPattern) || []).length;

@@ -8,6 +8,8 @@ import { determineTranslationMode } from "../../../../features/translation/utils
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -22,10 +24,9 @@ export class TranslationHandler {
    * Perform translation request
    */
   async performTranslation(selectedText, options = {}) {
-    try {
-      let settings;
-      
-      settings = await getSettingsAsync().catch(error => {
+    let settings;
+
+    settings = await getSettingsAsync().catch(error => {
         // If extension context is invalidated, use fallback values
         if (ExtensionContextManager.isContextError(error)) {
           this.logger.debug('Extension context invalidated, using fallback settings for translation');
@@ -151,11 +152,6 @@ export class TranslationHandler {
         throw resultError; // Re-throw the original error from messageListener
       }
 
-    } catch (error) {
-      // Don't log here as error is already logged in port fallback or messageListener
-      // Final error logging will be done in WindowsManager._handleTranslationError
-      throw error;
-    }
   }
 
   /**

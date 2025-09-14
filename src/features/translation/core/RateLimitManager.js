@@ -572,7 +572,7 @@ export class RateLimitManager {
    * This prevents duplicate API calls while catching configuration errors
    * @private
    */
-  async _testForDeterministicErrors(requestFunction, providerName, context) {
+  async _testForDeterministicErrors(_requestFunction, _providerName, _context) { // eslint-disable-line no-unused-vars
     // Instead of executing the full request, we'll rely on ErrorClassifier
     // to identify deterministic errors during the actual execution
     // This prevents duplicate API calls

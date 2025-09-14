@@ -13,7 +13,7 @@ import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { fieldDetector, FieldTypes } from "@/utils/text/FieldDetector.js";
 import { selectionDetector } from "@/utils/text/SelectionDetector.js";
-import { siteHandlerRegistry } from "@/utils/text/registry/SiteHandlerRegistry.js";
+// import { siteHandlerRegistry } from "@/utils/text/registry/SiteHandlerRegistry.js";
 
 export class TextSelectionManager extends ResourceTracker {
   constructor(options = {}) {
@@ -455,8 +455,8 @@ export class TextSelectionManager extends ResourceTracker {
         selectedText = getSelectedTextWithDash();
       }
       
-      const path = getEventPath(event);
-      
+      // const path = getEventPath(event);
+
       this.logger.debug('Selected text check', {
         hasSelectedText: !!selectedText,
         textLength: selectedText?.length || 0,
@@ -744,7 +744,7 @@ export class TextSelectionManager extends ResourceTracker {
   /**
    * Start drag detection (mousedown)
    */
-  startDragDetection(event) {
+  startDragDetection() {
     this.isDragging = true;
     this.pendingSelection = null;
   }
@@ -1407,12 +1407,12 @@ export class TextSelectionManager extends ResourceTracker {
     }
 
     // Read settings for selection translation mode
-    let settings;
-    let selectionTranslationMode;
-    
+    // let settings;
+    // let selectionTranslationMode;
+
     try {
-      settings = await getSettingsAsync();
-      selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      // await getSettingsAsync();
+      // selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
         this.logger.debug('Extension context invalidated, skipping selectionchange processing');

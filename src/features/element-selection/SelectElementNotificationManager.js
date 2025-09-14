@@ -1,13 +1,11 @@
 // SelectElementNotificationManager - Unified notification management for Select Element
 // Single responsibility: Manage Select Element notification lifecycle
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElementNotificationManager');
+import { getScopedLogger } from '../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
 
 class SelectElementNotificationManager extends ResourceTracker {
   constructor(notificationManager) {

@@ -1,9 +1,9 @@
 import { ref, reactive } from 'vue';
 import { ExclusionChecker } from '../core/ExclusionChecker.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+// import { getScopedLogger } from '@/shared/logging/logger.js';
+// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useExclusionChecker');
+// const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useExclusionChecker');
 
 let checkerInstance = null;
 const isInitialized = ref(false);

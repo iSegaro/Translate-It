@@ -376,7 +376,7 @@ export class QueueManager {
    * Cancel specific item
    */
   cancelItem(itemId) {
-    for (const [providerName, queue] of this.queues) {
+    for (const [, queue] of this.queues) {
       const item = queue.find(item => item.id === itemId);
       if (item && (item.status === QueueStatus.PENDING || item.status === QueueStatus.RETRYING)) {
         item.status = QueueStatus.FAILED;
@@ -429,7 +429,7 @@ export class QueueManager {
    */
   clearAll() {
     // Cancel all retry timeouts
-    for (const [itemId, timeout] of this.retryTimeouts) {
+    for (const [, timeout] of this.retryTimeouts) {
       clearTimeout(timeout);
     }
     

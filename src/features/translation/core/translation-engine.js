@@ -695,7 +695,7 @@ export class TranslationEngine {
     
     // Mixed scripts
     const hasLatin = /[a-zA-Z]/.test(text);
-    const hasNonLatin = /[^\x00-\x7F]/.test(text);
+    const hasNonLatin = /[^\u0000-\u007F]/.test(text); // eslint-disable-line no-control-regex
     if (hasLatin && hasNonLatin) complexity += 10;
     
     return Math.round(complexity);
@@ -736,7 +736,7 @@ export class TranslationEngine {
       
       // Mixed languages or scripts
       const hasLatin = /[a-zA-Z]/.test(text);
-      const hasNonLatin = /[^\x00-\x7F]/.test(text);
+      const hasNonLatin = /[^\u0000-\u007F]/.test(text); // eslint-disable-line no-control-regex
       if (hasLatin && hasNonLatin) textComplexity += 8;
       
       totalComplexity += textComplexity;
@@ -1224,7 +1224,6 @@ export class TranslationEngine {
    */
   async executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang) {
     const { text, provider, sourceLanguage, targetLanguage, mode, messageId } = data;
-    const tabId = sender?.tab?.id;
 
     // Initialize streaming session
     const { streamingManager } = await import("./StreamingManager.js");
@@ -1238,10 +1237,8 @@ export class TranslationEngine {
 
     // Start streaming translation
     try {
-      // Get abort controller for this translation
-      const abortController = this.activeTranslations.get(messageId);
       
-      const result = await providerInstance.translate(
+      await providerInstance.translate(
         text,
         sourceLanguage,
         targetLanguage,

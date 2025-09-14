@@ -10,7 +10,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'useCopyAction')
 
 export function useCopyAction() {
   // Use ResourceTracker for automatic cleanup
-  const tracker = useResourceTracker('copy-action')
+  useResourceTracker('copy-action')
   
   // State
   const isCopying = ref(false)

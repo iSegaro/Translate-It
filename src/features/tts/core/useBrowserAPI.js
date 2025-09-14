@@ -1,6 +1,6 @@
-import { ref, onMounted, getCurrentInstance } from 'vue';
+import { ref, onMounted } from 'vue';
 import browser from 'webextension-polyfill';
-import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
+// import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 // Global state for API readiness
@@ -36,7 +36,7 @@ const initializebrowserAPI = () => {
   return globalReadyPromise;
 };
 
-export function useBrowserAPI(context = 'vue-generic') {
+export function useBrowserAPI() {
   const isReady = ref(globalApiReady.value);
   const browserAPI = ref(globalbrowserAPI.value);
 

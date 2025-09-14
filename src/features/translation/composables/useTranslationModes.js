@@ -42,7 +42,7 @@ const _registerSelectStateListener = async () => {
   }
 
   // Register handler with central MessageHandler for background broadcasts
-  _selectStateHandler = (message, sender) => {
+  _selectStateHandler = (message) => {
     if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
       const { tabId, active } = message.data || {};
       try {

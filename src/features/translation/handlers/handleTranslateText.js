@@ -20,9 +20,9 @@ export async function handleTranslateText(message, sender, sendResponse) {
   // send immediate ack for callers using sendMessage
   try {
     if (typeof sendResponse === 'function') {
-      try { sendResponse({ ack: true, messageId: message.messageId }) } catch (e) {}
+      try { sendResponse({ ack: true, messageId: message.messageId }) } catch { /* ignore */ }
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   try {
     logger.debug('[Handler:TRANSLATE_TEXT] Processing Vue translation request:', message.data);

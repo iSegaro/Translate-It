@@ -5,14 +5,17 @@
 
 // Core Components
 export { default as MemoryManager, getMemoryManager } from './MemoryManager.js'
+import { getMemoryManager } from './MemoryManager.js'
 export { default as ResourceTracker } from './ResourceTracker.js'
 export { default as SmartCache } from './SmartCache.js'
 
 // Lifecycle Management
 export { default as GlobalCleanup, getGlobalCleanup, initializeGlobalCleanup } from './GlobalCleanup.js'
+import { getGlobalCleanup } from './GlobalCleanup.js'
 
 // Monitoring
 export { default as MemoryMonitor, getMemoryMonitor, startMemoryMonitoring } from './MemoryMonitor.js'
+import { getMemoryMonitor } from './MemoryMonitor.js'
 
 // Debug utilities for development
 export function getMemoryStats() {

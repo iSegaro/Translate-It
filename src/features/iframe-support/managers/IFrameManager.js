@@ -238,7 +238,7 @@ export class IFrameManager extends ResourceTracker {
   /**
    * Handle extension messages
    */
-  async _handleExtensionMessage(message, sender, sendResponse) {
+  async _handleExtensionMessage(message, _sender, _sendResponse) { // eslint-disable-line no-unused-vars
     try {
       if (!ExtensionContextManager.isValidSync()) {
         return false;

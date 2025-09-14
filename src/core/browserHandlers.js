@@ -57,7 +57,7 @@ export const addChromiumSpecificHandlers = (handlerMappings, Handlers) => {
  * @param {Object} handlerMappings - Handler mappings object to modify
  * @param {Object} Handlers - Available handlers object
  */
-export const addFirefoxSpecificHandlers = (handlerMappings, Handlers) => {
+export const addFirefoxSpecificHandlers = () => {
   if (isFirefox()) {
     // Currently no Firefox-specific handlers
     logger.debug('🦊 [Firefox] No Firefox-specific handlers to add');

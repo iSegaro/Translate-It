@@ -6,11 +6,11 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+// import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+// import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import browser from 'webextension-polyfill';
+// import browser from 'webextension-polyfill';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 
@@ -117,7 +117,7 @@ export class BaseTranslateProvider extends BaseProvider {
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
     }
-    
+
     // Fall back to traditional translation (original implementation)
     return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
   }
@@ -300,7 +300,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  _translateChunk(_chunkTexts, _sourceLang, _targetLang, _translateMode, _abortController) {
     // This should be overridden by subclasses to call their existing chunk translation logic
     throw new Error(`_translateChunk not implemented by ${this.providerName}`);
   }
@@ -335,7 +335,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {string} messageId - Message ID
    * @param {object} engine - Translation engine instance
    */
-  async _streamChunkError(error, chunkIndex, messageId, engine = null) {
+  async _streamChunkError(error, chunkIndex, messageId, _engine = null) {
     try {
       // Use streamingManager for error streaming
       await streamingManager.streamBatchError(messageId, error, chunkIndex);

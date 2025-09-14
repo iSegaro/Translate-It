@@ -186,36 +186,41 @@ export class FeatureManager extends ResourceTracker {
       let HandlerClass;
       
       switch (featureName) {
-        case 'contentMessageHandler':
+        case 'contentMessageHandler': {
           const { ContentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
           HandlerClass = ContentMessageHandler;
           break;
+        }
 
-        case 'selectElement':
+        case 'selectElement': {
           const { SelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
           HandlerClass = SelectElementManager;
           break;
-          
-        case 'textSelection':
+        }
+
+        case 'textSelection': {
           const { TextSelectionHandler } = await import('@/features/text-selection/handlers/TextSelectionHandler.js');
           HandlerClass = TextSelectionHandler;
           break;
-          
-        case 'textFieldIcon':
+        }
+
+        case 'textFieldIcon': {
           const { TextFieldIconHandler } = await import('@/features/text-field-interaction/handlers/TextFieldIconHandler.js');
           HandlerClass = TextFieldIconHandler;
           break;
-          
-        case 'shortcut':
+        }
+
+        case 'shortcut': {
           const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
           HandlerClass = ShortcutHandler;
           break;
-          
-        case 'windowsManager':
+        }
+
+        case 'windowsManager': {
           const { WindowsManagerHandler } = await import('@/features/windows/handlers/WindowsManagerHandler.js');
           HandlerClass = WindowsManagerHandler;
           break;
-          
+        }
         default:
           logger.error(`Unknown feature: ${featureName}`);
           return null;

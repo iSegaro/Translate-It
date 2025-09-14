@@ -1,12 +1,12 @@
 // Content script entry point for Vue build
 // Modern modular architecture with smart feature management
 
-import browser from "webextension-polyfill";
+// import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+// import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+// import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 // Import Main DOM CSS as raw string for injection
@@ -21,8 +21,8 @@ import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Import Field Detection System for global availability
-import { fieldDetector } from '@/utils/text/FieldDetector.js';
-import { selectionDetector } from '@/utils/text/SelectionDetector.js';
+// import { fieldDetector } from '@/utils/text/FieldDetector.js';
+// import { selectionDetector } from '@/utils/text/SelectionDetector.js';
 
 // Import Notification System
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -61,14 +61,19 @@ async function initializeLegacyHandlers() {
     // Legacy initialization is now handled by FeatureManager
     // Import only what's needed for backward compatibility
     const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
+    const { contentMessageHandler } = await import("@/handlers/content/index.js");
 
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
 
     // Store instances globally (for legacy compatibility)
     window.translationHandlerInstance = translationHandler;
+    window.contentMessageHandler = contentMessageHandler;
     // Note: selectElementManagerInstance is no longer available - use FeatureManager instead
-    
+
+    // Get message handler
+    const messageHandler = createMessageHandler();
+
     // Register all ContentMessageHandler handlers with the central message handler
     if (contentMessageHandler.handlers) {
       for (const [action, handler] of contentMessageHandler.handlers.entries()) {
@@ -183,6 +188,7 @@ if (!access.isAccessible) {
       // Check if UI Host already exists in current frame
       const hostId = `translate-it-host-${isInIframe ? 'iframe' : 'main'}`;
       if (document.getElementById(hostId)) {
+        // UI Host already exists
       } else {
         const { mountContentApp, getAppCss } = await import("@/app/main.js");
         const { pageEventBus } = await import("@/core/PageEventBus.js");

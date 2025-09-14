@@ -19,7 +19,7 @@ export function useIFrameDetection() {
         currentWindow = currentWindow.parent;
         if (depth > 10) break; // Safety check
       }
-    } catch (e) {
+    } catch {
       // Cross-origin frame access error
     }
     
@@ -52,7 +52,7 @@ export function useIFramePositioning() {
           y: position.y + frameRect.top
         };
       }
-    } catch (e) {
+    } catch {
       // Cross-origin access error
     }
     
@@ -80,7 +80,7 @@ export function useIFramePositioning() {
           y: rect.top
         };
       }
-    } catch (e) {
+    } catch {
       // Cross-origin access error
     }
     
