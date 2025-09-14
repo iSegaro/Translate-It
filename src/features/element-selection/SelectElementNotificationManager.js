@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElementNotificationManager');
 
@@ -73,44 +74,44 @@ class SelectElementNotificationManager extends ResourceTracker {
   
   setupEventListeners() {
     // Listen for show notification request
-    pageEventBus.on('show-select-element-notification', (data) => {
-      this.showNotification(data);
+    pageEventBus.on('show-select-element-notification', async (data) => {
+      await this.showNotification(data);
     });
-    
+
     // Listen for update notification request
-    pageEventBus.on('update-select-element-notification', (data) => {
-      this.updateNotification(data);
+    pageEventBus.on('update-select-element-notification', async (data) => {
+      await this.updateNotification(data);
     });
-    
+
     // Listen for dismiss notification request
     pageEventBus.on('dismiss-select-element-notification', (data) => {
       this.dismissNotification(data);
     });
-    
+
     this.logger.debug('Event listeners setup for notification manager');
   }
   
-  showNotification(data = {}) {
+  async showNotification(data = {}) {
     if (!this.isInitialized) {
       this.logger.warn('SelectElementNotificationManager not initialized, cannot show notification');
       return null;
     }
-    
+
     // Check if we already have an active notification
     if (this.currentNotification && this.currentNotification.isActive) {
       this.logger.debug('Select Element notification already exists, returning existing ID:', this.currentNotification.id);
       return this.currentNotification.id;
     }
-    
+
     // Clean up any existing notification first
     if (this.currentNotification) {
       this.dismissNotification();
     }
-    
+
     try {
-      // Create notification data
-      const notificationData = this.createNotificationData(data);
-      
+      // Create notification data (now async)
+      const notificationData = await this.createNotificationData(data);
+
       // Show the notification through notification manager
       const notificationId = this.notificationManager.show(
         notificationData.message,
@@ -121,7 +122,7 @@ class SelectElementNotificationManager extends ResourceTracker {
           actions: notificationData.actions
         }
       );
-      
+
       // Store notification reference
       this.currentNotification = {
         id: notificationId,
@@ -129,21 +130,21 @@ class SelectElementNotificationManager extends ResourceTracker {
         managerId: data.managerId,
         data: notificationData
       };
-      
-      this.logger.debug('Select Element notification shown', { 
+
+      this.logger.debug('Select Element notification shown', {
         notificationId,
         managerId: data.managerId
       });
-      
+
       return notificationId;
-      
+
     } catch (error) {
       this.logger.error('Error showing Select Element notification:', error);
       return null;
     }
   }
   
-  updateNotification(data = {}) {
+  async updateNotification(data = {}) {
     if (!this.currentNotification || !this.currentNotification.isActive) {
       this.logger.debug('No active notification to update');
       return null;
@@ -153,8 +154,11 @@ class SelectElementNotificationManager extends ResourceTracker {
       // Update notification based on status
       if (data.status === 'translating') {
         // Update the current notification with translation status but keep cancel button
+        const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+        const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+
         const cancelAction = {
-          label: 'کنسل',
+          label: cancelLabel,
           eventName: 'cancel-select-element-mode',
           handler: () => {
             // Emit cancel event through pageEventBus
@@ -163,10 +167,10 @@ class SelectElementNotificationManager extends ResourceTracker {
             });
           }
         };
-        
+
         // Show updated notification with cancel button
         const updatedNotificationId = this.notificationManager.show(
-          'در حال ترجمه...',
+          translatingMessage,
           'info',
           0, // Persistent
           {
@@ -174,13 +178,13 @@ class SelectElementNotificationManager extends ResourceTracker {
             actions: [cancelAction] // Keep cancel action during translation
           }
         );
-        
+
         // Dismiss the old notification
         this.notificationManager.dismiss(this.currentNotification.id);
-        
+
         // Update notification reference
         this.currentNotification.id = updatedNotificationId;
-        this.currentNotification.data.message = 'در حال ترجمه...';
+        this.currentNotification.data.message = translatingMessage;
         this.currentNotification.data.actions = [cancelAction];
         
         this.logger.debug('Select Element notification updated for translation', {
@@ -239,26 +243,31 @@ class SelectElementNotificationManager extends ResourceTracker {
     }
   }
   
-  createNotificationData(data = {}) {
+  async createNotificationData(data = {}) {
+    // Get localized strings
+    const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+    const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';
+    const message = await getTranslationString('SELECT_ELEMENT_MODE_ACTIVATED') || 'Element selection mode activated. Click on any text element to translate.';
+
     const baseActions = [
       {
-        label: 'کنسل',
+        label: cancelLabel,
         onClick: data.actions?.cancel || (() => {
           this.logger.debug('Cancel action triggered');
           pageEventBus.emit('cancel-select-element-mode');
         })
       },
       {
-        label: 'بازگشت',
+        label: revertLabel,
         onClick: data.actions?.revert || (() => {
           this.logger.debug('Revert action triggered');
           pageEventBus.emit('revert-translations');
         })
       }
     ];
-    
+
     return {
-      message: 'حالت انتخاب متن فعال شد. روی متنی که می‌خواهید ترجمه شود کلیک کنید.',
+      message: message,
       type: 'info',
       duration: 0, // Persistent
       persistent: true,

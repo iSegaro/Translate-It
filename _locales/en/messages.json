@@ -572,5 +572,10 @@
   "loading_fonts": { "message": "Loading fonts..." },
   "no_fonts_found": { "message": "No fonts found" },
   "system_font": { "message": "System" },
-  "font_loading_error": { "message": "Failed to load fonts" }
+  "font_loading_error": { "message": "Failed to load fonts" },
+
+  "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "Element selection mode activated. Click on any text element to translate." },
+  "SELECT_ELEMENT_TRANSLATING": { "message": "Translating..." },
+  "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
+  "SELECT_ELEMENT_REVERT": { "message": "Revert" }
 }

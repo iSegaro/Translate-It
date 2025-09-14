@@ -571,5 +571,10 @@
   "loading_fonts": { "message": "در حال بارگذاری فونت‌ها..." },
   "no_fonts_found": { "message": "هیچ فونتی یافت نشد" },
   "system_font": { "message": "سیستمی" },
-  "font_loading_error": { "message": "خطا در بارگذاری فونت‌ها" }
+  "font_loading_error": { "message": "خطا در بارگذاری فونت‌ها" },
+
+  "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "حالت انتخاب متن فعال شد. روی متنی که می‌خواهید ترجمه شود کلیک کنید." },
+  "SELECT_ELEMENT_TRANSLATING": { "message": "در حال ترجمه..." },
+  "SELECT_ELEMENT_CANCEL": { "message": "کنسل" },
+  "SELECT_ELEMENT_REVERT": { "message": "بازگشت" }
 }
