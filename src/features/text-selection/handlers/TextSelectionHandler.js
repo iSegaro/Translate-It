@@ -178,7 +178,13 @@ export class TextSelectionHandler extends ResourceTracker {
           // Use smart field detection
           const contextElement = this.getSelectionContextElement(selection);
           const detection = await fieldDetector.detect(contextElement);
-          
+
+          // Skip non-processable fields completely
+          if (detection.fieldType === FieldTypes.NON_PROCESSABLE) {
+            logger.debug('Ignoring selection in non-processable field');
+            return;
+          }
+
           logger.debug('Selection detected via selectionchange', {
             text: selection.toString().substring(0, 30) + '...',
             fieldType: detection.fieldType,
@@ -189,7 +195,7 @@ export class TextSelectionHandler extends ResourceTracker {
             elementTag: contextElement?.tagName,
             elementClass: contextElement?.className
           });
-          
+
           // For professional editors and rich text editors, check if we should process based on selection strategy
           if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
               detection.fieldType === FieldTypes.RICH_TEXT_EDITOR) {

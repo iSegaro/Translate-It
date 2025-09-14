@@ -46,18 +46,27 @@ const RichEditorPatterns = {
 };
 
 /**
- * Authentication field keywords to exclude
+ * Non-processable field keywords
+ * These fields should be completely ignored by the selection system
  */
-const AuthKeywords = [
+const NonProcessableKeywords = [
+  // Authentication fields
   'password', 'pwd', 'pass', 'login', 'username', 'email', 'user',
   'auth', 'signin', 'signup', 'register', 'captcha', 'otp', 'token',
-  'verification', 'confirm', 'security', 'pin', 'code'
+  'verification', 'confirm', 'security', 'pin', 'code',
+  // Phone and contact fields
+  'phone', 'mobile', 'tel', 'telephone', 'fax',
+  // Sensitive data
+  'ssn', 'social', 'credit', 'card', 'cvv', 'expiry',
+  // Other non-processable fields
+  'zipcode', 'postal', 'code'
 ];
 
 /**
- * Cache for field detection results
+ * Legacy AuthKeywords for backward compatibility
  */
-const detectionCache = new WeakMap();
+const AuthKeywords = NonProcessableKeywords;
+
 
 /**
  * Modern FieldDetector class with site handler integration
@@ -98,11 +107,6 @@ export class FieldDetector {
       return this._getDefaultDetection();
     }
 
-    // Check cache first
-    if (detectionCache.has(element)) {
-      return detectionCache.get(element);
-    }
-
     try {
       // Get site handler for current hostname
       const handler = await siteHandlerRegistry.getCurrentHandler();
@@ -110,7 +114,23 @@ export class FieldDetector {
 
       // Classify field type using both site-specific and generic logic
       const fieldType = await this._classifyFieldType(element, config);
-      
+
+      // For non-processable fields, return immediately with minimal processing
+      if (fieldType === FieldTypes.NON_PROCESSABLE) {
+        return {
+          fieldType,
+          selectionMethod: 'standard',
+          selectionStrategy: SelectionStrategies.ANY_SELECTION,
+          selectionEventStrategy: SelectionEventStrategies.SELECTION_BASED,
+          shouldShowSelectionIcon: false,
+          shouldShowTextFieldIcon: false,
+          siteConfig: config,
+          isAuthField: true,
+          isRichEditor: false,
+          handler: handler
+        };
+      }
+
       // Create detection result
       const shouldShowIcon = this._shouldShowSelectionIcon(fieldType);
       
@@ -126,17 +146,6 @@ export class FieldDetector {
         isRichEditor: this._isRichTextEditor(element),
         handler: handler
       };
-      
-      this.logger.debug('Field detected:', {
-        tagName: element?.tagName,
-        type: fieldType,
-        shouldShowIcon,
-        siteConfigType: config?.type,
-        handler: handler?.constructor.name
-      });
-
-      // Cache result
-      detectionCache.set(element, detection);
       
       this.logger.debug('Field detected:', {
         tagName: element.tagName,
@@ -165,11 +174,11 @@ export class FieldDetector {
     const tagName = element.tagName.toLowerCase();
 
     try {
-      // Skip authentication fields
-      if (this._isAuthField(element)) {
-        return FieldTypes.UNKNOWN;
+      // Non-processable fields should be completely ignored
+      if (this._isNonProcessableField(element)) {
+        return FieldTypes.NON_PROCESSABLE;
       }
-      
+
       // Site-specific classification first (highest priority)
       if (siteConfig.type === FieldTypes.PROFESSIONAL_EDITOR) {
         // Check if element matches site-specific selectors
@@ -180,59 +189,86 @@ export class FieldDetector {
             return false;
           }
         });
-        
+
         if (matchesSiteSelectors) {
           return FieldTypes.PROFESSIONAL_EDITOR;
         }
-        
+
         // For known professional sites, still treat as professional even if selectors don't match
         const hostname = window.location.hostname.toLowerCase();
         const isKnownProfessionalSite = await this._isKnownProfessionalSite(hostname);
-        
+
         if (isKnownProfessionalSite) {
           return FieldTypes.PROFESSIONAL_EDITOR;
         }
       }
-      
+
       // Generic rich text editor detection
       if (this._isRichTextEditor(element)) {
         return FieldTypes.RICH_TEXT_EDITOR;
       }
-      
+
       // ContentEditable detection
       if (element.isContentEditable || element.contentEditable === 'true') {
         // Check if it has rich features
         const hasRichFeatures = element.querySelector('div, span, p, br') ||
                               element.closest('[data-editor]') ||
                               element.closest('.editor');
-        
-        return hasRichFeatures ? 
-          FieldTypes.RICH_TEXT_EDITOR : 
+
+        return hasRichFeatures ?
+          FieldTypes.RICH_TEXT_EDITOR :
           FieldTypes.CONTENT_EDITABLE;
       }
-      
+
       // Regular form fields
       if (tagName === 'textarea') {
+        this.logger.debug('Element classified as REGULAR_INPUT (textarea)', {
+          tagName: tagName
+        });
         return FieldTypes.REGULAR_INPUT;
       } else if (tagName === 'input') {
         const type = (element.type || '').toLowerCase();
         const textTypes = ['text', 'search', 'email', 'url', 'tel'];
-        
+
+        this.logger.debug('Checking input element', {
+          tagName: tagName,
+          type: type,
+          hasType: !!type,
+          isInTextTypes: textTypes.includes(type),
+          textTypes: textTypes
+        });
+
         if (textTypes.includes(type) || !type) {
+          this.logger.debug('Element classified as REGULAR_INPUT (input)', {
+            tagName: tagName,
+            type: type,
+            reason: type ? 'in text types' : 'no type specified'
+          });
           return FieldTypes.REGULAR_INPUT;
         }
       }
-      
+
       // Check if element is inside a regular form field
       const parentField = this._findParentFormField(element);
       if (parentField) {
+        this.logger.debug('Element classified as REGULAR_INPUT due to parent field', {
+          elementTag: element.tagName,
+          parentFieldTag: parentField.tagName,
+          parentFieldType: parentField.type || 'N/A'
+        });
         return FieldTypes.REGULAR_INPUT;
       }
-      
+
     } catch (error) {
       this.logger.warn('Error classifying field type:', error);
     }
-    
+
+    this.logger.debug('Element classified as UNKNOWN (default)', {
+      tagName: tagName,
+      type: element.type,
+      name: element.name,
+      id: element.id
+    });
     return FieldTypes.UNKNOWN;
   }
 
@@ -243,28 +279,31 @@ export class FieldDetector {
    */
   _findParentFormField(element) {
     if (!element) return null;
-    
+
+    // If element is a table cell, check if it contains a form field directly
+    if (element.tagName === 'TD' || element.tagName === 'TH') {
+      const directField = element.querySelector('input[type="text"], input[type="search"], input[type="email"], input[type="url"], input[type="tel"], textarea, input:not([type])');
+      if (directField) {
+        this.logger.debug('Found direct field in table cell', {
+          elementTag: element.tagName,
+          directFieldTag: directField.tagName,
+          directFieldType: directField.type || 'N/A'
+        });
+        return directField;
+      }
+    }
+
     // Check common form field containers and class patterns
     const fieldSelectors = [
       'input[type="text"]',
-      'input[type="search"]', 
+      'input[type="search"]',
       'input[type="email"]',
       'input[type="url"]',
       'input[type="tel"]',
       'textarea',
       'input:not([type])',  // input without type defaults to text
     ];
-    
-    // Also check for common wrapper classes
-    const wrapperPatterns = [
-      /input/i,
-      /textfield/i,
-      /form-field/i,
-      /search/i,
-      /query/i,
-      /filter/i
-    ];
-    
+
     // Check if element is inside a form field
     for (const selector of fieldSelectors) {
       try {
@@ -276,13 +315,23 @@ export class FieldDetector {
         continue;
       }
     }
-    
+
+    // Also check for common wrapper classes
+    const wrapperPatterns = [
+      /input/i,
+      /textfield/i,
+      /form-field/i,
+      /search/i,
+      /query/i,
+      /filter/i
+    ];
+
     // Check if any parent has input-related classes
     let parent = element.parentElement;
     while (parent && parent !== document.body) {
       const className = parent.className || '';
       const classString = typeof className === 'string' ? className : '';
-      
+
       if (wrapperPatterns.some(pattern => pattern.test(classString))) {
         // Check if this wrapper contains actual form fields
         const hasFormFields = parent.querySelector('input, textarea');
@@ -290,10 +339,10 @@ export class FieldDetector {
           return parent;
         }
       }
-      
+
       parent = parent.parentElement;
     }
-    
+
     return null;
   }
 
@@ -403,10 +452,10 @@ export class FieldDetector {
   _shouldShowSelectionIcon(fieldType) {
     // Show selection icon for:
     // - Professional editors (with double-click requirement)
-    // - Rich text editors (with double-click requirement) 
+    // - Rich text editors (with double-click requirement)
     // - Regular content (UNKNOWN field type) - any selection is acceptable
-    // Regular input fields should NOT show selection icon
-    return fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
+    // Non-processable and regular input fields should NOT show selection icon
+    return fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
            fieldType === FieldTypes.RICH_TEXT_EDITOR ||
            fieldType === FieldTypes.UNKNOWN;
   }
@@ -422,29 +471,43 @@ export class FieldDetector {
   }
 
   /**
-   * Detect if element is an authentication-related field
+   * Detect if element is a non-processable field
    * @param {Element} element - Element to check
-   * @returns {boolean} True if authentication field
+   * @returns {boolean} True if non-processable field
    */
-  _isAuthField(element) {
+  _isNonProcessableField(element) {
     if (!element) return false;
-    
+
     const name = (element.name || '').toLowerCase();
     const placeholder = (element.placeholder || '').toLowerCase();
     const id = (element.id || '').toLowerCase();
     const autocomplete = (element.autocomplete || '').toLowerCase();
     const type = (element.type || '').toLowerCase();
-    
-    // Check for password type
-    if (type === 'password') return true;
-    
-    // Check for authentication keywords
-    return AuthKeywords.some(keyword => 
-      name.includes(keyword) || 
-      placeholder.includes(keyword) || 
+
+    // Check for non-processable input types
+    const nonProcessableTypes = [
+      'password', 'hidden', 'file', 'submit', 'reset', 'button', 'image',
+      'tel', 'email', 'url'  // These might need special handling
+    ];
+    if (nonProcessableTypes.includes(type)) return true;
+
+    // Check for non-processable keywords
+    return NonProcessableKeywords.some(keyword =>
+      name.includes(keyword) ||
+      placeholder.includes(keyword) ||
       id.includes(keyword) ||
       autocomplete.includes(keyword)
     );
+  }
+
+  /**
+   * Detect if element is an authentication-related field
+   * @param {Element} element - Element to check
+   * @returns {boolean} True if authentication field
+   * @deprecated Use _isNonProcessableField instead
+   */
+  _isAuthField(element) {
+    return this._isNonProcessableField(element);
   }
 
   /**
@@ -518,25 +581,7 @@ export class FieldDetector {
     };
   }
 
-  /**
-   * Clear detection cache
-   */
-  clearCache() {
-    detectionCache.clear();
-    this.logger.debug('Field detection cache cleared');
-  }
-
-  /**
-   * Get cache statistics for debugging
-   * @returns {Object} Cache statistics
-   */
-  getCacheStats() {
-    return {
-      detectionCacheSize: 'N/A (WeakMap)',
-      siteHandlerStats: siteHandlerRegistry.getStats()
-    };
-  }
-
+  
   /**
    * Check if element is editable (legacy compatibility)
    * @param {Element} element - Element to check
@@ -544,7 +589,8 @@ export class FieldDetector {
    */
   async isEditableElement(element) {
     const detection = await this.detect(element);
-    return detection.fieldType !== FieldTypes.UNKNOWN;
+    return detection.fieldType !== FieldTypes.UNKNOWN &&
+           detection.fieldType !== FieldTypes.NON_PROCESSABLE;
   }
 
   /**

@@ -10,6 +10,7 @@ export const FieldTypes = {
   PROFESSIONAL_EDITOR: 'professional-editor',  // Rich text editors like Google Docs, WPS
   CONTENT_EDITABLE: 'content-editable',     // Simple contentEditable elements
   RICH_TEXT_EDITOR: 'rich-text-editor',     // Advanced WYSIWYG editors
+  NON_PROCESSABLE: 'non-processable',       // Fields that should not be processed (password, phone, etc.)
   UNKNOWN: 'unknown'                        // Unclassified field
 };
 

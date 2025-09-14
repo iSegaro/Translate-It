@@ -995,6 +995,13 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Use smart retry mechanism based on field type detection
     const detection = await fieldDetector.detect(event.target);
+
+    // Skip non-processable fields completely
+    if (detection.fieldType === FieldTypes.NON_PROCESSABLE) {
+      this.logger.debug('Ignoring double-click on non-processable field');
+      return;
+    }
+
     const maxAttempts = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 5 : 3;
     const initialDelay = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 150 : 100;
     

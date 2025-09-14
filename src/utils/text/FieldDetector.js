@@ -44,13 +44,6 @@ export function getSelectionEventStrategy(element) {
   return fieldDetector.detect(element).then(result => result.selectionEventStrategy);
 }
 
-export function clearCache() {
-  return fieldDetector.clearCache();
-}
-
-export function getCacheStats() {
-  return fieldDetector.getCacheStats();
-}
 
 // Legacy FieldDetector class
 export class FieldDetector {
