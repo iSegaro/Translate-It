@@ -60,9 +60,12 @@ async function buildFirefoxExtension() {
     
     const zipStats = fs.statSync(path.join(rootDir, FIREFOX_ZIP_PATH))
     logSuccess(`Firefox package created: ${(zipStats.size / 1024).toFixed(0)}KB`)
-    
-    // Step 4: Success
-    reporter.success({})
+
+    // Step 4: Analyze build output
+    const buildStats = reporter.analyzeBuild(path.join(rootDir, FIREFOX_BUILD_DIR))
+
+    // Step 5: Success
+    reporter.success(buildStats)
     
     logSuccess('Firefox extension build completed successfully!')
     logStep(`Build location: ${FIREFOX_BUILD_DIR}`)

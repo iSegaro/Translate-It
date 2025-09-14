@@ -109,14 +109,17 @@ export class BuildReporter {
   getMainJSFiles(jsDir) {
     const files = []
     const items = fs.readdirSync(jsDir, { withFileTypes: true })
-    
+
     for (const item of items) {
       if (item.isFile() && item.name.endsWith('.js')) {
         const filePath = path.join(jsDir, item.name)
         const size = fs.statSync(filePath).size
-        
-        // Only report main entry files, not chunks
-        if (item.name.includes('popup') || item.name.includes('options') || item.name.includes('sidepanel')) {
+
+        // Report main files based on importance
+        if (item.name.startsWith('index.') ||
+            item.name.includes('content-scripts') ||
+            item.name.includes('vendor') ||
+            item.name.includes('main')) {
           files.push({ file: item.name, size })
         }
       } else if (item.isDirectory()) {
@@ -126,8 +129,9 @@ export class BuildReporter {
         files.push(...subFiles.map(f => ({ ...f, file: `${item.name}/${f.file}` })))
       }
     }
-    
-    return files.slice(0, 5) // Limit to top 5 files
+
+    // Sort by size (largest first) and limit to top 5
+    return files.sort((a, b) => b.size - a.size).slice(0, 5)
   }
 
   /**
