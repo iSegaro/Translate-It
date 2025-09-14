@@ -92,7 +92,7 @@ export class ContentMessageHandler extends ResourceTracker {
       
       // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
       this.trackResource('messageHandler', () => {
-        this.logger.warn('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
+        this.logger.debug('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
         // This callback is called but the actual cleanup is skipped by MemoryManager
         // because this resource is marked as critical. This is the expected behavior.
         this.logger.debug('Message handler is protected from cleanup and remains active');
