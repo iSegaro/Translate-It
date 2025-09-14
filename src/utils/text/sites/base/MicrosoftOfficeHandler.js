@@ -68,9 +68,9 @@ export class MicrosoftOfficeHandler extends BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, ) {
+  async calculatePosition(element, options = {}) {
     try {
-      const position = this.calculateStandardPosition(element, );
+      const position = this.calculateStandardPosition(element, options);
       return position;
     } catch (error) {
       this.logger.error('Microsoft Office position calculation failed:', error);

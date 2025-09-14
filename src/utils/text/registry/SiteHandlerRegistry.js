@@ -368,7 +368,7 @@ class DefaultSiteHandler extends BaseSiteHandler {
     });
   }
 
-  async detectSelection(element, ) {
+  async detectSelection(element /* , options = {} */) {
     try {
       let selectedText = '';
 
@@ -398,9 +398,9 @@ class DefaultSiteHandler extends BaseSiteHandler {
     }
   }
 
-  async calculatePosition(element, ) {
+  async calculatePosition(element, options = {}) {
     try {
-      const position = this.calculateStandardPosition(element, );
+      const position = this.calculateStandardPosition(element, options);
       return position;
     } catch (error) {
       this.logger.error('Default position calculation failed:', error);

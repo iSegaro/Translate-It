@@ -149,7 +149,7 @@ export class BaseSiteHandler {
    * @param {Object} options - Position options
    * @returns {Object} Position coordinates
    */
-  calculateStandardPosition(element, options) {
+  calculateStandardPosition(element, options = {}) {
     const { sourceEvent } = options;
 
     try {

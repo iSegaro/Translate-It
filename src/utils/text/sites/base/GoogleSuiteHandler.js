@@ -68,10 +68,10 @@ export class GoogleSuiteHandler extends BaseSiteHandler {
    * @param {Object} options - Position calculation options
    * @returns {Promise<{x: number, y: number}>} Position coordinates
    */
-  async calculatePosition(element, ) {
+  async calculatePosition(element, options = {}) {
     try {
       // Use standard position calculation
-      const position = this.calculateStandardPosition(element, );
+      const position = this.calculateStandardPosition(element, options);
       
       // Google Docs specific adjustments
       if (this.hostname === 'docs.google.com') {
