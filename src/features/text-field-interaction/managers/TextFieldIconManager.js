@@ -183,21 +183,25 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {boolean|null} Whether to process (null = skip silently)
    */
   async shouldProcessTextField(element) {
-    // Get current settings from storage
-    const settings = await storageManager.get([
-      'EXTENSION_ENABLED',
-      'TRANSLATE_ON_TEXT_FIELDS'
-    ]);
-    
-    // Basic validation
-    if (!settings?.EXTENSION_ENABLED) {
-      this.logger.debug('Skipping icon creation: Extension is disabled.');
+    // Context validation: Ensure the extension context is valid BEFORE any storage calls
+    if (!ExtensionContextManager.isValidSync()) {
+      this.logger.debug('Skipping icon creation: Extension context is invalid.');
       return null;
     }
 
-    // Context validation: Ensure the extension context is valid
-    if (!ExtensionContextManager.isValidSync()) {
-      this.logger.debug('Skipping icon creation: Extension context is invalid.');
+    // Get current settings from storage using safe operation
+    const settings = await ExtensionContextManager.safeStorageOperation(
+      () => storageManager.get([
+        'EXTENSION_ENABLED',
+        'TRANSLATE_ON_TEXT_FIELDS'
+      ]),
+      'text-field-icon-settings',
+      { EXTENSION_ENABLED: false, TRANSLATE_ON_TEXT_FIELDS: false }
+    );
+
+    // Basic validation
+    if (!settings?.EXTENSION_ENABLED) {
+      this.logger.debug('Skipping icon creation: Extension is disabled.');
       return null;
     }
 

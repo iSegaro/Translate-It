@@ -4,6 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ExtensionContextManager } from '@/core/extensionContext.js';
 
 // Lazy logger initialization to prevent TDZ issues
 let logger = null;
@@ -132,6 +133,12 @@ export class TextFieldIconHandler extends ResourceTracker {
 
         // Manager might be cleaned up by Memory GC - recreate if needed
         if (!this.textFieldIconManager) {
+          // Check extension context before recreating manager
+          if (!ExtensionContextManager.isValidSync()) {
+            getLogger().debug('Extension context invalid - skipping text field icon creation');
+            return;
+          }
+
           getLogger().debug('TextFieldIconManager missing - recreating');
           const { TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
           this.textFieldIconManager = new TextFieldIconManager();
@@ -145,7 +152,17 @@ export class TextFieldIconHandler extends ResourceTracker {
           // Add icon with a small delay to ensure proper positioning
           setTimeout(async () => {
             if (document.activeElement === element && this.textFieldIconManager) {
-              await this.textFieldIconManager.processEditableElement(element);
+              try {
+                await this.textFieldIconManager.processEditableElement(element);
+              } catch (error) {
+                // Silently handle extension context errors - these are expected during extension reload/update
+                const handler = ErrorHandler.getInstance();
+                await handler.handle(error, {
+                  context: 'TextFieldIconHandler-focus',
+                  showToast: false,
+                  showInUI: false
+                });
+              }
             }
           }, 100);
         }
@@ -157,6 +174,12 @@ export class TextFieldIconHandler extends ResourceTracker {
 
         // Manager might be cleaned up by Memory GC - recreate if needed
         if (!this.textFieldIconManager) {
+          // Check extension context before recreating manager
+          if (!ExtensionContextManager.isValidSync()) {
+            getLogger().debug('Extension context invalid in blur handler - skipping');
+            return;
+          }
+
           getLogger().debug('TextFieldIconManager missing in blur handler - recreating');
           const { TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
           this.textFieldIconManager = new TextFieldIconManager();
@@ -182,6 +205,12 @@ export class TextFieldIconHandler extends ResourceTracker {
 
         // Manager might be cleaned up by Memory GC - recreate if needed
         if (!this.textFieldIconManager) {
+          // Check extension context before recreating manager
+          if (!ExtensionContextManager.isValidSync()) {
+            getLogger().debug('Extension context invalid in input handler - skipping');
+            return;
+          }
+
           getLogger().debug('TextFieldIconManager missing in input handler - recreating');
           const { TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
           this.textFieldIconManager = new TextFieldIconManager();
