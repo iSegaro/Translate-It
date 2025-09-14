@@ -111,8 +111,6 @@ export const CONFIG = {
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
-  ENABLE_SUBTITLE_TRANSLATION: false, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
-  SHOW_SUBTITLE_ICON: false, // نمایش آیکون ترجمه در پلیر یوتوب
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
 
@@ -270,34 +268,6 @@ $_{TEXT}
 `,
   /*--- End PROMPT_BASE_POPUP_TRANSLATE ---*/
 
-  /*--- Start PROMPT_BASE_SUBTITLE ---*/
-  PROMPT_BASE_SUBTITLE: `You are a professional subtitle translation service specializing in video content translation. Your task is to translate subtitle text from any detected language into $_{TARGET} while maintaining optimal readability for video viewers.
-
-**Context**: This is a subtitle/caption from a video that appears on screen for a brief moment while the viewer is watching.
-
-**Translation Guidelines**:
-- Detect the input language automatically
-- Translate into $_{TARGET} with natural, fluent expression
-- Prioritize **conciseness** and **readability** - subtitles must be quickly readable
-- Maintain the **original meaning and tone** (formal, casual, emotional, etc.)
-- Preserve **timing-sensitive** expressions (exclamations, questions, emphasis)
-- Use **conversational language** appropriate for spoken dialogue
-- For technical terms, use commonly understood equivalents
-- Keep **cultural context** - adapt idioms and references when necessary
-- **Remove redundancy** - make text as clear and concise as possible
-
-**Critical Requirements**:
-- Output **ONLY** the translated text
-- Do **NOT** add explanations, notes, markdown, or formatting
-- Do **NOT** include quotation marks or additional punctuation
-- Ensure the translation sounds **natural when spoken**
-- Make it easily readable in **2-4 seconds** (typical subtitle display time)
-
-**Input text to translate**:
-
-$_{TEXT}`,
-  /*--- End PROMPT_BASE_SUBTITLE ---*/
-
   /*--- Start PROMPT_BASE_SCREEN_CAPTURE ---*/
   PROMPT_BASE_SCREEN_CAPTURE: `You are a professional image text extraction and translation service. Your task is to extract all readable text from the provided image and translate it into $_{TARGET}.
 
@@ -356,7 +326,6 @@ export const TranslationMode = {
   Dictionary_Translation: "dictionary",
   Popup_Translate: "popup_translate",
   Sidepanel_Translate: "sidepanel_translate",
-  Subtitle: "subtitle",
   ScreenCapture: "screen_capture",
 };
 
@@ -547,10 +516,6 @@ export const getPromptBASEFieldAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_FIELD", CONFIG.PROMPT_BASE_FIELD);
 };
 
-export const getPromptBASESubtitleAsync = async () => {
-  return getSettingValueAsync("PROMPT_BASE_SUBTITLE", CONFIG.PROMPT_BASE_SUBTITLE);
-};
-
 export const getPromptBASEScreenCaptureAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_SCREEN_CAPTURE", CONFIG.PROMPT_BASE_SCREEN_CAPTURE);
 };
@@ -695,10 +660,6 @@ export const getDeepSeekModelSelectionAsync = async () => {
 
 export const getOpenRouterModelSelectionAsync = async () => {
   return getSettingValueAsync("OPENROUTER_API_MODEL", CONFIG.OPENROUTER_API_MODEL);
-};
-
-export const getShowSubtitleIconAsync = async () => {
-  return getSettingValueAsync("SHOW_SUBTITLE_ICON", CONFIG.SHOW_SUBTITLE_ICON);
 };
 
 export const getEnableScreenCaptureAsync = async () => {

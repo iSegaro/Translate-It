@@ -24,13 +24,12 @@
 
 ## روش‌های ترجمه
 1. **انتخاب متن**: ترجمه متن انتخاب شده با نمایش آیکون یا کادر مستقیم
-2. **انتخاب المنت**: انتخاب و ترجمه المنت‌های DOM 
+2. **انتخاب المنت**: انتخاب و ترجمه المنت‌های DOM
 3. **Popup Interface**: رابط اصلی ترجمه در popup
 4. **Sidepanel**: رابط کامل در sidepanel مرورگر
 5. **Screen Capture**: ترجمه تصاویر با OCR
-6. **Subtitle Translation**: ترجمه زیرنویس‌ها در ویدئوهای آنلاین (YouTube و...)
-7. **Context Menu**: دسترسی از منوی کلیک راست
-8. **Keyboard Shortcuts**: میانبرهای صفحه‌کلید
+6. **Context Menu**: دسترسی از منوی کلیک راست
+7. **Keyboard Shortcuts**: میانبرهای صفحه‌کلید
 
 ## توسعه‌ی Provider ها
 سیستم از الگوی هرمی پرووایدرها استفاده می‌کند:
@@ -68,7 +67,6 @@
   - `exclusion/` - سیستم **Smart Handler Registration** با ExclusionChecker
   - `notifications/` - **سیستم اطلاع‌رسانی (2025)** - BaseNotification و مدیریت متمرکز notifications
   - `text-actions/` - عملیات copy/paste/TTS
-  - `subtitle/` - ترجمه زیرنویس ویدئوها
   - `windows/` - مدیریت UI رویداد-محور با WindowsManagerHandler
   - `iframe-support/` - سیستم ساده و مؤثر پشتیبانی از iframe با کامپوننت‌های ضروری
   - `history/` - مدیریت تاریخچه ترجمه

@@ -39,22 +39,7 @@
       </div>
     </div>
     
-    <div class="settings-section">
-      <h3 class="section-title">
-        Subtitle Translation
-      </h3>
-      
-      <div class="setting-item">
-        <label class="setting-label">
-          <input
-            type="checkbox"
-            class="setting-checkbox"
-          >
-          <span class="setting-text">Enable Subtitle Translation</span>
-        </label>
-      </div>
     </div>
-  </div>
 </template>
 
 <script setup>

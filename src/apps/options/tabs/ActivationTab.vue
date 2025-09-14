@@ -133,31 +133,7 @@
       </div>
     </BaseFieldset>
 
-    <!-- Video Subtitle -->
-  <BaseFieldset :legend="t('activation_group_subtitle_title') || 'Video Subtitle'">
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="enableSubtitle"
-          :disabled="!extensionEnabled"
-          :label="t('enable_subtitle_translation_label') || 'Enable Subtitle Translation'"
-        />
-        <span class="setting-description">
-          {{ t('enable_subtitle_translation_description') || 'وقتی که فعال باشد، در سایت یوتوب برای ویدیوهایی که زیرنویس وجود دارد ترجمه اتفاق می افتد و جایگزین زیرنویس پیش‌فرض یوتوب می شود.' }}
-        </span>
-      </div>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="iconSubtitle"
-          :disabled="!extensionEnabled"
-          :label="t('icon_subtitle_translation_label') || 'Show Subtitle Icon'"
-        />
-        <span class="setting-description">
-          {{ t('icon_subtitle_translation_description') || 'نمایش ایکون ترجمه زیرنویس در نوار پخش‌کننده یوتوب.' }}
-        </span>
-      </div>
-    </BaseFieldset>
-  </section>
+    </section>
 </template>
 
 <script setup>
@@ -231,20 +207,10 @@ const requireCtrlForTextSelection = computed({
   set: (value) => settingsStore.updateSettingLocally('REQUIRE_CTRL_FOR_TEXT_SELECTION', value)
 })
 
-// Dictionary and subtitle settings
+// Dictionary settings
 const enableDictionary = computed({
   get: () => settingsStore.settings?.ENABLE_DICTIONARY || false,
   set: (value) => settingsStore.updateSettingLocally('ENABLE_DICTIONARY', value)
-})
-
-const enableSubtitle = computed({
-  get: () => settingsStore.settings?.ENABLE_SUBTITLE_TRANSLATION ?? true,
-  set: (value) => settingsStore.updateSettingLocally('ENABLE_SUBTITLE_TRANSLATION', value)
-})
-
-const iconSubtitle = computed({
-  get: () => settingsStore.settings?.SHOW_SUBTITLE_ICON ?? true,
-  set: (value) => settingsStore.updateSettingLocally('SHOW_SUBTITLE_ICON', value)
 })
 </script>
 

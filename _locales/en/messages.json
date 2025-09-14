@@ -81,19 +81,7 @@
   "activation_group_general_title": { "message": "General Switch" },
   "activation_group_text_fields_title": { "message": "Text Field Translation" },
   "activation_group_page_selection_title": { "message": "On-Page Selection" },
-  "activation_group_dictionary_title": { "message": "Dictionary Mode" },
-  "activation_group_subtitle_title": { "message": "Video Subtitle (Experimental)" },
-
-  "enable_subtitle_translation_label": {
-    "message": "Enable subtitle translation on Youtube"
-  },
-  "enable_subtitle_translation_description": {
-    "message": "When enabled, this feature automatically translates subtitles on YouTube videos (if available) and replaces the default YouTube subtitles with the translated version."
-  },
-  "icon_subtitle_translation_label": { "message": "Show Icon on Youtube Player" },
-  "icon_subtitle_translation_description":{"message":"Display a translation icon in the YouTube player bar for quick access to enable/disable subtitle translation."},
-
-  "import_export_export_title": { "message": "Export Settings" },
+  "activation_group_dictionary_title": { "message": "Dictionary Mode" },  "import_export_export_title": { "message": "Export Settings" },
   "import_export_import_title": { "message": "Import Settings" },
 
   "notification_update_title": { "message": "Extension Updated" },
@@ -540,15 +528,7 @@
   },
   "gemini_thinking_description": {
     "message": "Allow the model to think step-by-step before responding."
-  },
-
-  "SUBTITLE_TRANSLATION_STARTED": {
-    "message": "Subtitle translation activated"
-  },
-  "SUBTITLE_TRANSLATION_STOPPED": {
-    "message": "Subtitle translation stopped"
-  },
-  "advance_section_title": { "message": "Advanced Settings" },
+  },  "advance_section_title": { "message": "Advanced Settings" },
   "prompt_source_help": { "message": "Select the source language for your prompt." },
   "prompt_target_help": { "message": "Select the target language for your prompt." },
   "prompt_text_help": { "message": "Enter the text you want to translate or process." },

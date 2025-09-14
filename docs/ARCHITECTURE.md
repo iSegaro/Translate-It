@@ -199,10 +199,6 @@ src/
 │   ├── text-actions/
 │   │   ├── composables/       # useCopyAction, usePasteAction
 │   │   └── components/        # ActionToolbar, CopyButton
-│   ├── subtitle/
-│   │   ├── core/              # BaseSubtitleHandler, NetflixSubtitleHandler
-│   │   ├── handlers/          # Subtitle handlers
-│   │   └── stores/            # subtitle.js store
 │   ├── windows/
 │   │   ├── managers/          # WindowsManager (business logic)
 │   │   ├── handlers/          # WindowsManagerHandler
@@ -555,10 +551,6 @@ Handlers are organized by feature category for maintainability:
 - `handleOpenSidePanel.js` - Sidepanel opening
 - `handleTriggerSidebarFromContent.js` - Content script triggers
 
-**Subtitle Translation:**
-- `handleSubtitleTranslate.js` - Subtitle translation processing
-- `handleSubtitleStatus.js` - Subtitle translation status
-- `handleSubtitleToggle.js` - Enable/disable subtitle translation
 
 **System Management:**
 - `handlePing.js` - Health checks
@@ -651,10 +643,6 @@ import { useTTSStore } from '@/store/modules/tts.js'
 const tts = useTTSStore()
 await tts.speak(text, language)
 
-// Subtitle translation state
-import { useSubtitleStore } from '@/store/modules/subtitle.js'
-const subtitle = useSubtitleStore()
-subtitle.toggleSubtitleTranslation()
 
 // Provider management
 import { useProvidersStore } from '@/store/modules/providers.js'
@@ -1020,7 +1008,6 @@ export const useTranslationStore = defineStore('translation', {
 - `src/background/handlers/translation/handleTranslate.js` - Main translation handler
 - `src/background/handlers/vue-integration/` - Vue-specific handlers
 - `src/background/handlers/tts/` - Text-to-speech handlers
-- `src/background/handlers/subtitle/` - Subtitle translation handlers
 - `src/background/handlers/element-selection/` - Element selection handlers
 
 ### Content Scripts
@@ -1231,38 +1218,6 @@ Vue UI Host → Event-Based Communication → SelectElement Support
 
 ---
 
-## 📺 Subtitle Translation System
-
-### Overview
-Advanced subtitle translation system for online videos (YouTube, streaming platforms) with real-time processing and overlay display.
-
-**Key Features:**
-- **Real-Time Translation**: Live subtitle translation as video plays
-- **Multiple Video Platforms**: YouTube, streaming services, and embedded videos
-- **Overlay Display**: Non-intrusive subtitle overlay on videos
-- **State Management**: Enable/disable per video or globally
-- **Timing Synchronization**: Maintains original subtitle timing
-
-**Core Components:**
-- `src/store/modules/subtitle.js` - Subtitle state management
-- `src/background/handlers/subtitle/` - Subtitle processing handlers
-- `src/components/feature/SubtitleTranslationPanel.vue` - Control panel
-
-**System Flow:**
-```
-Video Subtitle Detection → Content Script Processing
-    ↓
-Background Handler → Translation Provider → Overlay Rendering
-    ↓
-Vue Store Update → UI State Sync
-```
-
-**Background Handlers:**
-- `handleSubtitleTranslate.js` - Process subtitle translation requests
-- `handleSubtitleStatus.js` - Get current subtitle translation status
-- `handleSubtitleToggle.js` - Enable/disable subtitle translation
-
----
 
 ## 💾 Storage Manager System
 

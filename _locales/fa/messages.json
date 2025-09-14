@@ -84,19 +84,7 @@
   "activation_group_general_title": { "message": "سوییچ کلی" },
   "activation_group_text_fields_title": { "message": "ترجمه فیلدهای متنی" },
   "activation_group_page_selection_title": { "message": "انتخاب در صفحه" },
-  "activation_group_dictionary_title": { "message": "حالت دیکشنری" },
-  "activation_group_subtitle_title": { "message": "زیرنویس ویدیو (آزمایشی)" },
-
-  "enable_subtitle_translation_label": {
-    "message": "فعالسازی ترجمه زیرنویس در یوتوب"
-  },
-  "enable_subtitle_translation_description": {
-    "message": "زمانی که این قابلیت فعال باشد، در ویدیوهای یوتیوبی که دارای زیرنویس هستند، ترجمه به‌صورت خودکار انجام شده و جایگزین زیرنویس پیش‌فرض یوتیوب می‌شود."
-  },
-  "icon_subtitle_translation_label": {
-    "message": "آیکون ترجمه زیرنویس در پخش کننده یوتوب"
-  },
-  "icon_subtitle_translation_description": {
+  "activation_group_dictionary_title": { "message": "حالت دیکشنری" },  "icon_subtitle_translation_description": {
     "message": "نمایش آیکون ترجمه در نوار پخش یوتیوب برای دسترسی سریع به فعال/غیرفعال کردن ترجمه زیرنویس."
   },
 
@@ -542,16 +530,7 @@
   },
   "gemini_thinking_description": {
     "message": "اجازه دهید مدل قبل از پاسخ، گام به گام فکر کند."
-  },
-
-  "SUBTITLE_TRANSLATION_STARTED": {
-    "message": "ترجمه زیرنویس فعال شد"
-  },
-  "SUBTITLE_TRANSLATION_STOPPED": {
-    "message": "ترجمه زیرنویس متوقف شد"
-  },
-
-  "export_success_plaintext": { "message": "تنظیمات با موفقیت صادر شد (کلیدهای API به صورت متن ساده ذخیره شدند)." },
+  },  "export_success_plaintext": { "message": "تنظیمات با موفقیت صادر شد (کلیدهای API به صورت متن ساده ذخیره شدند)." },
   "import_error_generic": { "message": "خطا در وارد کردن تنظیمات." },
   "import_error_password": { "message": "وارد کردن تنظیمات با شکست مواجه شد: رمز عبور اشتباه است." },
 
