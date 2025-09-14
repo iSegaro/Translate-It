@@ -127,22 +127,41 @@ async function initializeApp() {
     logger.error('Failed to initialize options app:', error)
     logger.error('Error stack:', error.stack)
     
-    // Show detailed error UI
-    document.getElementById('app').innerHTML = DOMPurify.sanitize(`
-      <div style="padding: 16px; color: red; font-family: monospace;">
-        <h3>Failed to load extension options</h3>
-        <details>
-          <summary>Error Details (Click to expand)</summary>
-          <pre style="white-space: pre-wrap; margin-top: 8px; background: #f5f5f5; padding: 8px; border-radius: 4px; color: black;">
-Error: ${error.message}
+    // Show detailed error UI using DOM methods
+    const appElement = document.getElementById('app');
+    appElement.innerHTML = ''; // Clear existing content
 
-Stack: ${error.stack}
-          </pre>
-        </details>
-        <p>Please check the browser console for more details.</p>
-        <button onclick="location.reload()" style="padding: 8px 16px; margin-top: 8px;">Reload</button>
-      </div>
-    `)
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'padding: 16px; color: red; font-family: monospace;';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Failed to load extension options';
+    errorDiv.appendChild(h3);
+
+    const details = document.createElement('details');
+
+    const summary = document.createElement('summary');
+    summary.textContent = 'Error Details (Click to expand)';
+    details.appendChild(summary);
+
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'white-space: pre-wrap; margin-top: 8px; background: #f5f5f5; padding: 8px; border-radius: 4px; color: black;';
+    pre.textContent = `Error: ${error.message}\n\nStack: ${error.stack}`;
+    details.appendChild(pre);
+
+    errorDiv.appendChild(details);
+
+    const p = document.createElement('p');
+    p.textContent = 'Please check the browser console for more details.';
+    errorDiv.appendChild(p);
+
+    const button = document.createElement('button');
+    button.style.cssText = 'padding: 8px 16px; margin-top: 8px;';
+    button.textContent = 'Reload';
+    button.addEventListener('click', () => location.reload());
+    errorDiv.appendChild(button);
+
+    appElement.appendChild(errorDiv)
   }
 }
 
@@ -167,24 +186,63 @@ setTimeout(() => {
     logger.debug('- document.readyState:', document.readyState)
     logger.debug('- #app element:', document.getElementById('app'))
     
-    // Show simple recovery UI
-    appElement.innerHTML = DOMPurify.sanitize(`
-      <div style="padding: 20px; max-width: 600px; margin: 40px auto; border: 2px solid #e74c3c; border-radius: 8px; background: #fff;">
-        <h2 style="color: #e74c3c; margin-top: 0;">Extension Loading Issue</h2>
-        <p>The Vue.js application failed to initialize. This might be due to:</p>
-        <ul style="text-align: left;">
-          <li>browser extension API not ready</li>
-          <li>Content Security Policy restrictions</li>
-          <li>Missing dependencies or imports</li>
-          <li>Timing issues with async initialization</li>
-        </ul>
-        <p><strong>Check the browser console for detailed error messages.</strong></p>
-        <div style="margin-top: 20px;">
-          <button onclick="location.reload()" style="padding: 10px 20px; margin-right: 10px; border: none; background: #3498db; color: white; border-radius: 4px; cursor: pointer;">Reload Page</button>
-          <button onclick="browser.runtime.openOptionsPage()" style="padding: 10px 20px; border: none; background: #95a5a6; color: white; border-radius: 4px; cursor: pointer;">Open New Options Tab</button>
-        </div>
-      </div>
-    `)
+    // Show simple recovery UI using DOM methods
+    appElement.innerHTML = ''; // Clear existing content
+
+    const containerDiv = document.createElement('div');
+    containerDiv.style.cssText = 'padding: 20px; max-width: 600px; margin: 40px auto; border: 2px solid #e74c3c; border-radius: 8px; background: #fff;';
+
+    const h2 = document.createElement('h2');
+    h2.style.cssText = 'color: #e74c3c; margin-top: 0;';
+    h2.textContent = 'Extension Loading Issue';
+    containerDiv.appendChild(h2);
+
+    const p1 = document.createElement('p');
+    p1.textContent = 'The Vue.js application failed to initialize. This might be due to:';
+    containerDiv.appendChild(p1);
+
+    const ul = document.createElement('ul');
+    ul.style.textAlign = 'left';
+
+    const li1 = document.createElement('li');
+    li1.textContent = 'browser extension API not ready';
+    ul.appendChild(li1);
+
+    const li2 = document.createElement('li');
+    li2.textContent = 'Content Security Policy restrictions';
+    ul.appendChild(li2);
+
+    const li3 = document.createElement('li');
+    li3.textContent = 'Missing dependencies or imports';
+    ul.appendChild(li3);
+
+    const li4 = document.createElement('li');
+    li4.textContent = 'Timing issues with async initialization';
+    ul.appendChild(li4);
+
+    containerDiv.appendChild(ul);
+
+    const p2 = document.createElement('p');
+    p2.innerHTML = '<strong>Check the browser console for detailed error messages.</strong>';
+    containerDiv.appendChild(p2);
+
+    const buttonDiv = document.createElement('div');
+    buttonDiv.style.marginTop = '20px';
+
+    const reloadButton = document.createElement('button');
+    reloadButton.style.cssText = 'padding: 10px 20px; margin-right: 10px; border: none; background: #3498db; color: white; border-radius: 4px; cursor: pointer;';
+    reloadButton.textContent = 'Reload Page';
+    reloadButton.addEventListener('click', () => location.reload());
+    buttonDiv.appendChild(reloadButton);
+
+    const openButton = document.createElement('button');
+    openButton.style.cssText = 'padding: 10px 20px; border: none; background: #95a5a6; color: white; border-radius: 4px; cursor: pointer;';
+    openButton.textContent = 'Open New Options Tab';
+    openButton.addEventListener('click', () => browser.runtime.openOptionsPage());
+    buttonDiv.appendChild(openButton);
+
+    containerDiv.appendChild(buttonDiv);
+    appElement.appendChild(containerDiv)
   }
 }, 2000)
 
