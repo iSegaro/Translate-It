@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-v-html -->
 <template>
   <div class="about-page">
     <h2 class="page-title">
@@ -17,17 +18,18 @@
       >
         {{ t('options_changelog_error') || 'Failed to load changelog.' }}
       </div>
+      <!-- Safe: Content is sanitized with DOMPurify -->
       <div
         v-else
         class="changelog-content"
-        v-html="renderedChangelog"
+        v-html="sanitizedChangelog"
       />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import browser from 'webextension-polyfill'
@@ -42,7 +44,12 @@ const { t } = useI18n()
 
 const isLoadingChangelog = ref(true)
 const changelogError = ref(false)
-const renderedChangelog = ref('')
+const rawChangelog = ref('')
+
+// Computed property for sanitized HTML
+const sanitizedChangelog = computed(() => {
+  return DOMPurify.sanitize(rawChangelog.value)
+})
 
 const fetchChangelog = async () => {
   try {
@@ -71,7 +78,7 @@ const fetchChangelog = async () => {
     
     const html = marked(processedMarkdown, markedOptions)
     // Sanitize HTML for security
-    renderedChangelog.value = DOMPurify.sanitize(html)
+    rawChangelog.value = html
   } catch (error) {
   logger.error('Error fetching changelog:', error)
     changelogError.value = true

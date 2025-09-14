@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-v-html -->
 <template>
   <section class="help-tab">
     <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
@@ -18,9 +19,10 @@
           :class="{ open: openAccordion === 'shortcut' }"
         >
           <div class="accordion-inner">
-            <div 
-              class="markdown-content" 
-              v-html="shortcutHelpContent"
+            <!-- Safe: Content is sanitized with DOMPurify -->
+            <div
+              class="markdown-content"
+              v-html="sanitizedShortcutHelp"
             />
           </div>
         </div>
@@ -41,9 +43,10 @@
           :class="{ open: openAccordion === 'apiKeys' }"
         >
           <div class="accordion-inner">
-            <div 
-              class="markdown-content" 
-              v-html="apiKeysHelpContent"
+            <!-- Safe: Content is sanitized with DOMPurify -->
+            <div
+              class="markdown-content"
+              v-html="sanitizedApiKeysHelp"
             />
           </div>
         </div>
@@ -56,6 +59,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
+import DOMPurify from 'dompurify'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -90,6 +94,15 @@ ${t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:'}
     logger.warn('Shortcut help markdown rendering failed:', error)
     return content.replace(/\n/g, '<br>')
   }
+})
+
+// Sanitized computed properties
+const sanitizedShortcutHelp = computed(() => {
+  return DOMPurify.sanitize(shortcutHelpContent.value)
+})
+
+const sanitizedApiKeysHelp = computed(() => {
+  return DOMPurify.sanitize(apiKeysHelpContent.value)
 })
 
 const apiKeysHelpContent = computed(() => {

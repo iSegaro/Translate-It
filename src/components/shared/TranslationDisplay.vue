@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-v-html -->
 <template>
   <div
     ref="containerRef"
@@ -63,8 +64,10 @@
         textAlign: textDirection?.textAlign || 'left',
         direction: textDirection?.dir || 'ltr'
       }"
-      v-html="renderedContent"
-    />
+    >
+      <!-- Safe: Content is sanitized with DOMPurify -->
+      <div v-html="sanitizedContent" />
+    </div>
   </div>
 </template>
 
@@ -72,6 +75,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
+import DOMPurify from 'dompurify'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { useFont } from '@/composables/shared/useFont.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -254,6 +258,11 @@ const textDirection = computed(() => {
     dir: isRtl ? 'rtl' : 'ltr',
     textAlign: isRtl ? 'right' : 'left'
   }
+})
+
+// Sanitized content computed property
+const sanitizedContent = computed(() => {
+  return DOMPurify.sanitize(renderedContent.value)
 })
 
 const renderedContent = computed(() => {
