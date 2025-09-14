@@ -500,7 +500,7 @@ export class BaseAIProvider extends BaseProvider {
    * @param {AbortController} _abortController - Cancellation controller
    * @returns {Promise<string>} - Translated text
    */
-  async _translateSingle(_text, _sourceLang, _targetLang, _translateMode, _abortController) {
+  async _translateSingle(/* text, sourceLang, targetLang, translateMode, abortController */) {
     throw new Error(`_translateSingle method must be implemented by ${this.constructor.name}`);
   }
 
@@ -621,7 +621,7 @@ Important: Return only the JSON array with translated texts, no additional text 
    * @param {string} _targetLang - Target language
    * @returns {string} - Numbered batch prompt
    */
-  _buildNumberedBatchPrompt(textBatch, _sourceLang, _targetLang) {
+  _buildNumberedBatchPrompt(textBatch /* , sourceLang, targetLang */) {
     const numberedText = textBatch.map((text, index) => `${index + 1}. ${text}`).join('\n');
     return numberedText + '\n\nPlease return the translations in the same order, one per line, numbered 1. 2. 3. etc.';
   }
