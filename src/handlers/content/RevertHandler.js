@@ -88,11 +88,17 @@ export class RevertHandler extends ResourceTracker {
    */
   async revertVueTranslations() {
     try {
-      // Import the singleton directly to ensure the correct instance is used
-      const { selectElementManager } = await import("@/features/element-selection/managers/index.js");
-      const revertedCount = await selectElementManager.revertTranslations();
-      logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementService.`);
-      return revertedCount;
+      // Get SelectElementManager instance through FeatureManager
+      const selectElementManager = await this.getSelectElementManagerFromFeatureManager();
+
+      if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
+        const revertedCount = await selectElementManager.revertTranslations();
+        logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementManager.`);
+        return revertedCount;
+      } else {
+        logger.debug('[RevertHandler] SelectElementManager not available or revertTranslations method not found');
+        return 0;
+      }
     } catch (error) {
       logger.error('[RevertHandler] Error in Vue revert:', error);
       // Return 0 if this specific revert fails, so legacy can still try
@@ -127,16 +133,53 @@ export class RevertHandler extends ResourceTracker {
   }
 
   /**
-   * Get SelectElementManager instance if available
+   * Get SelectElementManager instance through FeatureManager
+   * @returns {Promise<Object|null>} SelectElementManager instance
+   */
+  async getSelectElementManagerFromFeatureManager() {
+    try {
+      // Try to get FeatureManager from global window object
+      if (window.featureManager && typeof window.featureManager.getFeatureHandler === 'function') {
+        const selectElementManager = window.featureManager.getFeatureHandler('selectElement');
+        if (selectElementManager) {
+          logger.debug('[RevertHandler] Found SelectElementManager through FeatureManager');
+          return selectElementManager;
+        }
+      }
+
+      // Try to import FeatureManager as fallback
+      try {
+        const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+        // This might not work as FeatureManager needs to be instantiated, but let's try
+        logger.debug('[RevertHandler] FeatureManager imported but instance not available globally');
+      } catch (importError) {
+        logger.debug('[RevertHandler] Failed to import FeatureManager:', importError);
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn('[RevertHandler] Could not get SelectElementManager from FeatureManager:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get SelectElementManager instance if available (legacy method)
    * @returns {Promise<Object|null>} SelectElementManager instance
    */
   async getSelectElementManager() {
     try {
-      // Try to get from global window object first
+      // First try the new method through FeatureManager
+      const manager = await this.getSelectElementManagerFromFeatureManager();
+      if (manager) {
+        return manager;
+      }
+
+      // Try to get from global window object
       if (window.selectElementManagerInstance) {
         return window.selectElementManagerInstance;
       }
-      
+
       // Fallback: try to find in existing instances
       return null;
     } catch (error) {

@@ -766,9 +766,3 @@ class SelectElementManager extends ResourceTracker {
 
 // Export class for direct instantiation by FeatureManager
 export { SelectElementManager };
-
-// Legacy getSelectElementManager for backwards compatibility (deprecated)
-export const getSelectElementManager = () => {
-  console.warn('getSelectElementManager is deprecated. Use SelectElementManager directly.');
-  return new SelectElementManager();
-};

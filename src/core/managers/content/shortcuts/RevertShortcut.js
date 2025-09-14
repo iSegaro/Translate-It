@@ -6,48 +6,19 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
 
 /**
- * Get active SelectElementManager via FeatureManager (if available)
+ * Get active SelectElementManager via FeatureManager
  * @returns {Object|null} Active SelectElementManager or null
  */
-async function getActiveSelectElementManager() {
-  try {
-    // Try multiple sources for FeatureManager instance
-    let featureManager = window.featureManager || window.featureManagerInstance;
+function getActiveSelectElementManager() {
+  // FeatureManager should always be available and manage everything
+  const featureManager = window.featureManager;
 
-    if (!featureManager) {
-      try {
-        const featureManagerModule = await import('@/core/managers/content/FeatureManager.js');
-        featureManager = featureManagerModule.default?.instance;
-      } catch (moduleError) {
-        logger.debug('Could not import FeatureManager module:', moduleError);
-      }
-    }
-
-    if (featureManager && featureManager.getFeatureHandler) {
-      const selectElementHandler = featureManager.getFeatureHandler('selectElement');
-      if (selectElementHandler && selectElementHandler.getSelectElementManager) {
-        const manager = selectElementHandler.getSelectElementManager();
-        if (manager) {
-          logger.debug('Found active SelectElementManager via FeatureManager');
-          return manager;
-        }
-      }
-    }
-
-    // Fallback: try legacy getSelectElementManager
-    try {
-      const { getSelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
-      const manager = getSelectElementManager();
-      logger.debug('Using legacy getSelectElementManager fallback');
-      return manager;
-    } catch (legacyError) {
-      logger.debug('Legacy getSelectElementManager not available:', legacyError);
-      return null;
-    }
-  } catch (error) {
-    logger.debug('Could not get active SelectElementManager:', error);
+  if (!featureManager) {
+    logger.error('FeatureManager not available - this should not happen');
     return null;
   }
+
+  return featureManager.getFeatureHandler('selectElement') || null;
 }
 
 /**
@@ -83,27 +54,14 @@ export class RevertShortcut {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
 
       try {
-        // Get active SelectElementManager
-        const selectElementManager = await getActiveSelectElementManager();
-
-        // Try multiple approaches to ensure cancellation works
-        if (selectElementManager) {
-          // Approach 1: Get active messageId for specific cancellation
-          const activeMessageId = selectElementManager.getActiveMessageId?.();
-
-          if (activeMessageId) {
-            // Cancel specific translation with proper state management
-            await selectElementManager.cancelSpecificTranslation?.(activeMessageId);
-            logger.debug(`[RevertShortcut] Cancelled specific translation: ${activeMessageId}`);
-          } else {
-            // Approach 2: Fallback to cancel all translations via SelectElementManager
-            logger.debug('[RevertShortcut] No specific messageId found, using cancel all approach');
-            await selectElementManager.translationOrchestrator?.cancelAllTranslations?.();
-            logger.debug('[RevertShortcut] Cancelled all translations via SelectElementManager');
-          }
+        // Cancel via SelectElementManager
+        const selectElementManager = getActiveSelectElementManager();
+        if (selectElementManager && selectElementManager.translationOrchestrator) {
+          await selectElementManager.translationOrchestrator.cancelAllTranslations();
+          logger.debug('[RevertShortcut] Cancelled translations via SelectElementManager');
         }
 
-        // Approach 3: Direct background cancellation as primary method now
+        // Also send cancellation to background
         try {
           const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
           const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
@@ -116,141 +74,45 @@ export class RevertShortcut {
               context: 'revert-shortcut'
             }
           });
-          logger.debug('[RevertShortcut] Sent direct cancel-all to background');
-        } catch (directCancelError) {
-          logger.debug('[RevertShortcut] Direct background cancellation failed:', directCancelError);
+          logger.debug('[RevertShortcut] Sent cancellation to background');
+        } catch (error) {
+          logger.warn('[RevertShortcut] Failed to send cancellation to background:', error);
         }
 
+        window.isTranslationInProgress = false;
         return { success: true, action: 'cancelled' };
       } catch (error) {
         logger.error('[RevertShortcut] Error cancelling translation:', error);
-        // Fallback: force clear state
-        try {
-          window.isTranslationInProgress = false;
-          return { success: true, action: 'cancelled_fallback' };
-        } catch (fallbackError) {
-          return { success: false, action: 'cancellation_failed', error: error.message };
-        }
+        window.isTranslationInProgress = false;
+        return { success: false, action: 'cancellation_failed', error: error.message };
       }
     }
 
-    // Priority 2: If no active processes, try to revert completed translations
+    // Priority 2: If no active processes, revert completed translations
     logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
-    
-    // Check if there are any translations to revert with enhanced detection
-    let hasModernTranslations = false;
-    let hasLegacyVueTranslations = false;
-    let hasLegacyTranslations = false;
-    
-    try {
-      // Check modern Vue translations in StateManager
-      const selectElementManager = await getActiveSelectElementManager();
-      hasModernTranslations = selectElementManager?.stateManager?.hasTranslatedElements?.() || false;
-    } catch (error) {
-      logger.debug('[RevertShortcut] Error checking modern translations:', error);
-    }
-    
-    try {
-      // Check legacy DOM-based translations  
-      hasLegacyVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
-      hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
-    } catch (error) {
-      logger.debug('[RevertShortcut] Error checking legacy translations:', error);
-    }
-    
-    logger.debug('[RevertShortcut] Translation status check:', {
-      hasModernTranslations,
-      hasLegacyVueTranslations,
-      hasLegacyTranslations
-    });
-    
-    if (!hasModernTranslations && !hasLegacyVueTranslations && !hasLegacyTranslations) {
-      logger.debug('[RevertShortcut] No translations found to revert');
-      return { success: false, reason: 'no_translations_found' };
-    }
 
     try {
-      // Import and use singleton RevertHandler
+      // Use RevertHandler - it handles everything including checking for translations
       const { revertHandler } = await import('@/handlers/content/RevertHandler.js');
-      
+
       if (!revertHandler) {
         logger.error('[RevertShortcut] RevertHandler not available');
-        return {
-          success: false,
-          error: 'RevertHandler not available'
-        };
+        return { success: false, error: 'RevertHandler not available' };
       }
-      
+
       const result = await revertHandler.executeRevert();
-      
+
       if (result.success) {
         logger.debug(`[RevertShortcut] ✅ Successfully reverted ${result.revertedCount} translations`);
       } else {
-        logger.error('[RevertShortcut] ❌ Revert failed:', result.error);
+        logger.debug('[RevertShortcut] No translations found to revert');
       }
-      
+
       return result;
-      
+
     } catch (error) {
       logger.error('[RevertShortcut] Error executing revert shortcut:', error);
-      
-      // Try fallback legacy revert methods
-      try {
-        logger.debug('[RevertShortcut] Attempting fallback revert methods');
-        let revertedCount = 0;
-        
-        // Fallback 1: Modern Vue translations
-        const modernElements = document.querySelectorAll("span[data-translate-it-original-text]");
-        modernElements.forEach(element => {
-          try {
-            const originalText = element.getAttribute('data-translate-it-original-text');
-            if (originalText) {
-              element.textContent = originalText;
-              element.removeAttribute('data-translate-it-original-text');
-              revertedCount++;
-            }
-          } catch (elementError) {
-            logger.debug('[RevertShortcut] Error reverting modern element:', elementError);
-          }
-        });
-        
-        // Fallback 2: Legacy translations
-        const legacyElements = document.querySelectorAll("span[data-aiwc-original-text]");
-        legacyElements.forEach(element => {
-          try {
-            const originalText = element.getAttribute('data-aiwc-original-text');
-            if (originalText) {
-              element.textContent = originalText;
-              element.removeAttribute('data-aiwc-original-text');
-              revertedCount++;
-            }
-          } catch (elementError) {
-            logger.debug('[RevertShortcut] Error reverting legacy element:', elementError);
-          }
-        });
-        
-        if (revertedCount > 0) {
-          logger.debug(`[RevertShortcut] ✅ Fallback revert successful: ${revertedCount} elements`);
-          return {
-            success: true,
-            revertedCount,
-            method: 'fallback'
-          };
-        } else {
-          logger.debug('[RevertShortcut] No elements reverted by fallback methods');
-          return {
-            success: false,
-            error: 'No elements could be reverted'
-          };
-        }
-        
-      } catch (fallbackError) {
-        logger.error('[RevertShortcut] Fallback revert methods also failed:', fallbackError);
-        return {
-          success: false,
-          error: error.message || 'Shortcut execution failed'
-        };
-      }
+      return { success: false, error: error.message || 'Shortcut execution failed' };
     }
   }
 
