@@ -59,13 +59,11 @@ const fetchChangelog = async () => {
       breaks: true,
       gfm: true,
       smartLists: true,
-      smartypants: true,
+      smartypants: false, // Disable smart quotes to preserve original text
       tables: true,
       headerIds: false,
       mangle: false,
-      sanitize: false,
-      // Preserve line breaks and spacing
-      smartypants: false // Disable smart quotes to preserve original text
+      sanitize: false
     }
     
     // Pre-process markdown to preserve empty lines
