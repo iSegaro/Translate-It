@@ -162,7 +162,7 @@ class SelectElementManager extends ResourceTracker {
   async activateSelectElementMode() {
     if (this.isActive) {
       this.logger.debug("SelectElement mode already active");
-      return;
+      return { isActive: this.isActive, instanceId: this.instanceId };
     }
     
     this.logger.debug("SelectElementManager.activate() entry point", {
@@ -734,6 +734,14 @@ class SelectElementManager extends ResourceTracker {
   // Background Communication
   async notifyBackgroundActivation() {
     try {
+      // Add a flag to prevent multiple concurrent notifications
+      if (this._isNotifyingBackground) {
+        this.logger.debug('Background notification already in progress, skipping duplicate');
+        return;
+      }
+
+      this._isNotifyingBackground = true;
+
       await sendMessage({
         action: MessageActions.SET_SELECT_ELEMENT_STATE,
         data: { active: true }
@@ -741,6 +749,9 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug('Successfully notified background: select element activated');
     } catch (err) {
       this.logger.error('Failed to notify background about activation', err);
+      // Don't throw - this is a non-critical operation
+    } finally {
+      this._isNotifyingBackground = false;
     }
   }
   
