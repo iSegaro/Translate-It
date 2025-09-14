@@ -476,8 +476,12 @@ export class FieldDetector {
    * @returns {boolean} True if should show text field icon
    */
   _shouldShowTextFieldIcon(fieldType) {
-    return fieldType === FieldTypes.REGULAR_INPUT || 
-           fieldType === FieldTypes.CONTENT_EDITABLE;
+    // Only show text field icon for contentEditable elements
+    // Regular input fields should NOT show text field icon
+    return fieldType === FieldTypes.CONTENT_EDITABLE;
+
+    // return fieldType === FieldTypes.REGULAR_INPUT || 
+    // fieldType === FieldTypes.CONTENT_EDITABLE;
   }
 
   /**
