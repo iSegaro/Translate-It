@@ -158,33 +158,50 @@ class ContentScriptVueBridge extends ResourceTracker {
   showCaptureError = (message, instanceId = null) => {
     if (instanceId) this.destroyMicroApp(instanceId);
     const errorContainer = this.createContainer(`top: 20px; left: 50%; transform: translateX(-50%);`);
-    errorContainer.innerHTML = DOMPurify.sanitize(`
-      <div style="
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #f44336;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        z-index: 2147483647;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideDown 0.3s ease;
-      ">
-        <span style="margin-right: 8px;">⚠️</span>
-        <span>Screen Capture Error: ${message}</span>
-        <button onclick="this.parentElement.parentElement.remove()" style="
-          background: none;
-          border: none;
-          color: white;
-          margin-left: 12px;
-          cursor: pointer;
-          font-size: 16px;
-        ">×</button>
-      </div>
-    `);
+
+    // Create error div using DOM methods instead of innerHTML
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f44336;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 2147483647;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      animation: slideDown 0.3s ease;
+    `;
+
+    // Create warning icon
+    const warningIcon = document.createElement('span');
+    warningIcon.style.marginRight = '8px';
+    warningIcon.textContent = '⚠️';
+    errorDiv.appendChild(warningIcon);
+
+    // Create message span
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = `Screen Capture Error: ${message}`;
+    errorDiv.appendChild(messageSpan);
+
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.style.cssText = `
+      background: none;
+      border: none;
+      color: white;
+      margin-left: 12px;
+      cursor: pointer;
+      font-size: 16px;
+    `;
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', () => errorContainer.remove());
+    errorDiv.appendChild(closeButton);
+
+    errorContainer.appendChild(errorDiv);
     setTimeout(() => errorContainer.remove(), 5000);
   }
 
