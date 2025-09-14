@@ -448,7 +448,7 @@ export function useTTSSmart() {
   // Listen for TTS completion messages from offscreen (event-driven system)
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message) => {
-      if (message.action === 'GOOGLE_TTS_ENDED') {
+      if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
         logger.debug("[useTTSSmart] TTS ended notification received - audio playback completed");
 
         // Clear safety timeout since we received the completion event

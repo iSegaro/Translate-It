@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/core/browserHandlers.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
@@ -21,7 +22,7 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
     if (sender.tab?.id) {
       // Content script request - send to specific tab
       await browserAPI.tabs.sendMessage(sender.tab.id, {
-        action: 'GOOGLE_TTS_ENDED',
+        action: MessageActions.GOOGLE_TTS_ENDED,
         source: 'background',
         reason: reason,
         targetFrameId: sender.frameId // Send to specific frame if available
@@ -30,7 +31,7 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
     } else {
       // Popup/Sidepanel request - send via runtime.sendMessage (global)
       await browserAPI.runtime.sendMessage({
-        action: 'GOOGLE_TTS_ENDED',
+        action: MessageActions.GOOGLE_TTS_ENDED,
         source: 'background',
         reason: reason,
         targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
@@ -400,7 +401,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
         // Send completion event for event-driven system (Firefox)
         // Note: Firefox completion is handled here, Chrome uses offscreen document
         initializebrowserAPI().then(browserAPI => {
-          browserAPI.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(() => {
+          browserAPI.runtime.sendMessage({ action: MessageActions.GOOGLE_TTS_ENDED }).catch(() => {
             logger.debug('[GoogleTTSHandler] Failed to send TTS ended notification (Firefox)');
           });
         }).catch(error => {
