@@ -9,13 +9,13 @@
         v-if="isLoadingChangelog"
         class="loading-changelog"
       >
-  {{ t('options_changelog_loading') || 'Loading changelog...' }}
+        {{ t('options_changelog_loading') || 'Loading changelog...' }}
       </div>
       <div
         v-else-if="changelogError"
         class="error-changelog"
       >
-  {{ t('options_changelog_error') || 'Failed to load changelog.' }}
+        {{ t('options_changelog_error') || 'Failed to load changelog.' }}
       </div>
       <div
         v-else

@@ -1,6 +1,6 @@
 <template>
   <div>
-  <h3>{{ t('openai_api_settings_title') || 'OpenAI API Settings' }}</h3>
+    <h3>{{ t('openai_api_settings_title') || 'OpenAI API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">
         {{ t('openai_api_key_info') || 'Get your OpenAI API key from' }}
@@ -11,20 +11,20 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-  {{ t('openai_api_key_link') || 'Get OpenAI API Key' }}
+        {{ t('openai_api_key_link') || 'Get OpenAI API Key' }}
       </a>
     </div>
     <div class="setting-group">
-  <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
+      <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
       <BaseInput
         v-model="openaiApiKey"
         type="password"
-  :placeholder="t('openai_api_key_placeholder') || 'Paste your OpenAI API key here'"
+        :placeholder="t('openai_api_key_placeholder') || 'Paste your OpenAI API key here'"
         class="api-key-input"
       />
     </div>
     <div class="setting-group">
-  <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="openaiApiModel"
         :options="openaiApiModelOptions"
@@ -36,10 +36,10 @@
       v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
-  <label>{{ t('openai_custom_model_label') || 'Custom Model Name' }}</label>
+      <label>{{ t('openai_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput
         v-model="openaiCustomModel"
-  :placeholder="t('openai_custom_model_placeholder') || 'Enter custom model name'"
+        :placeholder="t('openai_custom_model_placeholder') || 'Enter custom model name'"
       />
     </div>
   </div>

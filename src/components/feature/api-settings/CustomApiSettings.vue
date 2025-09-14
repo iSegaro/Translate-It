@@ -1,30 +1,30 @@
 <template>
   <div>
-  <h3>{{ t('custom_api_settings_title') || 'Custom API Settings' }}</h3>
+    <h3>{{ t('custom_api_settings_title') || 'Custom API Settings' }}</h3>
     <span class="setting-description">
       {{ t('custom_api_settings_description') || 'Use any API service that is compatible with the OpenAI chat completions format.' }}
     </span>
     <div class="setting-group">
-  <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
+      <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
         v-model="customApiUrl"
-  :placeholder="t('custom_api_url_placeholder') || 'Enter the base URL of your custom API'"
+        :placeholder="t('custom_api_url_placeholder') || 'Enter the base URL of your custom API'"
       />
     </div>
     <div class="setting-group">
-  <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
+      <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
       <BaseInput
         v-model="customApiKey"
         type="password"
-  :placeholder="t('custom_api_key_placeholder') || 'Paste your custom API key here'"
+        :placeholder="t('custom_api_key_placeholder') || 'Paste your custom API key here'"
         class="api-key-input"
       />
     </div>
     <div class="setting-group">
-  <label>{{ t('custom_api_settings_model_label') || 'Model' }}</label>
+      <label>{{ t('custom_api_settings_model_label') || 'Model' }}</label>
       <BaseInput
         v-model="customApiModel"
-  :placeholder="t('custom_api_model_placeholder') || 'Enter the model name'"
+        :placeholder="t('custom_api_model_placeholder') || 'Enter the model name'"
       />
     </div>
   </div>

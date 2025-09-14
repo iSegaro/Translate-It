@@ -1,6 +1,6 @@
 <template>
   <section class="activation-tab">
-  <h2>{{ t('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
+    <h2>{{ t('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
 
     <!-- Extension Enable/Disable -->
     <div class="setting-group extension-enabled-group">
@@ -14,7 +14,7 @@
     </div>
 
     <!-- Text Field Translation -->
-  <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
+    <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="translateOnTextFields"
@@ -67,7 +67,7 @@
     </BaseFieldset>
 
     <!-- On-Page Selection -->
-  <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
+    <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="translateWithSelectElement"
@@ -120,7 +120,7 @@
     </BaseFieldset>
 
     <!-- Dictionary Mode -->
-  <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
+    <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="enableDictionary"
@@ -132,8 +132,7 @@
         </span>
       </div>
     </BaseFieldset>
-
-    </section>
+  </section>
 </template>
 
 <script setup>

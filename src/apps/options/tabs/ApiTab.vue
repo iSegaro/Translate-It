@@ -1,9 +1,9 @@
 <template>
   <section class="api-tab">
-  <h2>{{ t('api_section_title') || 'Translation API' }}</h2>
+    <h2>{{ t('api_section_title') || 'Translation API' }}</h2>
     
     <div class="setting-group">
-  <label>{{ t('translation_api_label') || 'API Choice' }}</label>
+      <label>{{ t('translation_api_label') || 'API Choice' }}</label>
       <ProviderSelector v-model="selectedProvider" />
     </div>
     
@@ -12,20 +12,20 @@
         v-if="selectedProvider === 'google'"
         class="api-info"
       >
-          <h3>{{ t('google_translate_settings_title') || 'Google Translate' }}</h3>
+        <h3>{{ t('google_translate_settings_title') || 'Google Translate' }}</h3>
         <p class="setting-description">
-            {{ t('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
-          </p>
+          {{ t('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
+        </p>
       </div>
       
       <div
         v-else-if="selectedProvider === 'bing'"
         class="api-info"
       >
-          <h3>{{ t('bing_translate_settings_title') || 'Microsoft Bing Translate' }}</h3>
+        <h3>{{ t('bing_translate_settings_title') || 'Microsoft Bing Translate' }}</h3>
         <p class="setting-description">
-            {{ t('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}
-          </p>
+          {{ t('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}
+        </p>
       </div>
       
       <GeminiApiSettings v-else-if="selectedProvider === 'gemini'" />

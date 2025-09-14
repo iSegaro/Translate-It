@@ -14,7 +14,7 @@
       alt="Loading..."
       class="loading-gif"
       style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
-    />
+    >
   </div>
 
   <!-- Normal translation window -->
@@ -27,34 +27,82 @@
     @mousedown.stop
     @click.stop
   >
-    <div class="window-header" @mousedown="handleStartDrag">
+    <div
+      class="window-header"
+      @mousedown="handleStartDrag"
+    >
       <div class="header-actions">
-        <button class="action-btn" @click.stop="handleCopy" title="Copy translation">
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        <button
+          class="action-btn"
+          title="Copy translation"
+          @click.stop="handleCopy"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+            />
           </svg>
         </button>
         <button 
           class="action-btn" 
-          @click.stop="handleTTS" 
-          :disabled="!translatedText || translatedText.trim().length === 0"
+          :disabled="!translatedText || translatedText.trim().length === 0" 
           :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
+          @click.stop="handleTTS"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path v-if="!isSpeaking" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-            <path v-else fill="currentColor" d="M6 6h12v12H6z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              v-if="!isSpeaking"
+              fill="currentColor"
+              d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+            />
+            <path
+              v-else
+              fill="currentColor"
+              d="M6 6h12v12H6z"
+            />
           </svg>
         </button>
-        <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
+        <button
+          class="action-btn"
+          title="Show/Hide Original Text"
+          @click.stop="toggleShowOriginal"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
+            />
           </svg>
         </button>
       </div>
       <div class="header-close">
-        <button class="action-btn" @click.stop="handleClose" title="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        <button
+          class="action-btn"
+          title="Close"
+          @click.stop="handleClose"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            />
           </svg>
         </button>
       </div>
@@ -62,9 +110,16 @@
 
     <div class="window-body">
       <!-- Show Original Text Section -->
-      <div v-if="showOriginal && !isLoading" class="original-text-section">
-        <div class="original-label">Original:</div>
-        <div class="original-text">{{ originalText }}</div>
+      <div
+        v-if="showOriginal && !isLoading"
+        class="original-text-section"
+      >
+        <div class="original-label">
+          Original:
+        </div>
+        <div class="original-text">
+          {{ originalText }}
+        </div>
       </div>
       
       <!-- Translation Display Section -->

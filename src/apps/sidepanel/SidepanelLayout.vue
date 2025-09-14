@@ -13,8 +13,14 @@
     <!-- Content area -->
     <div class="content-area">
       <!-- Main Content -->
-      <SidepanelMainContent ref="mainContentRef" v-if="!useEnhancedVersion" />
-      <EnhancedSidepanelMainContent ref="mainContentRef" v-else />
+      <SidepanelMainContent
+        v-if="!useEnhancedVersion"
+        ref="mainContentRef"
+      />
+      <EnhancedSidepanelMainContent
+        v-else
+        ref="mainContentRef"
+      />
 
       <!-- History Panel -->
       <SidepanelHistory 

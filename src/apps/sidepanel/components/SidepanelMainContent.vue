@@ -71,7 +71,6 @@
         />
       </div>
     </form>
-
   </div>
 </template>
 

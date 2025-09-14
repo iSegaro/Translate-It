@@ -1,6 +1,6 @@
 <template>
   <div>
-  <h3>{{ t('webai_api_settings_title') || 'WebAI API Settings' }}</h3>
+    <h3>{{ t('webai_api_settings_title') || 'WebAI API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">
         {{ t('webai_api_key_info') || 'Run your API Server.' }}
@@ -11,21 +11,21 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-  {{ t('webai_api_key_link') || 'Get and Run your locally hosted WebAI API server.' }}
+        {{ t('webai_api_key_link') || 'Get and Run your locally hosted WebAI API server.' }}
       </a>
     </div>
     <div class="setting-group">
-  <label>{{ t('webai_api_url_label') || 'WebAI API URL' }}</label>
+      <label>{{ t('webai_api_url_label') || 'WebAI API URL' }}</label>
       <BaseInput
         v-model="webAIApiUrl"
-  :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
+        :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
       />
     </div>
     <div class="setting-group">
-  <label>{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
+      <label>{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
       <BaseInput
         v-model="webAIApiModel"
-  :placeholder="t('webai_api_model_placeholder') || 'Enter WebAI API model'"
+        :placeholder="t('webai_api_model_placeholder') || 'Enter WebAI API model'"
       />
     </div>
   </div>

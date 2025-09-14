@@ -8,7 +8,7 @@
       rich-colors 
       position="bottom-right"
       expand
-      :toastOptions="{ 
+      :toast-options="{ 
         style: { 
           pointerEvents: 'auto',
           cursor: 'auto',
@@ -18,9 +18,9 @@
     />
     <TextFieldIcon
       v-for="icon in activeIcons"
+      :id="icon.id"
       :key="icon.id"
       :ref="el => setIconRef(icon.id, el)"
-      :id="icon.id"
       :position="icon.position"
       :visible="icon.visible !== false"
       :target-element="icon.targetElement"
@@ -32,8 +32,8 @@
     <!-- WindowsManager Translation Windows -->
     <TranslationWindow
       v-for="window in translationWindows"
-      :key="window.id"
       :id="window.id"
+      :key="window.id"
       :position="window.position"
       :selected-text="window.selectedText"
       :initial-translated-text="window.translatedText"
@@ -48,8 +48,8 @@
     <!-- WindowsManager Translation Icons -->
     <TranslationIcon
       v-for="icon in translationIcons"
-      :key="icon.id"
       :id="icon.id"
+      :key="icon.id"
       :position="icon.position"
       :text="icon.text"
       @click="onTranslationIconClick"

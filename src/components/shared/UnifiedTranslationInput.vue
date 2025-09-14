@@ -1,8 +1,14 @@
 <template>
-  <form @submit.prevent="handleTranslate" class="unified-translation-input" :class="[`mode-${mode}`, { 'enhanced': enhanced }]">
-    
+  <form
+    class="unified-translation-input"
+    :class="[`mode-${mode}`, { 'enhanced': enhanced }]"
+    @submit.prevent="handleTranslate"
+  >
     <!-- Controls Section (Language & Provider) -->
-    <div v-if="showControls" class="controls-container">
+    <div
+      v-if="showControls"
+      class="controls-container"
+    >
       <LanguageSelector
         v-if="showLanguageSelector"
         v-model:source-language="sourceLanguage"
@@ -24,7 +30,10 @@
 
     <!-- Enhanced Source Text Input Section -->
     <div class="enhanced-input-section">
-      <label v-if="showInputLabel" class="input-label">{{ inputLabel }}:</label>
+      <label
+        v-if="showInputLabel"
+        class="input-label"
+      >{{ inputLabel }}:</label>
       <div class="input-container">
         <textarea
           ref="sourceInputRef"
@@ -62,8 +71,14 @@
     </div>
 
     <!-- Enhanced Translation Result Section -->
-    <div v-if="showResultSection" class="enhanced-result-section">
-      <label v-if="showResultLabel" class="input-label">{{ resultLabel }}:</label>
+    <div
+      v-if="showResultSection"
+      class="enhanced-result-section"
+    >
+      <label
+        v-if="showResultLabel"
+        class="input-label"
+      >{{ resultLabel }}:</label>
       <TranslationDisplay
         :content="translatedText"
         :target-language="currentTargetLanguage"
@@ -82,7 +97,10 @@
     </div>
 
     <!-- Status Bar -->
-    <div v-if="statusMessage" class="status-bar">
+    <div
+      v-if="statusMessage"
+      class="status-bar"
+    >
       <span :class="['status-message', statusType]">{{ statusMessage }}</span>
     </div>
   </form>

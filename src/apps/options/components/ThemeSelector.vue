@@ -100,7 +100,7 @@
           v-model="isAutoMode"
           type="checkbox"
         >
-  <span>{{ t('theme_auto') || 'System Theme' }}</span>
+        <span>{{ t('theme_auto') || 'System Theme' }}</span>
       </label>
     </div>
   </div>

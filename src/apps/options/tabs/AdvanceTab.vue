@@ -1,6 +1,6 @@
 <template>
   <section class="advance-tab">
-  <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
+    <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
     
     <div class="setting-group">
       <BaseCheckbox
@@ -17,7 +17,7 @@
     </div>
     
     <div class="setting-group">
-  <label>{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
+      <label>{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
       <BaseTextarea
         v-model="excludedSites"
         :rows="3"

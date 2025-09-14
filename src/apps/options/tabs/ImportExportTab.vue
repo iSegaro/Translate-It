@@ -1,9 +1,9 @@
 <template>
   <section class="import-export-tab">
-  <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
+    <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
 
     <!-- Export Settings -->
-  <BaseFieldset :legend="t('import_export_export_title') || 'Export Settings'">
+    <BaseFieldset :legend="t('import_export_export_title') || 'Export Settings'">
       <div class="setting-group">
         <p class="setting-description export-info">
           {{ t('export_settings_description') || 'Export your current settings to a JSON file for backup or sharing.' }}
@@ -11,7 +11,7 @@
       </div>
       
       <div class="setting-group">
-  <label>{{ t('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
+        <label>{{ t('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
         <div class="export-controls-row">
           <BaseInput
             v-model="exportPassword"
@@ -31,9 +31,9 @@
     </BaseFieldset>
 
     <!-- Import Settings -->
-  <BaseFieldset :legend="t('import_export_import_title') || 'Import Settings'">
+    <BaseFieldset :legend="t('import_export_import_title') || 'Import Settings'">
       <div class="setting-group">
-  <label>{{ t('import_settings_label') || 'Import from file' }}</label>
+        <label>{{ t('import_settings_label') || 'Import from file' }}</label>
         <input 
           ref="importFileInput"
           type="file" 
@@ -47,7 +47,7 @@
         v-if="showPasswordField"
         class="setting-group"
       >
-  <label>{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
+        <label>{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
         <div class="import-controls-row">
           <BaseInput
             v-model="importPassword"
@@ -78,7 +78,7 @@
       v-if="statusMessage"
       :class="`status-message status-${statusType}`"
     >
-  {{ statusMessage }}
+      {{ statusMessage }}
     </div>
   </section>
 </template>

@@ -1,10 +1,16 @@
 <template>
   <aside class="options-sidebar">
-    <div v-if="sidebarError" class="sidebar-error">
+    <div
+      v-if="sidebarError"
+      class="sidebar-error"
+    >
       <h2>Sidebar Error</h2>
       <pre>{{ sidebarError }}</pre>
     </div>
-    <div v-else class="sidebar-content">
+    <div
+      v-else
+      class="sidebar-content"
+    >
       <div class="sidebar-header">
         <h1>{{ t('name') }}</h1>
         <span>{{ manifestVersion }}</span>
@@ -23,7 +29,11 @@
             :class="{ selected: selectedLanguage === lang.code }"
             @click="selectedLanguage = lang.code"
           >
-            <img :src="getFlagUrl(lang.code)" class="language-flag-image" :alt="lang.name" />
+            <img
+              :src="getFlagUrl(lang.code)"
+              class="language-flag-image"
+              :alt="lang.name"
+            >
             <span>{{ lang.name }}</span>
           </li>
         </ul>

@@ -1,6 +1,6 @@
 <template>
   <!-- Direct DOM Manipulation - no template needed -->
-  <div style="display: none;"></div>
+  <div style="display: none;" />
 </template>
 
 <script setup>

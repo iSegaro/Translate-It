@@ -6,7 +6,10 @@
       
       <!-- Searchable Font Selector -->
       <div class="font-search-container">
-        <div class="font-dropdown" :class="{ 'is-open': isDropdownOpen }">
+        <div
+          class="font-dropdown"
+          :class="{ 'is-open': isDropdownOpen }"
+        >
           <div class="font-input-wrapper">
             <input
               id="font-family-search"
@@ -20,23 +23,42 @@
               @blur="closeDropdownDelayed"
               @input="handleSearch"
               @keydown="handleKeydown"
-            />
-            <div class="font-dropdown-arrow" @click="toggleDropdown">
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <path d="M6 8L2 4h8z" fill="currentColor"/>
+            >
+            <div
+              class="font-dropdown-arrow"
+              @click="toggleDropdown"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+              >
+                <path
+                  d="M6 8L2 4h8z"
+                  fill="currentColor"
+                />
               </svg>
             </div>
           </div>
           
           <!-- Loading state -->
-          <div v-if="isLoadingFonts" class="font-loading">
-            <div class="loading-spinner"></div>
+          <div
+            v-if="isLoadingFonts"
+            class="font-loading"
+          >
+            <div class="loading-spinner" />
             <span>{{ t('loading_fonts', 'Loading fonts...') }}</span>
           </div>
           
           <!-- Dropdown Options -->
-          <div v-else-if="isDropdownOpen" class="font-options-container">
-            <div class="font-options" ref="fontOptionsRef">
+          <div
+            v-else-if="isDropdownOpen"
+            class="font-options-container"
+          >
+            <div
+              ref="fontOptionsRef"
+              class="font-options"
+            >
               <div
                 v-for="(font, index) in filteredFonts"
                 :key="generateFontKey(font, index)"
@@ -52,18 +74,27 @@
                 @mouseenter="highlightedIndex = index"
               >
                 <div class="font-option-content">
-                  <span class="font-name" :style="{ fontFamily: getFontPreviewFamily(font) }">
+                  <span
+                    class="font-name"
+                    :style="{ fontFamily: getFontPreviewFamily(font) }"
+                  >
                     {{ font.name }}
                   </span>
                   <span class="font-category">{{ font.category }}</span>
                 </div>
-                <div v-if="font.isSystemFont" class="font-system-badge">
+                <div
+                  v-if="font.isSystemFont"
+                  class="font-system-badge"
+                >
                   {{ t('system_font', 'System') }}
                 </div>
               </div>
               
               <!-- No results message -->
-              <div v-if="filteredFonts.length === 0 && searchQuery" class="font-no-results">
+              <div
+                v-if="filteredFonts.length === 0 && searchQuery"
+                class="font-no-results"
+              >
                 {{ t('no_fonts_found', 'No fonts found') }}
               </div>
             </div>

@@ -78,7 +78,6 @@
             r="3"
           />
         </svg>
-
       </div>
     </template>
   </BaseActionButton>

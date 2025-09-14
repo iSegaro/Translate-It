@@ -1,6 +1,6 @@
 <template>
   <section class="help-tab">
-  <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
+    <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
     
     <div class="accordion">
       <!-- Shortcut Help Section -->
@@ -21,7 +21,7 @@
             <div 
               class="markdown-content" 
               v-html="shortcutHelpContent"
-            ></div>
+            />
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@
             <div 
               class="markdown-content" 
               v-html="apiKeysHelpContent"
-            ></div>
+            />
           </div>
         </div>
       </div>

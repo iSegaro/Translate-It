@@ -1,10 +1,10 @@
 <template>
   <section class="prompt-tab">
-  <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
+    <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
     
     <div class="setting-group prompt-template-group">
       <label class="prompt-label-with-button">
-  <span>{{ t('prompt_template_label') || 'Prompt Template' }}</span>
+        <span>{{ t('prompt_template_label') || 'Prompt Template' }}</span>
         <button
           type="button"
           class="button-inline"
@@ -16,7 +16,7 @@
       
       <BaseTextarea
         v-model="promptTemplate"
-  :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
+        :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
         :rows="5"
         class="prompt-template-input"
       />
@@ -30,7 +30,7 @@
       </div>
 
       <div class="prompt-template-help">
-  <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
+        <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
         <ul>
           <li>
             <code>${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}

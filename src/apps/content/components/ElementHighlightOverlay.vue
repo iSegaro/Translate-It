@@ -7,7 +7,10 @@
       :style="highlight.style"
       @click="onElementClick(highlight.element, highlight.id)"
     >
-      <div class="highlight-tooltip" v-if="showTooltip">
+      <div
+        v-if="showTooltip"
+        class="highlight-tooltip"
+      >
         {{ tooltipText }}
       </div>
     </div>
