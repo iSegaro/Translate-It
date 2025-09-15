@@ -245,6 +245,7 @@ const loadingGifUrl = computed(() => {
     return browser.runtime.getURL('icons/ui/loading.gif');
   } catch (error) {
     logger.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
+    return '';
   }
 });
 
