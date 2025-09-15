@@ -12,6 +12,9 @@ import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js'
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
 
+// Import notification click listener
+import "./listeners/onNotificationClicked.js";
+
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
 import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
