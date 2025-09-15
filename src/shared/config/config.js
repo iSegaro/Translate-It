@@ -273,8 +273,7 @@ $_{TEXT}`,
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- $_{SOURCE} to $_{TARGET}: Translate naturally, keeping the original tone
 - $_{TARGET} to $_{SOURCE}: Translate back fluently
-- Other languages to $_{TARGET}: Make it readable and natural
-- Bad grammar in $_{TARGET}: Fix it when translating to $_{SOURCE}`,
+- Other languages to $_{TARGET}: Make it readable and natural`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   // --- Debugging Values ---
