@@ -132,7 +132,11 @@ export async function sendMessage(message, options = {}) {
       // Re-create the error object from the response for a proper stack trace
       const errorMessage = response.error?.message || response.message || response.error || 'An unknown error occurred';
       const error = new Error(errorMessage);
-      Object.assign(error, response.error || response);
+
+      // Copy all response properties to error object for error matching
+      Object.assign(error, response.error || {});
+      Object.assign(error, response);
+
       throw error;
     }
 
@@ -144,21 +148,40 @@ export async function sendMessage(message, options = {}) {
 
     return response;
   } catch (error) {
-    // Import ErrorMatcher to detect TTS-related errors
+    // Import ErrorMatcher to detect error types
     const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
     const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
     
     const errorType = matchErrorToType(error);
-    
-    // Handle TTS stop errors silently - these are expected when offscreen document is closed
+
+    // Debug log to see what error type is detected
+    logger.debug(`Error type detected: ${errorType} for message: ${message.action}`, {
+      errorMessage: error.message,
+      errorObject: error
+    });
+
+    // Handle different error types with appropriate logging levels
     if (message.action && (message.action.includes('TTS_STOP') || message.action.includes('GOOGLE_TTS_STOP')) &&
-        (errorType === ErrorTypes.TTS_NO_RESPONSE || 
+        (errorType === ErrorTypes.TTS_NO_RESPONSE ||
          errorType === ErrorTypes.TTS_OFFSCREEN_CLOSED ||
          errorType === ErrorTypes.CONTEXT ||
          errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED)) {
+      // TTS stop errors are expected when offscreen document is closed
       logger.debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
+    } else if (errorType === ErrorTypes.TAB_BROWSER_INTERNAL ||
+               errorType === ErrorTypes.TAB_EXTENSION_PAGE ||
+               errorType === ErrorTypes.TAB_LOCAL_FILE ||
+               errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
+               errorType === ErrorTypes.TAB_RESTRICTED) {
+      // Tab accessibility errors should be debug level
+      logger.debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
     } else {
-      logger.error(`Message failed for ${message.action}:`, error.message);
+      // All other errors are logged as error level
+      logger.error(`Message failed for ${message.action}:`, {
+        message: error.message || error,
+        errorType: errorType,
+        fullError: error
+      });
     }
 
     // Extension context errors are handled automatically by ExtensionContextManager.isContextError

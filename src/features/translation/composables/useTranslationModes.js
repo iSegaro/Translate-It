@@ -12,6 +12,8 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
 
@@ -277,7 +279,20 @@ export function useSelectElementTranslation() {
     } catch (err) {
       const errorMsg = err.message || "Failed to activate select element mode";
       error.value = errorMsg;
-      logger.error('Error activating select mode:', err);
+
+      // Use Error Management system to determine error type and logging level
+      const errorType = matchErrorToType(err);
+
+      // Tab accessibility errors should be logged as debug, not error
+      if (errorType === ErrorTypes.TAB_BROWSER_INTERNAL ||
+          errorType === ErrorTypes.TAB_EXTENSION_PAGE ||
+          errorType === ErrorTypes.TAB_LOCAL_FILE ||
+          errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
+          errorType === ErrorTypes.TAB_RESTRICTED) {
+        logger.debug('Select mode activation blocked (restricted page):', { errorType, message: err.message });
+      } else {
+        logger.error('Error activating select mode:', err);
+      }
       return false;
     } finally {
       isActivating.value = false;

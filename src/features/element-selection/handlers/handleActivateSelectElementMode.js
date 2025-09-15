@@ -50,7 +50,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
     logger.debug('[Handler:activateSelectElementMode] Tab access result:', access);
     if (!access.isAccessible) {
-      logger.warn(`[Handler:activateSelectElementMode] Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
+      logger.debug(`[Handler:activateSelectElementMode] Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
       return {
         success: false,
         message: access.errorMessage,

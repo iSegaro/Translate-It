@@ -225,6 +225,57 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
 
+  // Tab Accessibility errors (specific to browser pages)
+  if (
+    msg.includes("feature not available on browser internal pages") ||
+    (msg.includes("browser internal") && msg.includes("not available"))
+  )
+    return ErrorTypes.TAB_BROWSER_INTERNAL;
+
+  if (
+    msg.includes("feature not available on extension pages") ||
+    (msg.includes("extension pages") && msg.includes("not available"))
+  )
+    return ErrorTypes.TAB_EXTENSION_PAGE;
+
+  if (
+    msg.includes("feature not available on local files") ||
+    (msg.includes("local files") && msg.includes("not available"))
+  )
+    return ErrorTypes.TAB_LOCAL_FILE;
+
+  if (
+    msg.includes("tab is not accessible") ||
+    msg.includes("tab not accessible") ||
+    msg.includes("page not accessible")
+  )
+    return ErrorTypes.TAB_NOT_ACCESSIBLE;
+
+  // Check for tab restriction in error object properties
+  if (rawOrError && typeof rawOrError === "object") {
+    // Check if error indicates a restricted page
+    if (rawOrError.isRestrictedPage === true) {
+      return ErrorTypes.TAB_RESTRICTED;
+    }
+
+    // Check if success is false and message indicates tab restrictions
+    if (rawOrError.success === false && rawOrError.message) {
+      const responseMsg = String(rawOrError.message).toLowerCase().trim();
+      if (responseMsg.includes("feature not available on browser internal pages")) {
+        return ErrorTypes.TAB_BROWSER_INTERNAL;
+      }
+      if (responseMsg.includes("feature not available on extension pages")) {
+        return ErrorTypes.TAB_EXTENSION_PAGE;
+      }
+      if (responseMsg.includes("feature not available on local files")) {
+        return ErrorTypes.TAB_LOCAL_FILE;
+      }
+      if (responseMsg.includes("not accessible")) {
+        return ErrorTypes.TAB_NOT_ACCESSIBLE;
+      }
+    }
+  }
+
   // General Context
   if (
     msg.includes("context") ||

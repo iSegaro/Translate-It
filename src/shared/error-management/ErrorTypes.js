@@ -20,6 +20,13 @@ export class ErrorTypes {
   static UNKNOWN = "UNKNOWN";
   static SELECT_ELEMENT = "SELECT_ELEMENT";
 
+  // Tab Accessibility errors
+  static TAB_RESTRICTED = "TAB_RESTRICTED";
+  static TAB_BROWSER_INTERNAL = "TAB_BROWSER_INTERNAL";
+  static TAB_EXTENSION_PAGE = "TAB_EXTENSION_PAGE";
+  static TAB_LOCAL_FILE = "TAB_LOCAL_FILE";
+  static TAB_NOT_ACCESSIBLE = "TAB_NOT_ACCESSIBLE";
+
 
   // کلیدهای اعتبارسنجی (همان errorKeys بدون پیشوند ERRORS_)
   static PROMPT_INVALID = "PROMPT_INVALID";
