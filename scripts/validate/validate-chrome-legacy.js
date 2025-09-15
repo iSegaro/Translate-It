@@ -8,7 +8,7 @@ const pkg = require('../package.json');
  * Combines web-ext validation with custom Chrome-specific checks
  */
 
-const CHROME_BUILD_DIR = `./Build-Extension/Chrome/Translate-It-v${pkg.version}/`;
+const CHROME_BUILD_DIR = `./dist/chrome/Translate-It-v${pkg.version}/`;
 const TEMP_ARTIFACTS_DIR = './temp/chrome-validation';
 
 async function validateChromeExtension() {

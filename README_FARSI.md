@@ -397,7 +397,7 @@ pnpm run build:firefox
 
 </div>
 
-این دستورات فایل‌های لازم را در مسیرهای `Build-Extension/Chrome/` و `Build-Extension/Firefox/` ایجاد می‌کنند که می‌توانید به عنوان افزونه موقت در مرورگر خود بارگذاری کنید.
+این دستورات فایل‌های لازم را در مسیرهای `dist/chrome/` و `dist/firefox/` ایجاد می‌کنند که می‌توانید به عنوان افزونه موقت در مرورگر خود بارگذاری کنید.
 
 برای توسعه فعال و اعمال تغییرات در لحظه، از یکی از دستورات زیر استفاده کنید:
 
@@ -500,7 +500,7 @@ pnpm run publish
 
 </div>
 
-پس از اجرا، پوشه `Build-Extension/Publish/` حاوی فایل‌های زیر خواهد بود:
+پس از اجرا، پوشه `dist/Publish/` حاوی فایل‌های زیر خواهد بود:
 
 - `Source-vX.X.X.zip`
 - `Translate-It-vX.X.X-for-Chrome.zip`
@@ -578,8 +578,8 @@ pnpm run publish
 [yandex-url]: https://translate.yandex.com/en/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
-[firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Publish/
-[chrome-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Publish/
+[firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/dist/Publish/
+[chrome-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/dist/Publish/
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/

@@ -8,7 +8,7 @@ const pkg = require("../package.json");
  * Enhanced validation with detailed reporting similar to Chrome validator
  */
 
-const FIREFOX_BUILD_DIR = `./Build-Extension/Firefox/Translate-It-v${pkg.version}/`;
+const FIREFOX_BUILD_DIR = `./dist/firefox/Translate-It-v${pkg.version}/`;
 
 async function validateFirefoxExtension() {
   console.log(

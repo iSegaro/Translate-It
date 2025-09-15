@@ -188,7 +188,7 @@ async function setupProject() {
     console.log('     pnpm run publish         - Full publishing workflow');
     
     console.log('\n💡 Next Steps:');
-    console.log('   1. Review the generated builds in Build-Extension/ folder');
+    console.log('   1. Review the generated builds in dist/ folder');
     console.log('   2. Load the extension in your browser for testing:');
     console.log('      - Chrome: chrome://extensions/ (Enable Developer Mode)');
     console.log('      - Firefox: about:debugging (This Firefox → Load Temporary Add-on)');
