@@ -10,6 +10,7 @@ import { CONFIG, getSettingsAsync } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
 
 /**
@@ -293,39 +294,22 @@ async function handleExtensionUpdate() {
 
 /**
  * Setup context menus on installation
+ * Note: Context menu creation is now handled by ContextMenuManager
+ * This function only clears existing menus to prevent duplicates
  */
 async function setupContextMenus() {
   try {
-    logger.debug("[InstallationHandler] Setting up context menus...");
+    logger.debug("[InstallationHandler] Clearing previous context menus...");
 
     // Clear all previous context menus to prevent duplicate errors
     await browser.contextMenus.removeAll();
     logger.debug("[InstallationHandler] All previous context menus removed.");
     logger.debug('All previous context menus removed.');
 
-    // Basic context menu setup - will be expanded when full context menu system is implemented
-    const pageMenuTitle =
-      (await getTranslationString("context_menu_translate_with_selection")) ||
-      "Translate Element";
-    logger.debug(
-      "[InstallationHandler] Creating context menu with title:",
-      pageMenuTitle,
-    );
-
-    const menuItem = browser.contextMenus.create({
-      id: "translate-with-select-element",
-      title: pageMenuTitle,
-      contexts: ["page", "selection"],
-    });
-
-    logger.debug("[InstallationHandler] Context menu created:", menuItem);
-    logger.info('Basic context menus setup completed');
+    // Note: Context menu creation is now handled by ContextMenuManager in LifecycleManager
+    logger.info('Context menu cleanup completed - ContextMenuManager will handle creation');
   } catch (error) {
-    logger.error(
-      "[InstallationHandler] Failed to setup context menus:",
-      error,
-    );
-    logger.error('Failed to setup context menus:', error);
+    logger.error('Failed to cleanup context menus:', error);
   }
 }
 
