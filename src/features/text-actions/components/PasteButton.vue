@@ -103,7 +103,7 @@ const canPaste = computed(() => {
 
 const iconSrc = computed(() => {
   // Use existing icon from assets
-  return new URL('@/assets/icons/ui/paste.png', import.meta.url).href
+  return browser.runtime.getURL('icons/ui/paste.png')
 })
 
 // Methods

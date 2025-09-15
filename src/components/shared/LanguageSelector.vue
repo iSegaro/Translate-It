@@ -25,7 +25,7 @@
       @click="handleSwapLanguages"
     >
       <img
-        src="@/assets/icons/ui/swap.png"
+        :src="swapIcon"
         :alt="swapAlt"
       >
     </button>
@@ -57,6 +57,7 @@ import { computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
+import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -130,6 +131,10 @@ const availableLanguages = computed(() => languages.allLanguages.value || [])
 const targetLanguages = computed(() => {
   // Filter out Auto-Detect from target languages
   return (languages.allLanguages.value || []).filter(lang => lang.code !== AUTO_DETECT_VALUE)
+})
+
+const swapIcon = computed(() => {
+  return browser.runtime.getURL('icons/ui/swap.png')
 })
 
 // Methods

@@ -85,11 +85,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import browser from 'webextension-polyfill';
 
-// Import icons
-import selectIcon from '@/assets/icons/ui/select.png'
-import revertIcon from '@/assets/icons/ui/revert.png'
-import clearIcon from '@/assets/icons/ui/clear.png'
-import settingsIcon from '@/assets/icons/ui/settings.png'
+// Icon URLs will be loaded at runtime
 
 // Lazy logger to avoid initialization order issues
 let _logger;
@@ -126,6 +122,12 @@ const { t } = useUnifiedI18n()
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { handleError, handleConnectionError } = useErrorHandler()
+
+// Icon URLs using runtime.getURL
+const selectIcon = browser.runtime.getURL('icons/ui/select.png')
+const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
+const clearIcon = browser.runtime.getURL('icons/ui/clear.png')
+const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 
 const handleSelectElement = async () => {
   getLogger().debug('Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')

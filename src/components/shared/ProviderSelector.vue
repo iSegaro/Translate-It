@@ -226,15 +226,18 @@ const currentProviderName = computed(() => {
 
 // Methods
 const getProviderIcon = (iconPath) => {
-  // Use paths that match build output structure
-  if (!iconPath) return '/assets/icons/providers/google.svg'
+  // Use runtime.getURL for extension icons
+  if (!browser || !browser.runtime || !browser.runtime.getURL) return '/assets/icons/providers/google.svg'
+
+  if (!iconPath) return browser.runtime.getURL('icons/providers/google.svg')
   if (iconPath.startsWith('@/assets/')) {
-    return iconPath.replace('@/assets/', '/')
+    const cleanPath = iconPath.replace('@/assets/', 'icons/')
+    return browser.runtime.getURL(cleanPath)
   }
   if (iconPath.includes('/')) {
-    return `/assets/icons/${iconPath}`
+    return browser.runtime.getURL(`icons/${iconPath}`)
   }
-  return `/assets/icons/providers/${iconPath}`
+  return browser.runtime.getURL(`icons/providers/${iconPath}`)
 }
 
 const handleTranslate = () => {

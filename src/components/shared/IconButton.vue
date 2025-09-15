@@ -20,6 +20,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import browser from 'webextension-polyfill'
 
 // Props
 const props = defineProps({
@@ -57,20 +58,29 @@ defineEmits(['click'])
 // Computed
 const iconSrc = computed(() => {
   if (!props.icon) return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjY2NjIi8+Cjwvc3ZnPgo='
-  
+
   if (props.icon.startsWith('@/')) {
     return props.icon.replace('@/', '/')
   }
   if (props.icon.startsWith('/')) {
     return props.icon
   }
-  
-  // For dynamic icons
+
+  // Use runtime.getURL for extension icons
+  if (browser && browser.runtime && browser.runtime.getURL) {
+    if (props.icon.includes('/')) {
+      // Provider icons like "providers/google.svg"
+      return browser.runtime.getURL(`icons/${props.icon}`)
+    } else {
+      // UI icons like "side-panel.png"
+      return browser.runtime.getURL(`icons/ui/${props.icon}`)
+    }
+  }
+
+  // Fallback for when runtime API is not available
   if (props.icon.includes('/')) {
-    // Provider icons like "providers/google.svg"
     return `/assets/icons/${props.icon}`
   } else {
-    // UI icons like "side-panel.png"
     return `/assets/icons/ui/${props.icon}`
   }
 })

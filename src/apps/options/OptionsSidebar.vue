@@ -98,7 +98,7 @@ const getFlagUrl = (code) => {
   };
   const flag = flagMap[code] || code;
   try {
-    return new URL(`../../assets/icons/flags/${flag}.svg`, import.meta.url).href
+    return browser.runtime.getURL(`icons/flags/${flag}.svg`)
   } catch (error) {
     logger.error(`Failed to load flag for ${code}:`, error);
     return '';

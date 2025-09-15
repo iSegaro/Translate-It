@@ -16,13 +16,14 @@ export function useApiProvider() {
 
   const currentProviderData = computed(() => getProviderById(currentProvider.value));
   const currentProviderIcon = computed(() => {
-    if (!currentProviderData.value) return '/assets/icons/providers/google.svg'
+    if (!browser || !browser.runtime || !browser.runtime.getURL) return ""
+    if (!currentProviderData.value) return browser.runtime.getURL('icons/providers/google.svg')
     const iconPath = currentProviderData.value.icon
-    if (!iconPath) return '/assets/icons/providers/google.svg'
+    if (!iconPath) return browser.runtime.getURL('icons/providers/google.svg')
     if (iconPath.includes('/')) {
-      return `/assets/icons/${iconPath}`
+      return browser.runtime.getURL(`icons/${iconPath}`)
     }
-    return `/assets/icons/providers/${iconPath}`
+    return browser.runtime.getURL(`icons/providers/${iconPath}`)
   });
   const currentProviderName = computed(() => currentProviderData.value?.name || "Translation Provider");
 
@@ -77,7 +78,7 @@ export function useApiProvider() {
   const createProviderItems = async () => {
     return availableProviders.value.map(provider => ({
       ...provider,
-      iconUrl: getProviderIconUrl(`icons/api-providers/${provider.icon}`),
+      iconUrl: getProviderIconUrl(`icons/providers/${provider.icon}`),
       isActive: provider.id === currentProvider.value,
     }));
   };

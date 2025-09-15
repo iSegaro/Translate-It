@@ -100,7 +100,10 @@ class ActionbarIconManager extends ResourceTracker {
   async generateCompositeIcon(provider) {
     try {
       // Fetch icons
-      const baseIconBlob = await this.fetchIcon('assets/icons/extension/extension_icon_32.png');
+      const baseIconPath = typeof browser !== 'undefined' && browser.runtime
+        ? browser.runtime.getURL('icons/extension/extension_icon_32.png')
+        : 'assets/icons/extension/extension_icon_32.png';
+      const baseIconBlob = await this.fetchIcon(baseIconPath);
       const providerIconBlob = await this.fetchProviderIcon(provider);
 
       if (!baseIconBlob) {
@@ -160,6 +163,10 @@ class ActionbarIconManager extends ResourceTracker {
    */
   async fetchProviderIcon(provider) {
     const iconPath = this.providerIcons[provider] || 'icons/providers/provider.png';
+    // Use runtime.getURL for extension icons
+    if (typeof browser !== 'undefined' && browser.runtime) {
+      return this.fetchIcon(browser.runtime.getURL(iconPath));
+    }
     return this.fetchIcon('assets/' + iconPath);
   }
 

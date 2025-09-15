@@ -29,14 +29,7 @@ function fixExtensionPaths() {
       console.log('⚠️ offscreen.html not found at:', htmlOffscreenHtml);
     }
 
-    // Copy icons for UI components
-    const iconsDir = resolve(process.cwd(), 'src/assets/icons');
-    const outIconsDir = resolve(outDir, 'assets/icons');
-    if (await fs.pathExists(iconsDir)) {
-      await fs.ensureDir(outIconsDir);
-      await fs.copy(iconsDir, outIconsDir);
-      console.log('✅ Copied icons from src/assets/icons/ to build/assets/icons/');
-    }
+    // Icons are copied later in transformManifest, skip here to avoid duplication
   };
 
   const fixHtmlPaths = async (outDir) => {
@@ -198,7 +191,30 @@ export default defineConfig({
         build: {
           ...baseConfig.build,
           outDir: `dist/chrome/Translate-It-v${pkg.version}`,
-          modulePreload: false
+          modulePreload: false,
+          rollupOptions: {
+            output: {
+              ...baseConfig.build?.rollupOptions?.output,
+              assetFileNames: (assetInfo) => {
+                const info = assetInfo.name.split('.')
+                const ext = info[info.length - 1]
+
+                if (/\.(css)$/i.test(assetInfo.name)) {
+                  return 'css/[name].[hash].[ext]'
+                }
+
+                if (/\.(png|jpe?g|svg|gif|webp|avif)$/i.test(assetInfo.name)) {
+                  return 'images/[name].[hash].[ext]'
+                }
+
+                if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
+                  return 'fonts/[name].[hash].[ext]'
+                }
+
+                return 'assets/[name].[hash].[ext]'
+              }
+            }
+          }
         }
       },
       scriptViteConfig: {
