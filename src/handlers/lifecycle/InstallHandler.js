@@ -5,7 +5,7 @@
 
 import browser from "webextension-polyfill";
 
-import { getTranslationString } from "../utils/i18n/i18n.js";
+import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -174,7 +174,7 @@ async function handleFreshInstallation() {
     logger.debug('Existing data found during fresh install - likely legacy migration',  );
 
     // Open options page with welcome message for migrated users
-    const optionsUrl = browser.runtime.getURL("options.html#about");
+    const optionsUrl = browser.runtime.getURL("html/options.html#about");
     await browser.tabs.create({ url: optionsUrl });
 
     // Show migration success notification
@@ -191,9 +191,14 @@ async function handleFreshInstallation() {
       );
     }
   } else {
-    // Truly fresh installation
-    logger.debug('Fresh installation with no existing data');
-    const optionsUrl = browser.runtime.getURL("options.html#languages");
+    // Truly fresh installation - initialize with default settings
+    logger.debug('Fresh installation with no existing data - initializing defaults');
+
+    // Save all CONFIG defaults to storage
+    await storageManager.set(CONFIG);
+    logger.debug('Default configuration settings saved for fresh installation');
+
+    const optionsUrl = browser.runtime.getURL("html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   }
 }
@@ -231,10 +236,25 @@ async function handleExtensionUpdate() {
 
     // --- START: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
+    // Try to get icon URL, fallback to empty string if it fails
+    let iconUrl = "";
+    try {
+      // Use the correct path based on the build structure
+      iconUrl = browser.runtime.getURL("icons/extension/extension_icon_128.png");
+    } catch (iconError) {
+      logger.debug("[InstallationHandler] Could not get icon URL:", iconError);
+      // Try fallback path
+      try {
+        iconUrl = browser.runtime.getURL("assets/icons/extension/extension_icon_128.png");
+      } catch (e) {
+        logger.debug("[InstallationHandler] Fallback icon URL also failed");
+      }
+    }
+
     // Create a base options object with properties common to all browsers.
     const notificationOptions = {
       type: "basic",
-      iconUrl: browser.runtime.getURL("icons/extension_icon_128.png"),
+      iconUrl: iconUrl,
       title: title,
       message: message,
     };

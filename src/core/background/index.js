@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -19,6 +20,17 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
 const errorHandler = ErrorHandler.getInstance();
 
 registerAllProviders();
+
+// Handle extension installation
+browser.runtime.onInstalled.addListener(async (details) => {
+  const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'onInstalled');
+
+  try {
+    await handleInstallationEvent(details);
+  } catch (error) {
+    logger.error('❌ Failed to handle installation event:', error);
+  }
+});
 
 const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
