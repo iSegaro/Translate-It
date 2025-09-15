@@ -166,7 +166,7 @@ function generateFirefoxManifest(baseManifest) {
     // Firefox-specific browser settings
     browser_specific_settings: {
       gecko: {
-        id: 'translate-it@anthropic.com',
+        id: 'ai-writing-companion@amm1rr.com',
         strict_min_version: '112.0', // Firefox 112+ for background.type module support
         data_collection_permissions: {
           required: ["none"]
