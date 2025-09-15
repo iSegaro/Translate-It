@@ -1,6 +1,28 @@
 ### Changelog – Translate It!
 
-#### v0.9.0 – Released on January 22, 2025
+#### v1.0.0 – Released on September 15, 2025
+
+##### Added
+
+- **Dynamic Extension Icon**: The extension icon now changes to match the selected translation provider
+- **Custom Fonts for Translations**: Users can now choose the font used to display translations.
+
+#### Changed
+
+- **Enhanced Notifications**: Added cancel functionality to Select Element Mode translations
+- **Universal Translation History**: History now tracks all translation modes and is searchable in Side Panel
+- **Removed YouTube Subtitles**: Experimental feature was removed due to low usage
+- **Optimized Field Icons**: Translation icon now only appears in relevant fields (like editors), not all input fields. Keyboard shortcuts still work everywhere.
+
+#### Fixed
+
+- **CSP Issues**: Resolved Content Security Policy conflicts across all websites
+- **Core Optimization**: Extension core rewritten for optimal resource usage with minimal overhead
+- **Pronunciation Selection**: Pronunciation options are now properly selectable and functional
+
+---
+
+#### v0.9.0 – Released on July 22, 2025
 
 ##### Added
 
@@ -12,7 +34,7 @@
 - **Model Selection in Settings**: Added comprehensive model selection options in settings page for each translation provider (Gemini, OpenAI, OpenRouter, DeepSeek)
 - **Secure AES-256 Import/Export**: Settings can now be exported and imported in AES-256 encrypted format, recoverable using a password
 - **YouTube Subtitle Translation** (Experimental): Implemented real-time subtitle translation for YouTube videos with dual-language display
-    - **Subtitle Icon Control**: Added a setting to independently control YouTube translation icon visibility
+        - **Subtitle Icon Control**: Added a setting to independently control YouTube translation icon visibility
 
 ##### Changed
 
