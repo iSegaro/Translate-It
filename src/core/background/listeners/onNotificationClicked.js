@@ -15,31 +15,15 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'notifications');
  */
 export async function handleNotificationUpdateClick(notificationId) {
   try {
-    switch (notificationId) {
-      case "update-notification":
-        // Open options page when update notification is clicked
-        const optionsUrl = browser.runtime.getURL("html/options.html#about");
-        await browser.tabs.create({ url: optionsUrl });
+    if (notificationId === "update-notification") {
+      // Open options page when update notification is clicked
+      const optionsUrl = browser.runtime.getURL("html/options.html#about");
+      await browser.tabs.create({ url: optionsUrl });
 
-        // Clear the notification
-        await browser.notifications.clear(notificationId);
+      // Clear the notification
+      await browser.notifications.clear(notificationId);
 
-        logger.debug('Options page opened from update notification');
-        break;
-
-      case "migration-success":
-        // Open options page when migration notification is clicked
-        const migrationOptionsUrl = browser.runtime.getURL("html/options.html#about");
-        await browser.tabs.create({ url: migrationOptionsUrl });
-
-        // Clear the notification
-        await browser.notifications.clear(notificationId);
-
-        logger.debug('Options page opened from migration notification');
-        break;
-
-      default:
-        logger.debug(`Unhandled notification click: ${notificationId}`);
+      logger.debug('Options page opened from update notification');
     }
   } catch (error) {
     logger.error('Failed to handle notification click:', error);

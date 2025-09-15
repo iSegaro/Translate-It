@@ -159,19 +159,6 @@ async function handleFreshInstallation() {
     // Open options page with welcome message for migrated users
     const optionsUrl = browser.runtime.getURL("html/options.html#about");
     await browser.tabs.create({ url: optionsUrl });
-
-    // Show migration success notification
-    try {
-      await browser.notifications.create("migration-success", {
-        type: "basic",
-        iconUrl: browser.runtime.getURL("icons/extension_icon_128.png"),
-        title: "Migration Successful",
-        message:
-          "Your settings have been migrated to the new Vue version. Click to review your settings.",
-      });
-    } catch (error) {
-      logger.error('Failed to show migration notification:', error);
-    }
   } else {
     // Truly fresh installation - initialize with default settings
     await storageManager.set(CONFIG);
