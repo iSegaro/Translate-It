@@ -242,11 +242,9 @@ watch(() => props.initialSize, (newSize) => {
 // Loading GIF URL using browser extension API
 const loadingGifUrl = computed(() => {
   try {
-    return browser.runtime.getURL('assets/icons/ui/loading.gif');
+    return browser.runtime.getURL('icons/ui/loading.gif');
   } catch (error) {
     logger.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
-    // Fallback for development
-    return '/src/assets/icons/ui/loading.gif';
   }
 });
 
