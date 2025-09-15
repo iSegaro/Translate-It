@@ -15,10 +15,10 @@ const extensionVersion = packageJson.version;
 // مسیرهای پروژه
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootPath = path.resolve(__dirname, "..");
+const rootPath = path.resolve(__dirname, "../..");
 
 // تعریف مسیر خروجی به پوشه Publish
-const outputDir = path.resolve(rootPath, "Build-Extension", "Publish");
+const outputDir = path.resolve(rootPath, "dist", "Publish");
 const outputFilePath = path.resolve(
   outputDir,
   `Source-v${extensionVersion}.zip`
@@ -27,25 +27,20 @@ const outputFilePath = path.resolve(
 // لیست فایل‌ها و پوشه‌هایی که باید در سورس کد نهایی گنجانده شوند
 const sourceFilesAndDirs = [
   ".gitignore",
-  "build-scripts",
-  "Backlog.md",
-  "Changelog.md",
-  "CLAUDE.md",
-  "eslint.config.mjs",
-  "html",
-  "icons",
   "_locales",
+  "config",
+  "html",
+  "public",
+  "scripts",
+  "src",
+  "Changelog.md",
+  "eslint.config.js",
   "package.json",
   "pnpm-lock.yaml",
   "Privacy.md",
-  "Prompt.ai",
+  "Prompt.md",
   "README.md",
   "README_FARSI.md",
-  "src",
-  "styles",
-  "webpack.chrome.js",
-  "webpack.common.js",
-  "webpack.firefox.js",
 ];
 
 // اطمینان از وجود پوشه خروجی
