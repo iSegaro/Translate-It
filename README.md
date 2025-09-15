@@ -58,14 +58,6 @@ Alternatively, a small translation icon can appear below the selected text—cli
   <img src="./docs/Images/Icon.jpg" alt="Small translation icon next to text input field" height="240" />
 </p>
 
-
-- **Video Subtitle Translation:**
-Automatically translates video subtitles on YouTube and Netflix in real-time. The extension detects when subtitles are available and provides instant translation without interrupting your viewing experience.
-
-<p align="center">
-  <img src="./docs/Images/Youtube_Subtitle.jpg" alt="Extension popup interface with translation and dictionary features" height="280" />
-</p>
-
 - **Advanced Popup/Sidepanel Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support and history.
 
 <p align="center">
