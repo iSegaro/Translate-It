@@ -46,7 +46,7 @@
           :title="t('github_link_title') || 'GitHub'"
         >
           <img
-            src="@/assets/icons/ui/github.svg"
+            src="@/icons/ui/github.svg"
             alt="GitHub"
             height="22"
             class="github-icon"

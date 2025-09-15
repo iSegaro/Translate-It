@@ -227,7 +227,7 @@ const currentProviderName = computed(() => {
 // Methods
 const getProviderIcon = (iconPath) => {
   // Use runtime.getURL for extension icons
-  if (!browser || !browser.runtime || !browser.runtime.getURL) return '/assets/icons/providers/google.svg'
+  if (!browser || !browser.runtime || !browser.runtime.getURL) return '/icons/providers/google.svg'
 
   if (!iconPath) return browser.runtime.getURL('icons/providers/google.svg')
   if (iconPath.startsWith('@/assets/')) {

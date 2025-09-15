@@ -15,7 +15,7 @@
           @click.stop="handleDelete"
         >
           <img
-            src="@/assets/icons/ui/trash-small.svg"
+            src="@/icons/ui/trash-small.svg"
             alt="Delete"
             class="delete-icon"
           >

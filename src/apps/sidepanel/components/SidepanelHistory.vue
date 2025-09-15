@@ -52,7 +52,7 @@
                 @click.stop="handleDeleteHistoryItem(item.index, $event)"
               >
                 <img
-                  src="@/assets/icons/ui/trash-small.svg"
+                  src="@/icons/ui/trash-small.svg"
                   alt="Delete"
                   class="delete-icon"
                 >
@@ -82,7 +82,7 @@
         @click="handleClearAllHistory"
       >
         <img
-          src="@/assets/icons/ui/trash.svg"
+          src="@/icons/ui/trash.svg"
           alt="Clear All"
           class="clear-all-icon"
         >

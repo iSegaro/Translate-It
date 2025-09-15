@@ -162,7 +162,7 @@ export class TranslationRenderer extends ResourceTracker {
 
     // Create image element safely
     const img = document.createElement('img')
-    img.src = `/assets/icons/${icon}`
+    img.src = `/icons/${icon}`
     img.alt = title
     img.className = 'toolbar-icon'
     button.appendChild(img)

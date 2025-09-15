@@ -54,7 +54,7 @@
         @click="handleHistoryClick"
       >
         <img
-          src="@/assets/icons/ui/history.svg"
+          src="@/icons/ui/history.svg"
           alt="History"
           class="toolbar-icon"
         >

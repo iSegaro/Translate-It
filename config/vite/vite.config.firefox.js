@@ -112,7 +112,7 @@ export default defineConfig({
         // Copy required assets
         const srcDir = process.cwd();
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
-        await fs.copy(resolve(srcDir, 'src/assets/icons'), resolve(outDir, 'icons'));
+        await fs.copy(resolve(srcDir, 'src/icons'), resolve(outDir, 'icons'));
         
         // Copy CSS files for content scripts (CRITICAL FIX)
         const stylesDir = resolve(srcDir, 'src/styles');
