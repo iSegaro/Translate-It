@@ -48,8 +48,6 @@ async function detectLegacyMigration() {
  */
 async function performLegacyMigration(existingData) {
   try {
-    logger.debug('Starting legacy data migration...');
-
     const migratedData = { ...existingData };
     const migrationLog = [];
 
@@ -98,8 +96,7 @@ async function performLegacyMigration(existingData) {
     await storageManager.clear();
     await storageManager.set(migratedData);
 
-    logger.init('Legacy migration completed successfully:');
-    migrationLog.forEach(() => logger.debug('- '));
+    logger.init('Legacy migration completed successfully');
 
     return {
       success: true,
@@ -117,12 +114,9 @@ async function performLegacyMigration(existingData) {
  */
 async function migrateConfigSettings() {
   try {
-    logger.debug('Starting config migration...');
-
     const migrationStatus = await detectLegacyMigration();
 
     if (migrationStatus.isLegacyMigration) {
-      logger.debug('Legacy migration detected - performing full migration',  );
       const existingData = await storageManager.get();
       return await performLegacyMigration(existingData);
     }
@@ -133,16 +127,8 @@ async function migrateConfigSettings() {
       (key) => !(key in currentSettings),
     );
 
-    // Check for customized settings
-    Object.keys(CONFIG).forEach((key) => {
-      if (key in currentSettings && currentSettings[key] !== CONFIG[key]) {
-        logger.debug('Preserving user setting: ${key} = ${currentSettings[key]} (default: ${CONFIG[key]})',  );
-      }
-    });
 
     if (newKeys.length > 0) {
-      logger.debug('Adding ${newKeys.length} new config keys:', newKeys,
-      );
 
       const newSettings = {};
       newKeys.forEach((key) => {
@@ -151,8 +137,6 @@ async function migrateConfigSettings() {
 
       await storageManager.set(newSettings);
       logger.init('Config migration completed successfully');
-    } else {
-      logger.debug('No new config keys found, migration skipped',  );
     }
 
     return { newKeys, success: true };
@@ -166,13 +150,11 @@ async function migrateConfigSettings() {
  * Handle fresh installation
  */
 async function handleFreshInstallation() {
-  logger.debug('First installation detected.');
-
   const storage = await storageManager.get();
   const hasExistingData = Object.keys(storage).length > 0;
 
   if (hasExistingData) {
-    logger.debug('Existing data found during fresh install - likely legacy migration',  );
+    logger.init('Legacy migration detected during fresh install');
 
     // Open options page with welcome message for migrated users
     const optionsUrl = browser.runtime.getURL("html/options.html#about");
@@ -188,16 +170,12 @@ async function handleFreshInstallation() {
           "Your settings have been migrated to the new Vue version. Click to review your settings.",
       });
     } catch (error) {
-      logger.error('Failed to show migration notification:', error,
-      );
+      logger.error('Failed to show migration notification:', error);
     }
   } else {
     // Truly fresh installation - initialize with default settings
-    logger.debug('Fresh installation with no existing data - initializing defaults');
-
-    // Save all CONFIG defaults to storage
     await storageManager.set(CONFIG);
-    logger.debug('Default configuration settings saved for fresh installation');
+    logger.init('Fresh installation completed with default settings');
 
     const optionsUrl = browser.runtime.getURL("html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
@@ -209,13 +187,8 @@ async function handleFreshInstallation() {
  */
 async function handleExtensionUpdate() {
   try {
-    logger.debug(
-      "[InstallationHandler] Starting update notification creation...",
-    );
-
     const manifest = browser.runtime.getManifest();
     const version = manifest.version;
-    logger.debug("[InstallationHandler] Extension version:", version);
 
     const appName = (await getTranslationString("name")) || "Translate It!";
     const title =
@@ -229,12 +202,6 @@ async function handleExtensionUpdate() {
       .replace("{appName}", appName)
       .replace("{version}", version);
 
-    logger.debug("[InstallationHandler] Notification details:", {
-      appName,
-      title,
-      message,
-    });
-
     // --- START: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
     // Try to get icon URL, fallback to empty string if it fails
@@ -243,13 +210,7 @@ async function handleExtensionUpdate() {
       // Use the correct path based on the build structure
       iconUrl = browser.runtime.getURL("icons/extension/extension_icon_128.png");
     } catch (iconError) {
-      logger.debug("[InstallationHandler] Could not get icon URL:", iconError);
-      // Try fallback path
-      try {
-        iconUrl = browser.runtime.getURL("assets/icons/extension/extension_icon_128.png");
-      } catch (e) {
-        logger.debug("[InstallationHandler] Fallback icon URL also failed");
-      }
+      // Icon not found, use empty string
     }
 
     // Create a base options object with properties common to all browsers.
@@ -260,34 +221,17 @@ async function handleExtensionUpdate() {
       message: message,
     };
 
-    logger.debug(
-      "[InstallationHandler] Notification options:",
-      notificationOptions,
-    );
-
-    // --- Clear any existing notification with the same ID before creating a new one ---
     await browser.notifications.clear("update-notification");
-    logger.debug("[InstallationHandler] Cleared existing notifications");
 
     // --- END: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
-    // Create the notification using the compatible options object.
-    const notificationId = await browser.notifications.create(
+    await browser.notifications.create(
       "update-notification",
       notificationOptions,
     );
 
-    logger.debug(
-      "[InstallationHandler] Notification created with ID:",
-      notificationId,
-    );
-    logger.debug('Update notification created with browser-specific options.',  );
+    logger.init(`Extension updated to version ${version}`);
   } catch (e) {
-    // This will now only catch unexpected errors, not the compatibility error.
-    logger.error(
-      "[InstallationHandler] Failed to create update notification:",
-      e,
-    );
     logger.error('Failed to create update notification:', e);
   }
 }
@@ -299,15 +243,7 @@ async function handleExtensionUpdate() {
  */
 async function setupContextMenus() {
   try {
-    logger.debug("[InstallationHandler] Clearing previous context menus...");
-
-    // Clear all previous context menus to prevent duplicate errors
     await browser.contextMenus.removeAll();
-    logger.debug("[InstallationHandler] All previous context menus removed.");
-    logger.debug('All previous context menus removed.');
-
-    // Note: Context menu creation is now handled by ContextMenuManager in LifecycleManager
-    logger.info('Context menu cleanup completed - ContextMenuManager will handle creation');
   } catch (error) {
     logger.error('Failed to cleanup context menus:', error);
   }
@@ -317,10 +253,7 @@ async function setupContextMenus() {
  * Main installation event handler
  */
 export async function handleInstallationEvent(details) {
-  logger.debug(
-    `[InstallationHandler] 🌟 Installation event triggered: ${details.reason}`,
-  );
-  logger.init('🌟 Success: ${details.reason}');
+  logger.init(`Installation event: ${details.reason}`);
 
   try {
     // Setup context menus for all scenarios
@@ -338,11 +271,10 @@ export async function handleInstallationEvent(details) {
       details.reason === "chrome_update" ||
       details.reason === "browser_update"
     ) {
-      // Browser was updated but extension wasn't - just log
-      logger.debug('Browser updated, extension still running');
+      // Browser was updated but extension wasn't
     }
 
-    logger.init('Installation handling completed successfully');
+    logger.init('Installation handling completed');
   } catch (error) {
     logger.error('Error during installation handling:', error);
     // Don't throw - allow extension to continue working
@@ -353,7 +285,6 @@ export async function handleInstallationEvent(details) {
  * Manual trigger for testing update notifications (for development)
  */
 export async function triggerTestUpdateNotification() {
-  logger.debug('Manual update notification trigger');
   await handleExtensionUpdate();
 }
 
@@ -361,6 +292,5 @@ export async function triggerTestUpdateNotification() {
  * Manual trigger for testing installation events (for development)
  */
 export async function triggerTestInstallation(reason = "update") {
-  logger.debug('Manual installation trigger: ${reason}');
   await handleInstallationEvent({ reason });
 }
