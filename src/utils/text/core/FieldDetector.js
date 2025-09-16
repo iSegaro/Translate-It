@@ -181,12 +181,25 @@ export class FieldDetector {
     const tagName = element.tagName.toLowerCase();
 
     try {
-      // Non-processable fields should be completely ignored
+      // ContentEditable detection should come BEFORE non-processable check
+      // because DIV elements might be flagged as non-processable otherwise
+      if (element.isContentEditable || element.contentEditable === 'true') {
+        // Check if it has rich features
+        const hasRichFeatures = element.querySelector('div, span, p, br') ||
+                              element.closest('[data-editor]') ||
+                              element.closest('.editor');
+
+        return hasRichFeatures ?
+          FieldTypes.RICH_TEXT_EDITOR :
+          FieldTypes.CONTENT_EDITABLE;
+      }
+
+      // Non-processable fields should be completely ignored (but after contentEditable check)
       if (this._isNonProcessableField(element)) {
         return FieldTypes.NON_PROCESSABLE;
       }
 
-      // Site-specific classification first (highest priority)
+      // Site-specific classification
       if (siteConfig.type === FieldTypes.PROFESSIONAL_EDITOR) {
         // Check if element matches site-specific selectors
         const matchesSiteSelectors = siteConfig.selectors.some(selector => {
@@ -233,7 +246,8 @@ export class FieldDetector {
         if (this._hasNumericOnlyExpectations(element)) {
           return FieldTypes.NON_PROCESSABLE;
         }
-        return FieldTypes.REGULAR_INPUT;
+        // TEXTAREA is multiline, treat as contentEditable for text field icon purposes
+        return FieldTypes.CONTENT_EDITABLE;
       } else if (tagName === 'input') {
         const type = (element.type || '').toLowerCase();
 
@@ -470,12 +484,12 @@ export class FieldDetector {
    * @returns {boolean} True if should show text field icon
    */
   _shouldShowTextFieldIcon(fieldType) {
-    // Only show text field icon for contentEditable elements
-    // Regular input fields should NOT show text field icon
-    return fieldType === FieldTypes.CONTENT_EDITABLE;
-
-    // return fieldType === FieldTypes.REGULAR_INPUT || 
-    // fieldType === FieldTypes.CONTENT_EDITABLE;
+    // Show text field icon for multiline fields:
+    // - ContentEditable elements (contenteditable="true")
+    // - Rich text editors (TEXTAREA with rich features)
+    // Regular input fields (single-line) should NOT show text field icon
+    return fieldType === FieldTypes.CONTENT_EDITABLE ||
+           fieldType === FieldTypes.RICH_TEXT_EDITOR;
   }
 
   /**
