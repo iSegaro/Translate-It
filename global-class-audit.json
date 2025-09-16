@@ -1,0 +1,2561 @@
+{
+  "timestamp": "2025-09-16T16:00:03.777Z",
+  "summary": {
+    "totalConflicts": 21,
+    "highPriority": 0,
+    "mediumPriority": 6,
+    "lowPriority": 15
+  },
+  "conflicts": {
+    "panel": [
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 11,
+        "content": "@use \"./layout/sidepanel\";",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 42,
+        "content": "body.sidepanel-context #app {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 1,
+        "content": "/* OLD/styles/sidepanel.css content */",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 3,
+        "content": "/* General toolbar icon styles for sidepanel */",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 4,
+        "content": "body.sidepanel-context .toolbar-icon {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 17,
+        "content": "/* Active state for toolbar buttons in sidepanel */",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 18,
+        "content": "body.sidepanel-context .toolbar-button.ti-active .toolbar-icon {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 24,
+        "content": "body.sidepanel-context .ti-active .toolbar-icon {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 95,
+        "content": ".history-panel {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 109,
+        "content": ".history-panel.ti-active {",
+        "pattern": ".panel\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 267,
+        "content": "$sidepanel-width: 400px;",
+        "pattern": ".panel\\b"
+      }
+    ],
+    "content": [
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 36,
+        "content": "justify-content: center !important;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 2,
+        "content": "// برخلاف content-app-global.scss که در Shadow DOM است",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 1,
+        "content": "// This file consolidates all global CSS for the content script UI.",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 4,
+        "content": "// Import all necessary styles for content script shadow DOM injection",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 43,
+        "content": ".justify-center { justify-content: center; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 44,
+        "content": ".justify-between { justify-content: space-between; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 45,
+        "content": ".justify-start { justify-content: flex-start; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 46,
+        "content": ".justify-end { justify-content: flex-end; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 52,
+        "content": ".justify-center { justify-content: center !important; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 53,
+        "content": ".justify-between { justify-content: space-between !important; }",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 1,
+        "content": "/* OLD/styles/sidepanel.css content */",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 92,
+        "content": "justify-content: center;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 115,
+        "content": "justify-content: space-between;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 14,
+        "content": "justify-content: stretch !important;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 42,
+        "content": "content: '';",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 39,
+        "content": "justify-content: center !important;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 123,
+        "content": "justify-content: space-between !important;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 138,
+        "content": "justify-content: center !important;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 32,
+        "content": ".content-app-container,",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 33,
+        "content": ".content-app-container * {",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 50,
+        "content": "html.AIWritingCompanion-disable-links .content-app-container,",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 51,
+        "content": "html.AIWritingCompanion-disable-links .content-app-container * {",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 32,
+        "content": "justify-content: center;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 38,
+        "content": "// Z-index - highest possible for extension content",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 139,
+        "content": "// Subtle shadow to distinguish from content",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 38,
+        "content": "justify-content: space-between;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 121,
+        "content": "justify-content: space-between;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 12,
+        "content": "content: '';",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 76,
+        "content": "justify-content: center;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 139,
+        "content": "@content;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 145,
+        "content": "@content;",
+        "pattern": ".content\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 151,
+        "content": "@content;",
+        "pattern": ".content\\b"
+      }
+    ],
+    "flex": [
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 35,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 37,
+        "content": ".flex { display: flex; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 37,
+        "content": ".flex { display: flex; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 38,
+        "content": ".flex-col { flex-direction: column; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 38,
+        "content": ".flex-col { flex-direction: column; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 39,
+        "content": ".flex-row { flex-direction: row; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 39,
+        "content": ".flex-row { flex-direction: row; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 41,
+        "content": ".items-start { align-items: flex-start; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 42,
+        "content": ".items-end { align-items: flex-end; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 45,
+        "content": ".justify-start { justify-content: flex-start; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 46,
+        "content": ".justify-end { justify-content: flex-end; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 47,
+        "content": ".flex-1 { flex: 1; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 47,
+        "content": ".flex-1 { flex: 1; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 48,
+        "content": ".flex-shrink-0 { flex-shrink: 0; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 48,
+        "content": ".flex-shrink-0 { flex-shrink: 0; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 49,
+        "content": ".flex { display: flex !important; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 49,
+        "content": ".flex { display: flex !important; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 50,
+        "content": ".flex-col { flex-direction: column !important; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 50,
+        "content": ".flex-col { flex-direction: column !important; }",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 38,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 39,
+        "content": "flex-direction: column;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 73,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 91,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 102,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 103,
+        "content": "flex-direction: column;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 114,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 141,
+        "content": "flex-grow: 1;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 159,
+        "content": "display: inline-flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 12,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 13,
+        "content": "flex-direction: column;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 15,
+        "content": "align-items: flex-start !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 10,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 11,
+        "content": "flex-direction: column !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 37,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 121,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 130,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 136,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 150,
+        "content": "display: flex !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 151,
+        "content": "flex-direction: column !important;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 30,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 31,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 32,
+        "content": "flex-direction: column;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 37,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 43,
+        "content": "flex-direction: row-reverse;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 47,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 53,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 120,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 30,
+        "content": "display: flex;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 33,
+        "content": "flex-wrap: wrap;",
+        "pattern": ".flex\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 74,
+        "content": "display: inline-flex;",
+        "pattern": ".flex\\b"
+      }
+    ],
+    "text": [
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 9,
+        "content": "// Layout styles - Page and context layouts",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 16,
+        "content": "@use \"./components/text-field-icon\";",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 22,
+        "content": "// Context-specific styles - these should be overridden by specific entry points",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 24,
+        "content": "/* Popup context (400px width) - only applied in popup.js */",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 25,
+        "content": "body.popup-context {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 31,
+        "content": "/* Options context - only applied in options.js */",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 32,
+        "content": "body.options-context {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 42,
+        "content": "body.sidepanel-context #app {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 30,
+        "content": "text-decoration: none !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 6,
+        "content": "@use \"./components/text-field-icon\";",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 19,
+        "content": "text-overflow: ellipsis;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 23,
+        "content": ".text-center { text-align: center; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 23,
+        "content": ".text-center { text-align: center; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 24,
+        "content": ".text-left { text-align: left; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 24,
+        "content": ".text-left { text-align: left; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 25,
+        "content": ".text-right { text-align: right; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 25,
+        "content": ".text-right { text-align: right; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 31,
+        "content": ".text-xs { font-size: $font-size-xs; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 32,
+        "content": ".text-sm { font-size: $font-size-sm; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 33,
+        "content": ".text-base { font-size: $font-size-base; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 34,
+        "content": ".text-md { font-size: $font-size-md; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_utilities.scss",
+        "line": 35,
+        "content": ".text-lg { font-size: $font-size-lg; }",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 80,
+        "content": "// Base styles for translated text containers",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 81,
+        "content": ".aiwc-translated-text {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 84,
+        "content": "text-align: inherit !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 87,
+        "content": "// RTL text styling",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 88,
+        "content": ".aiwc-rtl-text {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 90,
+        "content": "text-align: right !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 93,
+        "content": "// LTR text styling",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 94,
+        "content": ".aiwc-ltr-text {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 96,
+        "content": "text-align: left !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 99,
+        "content": "// Ensure proper text alignment in RTL contexts",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 100,
+        "content": "[dir=\"rtl\"] .aiwc-rtl-text {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 101,
+        "content": "text-align: right;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 104,
+        "content": "[dir=\"ltr\"] .aiwc-ltr-text {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 105,
+        "content": "text-align: left;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 4,
+        "content": "body.sidepanel-context .toolbar-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 18,
+        "content": "body.sidepanel-context .toolbar-button.ti-active .toolbar-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 24,
+        "content": "body.sidepanel-context .ti-active .toolbar-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 50,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 64,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 124,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 132,
+        "content": "color: var(--color-text-secondary);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 137,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 149,
+        "content": "text-align: center;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 10,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 33,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 37,
+        "content": "input[type=\"text\"],",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 46,
+        "content": "color: var(--input-text-color, var(--color-text));",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 46,
+        "content": "color: var(--input-text-color, var(--color-text));",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 58,
+        "content": "color: var(--color-text-disabled);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 70,
+        "content": "color: var(--button-text-color, white);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 109,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 133,
+        "content": "text-align: center;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 81,
+        "content": "color: var(--text-color, #2c3e50) !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 90,
+        "content": "color: var(--text-color, #555) !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 102,
+        "content": "color: var(--text-color, #e0e0e0) !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 111,
+        "content": "color: var(--text-color, #e0e0e0) !important;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 7,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 76,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 83,
+        "content": ".text-field-icon.is-hovering & {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 87,
+        "content": ".text-field-icon.is-active & {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 93,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 98,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 108,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 118,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 126,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 217,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 223,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 233,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 243,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 253,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 262,
+        "content": ".text-field-icon__svg {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 270,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 283,
+        "content": ".text-field-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 6,
+        "content": "// Base styles for extension popup - ONLY apply in popup context",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 7,
+        "content": "body.popup-context {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 16,
+        "content": "color: var(--text-color);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 58,
+        "content": "body.popup-context .toolbar-icon {",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 15,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 20,
+        "content": "color: var(--color-text-secondary);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 40,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 46,
+        "content": "color: var(--color-text-secondary);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 54,
+        "content": "text-decoration: none;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 61,
+        "content": "text-decoration: underline;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 6,
+        "content": "--text-color: #202124;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 23,
+        "content": "--language-select-text-color: #000;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 33,
+        "content": "--input-text-color: #202124;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 38,
+        "content": "--button-text-color: #fff;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 60,
+        "content": "--color-text: var(--text-color, #e8eaed);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 60,
+        "content": "--color-text: var(--text-color, #e8eaed);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 61,
+        "content": "--color-text-secondary: var(--placeholder-color, #9aa0a6);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 72,
+        "content": "--text-color: #e8eaed;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 89,
+        "content": "--language-select-text-color: #fff;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 99,
+        "content": "--input-text-color: #e8eaed;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 104,
+        "content": "--button-text-color: #202124;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 131,
+        "content": "--color-text: var(--text-color, #e8eaed);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 131,
+        "content": "--color-text: var(--text-color, #e8eaed);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 132,
+        "content": "--color-text-secondary: var(--placeholder-color, #888);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 160,
+        "content": "--color-text: var(--text-color, #212121);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 160,
+        "content": "--color-text: var(--text-color, #212121);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 161,
+        "content": "--color-text-secondary: var(--tab-button-color, #757575);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 162,
+        "content": "--color-text-disabled: #bdbdbd;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 166,
+        "content": "--color-text-placeholder: var(--placeholder-color, #9aa0a6);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 180,
+        "content": "--color-active-text: #1967d2;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_reset.scss",
+        "line": 14,
+        "content": "color: var(--color-text);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_reset.scss",
+        "line": 41,
+        "content": "background: var(--color-text-disabled);",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 82,
+        "content": "text-decoration: none;",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 121,
+        "content": "color: var(--input-text-color, var(--color-text));",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 121,
+        "content": "color: var(--input-text-color, var(--color-text));",
+        "pattern": ".text\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 132,
+        "content": "color: var(--color-text-secondary);",
+        "pattern": ".text\\b"
+      }
+    ],
+    "icon": [
+      {
+        "file": "src/assets/styles/main.scss",
+        "line": 16,
+        "content": "@use \"./components/text-field-icon\";",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 6,
+        "content": "@use \"./components/text-field-icon\";",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 3,
+        "content": "/* General toolbar icon styles for sidepanel */",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 4,
+        "content": "body.sidepanel-context .toolbar-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 8,
+        "content": "opacity: var(--icon-opacity);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 9,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 13,
+        "content": "opacity: var(--icon-hover-opacity);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 18,
+        "content": "body.sidepanel-context .toolbar-button.ti-active .toolbar-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 20,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 24,
+        "content": "body.sidepanel-context .ti-active .toolbar-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 26,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 77,
+        "content": ".inline-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 81,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 85,
+        "content": ".inline-icon:hover {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 171,
+        "content": ".clear-all-btn .clear-all-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 174,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 120,
+        "content": ".github-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 123,
+        "content": "filter: var(--github-icon-filter, none);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 7,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 83,
+        "content": ".text-field-icon.is-hovering & {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 87,
+        "content": ".text-field-icon.is-active & {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 93,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 126,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 200,
+        "content": ".icon-enter-active,",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 201,
+        "content": ".icon-leave-active {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 205,
+        "content": ".icon-enter-from {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 210,
+        "content": ".icon-leave-to {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 217,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 253,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 270,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 275,
+        "content": ".icon-enter-active,",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 276,
+        "content": ".icon-leave-active {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 283,
+        "content": ".text-field-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 58,
+        "content": "body.popup-context .toolbar-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 62,
+        "content": "opacity: var(--icon-opacity);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 64,
+        "content": "filter: var(--icon-filter);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 67,
+        "content": "opacity: var(--icon-hover-opacity);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 71,
+        "content": "// Revert icon animation",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 72,
+        "content": ".revert-icon {",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 50,
+        "content": "--github-icon-filter: none;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 51,
+        "content": "--icon-filter: none;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 52,
+        "content": "--icon-opacity: 0.8;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 53,
+        "content": "--icon-hover-opacity: 1;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 55,
+        "content": "// Provider icon filtering",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 56,
+        "content": "--provider-icon-active-filter: brightness(1.6) contrast(2.0) saturate(1.0);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 57,
+        "content": "--provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 116,
+        "content": "--github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 117,
+        "content": "--icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 118,
+        "content": "--icon-opacity: 0.6;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 119,
+        "content": "--icon-hover-opacity: 0.9;",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 121,
+        "content": "// Provider icon filtering",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 122,
+        "content": "--provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 123,
+        "content": "--provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 168,
+        "content": "// Default fallback values for provider icon filtering (light theme bias)",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 169,
+        "content": "--provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);",
+        "pattern": ".icon\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 170,
+        "content": "--provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);",
+        "pattern": ".icon\\b"
+      }
+    ],
+    "hover": [
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 33,
+        "content": "// Disable automatic hover highlighting - let JS handle highlighting - Maximum specificity",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 34,
+        "content": "html.AIWritingCompanion-disable-links *:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 35,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode *:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 36,
+        "content": "html.AIWritingCompanion-disable-links body:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 37,
+        "content": "html.AIWritingCompanion-disable-links html:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 38,
+        "content": "html.AIWritingCompanion-disable-links p:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 39,
+        "content": "html.AIWritingCompanion-disable-links div:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 40,
+        "content": "html.AIWritingCompanion-disable-links span:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 41,
+        "content": "html.AIWritingCompanion-disable-links h1:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 42,
+        "content": "html.AIWritingCompanion-disable-links h2:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 43,
+        "content": "html.AIWritingCompanion-disable-links h3:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 44,
+        "content": "html.AIWritingCompanion-disable-links h4:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 45,
+        "content": "html.AIWritingCompanion-disable-links h5:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 46,
+        "content": "html.AIWritingCompanion-disable-links h6:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 47,
+        "content": "html.AIWritingCompanion-disable-links li:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 48,
+        "content": "html.AIWritingCompanion-disable-links td:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 49,
+        "content": "html.AIWritingCompanion-disable-links th:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 50,
+        "content": "html.AIWritingCompanion-disable-links article:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 51,
+        "content": "html.AIWritingCompanion-disable-links section:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 52,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode p:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 53,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode div:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 54,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode span:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 55,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h1:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 56,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h2:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 57,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h3:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 58,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h4:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 59,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h5:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 60,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode h6:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 61,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode li:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 62,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode td:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 63,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode th:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 64,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode article:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 65,
+        "content": "html.AIWritingCompanion-disable-links.simple-mode section:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 70,
+        "content": "html.AIWritingCompanion-disable-links input:hover,",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 71,
+        "content": "html.AIWritingCompanion-disable-links textarea:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 12,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 13,
+        "content": "opacity: var(--icon-hover-opacity);",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 85,
+        "content": ".inline-icon:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 136,
+        "content": ".history-header .close-btn:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 167,
+        "content": ".clear-all-btn:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 168,
+        "content": "background-color: #d32f2f; /* Darker red for hover */",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 73,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 74,
+        "content": "background-color: var(--button-hover-bg-color, var(--color-primary-dark));",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 94,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 89,
+        "content": "background-color: var(--toolbar-link-hover-bg-color, #f0f0f0) !important;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 92,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 110,
+        "content": "background-color: var(--toolbar-link-hover-bg-color, #424242) !important;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 113,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 66,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 67,
+        "content": "opacity: var(--icon-hover-opacity);",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 75,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 59,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 19,
+        "content": "--toolbar-link-hover-bg-color: #e2e6ea;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 30,
+        "content": "--tab-button-hover-bg: #f1f3f4;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 39,
+        "content": "--button-hover-bg-color: #185abc;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 41,
+        "content": "--link-hover-color: #0c5dc0;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 53,
+        "content": "--icon-hover-opacity: 1;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 85,
+        "content": "--toolbar-link-hover-bg-color: #404040;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 96,
+        "content": "--tab-button-hover-bg: #3c4043;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 105,
+        "content": "--button-hover-bg-color: #9ac0f9;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 107,
+        "content": "--link-hover-color: #a7c8fa;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 119,
+        "content": "--icon-hover-opacity: 0.9;",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 128,
+        "content": "--color-background-hover: rgba(255, 255, 255, 0.1);",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 147,
+        "content": "--color-primary-dark: var(--button-hover-bg-color, #1565c0);",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 178,
+        "content": "--color-background-hover: rgba(0, 0, 0, 0.1);",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_reset.scss",
+        "line": 40,
+        "content": "&:hover {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 97,
+        "content": "&:hover:not(:disabled) {",
+        "pattern": ".hover\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 108,
+        "content": "&:hover:not(:disabled) {",
+        "pattern": ".hover\\b"
+      }
+    ],
+    "toast": [
+      {
+        "file": "src/assets/styles/content-main-dom.scss",
+        "line": 5,
+        "content": "@use './components/toast-integration';",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 8,
+        "content": "@use \"./components/toast-integration\";",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 2,
+        "content": "// Centralized styles for toast integration with Select Element mode",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 10,
+        "content": "// Vue Sonner toast element cursor and interaction overrides",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 11,
+        "content": "// These ensure toast notifications work correctly during Select Element mode",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 14,
+        "content": "[data-sonner-toast],",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 15,
+        "content": "[data-sonner-toast] *,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 18,
+        "content": ".sonner-toast,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 19,
+        "content": ".sonner-toast *,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 22,
+        "content": "li[data-sonner-toast],",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 23,
+        "content": "li[data-sonner-toast] *,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 24,
+        "content": "div[data-sonner-toast],",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 25,
+        "content": "div[data-sonner-toast] * {",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 44,
+        "content": "html.AIWritingCompanion-disable-links [data-sonner-toast],",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 45,
+        "content": "html.AIWritingCompanion-disable-links [data-sonner-toast] *,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 48,
+        "content": "html.AIWritingCompanion-disable-links .sonner-toast,",
+        "pattern": ".toast\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 49,
+        "content": "html.AIWritingCompanion-disable-links .sonner-toast *,",
+        "pattern": ".toast\\b"
+      }
+    ],
+    "inline": [
+      {
+        "file": "src/assets/styles/content-app-global.scss",
+        "line": 2,
+        "content": "// It is imported into src/app/main.js using ?inline.",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 82,
+        "content": "display: inline-block;",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 52,
+        "content": "padding-top: 25px; /* Make space for inline toolbar */",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 62,
+        "content": "padding-top: 25px; /* Make space for inline toolbar */",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 69,
+        "content": ".inline-toolbar {",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 77,
+        "content": ".inline-icon {",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 85,
+        "content": ".inline-icon:hover {",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 159,
+        "content": "display: inline-flex;",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 83,
+        "content": ".button-inline {",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 139,
+        "content": "--color-code-inline-bg: var(--language-controls-bg-color, #303741);",
+        "pattern": ".inline\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 74,
+        "content": "display: inline-flex;",
+        "pattern": ".inline\\b"
+      }
+    ],
+    "block": [
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 9,
+        "content": "display: block;",
+        "pattern": ".block\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 72,
+        "content": "display: block;",
+        "pattern": ".block\\b"
+      },
+      {
+        "file": "src/assets/styles/utilities/_helpers.scss",
+        "line": 82,
+        "content": "display: inline-block;",
+        "pattern": ".block\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_text-field-icon.scss",
+        "line": 79,
+        "content": "display: block;",
+        "pattern": ".block\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_api-settings-common.scss",
+        "line": 37,
+        "content": "display: block;",
+        "pattern": ".block\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 138,
+        "content": "--color-code-block-bg: var(--bg-result-color, #0e0e0e);",
+        "pattern": ".block\\b"
+      }
+    ],
+    "header": [
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 113,
+        "content": ".history-header {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 121,
+        "content": ".history-header h3 {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 127,
+        "content": ".history-header .close-btn {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 136,
+        "content": ".history-header .close-btn:hover {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 132,
+        "content": ".sidebar-header h1 {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 83,
+        "content": ".window-header {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 84,
+        "content": "background-color: var(--header-bg-color, #f7f7f7) !important;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 85,
+        "content": "border-bottom: $border-width $border-style var(--header-border-color, #e8e8e8) !important;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 104,
+        "content": ".window-header {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 105,
+        "content": "background-color: var(--header-bg-color, #333333) !important;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 106,
+        "content": "border-bottom: $border-width $border-style var(--header-border-color, #424242) !important;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 120,
+        "content": ".window-header {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_translation-window.scss",
+        "line": 129,
+        "content": ".header-actions {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 36,
+        "content": ".header-toolbar {",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 41,
+        "content": "background-color: var(--header-bg-color);",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 42,
+        "content": "border-bottom: $border-width $border-style var(--header-border-color);",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 105,
+        "content": "border: 3px solid var(--header-border-color, #dee2e6);",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 16,
+        "content": "--header-bg-color: #e9ecef;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 17,
+        "content": "--header-border-color: #ced4da;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 82,
+        "content": "--header-bg-color: #303741;",
+        "pattern": ".header\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 83,
+        "content": "--header-border-color: #5f6368;",
+        "pattern": ".header\\b"
+      }
+    ],
+    "footer": [
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 146,
+        "content": ".history-footer {",
+        "pattern": ".footer\\b"
+      }
+    ],
+    "list": [
+      {
+        "file": "src/assets/styles/layout/_sidepanel.scss",
+        "line": 140,
+        "content": ".history-list {",
+        "pattern": ".list\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 2,
+        "content": "@use 'sass:list';",
+        "pattern": ".list\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 32,
+        "content": "@if list.length($properties) == 0 {",
+        "pattern": ".list\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 37,
+        "content": "$transitions: list.append($transitions, #{$property} $transition-fast, comma);",
+        "pattern": ".list\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 44,
+        "content": "@if list.length($properties) == 0 {",
+        "pattern": ".list\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_mixins.scss",
+        "line": 49,
+        "content": "$transitions: list.append($transitions, #{$property} $transition-slow, comma);",
+        "pattern": ".list\\b"
+      }
+    ],
+    "button": [
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 83,
+        "content": ".button-inline {",
+        "pattern": "\\.button\\b"
+      }
+    ],
+    "input": [
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 176,
+        "content": ".input-error {",
+        "pattern": "\\.input\\b"
+      }
+    ],
+    "checkbox": [
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 114,
+        "content": "input[type=\"checkbox\"],",
+        "pattern": ".checkbox\\b"
+      }
+    ],
+    "radio": [
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 115,
+        "content": "input[type=\"radio\"] {",
+        "pattern": ".radio\\b"
+      }
+    ],
+    "container": [
+      {
+        "file": "src/assets/styles/layout/_options.scss",
+        "line": 16,
+        "content": "height: 100vh; /* Ensure the parent container has a fixed height */",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 21,
+        "content": "// Base transition container",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 22,
+        "content": ".ui-transition-container {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 41,
+        "content": ".ui-transition-container.transitioning::before {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 98,
+        "content": ".ui-transition-container.language-transition {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 113,
+        "content": ".ui-transition-container.theme-transition {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 134,
+        "content": ".ui-transition-container.settings-transition {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 154,
+        "content": ".ui-transition-container.theme-transition {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/ui-transitions.scss",
+        "line": 169,
+        "content": ".ui-transition-container {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 30,
+        "content": "// Content app container and children cursor protection",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 32,
+        "content": ".content-app-container,",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 33,
+        "content": ".content-app-container * {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 50,
+        "content": "html.AIWritingCompanion-disable-links .content-app-container,",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_toast-integration.scss",
+        "line": 51,
+        "content": "html.AIWritingCompanion-disable-links .content-app-container * {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 22,
+        "content": "// Popup container",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 23,
+        "content": ".popup-container {",
+        "pattern": ".container\\b"
+      },
+      {
+        "file": "src/assets/styles/base/_reset.scss",
+        "line": 20,
+        "content": "// Default app container",
+        "pattern": ".container\\b"
+      }
+    ],
+    "spinner": [
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 88,
+        "content": "// Loading spinner",
+        "pattern": ".spinner\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 89,
+        "content": ".spinner-overlay {",
+        "pattern": ".spinner\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 95,
+        "content": ".spinner-center {",
+        "pattern": ".spinner\\b"
+      },
+      {
+        "file": "src/assets/styles/components/_popup.scss",
+        "line": 102,
+        "content": ".spinner {",
+        "pattern": ".spinner\\b"
+      }
+    ],
+    "modal": [
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 260,
+        "content": "$z-modal: 1020;",
+        "pattern": ".modal\\b"
+      }
+    ],
+    "tooltip": [
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 258,
+        "content": "$z-tooltip: 1000;",
+        "pattern": ".tooltip\\b"
+      }
+    ],
+    "dropdown": [
+      {
+        "file": "src/assets/styles/base/_variables.scss",
+        "line": 259,
+        "content": "$z-dropdown: 1010;",
+        "pattern": ".dropdown\\b"
+      }
+    ]
+  }
+}

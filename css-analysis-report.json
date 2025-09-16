@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-09-16T15:09:27.014Z",
+  "timestamp": "2025-09-16T16:03:02.010Z",
   "summary": {
     "totalFiles": 16,
-    "totalClasses": 535,
+    "totalClasses": 532,
     "importantDeclarations": 413,
     "filesWithStyles": [
       "src/assets/styles/main.scss",
@@ -36,17 +36,6 @@
       "src/components/feature/FontSelector.vue",
       "src/components/content/ScreenSelector.vue",
       "src/components/content/CapturePreview.vue",
-      "src/apps/sidepanel/SidepanelLayout.vue",
-      "src/apps/sidepanel/SidepanelApp.vue",
-      "src/apps/popup/PopupApp.vue",
-      "src/apps/options/ProviderSettings.vue",
-      "src/apps/options/OptionsSidebar.vue",
-      "src/apps/options/OptionsLayout.vue",
-      "src/apps/options/OptionsApp.vue",
-      "src/apps/options/GeneralSettings.vue",
-      "src/apps/options/AdvancedSettings.vue",
-      "src/apps/options/About.vue",
-      "src/apps/content/ContentApp.vue",
       "src/components/base/LoadingSpinner.vue",
       "src/components/base/BaseToggle.vue",
       "src/components/base/BaseTextarea.vue",
@@ -58,6 +47,17 @@
       "src/components/base/BaseDropdown.vue",
       "src/components/base/BaseCheckbox.vue",
       "src/components/base/BaseButton.vue",
+      "src/apps/sidepanel/SidepanelLayout.vue",
+      "src/apps/sidepanel/SidepanelApp.vue",
+      "src/apps/popup/PopupApp.vue",
+      "src/apps/options/ProviderSettings.vue",
+      "src/apps/options/OptionsSidebar.vue",
+      "src/apps/options/OptionsLayout.vue",
+      "src/apps/options/OptionsApp.vue",
+      "src/apps/options/GeneralSettings.vue",
+      "src/apps/options/AdvancedSettings.vue",
+      "src/apps/options/About.vue",
+      "src/apps/content/ContentApp.vue",
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationIcon.vue",
       "src/features/text-field-interaction/components/TextFieldIcon.vue",
@@ -230,8 +230,6 @@
         "src/components/content/ScreenSelector.vue",
         "src/components/content/ScreenSelector.vue",
         "src/components/content/CapturePreview.vue",
-        "src/apps/options/OptionsSidebar.vue",
-        "src/apps/options/OptionsApp.vue",
         "src/components/base/LoadingSpinner.vue",
         "src/components/base/BaseToggle.vue",
         "src/components/base/BaseTextarea.vue",
@@ -241,6 +239,8 @@
         "src/components/base/BaseFieldset.vue",
         "src/components/base/BaseDropdown.vue",
         "src/components/base/BaseCheckbox.vue",
+        "src/apps/options/OptionsSidebar.vue",
+        "src/apps/options/OptionsApp.vue",
         "src/features/windows/components/TranslationWindow.vue",
         "src/features/windows/components/TranslationWindow.vue",
         "src/features/windows/components/TranslationIcon.vue",
@@ -258,34 +258,32 @@
       ]
     ],
     [
-      "}",
+      "",
       [
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/popup/PopupHeader.vue",
-        "src/components/content/ScreenSelector.vue",
-        "src/components/content/ScreenSelector.vue",
-        "src/components/content/ScreenSelector.vue",
+        "src/components/shared/UnifiedTranslationInput.vue",
+        "src/components/shared/TranslationInputField.vue",
+        "src/components/shared/TranslationDisplay.vue",
+        "src/components/shared/TranslationDisplay.vue",
+        "src/components/shared/IconButton.vue",
+        "src/components/feature/FontSelector.vue",
+        "src/components/feature/FontSelector.vue",
         "src/components/content/CapturePreview.vue",
-        "src/apps/options/OptionsSidebar.vue",
-        "src/components/base/LoadingSpinner.vue",
-        "src/components/base/BaseToggle.vue",
         "src/components/base/BaseTextarea.vue",
-        "src/components/base/BaseRadio.vue",
         "src/components/base/BaseInput.vue",
-        "src/components/base/BaseFieldset.vue",
-        "src/components/base/BaseDropdown.vue",
         "src/components/base/BaseCheckbox.vue",
-        "src/features/settings/components/SettingsManager.vue",
+        "src/apps/options/OptionsApp.vue",
+        "src/features/windows/components/TranslationWindow.vue",
+        "src/features/windows/components/TranslationWindow.vue",
+        "src/features/windows/components/TranslationIcon.vue",
+        "src/features/text-actions/components/ActionToolbar.vue",
+        "src/features/text-actions/components/ActionGroup.vue",
         "src/apps/sidepanel/components/SidepanelToolbar.vue",
         "src/apps/sidepanel/components/SidepanelToolbar.vue",
         "src/apps/sidepanel/components/SidepanelHistory.vue",
-        "src/apps/sidepanel/components/ApiProviderItem.vue"
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue"
       ]
     ],
     [
@@ -317,30 +315,9 @@
       ]
     ],
     [
-      "",
+      "}",
       [
-        "src/components/shared/UnifiedTranslationInput.vue",
-        "src/components/shared/TranslationInputField.vue",
-        "src/components/shared/TranslationDisplay.vue",
-        "src/components/shared/TranslationDisplay.vue",
-        "src/components/shared/IconButton.vue",
-        "src/components/feature/FontSelector.vue",
-        "src/components/feature/FontSelector.vue",
-        "src/apps/options/OptionsApp.vue",
-        "src/features/windows/components/TranslationWindow.vue",
-        "src/features/windows/components/TranslationWindow.vue",
-        "src/features/windows/components/TranslationIcon.vue",
-        "src/features/text-actions/components/ActionToolbar.vue",
-        "src/features/text-actions/components/ActionGroup.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue"
-      ]
-    ],
-    [
-      "active:",
-      [
+        "src/components/shared/ProviderSelector.vue",
         "src/components/shared/ProviderSelector.vue",
         "src/components/shared/ProviderSelector.vue",
         "src/components/shared/ProviderSelector.vue",
@@ -348,15 +325,17 @@
         "src/components/shared/ProviderSelector.vue",
         "src/components/shared/ProviderSelector.vue",
         "src/components/popup/PopupHeader.vue",
-        "src/components/content/CapturePreview.vue",
+        "src/components/content/ScreenSelector.vue",
+        "src/components/content/ScreenSelector.vue",
+        "src/components/content/ScreenSelector.vue",
+        "src/components/base/LoadingSpinner.vue",
+        "src/components/base/BaseToggle.vue",
+        "src/components/base/BaseRadio.vue",
+        "src/components/base/BaseFieldset.vue",
         "src/components/base/BaseDropdown.vue",
+        "src/apps/options/OptionsSidebar.vue",
         "src/features/settings/components/SettingsManager.vue",
-        "src/apps/sidepanel/components/SidepanelToolbar.vue",
-        "src/apps/sidepanel/components/SidepanelToolbar.vue",
-        "src/apps/sidepanel/components/SidepanelHistory.vue",
-        "src/apps/sidepanel/components/ApiProviderItem.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue"
+        "src/apps/sidepanel/components/ApiProviderItem.vue"
       ]
     ],
     [
@@ -417,6 +396,23 @@
         "src/features/settings/components/SettingsManager.vue",
         "src/features/settings/components/SettingsManager.vue",
         "src/features/settings/components/SettingsManager.vue"
+      ]
+    ],
+    [
+      "active:",
+      [
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/popup/PopupHeader.vue",
+        "src/components/base/BaseDropdown.vue",
+        "src/features/settings/components/SettingsManager.vue",
+        "src/apps/sidepanel/components/ApiProviderItem.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue"
       ]
     ],
     [
@@ -509,20 +505,6 @@
       ]
     ],
     [
-      "===",
-      [
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/shared/ProviderSelector.vue",
-        "src/components/content/CapturePreview.vue",
-        "src/apps/options/OptionsSidebar.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue",
-        "src/apps/options/tabs/HelpTab.vue"
-      ]
-    ],
-    [
       "loading-spinner",
       [
         "src/components/shared/TranslationDisplay.vue",
@@ -533,6 +515,19 @@
         "src/features/settings/components/SettingsManager.vue",
         "src/features/settings/components/SettingsManager.vue",
         "src/features/settings/components/SettingsManager.vue"
+      ]
+    ],
+    [
+      "===",
+      [
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/components/shared/ProviderSelector.vue",
+        "src/apps/options/OptionsSidebar.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue",
+        "src/apps/options/tabs/HelpTab.vue"
       ]
     ],
     [
@@ -869,15 +864,6 @@
       ]
     ],
     [
-      "disabled",
-      [
-        "src/components/base/BaseToggle.vue",
-        "src/components/base/BaseRadio.vue",
-        "src/components/base/BaseFieldset.vue",
-        "src/components/base/BaseCheckbox.vue"
-      ]
-    ],
-    [
       "aiwc-selection-popup-host",
       [
         "src/features/windows/components/TranslationWindow.vue",
@@ -920,7 +906,7 @@
       ]
     ],
     [
-      "active",
+      "ti-active",
       [
         "src/assets/styles/layout/_sidepanel.scss",
         "src/assets/styles/layout/_sidepanel.scss",
@@ -1000,14 +986,6 @@
       ]
     ],
     [
-      "input-label",
-      [
-        "src/components/shared/UnifiedTranslationInput.vue",
-        "src/components/shared/UnifiedTranslationInput.vue",
-        "src/components/base/BaseInput.vue"
-      ]
-    ],
-    [
       "dropdown-arrow",
       [
         "src/components/shared/ProviderSelector.vue",
@@ -1072,22 +1050,6 @@
       ]
     ],
     [
-      "error-text",
-      [
-        "src/components/content/ScreenSelector.vue",
-        "src/components/base/BaseInput.vue",
-        "src/features/windows/managers/translation/TranslationRenderer.js"
-      ]
-    ],
-    [
-      "checkbox-label",
-      [
-        "src/components/content/CapturePreview.vue",
-        "src/components/content/CapturePreview.vue",
-        "src/components/base/BaseCheckbox.vue"
-      ]
-    ],
-    [
       "translated-text",
       [
         "src/components/content/CapturePreview.vue",
@@ -1101,6 +1063,14 @@
         "src/components/content/CapturePreview.vue",
         "src/components/content/CapturePreview.vue",
         "src/components/content/CapturePreview.vue"
+      ]
+    ],
+    [
+      "disabled",
+      [
+        "src/components/base/BaseToggle.vue",
+        "src/components/base/BaseRadio.vue",
+        "src/components/base/BaseFieldset.vue"
       ]
     ],
     [
@@ -1289,7 +1259,7 @@
       ]
     ],
     [
-      "loading-window",
+      "ti-loading-window",
       [
         "src/assets/styles/components/_translation-window.scss",
         "src/features/windows/components/TranslationWindow.vue"
@@ -1429,10 +1399,10 @@
       ]
     ],
     [
-      "input-container",
+      "input-label",
       [
         "src/components/shared/UnifiedTranslationInput.vue",
-        "src/components/base/BaseInput.vue"
+        "src/components/shared/UnifiedTranslationInput.vue"
       ]
     ],
     [
@@ -1447,13 +1417,6 @@
       [
         "src/components/shared/UnifiedTranslationInput.vue",
         "src/apps/sidepanel/components/EnhancedSidepanelMainContent.vue"
-      ]
-    ],
-    [
-      "loading-overlay",
-      [
-        "src/components/shared/TranslationDisplay.vue",
-        "src/components/base/BaseTextarea.vue"
       ]
     ],
     [
@@ -1475,13 +1438,6 @@
       [
         "src/components/popup/TranslationForm.vue",
         "src/apps/sidepanel/components/SidepanelMainContent.vue"
-      ]
-    ],
-    [
-      "isSelectModeActive",
-      [
-        "src/components/popup/PopupHeader.vue",
-        "src/apps/sidepanel/components/SidepanelToolbar.vue"
       ]
     ],
     [
@@ -1520,6 +1476,13 @@
       ]
     ],
     [
+      "error-text",
+      [
+        "src/components/content/ScreenSelector.vue",
+        "src/features/windows/managers/translation/TranslationRenderer.js"
+      ]
+    ],
+    [
       "error-close",
       [
         "src/components/content/ScreenSelector.vue",
@@ -1549,6 +1512,13 @@
     ],
     [
       "language-group",
+      [
+        "src/components/content/CapturePreview.vue",
+        "src/components/content/CapturePreview.vue"
+      ]
+    ],
+    [
+      "checkbox-label",
       [
         "src/components/content/CapturePreview.vue",
         "src/components/content/CapturePreview.vue"
@@ -1594,6 +1564,48 @@
       [
         "src/components/content/CapturePreview.vue",
         "src/features/settings/components/SettingsManager.vue"
+      ]
+    ],
+    [
+      "modal-overlay",
+      [
+        "src/components/base/BaseModal.vue",
+        "src/components/base/__tests__/BaseModal.test.js"
+      ]
+    ],
+    [
+      "modal-container",
+      [
+        "src/components/base/BaseModal.vue",
+        "src/components/base/__tests__/BaseModal.test.js"
+      ]
+    ],
+    [
+      "fullscreen",
+      [
+        "src/components/base/BaseModal.vue",
+        "src/components/base/__tests__/BaseModal.test.js"
+      ]
+    ],
+    [
+      "close-button",
+      [
+        "src/components/base/BaseModal.vue",
+        "src/components/base/__tests__/BaseModal.test.js"
+      ]
+    ],
+    [
+      "dropdown-menu",
+      [
+        "src/components/base/BaseDropdown.vue",
+        "src/apps/sidepanel/components/SidepanelApiDropdown.vue"
+      ]
+    ],
+    [
+      "buttonClasses",
+      [
+        "src/components/base/BaseButton.vue",
+        "src/features/text-actions/components/BaseActionButton.vue"
       ]
     ],
     [
@@ -1678,55 +1690,6 @@
       [
         "src/apps/options/OptionsSidebar.vue",
         "src/apps/options/OptionsSidebar.vue"
-      ]
-    ],
-    [
-      "disabled,",
-      [
-        "src/components/base/BaseTextarea.vue",
-        "src/components/base/BaseInput.vue"
-      ]
-    ],
-    [
-      "modal-overlay",
-      [
-        "src/components/base/BaseModal.vue",
-        "src/components/base/__tests__/BaseModal.test.js"
-      ]
-    ],
-    [
-      "modal-container",
-      [
-        "src/components/base/BaseModal.vue",
-        "src/components/base/__tests__/BaseModal.test.js"
-      ]
-    ],
-    [
-      "fullscreen",
-      [
-        "src/components/base/BaseModal.vue",
-        "src/components/base/__tests__/BaseModal.test.js"
-      ]
-    ],
-    [
-      "close-button",
-      [
-        "src/components/base/BaseModal.vue",
-        "src/components/base/__tests__/BaseModal.test.js"
-      ]
-    ],
-    [
-      "dropdown-menu",
-      [
-        "src/components/base/BaseDropdown.vue",
-        "src/apps/sidepanel/components/SidepanelApiDropdown.vue"
-      ]
-    ],
-    [
-      "buttonClasses",
-      [
-        "src/components/base/BaseButton.vue",
-        "src/features/text-actions/components/BaseActionButton.vue"
       ]
     ],
     [
@@ -2569,7 +2532,6 @@
   ],
   "classesToMigrate": [
     "",
-    "!!error",
     "!hasSelection",
     "!isCapturing",
     "&&",
@@ -2591,7 +2553,6 @@
     "action-group",
     "action-toolbar",
     "activation-tab",
-    "active",
     "active-indicator",
     "active:",
     "advance-tab",
@@ -2617,7 +2578,6 @@
     "append",
     "arrow",
     "backup-actions",
-    "base-checkbox",
     "base-fieldset",
     "base-radio",
     "base-toggle",
@@ -2627,7 +2587,6 @@
     "button-icon",
     "button-inline",
     "button-label",
-    "button-text",
     "buttonClasses",
     "cancel-btn",
     "capture-btn",
@@ -2643,7 +2602,6 @@
     "checkmark",
     "clear-all-btn",
     "clear-all-icon",
-    "clear-button",
     "close-btn",
     "close-button",
     "computedClasses",
@@ -2667,7 +2625,6 @@
     "delete-icon",
     "detected-text",
     "disabled",
-    "disabled,",
     "display-toolbar",
     "docs-texteventtarget-iframe",
     "dropdown-arrow",
@@ -2683,7 +2640,6 @@
     "enhanced-input-section",
     "enhanced-result-section",
     "enhanced-version-toggle",
-    "error",
     "error-changelog",
     "error-close",
     "error-container",
@@ -2696,7 +2652,6 @@
     "error-meta",
     "error-panel",
     "error-text",
-    "error:",
     "excluded-sites-input",
     "export-area",
     "export-button",
@@ -2750,7 +2705,6 @@
     "highlight-element",
     "highlight-on-reset",
     "highlight-tooltip",
-    "hint-text",
     "history-count",
     "history-footer",
     "history-header",
@@ -2782,10 +2736,8 @@
     "inline-toolbar",
     "input-container",
     "input-error",
-    "input-help",
     "input-label",
     "input-toolbar",
-    "input-wrapper",
     "inputClasses",
     "instruction-content",
     "instruction-icon",
@@ -2797,11 +2749,9 @@
     "is-hovering",
     "isCapturing",
     "isDropdownOpen",
-    "isHistoryVisible",
     "isOpen",
     "isSelectModeActive",
     "isSelecting,",
-    "isVisible",
     "item-content",
     "item-meta",
     "item.isActive",
@@ -2830,7 +2780,6 @@
     "languages-tab",
     "length",
     "light",
-    "loading",
     "loading-changelog",
     "loading-container",
     "loading-gif",
@@ -2839,7 +2788,6 @@
     "loading-spin",
     "loading-spinner",
     "loading-text",
-    "loading-window",
     "localization",
     "localization-controls",
     "main-content",
@@ -2927,8 +2875,6 @@
     "providers-list",
     "radio-group",
     "radio-label",
-    "region",
-    "required-mark",
     "reset-btn",
     "result",
     "result-actions",
@@ -2955,7 +2901,6 @@
     "selected",
     "selected:",
     "selectedLanguage",
-    "selectedRegion",
     "selecting:",
     "selection-box",
     "selection-corners",
@@ -3007,7 +2952,6 @@
     "sticky-header",
     "sub-options-group",
     "sub-setting-group",
-    "success",
     "swap-button",
     "swap-languages",
     "switch",
@@ -3027,7 +2971,6 @@
     "text-sm",
     "text-xs",
     "textarea-container",
-    "textarea-wrapper",
     "textareaClass",
     "textareaClasses",
     "theme-auto-label",
@@ -3332,7 +3275,7 @@
       "src/apps/sidepanel/components/SidepanelToolbar.vue",
       "src/utils/rendering/TranslationRenderer.js"
     ],
-    "active": [
+    "ti-active": [
       "src/assets/styles/layout/_sidepanel.scss",
       "src/assets/styles/layout/_sidepanel.scss",
       "src/assets/styles/layout/_sidepanel.scss"
@@ -3512,7 +3455,7 @@
     "is-dragging": [
       "src/assets/styles/components/_translation-window.scss"
     ],
-    "loading-window": [
+    "ti-loading-window": [
       "src/assets/styles/components/_translation-window.scss",
       "src/features/windows/components/TranslationWindow.vue"
     ],
@@ -3834,10 +3777,10 @@
       "src/components/feature/api-settings/GeminiApiSettings.vue",
       "src/components/feature/api-settings/DeepseekApiSettings.vue"
     ],
-    "error": [
+    "ti-error": [
       "src/assets/styles/components/_api-settings-common.scss"
     ],
-    "success": [
+    "ti-success": [
       "src/assets/styles/components/_api-settings-common.scss"
     ],
     "theme-light": [
@@ -3876,8 +3819,6 @@
       "src/components/content/ScreenSelector.vue",
       "src/components/content/ScreenSelector.vue",
       "src/components/content/CapturePreview.vue",
-      "src/apps/options/OptionsSidebar.vue",
-      "src/apps/options/OptionsApp.vue",
       "src/components/base/LoadingSpinner.vue",
       "src/components/base/BaseToggle.vue",
       "src/components/base/BaseTextarea.vue",
@@ -3887,6 +3828,8 @@
       "src/components/base/BaseFieldset.vue",
       "src/components/base/BaseDropdown.vue",
       "src/components/base/BaseCheckbox.vue",
+      "src/apps/options/OptionsSidebar.vue",
+      "src/apps/options/OptionsApp.vue",
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationIcon.vue",
@@ -3910,12 +3853,19 @@
       "src/components/shared/IconButton.vue",
       "src/components/feature/FontSelector.vue",
       "src/components/feature/FontSelector.vue",
+      "src/components/content/CapturePreview.vue",
+      "src/components/base/BaseTextarea.vue",
+      "src/components/base/BaseInput.vue",
+      "src/components/base/BaseCheckbox.vue",
       "src/apps/options/OptionsApp.vue",
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationIcon.vue",
       "src/features/text-actions/components/ActionToolbar.vue",
       "src/features/text-actions/components/ActionGroup.vue",
+      "src/apps/sidepanel/components/SidepanelToolbar.vue",
+      "src/apps/sidepanel/components/SidepanelToolbar.vue",
+      "src/apps/sidepanel/components/SidepanelHistory.vue",
       "src/apps/options/tabs/HelpTab.vue",
       "src/apps/options/tabs/HelpTab.vue",
       "src/apps/options/tabs/HelpTab.vue",
@@ -3929,12 +3879,10 @@
     ],
     "input-label": [
       "src/components/shared/UnifiedTranslationInput.vue",
-      "src/components/shared/UnifiedTranslationInput.vue",
-      "src/components/base/BaseInput.vue"
+      "src/components/shared/UnifiedTranslationInput.vue"
     ],
     "input-container": [
-      "src/components/shared/UnifiedTranslationInput.vue",
-      "src/components/base/BaseInput.vue"
+      "src/components/shared/UnifiedTranslationInput.vue"
     ],
     "translation-textarea": [
       "src/components/shared/UnifiedTranslationInput.vue",
@@ -3977,8 +3925,7 @@
       "src/components/shared/TranslationDisplay.vue"
     ],
     "loading-overlay": [
-      "src/components/shared/TranslationDisplay.vue",
-      "src/components/base/BaseTextarea.vue"
+      "src/components/shared/TranslationDisplay.vue"
     ],
     "loading-spinner": [
       "src/components/shared/TranslationDisplay.vue",
@@ -4038,12 +3985,8 @@
       "src/components/shared/ProviderSelector.vue",
       "src/components/shared/ProviderSelector.vue",
       "src/components/popup/PopupHeader.vue",
-      "src/components/content/CapturePreview.vue",
       "src/components/base/BaseDropdown.vue",
       "src/features/settings/components/SettingsManager.vue",
-      "src/apps/sidepanel/components/SidepanelToolbar.vue",
-      "src/apps/sidepanel/components/SidepanelToolbar.vue",
-      "src/apps/sidepanel/components/SidepanelHistory.vue",
       "src/apps/sidepanel/components/ApiProviderItem.vue",
       "src/apps/options/tabs/HelpTab.vue",
       "src/apps/options/tabs/HelpTab.vue"
@@ -4066,20 +4009,13 @@
       "src/components/content/ScreenSelector.vue",
       "src/components/content/ScreenSelector.vue",
       "src/components/content/ScreenSelector.vue",
-      "src/components/content/CapturePreview.vue",
-      "src/apps/options/OptionsSidebar.vue",
       "src/components/base/LoadingSpinner.vue",
       "src/components/base/BaseToggle.vue",
-      "src/components/base/BaseTextarea.vue",
       "src/components/base/BaseRadio.vue",
-      "src/components/base/BaseInput.vue",
       "src/components/base/BaseFieldset.vue",
       "src/components/base/BaseDropdown.vue",
-      "src/components/base/BaseCheckbox.vue",
+      "src/apps/options/OptionsSidebar.vue",
       "src/features/settings/components/SettingsManager.vue",
-      "src/apps/sidepanel/components/SidepanelToolbar.vue",
-      "src/apps/sidepanel/components/SidepanelToolbar.vue",
-      "src/apps/sidepanel/components/SidepanelHistory.vue",
       "src/apps/sidepanel/components/ApiProviderItem.vue"
     ],
     "dropdown-arrow": [
@@ -4106,7 +4042,6 @@
       "src/components/shared/ProviderSelector.vue",
       "src/components/shared/ProviderSelector.vue",
       "src/components/shared/ProviderSelector.vue",
-      "src/components/content/CapturePreview.vue",
       "src/apps/options/OptionsSidebar.vue",
       "src/apps/options/tabs/HelpTab.vue",
       "src/apps/options/tabs/HelpTab.vue",
@@ -4161,8 +4096,7 @@
       "src/components/popup/PopupHeader.vue"
     ],
     "isSelectModeActive": [
-      "src/components/popup/PopupHeader.vue",
-      "src/apps/sidepanel/components/SidepanelToolbar.vue"
+      "src/components/popup/PopupHeader.vue"
     ],
     "switch": [
       "src/components/popup/PopupHeader.vue",
@@ -4409,7 +4343,6 @@
     ],
     "error-text": [
       "src/components/content/ScreenSelector.vue",
-      "src/components/base/BaseInput.vue",
       "src/features/windows/managers/translation/TranslationRenderer.js"
     ],
     "error-close": [
@@ -4455,12 +4388,6 @@
     "text-region": [
       "src/components/content/CapturePreview.vue"
     ],
-    "selectedRegion": [
-      "src/components/content/CapturePreview.vue"
-    ],
-    "region": [
-      "src/components/content/CapturePreview.vue"
-    ],
     "analysis-overlay": [
       "src/components/content/CapturePreview.vue"
     ],
@@ -4491,8 +4418,7 @@
     ],
     "checkbox-label": [
       "src/components/content/CapturePreview.vue",
-      "src/components/content/CapturePreview.vue",
-      "src/components/base/BaseCheckbox.vue"
+      "src/components/content/CapturePreview.vue"
     ],
     "checkbox": [
       "src/components/content/CapturePreview.vue",
@@ -4575,6 +4501,125 @@
     ],
     "error-meta": [
       "src/components/content/CapturePreview.vue"
+    ],
+    "true,": [
+      "src/components/base/LoadingSpinner.vue"
+    ],
+    "true": [
+      "src/components/base/LoadingSpinner.vue"
+    ],
+    "base-toggle": [
+      "src/components/base/BaseToggle.vue"
+    ],
+    "disabled": [
+      "src/components/base/BaseToggle.vue",
+      "src/components/base/BaseRadio.vue",
+      "src/components/base/BaseFieldset.vue"
+    ],
+    "ti-textarea-wrapper": [
+      "src/components/base/BaseTextarea.vue"
+    ],
+    "textareaClasses": [
+      "src/components/base/BaseTextarea.vue"
+    ],
+    "ti-textarea__loading": [
+      "src/components/base/BaseTextarea.vue"
+    ],
+    "base-radio": [
+      "src/components/base/BaseRadio.vue"
+    ],
+    "radio-label": [
+      "src/components/base/BaseRadio.vue"
+    ],
+    "modal-overlay": [
+      "src/components/base/BaseModal.vue",
+      "src/components/base/__tests__/BaseModal.test.js"
+    ],
+    "modal-container": [
+      "src/components/base/BaseModal.vue",
+      "src/components/base/__tests__/BaseModal.test.js"
+    ],
+    "fullscreen": [
+      "src/components/base/BaseModal.vue",
+      "src/components/base/__tests__/BaseModal.test.js"
+    ],
+    "}]": [
+      "src/components/base/BaseModal.vue"
+    ],
+    "modal-header": [
+      "src/components/base/BaseModal.vue"
+    ],
+    "modal-title": [
+      "src/components/base/BaseModal.vue"
+    ],
+    "close-button": [
+      "src/components/base/BaseModal.vue",
+      "src/components/base/__tests__/BaseModal.test.js"
+    ],
+    "modal-body": [
+      "src/components/base/BaseModal.vue"
+    ],
+    "modal-footer": [
+      "src/components/base/BaseModal.vue"
+    ],
+    "ti-input-wrapper": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__label": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__required": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__container": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "inputClasses": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__clear": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__help": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__error": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "ti-input__hint": [
+      "src/components/base/BaseInput.vue"
+    ],
+    "base-fieldset": [
+      "src/components/base/BaseFieldset.vue"
+    ],
+    "dropdown-wrapper": [
+      "src/components/base/BaseDropdown.vue"
+    ],
+    "dropdown-trigger": [
+      "src/components/base/BaseDropdown.vue"
+    ],
+    "isOpen": [
+      "src/components/base/BaseDropdown.vue"
+    ],
+    "dropdown-menu": [
+      "src/components/base/BaseDropdown.vue",
+      "src/apps/sidepanel/components/SidepanelApiDropdown.vue"
+    ],
+    "ti-checkbox": [
+      "src/components/base/BaseCheckbox.vue"
+    ],
+    "ti-checkbox__label": [
+      "src/components/base/BaseCheckbox.vue"
+    ],
+    "buttonClasses": [
+      "src/components/base/BaseButton.vue",
+      "src/features/text-actions/components/BaseActionButton.vue"
+    ],
+    "iconClasses": [
+      "src/components/base/BaseButton.vue"
+    ],
+    "ti-btn__text": [
+      "src/components/base/BaseButton.vue"
     ],
     "sidepanel-container": [
       "src/apps/sidepanel/SidepanelLayout.vue"
@@ -4785,124 +4830,6 @@
     "changelog-content": [
       "src/apps/options/About.vue"
     ],
-    "true,": [
-      "src/components/base/LoadingSpinner.vue"
-    ],
-    "true": [
-      "src/components/base/LoadingSpinner.vue"
-    ],
-    "base-toggle": [
-      "src/components/base/BaseToggle.vue"
-    ],
-    "disabled": [
-      "src/components/base/BaseToggle.vue",
-      "src/components/base/BaseRadio.vue",
-      "src/components/base/BaseFieldset.vue",
-      "src/components/base/BaseCheckbox.vue"
-    ],
-    "textarea-wrapper": [
-      "src/components/base/BaseTextarea.vue"
-    ],
-    "disabled,": [
-      "src/components/base/BaseTextarea.vue",
-      "src/components/base/BaseInput.vue"
-    ],
-    "loading": [
-      "src/components/base/BaseTextarea.vue"
-    ],
-    "textareaClasses": [
-      "src/components/base/BaseTextarea.vue"
-    ],
-    "base-radio": [
-      "src/components/base/BaseRadio.vue"
-    ],
-    "radio-label": [
-      "src/components/base/BaseRadio.vue"
-    ],
-    "modal-overlay": [
-      "src/components/base/BaseModal.vue",
-      "src/components/base/__tests__/BaseModal.test.js"
-    ],
-    "modal-container": [
-      "src/components/base/BaseModal.vue",
-      "src/components/base/__tests__/BaseModal.test.js"
-    ],
-    "fullscreen": [
-      "src/components/base/BaseModal.vue",
-      "src/components/base/__tests__/BaseModal.test.js"
-    ],
-    "}]": [
-      "src/components/base/BaseModal.vue"
-    ],
-    "modal-header": [
-      "src/components/base/BaseModal.vue"
-    ],
-    "modal-title": [
-      "src/components/base/BaseModal.vue"
-    ],
-    "close-button": [
-      "src/components/base/BaseModal.vue",
-      "src/components/base/__tests__/BaseModal.test.js"
-    ],
-    "modal-body": [
-      "src/components/base/BaseModal.vue"
-    ],
-    "modal-footer": [
-      "src/components/base/BaseModal.vue"
-    ],
-    "input-wrapper": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "error:": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "!!error": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "required-mark": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "inputClasses": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "clear-button": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "input-help": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "hint-text": [
-      "src/components/base/BaseInput.vue"
-    ],
-    "base-fieldset": [
-      "src/components/base/BaseFieldset.vue"
-    ],
-    "dropdown-wrapper": [
-      "src/components/base/BaseDropdown.vue"
-    ],
-    "dropdown-trigger": [
-      "src/components/base/BaseDropdown.vue"
-    ],
-    "isOpen": [
-      "src/components/base/BaseDropdown.vue"
-    ],
-    "dropdown-menu": [
-      "src/components/base/BaseDropdown.vue",
-      "src/apps/sidepanel/components/SidepanelApiDropdown.vue"
-    ],
-    "base-checkbox": [
-      "src/components/base/BaseCheckbox.vue"
-    ],
-    "buttonClasses": [
-      "src/components/base/BaseButton.vue",
-      "src/features/text-actions/components/BaseActionButton.vue"
-    ],
-    "iconClasses": [
-      "src/components/base/BaseButton.vue"
-    ],
-    "button-text": [
-      "src/components/base/BaseButton.vue"
-    ],
     "aiwc-selection-popup-host": [
       "src/features/windows/components/TranslationWindow.vue",
       "src/features/windows/components/TranslationWindow.vue",
@@ -5049,9 +4976,6 @@
     "toolbar-group": [
       "src/apps/sidepanel/components/SidepanelToolbar.vue"
     ],
-    "isHistoryVisible": [
-      "src/apps/sidepanel/components/SidepanelToolbar.vue"
-    ],
     "toolbar-group-bottom": [
       "src/apps/sidepanel/components/SidepanelToolbar.vue"
     ],
@@ -5071,9 +4995,6 @@
     ],
     "output-container": [
       "src/apps/sidepanel/components/SidepanelMainContent.vue"
-    ],
-    "isVisible": [
-      "src/apps/sidepanel/components/SidepanelHistory.vue"
     ],
     "loading-message": [
       "src/apps/sidepanel/components/SidepanelHistory.vue",
