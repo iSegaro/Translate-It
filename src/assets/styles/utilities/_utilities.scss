@@ -12,30 +12,3 @@
   white-space: nowrap;
   border: 0;
 }
-
-/* Text Utilities */
-.ti-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ti-text-center { text-align: center; }
-.ti-text-left { text-align: left; }
-.ti-text-right { text-align: right; }
-
-.ti-font-medium { font-weight: $font-weight-medium; }
-.ti-font-semibold { font-weight: $font-weight-semibold; }
-.ti-font-bold { font-weight: $font-weight-bold; }
-
-.ti-text-xs { font-size: $font-size-xs; }
-.ti-text-sm { font-size: $font-size-sm; }
-.ti-text-base { font-size: $font-size-base; }
-.ti-text-md { font-size: $font-size-md; }
-.ti-text-lg { font-size: $font-size-lg; }
-
-/* Flexbox Utilities - Note: Core utilities moved to ti-utilities.scss */
-.ti-flex-1 { flex: 1; }
-.ti-flex-shrink-0 { flex-shrink: 0; }
-.ti-flex-grow { flex-grow: 1; }
-.ti-flex-grow-0 { flex-grow: 0; }
