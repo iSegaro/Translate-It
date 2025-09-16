@@ -45,12 +45,7 @@ button {
   margin: 0;
 }
 
-// Flexbox and layout helpers
-.flex { display: flex !important; }
-.flex-col { flex-direction: column !important; }
-.items-center { align-items: center !important; }
-.justify-center { justify-content: center !important; }
-.justify-between { justify-content: space-between !important; }
+// Note: Flexbox utilities moved to ti-utilities.scss with ti- prefix
 
 // Reset common browser defaults that might interfere
 h1, h2, h3, h4, h5, h6 {
@@ -78,29 +73,29 @@ svg {
    ========================================================================== */
 
 // Base styles for translated text containers
-.aiwc-translated-text {
+.ti-translated-text {
   display: inline-block;
   unicode-bidi: isolate;
   text-align: inherit !important;
 }
 
 // RTL text styling
-.aiwc-rtl-text {
+.ti-rtl-text {
   direction: rtl;
   text-align: right !important;
 }
 
-// LTR text styling  
-.aiwc-ltr-text {
+// LTR text styling
+.ti-ltr-text {
   direction: ltr;
   text-align: left !important;
 }
 
 // Ensure proper text alignment in RTL contexts
-[dir="rtl"] .aiwc-rtl-text {
+[dir="rtl"] .ti-rtl-text {
   text-align: right;
 }
 
-[dir="ltr"] .aiwc-ltr-text {
+[dir="ltr"] .ti-ltr-text {
   text-align: left;
 }

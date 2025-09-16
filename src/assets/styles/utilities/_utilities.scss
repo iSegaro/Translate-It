@@ -1,8 +1,7 @@
 @use "../base/variables" as *;
 
-/* Utility Classes */
-
-.sr-only {
+/* Screen Reader Only - Keep as is (accessibility standard) */
+.ti-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -14,35 +13,29 @@
   border: 0;
 }
 
-.truncate {
+/* Text Utilities */
+.ti-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.text-center { text-align: center; }
-.text-left { text-align: left; }
-.text-right { text-align: right; }
+.ti-text-center { text-align: center; }
+.ti-text-left { text-align: left; }
+.ti-text-right { text-align: right; }
 
-.font-medium { font-weight: $font-weight-medium; }
-.font-semibold { font-weight: $font-weight-semibold; }
-.font-bold { font-weight: $font-weight-bold; }
+.ti-font-medium { font-weight: $font-weight-medium; }
+.ti-font-semibold { font-weight: $font-weight-semibold; }
+.ti-font-bold { font-weight: $font-weight-bold; }
 
-.text-xs { font-size: $font-size-xs; }
-.text-sm { font-size: $font-size-sm; }
-.text-base { font-size: $font-size-base; }
-.text-md { font-size: $font-size-md; }
-.text-lg { font-size: $font-size-lg; }
+.ti-text-xs { font-size: $font-size-xs; }
+.ti-text-sm { font-size: $font-size-sm; }
+.ti-text-base { font-size: $font-size-base; }
+.ti-text-md { font-size: $font-size-md; }
+.ti-text-lg { font-size: $font-size-lg; }
 
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.flex-row { flex-direction: row; }
-.items-center { align-items: center; }
-.items-start { align-items: flex-start; }
-.items-end { align-items: flex-end; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.justify-start { justify-content: flex-start; }
-.justify-end { justify-content: flex-end; }
-.flex-1 { flex: 1; }
-.flex-shrink-0 { flex-shrink: 0; }
+/* Flexbox Utilities - Note: Core utilities moved to ti-utilities.scss */
+.ti-flex-1 { flex: 1; }
+.ti-flex-shrink-0 { flex-shrink: 0; }
+.ti-flex-grow { flex-grow: 1; }
+.ti-flex-grow-0 { flex-grow: 0; }
