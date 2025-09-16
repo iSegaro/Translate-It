@@ -22,7 +22,7 @@
     
     <span
       v-if="$slots.default || text"
-      class="button-text"
+      class="ti-btn__text"
     >
       <slot>{{ text }}</slot>
     </span>
@@ -79,24 +79,24 @@ const props = defineProps({
 const emit = defineEmits(['click'])
 
 const buttonClasses = computed(() => [
-  'base-button',
-  `variant-${props.variant}`,
-  `size-${props.size}`,
+  'ti-btn',
+  `ti-btn--${props.variant}`,
+  `ti-btn--${props.size}`,
   {
-    'disabled': props.disabled || props.loading,
-    'loading': props.loading,
-    'full-width': props.fullWidth,
-    'icon-only': props.icon && !props.text && !(props.$slots && props.$slots.default),
-    'has-icon': props.icon,
-    [`icon-${props.iconPosition}`]: props.icon
+    'ti-btn--disabled': props.disabled || props.loading,
+    'ti-btn--loading': props.loading,
+    'ti-btn--full-width': props.fullWidth,
+    'ti-btn--icon-only': props.icon && !props.text && !(props.$slots && props.$slots.default),
+    'ti-btn--has-icon': props.icon,
+    [`ti-btn--icon-${props.iconPosition}`]: props.icon
   }
 ])
 
 const iconClasses = computed(() => [
-  'button-icon',
+  'ti-btn__icon',
   {
-    'mr-2': props.iconPosition === 'left' && (props.text || (props.$slots && props.$slots.default)),
-    'ml-2': props.iconPosition === 'right' && (props.text || (props.$slots && props.$slots.default))
+    'ti-btn__icon--right': props.iconPosition === 'left' && (props.text || (props.$slots && props.$slots.default)),
+    'ti-btn__icon--left': props.iconPosition === 'right' && (props.text || (props.$slots && props.$slots.default))
   }
 ])
 
@@ -108,7 +108,7 @@ const handleClick = (event) => {
 </script>
 
 <style scoped>
-.base-button {
+.ti-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -127,59 +127,59 @@ const handleClick = (event) => {
     box-shadow: 0 0 0 2px var(--color-primary), 0 0 0 4px rgba(25, 118, 210, 0.1);
   }
   
-  &.disabled {
+  &--disabled {
     cursor: not-allowed;
     opacity: 0.6;
   }
   
-  &.loading {
+  &--loading {
     cursor: wait;
   }
   
-  &.full-width {
+  &--full-width {
     width: 100%;
   }
 }
 
 /* Sizes */
-.size-xs {
+&--xs {
   padding: 4px 8px;
   font-size: var(--font-size-xs);
   
-  &.icon-only {
+  &--icon-only {
     padding: 4px;
     width: 24px;
     height: 24px;
   }
 }
 
-.size-sm {
+&--sm {
   padding: 6px 12px;
   font-size: var(--font-size-sm);
   
-  &.icon-only {
+  &--icon-only {
     padding: 6px;
     width: 32px;
     height: 32px;
   }
 }
 
-.size-md {
+&--md {
   padding: 8px 16px;
   font-size: var(--font-size-base);
   
-  &.icon-only {
+  &--icon-only {
     padding: 8px;
     width: 40px;
     height: 40px;
   }
 }
 
-.size-lg {
+&--lg {
   padding: 12px 20px;
   font-size: var(--font-size-md);
   
-  &.icon-only {
+  &--icon-only {
     padding: 12px;
     width: 48px;
     height: 48px;
@@ -187,7 +187,7 @@ const handleClick = (event) => {
 }
 
 /* Variants */
-.variant-primary {
+&--primary {
   background-color: var(--color-primary);
   color: white;
   border-color: var(--color-primary);
@@ -202,7 +202,7 @@ const handleClick = (event) => {
   }
 }
 
-.variant-secondary {
+&--secondary {
   background-color: var(--color-secondary);
   color: white;
   border-color: var(--color-secondary);
@@ -217,7 +217,7 @@ const handleClick = (event) => {
   }
 }
 
-.variant-outline {
+&--outline {
   background-color: transparent;
   color: var(--color-primary);
   border-color: var(--color-primary);
@@ -232,7 +232,7 @@ const handleClick = (event) => {
   }
 }
 
-.variant-ghost {
+&--ghost {
   background-color: transparent;
   color: var(--color-text);
   border-color: transparent;
@@ -246,7 +246,7 @@ const handleClick = (event) => {
   }
 }
 
-.variant-danger {
+&--danger {
   background-color: var(--color-error);
   color: white;
   border-color: var(--color-error);
@@ -262,11 +262,11 @@ const handleClick = (event) => {
 }
 
 /* Icon positioning */
-.icon-right {
+&--icon-right {
   flex-direction: row-reverse;
 }
 
-.button-icon {
+.ti-btn__icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -274,14 +274,14 @@ const handleClick = (event) => {
   filter: var(--icon-filter);
 }
 
-.button-text {
+.ti-btn__text {
   flex: 1;
   text-align: center;
 }
 
 /* Responsive adjustments */
 @media (max-width: 480px) {
-  .base-button {
+  .ti-btn {
     min-height: 44px; /* Touch target size */
   }
 }

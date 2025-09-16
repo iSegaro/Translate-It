@@ -6,7 +6,7 @@ describe('BaseButton', () => {
   it('renders correctly with default props', () => {
     const wrapper = mount(BaseButton)
     expect(wrapper.find('button').exists()).toBe(true)
-    expect(wrapper.classes()).toContain('base-button')
+    expect(wrapper.classes()).toContain('ti-btn')
   })
 
   it('renders text content', () => {

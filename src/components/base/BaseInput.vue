@@ -1,21 +1,21 @@
 <template>
   <div
-    class="input-wrapper"
-    :class="{ disabled, error: !!error }"
+    class="ti-input-wrapper"
+    :class="{ 'ti-input-wrapper--disabled': disabled, 'ti-input-wrapper--error': !!error }"
   >
     <label
       v-if="label"
       :for="inputId"
-      class="input-label"
+      class="ti-input__label"
     >
       {{ label }}
       <span
         v-if="required"
-        class="required-mark"
+        class="ti-input__required"
       >*</span>
     </label>
     
-    <div class="input-container">
+    <div class="ti-input__container">
       <input
         :id="inputId"
         :type="type"
@@ -35,22 +35,22 @@
         variant="ghost"
         size="xs"
         icon="clear"
-        class="clear-button"
+        class="ti-input__clear"
         @click="handleClear"
       />
     </div>
     
     <div
       v-if="error || hint"
-      class="input-help"
+      class="ti-input__help"
     >
       <span
         v-if="error"
-        class="error-text"
+        class="ti-input__error"
       >{{ error }}</span>
       <span
         v-else-if="hint"
-        class="hint-text"
+        class="ti-input__hint"
       >{{ hint }}</span>
     </div>
   </div>
@@ -114,13 +114,13 @@ const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'clear'])
 const inputId = ref(`input-${Math.random().toString(36).substr(2, 9)}`)
 
 const inputClasses = computed(() => [
-  'base-input',
-  `size-${props.size}`,
+  'ti-input',
+  `ti-input--${props.size}`,
   {
-    'has-error': !!props.error,
-    'readonly': props.readonly,
-    'disabled': props.disabled,
-    'clearable': props.clearable && props.modelValue && !props.disabled
+    'ti-input--has-error': !!props.error,
+    'ti-input--readonly': props.readonly,
+    'ti-input--disabled': props.disabled,
+    'ti-input--clearable': props.clearable && props.modelValue && !props.disabled
   }
 ])
 
@@ -143,31 +143,31 @@ const handleClear = () => {
 </script>
 
 <style scoped>
-.input-wrapper {
+.ti-input-wrapper {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.input-label {
+.ti-input__label {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
   margin-bottom: 4px;
 }
 
-.required-mark {
+.ti-input__required {
   color: var(--color-error);
   margin-left: 2px;
 }
 
-.input-container {
+.ti-input__container {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.base-input {
+.ti-input {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-base);
@@ -183,7 +183,7 @@ const handleClear = () => {
     box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
   }
   
-  &.has-error {
+  &--has-error {
     border-color: var(--color-error);
     
     &:focus {
@@ -192,19 +192,19 @@ const handleClear = () => {
     }
   }
   
-  &.readonly {
+  &--readonly {
     background-color: var(--color-surface);
     cursor: default;
   }
   
-  &.disabled {
+  &--disabled {
     background-color: var(--color-surface);
     color: var(--color-text-muted);
     cursor: not-allowed;
     opacity: 0.6;
   }
   
-  &.clearable {
+  &--clearable {
     padding-right: 32px;
   }
   
@@ -214,34 +214,34 @@ const handleClear = () => {
 }
 
 /* Sizes */
-.size-sm {
+&--sm {
   padding: 6px 12px;
   font-size: var(--font-size-sm);
   
-  &.clearable {
+  &--clearable {
     padding-right: 28px;
   }
 }
 
-.size-md {
+&--md {
   padding: 8px 16px;
   font-size: var(--font-size-base);
   
-  &.clearable {
+  &--clearable {
     padding-right: 32px;
   }
 }
 
-.size-lg {
+&--lg {
   padding: 12px 16px;
   font-size: var(--font-size-md);
   
-  &.clearable {
+  &--clearable {
     padding-right: 36px;
   }
 }
 
-.clear-button {
+.ti-input__clear {
   position: absolute;
   right: 4px;
   top: 50%;
@@ -249,30 +249,30 @@ const handleClear = () => {
   z-index: 1;
 }
 
-.input-help {
+.ti-input__help {
   font-size: var(--font-size-xs);
   margin-top: 4px;
 }
 
-.error-text {
+.ti-input__error {
   color: var(--color-error);
 }
 
-.hint-text {
+.ti-input__hint {
   color: var(--color-text-muted);
 }
 
-.input-wrapper.disabled {
+.ti-input-wrapper--disabled {
   opacity: 0.6;
 }
 
-.input-wrapper.error .input-label {
+.ti-input-wrapper--error .ti-input__label {
   color: var(--color-error);
 }
 
 /* Responsive adjustments */
 @media (max-width: 480px) {
-  .base-input {
+  .ti-input {
     min-height: 44px; /* Touch target size */
   }
 }

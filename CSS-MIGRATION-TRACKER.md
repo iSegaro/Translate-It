@@ -36,7 +36,9 @@ All classes will be prefixed with `ti-` (Translate-It) to prevent conflicts
 #### Migration Mapping
 | Old Class | New Class | Status | Files Affected |
 |-----------|-----------|--------|----------------|
-| `.btn` | `.ti-btn` | Pending | BaseButton.vue, _buttons.scss |
+| `.base-button` | `.ti-btn` | ✅ Completed | BaseButton.vue, BaseButton.test.js |
+| `.base-input` | `.ti-input` | ✅ Completed | BaseInput.vue |
+| `.btn` | `.ti-btn` | Pending | _buttons.scss |
 | `.icon` | `.ti-icon` | Pending | IconButton.vue, _icons.scss |
 | `.container` | `.ti-container` | Pending | Multiple components |
 | `.flex` | `.ti-u-flex` | Pending | _helpers.scss, components |
@@ -117,10 +119,15 @@ src/assets/styles/
 ## Change Log
 
 ### 2025-09-16
-- [ ] Created migration tracker document
-- [ ] Completed initial CSS analysis
-- [ ] Identified 100+ !important declarations
-- [ ] Mapped all CSS conflicts
+- [x] Created migration tracker document
+- [x] Completed initial CSS analysis
+- [x] Identified 413 !important declarations
+- [x] Mapped all CSS conflicts
+- [x] Set up StyleLint configuration
+- [x] Created automated CSS analysis script
+- [x] Migrated BaseButton.vue to ti- prefix
+- [x] Migrated BaseInput.vue to ti- prefix
+- [x] Successful build test
 
 ## Notes & Decisions
 
