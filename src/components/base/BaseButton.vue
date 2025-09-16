@@ -142,127 +142,127 @@ const handleClick = (event) => {
 }
 
 /* Sizes */
-&--xs {
+.ti-btn--xs {
   padding: 4px 8px;
   font-size: var(--font-size-xs);
-  
-  &--icon-only {
-    padding: 4px;
-    width: 24px;
-    height: 24px;
-  }
 }
 
-&--sm {
+.ti-btn--xs.ti-btn--icon-only {
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+}
+
+.ti-btn--sm {
   padding: 6px 12px;
   font-size: var(--font-size-sm);
-  
-  &--icon-only {
-    padding: 6px;
-    width: 32px;
-    height: 32px;
-  }
 }
 
-&--md {
+.ti-btn--sm.ti-btn--icon-only {
+  padding: 6px;
+  width: 32px;
+  height: 32px;
+}
+
+.ti-btn--md {
   padding: 8px 16px;
   font-size: var(--font-size-base);
-  
-  &--icon-only {
-    padding: 8px;
-    width: 40px;
-    height: 40px;
-  }
 }
 
-&--lg {
+.ti-btn--md.ti-btn--icon-only {
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+}
+
+.ti-btn--lg {
   padding: 12px 20px;
   font-size: var(--font-size-md);
-  
-  &--icon-only {
-    padding: 12px;
-    width: 48px;
-    height: 48px;
-  }
+}
+
+.ti-btn--lg.ti-btn--icon-only {
+  padding: 12px;
+  width: 48px;
+  height: 48px;
 }
 
 /* Variants */
-&--primary {
+.ti-btn--primary {
   background-color: var(--color-primary);
   color: white;
   border-color: var(--color-primary);
-  
-  &:hover:not(.disabled) {
+
+  &:hover:not(.ti-btn--disabled) {
     background-color: var(--color-primary-dark);
     border-color: var(--color-primary-dark);
   }
-  
-  &:active:not(.disabled) {
+
+  &:active:not(.ti-btn--disabled) {
     transform: translateY(1px);
   }
 }
 
-&--secondary {
+.ti-btn--secondary {
   background-color: var(--color-secondary);
   color: white;
   border-color: var(--color-secondary);
-  
-  &:hover:not(.disabled) {
+
+  &:hover:not(.ti-btn--disabled) {
     background-color: var(--color-secondary-dark);
     border-color: var(--color-secondary-dark);
   }
-  
-  &:active:not(.disabled) {
+
+  &:active:not(.ti-btn--disabled) {
     transform: translateY(1px);
   }
 }
 
-&--outline {
+.ti-btn--outline {
   background-color: transparent;
   color: var(--color-primary);
   border-color: var(--color-primary);
-  
-  &:hover:not(.disabled) {
+
+  &:hover:not(.ti-btn--disabled) {
     background-color: var(--color-primary);
     color: white;
   }
-  
-  &:active:not(.disabled) {
+
+  &:active:not(.ti-btn--disabled) {
     transform: translateY(1px);
   }
 }
 
-&--ghost {
+.ti-btn--ghost {
   background-color: transparent;
   color: var(--color-text);
   border-color: transparent;
-  
-  &:hover:not(.disabled) {
+
+  &:hover:not(.ti-btn--disabled) {
     background-color: var(--color-surface);
   }
-  
-  &:active:not(.disabled) {
+
+  &:active:not(.ti-btn--disabled) {
     transform: translateY(1px);
   }
 }
 
-&--danger {
+.ti-btn--danger {
   background-color: var(--color-error);
   color: white;
   border-color: var(--color-error);
-  
-  &:hover:not(.disabled) {
+
+  &:hover:not(.ti-btn--disabled) {
     background-color: #d32f2f;
     border-color: #d32f2f;
   }
-  
-  &:active:not(.disabled) {
+
+  &:active:not(.ti-btn--disabled) {
     transform: translateY(1px);
   }
 }
 
 /* Icon positioning */
-&--icon-right {
+.ti-btn--icon-right {
   flex-direction: row-reverse;
 }
 

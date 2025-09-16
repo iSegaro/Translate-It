@@ -214,31 +214,31 @@ const handleClear = () => {
 }
 
 /* Sizes */
-&--sm {
+.ti-input--sm {
   padding: 6px 12px;
   font-size: var(--font-size-sm);
-  
-  &--clearable {
-    padding-right: 28px;
-  }
 }
 
-&--md {
+.ti-input--sm.ti-input--clearable {
+  padding-right: 28px;
+}
+
+.ti-input--md {
   padding: 8px 16px;
   font-size: var(--font-size-base);
-  
-  &--clearable {
-    padding-right: 32px;
-  }
 }
 
-&--lg {
+.ti-input--md.ti-input--clearable {
+  padding-right: 32px;
+}
+
+.ti-input--lg {
   padding: 12px 16px;
   font-size: var(--font-size-md);
-  
-  &--clearable {
-    padding-right: 36px;
-  }
+}
+
+.ti-input--lg.ti-input--clearable {
+  padding-right: 36px;
 }
 
 .ti-input__clear {
