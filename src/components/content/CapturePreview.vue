@@ -41,7 +41,7 @@
               :key="index"
               class="text-region"
               :style="getRegionStyle(region)"
-              :class="{ active: selectedRegion === region }"
+              :class="{ 'ti-active': selectedRegion === region }"
               @click="selectTextRegion(region)"
             />
           </div>
@@ -693,7 +693,7 @@ onUnmounted(() => {
 }
 
 .text-region:hover,
-.text-region.active {
+.text-region.ti-active {
   border-color: #2196f3;
   background: rgba(33, 150, 243, 0.2);
 }

@@ -6,7 +6,7 @@ describe('BaseInput', () => {
   it('renders correctly with default props', () => {
     const wrapper = mount(BaseInput)
     expect(wrapper.find('input').exists()).toBe(true)
-    expect(wrapper.find('.input-wrapper').exists()).toBe(true)
+    expect(wrapper.find('.ti-input-wrapper').exists()).toBe(true)
   })
 
   it('renders label when provided', () => {
@@ -27,8 +27,8 @@ describe('BaseInput', () => {
       }
     })
     
-    expect(wrapper.find('.required-mark').exists()).toBe(true)
-    expect(wrapper.find('.required-mark').text()).toBe('*')
+    expect(wrapper.find('.ti-input__required').exists()).toBe(true)
+    expect(wrapper.find('.ti-input__required').text()).toBe('*')
   })
 
   it('binds v-model correctly', async () => {
@@ -65,8 +65,8 @@ describe('BaseInput', () => {
       props: { error: 'This field is required' }
     })
     
-    expect(wrapper.find('.error-text').exists()).toBe(true)
-    expect(wrapper.find('.error-text').text()).toBe('This field is required')
+    expect(wrapper.find('.ti-input__error').exists()).toBe(true)
+    expect(wrapper.find('.ti-input__error').text()).toBe('This field is required')
   })
 
   it('displays hint message when no error', () => {
@@ -74,8 +74,8 @@ describe('BaseInput', () => {
       props: { hint: 'Enter at least 3 characters' }
     })
     
-    expect(wrapper.find('.hint-text').exists()).toBe(true)
-    expect(wrapper.find('.hint-text').text()).toBe('Enter at least 3 characters')
+    expect(wrapper.find('.ti-input__hint').exists()).toBe(true)
+    expect(wrapper.find('.ti-input__hint').text()).toBe('Enter at least 3 characters')
   })
 
   it('prioritizes error over hint', () => {
@@ -86,7 +86,7 @@ describe('BaseInput', () => {
       }
     })
     
-    expect(wrapper.find('.error-text').exists()).toBe(true)
+    expect(wrapper.find('.ti-input__error').exists()).toBe(true)
     expect(wrapper.find('.hint-text').exists()).toBe(false)
   })
 

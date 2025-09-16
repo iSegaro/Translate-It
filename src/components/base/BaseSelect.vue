@@ -1,7 +1,7 @@
 <template>
   <select
     :value="modelValue"
-    :class="['base-select', { disabled: disabled }]"
+    :class="['ti-select', { 'ti-select--disabled': disabled }]"
     :disabled="disabled"
     v-bind="$attrs"
     @change="handleChange"
@@ -56,7 +56,7 @@ const handleChange = (event) => {
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.base-select {
+.ti-select {
   width: 100%;
   padding: $spacing-sm $spacing-base;
   border: $border-width $border-style var(--color-border);
@@ -86,7 +86,7 @@ const handleChange = (event) => {
   }
 
   &:disabled,
-  &.disabled {
+  &--disabled {
     background-color: var(--color-background-muted);
     color: var(--color-text-muted);
     cursor: not-allowed;
@@ -102,7 +102,7 @@ const handleChange = (event) => {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .base-select {
+  .ti-select {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
   }
 }

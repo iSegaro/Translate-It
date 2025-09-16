@@ -1,7 +1,7 @@
 <template>
   <label
-    class="base-checkbox"
-    :class="{ disabled }"
+    class="ti-checkbox"
+    :class="{ 'ti-checkbox--disabled': disabled }"
   >
     <input
       type="checkbox"
@@ -11,7 +11,7 @@
     >
     <span
       v-if="label"
-      class="checkbox-label"
+      class="ti-checkbox__label"
     >{{ label }}</span>
     <slot v-else />
   </label>
@@ -39,7 +39,7 @@ defineEmits(['update:modelValue'])
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.base-checkbox {
+.ti-checkbox {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
@@ -55,12 +55,12 @@ defineEmits(['update:modelValue'])
     flex-shrink: 0;
   }
   
-  .checkbox-label {
+  .ti-checkbox__label {
     flex: 1;
     color: var(--color-text);
   }
   
-  &.disabled {
+  &--disabled {
     opacity: 0.6;
     cursor: not-allowed;
     

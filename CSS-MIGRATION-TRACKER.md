@@ -127,7 +127,34 @@ src/assets/styles/
 - [x] Created automated CSS analysis script
 - [x] Migrated BaseButton.vue to ti- prefix
 - [x] Migrated BaseInput.vue to ti- prefix
-- [x] Successful build test
+- [x] Migrated BaseTextarea.vue to ti- prefix
+- [x] Migrated BaseSelect.vue to ti- prefix
+- [x] Migrated BaseCheckbox.vue to ti- prefix
+- [x] Migrated BaseModal.vue to ti- prefix
+- [x] Successfully resolved high-priority global class conflicts
+- [x] Updated 25+ Vue components to use ti-active instead of .active
+- [x] Build tests passing with all migrations
+
+## ⚠️ Critical Issue: Global Class Conflicts
+
+### Identified Conflicts
+During migration, the following global classes were found that could conflict with component classes:
+- `.active` - Used in sidepanel styles, could conflict with component active states
+- `.disabled` - Potentially used in global styles
+- Other generic state classes
+
+### Solution Strategy
+1. **Priority 1**: All component state classes must use `ti-` prefix
+2. **Priority 2**: Global utility classes need migration to `ti-u-` prefix
+3. **Priority 3**: Create explicit migration path for global classes
+
+### Action Items
+- [x] Audited all global SCSS files for generic class names
+- [x] Created migration plan for global styles
+- [x] Successfully migrated high-priority global class conflicts
+- [ ] Continue with medium-priority class migrations
+- [ ] Begin !important elimination phase
+- [ ] Set up CSS regression testing
 
 ## Notes & Decisions
 

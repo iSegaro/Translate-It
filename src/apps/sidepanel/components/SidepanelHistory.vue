@@ -2,7 +2,7 @@
   <div
     id="historyPanel"
     class="history-panel"
-    :class="{ active: isVisible }"
+    :class="{ 'ti-active': isVisible }"
   >
     <div class="history-header">
       <h3>{{ t('SIDEPANEL_HISTORY_TITLE') || 'Translation History' }}</h3>
@@ -354,7 +354,7 @@ onUnmounted(() => {
   z-index: 100;
 }
 
-.history-panel.active {
+.history-panel.ti-active {
   transform: translateX(0);
 }
 

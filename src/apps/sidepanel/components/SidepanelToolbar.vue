@@ -6,7 +6,7 @@
         class="toolbar-button"
         :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
         :disabled="isActivating"
-        :class="{ active: isSelectModeActive }"
+        :class="{ 'ti-active': isSelectModeActive }"
         @click="handleSelectElement"
       >
         <img
@@ -50,7 +50,7 @@
         id="historyBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_HISTORY_TOOLTIP')"
-        :class="{ active: isHistoryVisible }"
+        :class="{ 'ti-active': isHistoryVisible }"
         @click="handleHistoryClick"
       >
         <img
@@ -287,9 +287,9 @@ const handleSettingsClick = async () => {
     background-color: var(--color-background);
   }
 
-  &.active {
+  &.ti-active {
     background-color: var(--color-primary);
-    
+
     /* Removed nested .toolbar-icon - now handled by global sidepanel styles with higher specificity */
   }
 

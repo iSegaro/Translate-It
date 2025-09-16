@@ -77,14 +77,14 @@
 
 // Validation states
 .setting-group {
-  &.error {
+  &.ti-error {
     .api-key-input,
     .model-select {
       border-color: var(--color-error) !important;
     }
   }
 
-  &.success {
+  &.ti-success {
     .api-key-input,
     .model-select {
       border-color: var(--color-success) !important;

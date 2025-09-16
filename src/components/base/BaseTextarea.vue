@@ -1,7 +1,7 @@
 <template>
   <div
-    class="textarea-wrapper"
-    :class="{ disabled, loading }"
+    class="ti-textarea-wrapper"
+    :class="{ 'ti-textarea-wrapper--disabled': disabled, 'ti-textarea-wrapper--loading': loading }"
   >
     <textarea
       :value="modelValue"
@@ -18,7 +18,7 @@
     <LoadingSpinner
       v-if="loading"
       size="sm"
-      class="loading-overlay"
+      class="ti-textarea__loading"
     />
   </div>
 </template>
@@ -64,11 +64,11 @@ const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'input'])
 const isFocused = ref(false)
 
 const textareaClasses = computed(() => [
-  'base-textarea',
+  'ti-textarea',
   {
-    'focused': isFocused.value,
-    'readonly': props.readonly,
-    [`resize-${props.resize}`]: true
+    'ti-textarea--focused': isFocused.value,
+    'ti-textarea--readonly': props.readonly,
+    [`ti-textarea--resize-${props.resize}`]: true
   }
 ])
 
@@ -89,21 +89,21 @@ const handleBlur = (event) => {
 </script>
 
 <style scoped>
-.textarea-wrapper {
+.ti-textarea-wrapper {
   position: relative;
   
-  &.disabled {
+  &--disabled {
     opacity: 0.6;
   }
   
-  &.loading {
-    .base-textarea {
+  &--loading {
+    .ti-textarea {
       color: transparent;
     }
   }
 }
 
-.base-textarea {
+.ti-textarea {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--color-border);
@@ -130,29 +130,29 @@ const handleBlur = (event) => {
     cursor: not-allowed;
   }
   
-  &.readonly {
+  &--readonly {
     background-color: var(--color-surface);
     cursor: default;
   }
   
-  &.resize-none {
+  &--resize-none {
     resize: none;
   }
   
-  &.resize-both {
+  &--resize-both {
     resize: both;
   }
   
-  &.resize-horizontal {
+  &--resize-horizontal {
     resize: horizontal;
   }
   
-  &.resize-vertical {
+  &--resize-vertical {
     resize: vertical;
   }
 }
 
-.loading-overlay {
+.ti-textarea__loading {
   position: absolute;
   top: 50%;
   left: 50%;

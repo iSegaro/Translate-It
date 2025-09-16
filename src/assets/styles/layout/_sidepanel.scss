@@ -15,13 +15,13 @@ body.sidepanel-context .toolbar-icon {
 }
 
 /* Active state for toolbar buttons in sidepanel */
-body.sidepanel-context .toolbar-button.active .toolbar-icon {
+body.sidepanel-context .toolbar-button.ti-active .toolbar-icon {
   /* Use same filter as popup - no additional brightness adjustments */
   filter: var(--icon-filter);
 }
 
 /* Active state for SidepanelToolbar buttons */
-body.sidepanel-context .active .toolbar-icon {
+body.sidepanel-context .ti-active .toolbar-icon {
   /* Use same filter as popup - no additional brightness adjustments */
   filter: var(--icon-filter);
 }
@@ -106,7 +106,7 @@ textarea:focus {
   z-index: 100;
 }
 
-.history-panel.active {
+.history-panel.ti-active {
   transform: translateX(0);
 }
 

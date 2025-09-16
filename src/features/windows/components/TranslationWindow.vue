@@ -3,7 +3,7 @@
   <div 
     v-if="currentSize === 'small'"
     ref="windowElement"
-    class="translation-window aiwc-selection-popup-host loading-window"
+    class="translation-window aiwc-selection-popup-host ti-loading-window"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     @mousedown.stop
