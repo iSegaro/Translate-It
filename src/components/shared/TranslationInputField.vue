@@ -202,19 +202,23 @@ onMounted(async () => {
 .ti-textarea-container {
   position: relative;
   margin: 8px 12px;
+  border: 1px solid var(--color-border, #dee2e6);
+  border-radius: 8px;
+  background-color: var(--input-bg-color, #ffffff);
+  box-sizing: border-box;
 }
 
 .ti-translation-textarea {
   width: 100%;
   padding: 28px 10px 10px 10px;
-  /* border-radius: 3px; */
+  border-radius: 8px;
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
   box-sizing: border-box;
   direction: ltr;
   text-align: left;
-  background-color: var(--input-bg-color);
+  background-color: transparent;
   color: var(--text-color);
   border: none;
   line-height: 1.5;
@@ -262,7 +266,7 @@ onMounted(async () => {
 
 /* Context-specific adjustments for sidepanel */
 .sidepanel-wrapper .ti-textarea-container {
-  margin: 8px 0;
+  margin: 8px 12px;
 }
 
 .sidepanel-wrapper .ti-input-toolbar {

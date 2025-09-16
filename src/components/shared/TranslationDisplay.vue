@@ -382,6 +382,9 @@ onMounted(() => {
   position: relative;
   width: 100%;
   box-sizing: border-box;
+  border: 1px solid var(--color-border, #dee2e6);
+  border-radius: 8px;
+  background-color: var(--bg-result-color, #ffffff);
 }
 
 /* Mode-specific containers */
@@ -399,9 +402,6 @@ onMounted(() => {
 .ti-translation-display.sidepanel-mode {
   flex-grow: 1;
   min-height: 0;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 5px;
-  background-color: var(--bg-secondary, #ffffff);
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -424,7 +424,7 @@ onMounted(() => {
 .ti-translation-content {
   width: 100%;
   padding: 32px 10px 10px 10px;
-  border-radius: 3px;
+  border-radius: 8px;
   /* Use CSS variables for font settings with fallbacks */
   font-family: var(--translation-font-family, inherit);
   font-size: var(--translation-font-size, 14px);
@@ -432,9 +432,9 @@ onMounted(() => {
   text-align: var(--translation-text-align, left);
   box-sizing: border-box;
   min-height: 50px;
-  background-color: var(--bg-result-color, #ffffff);
+  background-color: transparent;
   color: var(--text-color, #212529);
-  border: 1px solid var(--header-border-color, #dee2e6);
+  border: none;
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -495,7 +495,7 @@ onMounted(() => {
   height: 100%;
   flex-grow: 1;
   border: none;
-  border-radius: 0;
+  border-radius: 8px;
   padding: 42px 5px 0px 5px;
 }
 
