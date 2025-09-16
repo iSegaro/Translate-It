@@ -429,11 +429,12 @@ const retryLoading = () => {
 .language-controls {
   display: flex;
   align-items: center;
-  padding:3px 6px 3px 12px;
+  justify-content: space-between;
+  padding: 8px 12px;
   margin: 0;
-  gap: 4px;
+  gap: 8px;
   background: var(--language-controls-bg-color);
-  min-height: 36px;
+  min-height: 40px;
   box-sizing: border-box;
 }
 </style>
@@ -488,11 +489,12 @@ const retryLoading = () => {
 .language-controls {
   display: flex;
   align-items: center;
-  padding:3px 6px 3px 12px;
+  justify-content: space-between;
+  padding: 8px 12px;
   margin: 0;
-  gap: 4px;
+  gap: 8px;
   background: var(--language-controls-bg-color);
-  min-height: 36px;
+  min-height: 40px;
   box-sizing: border-box;
 }
 </style>

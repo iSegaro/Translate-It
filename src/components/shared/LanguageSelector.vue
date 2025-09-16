@@ -307,8 +307,10 @@ onMounted(() => {
 /* Context-specific adjustments for popup vs sidepanel */
 .popup-wrapper .ti-language-controls {
   align-items: center;
-  height: auto;
+  height: 32px;
   justify-content: flex-end;
+  padding: 0;
+  margin: 0;
 }
 
 .popup-wrapper .ti-language-select {
