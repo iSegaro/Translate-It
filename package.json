@@ -20,7 +20,7 @@
     "validate:firefox": "node scripts/validate/validate-firefox.mjs",
     "source": "node scripts/dev/create-source-zip.mjs",
     "publish": "pnpm run build && pnpm run validate && pnpm run source",
-    "pre-submit": "pnpm run lint && pnpm run test:vue:run && pnpm run build",
+    "pre-submit": "pnpm run lint && pnpm run lint:styles && pnpm run test:vue:run && pnpm run build",
     "lint:source": "eslint --config eslint.config.js",
     "lint": "pnpm run lint:source",
     "format": "prettier --write src/**/*.js",
@@ -34,7 +34,9 @@
     "analyze": "node scripts/dev/analyze-bundles.js",
     "perf:monitor": "node scripts/dev/performance-monitor.js",
     "setup": "node scripts/setup/setup.js",
-    "setup:chrome-validator": "pnpm add -D web-ext && echo '✅ Chrome validator installed! You can now use: pnpm run validate:chrome'"
+    "setup:chrome-validator": "pnpm add -D web-ext && echo '✅ Chrome validator installed! You can now use: pnpm run validate:chrome'",
+    "lint:styles": "stylelint \"src/**/*.{css,scss,vue}\"",
+    "lint:styles:fix": "stylelint \"src/**/*.{css,scss,vue}\" --fix"
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
@@ -57,6 +59,12 @@
     "eslint-plugin-vue": "^9.27.0",
     "fs-extra": "^11.3.0",
     "globals": "^16.3.0",
+    "postcss": "^8.5.3",
+    "postcss-scss": "^4.0.9",
+    "stylelint": "^16.15.0",
+    "stylelint-config-recommended-vue": "^1.5.0",
+    "stylelint-config-standard-scss": "^14.0.0",
+    "stylelint-scss": "^6.10.0",
     "happy-dom": "^18.0.1",
     "jsdom": "^26.1.0",
     "playwright": "^1.54.1",

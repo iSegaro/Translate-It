@@ -1,0 +1,131 @@
+{
+  "extends": [
+    "stylelint-config-standard-scss",
+    "stylelint-config-recommended-vue"
+  ],
+  "customSyntax": "postcss-scss",
+  "rules": {
+    "selector-class-pattern": [
+      "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+      {
+        "message": "Class names must use ti- prefix (ti-component or ti-u-utility)"
+      }
+    ],
+    "selector-id-pattern": null,
+    "no-duplicate-selectors": true,
+    "no-empty-source": null,
+    "string-quotes": "single",
+    "indentation": 2,
+    "max-empty-lines": 2,
+    "rule-empty-line-before": [
+      "always",
+      {
+        "except": ["first-nested"],
+        "ignore": ["after-comment"]
+      }
+    ],
+    "unit-no-unknown": [
+      true,
+      {
+        "ignoreUnits": ["rpx"]
+      }
+    ],
+    "color-hex-length": "short",
+    "color-named": "never",
+    "selector-max-compound-selectors": 4,
+    "selector-max-attribute": 2,
+    "selector-max-class": 3,
+    "selector-max-id": 0,
+    "selector-max-pseudo-class": 3,
+    "selector-max-specificity": "0,4,1",
+    "selector-max-universal": 1,
+    "selector-no-qualifying-type": [
+      true,
+      {
+        "ignore": ["attribute", "class"]
+      }
+    ],
+    "declaration-no-important": true,
+    "declaration-block-no-duplicate-properties": true,
+    "declaration-block-no-redundant-longhand-properties": true,
+    "property-no-vendor-prefix": true,
+    "value-no-vendor-prefix": true,
+    "media-feature-range-operator-space-before": "never",
+    "media-feature-range-operator-space-after": "always",
+    "media-feature-parentheses-space-inside": "never",
+    "media-feature-name-no-vendor-prefix": true,
+    "comment-empty-line-before": [
+      "always",
+      {
+        "ignore": ["stylelint-commands"]
+      }
+    ],
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": ["use", "forward"]
+      }
+    ],
+    "scss/dollar-variable-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "SCSS variables should use kebab-case"
+      }
+    ],
+    "scss/at-mixin-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "Mixins should use kebab-case"
+      }
+    ],
+    "scss/percent-placeholder-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "Placeholders should use kebab-case"
+      }
+    ],
+    "order/properties-alphabetical-order": true,
+    "plugin/selector-bem-pattern": {
+      "preset": "bem",
+      "implicitComponents": true,
+      "componentNamePattern": "ti-[a-z]+",
+      "utilitySelectors": "ti-u-([a-z]-?)+"
+    }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.vue"],
+      "rules": {
+        "selector-class-pattern": [
+          "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+          {
+            "message": "Vue component classes must use ti- prefix"
+          }
+        ],
+        "vue-scoped-css/no-parsing-error": true,
+        "vue-scoped-css/require-v-deep-usage": null,
+        "vue-scoped-css/no-deep-combinator": null
+      }
+    },
+    {
+      "files": ["src/assets/styles/critical/**/*.scss"],
+      "rules": {
+        "declaration-no-important": null,
+        "selector-max-specificity": null
+      }
+    },
+    {
+      "files": ["src/assets/styles/utilities/**/*.scss"],
+      "rules": {
+        "declaration-no-important": null
+      }
+    }
+  ],
+  "ignoreFiles": [
+    "dist/**/*",
+    "node_modules/**/*",
+    "public/**/*",
+    "**/*.min.css",
+    "**/vendor/**/*"
+  ]
+}
