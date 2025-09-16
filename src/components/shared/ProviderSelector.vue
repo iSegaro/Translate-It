@@ -69,7 +69,7 @@
       <img
         :src="currentProviderIcon"
         alt="API Provider"
-        class="api-provider-icon"
+        class="ti-api-provider-icon"
       >
       <span>{{ currentProviderName }}</span>
       <IconButton
@@ -608,11 +608,11 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--header-border-color);
 }
 
-.dropdown-item:last-child {
+.ti-dropdown-item:last-child {
   border-bottom: none;
 }
 
-.dropdown-item:hover {
+.ti-dropdown-item:hover {
   background-color: var(--toolbar-link-hover-bg-color) !important;
   opacity: 1 !important;
   filter: none !important;
@@ -623,18 +623,20 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.dropdown-item img {
+.ti-dropdown-item img {
   width: 16px !important;
   height: 16px !important;
   max-width: 16px !important;
   max-height: 16px !important;
   opacity: var(--icon-opacity);
   object-fit: contain;
+  flex-shrink: 0;
 }
 
-.dropdown-item span {
+.ti-dropdown-item span {
   color: var(--text-color);
   font-size: 14px;
+  white-space: nowrap;
 }
 
 /* Context-specific adjustments for popup vs sidepanel */

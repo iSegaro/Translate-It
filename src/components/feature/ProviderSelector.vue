@@ -1,7 +1,7 @@
 <template>
   <select
     :value="modelValue"
-    class="provider-select"
+    class="ti-provider-select"
     @change="handleChange"
   >
     <option 
@@ -45,7 +45,7 @@ const handleChange = (event) => {
 </script>
 
 <style scoped>
-.provider-select {
+.ti-provider-select {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--color-border);
@@ -54,7 +54,7 @@ const handleChange = (event) => {
   background-color: var(--color-background);
   color: var(--color-text);
   cursor: pointer;
-  
+
   &:focus {
     outline: none;
     border-color: var(--color-primary);
