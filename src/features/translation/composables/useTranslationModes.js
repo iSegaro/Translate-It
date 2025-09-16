@@ -35,9 +35,9 @@ const _registerSelectStateListener = async () => {
     const { sendMessage, createMessage, MessageActions } = useMessaging('sidepanel');
     const message = createMessage(MessageActions.GET_SELECT_ELEMENT_STATE);
     const response = await sendMessage(message);
-    if (response && response.result && response.result.success) {
-      sharedIsSelectModeActive.value = !!response.result.active;
-      _currentTabId = response.result.tabId;
+    if (response && response.success) {
+      sharedIsSelectModeActive.value = !!response.active;
+      _currentTabId = response.tabId;
     }
   } catch (err) {
     logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
