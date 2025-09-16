@@ -473,18 +473,18 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
 
 </summary>
 
-- <img src="icons/page.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon)
-- <img src="icons/select.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
-- <img src="icons/paste.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Paste)
-- <img src="icons/speaker.png" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (Voice Command)
-- <img src="icons/translate.png" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (Translate)
-- <img src="icons/clear.png" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (Clear)
-- <img src="icons/close.png" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (Close)
-- <img src="icons/swap.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Swap)
-- <img src="icons/settings.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
-- <img src="icons/copy.png" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
-- <img src="icons/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (Revert)
-- <img src="icons/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (Side Panel)
+- <img src="src/icons/ui/page.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon)
+- <img src="src/icons/ui/select.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
+- <img src="src/icons/ui/paste.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Paste)
+- <img src="src/icons/ui/speaker.png" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (Voice Command)
+- <img src="src/icons/ui/translate.png" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (Translate)
+- <img src="src/icons/ui/clear.png" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (Clear)
+- <img src="src/icons/ui/close.png" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (Close)
+- <img src="src/icons/ui/swap.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Swap)
+- <img src="src/icons/ui/settings.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
+- <img src="src/icons/ui/copy.png" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
+- <img src="src/icons/ui/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (Revert)
+- <img src="src/icons/ui/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (Side Panel)
 
 </details>
 

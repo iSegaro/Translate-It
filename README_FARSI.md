@@ -521,18 +521,18 @@ pnpm run publish
 
 </summary>
 
-- <img src="icons/page.png" alt="آیکون اصلی" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (آیکون اصلی)
-- <img src="icons/select.png" alt="انتخاب" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (انتخاب)
-- <img src="icons/paste.png" alt="چسباندن" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (چسباندن)
-- <img src="icons/speaker.png" alt="فرمان صوتی" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (فرمان صوتی)
-- <img src="icons/translate.png" alt="ترجمه" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (ترجمه)
-- <img src="icons/clear.png" alt="پاک کردن" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (پاک کردن)
-- <img src="icons/close.png" alt="بستن" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (بستن)
-- <img src="icons/swap.png" alt="تغییر جای" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تغییر جای)
-- <img src="icons/settings.png" alt="تنظیمات" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تنظیمات)
-- <img src="icons/copy.png" alt="کپی" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (کپی)
-- <img src="icons/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (بازگشت)
-- <img src="icons/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (پنل کناری)
+- <img src="src/icons/ui/page.png" alt="آیکون اصلی" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (آیکون اصلی)
+- <img src="src/icons/ui/select.png" alt="انتخاب" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (انتخاب)
+- <img src="src/icons/ui/paste.png" alt="چسباندن" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (چسباندن)
+- <img src="src/icons/ui/speaker.png" alt="فرمان صوتی" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (فرمان صوتی)
+- <img src="src/icons/ui/translate.png" alt="ترجمه" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (ترجمه)
+- <img src="src/icons/ui/clear.png" alt="پاک کردن" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (پاک کردن)
+- <img src="src/icons/ui/close.png" alt="بستن" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (بستن)
+- <img src="src/icons/ui/swap.png" alt="تغییر جای" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تغییر جای)
+- <img src="src/icons/ui/settings.png" alt="تنظیمات" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تنظیمات)
+- <img src="src/icons/ui/copy.png" alt="کپی" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (کپی)
+- <img src="src/icons/ui/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (بازگشت)
+- <img src="src/icons/ui/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (پنل کناری)
 
 </details>
 
