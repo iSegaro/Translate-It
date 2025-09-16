@@ -216,8 +216,8 @@ onMounted(async () => {
 }
 
 .language-selector-row {
-  display: flex;
   align-items: center;
+  justify-content: flex-start;
   width: 100%;
   max-width: 100%;
   overflow: visible;
@@ -225,6 +225,7 @@ onMounted(async () => {
   z-index: 11;
   min-height: 40px;
   box-sizing: border-box;
+  padding: 0 8px;
 }
 
 .language-selector-row :deep(.language-controls) {

@@ -208,7 +208,7 @@ onMounted(() => {
 .ti-language-controls {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 6px 12px;
   gap: 6px;
   background: var(--language-controls-bg-color);
@@ -339,7 +339,7 @@ onMounted(() => {
   height: 40px;
   align-items: center;
   padding: 4px 0;
-  margin: 2px 0 4px 0;
+  margin: 0;
   gap: 6px;
   box-sizing: border-box;
   background: transparent;
