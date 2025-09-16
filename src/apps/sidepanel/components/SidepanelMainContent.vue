@@ -230,7 +230,7 @@ onMounted(async () => {
 
 .language-selector-row :deep(.language-controls) {
   width: 100%;
-  max-width: 100%;
+  max-width: calc(100% - 16px);
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
@@ -239,7 +239,7 @@ onMounted(async () => {
   margin: 0;
   background: transparent;
   height: auto;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex-wrap: nowrap !important;
 }
 

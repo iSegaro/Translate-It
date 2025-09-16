@@ -347,12 +347,14 @@ onMounted(() => {
 }
 
 .sidepanel-wrapper .ti-language-select {
-  padding: 6px 10px;
+  padding: 6px 30px 6px 10px;
   font-size: 14px;
   height: 32px;
   line-height: 1.4;
-  min-width: 90px;
-  max-width: 150px;
+  min-width: 100px;
+  max-width: 140px;
+  width: auto;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: flex-start;
