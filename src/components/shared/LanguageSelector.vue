@@ -312,7 +312,7 @@ onMounted(() => {
 }
 
 .popup-wrapper .ti-language-select {
-  padding: 6px 10px;
+  padding: 6px 30px 6px 10px;
   font-size: 14px;
   min-width: 70px;
   max-width: 100px;
