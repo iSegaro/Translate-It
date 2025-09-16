@@ -7,24 +7,24 @@
     :aria-label="ariaLabel"
     :label="label"
     :show-label="showLabel"
-    :custom-classes="['copy-button', { 'copying': isCopying }]"
+    :custom-classes="['ti-copy-button', { 'ti-copying': isCopying }]"
     @click="handleCopy"
   >
     <template #icon>
       <img 
         :src="iconSrc" 
         :alt="iconAlt"
-        class="button-icon"
+        class="ti-button-icon"
         style="width: 16px !important; height: 16px !important; object-fit: contain;"
       >
     </template>
     
     <template #feedback>
       <!-- Success feedback -->
-      <Transition name="feedback">
+      <Transition name="ti-feedback">
         <div
           v-if="showFeedback"
-          class="copy-feedback"
+          class="ti-copy-feedback"
         >
           ✓ {{ feedbackText }}
         </div>
@@ -149,19 +149,19 @@ const handleCopy = async () => {
 
 <style scoped>
 /* Copy button specific styles */
-.copy-button.copying {
+.ti-copy-button.ti-copying {
   opacity: 0.7;
 }
 
 /* Button elements */
-.button-icon {
+.ti-button-icon {
   flex-shrink: 0;
   object-fit: contain;
   filter: var(--icon-filter);
 }
 
 /* Feedback animation */
-.copy-feedback {
+.ti-copy-feedback {
   position: absolute;
   top: -30px;
   left: 50%;
@@ -175,20 +175,20 @@ const handleCopy = async () => {
   z-index: 1000;
 }
 
-.feedback-enter-active,
-.feedback-leave-active {
+.ti-feedback-enter-active,
+.ti-feedback-leave-active {
   transition: all 0.3s ease;
 }
 
-.feedback-enter-from,
-.feedback-leave-to {
+.ti-feedback-enter-from,
+.ti-feedback-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(-10px);
 }
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .variant-standalone {
+  .ti-variant-standalone {
     border-color: rgba(255, 255, 255, 0.2);
     background-color: rgba(0, 0, 0, 0.9);
   }

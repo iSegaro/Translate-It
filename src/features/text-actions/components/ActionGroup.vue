@@ -1,10 +1,10 @@
 <template>
   <div
-    class="action-group"
+    class="ti-action-group"
     :class="[
-      `layout-${layout}`,
-      `spacing-${spacing}`,
-      { 'bordered': bordered, 'elevated': elevated }
+      `ti-layout-${layout}`,
+      `ti-spacing-${spacing}`,
+      { 'ti-bordered': bordered, 'ti-elevated': elevated }
     ]"
   >
     <slot />
@@ -36,41 +36,41 @@ defineProps({
 </script>
 
 <style scoped>
-.action-group {
+.ti-action-group {
   display: flex;
   align-items: center;
 }
 
 /* Layout variants */
-.layout-horizontal {
+.ti-layout-horizontal {
   flex-direction: row;
 }
 
-.layout-vertical {
+.ti-layout-vertical {
   flex-direction: column;
 }
 
 /* Spacing variants */
-.spacing-tight {
+.ti-spacing-tight {
   gap: 2px;
 }
 
-.spacing-normal {
+.ti-spacing-normal {
   gap: 4px;
 }
 
-.spacing-loose {
+.ti-spacing-loose {
   gap: 8px;
 }
 
 /* Style variants */
-.bordered {
+.ti-bordered {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   padding: 2px;
 }
 
-.elevated {
+.ti-elevated {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   padding: 2px;
@@ -79,11 +79,11 @@ defineProps({
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .bordered {
+  .ti-bordered {
     border-color: rgba(255, 255, 255, 0.1);
   }
-  
-  .elevated {
+
+  .ti-elevated {
     background: rgba(0, 0, 0, 0.9);
     box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
   }

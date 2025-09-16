@@ -10,7 +10,7 @@
     <slot name="icon" />
     <span
       v-if="showLabel"
-      class="button-label"
+      class="ti-button-label"
     >
       <slot name="label">{{ label }}</slot>
     </span>
@@ -64,12 +64,12 @@ defineEmits(['click'])
 
 // Computed
 const buttonClasses = computed(() => [
-  'base-action-button',
-  `size-${props.size}`,
-  `variant-${props.variant}`,
+  'ti-base-action-button',
+  `ti-size-${props.size}`,
+  `ti-variant-${props.variant}`,
   {
-    'disabled': props.disabled,
-    'has-label': props.showLabel
+    'ti-disabled': props.disabled,
+    'ti-has-label': props.showLabel
   },
   ...props.customClasses
 ])
@@ -77,7 +77,7 @@ const buttonClasses = computed(() => [
 
 <style scoped>
 /* Base Action Button Styles */
-.base-action-button {
+.ti-base-action-button {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -92,26 +92,26 @@ const buttonClasses = computed(() => [
   outline: none;
 }
 
-.base-action-button:focus {
+.ti-base-action-button:focus {
   outline: 2px solid var(--focus-color, #007bff);
   outline-offset: 2px;
 }
 
-.base-action-button:hover:not(.disabled) {
+.ti-base-action-button:hover:not(.ti-disabled) {
   background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
 }
 
-.base-action-button:active:not(.disabled) {
+.ti-base-action-button:active:not(.ti-disabled) {
   transform: scale(0.95);
 }
 
-.base-action-button.disabled {
+.ti-base-action-button.ti-disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Size variants */
-.size-sm {
+.ti-size-sm {
   padding: 2px;
   min-width: 20px;
   min-height: 20px;
@@ -119,7 +119,7 @@ const buttonClasses = computed(() => [
   gap: 4px;
 }
 
-.size-md {
+.ti-size-md {
   padding: 6px;
   min-width: 32px;
   min-height: 32px;
@@ -127,7 +127,7 @@ const buttonClasses = computed(() => [
   gap: 6px;
 }
 
-.size-lg {
+.ti-size-lg {
   padding: 8px;
   min-width: 40px;
   min-height: 40px;
@@ -136,30 +136,30 @@ const buttonClasses = computed(() => [
 }
 
 /* Variant styles */
-.variant-primary {
+.ti-variant-primary {
   background-color: var(--primary-color, #007bff);
   color: white;
   border: 1px solid var(--primary-color, #007bff);
 }
 
-.variant-primary:hover:not(.disabled) {
+.ti-variant-primary:hover:not(.ti-disabled) {
   background-color: var(--primary-color-hover, #0056b3);
 }
 
-.variant-secondary {
+.ti-variant-secondary {
   background-color: transparent;
   color: var(--text-color, #333);
   border: 1px solid transparent;
   margin: 0 1px;
 }
 
-.variant-secondary:hover:not(.disabled) {
+.ti-variant-secondary:hover:not(.ti-disabled) {
   background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
   border-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
 }
 
 /* Label */
-.button-label {
+.ti-button-label {
   margin-left: 6px;
   font-size: 12px;
   font-weight: 500;
@@ -168,7 +168,7 @@ const buttonClasses = computed(() => [
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .variant-secondary {
+  .ti-variant-secondary {
     border-color: rgba(255, 255, 255, 0.2);
     background-color: rgba(0, 0, 0, 0.9);
   }

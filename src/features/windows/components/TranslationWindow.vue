@@ -28,12 +28,12 @@
     @click.stop
   >
     <div
-      class="window-header"
+      class="ti-window-header"
       @mousedown="handleStartDrag"
     >
-      <div class="header-actions">
+      <div class="ti-header-actions">
         <button
-          class="action-btn"
+          class="ti-action-btn"
           title="Copy translation"
           @click.stop="handleCopy"
         >
@@ -49,7 +49,7 @@
           </svg>
         </button>
         <button 
-          class="action-btn" 
+          class="ti-action-btn" 
           :disabled="!translatedText || translatedText.trim().length === 0" 
           :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
           @click.stop="handleTTS"
@@ -72,7 +72,7 @@
           </svg>
         </button>
         <button
-          class="action-btn"
+          class="ti-action-btn"
           title="Show/Hide Original Text"
           @click.stop="toggleShowOriginal"
         >
@@ -88,9 +88,9 @@
           </svg>
         </button>
       </div>
-      <div class="header-close">
+      <div class="ti-header-close">
         <button
-          class="action-btn"
+          class="ti-action-btn"
           title="Close"
           @click.stop="handleClose"
         >
@@ -108,16 +108,16 @@
       </div>
     </div>
 
-    <div class="window-body">
+    <div class="ti-window-body">
       <!-- Show Original Text Section -->
       <div
         v-if="showOriginal && !isLoading"
-        class="original-text-section"
+        class="ti-original-text-section"
       >
-        <div class="original-label">
+        <div class="ti-original-label">
           Original:
         </div>
-        <div class="original-text">
+        <div class="ti-original-text">
           {{ originalText }}
         </div>
       </div>
@@ -137,7 +137,7 @@
         :show-tts-button="false"
         :can-retry="!!errorMessage"
         :on-retry="handleRetry"
-        class="window-translation-display"
+        class="ti-window-translation-display"
       />
     </div>
   </div>
@@ -376,7 +376,7 @@ const handleStartDrag = (event) => {
 
 /* Theme styles moved to enhanced section below */
 
-.window-header {
+.ti-window-header {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -386,47 +386,47 @@ const handleStartDrag = (event) => {
 }
 
 /* Theme-specific styles for light mode */
-.translation-window.light .window-header {
+.translation-window.light .ti-window-header {
   background-color: #f7f7f7 !important;
   border-bottom: 1px solid #e8e8e8 !important;
 }
 
-.translation-window.light .action-btn {
+.translation-window.light .ti-action-btn {
   background-color: #f0f0f0 !important;
   color: #555 !important;
 }
 
-.translation-window.light .action-btn:hover {
+.translation-window.light .ti-action-btn:hover {
   background-color: #e5e5e5 !important;
 }
 
 /* Theme-specific styles for dark mode */
-.translation-window.dark .window-header {
+.translation-window.dark .ti-window-header {
   background-color: #333333 !important;
   border-bottom: 1px solid #424242 !important;
 }
 
-.translation-window.dark .action-btn {
+.translation-window.dark .ti-action-btn {
   background-color: #424242 !important;
   color: #e0e0e0 !important;
 }
 
-.translation-window.dark .action-btn:hover {
+.translation-window.dark .ti-action-btn:hover {
   background-color: #555555 !important;
 }
 
-.header-actions {
+.ti-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.header-close {
+.ti-header-close {
   display: flex;
   align-items: center;
 }
 
-.action-btn {
+.ti-action-btn {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -438,26 +438,26 @@ const handleStartDrag = (event) => {
   transition: background-color 0.2s ease !important;
 }
 
-.action-btn:hover {
+.ti-action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.action-btn:disabled {
+.ti-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Theme-specific hover effects */
-.translation-window.light .action-btn:hover {
+.translation-window.light .ti-action-btn:hover {
   background-color: #f0f0f0;
 }
 
-.translation-window.dark .action-btn:hover {
+.translation-window.dark .ti-action-btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
 
-.window-body {
+.ti-window-body {
   padding: 16px !important;
   min-height: 100px !important;
   display: flex !important;
@@ -465,13 +465,13 @@ const handleStartDrag = (event) => {
 }
 
 /* Original text section styling */
-.original-text-section {
+.ti-original-text-section {
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.original-label {
+.ti-original-label {
   font-size: 12px;
   font-weight: 600;
   color: #666;
@@ -480,7 +480,7 @@ const handleStartDrag = (event) => {
   letter-spacing: 0.5px;
 }
 
-.original-text {
+.ti-original-text {
   font-size: 13px;
   line-height: 1.4;
   color: #555;
@@ -489,7 +489,7 @@ const handleStartDrag = (event) => {
 }
 
 /* Translation display integration */
-.window-translation-display {
+.ti-window-translation-display {
   flex: 1;
   min-height: 80px;
   position: relative;
