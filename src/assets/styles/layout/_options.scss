@@ -80,7 +80,7 @@ button {
   }
 }
 
-.button-inline {
+.ti-button-inline {
   padding: $spacing-xs $spacing-sm;
   font-size: $font-size-xs;
   font-weight: $font-weight-semibold;
@@ -173,7 +173,7 @@ input[type="radio"] {
   }
 }
 
-.input-error {
+.ti-input-error {
   border-color: var(--color-error) !important;
   box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2) !important;
 

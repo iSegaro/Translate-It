@@ -29,8 +29,8 @@ div[data-sonner-toast] * {
 
 // Content app container and children cursor protection
 // Ensures our Shadow DOM elements maintain proper cursor behavior
-.content-app-container,
-.content-app-container * {
+.ti-content-app-container,
+.ti-content-app-container * {
   cursor: auto !important;
 }
 

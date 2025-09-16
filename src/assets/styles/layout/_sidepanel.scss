@@ -66,7 +66,7 @@ textarea:focus {
   word-wrap: break-word;
 }
 
-.inline-toolbar {
+.ti-inline-toolbar {
   position: absolute;
   top: 5px;
   right: 5px;
@@ -74,7 +74,7 @@ textarea:focus {
   gap: 5px;
 }
 
-.inline-icon {
+.ti-inline-icon {
   width: 20px;
   height: 20px;
   cursor: pointer;
@@ -82,7 +82,7 @@ textarea:focus {
   transition: opacity 0.2s;
 }
 
-.inline-icon:hover {
+.ti-inline-icon:hover {
   opacity: 0.7;
 }
 

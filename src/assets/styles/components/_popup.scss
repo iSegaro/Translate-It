@@ -20,7 +20,7 @@ body.popup-context {
 }
 
 // Popup container
-.popup-container {
+.ti-popup-container {
   width: 100%;
   min-height: 350px;
   height: auto;
@@ -33,7 +33,7 @@ body.popup-context {
 }
 
 // Header toolbar
-.header-toolbar {
+.ti-header-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -43,13 +43,13 @@ body.popup-context {
   flex-direction: row-reverse;
 }
 
-.toolbar-right-group {
+.ti-toolbar-right-group {
   display: flex;
   gap: $spacing-sm;
   align-items: center;
 }
 
-.toolbar-left-group {
+.ti-toolbar-left-group {
   display: flex;
   gap: $spacing-sm;
 }
@@ -78,7 +78,7 @@ body.popup-context .ti-toolbar-icon {
 }
 
 // Textarea and result styles
-.result {
+.ti-result {
   background-color: var(--bg-result-color);
   white-space: normal !important;
   word-wrap: break-word;
@@ -86,20 +86,20 @@ body.popup-context .ti-toolbar-icon {
 }
 
 // Loading spinner
-.spinner-overlay {
+.ti-spinner-overlay {
   position: relative;
   width: 100%;
   min-height: 60px;
 }
 
-.spinner-center {
+.ti-spinner-center {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.spinner {
+.ti-spinner {
   width: 28px;
   height: 28px;
   border: 3px solid var(--header-border-color, #dee2e6);
@@ -110,13 +110,13 @@ body.popup-context .ti-toolbar-icon {
 }
 
 // Fade in animation
-.result.fade-in {
+.ti-result.ti-fade-in {
   animation: fadeIn 0.4s ease-in-out;
 }
 
 
 // Language controls in popup
-.language-controls {
+.ti-language-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
