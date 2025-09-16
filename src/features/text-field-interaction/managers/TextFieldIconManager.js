@@ -96,17 +96,22 @@ export class TextFieldIconManager extends ResourceTracker {
    */
   async isEditableElement(element) {
     if (!element) return false;
-    
+
     // Use the new FieldDetector system - lazy import to avoid circular dependencies
     try {
       // Try to use fieldDetector if available
       if (typeof window !== 'undefined' && window.fieldDetector) {
         const detection = await window.fieldDetector.detect(element);
+        this.logger.debug('FieldDetector result:', {
+          tagName: element.tagName,
+          fieldType: detection.fieldType,
+          shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+        });
         return detection.shouldShowTextFieldIcon;
+      } else {
+        this.logger.debug('FieldDetector not available, using fallback');
+        return this._basicFieldDetection(element);
       }
-      
-      // Fallback to basic detection if FieldDetector not available
-      return this._basicFieldDetection(element);
     } catch (error) {
       this.logger.debug('Error in field detection, using fallback:', error);
       return this._basicFieldDetection(element);
@@ -122,7 +127,9 @@ export class TextFieldIconManager extends ResourceTracker {
     if (!element) return false;
     
     // Check for contenteditable elements
-    if (element.isContentEditable || (element.closest && element.closest('[contenteditable="true"]'))) {
+    if (element.isContentEditable ||
+        element.contentEditable === 'true' ||
+        (element.closest && element.closest('[contenteditable="true"]'))) {
       return true;
     }
     
