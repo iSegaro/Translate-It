@@ -98,6 +98,8 @@ Renders translation icons on text fields. Managed through the `activeIcons` reac
 3. **Consistency**: Uniform notification and UI patterns across the extension
 4. **Performance**: Reduced DOM manipulation and optimized rendering
 5. **Scalability**: Easy to add new UI components and features
+6. **CSS Architecture**: Modern principled CSS with CSS Grid, containment, and safe variable functions
+7. **Future-Proof**: SCSS mixins and functions prevent variable interpolation issues
 
 ## Integration Points
 
