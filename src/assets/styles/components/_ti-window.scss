@@ -114,13 +114,13 @@
     color: var(--text-color, #2c3e50);
 
     // Light theme header with maximum specificity
-    .window-header {
+    .ti-window-header {
       background-color: var(--header-bg-color, #f7f7f7);
       border-bottom: $border-width $border-style var(--header-border-color, #e8e8e8);
     }
 
     // Light theme action buttons with maximum specificity
-    .action-btn {
+    .ti-action-btn {
       background-color: var(--toolbar-link-hover-bg-color, #f0f0f0);
       color: var(--text-color, #555);
 
@@ -137,13 +137,13 @@
     color: var(--text-color, #e0e0e0);
 
     // Dark theme header with maximum specificity
-    .window-header {
+    .ti-window-header {
       background-color: var(--header-bg-color, #333333);
       border-bottom: $border-width $border-style var(--header-border-color, #424242);
     }
 
     // Dark theme action buttons with maximum specificity
-    .action-btn {
+    .ti-action-btn {
       background-color: var(--toolbar-link-hover-bg-color, #424242);
       color: var(--text-color, #e0e0e0);
 
@@ -156,27 +156,39 @@
 
 // Component-specific styles with maximum specificity
 // Window header with increased specificity
-.ti-window .window-header,
-.window-header {
+.ti-window .ti-window-header,
+.ti-window-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: $spacing-sm $spacing-base;
   cursor: move;
   user-select: none;
+  background-color: var(--header-bg-color, #f8f9fa);
+  border-bottom: $border-width $border-style var(--header-border-color, #e8e8e8);
+  border-radius: var(--ti-window-border-radius) var(--ti-window-border-radius) 0 0;
 }
 
 // Header actions with increased specificity
-.ti-window .header-actions,
-.header-actions {
+.ti-window .ti-header-actions,
+.ti-header-actions {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
+  flex: 1;
+}
+
+// Header close section with increased specificity
+.ti-window .ti-header-close,
+.ti-header-close {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
 }
 
 // Action button with increased specificity
-.ti-window .action-btn,
-.action-btn {
+.ti-window .ti-action-btn,
+.ti-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,12 +197,17 @@
   border: none;
   border-radius: var(--ti-action-btn-border-radius);
   cursor: pointer;
+  background-color: transparent;
   @include transition-fast(background-color);
+
+  &:hover {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.1));
+  }
 }
 
 // Window body with increased specificity
-.ti-window .window-body,
-.window-body {
+.ti-window .ti-window-body,
+.ti-window-body {
   padding: $spacing-md;
   min-height: var(--ti-normal-window-min-height);
   display: flex;
@@ -199,43 +216,22 @@
   margin-left: var(--ti-window-body-margin);
 }
 
-// Additional specificity for theme-specific components
-.ti-window.light .window-header,
-.ti-window.dark .window-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-sm $spacing-base;
-  cursor: move;
-  user-select: none;
+// Dark theme specific overrides
+.ti-window.dark .ti-window-header {
+  background-color: var(--header-bg-color, #373737);
+  border-bottom-color: var(--header-border-color, #4a4a4a);
 }
 
-.ti-window.light .header-actions,
-.ti-window.dark .header-actions {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
+.ti-window.dark .ti-action-btn:hover {
+  background-color: var(--toolbar-link-hover-bg-color, rgba(255, 255, 255, 0.1));
 }
 
-.ti-window.light .action-btn,
-.ti-window.dark .action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ti-action-btn-size);
-  height: var(--ti-action-btn-size);
-  border: none;
-  border-radius: var(--ti-action-btn-border-radius);
-  cursor: pointer;
-  @include transition-fast(background-color);
+// Light theme specific overrides
+.ti-window.light .ti-window-header {
+  background-color: var(--header-bg-color, #f8f9fa);
+  border-bottom-color: var(--header-border-color, #e8e8e8);
 }
 
-.ti-window.light .window-body,
-.ti-window.dark .window-body {
-  padding: $spacing-md;
-  min-height: var(--ti-normal-window-min-height);
-  display: flex;
-  flex-direction: column;
-  margin-right: var(--ti-window-body-margin);
-  margin-left: var(--ti-window-body-margin);
+.ti-window.light .ti-action-btn:hover {
+  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
 }
