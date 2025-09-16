@@ -35,8 +35,8 @@
     "perf:monitor": "node scripts/dev/performance-monitor.js",
     "setup": "node scripts/setup/setup.js",
     "setup:chrome-validator": "pnpm add -D web-ext && echo '✅ Chrome validator installed! You can now use: pnpm run validate:chrome'",
-    "lint:styles": "stylelint \"src/**/*.{css,scss,vue}\"",
-    "lint:styles:fix": "stylelint \"src/**/*.{css,scss,vue}\" --fix"
+    "lint:styles": "stylelint \"src/assets/styles/**/*.{css,scss}\"",
+    "lint:styles:fix": "stylelint \"src/assets/styles/**/*.{css,scss}\" --fix"
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
@@ -60,6 +60,7 @@
     "fs-extra": "^11.3.0",
     "globals": "^16.3.0",
     "postcss": "^8.5.3",
+    "postcss-html": "^1.7.0",
     "postcss-scss": "^4.0.9",
     "stylelint": "^16.15.0",
     "stylelint-config-recommended-vue": "^1.5.0",

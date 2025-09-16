@@ -3,7 +3,7 @@
     "stylelint-config-standard-scss",
     "stylelint-config-recommended-vue"
   ],
-  "customSyntax": "postcss-scss",
+  "customSyntax": "postcss-html",
   "rules": {
     "selector-class-pattern": [
       "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
@@ -126,6 +126,7 @@
     "node_modules/**/*",
     "public/**/*",
     "**/*.min.css",
-    "**/vendor/**/*"
+    "**/vendor/**/*",
+    "src/**/*.vue"
   ]
 }
