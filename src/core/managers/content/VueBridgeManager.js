@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import DOMPurify from "dompurify";
+// DOMPurify import removed - not used in this module
 // import browser from "webextension-polyfill";
 // import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";

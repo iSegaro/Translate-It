@@ -5,7 +5,7 @@ import { pinia } from '@/store'
 import OptionsApp from '@/apps/options/OptionsApp.vue'
 import '@/assets/styles/main.scss'
 import browser from 'webextension-polyfill'
-import DOMPurify from 'dompurify'
+// DOMPurify import removed - not used in this module
 import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';

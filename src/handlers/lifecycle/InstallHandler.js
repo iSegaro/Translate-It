@@ -196,8 +196,9 @@ async function handleExtensionUpdate() {
     try {
       // Use the correct path based on the build structure
       iconUrl = browser.runtime.getURL("icons/extension/extension_icon_128.png");
-    } catch (iconError) {
+    } catch (error) {
       // Icon not found, use empty string
+      logger.warn('Could not load extension icon:', error);
     }
 
     // Create a base options object with properties common to all browsers.
