@@ -3,8 +3,8 @@
 
 // Import all necessary styles for content script shadow DOM injection
 @use "./utilities/helpers";
-@use "./components/text-field-icon";
-@use "./components/translation-window";
+@use "./components/ti-field-icon";
+@use "./components/ti-window";
 @use "./components/toast-integration";
 
 // Import vue-sonner styles for notifications

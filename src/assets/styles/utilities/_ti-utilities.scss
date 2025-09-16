@@ -1,0 +1,119 @@
+@use '../base/variables' as *;
+
+// Translate-It Utility Classes with ti- prefix
+// These utilities are safe to use across all contexts
+
+// Layout Utilities
+.ti-u-flex { display: flex !important; }
+.ti-u-inline-flex { display: inline-flex !important; }
+.ti-u-grid { display: grid !important; }
+.ti-u-block { display: block !important; }
+.ti-u-inline-block { display: inline-block !important; }
+.ti-u-hidden { display: none !important; }
+.ti-u-visible { display: block !important; }
+
+// Flexbox Utilities
+.ti-u-flex-col { flex-direction: column !important; }
+.ti-u-flex-row { flex-direction: row !important; }
+.ti-u-flex-wrap { flex-wrap: wrap !important; }
+.ti-u-flex-nowrap { flex-wrap: nowrap !important; }
+.ti-u-items-center { align-items: center !important; }
+.ti-u-items-start { align-items: flex-start !important; }
+.ti-u-items-end { align-items: flex-end !important; }
+.ti-u-items-stretch { align-items: stretch !important; }
+.ti-u-justify-center { justify-content: center !important; }
+.ti-u-justify-start { justify-content: flex-start !important; }
+.ti-u-justify-end { justify-content: flex-end !important; }
+.ti-u-justify-between { justify-content: space-between !important; }
+.ti-u-justify-around { justify-content: space-around !important; }
+.ti-u-gap-0 { gap: 0 !important; }
+.ti-u-gap-1 { gap: $spacing-xs !important; }
+.ti-u-gap-2 { gap: $spacing-sm !important; }
+.ti-u-gap-3 { gap: $spacing-md !important; }
+.ti-u-gap-4 { gap: $spacing-lg !important; }
+
+// Spacing Utilities
+.ti-u-m-0 { margin: 0 !important; }
+.ti-u-m-1 { margin: $spacing-xs !important; }
+.ti-u-m-2 { margin: $spacing-sm !important; }
+.ti-u-m-3 { margin: $spacing-md !important; }
+.ti-u-m-4 { margin: $spacing-lg !important; }
+
+.ti-u-p-0 { padding: 0 !important; }
+.ti-u-p-1 { padding: $spacing-xs !important; }
+.ti-u-p-2 { padding: $spacing-sm !important; }
+.ti-u-p-3 { padding: $spacing-md !important; }
+.ti-u-p-4 { padding: $spacing-lg !important; }
+
+// Position Utilities
+.ti-u-relative { position: relative !important; }
+.ti-u-absolute { position: absolute !important; }
+.ti-u-fixed { position: fixed !important; }
+.ti-u-static { position: static !important; }
+
+// Z-index Utilities
+.ti-u-z-0 { z-index: 0 !important; }
+.ti-u-z-10 { z-index: 10 !important; }
+.ti-u-z-20 { z-index: 20 !important; }
+.ti-u-z-30 { z-index: 30 !important; }
+.ti-u-z-max { z-index: 2147483647 !important; }
+
+// Width & Height Utilities
+.ti-u-w-full { width: 100% !important; }
+.ti-u-w-auto { width: auto !important; }
+.ti-u-h-full { height: 100% !important; }
+.ti-u-h-auto { height: auto !important; }
+
+// Text Utilities
+.ti-u-text-left { text-align: left !important; }
+.ti-u-text-center { text-align: center !important; }
+.ti-u-text-right { text-align: right !important; }
+.ti-u-text-ellipsis {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+// State Utilities
+.ti-u-disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+.ti-u-hidden { display: none !important; }
+.ti-u-invisible { visibility: hidden !important; }
+
+// Overflow Utilities
+.ti-u-overflow-auto { overflow: auto !important; }
+.ti-u-overflow-hidden { overflow: hidden !important; }
+.ti-u-overflow-visible { overflow: visible !important; }
+.ti-u-overflow-scroll { overflow: scroll !important; }
+
+// Shadow Utilities
+.ti-u-shadow-sm { box-shadow: $shadow-sm !important; }
+.ti-u-shadow { box-shadow: $shadow-base !important; }
+.ti-u-shadow-md { box-shadow: $shadow-md !important; }
+.ti-u-shadow-lg { box-shadow: $shadow-lg !important; }
+.ti-u-shadow-none { box-shadow: none !important; }
+
+// Border Utilities
+.ti-u-border-none { border: none !important; }
+.ti-u-border { border: $border-width $border-style $border-color !important; }
+.ti-u-rounded { border-radius: $border-radius-md !important; }
+.ti-u-rounded-sm { border-radius: $border-radius-sm !important; }
+.ti-u-rounded-lg { border-radius: $border-radius-lg !important; }
+.ti-u-rounded-full { border-radius: 50% !important; }
+
+// Background Utilities
+.ti-u-bg-transparent { background-color: transparent !important; }
+.ti-u-bg-current { background-color: currentColor !important; }
+
+// Cursor Utilities
+.ti-u-pointer { cursor: pointer !important; }
+.ti-u-default { cursor: default !important; }
+.ti-u-not-allowed { cursor: not-allowed !important; }
+
+// Select Utilities
+.ti-u-select-none { user-select: none !important; }
+.ti-u-select-text { user-select: text !important; }
+.ti-u-select-auto { user-select: auto !important; }

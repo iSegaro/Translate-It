@@ -4,7 +4,7 @@
 // Enhanced TextFieldIcon component styles with smart positioning
 // Optimized for Shadow DOM with advanced positioning system
 
-.text-field-icon {
+.ti-field-icon {
   // Button reset
   padding: 0;
   margin: 0;
@@ -73,29 +73,29 @@
   }
 }
 
-.text-field-icon__svg {
+.ti-field-icon__svg {
   width: 16px;
   height: 16px;
   display: block;
   pointer-events: none;
   @include transition-fast(transform);
 
-  .text-field-icon.is-hovering & {
+  .ti-field-icon.is-hovering & {
     transform: scale(1.05);
   }
 
-  .text-field-icon.is-active & {
+  .ti-field-icon.is-active & {
     transform: scale(0.95);
   }
 }
 
 // Size variants
-.text-field-icon {
+.ti-field-icon {
   &.size-small {
     width: 24px;
     height: 24px;
 
-    .text-field-icon__svg {
+    .ti-field-icon__svg {
       width: 14px;
       height: 14px;
     }
@@ -105,7 +105,7 @@
     width: 28px;
     height: 28px;
 
-    .text-field-icon__svg {
+    .ti-field-icon__svg {
       width: 16px;
       height: 16px;
     }
@@ -115,7 +115,7 @@
     width: 32px;
     height: 32px;
 
-    .text-field-icon__svg {
+    .ti-field-icon__svg {
       width: 18px;
       height: 18px;
     }
@@ -123,7 +123,7 @@
 }
 
 // Placement-specific styles
-.text-field-icon {
+.ti-field-icon {
   // Inside placements - general styling
   &.placement-inside-right,
   &.placement-inside-left,
@@ -214,13 +214,13 @@
 
 // Responsive design
 @media (max-width: 768px) {
-  .text-field-icon {
+  .ti-field-icon {
     // Slightly larger on mobile for easier touch interaction
     &.size-small { 
       width: 28px; 
       height: 28px; 
       
-      .text-field-icon__svg { 
+      .ti-field-icon__svg { 
         width: 16px; 
         height: 16px; 
       }
@@ -230,7 +230,7 @@
       width: 32px; 
       height: 32px; 
       
-      .text-field-icon__svg { 
+      .ti-field-icon__svg { 
         width: 18px; 
         height: 18px; 
       }
@@ -240,7 +240,7 @@
       width: 36px; 
       height: 36px; 
       
-      .text-field-icon__svg { 
+      .ti-field-icon__svg { 
         width: 20px; 
         height: 20px; 
       }
@@ -250,7 +250,7 @@
 
 // High contrast mode support
 @media (prefers-contrast: high) {
-  .text-field-icon {
+  .ti-field-icon {
     border-width: 2px;
     border-color: #000;
     
@@ -259,7 +259,7 @@
       color: #fff;
     }
     
-    .text-field-icon__svg {
+    .ti-field-icon__svg {
       filter: contrast(2);
     }
   }
@@ -267,7 +267,7 @@
 
 // Reduced motion preference
 @media (prefers-reduced-motion: reduce) {
-  .text-field-icon {
+  .ti-field-icon {
     animation: none;
     transition: none;
   }
@@ -280,7 +280,7 @@
 
 // Print styles (hide icons)
 @media print {
-  .text-field-icon {
+  .ti-field-icon {
     display: none !important;
   }
 }

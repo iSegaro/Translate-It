@@ -4,7 +4,7 @@
 // TranslationWindow component styles - for Shadow DOM injection
 // Using !important because this component is injected into pages with existing styles
 
-.translation-window {
+.ti-window {
   border-radius: $border-radius-lg !important;
   @include shadow-lg;
   display: flex !important;

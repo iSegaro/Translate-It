@@ -12,12 +12,13 @@
 
 // Component styles - Reusable components
 @use "./components/popup";
-@use "./components/translation-window";
-@use "./components/text-field-icon";
+@use "./components/ti-window";
+@use "./components/ti-field-icon";
 
 // Utility styles - Helpers and utilities
 @use "./utilities/utilities";
 @use "./utilities/helpers";
+@use "./utilities/ti-utilities";
 
 // Context-specific styles - these should be overridden by specific entry points
 

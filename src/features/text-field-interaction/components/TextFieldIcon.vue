@@ -5,7 +5,7 @@
   >
     <button
       v-show="visible"
-      class="text-field-icon"
+      class="ti-field-icon"
       :class="computedClasses"
       :style="computedStyle"
       :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
@@ -22,7 +22,7 @@
       @keydown="onKeydown"
     >
       <svg
-        class="text-field-icon__svg"
+        class="ti-field-icon__svg"
         viewBox="0 0 64 64"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
@@ -266,7 +266,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.text-field-icon {
+.ti-field-icon {
   /* Button reset */
   padding: 0;
   margin: 0;
@@ -274,71 +274,71 @@ onMounted(() => {
   border: none;
   outline: none;
   font: inherit;
-  
+
   /* Positioning - handled by computedStyle */
   position: fixed;
-  
+
   /* Default size - overridden by computedStyle */
   width: 28px;
   height: 28px;
-  
+
   /* Appearance */
   background-color: #ffffff;
   border: 1px solid #dadce0;
   border-radius: 50%;
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.1),
     0 1px 3px rgba(0, 0, 0, 0.08);
-  
+
   /* Layout */
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   /* Interaction */
   cursor: pointer;
   user-select: none;
-  
+
   /* Z-index - handled by computedStyle */
   z-index: 2147483647;
-  
+
   /* Animation - smooth position transitions */
-  transition: 
+  transition:
     all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.2s ease-out,
     left 0.2s ease-out;
   opacity: 1;
 }
 
-.text-field-icon:disabled {
+.ti-field-icon:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-.text-field-icon.is-hovering {
+.ti-field-icon.is-hovering {
   background-color: #f8f9fa;
   border-color: #dadce0;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.15),
     0 2px 6px rgba(0, 0, 0, 0.1);
   transform: scale(1.1) translateY(-1px);
 }
 
-.text-field-icon.is-active {
+.ti-field-icon.is-active {
   background-color: #e8f0fe;
   border-color: #4285f4;
   transform: scale(0.95);
 }
 
-.text-field-icon:focus-visible {
+.ti-field-icon:focus-visible {
   border-color: #4285f4;
-  box-shadow: 
+  box-shadow:
     0 0 0 2px rgba(66, 133, 244, 0.2),
     0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.text-field-icon__svg {
+.ti-field-icon__svg {
   width: 16px;
   height: 16px;
   display: block;
@@ -346,57 +346,57 @@ onMounted(() => {
   transition: transform 0.2s ease;
 }
 
-.text-field-icon.is-hovering .text-field-icon__svg {
+.ti-field-icon.is-hovering .ti-field-icon__svg {
   transform: scale(1.05);
 }
 
-.text-field-icon.is-active .text-field-icon__svg {
+.ti-field-icon.is-active .ti-field-icon__svg {
   transform: scale(0.95);
 }
 
 /* Size variants */
-.text-field-icon.size-small {
+.ti-field-icon.size-small {
   width: 24px;
   height: 24px;
 }
 
-.text-field-icon.size-medium {
+.ti-field-icon.size-medium {
   width: 28px;
   height: 28px;
 }
 
-.text-field-icon.size-large {
+.ti-field-icon.size-large {
   width: 32px;
   height: 32px;
 }
 
-.text-field-icon.size-small .text-field-icon__svg {
+.ti-field-icon.size-small .ti-field-icon__svg {
   width: 14px;
   height: 14px;
 }
 
-.text-field-icon.size-medium .text-field-icon__svg {
+.ti-field-icon.size-medium .ti-field-icon__svg {
   width: 16px;
   height: 16px;
 }
 
-.text-field-icon.size-large .text-field-icon__svg {
+.ti-field-icon.size-large .ti-field-icon__svg {
   width: 18px;
   height: 18px;
 }
 
 /* Placement-specific styles */
-.text-field-icon.placement-inside-right,
-.text-field-icon.placement-inside-left {
+.ti-field-icon.placement-inside-right,
+.ti-field-icon.placement-inside-left {
   /* Inside placements have slightly different styling */
   background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(2px);
 }
 
 /* Smart attachment indicator */
-.text-field-icon.smart-attached {
+.ti-field-icon.smart-attached {
   /* Visual indicator for smart positioning */
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(66, 133, 244, 0.1),
     0 1px 3px rgba(66, 133, 244, 0.08),
     inset 0 0 0 1px rgba(66, 133, 244, 0.1);
@@ -432,12 +432,12 @@ onMounted(() => {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .text-field-icon {
+  .ti-field-icon {
     width: 32px;
     height: 32px;
   }
-  
-  .text-field-icon__svg {
+
+  .ti-field-icon__svg {
     width: 18px;
     height: 18px;
   }
@@ -445,23 +445,23 @@ onMounted(() => {
 
 /* High contrast mode */
 @media (prefers-contrast: high) {
-  .text-field-icon {
+  .ti-field-icon {
     border-width: 2px;
     border-color: #000;
   }
-  
-  .text-field-icon.is-hovering {
+
+  .ti-field-icon.is-hovering {
     background-color: #000;
   }
-  
-  .text-field-icon__svg {
+
+  .ti-field-icon__svg {
     filter: invert(1);
   }
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .text-field-icon {
+  .ti-field-icon {
     animation: none;
     transition: none;
   }
@@ -469,7 +469,7 @@ onMounted(() => {
 
 /* Print styles */
 @media print {
-  .text-field-icon {
+  .ti-field-icon {
     display: none;
   }
 }
