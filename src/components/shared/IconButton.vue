@@ -127,6 +127,12 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
   height: 16px;
 }
 
+.ti-toolbar-icon {
+  width: 20px;
+  height: 20px;
+  opacity: var(--icon-opacity, 0.6);
+}
+
 .ti-voice-target-icon {
   width: 16px !important;
   height: 16px !important;

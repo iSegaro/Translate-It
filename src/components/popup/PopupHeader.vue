@@ -334,15 +334,7 @@ const handleOpenSidePanelNative = async (event) => {
 }
 
 
-/* Removed duplicate .toolbar-icon - now handled by popup.scss global styles */
-
-.revert-icon {
-  transition: transform 0.4s ease, opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
-}
-
-.revert-icon:hover {
-  transform: rotate(360deg);
-}
+/* Icon styles are now handled by popup.scss global styles */
 
 .toolbar-link {
   display: inline-flex;

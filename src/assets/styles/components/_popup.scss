@@ -55,7 +55,7 @@ body.popup-context {
 }
 
 // Icon styles with proper specificity
-body.popup-context .toolbar-icon {
+body.popup-context .ti-toolbar-icon {
   width: 20px;
   height: 20px;
   cursor: pointer;
@@ -69,7 +69,7 @@ body.popup-context .toolbar-icon {
 }
 
 // Revert icon animation
-.revert-icon {
+.ti-revert-icon {
   @include transition-slow(transform, opacity, filter);
 
   &:hover {
