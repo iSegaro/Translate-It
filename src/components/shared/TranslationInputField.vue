@@ -210,7 +210,7 @@ onMounted(async () => {
 
 .ti-translation-textarea {
   width: 100%;
-  padding: 28px 10px 10px 10px;
+  padding: 38px 10px 10px 10px;
   border-radius: 8px;
   font-family: inherit;
   font-size: 13px;
