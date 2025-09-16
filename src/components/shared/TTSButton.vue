@@ -11,11 +11,11 @@
   >
     <template #icon>
       <!-- Icon Container -->
-      <div class="icon-container">
+      <div class="ti-icon-container">
         <!-- Idle State Icon -->
         <svg
           v-if="tts.ttsState.value === 'idle'"
-          class="tts-icon"
+          class="ti-tts-icon"
           viewBox="0 0 24 24"
           width="16"
           height="16"
@@ -29,7 +29,7 @@
         <!-- Loading State Icon with Animation -->
         <svg
           v-else-if="tts.ttsState.value === 'loading'"
-          class="tts-icon loading-spin"
+          class="ti-tts-icon ti-loading-spin"
           viewBox="0 0 24 24"
           width="16"
           height="16"
@@ -48,7 +48,7 @@
         <!-- Playing State Icon (Stop) -->
         <svg
           v-else-if="tts.ttsState.value === 'playing'"
-          class="tts-icon"
+          class="ti-tts-icon"
           viewBox="0 0 24 24"
           width="16"
           height="16"
@@ -62,7 +62,7 @@
         <!-- Error State Icon -->
         <svg
           v-else-if="tts.ttsState.value === 'error'"
-          class="tts-icon error-icon"
+          class="ti-tts-icon ti-error-icon"
           viewBox="0 0 24 24"
           width="16"
           height="16"
@@ -136,10 +136,10 @@ const tts = useTTSSmart()
 
 // Computed Properties
 const ttsButtonClasses = computed(() => [
-  'tts-button',
-  `tts-button--${tts.ttsState.value}`,
+  'ti-tts-button',
+  `ti-tts-button--${tts.ttsState.value}`,
   {
-    'tts-button--has-label': props.showLabel
+    'ti-tts-button--has-label': props.showLabel
   }
 ])
 
@@ -240,63 +240,63 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 
 <style scoped>
 /* TTS Button specific styles */
-.tts-button {
+.ti-tts-button {
   /* No additional styling needed - BaseActionButton handles it */
 }
 
 /* State-specific Styles */
-.tts-button--loading {
+.ti-tts-button--loading {
   pointer-events: none;
 }
 
-.tts-button--playing {
+.ti-tts-button--playing {
   border-color: var(--color-error, #dc3545);
 }
 
-.tts-button--error {
+.ti-tts-button--error {
   border-color: var(--color-error, #dc3545);
 }
 
 /* Icon Container */
-.icon-container {
+.ti-icon-container {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 /* TTS Icon */
-.tts-icon {
+.ti-tts-icon {
   transition: all 0.2s ease;
   flex-shrink: 0;
   color: inherit;
 }
 
 /* Ensure SVG paths inherit proper color */
-.tts-icon path {
+.ti-tts-icon path {
   fill: currentColor;
   stroke: none;
 }
 
-.loading-spin {
-  animation: spin 1s linear infinite;
+.ti-loading-spin {
+  animation: ti-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes ti-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-.error-icon {
+.ti-error-icon {
   color: currentColor;
 }
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .tts-icon {
+  .ti-tts-icon {
     transition: none;
   }
-  
-  .loading-spin {
+
+  .ti-loading-spin {
     animation: none;
   }
 }

@@ -1,15 +1,15 @@
 <template>
   <div
-    class="action-toolbar"
+    class="ti-action-toolbar"
     :class="[
-      `mode-${mode}`,
-      `layout-${layout}`,
-      `position-${position}`,
-      { 'visible': visible, 'has-content': hasContent }
+      `ti-mode-${mode}`,
+      `ti-layout-${layout}`,
+      `ti-position-${position}`,
+      { 'ti-visible': visible, 'ti-has-content': hasContent }
     ]"
   >
     <!-- Left group: Copy + TTS -->
-    <div class="toolbar-left">
+    <div class="ti-toolbar-left">
       <CopyButton
         v-if="showCopy"
         :text="text"
@@ -37,7 +37,7 @@
     </div>
     
     <!-- Right group: Paste -->
-    <div class="toolbar-right">
+    <div class="ti-toolbar-right">
       <PasteButton
         v-if="showPaste"
         :size="buttonSize"
@@ -251,7 +251,7 @@ const handleTTSStateChanged = (data) => {
 </script>
 
 <style scoped>
-.action-toolbar {
+.ti-action-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -260,8 +260,8 @@ const handleTTSStateChanged = (data) => {
 }
 
 /* Toolbar groups */
-.toolbar-left,
-.toolbar-right {
+.ti-toolbar-left,
+.ti-toolbar-right {
   display: flex;
   gap: 2px;
   align-items: center;
@@ -270,42 +270,42 @@ const handleTTSStateChanged = (data) => {
   overflow: visible;
 }
 
-.toolbar-left {
+.ti-toolbar-left {
   flex: 0 1 auto;
 }
 
-.toolbar-right {
+.ti-toolbar-right {
   flex: 0 1 auto;
 }
 
 /* Layout variants */
-.layout-horizontal {
+.ti-layout-horizontal {
   flex-direction: row;
 }
 
-.layout-horizontal .toolbar-left,
-.layout-horizontal .toolbar-right {
+.ti-layout-horizontal .ti-toolbar-left,
+.ti-layout-horizontal .ti-toolbar-right {
   flex-direction: row;
 }
 
-.layout-vertical {
+.ti-layout-vertical {
   flex-direction: column;
   justify-content: flex-start;
   gap: 4px;
 }
 
-.layout-vertical .toolbar-left,
-.layout-vertical .toolbar-right {
+.ti-layout-vertical .ti-toolbar-left,
+.ti-layout-vertical .ti-toolbar-right {
   flex-direction: column;
   width: 100%;
 }
 
-.layout-vertical .toolbar-right {
+.ti-layout-vertical .ti-toolbar-right {
   margin-top: 4px;
 }
 
 /* Position variants */
-.position-top-right {
+.ti-position-top-right {
   position: absolute;
   top: 8px;
   right: 0px;
@@ -313,7 +313,7 @@ const handleTTSStateChanged = (data) => {
   box-sizing: border-box;
 }
 
-.position-top-left {
+.ti-position-top-left {
   position: absolute;
   top: 8px;
   left: 0px;
@@ -321,7 +321,7 @@ const handleTTSStateChanged = (data) => {
   box-sizing: border-box;
 }
 
-.position-bottom-right {
+.ti-position-bottom-right {
   position: absolute;
   bottom: 8px;
   right: 0px;
@@ -330,7 +330,7 @@ const handleTTSStateChanged = (data) => {
   right: 8px;
 }
 
-.position-bottom-left {
+.ti-position-bottom-left {
   position: absolute;
   bottom: 8px;
   left: 0px;
@@ -338,22 +338,22 @@ const handleTTSStateChanged = (data) => {
   box-sizing: border-box;
 }
 
-.position-inline {
+.ti-position-inline {
   position: relative;
   display: inline-flex;
 }
 
 /* Mode-specific styles - simplified */
-.mode-input,
-.mode-output,
-.mode-floating {
+.ti-mode-input,
+.ti-mode-output,
+.ti-mode-floating {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 4px;
   padding: 2px;
 }
 
-.mode-inline,
-.mode-sidepanel {
+.ti-mode-inline,
+.ti-mode-sidepanel {
   background: transparent;
   padding: 2px;
 }
@@ -363,9 +363,9 @@ const handleTTSStateChanged = (data) => {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .mode-input,
-  .mode-output,
-  .mode-floating {
+  .ti-mode-input,
+  .ti-mode-output,
+  .ti-mode-floating {
     background: rgba(0, 0, 0, 0.9);
   }
 }

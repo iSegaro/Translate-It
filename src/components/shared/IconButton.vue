@@ -4,14 +4,14 @@
     :alt="alt"
     :title="title"
     :class="[
-      'icon-button',
+      'ti-icon-button',
       {
-        'revert-icon': isRevertIcon,
-        'toolbar-icon': isToolbarIcon,
-        'inline-icon': isInlineIcon,
-        'paste-icon-separate': isPasteIconSeparate,
-        'voice-target-icon': isVoiceTargetIcon,
-        'hidden-by-clipboard': hiddenByClipboard
+        'ti-revert-icon': isRevertIcon,
+        'ti-toolbar-icon': isToolbarIcon,
+        'ti-inline-icon': isInlineIcon,
+        'ti-paste-icon-separate': isPasteIconSeparate,
+        'ti-voice-target-icon': isVoiceTargetIcon,
+        'ti-hidden-by-clipboard': hiddenByClipboard
       }
     ]"
     @click="$emit('click')"
@@ -93,32 +93,32 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
 </script>
 
 <style scoped>
-.icon-button {
+.ti-icon-button {
   cursor: pointer;
   transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
   filter: var(--icon-filter);
 }
 
-.icon-button:hover {
+.ti-icon-button:hover {
   opacity: var(--icon-hover-opacity);
 }
 
 
-.inline-icon {
+.ti-inline-icon {
   width: 16px;
   height: 16px;
   opacity: var(--icon-opacity, 0.6);
 }
 
-.revert-icon {
+.ti-revert-icon {
   transition: transform 0.4s ease, opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
 }
 
-.revert-icon:hover {
+.ti-revert-icon:hover {
   transform: rotate(360deg);
 }
 
-.paste-icon-separate {
+.ti-paste-icon-separate {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -127,14 +127,14 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
   height: 16px;
 }
 
-.voice-target-icon {
+.ti-voice-target-icon {
   width: 16px !important;
   height: 16px !important;
   max-width: 16px !important;
   max-height: 16px !important;
 }
 
-.paste-icon-separate.hidden-by-clipboard {
+.ti-paste-icon-separate.ti-hidden-by-clipboard {
   display: none !important;
 }
 </style>

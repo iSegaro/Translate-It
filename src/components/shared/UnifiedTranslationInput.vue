@@ -1,13 +1,13 @@
 <template>
   <form
-    class="unified-translation-input"
-    :class="[`mode-${mode}`, { 'enhanced': enhanced }]"
+    class="ti-unified-translation-input"
+    :class="[`ti-mode-${mode}`, { 'ti-enhanced': enhanced }]"
     @submit.prevent="handleTranslate"
   >
     <!-- Controls Section (Language & Provider) -->
     <div
       v-if="showControls"
-      class="controls-container"
+      class="ti-controls-container"
     >
       <LanguageSelector
         v-if="showLanguageSelector"
@@ -29,19 +29,19 @@
 
 
     <!-- Enhanced Source Text Input Section -->
-    <div class="enhanced-input-section">
+    <div class="ti-enhanced-input-section">
       <label
         v-if="showInputLabel"
-        class="input-label"
+        class="ti-input-label"
       >{{ inputLabel }}:</label>
-      <div class="input-container">
+      <div class="ti-input-container">
         <textarea
           ref="sourceInputRef"
           v-model="sourceText"
           :placeholder="inputPlaceholder"
           :rows="inputRows"
           :tabindex="1"
-          class="translation-textarea enhanced"
+          class="ti-translation-textarea ti-enhanced"
           @input="handleSourceInput"
           @keydown="handleKeydown"
         />
@@ -73,11 +73,11 @@
     <!-- Enhanced Translation Result Section -->
     <div
       v-if="showResultSection"
-      class="enhanced-result-section"
+      class="ti-enhanced-result-section"
     >
       <label
         v-if="showResultLabel"
-        class="input-label"
+        class="ti-input-label"
       >{{ resultLabel }}:</label>
       <TranslationDisplay
         :content="translatedText"
@@ -88,8 +88,8 @@
         :placeholder="resultPlaceholder"
         :copy-title="copyResultTitle"
         :tts-title="ttsResultTitle"
-        :container-class="`${mode}-result-container`"
-        :content-class="`${mode}-result-content`"
+        :container-class="`ti-${mode}-result-container`"
+        :content-class="`ti-${mode}-result-content`"
         @text-copied="handleTranslationCopied"
         @tts-speaking="handleTranslationTTSSpeaking"
         @action-failed="handleActionFailed"
@@ -99,9 +99,9 @@
     <!-- Status Bar -->
     <div
       v-if="statusMessage"
-      class="status-bar"
+      class="ti-status-bar"
     >
-      <span :class="['status-message', statusType]">{{ statusMessage }}</span>
+      <span :class="['ti-status-message', statusType]">{{ statusMessage }}</span>
     </div>
   </form>
 </template>

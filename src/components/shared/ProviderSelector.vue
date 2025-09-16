@@ -2,12 +2,12 @@
   <!-- Split Button Mode for Popup -->
   <div
     v-if="mode === 'split'"
-    class="split-translate-button-container"
+    class="ti-split-translate-button-container"
   >
-    <div class="split-translate-button">
+    <div class="ti-split-translate-button">
       <button
         type="submit"
-        class="translate-main-area"
+        class="ti-translate-main-area"
         :title="t('popup_translate_button_title') || 'ترجمه'"
         :disabled="isTranslating || disabled"
         @click="handleTranslate"
@@ -15,21 +15,21 @@
         <img
           :src="currentProviderIcon"
           alt="API Provider"
-          class="api-provider-icon"
+          class="ti-api-provider-icon"
         >
         <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
       </button>
       <button 
         type="button"
-        class="provider-dropdown-area"
-        :class="{ active: isDropdownOpen }"
+        class="ti-provider-dropdown-area"
+        :class="{ 'ti-active': isDropdownOpen }"
         @click.stop="toggleDropdown"
       >
         <IconButton
           icon="dropdown-arrow.svg"
           alt="Dropdown"
           type="inline"
-          class="dropdown-arrow"
+          class="ti-dropdown-arrow"
         />
       </button>
     </div>
@@ -37,14 +37,14 @@
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="provider-dropdown-menu"
+      class="ti-provider-dropdown-menu"
       @click.stop
     >
       <div
         v-for="provider in availableProviders"
         :key="provider.id"
-        class="dropdown-item"
-        :class="{ active: currentProvider === provider.id }"
+        class="ti-dropdown-item"
+        :class="{ 'ti-active': currentProvider === provider.id }"
         @click="selectProvider(provider)"
       >
         <img
@@ -59,11 +59,11 @@
   <!-- Regular Button Mode for Sidepanel -->
   <div
     v-else-if="mode === 'button'"
-    class="provider-button-container"
+    class="ti-provider-button-container"
   >
     <button
-      class="provider-button"
-      :class="{ active: isDropdownOpen }"
+      class="ti-provider-button"
+      :class="{ 'ti-active': isDropdownOpen }"
       @click="toggleDropdown"
     >
       <img
@@ -84,14 +84,14 @@
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="provider-dropdown-menu"
+      class="ti-provider-dropdown-menu"
       @click.stop
     >
       <div
         v-for="provider in availableProviders"
         :key="provider.id"
-        class="dropdown-item"
-        :class="{ active: currentProvider === provider.id }"
+        class="ti-dropdown-item"
+        :class="{ 'ti-active': currentProvider === provider.id }"
         @click="selectProvider(provider)"
       >
         <img
@@ -106,32 +106,32 @@
   <!-- Icon Only Mode for Sidepanel Toolbar -->
   <div
     v-else-if="mode === 'icon-only'"
-    class="provider-icon-only-container"
+    class="ti-provider-icon-only-container"
   >
     <button
-      class="provider-icon-button"
-      :class="{ active: isDropdownOpen }"
+      class="ti-provider-icon-button"
+      :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
       @click="toggleDropdown"
     >
       <img
         :src="currentProviderIcon"
         alt="API Provider"
-        class="provider-icon-only"
+        class="ti-provider-icon-only"
       >
     </button>
     
     <!-- Provider Dropdown -->
     <div 
       v-show="isDropdownOpen"
-      class="provider-dropdown-menu"
+      class="ti-provider-dropdown-menu"
       @click.stop
     >
       <div
         v-for="provider in availableProviders"
         :key="provider.id"
-        class="dropdown-item"
-        :class="{ active: currentProvider === provider.id }"
+        class="ti-dropdown-item"
+        :class="{ 'ti-active': currentProvider === provider.id }"
         @click="selectProvider(provider)"
       >
         <img
@@ -146,11 +146,11 @@
   <!-- Compact Mode -->
   <div
     v-else
-    class="provider-compact-container"
+    class="ti-provider-compact-container"
   >
     <select
       :value="currentProvider"
-      class="provider-select"
+      class="ti-provider-select"
       @change="handleProviderChange"
     >
       <option
@@ -299,7 +299,7 @@ const handleProviderChange = (event) => {
 }
 
 const closeDropdown = (event) => {
-  if (!event.target.closest('.split-translate-button-container, .provider-button-container, .provider-icon-only-container')) {
+  if (!event.target.closest('.ti-split-translate-button-container, .ti-provider-button-container, .ti-provider-icon-only-container')) {
     isDropdownOpen.value = false
   }
 }
@@ -341,13 +341,13 @@ onUnmounted(() => {
 
 <style scoped>
 /* Split Button Styles */
-.split-translate-button-container {
+.ti-split-translate-button-container {
   position: relative;
   flex-shrink: 0;
   z-index: 100;
 }
 
-.split-translate-button {
+.ti-split-translate-button {
   background: none;
   border: 1px solid var(--header-border-color);
   border-radius: 4px;
@@ -362,16 +362,16 @@ onUnmounted(() => {
   height: 32px;
 }
 
-.split-translate-button:hover {
+.ti-split-translate-button:hover {
   border-color: var(--language-select-border-color);
 }
 
-.split-translate-button:disabled {
+.ti-split-translate-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.translate-main-area {
+.ti-translate-main-area {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -385,11 +385,11 @@ onUnmounted(() => {
   color: var(--text-color);
 }
 
-.translate-main-area:hover {
+.ti-translate-main-area:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-.api-provider-icon {
+.ti-api-provider-icon {
   width: 14px !important;
   height: 14px !important;
   max-width: 14px !important;
@@ -399,7 +399,7 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
-.provider-dropdown-area {
+.ti-provider-dropdown-area {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -414,21 +414,21 @@ onUnmounted(() => {
   background: none;
 }
 
-.provider-dropdown-area:hover {
+.ti-provider-dropdown-area:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-.provider-dropdown-area.active {
+.ti-provider-dropdown-area.ti-active {
   background-color: var(--language-controls-bg-color);
 }
 
 /* Regular Button Styles */
-.provider-button-container {
+.ti-provider-button-container {
   position: relative;
   z-index: 100;
 }
 
-.provider-button {
+.ti-provider-button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -442,23 +442,23 @@ onUnmounted(() => {
   color: var(--text-color);
 }
 
-.provider-button:hover {
+.ti-provider-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-.provider-button.active {
+.ti-provider-button.ti-active {
   background-color: var(--language-controls-bg-color);
 }
 
 /* Icon Only Mode Styles */
-.provider-icon-only-container {
+.ti-provider-icon-only-container {
   position: relative;
   z-index: 100;
   display: flex;
   justify-content: flex-end;
 }
 
-.provider-icon-only-container .provider-dropdown-menu {
+.provider-icon-only-container .ti-provider-dropdown-menu {
   left: 100%;
   right: auto;
   top: 0;
@@ -468,7 +468,7 @@ onUnmounted(() => {
   min-width: 200px;
 }
 
-.provider-icon-button {
+.ti-provider-icon-button {
   background: none;
   border: none;
   padding: 4px;
@@ -485,16 +485,16 @@ onUnmounted(() => {
     background-color: var(--color-background);
   }
 
-  &.active {
+  &.ti-active {
     background-color: var(--color-primary);
 
-    .provider-icon-only {
+    .ti-provider-icon-only {
       filter: invert(1);
     }
   }
 }
 
-.provider-icon-only {
+.ti-provider-icon-only {
   width: 18px;
   height: 18px;
   object-fit: contain;
@@ -503,7 +503,7 @@ onUnmounted(() => {
 }
 
 /* Right-aligned dropdown for icon-only mode */
-.dropdown-menu-right {
+.ti-dropdown-menu-right {
   right: 0;
   left: auto;
   top: 100%;
@@ -515,27 +515,27 @@ onUnmounted(() => {
 }
 
 /* Enhanced dropdown items for icon-only mode */
-.provider-icon-only-container .dropdown-item {
+.provider-icon-only-container .ti-dropdown-item {
   background-color: var(--color-background, #ffffff);
   color: var(--color-text, #374151);
   border-bottom: 1px solid var(--color-border, #e5e7eb);
 }
 
-.provider-icon-only-container .dropdown-item:hover {
+.ti-provider-icon-only-container .ti-dropdown-item:hover {
   background-color: var(--color-surface-alt, #f3f4f6) !important;
 }
 
-.provider-icon-only-container .dropdown-item.active {
+.ti-provider-icon-only-container .ti-dropdown-item.ti-active {
   background-color: var(--color-primary, #3b82f6) !important;
   color: white !important;
 }
 
-.provider-icon-only-container .dropdown-item.active span {
+.ti-provider-icon-only-container .ti-dropdown-item.ti-active span {
   color: white !important;
 }
 
 /* Compact Select Styles */
-.provider-select {
+.ti-provider-select {
   padding: 6px 8px;
   border: 1px solid var(--header-border-color);
   border-radius: 4px;
@@ -547,11 +547,11 @@ onUnmounted(() => {
 
 /* Common Styles */
 
-.translate-main-area:hover .api-provider-icon {
+.ti-translate-main-area:hover .ti-api-provider-icon {
   opacity: var(--icon-hover-opacity);
 }
 
-.dropdown-arrow {
+.ti-dropdown-arrow {
   width: 6px !important;
   height: 4px !important;
   opacity: var(--icon-opacity);
@@ -560,11 +560,11 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.dropdown-arrow.rotated {
+.ti-dropdown-arrow.rotated {
   transform: rotate(180deg);
 }
 
-.provider-dropdown-area.active .dropdown-arrow {
+.ti-provider-dropdown-area.ti-active .ti-dropdown-arrow {
   transform: rotate(180deg);
 }
 
@@ -578,7 +578,7 @@ onUnmounted(() => {
 }
 
 /* Provider Dropdown Menu */
-.provider-dropdown-menu {
+.ti-provider-dropdown-menu {
   position: absolute;
   top: 100%;
   left: 0;
@@ -598,7 +598,7 @@ onUnmounted(() => {
 
 
 
-.dropdown-item {
+.ti-dropdown-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -618,7 +618,7 @@ onUnmounted(() => {
   filter: none !important;
 }
 
-.dropdown-item.active {
+.ti-dropdown-item.ti-active {
   background-color: var(--language-controls-bg-color);
   font-weight: 500;
 }
@@ -638,13 +638,13 @@ onUnmounted(() => {
 }
 
 /* Context-specific adjustments for popup vs sidepanel */
-.popup-wrapper .split-translate-button {
+.popup-wrapper .ti-split-translate-button {
   height: 32px;
   min-width: 100px;
   align-self: center;
 }
 
-.popup-wrapper .translate-main-area {
+.popup-wrapper .ti-translate-main-area {
   padding: 0;
   height: 100%;
   display: flex;
@@ -657,12 +657,12 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.popup-wrapper .api-provider-icon {
+.popup-wrapper .ti-api-provider-icon {
   width: 12px !important;
   height: 12px !important;
 }
 
-.popup-wrapper .provider-dropdown-area {
+.popup-wrapper .ti-provider-dropdown-area {
   width: 18px;
   height: 100%;
   display: flex;
@@ -670,14 +670,14 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.sidepanel-wrapper .split-translate-button {
+.sidepanel-wrapper .ti-split-translate-button {
   height: 28px;
   min-width: 100px;
   border-radius: 3px;
   align-self: center;
 }
 
-.sidepanel-wrapper .translate-main-area {
+.sidepanel-wrapper .ti-translate-main-area {
   padding: 0;
   height: 100%;
   display: flex;
@@ -690,12 +690,12 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.sidepanel-wrapper .api-provider-icon {
+.sidepanel-wrapper .ti-api-provider-icon {
   width: 12px !important;
   height: 12px !important;
 }
 
-.sidepanel-wrapper .provider-dropdown-area {
+.sidepanel-wrapper .ti-provider-dropdown-area {
   width: 18px;
   height: 100%;
   display: flex;
@@ -703,12 +703,12 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.sidepanel-wrapper .split-translate-button-container {
+.sidepanel-wrapper .ti-split-translate-button-container {
   max-width: 150px;
   align-self: flex-start;
 }
 
-.sidepanel-wrapper .split-translate-button {
+.sidepanel-wrapper .ti-split-translate-button {
   background-color: var(--bg-color);
   border: 1px solid var(--primary-color, #007bff);
 }

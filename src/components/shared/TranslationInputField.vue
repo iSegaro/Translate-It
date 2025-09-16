@@ -1,7 +1,7 @@
 <template>
   <div
-    class="textarea-container"
-    :class="{ 'has-content': hasContent }"
+    class="ti-textarea-container"
+    :class="{ 'ti-has-content': hasContent }"
   >
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
@@ -13,7 +13,7 @@
       :show-paste="true"
       :copy-disabled="!hasContent"
       :tts-disabled="!hasContent"
-      class="input-toolbar"
+      class="ti-input-toolbar"
       @text-pasted="handlePaste"
     />
     
@@ -25,7 +25,7 @@
       :rows="rows"
       :tabindex="tabindex"
       :class="textareaClass"
-      class="translation-textarea"
+      class="ti-translation-textarea"
       @input="handleInput"
       @keydown="handleKeydown"
     />
@@ -199,12 +199,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.textarea-container {
+.ti-textarea-container {
   position: relative;
   margin: 8px 12px;
 }
 
-.translation-textarea {
+.ti-translation-textarea {
   width: 100%;
   padding: 28px 10px 10px 10px;
   /* border-radius: 3px; */
@@ -223,19 +223,19 @@ onMounted(async () => {
   overflow-x: hidden;
 }
 
-.translation-textarea:focus {
+.ti-translation-textarea:focus {
   border: none;
   outline: 0;
   box-shadow: none;
 }
 
-.translation-textarea::placeholder {
+.ti-translation-textarea::placeholder {
   color: var(--text-secondary, #6c757d);
   opacity: 0.7;
 }
 
 /* Enhanced Text Actions Toolbar */
-.input-toolbar {
+.ti-input-toolbar {
   position: absolute;
   top: 6px;
   left: 12px;
@@ -248,12 +248,12 @@ onMounted(async () => {
   padding: 2px;
 }
 
-.textarea-container:hover .input-toolbar {
+.ti-textarea-container:hover .ti-input-toolbar {
   opacity: 1;
 }
 
 /* Standalone Paste Button */
-.paste-standalone {
+.ti-paste-standalone {
   position: absolute;
   top: 6px;
   right: 12px;
@@ -261,20 +261,20 @@ onMounted(async () => {
 }
 
 /* Context-specific adjustments for sidepanel */
-.sidepanel-wrapper .textarea-container {
+.sidepanel-wrapper .ti-textarea-container {
   margin: 8px 0;
 }
 
-.sidepanel-wrapper .input-toolbar {
+.sidepanel-wrapper .ti-input-toolbar {
   top: 8px;
   background: rgba(0, 0, 0, 0.02);
 }
 
-.sidepanel-wrapper .paste-standalone {
+.sidepanel-wrapper .ti-paste-standalone {
   right: 18px;
 }
 
-.sidepanel-wrapper .translation-textarea {
+.sidepanel-wrapper .ti-translation-textarea {
   min-height: 140px; /* Use min-height instead of fixed height */
   max-height: 400px; /* Add a max-height to constrain resizing */
   padding: 42px 14px 12px 14px;
@@ -284,27 +284,27 @@ onMounted(async () => {
   resize: vertical; /* Enable vertical resizing */
 }
 
-html[dir="rtl"] .sidepanel-wrapper .translation-textarea {
+html[dir="rtl"] .sidepanel-wrapper .ti-translation-textarea {
   padding: 42px 14px 12px 14px;
 }
 
 /* RTL adjustments */
-html[dir="rtl"] .input-toolbar {
+html[dir="rtl"] .ti-input-toolbar {
   left: auto;
   right: 12px;
 }
 
-html[dir="rtl"] .paste-standalone {
+html[dir="rtl"] .ti-paste-standalone {
   right: auto;
   left: 12px;
 }
 
-html[dir="rtl"] .sidepanel-wrapper .input-toolbar {
+html[dir="rtl"] .sidepanel-wrapper .ti-input-toolbar {
   left: 18px;
   right: 18px;
 }
 
-html[dir="rtl"] .sidepanel-wrapper .paste-standalone {
+html[dir="rtl"] .sidepanel-wrapper .ti-paste-standalone {
   right: auto;
   left: 18px;
 }

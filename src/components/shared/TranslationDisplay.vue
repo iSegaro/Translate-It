@@ -2,7 +2,7 @@
 <template>
   <div
     ref="containerRef"
-    class="translation-display"
+    class="ti-translation-display"
     :class="[
       {
         'has-content': hasContent,
@@ -23,7 +23,7 @@
       :text="content"
       :language="targetLanguage"
       :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
-      class="display-toolbar"
+      class="ti-display-toolbar"
       :show-copy="showCopyButton"
       :show-paste="false"
       :show-tts="showTTSButton"
@@ -39,17 +39,17 @@
     <!-- Loading Spinner -->
     <div
       v-if="isLoading"
-      class="loading-overlay"
+      class="ti-loading-overlay"
     >
-      <div class="loading-spinner">
-        <div class="spinner" />
+      <div class="ti-loading-spinner">
+        <div class="ti-spinner" />
       </div>
     </div>
     
     <!-- Content Display -->
     <div 
       ref="contentRef"
-      class="translation-content"
+      class="ti-translation-content"
       :class="[
         {
           'fade-in': false, /* Animation disabled */
@@ -378,14 +378,14 @@ onMounted(() => {
 
 <style scoped>
 /* Base container */
-.translation-display {
+.ti-translation-display {
   position: relative;
   width: 100%;
   box-sizing: border-box;
 }
 
 /* Mode-specific containers */
-.translation-display.popup-mode {
+.ti-translation-display.popup-mode {
   margin: 8px 12px;
   height: 100%;
   max-width: calc(100vw - 24px);
@@ -396,7 +396,7 @@ onMounted(() => {
   flex: 1;
 }
 
-.translation-display.sidepanel-mode {
+.ti-translation-display.sidepanel-mode {
   flex-grow: 1;
   min-height: 0;
   border: 1px solid var(--border-color, #dee2e6);
@@ -407,7 +407,7 @@ onMounted(() => {
   overflow: visible;
 }
 
-.translation-display.selection-mode {
+.ti-translation-display.selection-mode {
   width: 100%;
   max-width: 400px;
   border-radius: 8px;
@@ -416,12 +416,12 @@ onMounted(() => {
   box-shadow: 0 4px 12px var(--sw-shadow-color, rgba(0,0,0,0.1));
 }
 
-.translation-display.compact-mode {
+.ti-translation-display.compact-mode {
   padding: 8px;
 }
 
 /* Content container */
-.translation-content {
+.ti-translation-content {
   width: 100%;
   padding: 32px 10px 10px 10px;
   border-radius: 3px;
@@ -448,21 +448,21 @@ onMounted(() => {
   - It bypasses native browser list rendering (which is buggy in some extension contexts)
     by creating markers manually with the ::before pseudo-element.
 */
-.translation-content :deep(ul),
-.translation-content :deep(ol) {
+.ti-translation-content :deep(ul),
+.ti-translation-content :deep(ol) {
   list-style: none !important;
   padding: 0 0 0 2em !important; /* Create space for our manual markers */
   margin: 8px 0 !important;
 }
 
-.translation-content :deep(li) {
+.ti-translation-content :deep(li) {
   position: relative !important;
   padding-left: 0.5em !important; /* Space between marker and text */
   margin-bottom: 6px !important;
 }
 
 /* Manual bullet for unordered lists */
-.translation-content :deep(ul > li::before) {
+.ti-translation-content :deep(ul > li::before) {
   content: '•' !important;
   position: absolute !important;
   left: -1em !important; /* Position in the ul's padding */
@@ -472,13 +472,13 @@ onMounted(() => {
 }
 
 /* Manual numbers for ordered lists */
-.translation-content :deep(ol) {
+.ti-translation-content :deep(ol) {
   counter-reset: list-counter; /* Initialize counter */
 }
-.translation-content :deep(ol > li) {
+.ti-translation-content :deep(ol > li) {
   counter-increment: list-counter; /* Increment counter for each li */
 }
-.translation-content :deep(ol > li::before) {
+.ti-translation-content :deep(ol > li::before) {
   content: counter(list-counter) '.' !important; /* Display counter and dot */
   position: absolute !important;
   left: -1.5em !important; /* Adjust position for numbers */
@@ -491,7 +491,7 @@ onMounted(() => {
 
 
 /* Sidepanel content adjustments */
-.sidepanel-mode .translation-content {
+.ti-sidepanel-mode .ti-translation-content {
   height: 100%;
   flex-grow: 1;
   border: none;
@@ -500,7 +500,7 @@ onMounted(() => {
 }
 
 /* Selection window adjustments */
-.selection-mode .translation-content {
+.ti-selection-mode .ti-translation-content {
   border: none;
   border-radius: 0 0 8px 8px;
   background-color: transparent;
@@ -510,7 +510,7 @@ onMounted(() => {
 }
 
 /* Popup mode specific adjustments */
-.popup-mode .translation-content {
+.ti-popup-mode .ti-translation-content {
   height: 100%;
   flex: 1;
   font-size: 13px;
@@ -518,7 +518,7 @@ onMounted(() => {
 }
 
 /* Message styling */
-.translation-content :deep(.placeholder-message) {
+.ti-translation-content :deep(.placeholder-message) {
   color: #6c757d;
   font-style: italic;
   opacity: 0.7;
@@ -526,7 +526,7 @@ onMounted(() => {
   padding: 16px;
 }
 
-.translation-content :deep(.error-message) {
+.ti-translation-content :deep(.error-message) {
   color: #dc3545;
   font-style: italic;
   padding: 12px;
@@ -538,18 +538,18 @@ onMounted(() => {
   font-size: var(--translation-font-size, 14px);
 }
 
-.translation-content :deep(.error-text) {
+.ti-translation-content :deep(.error-text) {
   margin-bottom: 8px;
 }
 
-.translation-content :deep(.error-actions) {
+.ti-translation-content :deep(.error-actions) {
   display: flex;
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
 
-.translation-content :deep(.error-action) {
+.ti-translation-content :deep(.error-action) {
   background: #dc3545;
   color: white;
   border: none;
@@ -564,27 +564,27 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.translation-content :deep(.error-action:hover) {
+.ti-translation-content :deep(.error-action:hover) {
   background: #c82333;
 }
 
-.translation-content :deep(.error-action.retry-btn) {
+.ti-translation-content :deep(.error-action.retry-btn) {
   background: #007bff;
 }
 
-.translation-content :deep(.error-action.retry-btn:hover) {
+.ti-translation-content :deep(.error-action.retry-btn:hover) {
   background: #0056b3;
 }
 
-.translation-content :deep(.error-action.settings-btn) {
+.ti-translation-content :deep(.error-action.settings-btn) {
   background: #6c757d;
 }
 
-.translation-content :deep(.error-action.settings-btn:hover) {
+.ti-translation-content :deep(.error-action.settings-btn:hover) {
   background: #5a6268;
 }
 
-.translation-content :deep(.loading-message) {
+.ti-translation-content :deep(.loading-message) {
   color: var(--accent-color, #1967d2);
   font-style: italic;
   opacity: 0.8;
@@ -595,7 +595,7 @@ onMounted(() => {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.translation-content :deep(.placeholder-message) {
+.ti-translation-content :deep(.placeholder-message) {
   color: var(--text-secondary, #6c757d);
   font-style: italic;
   opacity: 0.7;
@@ -606,23 +606,23 @@ onMounted(() => {
 }
 
 /* General Markdown styling */
-.translation-content :deep(h1),
-.translation-content :deep(h2),
-.translation-content :deep(h3) {
+.ti-translation-content :deep(h1),
+.ti-translation-content :deep(h2),
+.ti-translation-content :deep(h3) {
   margin-top: 16px;
   margin-bottom: 8px;
   font-weight: 600;
 }
 
-.translation-content :deep(h1) { font-size: 18px; }
-.translation-content :deep(h2) { font-size: 16px; }
-.translation-content :deep(h3) { font-size: 15px; }
+.ti-translation-content :deep(h1) { font-size: 18px; }
+.ti-translation-content :deep(h2) { font-size: 16px; }
+.ti-translation-content :deep(h3) { font-size: 15px; }
 
-.translation-content :deep(p) {
+.ti-translation-content :deep(p) {
   margin-bottom: 8px;
 }
 
-.translation-content :deep(code) {
+.ti-translation-content :deep(code) {
   background: var(--bg-secondary, #f8f9fa);
   padding: 2px 4px;
   border-radius: 3px;
@@ -630,7 +630,7 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.translation-content :deep(pre) {
+.ti-translation-content :deep(pre) {
   background: var(--bg-secondary, #f8f9fa);
   padding: 12px;
   border-radius: 4px;
@@ -640,7 +640,7 @@ onMounted(() => {
   margin: 8px 0;
 }
 
-.translation-content :deep(blockquote) {
+.ti-translation-content :deep(blockquote) {
   border-inline-start: 3px solid var(--accent-color, #007bff);
   padding-inline-start: 12px;
   margin-inline-start: 0;
@@ -648,17 +648,17 @@ onMounted(() => {
   font-style: italic;
 }
 
-.translation-content :deep(a) {
+.ti-translation-content :deep(a) {
   color: var(--accent-color, #007bff);
   text-decoration: none;
 }
 
-.translation-content :deep(a:hover) {
+.ti-translation-content :deep(a:hover) {
   text-decoration: underline;
 }
 
 /* Enhanced Display Toolbar */
-.display-toolbar {
+.ti-display-toolbar {
   position: absolute;
   top: 6px;
   left: 12px;
@@ -671,7 +671,7 @@ onMounted(() => {
 }
 
 /* Loading overlay */
-.loading-overlay {
+.ti-loading-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -685,7 +685,7 @@ onMounted(() => {
   justify-content: center;
 }
 
-.spinner {
+.ti-spinner {
   width: 28px;
   height: 28px;
   border: 3px solid var(--header-border-color, #dee2e6);
@@ -705,44 +705,44 @@ onMounted(() => {
 }
 
 /* Custom scrollbar */
-.translation-content::-webkit-scrollbar {
+.ti-translation-content::-webkit-scrollbar {
   width: 6px;
 }
 
-.translation-content::-webkit-scrollbar-track {
+.ti-translation-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.translation-content::-webkit-scrollbar-thumb {
+.ti-translation-content::-webkit-scrollbar-thumb {
   background: var(--header-border-color);
   border-radius: 3px;
 }
 
-.translation-content::-webkit-scrollbar-thumb:hover {
+.ti-translation-content::-webkit-scrollbar-thumb:hover {
   background: var(--toolbar-link-color);
 }
 
 /* --- RTL Specific Overrides for Manual Bullets --- */
 
 /* When the content direction is RTL, reset left padding and add right padding */
-.translation-content[dir="rtl"] :deep(ul),
-.translation-content[dir="rtl"] :deep(ol) {
+.ti-translation-content[dir="rtl"] :deep(ul),
+.ti-translation-content[dir="rtl"] :deep(ol) {
   padding-left: 0 !important;
   padding-right: 2em !important; /* Space for bullets on the right */
 }
 
-.translation-content[dir="rtl"] :deep(li) {
+.ti-translation-content[dir="rtl"] :deep(li) {
   padding-left: 0 !important;
   padding-right: 0.5em !important; /* Space between bullet and text */
 }
 
 /* Position the bullet on the right for RTL */
-.translation-content[dir="rtl"] :deep(ul > li::before) {
+.ti-translation-content[dir="rtl"] :deep(ul > li::before) {
   left: auto !important; /* Unset the left property */
   right: -1.5em !important; /* Position on the right */
 }
 
-.translation-content[dir="rtl"] :deep(ol > li::before) {
+.ti-translation-content[dir="rtl"] :deep(ol > li::before) {
   left: auto !important; /* Unset the left property */
   right: -2em !important; /* Position on the right */
   text-align: left; /* Ensure number itself is not reversed */

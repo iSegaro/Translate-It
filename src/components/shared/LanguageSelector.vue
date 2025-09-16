@@ -1,9 +1,9 @@
 <template>
-  <div class="language-controls">
+  <div class="ti-language-controls">
     <!-- Target Language Dropdown -->
     <select
       v-model="targetLanguage"
-      class="language-select"
+      class="ti-language-select"
       :title="targetTitle"
       :disabled="disabled"
       @click="handleDropdownClick"
@@ -20,7 +20,7 @@
     <!-- Swap Button -->
     <button
       type="button"
-      class="swap-button"
+      class="ti-swap-button"
       :title="swapTitle"
       @click="handleSwapLanguages"
     >
@@ -33,7 +33,7 @@
     <!-- Source Language Dropdown -->
     <select
       v-model="sourceLanguage"
-      class="language-select"
+      class="ti-language-select"
       :title="sourceTitle"
       :disabled="disabled"
       @click="handleDropdownClick"
@@ -205,7 +205,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.language-controls {
+.ti-language-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -215,7 +215,7 @@ onMounted(() => {
   margin: 8px 12px 0 12px;
 }
 
-.language-select {
+.ti-language-select {
   flex: 1 1 80px;
   min-width: 70px;
   max-width: 120px;
@@ -236,19 +236,19 @@ onMounted(() => {
   vertical-align: middle;
 }
 
-.language-select:focus {
+.ti-language-select:focus {
   outline: none;
   border-color: #80bdff;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-.language-select:disabled {
+.ti-language-select:disabled {
   background-color: var(--bg-disabled, #e9ecef);
   color: var(--text-disabled, #6c757d);
   cursor: not-allowed;
 }
 
-.swap-button {
+.ti-swap-button {
   background: none;
   border: none;
   padding: 4px;
@@ -261,16 +261,16 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.swap-button:hover {
+.ti-swap-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-.swap-button:disabled {
+.ti-swap-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.swap-button img {
+.ti-swap-button img {
   width: 16px;
   height: 16px;
   opacity: var(--icon-opacity);
@@ -278,22 +278,22 @@ onMounted(() => {
   transition: opacity 0.2s ease-in-out;
 }
 
-.swap-button:hover img {
+.ti-swap-button:hover img {
   opacity: var(--icon-hover-opacity);
 }
 
 /* Responsive Design */
 @media (max-width: 320px) {
-  .language-controls {
+  .ti-language-controls {
     gap: 4px;
   }
-  
-  .language-select {
+
+  .ti-language-select {
     font-size: 11px;
     padding: 4px 6px;
   }
-  
-  .swap-button {
+
+  .ti-swap-button {
     width: 28px;
     padding: 4px;
   }
