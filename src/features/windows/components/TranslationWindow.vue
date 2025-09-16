@@ -203,9 +203,9 @@ const handleRetry = () => {
 };
 const showOriginal = ref(false);
 
-// Computed dimensions for positioning
-const currentWidth = computed(() => currentSize.value === 'small' ? 60 : 350);
-const currentHeight = computed(() => currentSize.value === 'small' ? 40 : 180);
+// Computed dimensions for positioning - now handled by CSS classes
+const currentWidth = computed(() => currentSize.value === 'small' ? 60 : null); // null = use CSS
+const currentHeight = computed(() => currentSize.value === 'small' ? 40 : null); // null = use CSS
 
 // Use positioning composable with drag enabled
 const {
@@ -216,16 +216,16 @@ const {
   updatePosition,
   cleanup: cleanupPositioning
 } = usePositioning(props.position, {
-  defaultWidth: currentWidth.value,
-  defaultHeight: currentHeight.value,
+  defaultWidth: currentWidth.value || 240, // fallback for normal windows
+  defaultHeight: currentHeight.value || 180, // fallback for normal windows
   enableDragging: true
 });
 
 // Watch for prop changes and recalculate position with correct dimensions
 watch(() => props.position, (newPos) => {
   updatePosition(newPos, {
-    width: currentWidth.value,
-    height: currentHeight.value
+    width: currentWidth.value || 240,
+    height: currentHeight.value || 180
   });
 });
 
@@ -233,8 +233,8 @@ watch(() => props.initialSize, (newSize) => {
   currentSize.value = newSize;
   // Recalculate position with new dimensions to ensure it stays within viewport
   updatePosition(currentPosition.value, {
-    width: currentWidth.value,
-    height: currentHeight.value
+    width: currentWidth.value || 240,
+    height: currentHeight.value || 180
   });
 });
 
@@ -249,17 +249,11 @@ const loadingGifUrl = computed(() => {
   }
 });
 
-// Computed Style for positioning only (no opacity/transform - handled by CSS classes)
+// Computed Style for positioning only - dimensions handled by CSS classes
 const windowStyle = computed(() => {
-  const isSmall = currentSize.value === 'small';
-  
   return {
-    ...positionStyle.value,
-    width: isSmall ? '60px' : '350px',
-    height: isSmall ? '40px' : 'auto',
-    minWidth: isSmall ? '60px' : '300px',
-    minHeight: isSmall ? '40px' : '120px',
-    borderRadius: isSmall ? '20px' : '8px'
+    ...positionStyle.value
+    // All width, height, minWidth, minHeight, borderRadius now handled by CSS classes
   };
 });
 
@@ -363,16 +357,7 @@ const handleStartDrag = (event) => {
 </script>
 
 <style scoped>
-.translation-window {
-  width: 350px !important;
-  border-radius: 8px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  font-family: 'Vazirmatn', sans-serif !important;
-  overflow: hidden !important;
-  will-change: width, height, border-radius;
-}
+/* Remove hardcoded width - now handled by global CSS classes */
 
 /* Theme styles moved to enhanced section below */
 
@@ -559,43 +544,6 @@ const handleStartDrag = (event) => {
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Visibility and animation control */
-.translation-window {
-  /* Base styles - Force important to override Shadow DOM resets */
-  background: #fff !important;
-  border: 1px solid #e8e8e8 !important;
-  border-radius: 8px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  font-family: 'Vazirmatn', sans-serif !important;
-  position: relative !important;
-  
-  /* Animation styles */
-  opacity: 0 !important;
-  transform: scale(0.95) !important;
-  transition: opacity 0.2s ease, transform 0.2s ease !important;
-  visibility: hidden !important;
-}
-
-.translation-window.visible {
-  opacity: 0.9 !important;
-  transform: scale(1) !important;
-  visibility: visible !important;
-}
-
-/* Base theme styles - Light Mode */
-.translation-window.light {
-  background-color: var(--bg-color, #ffffff) !important;
-  border: 1px solid var(--border-color, #e8e8e8) !important;
-  color: var(--text-color, #2c3e50) !important;
-}
-
-/* Base theme styles - Dark Mode */
-.translation-window.dark {
-  background-color: var(--bg-color, #2d2d2d) !important;
-  border: 1px solid var(--border-color, #424242) !important;
-  color: var(--text-color, #e0e0e0) !important;
-}
+/* Component-specific styles only - base window styles handled by global CSS */
 
 </style>
