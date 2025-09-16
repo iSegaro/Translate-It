@@ -473,19 +473,33 @@ const handleStartDrag = (event) => {
   word-wrap: break-word;
 }
 
-/* Translation display integration */
+/* Translation display with modern containment */
 .ti-window-translation-display {
   flex: 1;
   min-height: 80px;
   position: relative;
+
+  /* Modern containment approach */
+  contain: layout style;
+  overflow: clip; /* Modern clipping */
+  min-width: 0; /* Allow flex shrinking */
+  width: 100%; /* Take full width */
 }
 
 .window-translation-display :deep(.translation-content) {
   border: none;
   background: transparent;
-  padding: 8px 0 0 0;
+  padding-top: 8px;
   font-size: 14px;
   line-height: 1.5;
+
+  /* Natural text wrapping */
+  overflow-wrap: break-word;
+  hyphens: auto; /* Enable hyphenation */
+
+  /* Constrain to container */
+  width: 100%;
+  overflow-x: clip;
 }
 
 

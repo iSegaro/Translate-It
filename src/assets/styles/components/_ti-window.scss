@@ -6,7 +6,7 @@
 
 // CSS Custom Properties for component-specific overrides
 :root {
-  // Window-specific properties
+  // Window-specific animation properties
   --ti-window-border-radius: #{$border-radius-lg};
   --ti-window-opacity-hidden: 0;
   --ti-window-opacity-visible: 0.9;
@@ -28,29 +28,22 @@
   --ti-loading-border-light: rgba(0, 0, 0, 0.1);
   --ti-loading-border-dark: rgba(255, 255, 255, 0.2);
 
-  // Normal window properties
-  --ti-normal-window-width: #{$selection-window-max-width};
-  --ti-normal-window-min-height: 100px;
-
-  // Action button properties
-  --ti-action-btn-size: 28px;
-  --ti-action-btn-border-radius: #{$border-radius-md};
-
-  // Window body properties
-  --ti-window-body-margin: 5px;
+  // Window dimensions using proper SCSS->CSS conversion
+  @include window-dimensions;
 }
 
-// Base window styles with maximum specificity
+// Base window styles with CSS Grid layout
 .ti-window {
   border-radius: var(--ti-window-border-radius);
   @include shadow-lg;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr; // header auto, body flexible
   font-family: $font-family-base;
   opacity: var(--ti-window-opacity-hidden);
   transform: var(--ti-window-transform-hidden);
   transition: var(--ti-window-transition);
   visibility: var(--ti-window-visibility-hidden);
+  container-type: inline-size; // Enable container queries
 
   // Disable transitions when dragging
   &.is-dragging {
@@ -95,10 +88,12 @@
     }
   }
 
-  // Normal window - full size
+  // Normal window - using safe CSS variable function
   &.normal-window {
-    width: var(--ti-normal-window-width);
-    min-height: var(--ti-normal-window-min-height);
+    width: #{css-var('normal-window-width', $selection-window-max-width)};
+    height: max-content; // Height based on content
+    min-height: #{css-var('normal-window-min-height', 120px)};
+    overflow: hidden; // Establish containment context
   }
 
   &.visible {
@@ -205,15 +200,22 @@
   }
 }
 
-// Window body with increased specificity
+// Window body with safe CSS variable usage
 .ti-window .ti-window-body,
 .ti-window-body {
-  padding: $spacing-md;
-  min-height: var(--ti-normal-window-min-height);
+  padding: #{css-var('window-padding', $spacing-md)};
+  min-height: #{css-var('normal-window-min-height', 120px)};
   display: flex;
   flex-direction: column;
-  margin-right: var(--ti-window-body-margin);
-  margin-left: var(--ti-window-body-margin);
+  margin-left: #{css-var('window-body-margin', 5px)};
+  margin-right: #{css-var('window-body-margin', 5px)};
+
+  // Content constraint with natural flow
+  width: 100%; // Take full width of parent
+  overflow-wrap: break-word; // Break long words naturally
+  overflow-x: clip; // Modern way to clip overflow
+  contain: layout style; // Establish containment
+  box-sizing: border-box; // Include padding in width
 }
 
 // Dark theme specific overrides

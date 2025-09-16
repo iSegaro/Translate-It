@@ -3,6 +3,34 @@
 
 // Common mixins for the extension
 
+// CSS Custom Properties Generator - اصولی ترین راه برای interpolation
+@mixin css-properties($prefix: 'ti', $properties: ()) {
+  @each $name, $value in $properties {
+    --#{$prefix}-#{$name}: #{$value};
+  }
+}
+
+// Safe CSS variable function with fallback
+@function css-var($name, $fallback: null) {
+  @if $fallback {
+    @return var(--ti-#{$name}, #{$fallback});
+  } @else {
+    @return var(--ti-#{$name});
+  }
+}
+
+// Window dimensions mixin with proper SCSS->CSS conversion
+@mixin window-dimensions {
+  @include css-properties('ti', (
+    'normal-window-width': $selection-window-max-width,
+    'normal-window-min-height': 120px,
+    'window-padding': $spacing-md,
+    'window-body-margin': 5px,
+    'action-btn-size': 28px,
+    'action-btn-border-radius': $border-radius-md
+  ));
+}
+
 // Loading state mixin
 @mixin loading-state {
   position: relative;
