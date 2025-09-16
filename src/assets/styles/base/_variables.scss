@@ -139,6 +139,20 @@
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
 }
 
+// Z-index CSS Custom Properties
+:root {
+  // Z-index layers
+  --ti-z-base: 1;
+  --ti-z-dropdown: 1000;
+  --ti-z-tooltip: 1010;
+  --ti-z-modal: 1020;
+  --ti-z-notification: 1030;
+  --ti-z-overlay: 1040;
+  --ti-z-selection: 1050;
+  --ti-z-field-icon: 1060;
+  --ti-z-max: 2147483647;
+}
+
 // Map theme variables to component variables
 :root {
   // Primary colors (mapped from theme)
