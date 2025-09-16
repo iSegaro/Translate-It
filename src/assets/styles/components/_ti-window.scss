@@ -93,7 +93,10 @@
     width: #{css-var('normal-window-width', $selection-window-max-width)};
     height: max-content; // Height based on content
     min-height: #{css-var('normal-window-min-height', 120px)};
+    max-height: #{css-var('normal-window-max-height', 400px)}; // Add max height for scrolling
     overflow: hidden; // Establish containment context
+    display: flex;
+    flex-direction: column; // Ensure proper layout for scrollable content
   }
 
   &.visible {
@@ -209,13 +212,53 @@
   flex-direction: column;
   margin-left: #{css-var('window-body-margin', 5px)};
   margin-right: #{css-var('window-body-margin', 5px)};
+  flex: 1; // Take remaining space in flex container
+  overflow-y: auto; // Enable vertical scrolling when content exceeds height
+  overflow-x: hidden; // Hide horizontal overflow
 
   // Content constraint with natural flow
   width: 100%; // Take full width of parent
   overflow-wrap: break-word; // Break long words naturally
-  overflow-x: clip; // Modern way to clip overflow
   contain: layout style; // Establish containment
   box-sizing: border-box; // Include padding in width
+
+  // Custom scrollbar styling
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  // Dark theme scrollbar
+  .ti-window.dark & {
+    &::-webkit-scrollbar-thumb {
+      background-color: rgba(255, 255, 255, 0.2);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+    }
+  }
+
+  // Firefox scrollbar
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+
+  .ti-window.dark & {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
 }
 
 // Dark theme specific overrides
