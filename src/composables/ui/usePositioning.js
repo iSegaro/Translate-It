@@ -20,25 +20,52 @@ export function usePositioning(initialPosition, options = {}) {
   const isDragging = ref(false);
 
   /**
-   * Clamp position to viewport bounds
+   * Smart positioning: automatically find best position to keep window visible
    */
-  function clampToViewport(pos, width = defaultWidth, height = defaultHeight) {
+  function findSmartPosition(pos, width = defaultWidth, height = defaultHeight) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    
-    
+
     let x = pos.x ?? pos.left ?? 0;
     let y = pos.y ?? pos.top ?? 0;
 
+    // Smart horizontal positioning
+    if (x + width + margin > vw) {
+      // Window would overflow right - try positioning to the left of cursor
+      const leftPosition = x - width - margin;
+      if (leftPosition >= margin) {
+        x = leftPosition; // Position to left
+      } else {
+        // Not enough space on left either - position at right edge
+        x = vw - width - margin;
+      }
+    }
 
-    // Prevent overflow right/bottom
-    
-    if (x + width > vw) x = vw - width - margin;
-    if (x < margin) x = margin;
-    if (y + height > vh) y = vh - height - margin;
-    if (y < margin) y = margin;
-    
+    // Smart vertical positioning
+    if (y + height + margin > vh) {
+      // Window would overflow bottom - try positioning above cursor
+      const topPosition = y - height - margin;
+      if (topPosition >= margin) {
+        y = topPosition; // Position above
+      } else {
+        // Not enough space above either - position at bottom edge
+        y = vh - height - margin;
+      }
+    }
+
+    // Final bounds check to ensure minimum margins
+    x = Math.max(margin, Math.min(x, vw - width - margin));
+    y = Math.max(margin, Math.min(y, vh - height - margin));
+
     return { x, y };
+  }
+
+  /**
+   * Clamp position to viewport bounds (legacy method)
+   */
+  function clampToViewport(pos, width = defaultWidth, height = defaultHeight) {
+    // Use smart positioning for better UX
+    return findSmartPosition(pos, width, height);
   }
 
   /**
