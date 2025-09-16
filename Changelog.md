@@ -1,5 +1,18 @@
 ### Changelog – Translate It!
 
+
+#### v1.1.0 – Released on X, 2025
+
+##### Added
+
+- Scroll support for long translations in the floating window  
+
+##### Fixed
+
+- Fixed styles and UI
+
+---
+
 #### v1.0.0 – Released on September 15, 2025
 
 ##### Added
