@@ -6,6 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -17,6 +18,33 @@ export class BaseProvider {
   constructor(providerName) {
     this.providerName = providerName;
     this.sessionContext = null;
+    this._initializeProxy();
+  }
+
+  /**
+   * Initialize proxy configuration from settings
+   * @private
+   */
+  async _initializeProxy() {
+    try {
+      const { getSettingsAsync } = await import("@/shared/config/config.js");
+      const settings = await getSettingsAsync();
+
+      if (settings.PROXY_ENABLED) {
+        proxyManager.setConfig({
+          enabled: settings.PROXY_ENABLED,
+          type: settings.PROXY_TYPE,
+          host: settings.PROXY_HOST,
+          port: settings.PROXY_PORT,
+          auth: {
+            username: settings.PROXY_USERNAME,
+            password: settings.PROXY_PASSWORD
+          }
+        });
+      }
+    } catch (error) {
+      logger.warn(`[${this.providerName}] Failed to initialize proxy:`, error);
+    }
   }
 
   // By default providers are considered "not reliably returning JSON-mode"
@@ -185,7 +213,8 @@ export class BaseProvider {
         finalFetchOptions.signal = abortController.signal;
       }
       
-      const response = await fetch(url, finalFetchOptions);
+      // Use proxy manager for the request
+      const response = await proxyManager.fetch(url, finalFetchOptions);
       logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
@@ -293,6 +322,21 @@ export class BaseProvider {
    */
   _isSameLanguage(sourceLang, targetLang) {
     return sourceLang === targetLang;
+  }
+
+  /**
+   * Test proxy connection
+   * @param {string} testUrl - Optional test URL
+   * @returns {Promise<boolean>} - True if connection successful
+   */
+  async testProxyConnection(testUrl) {
+    try {
+      await this._initializeProxy();
+      return await proxyManager.testConnection(testUrl);
+    } catch (error) {
+      logger.error(`[${this.providerName}] Proxy test failed:`, error);
+      return false;
+    }
   }
 
   /**

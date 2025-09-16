@@ -114,6 +114,14 @@ export const CONFIG = {
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
 
+  // --- Proxy Settings ---
+  PROXY_ENABLED: false, // فعال بودن proxy
+  PROXY_TYPE: "http", // نوع proxy: http, https, socks
+  PROXY_HOST: "", // آدرس proxy server
+  PROXY_PORT: 8080, // پورت proxy server
+  PROXY_USERNAME: "", // نام کاربری proxy (اختیاری)
+  PROXY_PASSWORD: "", // رمز عبور proxy (اختیاری)
+
   // --- UI & Styling ---
   HIGHLIGHT_NEW_ELEMENT_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
   TRANSLATION_ICON_TITLE: "Translate Text",
