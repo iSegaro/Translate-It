@@ -203,12 +203,13 @@ export class TextSelectionHandler extends ResourceTracker {
           });
 
           // For professional editors and rich text editors, check if we should process based on selection strategy
-          if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
-              detection.fieldType === FieldTypes.RICH_TEXT_EDITOR) {
+          if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
+              detection.fieldType === FieldTypes.RICH_TEXT_EDITOR ||
+              detection.fieldType === FieldTypes.CONTENT_EDITABLE) {
             const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
             const isFromDoubleClick = this._isFromRecentDoubleClick();
             const shouldProcess = !needsDoubleClick || isFromDoubleClick;
-            
+
             if (shouldProcess) {
               logger.debug('Processing editor selection', {
                 text: selection.toString().substring(0, 30),
@@ -218,6 +219,21 @@ export class TextSelectionHandler extends ResourceTracker {
                 isFromDoubleClick,
                 timeSinceDoubleClick: Date.now() - this.preservedState.lastDoubleClickTime
               });
+
+              // For double-click-required fields, only process if it's actually from a double-click
+              // or if it's a keyboard selection (which doesn't trigger drag detection)
+              if (needsDoubleClick && !isFromDoubleClick) {
+                const isKeyboardSelection = !this.textSelectionManager.isDragging;
+                if (!isKeyboardSelection) {
+                  logger.debug('Editor selection ignored - drag selection not allowed in double-click-required field', {
+                    text: selection.toString().substring(0, 30),
+                    fieldType: detection.fieldType,
+                    isDragging: this.textSelectionManager.isDragging
+                  });
+                  return;
+                }
+              }
+
               this.textSelectionManager.handleTextSelection({
                 type: 'selectionchange',
                 selection: selection,

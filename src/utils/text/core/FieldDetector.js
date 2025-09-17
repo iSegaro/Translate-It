@@ -434,9 +434,10 @@ export class FieldDetector {
    * @returns {string} Selection event strategy
    */
   _getSelectionEventStrategy(element, fieldType, siteConfig) {
-    // For professional and rich text editors, check if element is inside editor
-    if (fieldType === FieldTypes.PROFESSIONAL_EDITOR || 
-        fieldType === FieldTypes.RICH_TEXT_EDITOR) {
+    // For professional, rich text, and content editable editors, check if element is inside editor
+    if (fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
+        fieldType === FieldTypes.RICH_TEXT_EDITOR ||
+        fieldType === FieldTypes.CONTENT_EDITABLE) {
       
       // In iframe contexts, check if element is inside actual editor
       if (siteConfig.selectors && element) {
