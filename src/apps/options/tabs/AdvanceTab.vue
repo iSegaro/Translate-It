@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
@@ -189,35 +189,47 @@ const excludedSites = computed({
   }
 })
 
-// Proxy settings
-const proxyEnabled = computed({
-  get: () => settingsStore.settings?.PROXY_ENABLED || false,
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_ENABLED', value)
+// Proxy settings refs synchronized with store (like other tabs)
+const proxyEnabled = ref(settingsStore.settings?.PROXY_ENABLED || false)
+const proxyType = ref(settingsStore.settings?.PROXY_TYPE || 'http')
+const proxyHost = ref(settingsStore.settings?.PROXY_HOST || '')
+const proxyPort = ref(settingsStore.settings?.PROXY_PORT || 8080)
+const proxyUsername = ref(settingsStore.settings?.PROXY_USERNAME || '')
+const proxyPassword = ref(settingsStore.settings?.PROXY_PASSWORD || '')
+
+// Sync with settings on mount
+onMounted(() => {
+  proxyEnabled.value = settingsStore.settings?.PROXY_ENABLED || false
+  proxyType.value = settingsStore.settings?.PROXY_TYPE || 'http'
+  proxyHost.value = settingsStore.settings?.PROXY_HOST || ''
+  proxyPort.value = settingsStore.settings?.PROXY_PORT || 8080
+  proxyUsername.value = settingsStore.settings?.PROXY_USERNAME || ''
+  proxyPassword.value = settingsStore.settings?.PROXY_PASSWORD || ''
 })
 
-const proxyType = computed({
-  get: () => settingsStore.settings?.PROXY_TYPE || 'http',
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_TYPE', value)
+// Update settings locally when changed (like other tabs)
+watch(proxyEnabled, (value) => {
+  settingsStore.updateSettingLocally('PROXY_ENABLED', value)
 })
 
-const proxyHost = computed({
-  get: () => settingsStore.settings?.PROXY_HOST || '',
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_HOST', value)
+watch(proxyType, (value) => {
+  settingsStore.updateSettingLocally('PROXY_TYPE', value)
 })
 
-const proxyPort = computed({
-  get: () => settingsStore.settings?.PROXY_PORT || 8080,
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_PORT', parseInt(value) || 8080)
+watch(proxyHost, (value) => {
+  settingsStore.updateSettingLocally('PROXY_HOST', value)
 })
 
-const proxyUsername = computed({
-  get: () => settingsStore.settings?.PROXY_USERNAME || '',
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_USERNAME', value)
+watch(proxyPort, (value) => {
+  settingsStore.updateSettingLocally('PROXY_PORT', parseInt(value) || 8080)
 })
 
-const proxyPassword = computed({
-  get: () => settingsStore.settings?.PROXY_PASSWORD || '',
-  set: (value) => settingsStore.updateSettingAndPersist('PROXY_PASSWORD', value)
+watch(proxyUsername, (value) => {
+  settingsStore.updateSettingLocally('PROXY_USERNAME', value)
+})
+
+watch(proxyPassword, (value) => {
+  settingsStore.updateSettingLocally('PROXY_PASSWORD', value)
 })
 
 // Proxy test functionality
