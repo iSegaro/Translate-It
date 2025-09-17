@@ -355,12 +355,17 @@ h2 {
   justify-content: space-between;
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
-  
+
   &:last-child {
     border-bottom: none;
     margin-bottom: 0;
   }
-  
+
+  // Remove border-bottom when followed by a setting-section
+  & + .setting-section {
+    border-top: none;
+  }
+
   label {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
@@ -398,6 +403,12 @@ h2 {
   margin-top: $spacing-xl;
   padding-top: $spacing-xl;
   border-top: 2px solid var(--color-border);
+
+  // Reduce top spacing and border when following setting-group
+  &.proxy-section {
+    margin-top: $spacing-lg;
+    padding-top: $spacing-lg;
+  }
 
   h3 {
     font-size: $font-size-lg;
