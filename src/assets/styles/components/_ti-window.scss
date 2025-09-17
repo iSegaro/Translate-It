@@ -222,6 +222,87 @@
   contain: layout style; // Establish containment
   box-sizing: border-box; // Include padding in width
 
+  // List styles for dictionary/definition content
+  .ti-window-body ul,
+  .ti-window-body ol {
+    // Reset default padding
+    padding: 0;
+    margin: 8px 0;
+  }
+
+  // LTR content
+  .ti-window-body[dir="ltr"] ul,
+  .ti-window-body[dir="ltr"] ol,
+  .ti-window-body .simple-markdown[dir="ltr"] ul,
+  .ti-window-body .simple-markdown[dir="ltr"] ol {
+    padding-left: 20px;
+    padding-right: 0;
+  }
+
+  // RTL content
+  [dir="rtl"] .ti-window-body ul,
+  [dir="rtl"] .ti-window-body ol,
+  .ti-window-body[dir="rtl"] ul,
+  .ti-window-body[dir="rtl"] ol,
+  [dir="rtl"] .simple-markdown ul,
+  [dir="rtl"] .simple-markdown ol,
+  .simple-markdown[dir="rtl"] ul,
+  .simple-markdown[dir="rtl"] ol {
+    padding-left: 0;
+    padding-right: 20px;
+  }
+
+  // List items
+  li {
+    // Ensure proper spacing between list items
+    margin-bottom: 4px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  // Nested lists
+  ul ul, ol ol, ul ol, ol ul {
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  // Markdown content styling
+  .simple-markdown {
+    // Ensure paragraphs have proper spacing
+    p {
+      margin-bottom: 8px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    // Style for labeled definitions (e.g., "نوع: اسم")
+    strong {
+      font-weight: 600;
+      color: var(--color-text, inherit);
+    }
+
+    // Code blocks
+    pre {
+      background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+      padding: 8px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+
+    code {
+      background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+  }
+
   // Custom scrollbar styling
   &::-webkit-scrollbar {
     width: 6px;
