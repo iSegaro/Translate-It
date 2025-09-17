@@ -1,7 +1,19 @@
 ### Changelog – Translate It!
 
 
-#### v1.1.0 – Released on 17, 2025
+#### v1.2.0 – Released on September X, 2025
+
+##### Added
+
+- **Proxy Support**: Added proxy configuration support in `Settings > Advanced Tab > Proxy Settings` to enable access to translation services with geographic restrictions
+
+##### Fixed
+
+- **Translation Status Notification**: Fixed issue where "Translating..." notification would remain stuck when text field translation failed due to text extraction errors or background service failures
+
+---
+
+#### v1.1.0 – Released on September 16, 2025
 
 ##### Added
 
