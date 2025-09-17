@@ -100,13 +100,23 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       // For HTTP URLs, we can try to proxy directly
       if (url.startsWith('http://')) {
         const fullProxyUrl = `${proxyUrl}/${url}`;
-        return await fetch(fullProxyUrl, {
+        const response = await fetch(fullProxyUrl, {
           ...proxyOptions,
           headers: {
             ...proxyOptions.headers,
             'Host': new URL(url).host
           }
         });
+
+        // Check if the response is actually from the target or an error page
+        const contentType = response.headers.get('content-type');
+
+        // If we get HTML content, it's likely an error page from the proxy
+        if (contentType && contentType.includes('text/html')) {
+          throw new Error('SOCKS proxy returned HTML error page instead of target response');
+        }
+
+        return response;
       }
       // For HTTPS URLs through SOCKS, we need a different approach
       else if (url.startsWith('https://')) {
@@ -157,7 +167,15 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
         }
       });
 
-      // If we get a response, consider it successful
+      // Check if the response is actually from the target or an error page
+      const contentType = response.headers.get('content-type');
+
+      // If we get HTML content, it's likely an error page from the proxy
+      if (contentType && contentType.includes('text/html')) {
+        throw new Error('SOCKS proxy returned HTML error page instead of target response');
+      }
+
+      // For successful responses, return them
       if (response.status < 500) {
         return response;
       } else {
