@@ -60,7 +60,7 @@ import { useSelectElementTranslation } from '@/features/translation/composables/
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { CONFIG } from '@/shared/config/config.js';
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
 import { getLanguageCode } from '@/utils/i18n/languages.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguageSelector');
@@ -140,9 +140,8 @@ const swapIcon = computed(() => {
 // Methods
 const handleSwapLanguages = async () => {
   try {
-    // Get fresh default languages directly from storage to ensure up-to-date data
-    const defaults = await storageManager.get(['SOURCE_LANGUAGE', 'TARGET_LANGUAGE']);
-    const defaultTarget = getLanguageCode(defaults?.TARGET_LANGUAGE) || 'en';
+    // Use CONFIG defaults which have the latest values (migrations ensure storage is up-to-date)
+    const defaultTarget = getLanguageCode(CONFIG?.TARGET_LANGUAGE) || 'en';
 
     logger.debug('[LanguageSelector] Swap requested:', {
       current: { source: sourceLanguage.value, target: targetLanguage.value },
