@@ -110,6 +110,9 @@
               {{ t('proxy_testing') || 'Testing...' }}
             </span>
             <span v-else class="button-content">
+              <svg class="test-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3"/>
+              </svg>
               {{ testButtonText }}
             </span>
           </button>
@@ -130,10 +133,15 @@ import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AdvanceTab')
 
 const { t } = useI18n()
 
@@ -225,6 +233,13 @@ const testProxyConnection = async () => {
   isTestingProxy.value = true
   testResult.value = null
 
+  logger.debug('Starting proxy connection test', {
+    proxyEnabled: proxyEnabled.value,
+    proxyType: proxyType.value,
+    proxyHost: proxyHost.value,
+    proxyPort: proxyPort.value
+  })
+
   try {
     // Import the proxy manager
     const { proxyManager } = await import('@/shared/proxy/ProxyManager.js')
@@ -248,18 +263,49 @@ const testProxyConnection = async () => {
     // Test the connection
     const success = await proxyManager.testConnection()
 
+    const successMessage = success
+      ? (proxyEnabled.value
+          ? (t('proxy_test_success') || 'Proxy connection successful!')
+          : (t('direct_test_success') || 'Direct connection successful!'))
+      : (proxyEnabled.value
+          ? (t('proxy_test_failed') || 'Proxy connection failed. Check your settings.')
+          : (t('direct_test_failed') || 'Direct connection failed. Check your internet connection.'))
+
     testResult.value = {
       success,
-      message: success
-        ? (proxyEnabled.value
-            ? (t('proxy_test_success') || 'Proxy connection successful!')
-            : (t('direct_test_success') || 'Direct connection successful!'))
-        : (proxyEnabled.value
-            ? (t('proxy_test_failed') || 'Proxy connection failed. Check your settings.')
-            : (t('direct_test_failed') || 'Direct connection failed. Check your internet connection.'))
+      message: successMessage
+    }
+
+    if (success) {
+      logger.operation('Proxy test completed successfully', {
+        proxyEnabled: proxyEnabled.value,
+        proxyType: proxyType.value
+      })
+    } else {
+      logger.warn('Proxy test failed', {
+        proxyEnabled: proxyEnabled.value,
+        proxyType: proxyType.value
+      })
     }
 
   } catch (error) {
+    logger.error('Proxy test error', {
+      error: error.message,
+      proxyEnabled: proxyEnabled.value,
+      proxyType: proxyType.value
+    })
+
+    // Use error handler for consistent error processing
+    await handleError(error, {
+      context: 'proxy-connection-test',
+      showToast: false,  // We handle UI feedback ourselves
+      metadata: {
+        proxyType: proxyType.value,
+        proxyHost: proxyHost.value,
+        proxyPort: proxyPort.value
+      }
+    })
+
     let errorMessage = t('proxy_test_error') || 'Test failed with an error.'
 
     // Check for specific error types
@@ -268,6 +314,8 @@ const testProxyConnection = async () => {
       errorMessage = t('proxy_host_invalid') || 'Invalid hostname. Please enter a valid domain name or IP address.'
     } else if (error.message.includes('configuration validation failed')) {
       errorMessage = t('proxy_config_invalid') || 'Invalid proxy configuration. Please check your settings.'
+    } else if (error.message.includes('Unsupported proxy type')) {
+      errorMessage = t('proxy_type_unsupported') || 'Unsupported proxy type. Please select HTTP, HTTPS, or SOCKS.'
     }
 
     testResult.value = {
@@ -403,49 +451,96 @@ h2 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: $spacing-sm $spacing-base;
-    background-color: var(--color-primary);
-    color: var(--color-primary-text);
-    border: none;
-    border-radius: $border-radius-base;
-    font-size: $font-size-sm;
-    font-weight: $font-weight-medium;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 160px;
+    transition: all 0.3s ease;
+    min-width: 180px;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
 
     &:hover:not(:disabled) {
-      background-color: var(--color-primary-hover);
-      transform: translateY(-1px);
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+
+      &::before {
+        left: 100%;
+      }
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
     }
 
     &:disabled {
-      background-color: var(--color-muted);
-      color: var(--color-text-muted);
+      background: linear-gradient(135deg, #9ca3af, #6b7280);
+      border-color: #9ca3af;
+      color: #f3f4f6;
       cursor: not-allowed;
       transform: none;
+      box-shadow: none;
     }
 
     &.success {
-      background-color: var(--color-success);
-      color: white;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-color: #059669;
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+
+      &:hover:not(:disabled) {
+        background: linear-gradient(135deg, #059669, #047857);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      }
     }
 
     &.error {
-      background-color: var(--color-danger);
-      color: white;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-color: #dc2626;
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+
+      &:hover:not(:disabled) {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+      }
     }
 
     .button-content {
       display: flex;
       align-items: center;
-      gap: $spacing-xs;
+      gap: 8px;
+
+      .test-icon {
+        flex-shrink: 0;
+        transition: transform 0.3s ease;
+      }
+    }
+
+    &:hover:not(:disabled) .button-content .test-icon {
+      transform: scale(1.1);
     }
 
     .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid transparent;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
       border-top: 2px solid currentColor;
       border-radius: 50%;
       animation: spin 1s linear infinite;
@@ -453,21 +548,40 @@ h2 {
   }
 
   .test-result {
-    padding: $spacing-sm $spacing-base;
-    border-radius: $border-radius-base;
-    font-size: $font-size-sm;
-    font-weight: $font-weight-medium;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 8px;
+    border: 1px solid;
+    animation: slideIn 0.3s ease-out;
 
     &.success {
-      background-color: rgba(34, 197, 94, 0.1);
-      color: var(--color-success);
-      border: 1px solid rgba(34, 197, 94, 0.3);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+      color: #059669;
+      border-color: rgba(16, 185, 129, 0.3);
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+
+      &::before {
+        content: '✓';
+        margin-right: 8px;
+        font-weight: bold;
+        color: #10b981;
+      }
     }
 
     &.error {
-      background-color: rgba(239, 68, 68, 0.1);
-      color: var(--color-danger);
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));
+      color: #dc2626;
+      border-color: rgba(239, 68, 68, 0.3);
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+
+      &::before {
+        content: '✗';
+        margin-right: 8px;
+        font-weight: bold;
+        color: #ef4444;
+      }
     }
   }
 }
@@ -508,6 +622,17 @@ h2 {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

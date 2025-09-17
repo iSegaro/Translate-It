@@ -36,7 +36,7 @@ const componentLogLevels = {
   Content: LOG_LEVELS.DEBUG,     // Windows Manager and content scripts
 
   // اپلیکیشن‌ها و UI (Apps and UI)
-  UI: LOG_LEVELS.INFO,          // UI composables
+  UI: LOG_LEVELS.INFO,           // UI composables
   Popup: LOG_LEVELS.INFO,        // Popup app
   Sidepanel: LOG_LEVELS.INFO,    // Sidepanel app
   Options: LOG_LEVELS.INFO,      // Options app
@@ -58,6 +58,7 @@ const componentLogLevels = {
   Error: LOG_LEVELS.INFO,
   Config: LOG_LEVELS.INFO,       // Config system
   Memory: LOG_LEVELS.INFO,       // Memory management system
+  Proxy: LOG_LEVELS.DEBUG,      // Memory management system
 
   // ابزارها و utilities (Tools and utilities)
   Utils: LOG_LEVELS.INFO,       // Utilities

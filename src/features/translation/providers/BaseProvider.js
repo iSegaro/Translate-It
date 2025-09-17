@@ -30,18 +30,17 @@ export class BaseProvider {
       const { getSettingsAsync } = await import("@/shared/config/config.js");
       const settings = await getSettingsAsync();
 
-      if (settings.PROXY_ENABLED) {
-        proxyManager.setConfig({
-          enabled: settings.PROXY_ENABLED,
-          type: settings.PROXY_TYPE,
-          host: settings.PROXY_HOST,
-          port: settings.PROXY_PORT,
-          auth: {
-            username: settings.PROXY_USERNAME,
-            password: settings.PROXY_PASSWORD
-          }
-        });
-      }
+      // Always set config - enabled or disabled
+      proxyManager.setConfig({
+        enabled: settings.PROXY_ENABLED || false,
+        type: settings.PROXY_TYPE || 'http',
+        host: settings.PROXY_HOST || '',
+        port: settings.PROXY_PORT || 8080,
+        auth: {
+          username: settings.PROXY_USERNAME || '',
+          password: settings.PROXY_PASSWORD || ''
+        }
+      });
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to initialize proxy:`, error);
     }
@@ -212,7 +211,10 @@ export class BaseProvider {
       if (abortController) {
         finalFetchOptions.signal = abortController.signal;
       }
-      
+
+      // Ensure proxy is initialized with latest settings before request
+      await this._initializeProxy();
+
       // Use proxy manager for the request
       const response = await proxyManager.fetch(url, finalFetchOptions);
       logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);

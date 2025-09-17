@@ -1,17 +1,40 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ProxyManager');
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 /**
- * Chrome Extension Proxy Manager
- * Uses Chrome's proxy API for actual proxy functionality
+ * Extension-Only Proxy Manager
+ * Uses strategy pattern for different proxy types without affecting browser-wide settings
  */
 export class ProxyManager {
   constructor() {
     this.config = null;
-    this.currentProxyMode = 'direct'; // 'direct', 'auto_detect', 'fixed_servers', 'pac_script'
-    this.proxyRules = null;
+    this.strategies = new Map();
+    this.logger = getScopedLogger(LOG_COMPONENTS.PROXY, 'ProxyManager');
+    this.errorHandler = ErrorHandler.getInstance();
+    this._initializeStrategies();
+  }
+
+  /**
+   * Initialize proxy strategies
+   * @private
+   */
+  async _initializeStrategies() {
+    try {
+      // Lazy load strategies to avoid circular dependencies
+      const { HttpProxyStrategy } = await import('./strategies/HttpProxyStrategy.js');
+      const { HttpsProxyStrategy } = await import('./strategies/HttpsProxyStrategy.js');
+      const { SocksProxyStrategy } = await import('./strategies/SocksProxyStrategy.js');
+
+      this.strategies.set('http', HttpProxyStrategy);
+      this.strategies.set('https', HttpsProxyStrategy);
+      this.strategies.set('socks', SocksProxyStrategy);
+
+      this.logger.debug('Proxy strategies initialized');
+    } catch (error) {
+      this.logger.warn('Failed to initialize proxy strategies', error);
+    }
   }
 
   /**
@@ -28,21 +51,23 @@ export class ProxyManager {
   setConfig(config) {
     this.config = config;
 
-    if (config?.enabled && chrome?.proxy) {
-      // Configure Chrome proxy API
-      this._configureChromeProxy();
-    } else if (!config?.enabled && chrome?.proxy) {
-      // Clear proxy configuration
-      this._clearChromeProxy();
-    }
-
-    logger.debug('Proxy config updated:', {
+    this.logger.debug('Proxy config updated:', {
       enabled: config?.enabled,
       type: config?.type,
       host: config?.host,
       port: config?.port,
       hasAuth: !!(config?.auth?.username)
     });
+
+    if (config?.enabled) {
+      this.logger.init('Proxy enabled', {
+        type: config.type,
+        host: config.host,
+        port: config.port
+      });
+    } else {
+      this.logger.init('Proxy disabled');
+    }
   }
 
   /**
@@ -91,91 +116,110 @@ export class ProxyManager {
   }
 
   /**
-   * Make a fetch request through proxy
+   * Make a fetch request through proxy (extension-only)
    * @param {string} url - Target URL
    * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
   async fetch(url, options = {}) {
-    // With Chrome proxy API, the proxy is applied at the browser level
-    // All fetch requests will automatically use the proxy if configured
-    return fetch(url, options);
+    // Check extension context first
+    if (!ExtensionContextManager.isValidSync()) {
+      this.logger.debug('Extension context invalid, using direct fetch');
+      return fetch(url, options);
+    }
+
+    if (!this.isEnabled()) {
+      this.logger.debug('Proxy disabled, using direct fetch');
+      return fetch(url, options);
+    }
+
+    const startTime = Date.now();
+
+    try {
+      this.logger.debug('Proxy fetch request', {
+        url: this._sanitizeUrl(url),
+        proxyType: this.config.type
+      });
+
+      const strategy = await this._getStrategy(url);
+      const result = await strategy.execute(url, options);
+
+      const duration = Date.now() - startTime;
+      this.logger.info('Proxy request successful', {
+        url: this._sanitizeUrl(url),
+        duration: `${duration}ms`,
+        proxyType: this.config.type
+      });
+
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      await this.errorHandler.handle(error, {
+        context: 'proxy-manager-fetch',
+        showToast: false, // Silent for proxy errors
+        metadata: {
+          url: this._sanitizeUrl(url),
+          proxyConfig: this._getConfigSummary(),
+          duration: `${duration}ms`
+        }
+      });
+
+      this.logger.warn('Proxy request failed, falling back to direct connection', {
+        url: this._sanitizeUrl(url),
+        error: error.message,
+        duration: `${duration}ms`
+      });
+
+      // Graceful fallback to direct connection
+      return fetch(url, options);
+    }
   }
 
   /**
-   * Configure Chrome proxy API
+   * Get appropriate strategy for URL and proxy type
    * @private
+   * @param {string} url - Target URL
+   * @returns {Object} Strategy instance
    */
-  _configureChromeProxy() {
-    if (!chrome.proxy) {
-      logger.warn('Chrome proxy API not available. Please ensure "proxy" permission is granted.');
-      return;
+  async _getStrategy(url) {
+    if (!this.strategies.size) {
+      await this._initializeStrategies();
     }
 
-    const { type, host, port, auth } = this.config;
-    const scheme = type === 'socks' ? 'socks5' : type;
-
-    const config = {
-      mode: 'fixed_servers',
-      rules: {
-        singleProxy: {
-          scheme: scheme,
-          host: host,
-          port: port
-        },
-        bypassList: ['localhost', '127.0.0.1', '::1']
-      }
-    };
-
-    // Configure proxy authentication if provided
-    if (auth?.username) {
-      if (chrome.webRequest && chrome.webRequest.onAuthRequired) {
-        chrome.webRequest.onAuthRequired.addListener(
-          (details) => {
-            return {
-              authCredentials: {
-                username: auth.username,
-                password: auth.password || ''
-              }
-            };
-          },
-          { urls: ['<all_urls>'] },
-          ['blocking']
-        );
-      }
+    const StrategyClass = this.strategies.get(this.config.type);
+    if (!StrategyClass) {
+      throw new Error(`Unsupported proxy type: ${this.config.type}`);
     }
 
-    chrome.proxy.settings.set(
-      { value: config, scope: 'regular' },
-      () => {
-        if (chrome.runtime.lastError) {
-          logger.error('Failed to set proxy:', chrome.runtime.lastError);
-        } else {
-          logger.debug('Chrome proxy configured successfully');
-          this.currentProxyMode = 'fixed_servers';
-        }
-      }
-    );
+    return new StrategyClass(this.config);
   }
 
   /**
-   * Clear Chrome proxy configuration
+   * Initialize proxy configuration from settings
    * @private
    */
-  _clearChromeProxy() {
-    if (!chrome.proxy) return;
+  async _initializeProxy() {
+    try {
+      const { getSettingsAsync } = await import('@/shared/config/config.js');
+      const settings = await getSettingsAsync();
 
-    chrome.proxy.settings.clear(
-      { scope: 'regular' },
-      () => {
-        if (chrome.runtime.lastError) {
-          logger.error('Failed to clear proxy:', chrome.runtime.lastError);
-        } else {
-          logger.debug('Chrome proxy cleared successfully');
-          this.currentProxyMode = 'direct';
-        }
+      if (settings.PROXY_ENABLED) {
+        this.setConfig({
+          enabled: settings.PROXY_ENABLED,
+          type: settings.PROXY_TYPE,
+          host: settings.PROXY_HOST,
+          port: settings.PROXY_PORT,
+          auth: {
+            username: settings.PROXY_USERNAME,
+            password: settings.PROXY_PASSWORD
+          }
+        });
       }
-    );
+    } catch (error) {
+      this.logger.warn('Failed to initialize proxy from settings', error);
+    }
   }
 
   /**
@@ -184,10 +228,11 @@ export class ProxyManager {
    * @returns {Promise<boolean>}
    */
   async testConnection(testUrl = 'https://httpbin.org/ip') {
+    const startTime = Date.now();
+
     if (!this.isEnabled()) {
       try {
-        // Test direct connection
-        logger.debug('Testing direct connection to:', testUrl);
+        this.logger.debug('Testing direct connection', { testUrl });
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -198,56 +243,81 @@ export class ProxyManager {
 
         clearTimeout(timeoutId);
         const success = response.ok;
-        logger.debug('Direct connection test:', success ? 'success' : `failed with status ${response.status}`);
+        const duration = Date.now() - startTime;
+
+        this.logger.operation('Direct connection test completed', {
+          success,
+          status: response.status,
+          duration: `${duration}ms`
+        });
+
         return success;
       } catch (error) {
-        logger.debug('Direct connection test failed:', error.message);
+        const duration = Date.now() - startTime;
+        this.logger.warn('Direct connection test failed', {
+          error: error.message,
+          duration: `${duration}ms`
+        });
         return false;
       }
     }
 
-    // For proxy connection test with Chrome API
+    // Test proxy connection
     try {
-      logger.debug('Testing proxy connection with Chrome Proxy API');
+      this.logger.debug('Testing proxy connection', {
+        testUrl,
+        proxyType: this.config.type,
+        proxyHost: this.config.host
+      });
 
-      // First, validate proxy configuration
+      // Validate proxy configuration
       if (!this._validateProxyConfig()) {
-        logger.debug('Proxy configuration validation failed');
+        this.logger.warn('Proxy configuration validation failed');
         return false;
       }
 
-      // Test if Chrome proxy API is available
-      if (!chrome.proxy) {
-        logger.debug('Chrome proxy API not available');
-        return false;
-      }
-
-      // Apply proxy configuration temporarily for testing
-      this._configureChromeProxy();
-
-      // Test the connection through proxy
+      // Test through proxy manager's fetch method
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      // Use a service that shows IP to verify proxy is working
-      const response = await fetch('https://api.ipify.org?format=json', {
+      const response = await this.fetch(testUrl, {
         method: 'GET',
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
 
       if (response.ok) {
-        const data = await response.json();
-        logger.debug('Connection test successful. IP:', data.ip);
+        try {
+          const data = await response.json();
+          this.logger.operation('Proxy connection test successful', {
+            ip: data.ip,
+            duration: `${duration}ms`,
+            proxyType: this.config.type
+          });
+        } catch (jsonError) {
+          this.logger.operation('Proxy connection test successful', {
+            status: response.status,
+            duration: `${duration}ms`,
+            proxyType: this.config.type
+          });
+        }
         return true;
       } else {
-        logger.debug(`Connection test failed with status ${response.status}`);
+        this.logger.warn('Proxy connection test failed', {
+          status: response.status,
+          duration: `${duration}ms`
+        });
         return false;
       }
 
     } catch (error) {
-      logger.debug('Proxy connection test failed:', error.message);
+      const duration = Date.now() - startTime;
+      this.logger.warn('Proxy connection test failed', {
+        error: error.message,
+        duration: `${duration}ms`
+      });
       return false;
     }
   }
@@ -363,7 +433,38 @@ export class ProxyManager {
   }
 
   /**
-   * Build proxy URL for logging/debugging
+   * Sanitize URL for logging (remove sensitive data)
+   * @private
+   * @param {string} url
+   * @returns {string}
+   */
+  _sanitizeUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`;
+    } catch {
+      return '[invalid-url]';
+    }
+  }
+
+  /**
+   * Get proxy config summary for logging
+   * @private
+   * @returns {Object}
+   */
+  _getConfigSummary() {
+    if (!this.config) return null;
+
+    return {
+      type: this.config.type,
+      host: this.config.host,
+      port: this.config.port,
+      hasAuth: !!(this.config.auth?.username)
+    };
+  }
+
+  /**
+   * Build proxy URL for debugging (with masked credentials)
    * @private
    */
   _buildProxyUrl() {
