@@ -10,6 +10,7 @@ import { CONFIG, getSettingsAsync } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { runSettingsMigrations } from "@/shared/config/settingsMigrations.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
 
@@ -74,15 +75,9 @@ async function performLegacyMigration(existingData) {
     }
 
     // 3. Add Vue-specific settings
-    const vueDefaults = {
-      VUE_MIGRATED: true,
-      MIGRATION_DATE: new Date().toISOString(),
-      MIGRATION_FROM_VERSION: "legacy",
-      EXTENSION_VERSION: browser.runtime.getManifest().version,
-    };
+    const vueDefaults = {};
 
     Object.assign(migratedData, vueDefaults);
-    migrationLog.push("Added Vue migration markers");
 
     // 4. Ensure all CONFIG defaults are present
     Object.keys(CONFIG).forEach((key) => {
@@ -114,35 +109,63 @@ async function performLegacyMigration(existingData) {
  */
 async function migrateConfigSettings() {
   try {
+    // First, handle legacy migration if needed
     const migrationStatus = await detectLegacyMigration();
 
     if (migrationStatus.isLegacyMigration) {
       const existingData = await storageManager.get();
-      return await performLegacyMigration(existingData);
+      const legacyResult = await performLegacyMigration(existingData);
+
+      // After legacy migration, also run settings migrations
+      await runIncrementalSettingsMigrations();
+
+      return { ...legacyResult, settingsMigrated: true };
     }
 
-    // Regular config migration for Vue-to-Vue updates
-    const currentSettings = await getSettingsAsync();
-    const newKeys = Object.keys(CONFIG).filter(
-      (key) => !(key in currentSettings),
-    );
+    // Run incremental settings migrations for Vue-to-Vue updates
+    await runIncrementalSettingsMigrations();
 
-
-    if (newKeys.length > 0) {
-
-      const newSettings = {};
-      newKeys.forEach((key) => {
-        newSettings[key] = CONFIG[key];
-      });
-
-      await storageManager.set(newSettings);
-      logger.init('Config migration completed successfully');
-    }
-
-    return { newKeys, success: true };
+    return { success: true, settingsMigrated: true };
   } catch (error) {
     logger.error('Config migration failed:', error);
     throw error;
+  }
+}
+
+/**
+ * Runs incremental settings migrations based on version tracking
+ */
+async function runIncrementalSettingsMigrations() {
+  try {
+    // Get current settings from storage
+    const currentSettings = await storageManager.get();
+
+    // Always run migration for update events to ensure users get latest settings
+    // The migration function itself will check if updates are actually needed
+    const { updates, logs } = await runSettingsMigrations(
+      { ...currentSettings } // Pass copy of current settings
+    );
+
+    logger.debug('Migration result', {
+      updatesCount: Object.keys(updates).length,
+      updateKeys: Object.keys(updates),
+      logs
+    });
+
+    // Apply updates if any
+    if (Object.keys(updates).length > 0) {
+      await storageManager.set(updates);
+      logger.info('Applied settings migration updates', {
+        updateCount: Object.keys(updates).length,
+        logs
+      });
+    } else {
+      logger.info('No settings updates needed');
+    }
+
+  } catch (error) {
+    logger.error('Settings migration failed:', error);
+    // Don't throw - allow extension to continue working
   }
 }
 
@@ -267,6 +290,12 @@ export async function handleInstallationEvent(details) {
     logger.error('Error during installation handling:', error);
     // Don't throw - allow extension to continue working
   }
+}
+
+// Also expose the function for manual triggering
+export async function manualTriggerMigration() {
+  logger.info('Manual migration triggered');
+  await runIncrementalSettingsMigrations();
 }
 
 /**

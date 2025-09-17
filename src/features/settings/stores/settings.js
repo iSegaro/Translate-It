@@ -6,6 +6,7 @@ import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
 // --- Helpers ------------------------------------------------------------
@@ -42,7 +43,7 @@ function getDefaultSettings() {
     TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION ?? true,
     REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
-  DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
+    DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
     USE_MOCK: CONFIG.USE_MOCK ?? false,
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
     // Proxy Settings
@@ -55,11 +56,6 @@ function getDefaultSettings() {
     // Font Settings
     TRANSLATION_FONT_FAMILY: CONFIG.TRANSLATION_FONT_FAMILY || 'auto',
     TRANSLATION_FONT_SIZE: CONFIG.TRANSLATION_FONT_SIZE || '14',
-    // Migration & versioning flags
-    VUE_MIGRATED: false,
-    MIGRATION_DATE: null,
-    MIGRATION_FROM_VERSION: null,
-    EXTENSION_VERSION: null,
     translationHistory: []
   };
 }
@@ -103,6 +99,9 @@ export const useSettingsStore = defineStore('settings', () => {
       try {
         const stored = await storageManager.get(null);
         const current = settings.value;
+
+  
+        // Merge settings from storage (after potential migrations)
         Object.keys(current).forEach(key => {
           if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
             if (key === 'EXCLUDED_SITES') {
@@ -116,7 +115,9 @@ export const useSettingsStore = defineStore('settings', () => {
             }
           }
         });
-  if (settings.value.DEBUG_MODE) logger.debug('Settings merged from storage');
+
+        logger.debug('Settings merged from storage');
+
         isInitialized.value = true;
         return current;
       } catch (error) {
@@ -293,39 +294,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
-  const checkMigrationStatus = () => {
-    return {
-      isVueMigrated: settings.value.VUE_MIGRATED || false,
-      migrationDate: settings.value.MIGRATION_DATE,
-      migrationFromVersion: settings.value.MIGRATION_FROM_VERSION,
-      extensionVersion: settings.value.EXTENSION_VERSION,
-      hasLegacyData: !!(settings.value.translationHistory || settings.value.lastTranslation)
-    }
-  }
-  
-  const markMigrationComplete = async (fromVersion = 'legacy') => {
-    try {
-      let version; 
-      try { 
-        version = browser.runtime.getManifest()?.version; 
-      } catch {
-        // Browser runtime not available, use undefined
-      }
-      Object.assign(settings.value, {
-        VUE_MIGRATED: true,
-        MIGRATION_DATE: new Date().toISOString(),
-        MIGRATION_FROM_VERSION: fromVersion,
-        EXTENSION_VERSION: version
-      });
-      await saveAllSettings(true);
-      logger.info('Migration status updated');
-      return true;
-    } catch (error) {
-      logger.error('Failed to mark migration complete:', error);
-      throw error;
-    }
-  }
-  
+    
   // Storage change listener
   let storageListener = null
 
@@ -410,9 +379,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exportSettings,
     importSettings,
     getSetting,
-    validateSettings,
-    checkMigrationStatus,
-    markMigrationComplete
+    validateSettings
   }
 })
 
