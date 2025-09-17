@@ -41,7 +41,9 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
         url: this._sanitizeUrl(url),
         error: error.message
       });
-      throw error;
+
+      // Do NOT fall back to direct connection - rethrow the error
+      throw new Error(`HTTPS proxy connection failed: ${error.message}`);
     }
   }
 
@@ -75,7 +77,25 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
 
     // Simple approach: send request to proxy with target info
     // Note: This assumes the proxy server supports URL forwarding
-    return fetch(proxyUrl, proxyOptions);
+    try {
+      const response = await fetch(proxyUrl, proxyOptions);
+
+      // Check if proxy responded with an error
+      if (!response.ok && response.status >= 400) {
+        throw new Error(`HTTPS proxy returned error status: ${response.status}`);
+      }
+
+      return response;
+    } catch (error) {
+      this.logger.error('HTTPS proxy connection failed', {
+        proxyUrl,
+        targetUrl: this._sanitizeUrl(url),
+        error: error.message
+      });
+
+      // Re-throw with more context
+      throw new Error(`Failed to connect to HTTPS proxy at ${proxyUrl}: ${error.message}`);
+    }
   }
 
   /**

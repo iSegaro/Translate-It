@@ -263,32 +263,33 @@ const testProxyConnection = async () => {
     // Import the proxy manager
     const { proxyManager } = await import('@/shared/proxy/ProxyManager.js')
 
-    // Update proxy configuration
-    if (proxyEnabled.value) {
-      proxyManager.setConfig({
-        enabled: proxyEnabled.value,
-        type: proxyType.value,
-        host: proxyHost.value,
-        port: proxyPort.value,
-        auth: {
-          username: proxyUsername.value,
-          password: proxyPassword.value
-        }
-      })
-    } else {
-      proxyManager.setConfig({ enabled: false })
+    // If proxy is not enabled, show appropriate message
+    if (!proxyEnabled.value) {
+      testResult.value = {
+        success: false,
+        message: t('proxy_not_enabled') || 'Please enable proxy first to test connection.'
+      }
+      return
     }
+
+    // Update proxy configuration
+    proxyManager.setConfig({
+      enabled: proxyEnabled.value,
+      type: proxyType.value,
+      host: proxyHost.value,
+      port: proxyPort.value,
+      auth: {
+        username: proxyUsername.value,
+        password: proxyPassword.value
+      }
+    })
 
     // Test the connection
     const success = await proxyManager.testConnection()
 
     const successMessage = success
-      ? (proxyEnabled.value
-          ? (t('proxy_test_success') || 'Proxy connection successful!')
-          : (t('direct_test_success') || 'Direct connection successful!'))
-      : (proxyEnabled.value
-          ? (t('proxy_test_failed') || 'Proxy connection failed. Check your settings.')
-          : (t('direct_test_failed') || 'Direct connection failed. Check your internet connection.'))
+      ? (t('proxy_test_success') || 'Proxy connection successful!')
+      : (t('proxy_test_failed') || 'Proxy connection failed. Check your settings.')
 
     testResult.value = {
       success,
@@ -335,6 +336,10 @@ const testProxyConnection = async () => {
       errorMessage = t('proxy_config_invalid') || 'Invalid proxy configuration. Please check your settings.'
     } else if (error.message.includes('Unsupported proxy type')) {
       errorMessage = t('proxy_type_unsupported') || 'Unsupported proxy type. Please select HTTP, HTTPS, or SOCKS.'
+    } else if (error.message.includes('SOCKS proxy is not supported')) {
+      errorMessage = t('proxy_socks_unsupported') || 'SOCKS proxy is not supported in browser extensions. Please use HTTP or HTTPS proxy instead.'
+    } else if (error.message.includes('HTTPS through HTTP proxy is not supported')) {
+      errorMessage = t('proxy_https_via_http_unsupported') || 'HTTPS through HTTP proxy is not supported. Please use HTTPS proxy for HTTPS URLs.'
     }
 
     testResult.value = {

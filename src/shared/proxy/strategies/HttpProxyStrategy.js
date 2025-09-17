@@ -92,11 +92,11 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
    * @returns {Promise<Response>}
    */
   async _proxyHttpsRequest(url, options) {
-    this.logger.debug('HTTPS through HTTP proxy not directly supported, falling back to direct connection');
+    this.logger.debug('HTTPS through HTTP proxy not supported in browser extension environment');
 
-    // For HTTPS through HTTP proxy, we would need to implement CONNECT tunnel
-    // This is complex in browser environment, so we fall back to direct connection
-    return fetch(url, options);
+    // In browser extensions, we cannot properly implement CONNECT tunnel for HTTPS through HTTP proxy
+    // Instead of falling back to direct connection, we should fail to properly test the proxy
+    throw new Error('HTTPS through HTTP proxy is not supported. Please use HTTPS proxy or test with HTTP URL.');
   }
 
   /**

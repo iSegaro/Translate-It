@@ -164,14 +164,14 @@ export class ProxyManager {
         }
       });
 
-      this.logger.warn('Proxy request failed, falling back to direct connection', {
+      this.logger.error('Proxy request failed', {
         url: this._sanitizeUrl(url),
         error: error.message,
         duration: `${duration}ms`
       });
 
-      // Graceful fallback to direct connection
-      return fetch(url, options);
+      // Do NOT fall back to direct connection - rethrow the error
+      throw error;
     }
   }
 
@@ -228,36 +228,10 @@ export class ProxyManager {
   async testConnection(testUrl = 'https://httpbin.org/ip') {
     const startTime = Date.now();
 
+    // This method is specifically for testing proxy connection
     if (!this.isEnabled()) {
-      try {
-        this.logger.debug('Testing direct connection', { testUrl });
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        const response = await fetch(testUrl, {
-          method: 'GET',
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        const success = response.ok;
-        const duration = Date.now() - startTime;
-
-        this.logger.operation('Direct connection test completed', {
-          success,
-          status: response.status,
-          duration: `${duration}ms`
-        });
-
-        return success;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        this.logger.warn('Direct connection test failed', {
-          error: error.message,
-          duration: `${duration}ms`
-        });
-        return false;
-      }
+      this.logger.warn('Proxy test called but proxy is not enabled');
+      return false;
     }
 
     // Test proxy connection
@@ -270,7 +244,7 @@ export class ProxyManager {
 
       // Validate proxy configuration
       if (!this._validateProxyConfig()) {
-        this.logger.warn('Proxy configuration validation failed');
+        this.logger.warn('Proxy configuration validation failed - please check your proxy settings');
         return false;
       }
 
@@ -376,14 +350,56 @@ export class ProxyManager {
       return false;
     }
 
-    // Valid hostname regex
-    const hostnameRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+    // Check for invalid characters
+    if (!/^[a-zA-Z0-9.-]+$/.test(hostname)) {
+      this.logger.debug('Hostname contains invalid characters:', hostname);
+      return false;
+    }
+
+    // Check if it starts or ends with a dot or hyphen
+    if (/^[.-]/.test(hostname) || /[.-]$/.test(hostname)) {
+      this.logger.debug('Hostname cannot start or end with dot or hyphen:', hostname);
+      return false;
+    }
+
+    // Check for consecutive dots
+    if (/\.\./.test(hostname)) {
+      this.logger.debug('Hostname cannot contain consecutive dots:', hostname);
+      return false;
+    }
 
     // Valid IP address regex
     const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 
-    // Must be either valid hostname or valid IP
-    return hostnameRegex.test(hostname) || ipRegex.test(hostname);
+    // If it's a valid IP, accept it
+    if (ipRegex.test(hostname)) {
+      return true;
+    }
+
+    // Valid hostname regex - each label must be 1-63 characters and can contain a-z, A-Z, 0-9, and hyphens (but not at start/end)
+    const labels = hostname.split('.');
+
+    // Must have at least one label
+    if (labels.length === 0) {
+      this.logger.debug('Hostname must have at least one label:', hostname);
+      return false;
+    }
+
+    // Validate each label
+    for (const label of labels) {
+      if (label.length === 0 || label.length > 63) {
+        this.logger.debug('Hostname label must be 1-63 characters:', label);
+        return false;
+      }
+
+      if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)) {
+        this.logger.debug('Hostname label contains invalid characters or format:', label);
+        return false;
+      }
+    }
+
+    // All checks passed
+    return true;
   }
 
   /**

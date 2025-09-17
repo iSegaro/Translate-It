@@ -31,15 +31,14 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     try {
       return await this._socksProxy(url, options);
     } catch (error) {
-      this.logger.warn('SOCKS proxy failed, attempting fallback', {
+      this.logger.error('SOCKS proxy failed', {
         ...this._getStrategyInfo(),
         url: this._sanitizeUrl(url),
         error: error.message
       });
 
-      // Fallback to direct connection for SOCKS
-      // In a real implementation, this might use a SOCKS client library
-      return fetch(url, options);
+      // Do NOT fall back to direct connection - rethrow the error
+      throw new Error(`SOCKS proxy connection failed: ${error.message}`);
     }
   }
 
@@ -52,7 +51,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    */
   async _socksProxy(url, options) {
     // Note: True SOCKS implementation requires binary protocol handling
-    // This is a simplified approach that works if proxy supports HTTP-over-SOCKS
+    // Some SOCKS proxies support HTTP-over-SOCKS which we can attempt
 
     this.logger.debug('Attempting SOCKS proxy connection', {
       proxyHost: this.config.host,
@@ -60,23 +59,66 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       targetUrl: this._sanitizeUrl(url)
     });
 
-    // Try to connect through SOCKS proxy using HTTP-compatible method
-    // This assumes the SOCKS proxy also supports HTTP proxying
+    // First, validate that we can reach the proxy server itself
+    // This helps distinguish between invalid proxy host vs proxy connectivity issues
+    try {
+      const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
+      // Test basic connectivity to the proxy
+      const testResponse = await fetch(proxyUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+
+      // If we can reach the proxy, continue with proxy attempt
+      return await this._attemptProxyRequest(url, options, proxyUrl);
+
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Cannot connect to SOCKS proxy at ${this.config.host}:${this.config.port}. Connection timed out.`);
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        throw new Error(`Cannot connect to SOCKS proxy at ${this.config.host}:${this.config.port}. Please check the proxy address and port.`);
+      } else {
+        throw new Error(`SOCKS proxy connection failed: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Attempt to make the actual proxy request
+   * @private
+   */
+  async _attemptProxyRequest(url, options, proxyUrl) {
     const proxyOptions = {
       ...options,
       headers: this._addProxyHeaders(options.headers)
     };
 
-    // Simple HTTP-over-SOCKS approach
     try {
       this.logger.debug('Attempting HTTP-over-SOCKS request');
-      return await fetch(url, proxyOptions);
-    } catch {
-      this.logger.debug('HTTP-over-SOCKS failed, trying alternate approach');
 
-      // Alternative approach: some SOCKS proxies accept HTTP CONNECT
-      return await this._socksConnect(url, proxyOptions);
+      // For HTTP URLs, we can try to proxy directly
+      if (url.startsWith('http://')) {
+        const fullProxyUrl = `${proxyUrl}/${url}`;
+        return await fetch(fullProxyUrl, {
+          ...proxyOptions,
+          headers: {
+            ...proxyOptions.headers,
+            'Host': new URL(url).host
+          }
+        });
+      }
+      // For HTTPS URLs through SOCKS, we need a different approach
+      else if (url.startsWith('https://')) {
+        return await this._socksHttpsConnect(url, proxyOptions);
+      }
+
+      throw new Error('Unsupported URL scheme for SOCKS proxy');
+    } catch (error) {
+      this.logger.debug('HTTP-over-SOCKS failed', {
+        error: error.message
+      });
+      throw new Error(`SOCKS proxy request failed: ${error.message}`);
     }
   }
 
@@ -87,32 +129,45 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
-  async _socksConnect(url, options) {
+  async _socksHttpsConnect(url, options) {
     const targetUrl = new URL(url);
     const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
-    // Attempt HTTP CONNECT through SOCKS proxy
-    const connectOptions = {
-      method: 'CONNECT',
-      headers: {
-        'Host': `${targetUrl.hostname}:${targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80)}`,
-        ...this._addProxyHeaders()
-      }
-    };
-
-    this.logger.debug('Attempting SOCKS CONNECT', {
+    this.logger.debug('Attempting HTTPS through SOCKS proxy', {
       proxyUrl,
-      target: `${targetUrl.hostname}:${targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80)}`
+      targetHost: targetUrl.hostname,
+      targetPort: targetUrl.port || 443
     });
 
-    // This is a simplified approach - real SOCKS would need binary protocol
-    const connectResponse = await fetch(proxyUrl, connectOptions);
+    // In browser extensions, we cannot implement proper SOCKS CONNECT tunnel
+    // Instead, we'll try to use the proxy as a regular HTTP proxy
+    // This works if the SOCKS proxy also supports HTTP proxy mode
 
-    if (connectResponse.status === 200) {
-      // CONNECT successful, now make the actual request
-      return fetch(url, options);
-    } else {
-      throw new Error(`SOCKS CONNECT failed with status ${connectResponse.status}`);
+    try {
+      // Try to fetch through the proxy directly
+      // Some SOCKS proxies support this hybrid mode
+      const response = await fetch(proxyUrl, {
+        ...options,
+        method: options.method || 'GET',
+        headers: {
+          ...options.headers,
+          'Host': targetUrl.host,
+          'X-Target-URL': url,
+          'X-Proxy-Mode': 'socks'
+        }
+      });
+
+      // If we get a response, consider it successful
+      if (response.status < 500) {
+        return response;
+      } else {
+        throw new Error(`Proxy returned error status: ${response.status}`);
+      }
+    } catch (error) {
+      this.logger.debug('HTTPS through SOCKS failed', {
+        error: error.message
+      });
+      throw new Error(`Cannot establish HTTPS connection through SOCKS proxy: ${error.message}`);
     }
   }
 
