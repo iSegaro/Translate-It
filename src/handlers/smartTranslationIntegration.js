@@ -78,6 +78,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     });
 
     const newToastId = `status-${Date.now()}`;
+    // Store the toast ID globally for cleanup in case of errors
+    window.pendingTranslationToastId = newToastId;
     pageEventBus.emit('show-notification', { id: newToastId, message: 'Translating...', type: 'status' });
 
     // Send direct translation message to background (fire-and-forget pattern like element selection)
@@ -125,6 +127,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     if (toastId) {
       pageEventBus.emit('dismiss_notification', { id: toastId });
     }
+    // Also clear the globally stored toast ID
+    if (window.pendingTranslationToastId) {
+      pageEventBus.emit('dismiss_notification', { id: window.pendingTranslationToastId });
+      window.pendingTranslationToastId = null;
+    }
     clearPendingNotificationData('translateFieldViaSmartHandler-error');
   }
 }
@@ -155,13 +162,19 @@ export async function applyTranslationToTextField(translatedText, originalText, 
   if (!translatedText || translatedText === 'undefined' || translatedText.trim() === '') {
     const errorMessage = 'Translation failed or returned empty result';
     logger.error(errorMessage, { translatedText, originalText });
-    
+
     // Dismiss the status notification if it exists
     if (toastId) {
       pageEventBus.emit('dismiss_notification', { id: toastId });
     }
     clearPendingNotificationData('applyTranslationToTextField-failed');
-    
+
+    // Also dismiss any pending notifications that might be stuck
+    if (window.pendingTranslationToastId) {
+      pageEventBus.emit('dismiss_notification', { id: window.pendingTranslationToastId });
+      window.pendingTranslationToastId = null;
+    }
+
     // Use centralized error handling
     const errorHandler = ErrorHandler.getInstance();
     await errorHandler.handle(new Error(errorMessage), {
@@ -169,7 +182,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       type: ErrorTypes.TRANSLATION_FAILED,
       showToast: true
     });
-    
+
     // Clear pending translation data
     clearPendingTranslationData();
     throw new Error(errorMessage);
@@ -303,6 +316,7 @@ function clearPendingTranslationData() {
   window.pendingTranslationTabId = null;
   window.pendingSelectionRange = null;
   window.pendingTranslationTimestamp = null;
+  window.pendingTranslationToastId = null;
 }
 
 /**

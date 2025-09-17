@@ -348,6 +348,11 @@ export class ContentMessageHandler extends ResourceTracker {
           if (toastId) {
             pageEventBus.emit('dismiss_notification', { id: toastId });
           }
+          // Also clear any globally stored toast ID
+          if (window.pendingTranslationToastId) {
+            pageEventBus.emit('dismiss_notification', { id: window.pendingTranslationToastId });
+            window.pendingTranslationToastId = null;
+          }
           
           // Extract error message safely
           let errorMessage;
