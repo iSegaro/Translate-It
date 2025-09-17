@@ -112,6 +112,7 @@
 - **`docs/STORAGE_MANAGER.md`**: مدیریت storage با caching
 - **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
 - **`docs/MEMORY_GARBAGE_COLLECTOR.md`**: سیستم مدیریت حافظه پیشرفته با Critical Protection System
+- **`docs/PROXY_SYSTEM.md`**: سیستم پروکسی extension-only با Strategy Pattern برای دسترسی به سرویس‌های ترجمه با محدودیت جغرافیایی
 
 ### مستندات ویژگی‌ها  
 - **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host

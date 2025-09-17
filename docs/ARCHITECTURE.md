@@ -40,6 +40,7 @@
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system with Critical Protection for essential resources
+- **[Proxy System](PROXY_SYSTEM.md)** - Extension-only proxy system with Strategy Pattern for accessing geo-restricted translation services
 - **[Toast Integration System](TOAST_INTEGRATION_SYSTEM.md)** - Comprehensive Vue Sonner toast integration with actionable notifications and event-driven architecture
 - **[CSS Architecture](CSS_ARCHITECTURE.md)** - Modern principled CSS with Grid layout, containment, safe variable functions, and future-proof SCSS patterns
 
