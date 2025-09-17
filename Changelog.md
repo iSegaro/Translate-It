@@ -1,7 +1,7 @@
 ### Changelog – Translate It!
 
 
-#### v1.1.0 – Released on X, 2025
+#### v1.1.0 – Released on 17, 2025
 
 ##### Added
 
