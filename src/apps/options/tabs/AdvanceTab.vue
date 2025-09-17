@@ -100,25 +100,27 @@
         </div>
 
         <div class="setting-group proxy-test">
-          <button
-            :disabled="isTestingProxy || !canTestProxy"
-            :class="['test-button', testResultClass]"
-            @click="testProxyConnection"
-          >
-            <span v-if="isTestingProxy" class="button-content">
-              <div class="spinner"></div>
-              {{ t('proxy_testing') || 'Testing...' }}
-            </span>
-            <span v-else class="button-content">
-              <svg class="test-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3"/>
-              </svg>
-              {{ testButtonText }}
-            </span>
-          </button>
+          <div class="test-container">
+            <button
+              :disabled="isTestingProxy || !canTestProxy"
+              :class="['test-button', testResultClass]"
+              @click="testProxyConnection"
+            >
+              <span v-if="isTestingProxy" class="button-content">
+                <div class="spinner"></div>
+                {{ t('proxy_testing') || 'Testing...' }}
+              </span>
+              <span v-else class="button-content">
+                <svg class="test-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3"/>
+                </svg>
+                {{ testButtonText }}
+              </span>
+            </button>
 
-          <div v-if="testResult" :class="['test-result', testResult.success ? 'success' : 'error']">
-            {{ testResult.message }}
+            <div v-if="testResult" :class="['test-result', testResult.success ? 'success' : 'error']">
+              {{ testResult.message }}
+            </div>
           </div>
         </div>
       </template>
@@ -445,7 +447,13 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
-  align-items: flex-start;
+
+  .test-container {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-base;
+    flex-wrap: wrap;
+  }
 
   .test-button {
     display: inline-flex;
@@ -552,9 +560,11 @@ h2 {
     border-radius: 8px;
     font-size: 14px;
     font-weight: 500;
-    margin-top: 8px;
     border: 1px solid;
     animation: slideIn 0.3s ease-out;
+    flex: 1;
+    min-width: 250px;
+    align-self: center;
 
     &.success {
       background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
@@ -652,9 +662,20 @@ h2 {
   }
 
   .proxy-test {
+    .test-container {
+      flex-direction: column;
+      align-items: stretch;
+      gap: $spacing-sm;
+    }
+
     .test-button {
       width: 100%;
       min-width: auto;
+    }
+
+    .test-result {
+      min-width: auto;
+      align-self: stretch;
     }
   }
 }
