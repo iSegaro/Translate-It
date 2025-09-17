@@ -17,6 +17,10 @@ const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
 export function matchErrorToType(rawOrError = "") {
   // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
+    // Ensure API_RESPONSE_INVALID is properly recognized
+    if (rawOrError.type === ErrorTypes.API_RESPONSE_INVALID) {
+      return ErrorTypes.API_RESPONSE_INVALID;
+    }
     return rawOrError.type;
   }
 
@@ -64,6 +68,8 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
+  const msg = String(rawOrError).toLowerCase().trim();
+
   // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا (برای مواردی که statusCode ندارند)
   if (typeof rawOrError === "string") {
     const rawKey = rawOrError.trim();
@@ -72,7 +78,10 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
-  const msg = String(rawOrError).toLowerCase().trim();
+  // Check for API_RESPONSE_INVALID error message specifically
+  if (msg.includes("api response invalid") || msg.includes("invalid api response")) {
+    return ErrorTypes.API_RESPONSE_INVALID;
+  }
 
   //--- این بخش به عنوان فال‌بک برای مواردی که کد وضعیت در دسترس نیست، حفظ می‌شود --- //
 

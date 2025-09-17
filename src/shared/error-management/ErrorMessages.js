@@ -17,6 +17,7 @@ export const errorMessages = {
 
   // API settings errors
   [ErrorTypes.API]: "API error",
+  [ErrorTypes.API_RESPONSE_INVALID]: "Invalid API response format",
   [ErrorTypes.API_KEY_MISSING]: "API Key is missing",
   [ErrorTypes.API_KEY_INVALID]: "API Key is wrong or invalid",
   [ErrorTypes.API_URL_MISSING]: "API URL is missing",

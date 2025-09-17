@@ -239,6 +239,20 @@ export class BaseProvider {
         throw err;
       }
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // If we got HTML or other content, log the response for debugging
+        const responseText = await response.text();
+        logger.error(`[${this.providerName}] Expected JSON but received ${contentType || 'unknown content type'}. Response:`, responseText.substring(0, 500));
+
+        const err = new Error('API returned non-JSON response. This may indicate a proxy configuration error.');
+        err.type = ErrorTypes.API_RESPONSE_INVALID;
+        err.statusCode = response.status;
+        err.context = context;
+        throw err;
+      }
+
       const data = await response.json();
       logger.debug('_executeApiCall raw response data:', data);
 
@@ -246,7 +260,7 @@ export class BaseProvider {
       if (result === undefined) {
         logger.error(`[${this.providerName}] _executeApiCall result is undefined. Raw data:`, data);
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
-        err.type = ErrorTypes.API;
+        err.type = ErrorTypes.API_RESPONSE_INVALID;
         err.statusCode = response.status;
         err.context = context;
         throw err;
