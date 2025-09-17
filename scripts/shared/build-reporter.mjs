@@ -1,6 +1,11 @@
 import { logStep, logSuccess, logError, logInfo } from './logger.mjs'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const rootDir = path.resolve(__dirname, '../..')
+const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
 /**
  * Beautiful build reporter with consistent formatting
@@ -37,7 +42,7 @@ export class BuildReporter {
   logConfiguration() {
     console.log('┌─ CONFIGURATION')
     console.log(`├─ Browser:          ${this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V2)'}`)
-    console.log(`├─ Output Directory: dist/${this.browser === 'chrome' ? 'Chrome' : 'Firefox'}/Translate-It-v0.10.0/`)
+    console.log(`├─ Output Directory: dist/${this.browser}/Translate-It-v${pkg.version}/`)
     console.log(`├─ Build Mode:       ${process.env.NODE_ENV || 'Production'}`)
     console.log(`└─ Vue Version:      3.5.18\n`)
   }
