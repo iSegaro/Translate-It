@@ -23,10 +23,10 @@ const resourceTracker = new ResourceTracker('smart-translation-integration');
 function clearPendingNotificationData(context = 'cleanup') {
   // Clear timeout if it exists
   if (window.pendingTranslationDismissTimeout) {
-    resourceTracker.clearTimeout(window.pendingTranslationDismissTimeout);
+    resourceTracker.clearTimer(window.pendingTranslationDismissTimeout);
     window.pendingTranslationDismissTimeout = null;
   }
-  
+
   logger.debug('Pending notification data cleared', { context });
 }
 
@@ -81,6 +81,18 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     // Store the toast ID globally for cleanup in case of errors
     window.pendingTranslationToastId = newToastId;
     pageEventBus.emit('show-notification', { id: newToastId, message: 'Translating...', type: 'status' });
+
+    // Set a timeout to automatically dismiss the notification if no response is received
+    // This prevents the "Translating..." message from staying stuck forever
+    logger.debug('Setting up translation timeout (15 seconds)');
+    window.pendingTranslationDismissTimeout = resourceTracker.trackTimeout(() => {
+      logger.debug('Translation request timeout reached, dismissing notification');
+      if (window.pendingTranslationToastId) {
+        pageEventBus.emit('dismiss_notification', { id: window.pendingTranslationToastId });
+        window.pendingTranslationToastId = null;
+      }
+      clearPendingNotificationData('translation-timeout');
+    }, 15000); // 15 seconds timeout
 
     // Send direct translation message to background (fire-and-forget pattern like element selection)
     // Response will come via TRANSLATION_RESULT_UPDATE broadcast and handled by ContentMessageHandler
