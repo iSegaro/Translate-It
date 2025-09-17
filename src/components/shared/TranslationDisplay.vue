@@ -662,7 +662,7 @@ onMounted(() => {
   position: absolute;
   top: 6px;
   left: 12px;
-  z-index: 10;
+  /* z-index: 10; */
   opacity: 1;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(4px);
