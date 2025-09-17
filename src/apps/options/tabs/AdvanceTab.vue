@@ -106,19 +106,36 @@
               :class="['test-button', testResultClass]"
               @click="testProxyConnection"
             >
-              <span v-if="isTestingProxy" class="button-content">
-                <div class="spinner"></div>
+              <span
+                v-if="isTestingProxy"
+                class="button-content"
+              >
+                <div class="spinner" />
                 {{ t('proxy_testing') || 'Testing...' }}
               </span>
-              <span v-else class="button-content">
-                <svg class="test-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3"/>
+              <span
+                v-else
+                class="button-content"
+              >
+                <svg
+                  class="test-icon"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
                 </svg>
                 {{ testButtonText }}
               </span>
             </button>
 
-            <div v-if="testResult" :class="['test-result', testResult.success ? 'success' : 'error']">
+            <div
+              v-if="testResult"
+              :class="['test-result', testResult.success ? 'success' : 'error']"
+            >
               {{ testResult.message }}
             </div>
           </div>

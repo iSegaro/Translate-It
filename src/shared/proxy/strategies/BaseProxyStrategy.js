@@ -18,7 +18,7 @@ export class BaseProxyStrategy {
    * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
-  async execute(url, options) {
+  async execute() {
     throw new Error(`execute method must be implemented by ${this.constructor.name}`);
   }
 

@@ -62,7 +62,6 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
 
     // Try to connect through SOCKS proxy using HTTP-compatible method
     // This assumes the SOCKS proxy also supports HTTP proxying
-    const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
     const proxyOptions = {
       ...options,
@@ -73,7 +72,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     try {
       this.logger.debug('Attempting HTTP-over-SOCKS request');
       return await fetch(url, proxyOptions);
-    } catch (error) {
+    } catch {
       this.logger.debug('HTTP-over-SOCKS failed, trying alternate approach');
 
       // Alternative approach: some SOCKS proxies accept HTTP CONNECT

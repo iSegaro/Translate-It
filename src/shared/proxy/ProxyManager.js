@@ -92,8 +92,6 @@ export class ProxyManager {
       return originalOptions;
     }
 
-    const proxyUrl = this._buildProxyUrl();
-
     // For browser extensions, we need to use a proxy agent or similar approach
     // Since fetch doesn't directly support proxy, we'll modify the approach
     const options = { ...originalOptions };
@@ -111,7 +109,7 @@ export class ProxyManager {
     // may require using chrome.proxy API or similar browser-specific APIs
     // For now, we'll prepare the configuration for potential integration
 
-    logger.debug('Proxy fetch options prepared for:', url);
+    this.logger.debug('Proxy fetch options prepared for:', url);
     return options;
   }
 
@@ -183,7 +181,7 @@ export class ProxyManager {
    * @param {string} url - Target URL
    * @returns {Object} Strategy instance
    */
-  async _getStrategy(url) {
+  async _getStrategy() {
     if (!this.strategies.size) {
       await this._initializeStrategies();
     }
@@ -296,7 +294,7 @@ export class ProxyManager {
             duration: `${duration}ms`,
             proxyType: this.config.type
           });
-        } catch (jsonError) {
+        } catch {
           this.logger.operation('Proxy connection test successful', {
             status: response.status,
             duration: `${duration}ms`,
@@ -329,36 +327,36 @@ export class ProxyManager {
    */
   _validateProxyConfig() {
     if (!this.config) {
-      logger.debug('No proxy config found');
+      this.logger.debug('No proxy config found');
       return false;
     }
 
     const { type, host, port } = this.config;
 
     if (!type || !['http', 'https', 'socks'].includes(type)) {
-      logger.debug('Invalid proxy type:', type);
+      this.logger.debug('Invalid proxy type:', type);
       return false;
     }
 
     if (!host || typeof host !== 'string' || host.trim() === '') {
-      logger.debug('Invalid proxy host:', host);
+      this.logger.debug('Invalid proxy host:', host);
       return false;
     }
 
     // More strict hostname/IP validation
     if (!this._isValidHostname(host.trim())) {
-      logger.debug('Invalid proxy hostname format:', host);
+      this.logger.debug('Invalid proxy hostname format:', host);
       return false;
     }
 
     if (!port || isNaN(port) || port < 1 || port > 65535) {
-      logger.debug('Invalid proxy port:', port);
+      this.logger.debug('Invalid proxy port:', port);
       return false;
     }
 
     // Check for common mistakes
     if (host.trim() === port.toString()) {
-      logger.debug('Host cannot be the same as port:', { host, port });
+      this.logger.debug('Host cannot be the same as port:', { host, port });
       return false;
     }
 
@@ -374,7 +372,7 @@ export class ProxyManager {
   _isValidHostname(hostname) {
     // Check if it's just a number (common mistake - using port as host)
     if (/^\d+$/.test(hostname)) {
-      logger.debug('Hostname cannot be just a number:', hostname);
+      this.logger.debug('Hostname cannot be just a number:', hostname);
       return false;
     }
 
@@ -399,11 +397,11 @@ export class ProxyManager {
 
       // Use the improved hostname validation
       if (!this._isValidHostname(host.trim())) {
-        logger.debug('Proxy hostname validation failed:', host);
+        this.logger.debug('Proxy hostname validation failed:', host);
         return false;
       }
 
-      logger.debug('Proxy host format validation passed:', host);
+      this.logger.debug('Proxy host format validation passed:', host);
 
       // Since we can't actually connect to proxy in browser extension,
       // we'll just return true if validation passed
@@ -411,7 +409,7 @@ export class ProxyManager {
       return true;
 
     } catch (error) {
-      logger.debug('Proxy reachability test error:', error.message);
+      this.logger.debug('Proxy reachability test error:', error.message);
       return false;
     }
   }

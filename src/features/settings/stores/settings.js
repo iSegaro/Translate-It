@@ -6,7 +6,6 @@ import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
 // --- Helpers ------------------------------------------------------------

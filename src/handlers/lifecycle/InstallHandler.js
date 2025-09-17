@@ -6,7 +6,7 @@
 import browser from "webextension-polyfill";
 
 import { getTranslationString } from "@/utils/i18n/i18n.js";
-import { CONFIG, getSettingsAsync } from "@/shared/config/config.js";
+import { CONFIG } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
