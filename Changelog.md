@@ -9,7 +9,10 @@
 
 ##### Fixed
 
-- **Translation Status Notification**: Fixed issue where "Translating..." notification would remain stuck when text field translation failed due to text extraction errors or background service failures
+- **Translation Status Notification**: Fixed issue where "Translating..." notification would remain stuck when text field translation failed due to text extraction errors or background service failures  
+- **[#59](https://github.com/iSegaro/Translate-It/issues/59)**: Fixed issue where prompt changes from the recent update were not being applied
+- Fixed icon display issue when selecting in advanced text fields using drag.
+
 
 ---
 
