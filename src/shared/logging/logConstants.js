@@ -29,8 +29,9 @@ export const LOG_COMPONENTS = {
   HISTORY: 'History',             // src/features/history/
   SETTINGS: 'Settings',           // src/features/settings/
   WINDOWS: 'Windows',             // src/features/windows/
-
+  
   // سیستم‌های مشترک
+  PROXY: 'Proxy',                 // src/shared/proxy/
   MESSAGING: 'Messaging',         // src/shared/messaging/
   STORAGE: 'Storage',             // src/shared/storage/
   ERROR: 'Error',                 // src/shared/error-management/

@@ -117,7 +117,8 @@ function generateChromeManifest(baseManifest) {
       ...baseManifest.permissions,
       'sidePanel',
       'tts',
-      'offscreen'
+      'offscreen',
+      'proxy'
     ],
     
     // Chrome action (popup)
