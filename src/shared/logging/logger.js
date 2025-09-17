@@ -58,7 +58,7 @@ const componentLogLevels = {
   Error: LOG_LEVELS.INFO,
   Config: LOG_LEVELS.INFO,       // Config system
   Memory: LOG_LEVELS.INFO,       // Memory management system
-  Proxy: LOG_LEVELS.DEBUG,      // Memory management system
+  Proxy: LOG_LEVELS.INFO,      // Memory management system
 
   // ابزارها و utilities (Tools and utilities)
   Utils: LOG_LEVELS.INFO,       // Utilities
