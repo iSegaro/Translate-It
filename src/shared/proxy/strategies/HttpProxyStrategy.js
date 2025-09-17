@@ -87,11 +87,9 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
   /**
    * Proxy HTTPS request through HTTP proxy using CONNECT
    * @private
-   * @param {string} url - Target URL
-   * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
-  async _proxyHttpsRequest(url, options) {
+  async _proxyHttpsRequest() {
     this.logger.debug('HTTPS through HTTP proxy not supported in browser extension environment');
 
     // In browser extensions, we cannot properly implement CONNECT tunnel for HTTPS through HTTP proxy

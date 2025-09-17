@@ -65,7 +65,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
       // Test basic connectivity to the proxy
-      const testResponse = await fetch(proxyUrl, {
+      await fetch(proxyUrl, {
         method: 'HEAD',
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
