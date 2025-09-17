@@ -254,7 +254,7 @@ export class FieldDetector {
         // Note: Non-processable types are already checked in _isNonProcessableField
         // which is called at the beginning of this method
 
-        const textTypes = ['text', 'search'];
+        const textTypes = ['text', 'search', 'email', 'url', 'tel'];
 
         if (textTypes.includes(type) || !type) {
           // For text inputs without explicit type, check if they actually expect text content
@@ -416,12 +416,12 @@ export class FieldDetector {
     if (fieldType === FieldTypes.PROFESSIONAL_EDITOR && siteConfig.selectionStrategy) {
       return siteConfig.selectionStrategy;
     }
-    
-    // For rich text editors, require double-click by default
-    if (fieldType === FieldTypes.RICH_TEXT_EDITOR) {
+
+    // For rich text editors and content editable fields, require double-click by default
+    if (fieldType === FieldTypes.RICH_TEXT_EDITOR || fieldType === FieldTypes.CONTENT_EDITABLE) {
       return SelectionStrategies.DOUBLE_CLICK_REQUIRED;
     }
-    
+
     // For all other field types, any selection is acceptable
     return SelectionStrategies.ANY_SELECTION;
   }
@@ -471,10 +471,12 @@ export class FieldDetector {
     // Show selection icon for:
     // - Professional editors (with double-click requirement)
     // - Rich text editors (with double-click requirement)
+    // - Content editable fields (TEXTAREA, etc. with double-click requirement)
     // - Regular content (UNKNOWN field type) - any selection is acceptable
     // Non-processable and regular input fields should NOT show selection icon
     return fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
            fieldType === FieldTypes.RICH_TEXT_EDITOR ||
+           fieldType === FieldTypes.CONTENT_EDITABLE ||
            fieldType === FieldTypes.UNKNOWN;
   }
 
@@ -510,7 +512,7 @@ export class FieldDetector {
     // Check for non-processable input types
     const nonProcessableTypes = [
       'password', 'hidden', 'file', 'submit', 'reset', 'button', 'image',
-      'tel', 'email', 'url', 'number', 'range', 'date', 'time', 'datetime-local',
+      'number', 'range', 'date', 'time', 'datetime-local',
       'month', 'week', 'color', 'search'
     ];
     if (nonProcessableTypes.includes(type)) return true;

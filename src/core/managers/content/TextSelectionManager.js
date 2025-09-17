@@ -900,8 +900,46 @@ export class TextSelectionManager extends ResourceTracker {
       this.logger.debug('Using last valid position as fallback', position);
     }
 
+    // Check if selection is near a regular-input field and should not show icon
+    let shouldSkip = false;
+
+    // Check source event target
+    if (sourceEvent && sourceEvent.target) {
+      try {
+        const targetDetection = await fieldDetector.detect(sourceEvent.target);
+        if (targetDetection.fieldType === FieldTypes.REGULAR_INPUT) {
+          this.logger.debug('Skipping selection icon - selection originated from regular-input field', {
+            fieldType: targetDetection.fieldType,
+            tagName: sourceEvent.target.tagName
+          });
+          shouldSkip = true;
+        }
+      } catch (error) {
+        this.logger.debug('Error checking target field type', error);
+      }
+    }
+
+    // Also check active element for selection-based positioning (e.g., double-click in input)
+    if (!shouldSkip && !sourceEvent) {
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        try {
+          const activeDetection = await fieldDetector.detect(activeElement);
+          if (activeDetection.fieldType === FieldTypes.REGULAR_INPUT) {
+            this.logger.debug('Skipping selection icon - selection in regular-input field via keyboard/double-click', {
+              fieldType: activeDetection.fieldType,
+              tagName: activeElement.tagName
+            });
+            shouldSkip = true;
+          }
+        } catch (error) {
+          this.logger.debug('Error checking active element field type', error);
+        }
+      }
+    }
+
     // --- Show Window/Icon ---
-    if (windowsManager && position) {
+    if (windowsManager && position && !shouldSkip) {
       this.logger.debug('Calling windowsManager.show()', {
         text: selectedText.substring(0, 30) + '...', 
         position
@@ -909,7 +947,7 @@ export class TextSelectionManager extends ResourceTracker {
       await windowsManager.show(selectedText, position);
       this.lastProcessedText = selectedText;
       this.lastProcessedTime = currentTime;
-    } else if (window !== window.top && position) {
+    } else if (window !== window.top && position && !shouldSkip) {
       this.logger.debug('Requesting window creation in main frame', {
         text: selectedText.substring(0, 30) + '...', 
         position
@@ -918,7 +956,11 @@ export class TextSelectionManager extends ResourceTracker {
       this.lastProcessedText = selectedText;
       this.lastProcessedTime = currentTime;
     } else {
-      this.logger.warn('SelectionWindows not available or position not calculated');
+      if (shouldSkip) {
+        this.logger.debug('Selection icon intentionally skipped due to field type restrictions');
+      } else {
+        this.logger.warn('SelectionWindows not available or position not calculated');
+      }
     }
   }
 
