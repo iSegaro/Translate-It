@@ -67,7 +67,7 @@ async function buildAll() {
 ## Firefox Extension  
 - **File**: Translate-It-v${version}-for-Firefox.zip
 - **Manifest**: Version 2
-- **Compatible**: Firefox 109+
+- **Compatible**: Firefox 112+
 
 ## Installation
 1. Download the appropriate file for your browser
