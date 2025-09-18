@@ -58,11 +58,13 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 
-// Function to add target="_blank" to all links
+// Function to add target="_blank" only to external links
 const addTargetBlankToLinks = () => {
-  // Find all links in the help tab and add target="_blank"
+  // Find all links in the help tab and add target="_blank" only to external links
   document.querySelectorAll('.help-tab .markdown-content a').forEach(link => {
-    if (!link.target) {
+    const href = link.getAttribute('href')
+    // Only add target="_blank" to external links (not starting with #)
+    if (href && !href.startsWith('#') && !link.target) {
       link.target = '_blank'
       link.rel = 'noopener noreferrer'
     }

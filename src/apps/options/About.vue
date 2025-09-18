@@ -89,14 +89,16 @@ const fetchChangelog = async () => {
   }
 }
 
-// Function to add target="_blank" to all links
+// Function to add target="_blank" only to external links
 const addTargetBlankToLinks = () => {
   // Use a simple selector to find all links in the changelog
   const changelogElements = document.querySelectorAll('.changelog-content')
   changelogElements.forEach(element => {
     const links = element.querySelectorAll('a')
     links.forEach(link => {
-      if (!link.getAttribute('target')) {
+      const href = link.getAttribute('href')
+      // Only add target="_blank" to external links (not starting with #)
+      if (href && !href.startsWith('#') && !link.getAttribute('target')) {
         link.setAttribute('target', '_blank')
         link.setAttribute('rel', 'noopener noreferrer')
       }
