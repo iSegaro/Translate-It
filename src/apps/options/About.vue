@@ -21,6 +21,7 @@
       <!-- Safe: Content is sanitized with DOMPurify -->
       <div
         v-else
+        ref="changelogContent"
         class="changelog-content"
         v-html="sanitizedChangelog"
       />
@@ -29,7 +30,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import browser from 'webextension-polyfill'
@@ -72,7 +73,7 @@ const fetchChangelog = async () => {
       mangle: false,
       sanitize: false
     }
-    
+
     let html = marked(markdown, markedOptions)
 
     // Post-process to add spacing between sections without breaking markdown
@@ -88,8 +89,32 @@ const fetchChangelog = async () => {
   }
 }
 
+// Function to add target="_blank" to all links
+const addTargetBlankToLinks = () => {
+  // Use a simple selector to find all links in the changelog
+  const changelogElements = document.querySelectorAll('.changelog-content')
+  changelogElements.forEach(element => {
+    const links = element.querySelectorAll('a')
+    links.forEach(link => {
+      if (!link.getAttribute('target')) {
+        link.setAttribute('target', '_blank')
+        link.setAttribute('rel', 'noopener noreferrer')
+      }
+    })
+  })
+}
+
+// Watch for changes and process links
+watch(sanitizedChangelog, () => {
+  nextTick(() => {
+    addTargetBlankToLinks()
+  })
+})
+
 onMounted(() => {
   fetchChangelog()
+  // Process links after a short delay to ensure DOM is ready
+  setTimeout(addTargetBlankToLinks, 500)
 })
 </script>
 
