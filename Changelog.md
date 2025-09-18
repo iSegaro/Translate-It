@@ -3,6 +3,7 @@
 
 #### v1.2.0 – Released on September 18, 2025
 
+
 ##### Added
 
 - **Proxy Support**: Added proxy configuration support in `Settings > Advanced Tab > Proxy Settings` to enable access to translation services with geographic restrictions
@@ -29,6 +30,7 @@
 
 #### v1.0.0 – Released on September 15, 2025
 
+
 ##### Added
 
 - **Dynamic Extension Icon**: The extension icon now changes to match the selected translation provider
@@ -51,6 +53,7 @@
 
 #### v0.9.5 – Released on July 26, 2025
 
+
 ##### Added
 
 - Added `Microsoft Bing` as a translation provider
@@ -70,6 +73,7 @@
 ---
 
 #### v0.9.0 – Released on July 22, 2025
+
 
 ##### Added
 
@@ -107,6 +111,7 @@
 
 #### v0.8.0 – Released on July 14, 2025
 
+
 ##### Added
 
 - Introduced Side Panel support for display in the browser's sidebar
@@ -118,6 +123,7 @@
 ---
 
 #### v0.7.0 – Released on 12 July 2025
+
 
 ##### Added
 
@@ -140,6 +146,7 @@
 
 #### v0.6.5 – Released on 2 July 2025
 
+
 ##### Added
 
 - Added quick access to the API provider from the right-click context menu in the extension's action bar.
@@ -157,6 +164,7 @@
 ---
 
 #### v0.6.0 – Released on 1 July 2025
+
 
 ##### Added
 
@@ -186,6 +194,7 @@
 
 #### v0.5.0 – Released on 30 June 2025
 
+
 ##### Added
 
 - Added quick access options to the extension’s context (right-click) menu via the action toolbar.
@@ -205,6 +214,7 @@
 
 #### v0.4.0 – Released on 29 June 2025
 
+
 ##### Added
 
 - Added 'Translate with Select Element' mode to the right-click context menu for quick access.
@@ -220,6 +230,7 @@
 
 #### v0.3.6 – Released on 28 June 2025
 
+
 ##### Fixed
 - Resolved issues on certain pages where the extension failed to function properly — particularly on platforms acting as software containers (e.g., frameworks like PhoneGap and similar).
 
@@ -229,6 +240,7 @@
 ---
 
 #### v0.3.5 – Released on 27 June 2025
+
 
 ##### Fixed
 - Resolved an error that occurred during page loading.
@@ -251,6 +263,7 @@
 
 #### v0.3.3 - Released 26 June 2025
 
+
 ##### Added
 - Add API key information and links for WebAI, OpenAI, OpenRouter, and DeepSeek on Options page.
 - Add additional default excluded sites to the exclusion list:
@@ -268,6 +281,7 @@
 ---
 
 #### v0.3.0 - Released 23 June 2025
+
 
 ##### Added
 
@@ -289,12 +303,14 @@
 
 #### v0.2.2 - Released 21 June 2025
 
+
 - New Feature: In addition to automatic translation on text selection, a new method has been added — a small icon now appears near the selected text. The translation is shown only after clicking this icon, allowing for a more deliberate and user-controlled experience.
 - Minor UI improvements and stability enhancements.
 
 ---
 
 #### v0.2.1 - Released 28 May 2025
+
 
 - Improved Popup Behavior on Initial Inactivity
 - Enhanced display of the last translation (now shown only in Dictionary mode)
@@ -303,6 +319,7 @@
 ---
 
 #### v0.2.0 - Released 26 May 2025
+
 
 - Theme Support Added
     - Switch between Light, Dark, or Auto (system-based) themes to suit your visual preferences.
@@ -317,11 +334,13 @@
 
 #### v0.1.1 - Released 6 May 2025
 
+
 - Updated the build process and added a lint check
 - Renamed the extension (UUID remains unchanged)
 
 ---
 
 #### v0.1.0 - Released 30 Apr 2025
+
 
 - First public release
