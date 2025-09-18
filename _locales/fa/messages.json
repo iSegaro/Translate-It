@@ -101,6 +101,7 @@
   "about_tab_title": { "message": "تغییرات جدید" },
   "help_section_title": { "message": "راهنما و مستندات" },
   "about_section_title": { "message": "آخرین تغییرات" },
+  "options_changelog_error": { "message": "خطا در بارگذاری تغییرات." },
   "help_shortcut_title": {
     "message": "چگونه میانبرهای کیبورد را تغییر دهیم؟"
   },

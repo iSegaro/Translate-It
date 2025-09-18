@@ -101,6 +101,7 @@
   "about_tab_title": { "message": "What's New" },
   "help_section_title": { "message": "Help & Documentation" },
   "about_section_title": { "message": "Changelog" },
+  "options_changelog_error": { "message": "Failed to load changelog." },
   "help_shortcut_title": { "message": "How to change keyboard shortcuts ?" },
   "help_shortcut_content_p1": {
     "message": "In Firefox, shortcuts are managed through the Add-ons page:"
