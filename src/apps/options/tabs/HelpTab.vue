@@ -56,7 +56,36 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+
+// Function to add target="_blank" to all links
+const addTargetBlankToLinks = () => {
+  // Find all links in the help tab and add target="_blank"
+  document.querySelectorAll('.help-tab .markdown-content a').forEach(link => {
+    if (!link.target) {
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+    }
+  })
+}
+
+// Watch for changes and process links
+const helpContentWatch = watch([() => sanitizedShortcutHelp.value, () => sanitizedApiKeysHelp.value], () => {
+  nextTick(addTargetBlankToLinks)
+})
+
+// Process links when component mounts and when accordions are clicked
+onMounted(() => {
+  setTimeout(addTargetBlankToLinks, 200)
+
+  // Also process when accordion is clicked
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.accordion-header')) {
+      setTimeout(addTargetBlankToLinks, 100)
+    }
+  })
+})
+
 import { useI18n } from 'vue-i18n'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import DOMPurify from 'dompurify'
