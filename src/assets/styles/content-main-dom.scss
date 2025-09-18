@@ -17,14 +17,15 @@ html.AIWritingCompanion-disable-links body * {
 }
 
 // Disable pointer events on interactive elements to prevent navigation - Maximum specificity
-html.AIWritingCompanion-disable-links a,
-html.AIWritingCompanion-disable-links button,
-html.AIWritingCompanion-disable-links [onclick],
-html.AIWritingCompanion-disable-links [role="link"],
-html.AIWritingCompanion-disable-links div[role="link"],
-html.AIWritingCompanion-disable-links input[type="submit"],
-html.AIWritingCompanion-disable-links input[type="button"],
-html.AIWritingCompanion-disable-links [href] {
+// Only apply when in select element mode AND the mode is actually active
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] a,
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] button,
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [onclick],
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [role="link"],
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] div[role="link"],
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] input[type="submit"],
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] input[type="button"],
+html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [href] {
   pointer-events: none !important;
   color: inherit !important;
   text-decoration: none !important;

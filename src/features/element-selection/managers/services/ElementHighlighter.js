@@ -237,6 +237,9 @@ export class ElementHighlighter extends ResourceTracker {
     // Apply the CSS class that enables crosshair cursor and hover effects
     taggleLinks(true);
 
+    // Set data attribute to indicate select element mode is active
+    document.documentElement.setAttribute('data-select-element-mode', 'true');
+
     // Verify the class was applied
     const hasClass = document.documentElement.classList.contains(
       UI_CONSTANTS.DISABLE_LINKS_CLASS
@@ -255,6 +258,9 @@ export class ElementHighlighter extends ResourceTracker {
   removeGlobalStyles() {
     // Remove the CSS class that disables crosshair cursor and hover effects
     taggleLinks(false);
+
+    // Remove data attribute to indicate select element mode is inactive
+    document.documentElement.removeAttribute('data-select-element-mode');
   }
 
   /**
