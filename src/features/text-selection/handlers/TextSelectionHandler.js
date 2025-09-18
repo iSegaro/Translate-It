@@ -4,7 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { fieldDetector, FieldTypes } from '@/utils/text/FieldDetector.js';
+import { SelectionDecisionManager } from '../utils/SelectionDecisionManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionHandler');
 
@@ -181,102 +181,94 @@ export class TextSelectionHandler extends ResourceTracker {
         const selection = window.getSelection();
         if (selection && selection.toString().trim()) {
 
-          // Use smart field detection
-          const contextElement = this.getSelectionContextElement(selection);
-          const detection = await fieldDetector.detect(contextElement);
+          // Use the centralized decision manager
+          const contextElement = SelectionDecisionManager.getSelectionContextElement(selection);
 
-          // Skip non-processable fields completely
-          if (detection.fieldType === FieldTypes.NON_PROCESSABLE) {
-            logger.debug('Ignoring selection in non-processable field');
-            return;
+          // Additional check: If we detected an input field, do a quick field type check
+          if (contextElement && contextElement.tagName === 'INPUT') {
+            logger.debug('Input field detected, checking if non-processable');
+
+            // Quick check for non-processable input types
+            const inputType = (contextElement.type || '').toLowerCase();
+            const nonProcessableTypes = ['password', 'email', 'tel', 'url', 'search', 'hidden', 'submit', 'button', 'reset'];
+
+            if (nonProcessableTypes.includes(inputType)) {
+              logger.debug('Ignoring selection in non-processable input type:', inputType);
+              return;
+            }
+
+            // Check for authentication-related attributes
+            const name = (contextElement.name || '').toLowerCase();
+            const id = (contextElement.id || '').toLowerCase();
+            const placeholder = (contextElement.placeholder || '').toLowerCase();
+            const autocomplete = (contextElement.autocomplete || '').toLowerCase();
+
+            const authKeywords = ['password', 'email', 'username', 'login', 'signin', 'auth', 'account'];
+            const hasAuthKeyword = authKeywords.some(keyword =>
+              name.includes(keyword) ||
+              id.includes(keyword) ||
+              placeholder.includes(keyword) ||
+              autocomplete.includes(keyword)
+            );
+
+            if (hasAuthKeyword) {
+              logger.debug('Ignoring selection in authentication-related input field');
+              return;
+            }
           }
 
-          logger.debug('Selection detected via selectionchange', {
-            text: selection.toString().substring(0, 30) + '...',
-            fieldType: detection.fieldType,
-            shouldShowIcon: detection.shouldShowSelectionIcon,
-            selectionStrategy: detection.selectionStrategy,
-            selectionEventStrategy: detection.selectionEventStrategy,
+          const decision = await SelectionDecisionManager.shouldShowSelectionIcon(selection, {
+            element: contextElement,
             isFromDoubleClick: this._isFromRecentDoubleClick(),
-            elementTag: contextElement?.tagName,
-            elementClass: contextElement?.className
+            isDragging: this.textSelectionManager?.isDragging || false
           });
 
-          // For professional editors and rich text editors, check if we should process based on selection strategy
-          if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
-              detection.fieldType === FieldTypes.RICH_TEXT_EDITOR ||
-              detection.fieldType === FieldTypes.CONTENT_EDITABLE) {
-            const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
-            const isFromDoubleClick = this._isFromRecentDoubleClick();
-            const shouldProcess = !needsDoubleClick || isFromDoubleClick;
+          if (decision.shouldShow) {
+            // Use the detection from the decision (no need to call fieldDetector again)
+            const detection = decision.detection;
 
-            if (shouldProcess) {
-              logger.debug('Processing editor selection', {
-                text: selection.toString().substring(0, 30),
-                fieldType: detection.fieldType,
-                selectionStrategy: detection.selectionStrategy,
-                needsDoubleClick,
-                isFromDoubleClick,
-                timeSinceDoubleClick: Date.now() - this.preservedState.lastDoubleClickTime
+            if (detection && detection.selectionEventStrategy === 'selection-based') {
+              // Use clean selectionchange events for regular webpage content
+              logger.debug('Processing selection with selection-based strategy', {
+                reason: decision.reason,
+                text: selection.toString().substring(0, 30) + '...'
               });
-
-              // For double-click-required fields, only process if it's actually from a double-click
-              // or if it's a keyboard selection (which doesn't trigger drag detection)
-              if (needsDoubleClick && !isFromDoubleClick) {
-                const isKeyboardSelection = !this.textSelectionManager.isDragging;
-                if (!isKeyboardSelection) {
-                  logger.debug('Editor selection ignored - drag selection not allowed in double-click-required field', {
-                    text: selection.toString().substring(0, 30),
-                    fieldType: detection.fieldType,
-                    isDragging: this.textSelectionManager.isDragging
-                  });
-                  return;
-                }
-              }
 
               this.textSelectionManager.handleTextSelection({
                 type: 'selectionchange',
                 selection: selection,
                 fieldType: detection.fieldType
               });
-            } else {
-              logger.debug('Editor selection ignored - double-click required', {
-                text: selection.toString().substring(0, 30),
-                fieldType: detection.fieldType,
-                selectionStrategy: detection.selectionStrategy,
-                needsDoubleClick,
-                isFromDoubleClick,
-                timeSinceDoubleClick: Date.now() - this.preservedState.lastDoubleClickTime
-              });
-            }
-          } else if (detection.shouldShowSelectionIcon) {
-            // Route based on selection event strategy
-            if (detection.selectionEventStrategy === 'selection-based') {
-              // Use clean selectionchange events for regular webpage content
-              logger.debug('Calling handleTextSelection for selection-based strategy', {
-                fieldType: detection.fieldType,
-                selectionEventStrategy: detection.selectionEventStrategy,
-                text: selection.toString().substring(0, 30) + '...'
-              });
-              
-              this.textSelectionManager.handleTextSelection({
-                type: 'selectionchange', 
-                selection: selection,
-                fieldType: detection.fieldType
-              });
-            } else {
+            } else if (detection) {
               // For mouse-based strategy (professional editors), ignore selectionchange
               // These will be handled by mouseup events
               logger.debug('Ignoring selectionchange for mouse-based strategy', {
+                reason: decision.reason,
                 fieldType: detection.fieldType,
                 selectionEventStrategy: detection.selectionEventStrategy
               });
+            } else {
+              // Fallback if detection failed
+              logger.debug('Processing selection with fallback strategy', {
+                reason: decision.reason,
+                text: selection.toString().substring(0, 30) + '...'
+              });
+
+              this.textSelectionManager.handleTextSelection({
+                type: 'selectionchange',
+                selection: selection,
+                fieldType: 'unknown'
+              });
             }
           } else {
-            logger.debug('Not showing selection icon', {
-              fieldType: detection.fieldType,
-              shouldShowSelectionIcon: detection.shouldShowSelectionIcon,
-              shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+            logger.debug('Selection ignored', {
+              reason: decision.reason,
+              details: decision.details,
+              text: selection.toString().substring(0, 30) + '...',
+              fieldType: decision.detection?.fieldType,
+              isFromDoubleClick: this._isFromRecentDoubleClick(),
+              isDragging: this.textSelectionManager?.isDragging || false,
+              contextElement: contextElement?.tagName
             });
           }
         }
@@ -383,20 +375,7 @@ export class TextSelectionHandler extends ResourceTracker {
     }
   }
 
-  // Helper methods
-  getSelectionContextElement(selection) {
-    if (!selection || !selection.rangeCount) return null;
-
-    try {
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      return container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
-    } catch (error) {
-      logger.debug('Error getting selection context element:', error);
-      return null;
-    }
-  }
-
+  
 
   _isFromRecentDoubleClick() {
     const timeSinceDoubleClick = Date.now() - this.preservedState.lastDoubleClickTime;
