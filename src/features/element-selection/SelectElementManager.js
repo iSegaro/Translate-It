@@ -835,6 +835,12 @@ class SelectElementManager extends ResourceTracker {
   // Utility Methods
   async revertTranslations() {
     this.logger.info("Starting translation revert process in SelectElementManager");
+
+    if (!this.stateManager) {
+      this.logger.warn("StateManager is not available for revert");
+      return 0;
+    }
+
     return await this.stateManager.revertTranslations();
   }
   
