@@ -73,8 +73,8 @@ const fetchChangelog = async () => {
       sanitize: false
     }
     
-    // Pre-process markdown to preserve empty lines
-    const processedMarkdown = markdown.replace(/\n\n/g, '\n&nbsp;\n')
+    // Pre-process markdown to preserve single empty lines (but not double)
+    const processedMarkdown = markdown.replace(/\n\n\n/g, '\n\n<br>\n')
     
     const html = marked(processedMarkdown, markedOptions)
     // Sanitize HTML for security
@@ -163,7 +163,7 @@ $border-style: solid;
     :deep(h1), :deep(h2), :deep(h3), :deep(h4), :deep(h5), :deep(h6) {
       color: var(--color-text) !important;
       margin-top: 0 !important;
-      margin-bottom: 4px !important; // کاهش فاصله بعد از headers
+      margin-bottom: 2px !important; // فاصله کم بعد از headers
       padding-bottom: 0 !important;
       font-weight: bold !important;
       line-height: 1.2 !important;
@@ -177,7 +177,7 @@ $border-style: solid;
     :deep(h6) { font-size: 0.75rem !important; }
 
     :deep(p) {
-      margin-bottom: 8px !important; // کاهش فاصله پاراگراف‌ها
+      margin-bottom: 6px !important; // تنظیم فاصله پاراگراف‌ها
       color: var(--color-text) !important;
       line-height: 1.6 !important;
       direction: ltr !important;
