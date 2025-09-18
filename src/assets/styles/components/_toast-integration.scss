@@ -1,56 +1,71 @@
 // Toast Integration Styles - Vue Sonner Integration
+// Modern CSS Architecture (2025) - Zero !important Policy
 // Centralized styles for toast integration with Select Element mode
 
 @use '../base/variables' as *;
 
 /* ==========================================================================
-   Toast Integration - Vue Sonner Compatibility
+   Toast Integration - Vue Sonner Compatibility (Shadow DOM)
    ========================================================================== */
 
-// Vue Sonner toast element cursor and interaction overrides
-// These ensure toast notifications work correctly during Select Element mode
-[data-sonner-toaster],
-[data-sonner-toaster] *,
-[data-sonner-toast], 
-[data-sonner-toast] *,
-.sonner-toaster,
-.sonner-toaster *,
-.sonner-toast,
-.sonner-toast *,
-[data-testid="toaster"],
-[data-testid="toaster"] *,
-li[data-sonner-toast],
-li[data-sonner-toast] *,
-div[data-sonner-toast],
-div[data-sonner-toast] * {
-  cursor: auto !important;
-  pointer-events: auto !important;
+// CSS custom properties for toast styling consistency
+:root {
+  --toast-cursor: auto;
+  --toast-z-index: #{$z-overlay};
 }
 
-// Content app container and children cursor protection
-// Ensures our Shadow DOM elements maintain proper cursor behavior
-.ti-content-app-container,
-.ti-content-app-container * {
-  cursor: auto !important;
+// Vue Sonner toast element cursor and interaction overrides
+// High specificity without !important
+[data-sonner-toaster][data-sonner-toaster],
+[data-sonner-toast][data-sonner-toast],
+.sonner-toaster.sonner-toaster,
+.sonner-toast.sonner-toast,
+[data-testid="toaster"][data-testid="toaster"],
+li[data-sonner-toast][data-sonner-toast],
+div[data-sonner-toast][data-sonner-toast] {
+  cursor: var(--toast-cursor);
+  pointer-events: auto;
+  contain: layout style;
+
+  // Apply to all child elements
+  * {
+    cursor: var(--toast-cursor);
+    pointer-events: auto;
+  }
+}
+
+// Content app container cursor protection (Shadow DOM)
+.ti-content-app-container {
+  cursor: var(--toast-cursor);
+  contain: layout style;
+
+  * {
+    cursor: var(--toast-cursor);
+  }
 }
 
 /* ==========================================================================
-   Main DOM Toast Integration (for injection into main DOM)
+   Main DOM Toast Integration (Critical for select-element mode)
    ========================================================================== */
 
-// Toast elements exception during Select Element mode (crosshair cursor active)
-html.AIWritingCompanion-disable-links [data-sonner-toaster],
-html.AIWritingCompanion-disable-links [data-sonner-toaster] *,
-html.AIWritingCompanion-disable-links [data-sonner-toast],
-html.AIWritingCompanion-disable-links [data-sonner-toast] *,
-html.AIWritingCompanion-disable-links .sonner-toaster,
-html.AIWritingCompanion-disable-links .sonner-toaster *,
-html.AIWritingCompanion-disable-links .sonner-toast,
-html.AIWritingCompanion-disable-links .sonner-toast *,
-html.AIWritingCompanion-disable-links .content-app-container,
-html.AIWritingCompanion-disable-links .content-app-container * {
-  cursor: auto !important;
-  pointer-events: auto !important;
-  position: relative !important;
-  z-index: $z-overlay !important;
+// Toast elements exception during Select Element mode
+// Ensure toasts remain interactive when crosshair cursor is active
+html[data-translate-it-select-mode="true"] {
+  [data-sonner-toaster][data-sonner-toaster],
+  [data-sonner-toast][data-sonner-toast],
+  .sonner-toaster.sonner-toaster,
+  .sonner-toast.sonner-toast,
+  .content-app-container.content-app-container {
+    cursor: var(--toast-cursor);
+    pointer-events: auto;
+    position: relative;
+    z-index: var(--toast-z-index);
+    contain: layout style;
+
+    // Ensure all child elements are interactive
+    * {
+      cursor: var(--toast-cursor);
+      pointer-events: auto;
+    }
+  }
 }

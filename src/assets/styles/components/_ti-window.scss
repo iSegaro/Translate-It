@@ -32,7 +32,7 @@
   @include window-dimensions;
 }
 
-// Base window styles with CSS Grid layout
+// Base window styles with CSS Grid layout and Modern Containment
 .ti-window {
   border-radius: var(--ti-window-border-radius);
   @include shadow-lg;
@@ -43,7 +43,11 @@
   transform: var(--ti-window-transform-hidden);
   transition: var(--ti-window-transition);
   visibility: var(--ti-window-visibility-hidden);
+
+  // Modern CSS containment for performance
   container-type: inline-size; // Enable container queries
+  contain: layout style; // Establish layout and style containment
+  isolation: isolate; // Create new stacking context
 
   // Disable transitions when dragging
   &.is-dragging {
@@ -214,12 +218,15 @@
   margin-right: #{css-var('window-body-margin', 5px)};
   flex: 1; // Take remaining space in flex container
   overflow-y: auto; // Enable vertical scrolling when content exceeds height
-  overflow-x: hidden; // Hide horizontal overflow
+  overflow-x: clip; // Modern way to clip overflow
 
   // Content constraint with natural flow
   width: 100%; // Take full width of parent
   overflow-wrap: break-word; // Break long words naturally
-  contain: layout style; // Establish containment
+
+  // Modern CSS containment for better isolation
+  contain: layout style paint; // Full containment for maximum isolation
+  isolation: isolate; // Create stacking context
   box-sizing: border-box; // Include padding in width
 
   // List styles for dictionary/definition content

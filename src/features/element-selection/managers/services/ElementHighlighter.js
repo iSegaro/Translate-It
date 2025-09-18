@@ -238,7 +238,7 @@ export class ElementHighlighter extends ResourceTracker {
     taggleLinks(true);
 
     // Set data attribute to indicate select element mode is active
-    document.documentElement.setAttribute('data-select-element-mode', 'true');
+    document.documentElement.setAttribute('data-translate-it-select-mode', 'true');
 
     // Verify the class was applied
     const hasClass = document.documentElement.classList.contains(
@@ -260,7 +260,7 @@ export class ElementHighlighter extends ResourceTracker {
     taggleLinks(false);
 
     // Remove data attribute to indicate select element mode is inactive
-    document.documentElement.removeAttribute('data-select-element-mode');
+    document.documentElement.removeAttribute('data-translate-it-select-mode');
   }
 
   /**

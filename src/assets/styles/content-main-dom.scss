@@ -1,92 +1,103 @@
-// Main DOM CSS - این فایل برای inject کردن در Main DOM استفاده می‌شود
+// Main DOM CSS - Critical styles only for Main DOM injection
+// Modern CSS Architecture (2025) - Zero !important Policy
 // برخلاف content-app-global.scss که در Shadow DOM است
 
 @use './base/variables' as *;
 @use './components/toast-integration';
 
 /* ==========================================================================
-   Select Element Mode Styles - Main DOM Injection
+   Select Element Mode Styles - Main DOM Injection (Critical Only)
    ========================================================================== */
 
-// Global cursor change when in select element mode - Maximum specificity
-html.AIWritingCompanion-disable-links,
-html.AIWritingCompanion-disable-links *,
-html.AIWritingCompanion-disable-links body,
-html.AIWritingCompanion-disable-links body * {
-  cursor: crosshair !important;
+// Scoped cursor change when in select element mode using high specificity
+html[data-translate-it-select-mode="true"] {
+  cursor: crosshair;
+
+  // Apply to all elements when in select mode
+  & * {
+    cursor: crosshair;
+  }
+
+  // More specific for body elements
+  body {
+    cursor: crosshair;
+
+    & * {
+      cursor: crosshair;
+    }
+  }
 }
 
-// Disable pointer events on interactive elements to prevent navigation - Maximum specificity
-// Only apply when in select element mode AND the mode is actually active
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] a,
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] button,
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [onclick],
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [role="link"],
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] div[role="link"],
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] input[type="submit"],
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] input[type="button"],
-html.AIWritingCompanion-disable-links[data-select-element-mode="true"] [href] {
-  pointer-events: none !important;
-  color: inherit !important;
-  text-decoration: none !important;
+// Disable interactions on clickable elements during select mode
+// Scoped to select-element mode only with high specificity
+html[data-translate-it-select-mode="true"] {
+  // Interactive elements that should be disabled
+  a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]) {
+    pointer-events: none;
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
-// Disable automatic hover highlighting - let JS handle highlighting - Maximum specificity
-html.AIWritingCompanion-disable-links *:hover,
-html.AIWritingCompanion-disable-links.simple-mode *:hover,
-html.AIWritingCompanion-disable-links body:hover,
-html.AIWritingCompanion-disable-links html:hover,
-html.AIWritingCompanion-disable-links p:hover,
-html.AIWritingCompanion-disable-links div:hover,
-html.AIWritingCompanion-disable-links span:hover,
-html.AIWritingCompanion-disable-links h1:hover,
-html.AIWritingCompanion-disable-links h2:hover,
-html.AIWritingCompanion-disable-links h3:hover,
-html.AIWritingCompanion-disable-links h4:hover,
-html.AIWritingCompanion-disable-links h5:hover,
-html.AIWritingCompanion-disable-links h6:hover,
-html.AIWritingCompanion-disable-links li:hover,
-html.AIWritingCompanion-disable-links td:hover,
-html.AIWritingCompanion-disable-links th:hover,
-html.AIWritingCompanion-disable-links article:hover,
-html.AIWritingCompanion-disable-links section:hover,
-html.AIWritingCompanion-disable-links.simple-mode p:hover,
-html.AIWritingCompanion-disable-links.simple-mode div:hover,
-html.AIWritingCompanion-disable-links.simple-mode span:hover,
-html.AIWritingCompanion-disable-links.simple-mode h1:hover,
-html.AIWritingCompanion-disable-links.simple-mode h2:hover,
-html.AIWritingCompanion-disable-links.simple-mode h3:hover,
-html.AIWritingCompanion-disable-links.simple-mode h4:hover,
-html.AIWritingCompanion-disable-links.simple-mode h5:hover,
-html.AIWritingCompanion-disable-links.simple-mode h6:hover,
-html.AIWritingCompanion-disable-links.simple-mode li:hover,
-html.AIWritingCompanion-disable-links.simple-mode td:hover,
-html.AIWritingCompanion-disable-links.simple-mode th:hover,
-html.AIWritingCompanion-disable-links.simple-mode article:hover,
-html.AIWritingCompanion-disable-links.simple-mode section:hover {
-  outline: none !important;
+// Disable default hover effects during select mode
+// Let JavaScript handle highlighting instead
+html[data-translate-it-select-mode="true"] {
+  // Common content elements that might have hover effects
+  *:hover,
+  body:hover,
+  p:hover,
+  div:hover,
+  span:hover,
+  h1:hover,
+  h2:hover,
+  h3:hover,
+  h4:hover,
+  h5:hover,
+  h6:hover,
+  li:hover,
+  td:hover,
+  th:hover,
+  article:hover,
+  section:hover {
+    outline: none;
+  }
 }
 
-// Keep input element highlighting for user feedback - Maximum specificity
-html.AIWritingCompanion-disable-links input:hover,
-html.AIWritingCompanion-disable-links textarea:hover {
-  outline: 2px solid #4a90e2 !important;
-  outline-offset: 1px !important;
+// Visual feedback for input elements during select mode
+html[data-translate-it-select-mode="true"] {
+  input:hover,
+  textarea:hover {
+    outline: 2px solid #4a90e2;
+    outline-offset: 1px;
+  }
 }
 
-// JS-controlled highlighting for selected main containers - Maximum CSS specificity
+// JS-controlled highlighting for selected elements
+// Using CSS custom properties for consistency
+:root {
+  --translate-highlight-color: #ff8800;
+  --translate-highlight-width: 3px;
+  --translate-highlight-offset: 2px;
+}
+
+// High specificity highlighting without !important
 html body [data-translate-highlighted="true"][data-translate-highlighted="true"],
 html body .translate-it-element-highlighted.translate-it-element-highlighted {
-  outline: 3px solid #ff8800 !important;
-  outline-offset: 2px !important;
-  outline-color: #ff8800 !important;
-  outline-style: solid !important;
-  outline-width: 3px !important;
-  z-index: $z-overlay !important;
-  position: relative !important;
-  box-shadow: 0 0 0 3px #ff8800 !important;
-}
+  outline: var(--translate-highlight-width) solid var(--translate-highlight-color);
+  outline-offset: var(--translate-highlight-offset);
+  z-index: $z-overlay;
+  position: relative;
+  box-shadow: 0 0 0 var(--translate-highlight-width) var(--translate-highlight-color);
 
-.translate-it-element-highlighted * {
-  outline: none !important;
+  // Prevent child elements from showing their own outlines
+  * {
+    outline: none;
+  }
 }

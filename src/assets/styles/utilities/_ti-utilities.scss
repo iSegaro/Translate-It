@@ -1,18 +1,46 @@
 @use '../base/variables' as *;
 
-// Translate-It Utility Classes - Emergency/Override utilities only
-// Note: These are reserved for critical CSS injection contexts
-// Most styling should be done through component-specific classes
+// Translate-It Utility Classes - Critical utilities only
+// Modern CSS Architecture (2025) - Minimized !important usage
+// Note: These are reserved for critical CSS injection contexts only
 
-// Emergency display utilities for dynamic injection
-.ti-u-hidden { display: none !important; }
-.ti-u-visible { display: block !important; }
+// CSS Custom Properties for utilities
+:root {
+  --ti-z-max: 2147483647;
+  --ti-z-overlay: #{$z-overlay};
+}
 
-// Emergency positioning for overlay conflicts
-.ti-u-relative { position: relative !important; }
-.ti-u-absolute { position: absolute !important; }
-.ti-u-z-max { z-index: 2147483647 !important; }
+// Emergency display utilities (justified !important for critical overrides)
+.ti-u-hidden {
+  display: none !important; // Justified: Critical visibility control
+}
 
-// Emergency pointer events for select element mode
-.ti-u-pointer-none { pointer-events: none !important; }
-.ti-u-pointer-auto { pointer-events: auto !important; }
+.ti-u-visible {
+  display: block !important; // Justified: Critical visibility control
+}
+
+// High-specificity positioning (reduced !important usage)
+.ti-u-relative.ti-u-relative {
+  position: relative;
+}
+
+.ti-u-absolute.ti-u-absolute {
+  position: absolute;
+}
+
+.ti-u-z-max.ti-u-z-max {
+  z-index: var(--ti-z-max);
+}
+
+.ti-u-z-overlay.ti-u-z-overlay {
+  z-index: var(--ti-z-overlay);
+}
+
+// Emergency pointer events (justified !important for select-element mode)
+.ti-u-pointer-none {
+  pointer-events: none !important; // Justified: Critical for select-element mode
+}
+
+.ti-u-pointer-auto {
+  pointer-events: auto !important; // Justified: Critical for select-element mode
+}
