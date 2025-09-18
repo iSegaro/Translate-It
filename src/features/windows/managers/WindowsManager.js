@@ -16,10 +16,10 @@ import { TTSGlobalManager as globalTTSManager } from "@/features/tts/core/TTSGlo
 import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
+import { isTextDragOperation } from "@/utils/browser/events.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { isTextDragOperation } from "@/utils/browser/events.js";
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -338,7 +338,7 @@ export class WindowsManager extends ResourceTracker {
 
   /**
    * Add listener to dismiss icon or window on outside clicks
-   * Using double-click to dismiss to avoid interfering with text drag operations
+   * Using click event with text element detection to avoid interfering with text selection
    */
   _addDismissListener() {
     // Remove any existing listener first
@@ -381,7 +381,7 @@ export class WindowsManager extends ResourceTracker {
           this.state._lastClickWasInsideWindow = true;
         }
 
-        this.logger.debug('Double-click on translation UI element - not dismissing', {
+        this.logger.debug('Click on translation UI element - not dismissing', {
           target: target?.tagName,
           className: target?.className,
           closestIcon: !!target?.closest('.translation-icon'),
@@ -392,18 +392,53 @@ export class WindowsManager extends ResourceTracker {
         return;
       }
 
-      this.logger.debug('Outside double-click detected - dismissing window', {
+      // Check if clicking on a text-containing element
+      const isTextElement = target.nodeType === Node.TEXT_NODE ||
+                           target.tagName === 'P' ||
+                           target.tagName === 'SPAN' ||
+                           target.tagName === 'DIV' ||
+                           target.tagName === 'H1' ||
+                           target.tagName === 'H2' ||
+                           target.tagName === 'H3' ||
+                           target.tagName === 'H4' ||
+                           target.tagName === 'H5' ||
+                           target.tagName === 'H6' ||
+                           target.tagName === 'TD' ||
+                           target.tagName === 'LI' ||
+                           target.tagName === 'A' ||
+                           target.tagName === 'B' ||
+                           target.tagName === 'I' ||
+                           target.tagName === 'STRONG' ||
+                           target.tagName === 'EM';
+
+      if (isTextElement) {
+        // Check if there's any text selection
+        const selection = window.getSelection();
+        const hasSelection = selection && selection.toString().trim().length > 0;
+
+        if (hasSelection) {
+          this.logger.debug('Click on text element with selection - not dismissing', {
+            target: target?.tagName,
+            selectionLength: selection.toString().length
+          });
+          return;
+        }
+      }
+
+      this.logger.debug('Outside click detected - dismissing window', {
         target: target?.tagName,
         className: target?.className,
         eventType: event.type,
         isIconMode: this.state.isIconMode,
         isVisible: this.state.isVisible
       });
+
+      // Dismiss immediately
       this.dismiss();
     };
 
-    // Use double-click instead of single click to avoid interfering with drag
-    document.addEventListener('dblclick', this._dismissHandler, { capture: false });
+    // Use click with delay to dismiss - allows drag operations to complete first
+    document.addEventListener('click', this._dismissHandler, { capture: false });
 
     // Also add Escape key listener for better UX
     this._escapeKeyHandler = (event) => {
@@ -414,7 +449,7 @@ export class WindowsManager extends ResourceTracker {
     };
     document.addEventListener('keydown', this._escapeKeyHandler, { capture: false });
 
-    this.logger.debug('Added double-click dismiss listener and Escape key handler', {
+    this.logger.debug('Added click dismiss listener with text element detection and Escape key handler', {
       forIcon: this.state.isIconMode,
       forWindow: this.state.isVisible
     });
@@ -425,7 +460,7 @@ export class WindowsManager extends ResourceTracker {
    */
   _removeDismissListener() {
     if (this._dismissHandler) {
-      document.removeEventListener('dblclick', this._dismissHandler, { capture: false });
+      document.removeEventListener('click', this._dismissHandler, { capture: false });
       this._dismissHandler = null;
     }
 
@@ -685,6 +720,28 @@ export class WindowsManager extends ResourceTracker {
    */
   async _handleOutsideClick() {
     if (this.state.shouldPreventDismissal) return;
+
+    // Check for drag operations - get reference to textSelectionManager if available
+    let textSelectionManager = null;
+    if (window.textSelectionManager) {
+      textSelectionManager = window.textSelectionManager;
+    } else if (window.TranslateItTextSelectionManager) {
+      textSelectionManager = window.TranslateItTextSelectionManager;
+    }
+
+    // Prevent dismissal during or after drag operations
+    if (textSelectionManager &&
+        (textSelectionManager.isDragging ||
+         textSelectionManager.justFinishedDrag ||
+         textSelectionManager.preventDismissOnNextClear)) {
+      this.logger.debug('Outside click ignored during drag operation in _handleOutsideClick', {
+        isDragging: textSelectionManager.isDragging,
+        justFinishedDrag: textSelectionManager.justFinishedDrag,
+        preventDismissOnNextClear: textSelectionManager.preventDismissOnNextClear
+      });
+      return;
+    }
+
     await this.dismiss(true);
   }
 

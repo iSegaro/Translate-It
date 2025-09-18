@@ -89,9 +89,30 @@ export class ClickManager extends ResourceTracker {
       return;
     }
 
+    // Check for drag operations - get reference to textSelectionManager if available
+    let textSelectionManager = null;
+    if (window.textSelectionManager) {
+      textSelectionManager = window.textSelectionManager;
+    } else if (window.TranslateItTextSelectionManager) {
+      textSelectionManager = window.TranslateItTextSelectionManager;
+    }
+
+    // Prevent dismissal during or after drag operations
+    if (textSelectionManager &&
+        (textSelectionManager.isDragging ||
+         textSelectionManager.justFinishedDrag ||
+         textSelectionManager.preventDismissOnNextClear)) {
+      this.logger.debug('Outside click ignored during drag operation', {
+        isDragging: textSelectionManager.isDragging,
+        justFinishedDrag: textSelectionManager.justFinishedDrag,
+        preventDismissOnNextClear: textSelectionManager.preventDismissOnNextClear
+      });
+      return;
+    }
+
     // Check if we should dismiss based on click target
     const shouldDismiss = this._shouldDismissOnOutsideClick(e);
-    
+
     if (shouldDismiss && this.onOutsideClick) {
       this.onOutsideClick(e);
     }

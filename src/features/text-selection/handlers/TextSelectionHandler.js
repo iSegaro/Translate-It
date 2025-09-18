@@ -43,7 +43,10 @@ export class TextSelectionHandler extends ResourceTracker {
       this.textSelectionManager = new TextSelectionManager({
         featureManager: this.featureManager
       });
-      
+
+      // Expose on window for ClickManager access
+      window.TranslateItTextSelectionManager = this.textSelectionManager;
+
       logger.debug('TextSelectionManager created successfully', {
         hasManager: !!this.textSelectionManager,
         hasFeatureManager: !!this.featureManager,
@@ -105,7 +108,12 @@ export class TextSelectionHandler extends ResourceTracker {
       if (this.textSelectionManager) {
         this.textSelectionManager.cancelSelectionTranslation();
       }
-      
+
+      // Clean up window reference
+      if (window.TranslateItTextSelectionManager === this.textSelectionManager) {
+        delete window.TranslateItTextSelectionManager;
+      }
+
       // ResourceTracker cleanup will handle all tracked resources
       this.cleanup();
       
@@ -309,6 +317,36 @@ export class TextSelectionHandler extends ResourceTracker {
                 return;
               }
 
+              // Check if this is after a recent double-click (which might have created a new window)
+              const timeSinceDoubleClick = Date.now() - this.preservedState.lastDoubleClickTime;
+              if (timeSinceDoubleClick <= 1000) { // Within 1 second of double-click
+                logger.debug('Selection cleared shortly after double-click - not dismissing to allow new window', {
+                  timeSinceDoubleClick,
+                  lastDoubleClickTime: this.preservedState.lastDoubleClickTime
+                });
+                return;
+              }
+
+              // Check if this is after a drag operation (which might have created a new selection)
+              if (this.textSelectionManager && (this.textSelectionManager.isDragging || this.textSelectionManager.justFinishedDrag || this.textSelectionManager.preventDismissOnNextClear)) {
+                logger.debug('Selection cleared after drag operation - not dismissing to allow drag completion', {
+                  isDragging: this.textSelectionManager.isDragging,
+                  justFinishedDrag: this.textSelectionManager.justFinishedDrag,
+                  preventDismissOnNextClear: this.textSelectionManager.preventDismissOnNextClear
+                });
+
+                // Reset the preventDismiss flag after using it
+                if (this.textSelectionManager.preventDismissOnNextClear) {
+                  setTimeout(() => {
+                    if (this.textSelectionManager) {
+                      this.textSelectionManager.preventDismissOnNextClear = false;
+                      this.logger.debug('Reset preventDismissOnNextClear flag');
+                    }
+                  }, 3000);
+                }
+                return;
+              }
+
               if (windowsManager && (windowsManager.state.isIconMode || windowsManager.state.isVisible)) {
                 logger.debug('Selection cleared and no new selection started - dismissing icon/window');
                 windowsManager.dismiss();
@@ -404,6 +442,9 @@ export class TextSelectionHandler extends ResourceTracker {
       this.textSelectionManager = new TextSelectionManager({
         featureManager: this.featureManager
       });
+
+      // Expose on window for ClickManager access
+      window.TranslateItTextSelectionManager = this.textSelectionManager;
 
       // Restore preserved state
       if (this.preservedState.lastDoubleClickTime) {

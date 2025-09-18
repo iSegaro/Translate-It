@@ -49,6 +49,8 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Mouse drag detection for principled selection handling
     this.isDragging = false;
+    this.justFinishedDrag = false;
+    this.preventDismissOnNextClear = false;
     this.pendingSelection = null;
     
     // Track last processed selection to prevent duplicate processing
@@ -756,7 +758,13 @@ export class TextSelectionManager extends ResourceTracker {
    */
   async endDragDetection(event) {
     this.isDragging = false;
-    
+
+    // Set a flag to indicate we just finished a drag operation
+    this.justFinishedDrag = true;
+    setTimeout(() => {
+      this.justFinishedDrag = false;
+    }, 3000); // Keep flag for 3 seconds after drag completion
+
     // Process pending selection if exists
     if (this.pendingSelection) {
       const pendingEvent = {
@@ -765,7 +773,11 @@ export class TextSelectionManager extends ResourceTracker {
         fieldType: this.pendingSelection.fieldType,
         target: this.pendingSelection.target
       };
-      
+
+      // Set flag to prevent dismissal for drag selections
+      this.preventDismissOnNextClear = true;
+      this.logger.debug('Set preventDismissOnNextClear flag for drag selection');
+
       // Pass the mouseup event as the source event
       await this._processSelectionChangeEvent(pendingEvent, event);
       this.pendingSelection = null;
@@ -943,9 +955,16 @@ export class TextSelectionManager extends ResourceTracker {
     // --- Show Window/Icon ---
     if (windowsManager && position && !shouldSkip) {
       this.logger.debug('Calling windowsManager.show()', {
-        text: selectedText.substring(0, 30) + '...', 
+        text: selectedText.substring(0, 30) + '...',
         position
       });
+
+      // Set flag to prevent dismissal if this is from a drag operation
+      if (options.isFromDrag) {
+        this.preventDismissOnNextClear = true;
+        this.logger.debug('Set preventDismissOnNextClear flag for drag selection');
+      }
+
       await windowsManager.show(selectedText, position);
       this.lastProcessedText = selectedText;
       this.lastProcessedTime = currentTime;
