@@ -19,6 +19,7 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { isTextDragOperation } from "@/utils/browser/events.js";
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -346,6 +347,15 @@ export class WindowsManager extends ResourceTracker {
     this._dismissHandler = (event) => {
       // Handle both icon mode and visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
+
+      // Check if this is a text drag operation - if so, don't dismiss
+      if (isTextDragOperation(event)) {
+        this.logger.debug('Text drag operation detected - preserving selection and window', {
+          target: event.target?.tagName,
+          selectionLength: window.getSelection().toString().length
+        });
+        return;
+      }
 
       // Only dismiss on left click when clicking outside selected text
       // For right-click, only dismiss if not on selected text

@@ -142,3 +142,55 @@ export const getSelectedTextWithDash = () => {
 export const isCtrlClick = (event) => {
   return event.ctrlKey || event.metaKey;
 };
+
+/**
+ * Detect if a mousedown event is likely the start of a text drag operation
+ * This helps prevent dismissing translation windows when users try to drag selected text
+ * @param {MouseEvent} event - Mousedown event
+ * @returns {boolean} True if this appears to be a text drag operation
+ */
+export const isTextDragOperation = (event) => {
+  try {
+    // Get the current selection
+    const selection = window.getSelection();
+
+    // Check if there's any selected text
+    if (!selection || selection.toString().trim().length === 0) {
+      return false;
+    }
+
+    // Check if the mousedown is within the selected text range
+    const range = selection.getRangeAt(0);
+    if (!range) {
+      return false;
+    }
+
+    // Get the mousedown coordinates
+    const x = event.clientX;
+    const y = event.clientY;
+
+    // Check if the click is within the bounding rectangle of the selection
+    const rects = range.getClientRects();
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        // Mousedown is within selected text - likely a drag operation
+        return true;
+      }
+    }
+
+    // Also check if the target is within the selection using node containment
+    let node = event.target;
+    while (node && node !== range.commonAncestorContainer) {
+      if (range.intersectsNode(node)) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+
+    return false;
+  } catch (error) {
+    // If anything fails, assume it's not a drag operation
+    return false;
+  }
+};

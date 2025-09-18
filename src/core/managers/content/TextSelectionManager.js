@@ -7,7 +7,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isUrlExcluded } from "@/utils/ui/exclusion.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
-import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js";
+import { getEventPath, getSelectedTextWithDash, isTextDragOperation } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -1201,6 +1201,15 @@ export class TextSelectionManager extends ResourceTracker {
 
     // Only dismiss on left click (button 0), ignore right-click (button 2) and middle-click (button 1)
     if (event.button !== 0) {
+      return;
+    }
+
+    // Check if this is a text drag operation - if so, don't dismiss
+    if (isTextDragOperation(event)) {
+      this.logger.debug('Text drag operation detected in TextSelectionManager - preserving window', {
+        target: event.target?.tagName,
+        selectionLength: window.getSelection().toString().length
+      });
       return;
     }
 
