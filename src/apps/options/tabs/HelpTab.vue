@@ -72,7 +72,7 @@ const addTargetBlankToLinks = () => {
 }
 
 // Watch for changes and process links
-const helpContentWatch = watch([() => sanitizedShortcutHelp.value, () => sanitizedApiKeysHelp.value], () => {
+watch([() => sanitizedShortcutHelp.value, () => sanitizedApiKeysHelp.value], () => {
   nextTick(addTargetBlankToLinks)
 })
 
