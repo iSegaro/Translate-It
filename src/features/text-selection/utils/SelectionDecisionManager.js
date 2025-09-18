@@ -45,15 +45,11 @@ export class SelectionDecisionManager {
       // Log the detection details for debugging
       logger.debug('Selection decision analysis', {
         elementType: context.element?.tagName,
-        elementClass: context.element?.className,
-        elementId: context.element?.id,
         fieldType: detection.fieldType,
         selectionStrategy: detection.selectionStrategy,
-        selectionEventStrategy: detection.selectionEventStrategy,
         isFromDoubleClick: context.isFromDoubleClick,
         isDragging: context.isDragging,
-        textPreview: selection.toString().substring(0, 30),
-        fullDecision: 'Field type: ' + detection.fieldType + ', Strategy: ' + detection.selectionStrategy + ', Double-click: ' + context.isFromDoubleClick
+        textPreview: selection.toString().substring(0, 30)
       });
 
       // 1. Non-processable fields: never show
@@ -229,7 +225,7 @@ export class SelectionDecisionManager {
       // Method 1: Check if any input is currently focused
       const activeElement = document.activeElement;
       if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-        logger.debug('Found active form field:', activeElement);
+        logger.debug('Found active form field:', activeElement.tagName);
         return activeElement;
       }
 
@@ -241,23 +237,14 @@ export class SelectionDecisionManager {
         const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         if (!element) return null;
 
-        // Debug: Log the node details
-        logger.debug('Checking node for form fields:', {
-          nodeType: node.nodeType,
-          tagName: element?.tagName,
-          element: element
-        });
-
         // Traverse up to find form fields
         let current = element;
         while (current && current !== document.body) {
           if (current.tagName === 'TEXTAREA' || current.tagName === 'INPUT') {
-            logger.debug('Found form field in traversal:', current);
             return current;
           }
           current = current.parentElement;
         }
-        logger.debug('No form field found in traversal');
         return null;
       };
 
@@ -278,7 +265,7 @@ export class SelectionDecisionManager {
 
       if (fieldFromAnchor || fieldFromFocus) {
         const foundField = fieldFromAnchor || fieldFromFocus;
-        logger.debug('Found form field through anchor/focus check:', foundField);
+        logger.debug('Found form field through anchor/focus check:', foundField.tagName);
         return foundField;
       }
 
@@ -296,7 +283,6 @@ export class SelectionDecisionManager {
             while (testElement && testElement !== document.body) {
               if (testElement.tagName === 'TEXTAREA' ||
                   testElement.tagName === 'INPUT') {
-                logger.debug('Found form field within selection nodes:', testElement);
                 return testElement;
               }
               testElement = testElement.parentElement;
@@ -305,11 +291,13 @@ export class SelectionDecisionManager {
         }
       }
 
-      logger.debug('No form field found in selection, returning original container:', {
-        tagName: originalContainer.tagName,
-        className: originalContainer.className,
-        selectionText: selection.toString().substring(0, 50)
-      });
+      // Only log if returning original container (for debugging)
+      if (originalContainer && originalContainer.tagName !== 'INPUT' && originalContainer.tagName !== 'TEXTAREA') {
+        logger.debug('No form field found in selection, returning container:', {
+          tagName: originalContainer.tagName,
+          className: originalContainer.className
+        });
+      }
       return originalContainer;
     } catch (error) {
       logger.debug('Error getting selection context element:', error);
