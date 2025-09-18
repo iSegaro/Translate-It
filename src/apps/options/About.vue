@@ -63,20 +63,21 @@ const fetchChangelog = async () => {
     
     // Configure marked options for better markdown support
     const markedOptions = {
-      breaks: true,
+      breaks: false, // Don't convert single line breaks to <br>
       gfm: true,
       smartLists: true,
-      smartypants: false, // Disable smart quotes to preserve original text
+      smartypants: false,
       tables: true,
       headerIds: false,
       mangle: false,
       sanitize: false
     }
     
-    // Pre-process markdown to preserve single empty lines (but not double)
-    const processedMarkdown = markdown.replace(/\n\n\n/g, '\n\n<br>\n')
-    
-    const html = marked(processedMarkdown, markedOptions)
+    let html = marked(markdown, markedOptions)
+
+    // Post-process to add spacing between sections without breaking markdown
+    html = html.replace(/(<h[1-6][^>]*>.*?<\/h[1-6]>)\s*(?=<h[1-6]|$)/g, '$1<br>')
+
     // Sanitize HTML for security
     rawChangelog.value = html
   } catch (error) {

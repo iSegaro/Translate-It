@@ -1,0 +1,260 @@
+// Centralized markdown styles for the extension
+// This file contains all common markdown styling to avoid duplication
+
+// Base markdown container styles
+.markdown-content,
+.simple-markdown,
+.changelog-content,
+.markdown-body {
+  line-height: 1.6;
+  color: var(--color-text);
+
+  // Headers with consistent spacing
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-text);
+    margin-top: 0;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.2;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  h1 { font-size: 1.5em; }
+  h2 { font-size: 1.375em; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1.125em; }
+  h5 { font-size: 1em; }
+  h6 { font-size: 0.875em; }
+
+  // Paragraphs with proper spacing
+  p {
+    margin-bottom: 0.75em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  // Lists with proper indentation
+  ul, ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  ul {
+    list-style-type: disc;
+  }
+
+  ol {
+    list-style-type: decimal;
+  }
+
+  li {
+    margin-bottom: 0.25em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    // Nested lists
+    ul, ol {
+      margin-top: 0.25em;
+      margin-bottom: 0.25em;
+    }
+  }
+
+  // Code formatting
+  code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+    background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: var(--color-text);
+  }
+
+  pre {
+    background-color: var(--color-code-block-bg, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 1em 0;
+    font-size: 0.875em;
+
+    code {
+      background: none;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+    }
+  }
+
+  // Blockquotes
+  blockquote {
+    border-left: 4px solid var(--color-border);
+    padding-left: 1em;
+    margin: 1em 0;
+    color: var(--color-text-secondary);
+    font-style: italic;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  // Links
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  // Horizontal rules
+  hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 1.5em 0;
+  }
+
+  // Tables (basic support)
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  th, td {
+    border: 1px solid var(--color-border);
+    padding: 0.5em 1em;
+    text-align: left;
+  }
+
+  th {
+    background-color: var(--color-background-soft);
+    font-weight: 600;
+  }
+
+  // Text formatting
+  strong, b {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  em, i {
+    font-style: italic;
+    color: var(--color-text);
+  }
+
+  // RTL support
+  [dir="rtl"] & {
+    ul, ol {
+      padding-left: 0;
+      padding-right: 1.5em;
+    }
+
+    blockquote {
+      border-left: none;
+      border-right: 4px solid var(--color-border);
+      padding-left: 0;
+      padding-right: 1em;
+    }
+
+    th, td {
+      text-align: right;
+    }
+  }
+
+  // Responsive adjustments
+  @media (max-width: 768px) {
+    h1 { font-size: 1.375em; }
+    h2 { font-size: 1.25em; }
+    h3 { font-size: 1.125em; }
+
+    pre {
+      padding: 0.75em;
+      font-size: 0.85em;
+    }
+
+    th, td {
+      padding: 0.4em 0.8em;
+    }
+  }
+}
+
+// Changelog-specific styles
+.changelog-content {
+  // Changelog headers need less spacing
+  h5 {
+    margin-bottom: 0.25em;
+  }
+
+  // Changelog lists are more compact
+  ul, ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+
+  li {
+    margin-bottom: 0.125em;
+  }
+
+  // Version separators
+  hr {
+    margin: 2em 0;
+    border-top-width: 2px;
+  }
+}
+
+// Translation-specific styles
+.translation-content {
+  // Dictionary entries need special handling
+  p {
+    &:has(strong) {
+      margin-bottom: 0.5em;
+    }
+  }
+
+  // Label formatting (e.g., "نوع: اسم")
+  strong {
+    &:after {
+      content: ":";
+      margin-right: 0.25em;
+    }
+  }
+
+  // More compact layout for translations
+  ul, ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+}
+
+// Fallback styles
+.markdown-fallback {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+// Utility classes
+.markdown-table {
+  // Enhanced table styles when full table support is added
+}
+
+.has-tables {
+  // Indicator for content that contains tables
+}
