@@ -1,8 +1,4 @@
-### Changelog – Translate It!
-
-
 #### v1.2.0 – Released on September 18, 2025
-
 
 ##### Added
 
