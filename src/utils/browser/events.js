@@ -146,6 +146,7 @@ export const isCtrlClick = (event) => {
 /**
  * Detect if a mousedown event is likely the start of a text drag operation
  * This helps prevent dismissing translation windows when users try to drag selected text
+ * Improved to distinguish between actual drag operations and new text selection attempts
  * @param {MouseEvent} event - Mousedown event
  * @returns {boolean} True if this appears to be a text drag operation
  */
@@ -171,24 +172,47 @@ export const isTextDragOperation = (event) => {
 
     // Check if the click is within the bounding rectangle of the selection
     const rects = range.getClientRects();
+    let isWithinSelectionBounds = false;
+
     for (let i = 0; i < rects.length; i++) {
       const rect = rects[i];
       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-        // Mousedown is within selected text - likely a drag operation
-        return true;
+        isWithinSelectionBounds = true;
+        break;
       }
     }
 
-    // Also check if the target is within the selection using node containment
+    // If not within selection bounds, it's definitely not a drag operation
+    if (!isWithinSelectionBounds) {
+      return false;
+    }
+
+    // Additional check: verify the target is actually part of the selection
+    // This prevents false positives when clicking near but not on selected text
+    let targetInSelection = false;
     let node = event.target;
-    while (node && node !== range.commonAncestorContainer) {
+
+    // Check if target is within the selection range
+    while (node && node !== range.commonAncestorContainer && node !== document.body) {
       if (range.intersectsNode(node)) {
-        return true;
+        targetInSelection = true;
+        break;
       }
       node = node.parentNode;
     }
 
-    return false;
+    // For text nodes, check directly
+    if (event.target.nodeType === Node.TEXT_NODE && range.intersectsNode(event.target)) {
+      targetInSelection = true;
+    }
+
+    // Only consider it a drag if:
+    // 1. Click is within selection bounds AND
+    // 2. Target is actually part of the selection AND
+    // 3. Selection has some meaningful length (prevents tiny selections from blocking)
+    const selectionLength = selection.toString().trim().length;
+
+    return targetInSelection && selectionLength > 0;
   } catch (error) {
     // If anything fails, assume it's not a drag operation
     return false;

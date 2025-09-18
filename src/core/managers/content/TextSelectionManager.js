@@ -211,59 +211,61 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Create bound handler
     this._iframeDismissHandler = (event) => {
-      // In iframe, we don't have direct access to WindowsManager state
-      // So we'll send dismiss message whenever there's a mousedown
-      // and let the main frame decide if dismissal is needed
-      
+      // In iframe, we only handle double-click for dismissal
+      if (event.type !== 'dblclick') return;
+
+      // Only handle left clicks
+      if (event.button !== 0) return;
+
       const target = event.target;
-      
+
       // Use similar logic as WindowsManager for UI detection
       const vueUIHostMain = document.getElementById('translate-it-host-main');
       const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
       const vueUIHost = vueUIHostMain || vueUIHostIframe;
-      
+
       const isInsideVueUIHost = vueUIHost && vueUIHost.contains(target);
-      
+
       // Check legacy elements
       const iconElement = document.getElementById('translate-it-icon');
       const isInsideLegacyIcon = iconElement && iconElement.contains(target);
-      
+
       const windowElements = document.querySelectorAll('.translation-window');
-      const isInsideLegacyWindow = Array.from(windowElements).some(element => 
+      const isInsideLegacyWindow = Array.from(windowElements).some(element =>
         element.contains(target)
       );
-      
+
       const isClickingOnTranslationUI = isInsideVueUIHost || isInsideLegacyIcon || isInsideLegacyWindow;
-      
+
       if (isClickingOnTranslationUI) {
-        this.logger.debug('Mousedown on translation UI in iframe - not dismissing', {
+        this.logger.debug('Double-click on translation UI in iframe - not dismissing', {
           target: target?.tagName,
           className: target?.className
         });
         return;
       }
-      
+
       // Send dismiss message to main frame
-      this.logger.debug('Iframe mousedown detected - sending dismiss to main frame', {
+      this.logger.debug('Iframe double-click detected - sending dismiss to main frame', {
         target: target?.tagName,
         className: target?.className,
         eventType: event.type
       });
-      
+
       try {
         window.parent.postMessage({
           type: 'DISMISS_WINDOWS_MANAGER',
           frameId: this.frameId,
           timestamp: Date.now(),
-          reason: 'iframe-mousedown'
+          reason: 'iframe-dblclick'
         }, '*');
       } catch (error) {
         this.logger.warn('Failed to send dismiss message from iframe:', error);
       }
     };
-    
-    // Add listener with capture to catch drag start immediately
-    document.addEventListener('mousedown', this._iframeDismissHandler, { capture: true, passive: true });
+
+    // Add listener for double-click events
+    document.addEventListener('dblclick', this._iframeDismissHandler, { capture: false });
     
     this.logger.debug('Iframe dismiss listener setup for cross-frame communication');
   }
@@ -1199,17 +1201,13 @@ export class TextSelectionManager extends ResourceTracker {
     // Only handle mouse events for dismissing windows, not for text selection
     if (!event) return;
 
-    // Only dismiss on left click (button 0), ignore right-click (button 2) and middle-click (button 1)
-    if (event.button !== 0) {
+    // Only handle double-click events for dismissal
+    if (event.type !== 'dblclick') {
       return;
     }
 
-    // Check if this is a text drag operation - if so, don't dismiss
-    if (isTextDragOperation(event)) {
-      this.logger.debug('Text drag operation detected in TextSelectionManager - preserving window', {
-        target: event.target?.tagName,
-        selectionLength: window.getSelection().toString().length
-      });
+    // Only dismiss on left click (button 0)
+    if (event.button !== 0) {
       return;
     }
 
@@ -1217,7 +1215,17 @@ export class TextSelectionManager extends ResourceTracker {
     if (!windowsManager || !this._isWindowVisible()) {
       return;
     }
-    
+
+    // Proceed with the outside click logic
+    this._performOutsideClickDismissal(event, windowsManager);
+  }
+
+  /**
+   * Perform the actual outside click dismissal after delay
+   * @param {MouseEvent} event - Mouse event
+   * @param {WindowsManager} windowsManager - WindowsManager instance
+   */
+  _performOutsideClickDismissal(event, windowsManager) {
     // Check if mouse event is inside translation window
     const displayElement = windowsManager.displayElement;
     if (displayElement && event.target) {
@@ -1256,7 +1264,7 @@ export class TextSelectionManager extends ResourceTracker {
         }
       }
     }
-    
+
     // Mouse event outside window, dismiss it instantly
     this.logger.debug('Outside mouse event detected - dismissing translation window', {
       eventType: event.type,

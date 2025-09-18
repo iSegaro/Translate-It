@@ -283,13 +283,12 @@ export class TextSelectionHandler extends ResourceTracker {
         // Check if selection was cleared and dismiss icon if needed
         const selection = window.getSelection();
         if (!selection || !selection.toString().trim()) {
-          // Selection was cleared, dismiss any open icon/window after a short delay
+          // Selection was cleared - dismiss after a longer delay to allow new selection
           setTimeout(() => {
             if (this.textSelectionManager) {
               const windowsManager = this.textSelectionManager._getWindowsManager();
 
               // Don't dismiss if we're in window mode and a click was recently handled
-              // This prevents dismissing when clicking inside the translation window
               if (windowsManager && windowsManager.state.isVisible &&
                   windowsManager.state._lastClickWasInsideWindow) {
                 logger.debug('Selection cleared but click was inside window - not dismissing');
@@ -299,16 +298,23 @@ export class TextSelectionHandler extends ResourceTracker {
 
               // Don't dismiss if WindowsManager is in the middle of icon-to-window transition
               if (windowsManager && windowsManager._isIconToWindowTransition) {
-                logger.debug('Selection cleared but WindowsManager is transitioning from icon to window - not dismissing');
+                logger.debug('Selection cleared but WindowsManager is transitioning - not dismissing');
+                return;
+              }
+
+              // Check if user has started a new selection (in case they're selecting quickly)
+              const currentSelection = window.getSelection();
+              if (currentSelection && currentSelection.toString().trim()) {
+                logger.debug('User started new selection - keeping window open');
                 return;
               }
 
               if (windowsManager && (windowsManager.state.isIconMode || windowsManager.state.isVisible)) {
-                logger.debug('Selection cleared, dismissing icon/window');
+                logger.debug('Selection cleared and no new selection started - dismissing icon/window');
                 windowsManager.dismiss();
               }
             }
-          }, 100); // Small delay to avoid conflicts with other selection events
+          }, 2000); // Wait 2 seconds before dismissing to allow new selection
         } else {
           selectionTimeout = setTimeout(processSelection, 50);
         }
@@ -354,8 +360,8 @@ export class TextSelectionHandler extends ResourceTracker {
         // Start drag detection
         this.textSelectionManager.startDragDetection(event);
 
-        // Instant dismiss on mousedown for better UX
-        this.textSelectionManager._onOutsideClick(event);
+        // Don't dismiss on mousedown - let the click handlers handle dismissal
+        // This allows drag operations to work properly
       }, { critical: true });
       
       this.addEventListener(document, 'mouseup', (event) => {

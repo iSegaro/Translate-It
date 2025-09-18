@@ -337,66 +337,51 @@ export class WindowsManager extends ResourceTracker {
   }
 
   /**
-   * Add listener to immediately dismiss icon or window on any mousedown (drag start detection)
+   * Add listener to dismiss icon or window on outside clicks
+   * Using double-click to dismiss to avoid interfering with text drag operations
    */
   _addDismissListener() {
     // Remove any existing listener first
     this._removeDismissListener();
-    
+
     // Create bound handler for reuse
     this._dismissHandler = (event) => {
       // Handle both icon mode and visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
 
-      // Check if this is a text drag operation - if so, don't dismiss
-      if (isTextDragOperation(event)) {
-        this.logger.debug('Text drag operation detected - preserving selection and window', {
-          target: event.target?.tagName,
-          selectionLength: window.getSelection().toString().length
-        });
+      // Don't dismiss on middle or right clicks
+      if (event.button !== 0) {
         return;
       }
 
-      // Only dismiss on left click when clicking outside selected text
-      // For right-click, only dismiss if not on selected text
-      if (event.button === 2) {
-        // Right-click: check if clicking on selected text
-        const selection = window.getSelection();
-        if (selection && selection.toString().trim()) {
-          // If there's selected text, don't dismiss on right-click
-          this.logger.debug('[Selection] Right-click ignored - preserving selection');
-          return;
-        }
-      }
-
       const target = event.target;
-      
+
       // Use the same logic as ClickManager for consistency
       // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
       const vueUIHostMain = document.getElementById('translate-it-host-main');
       const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
       const vueUIHost = vueUIHostMain || vueUIHostIframe;
-      
+
       const isInsideVueUIHost = vueUIHost && vueUIHost.contains(target);
-      
+
       // Also check legacy elements for compatibility
       const iconElement = document.getElementById('translate-it-icon'); // WindowsConfig.IDS.ICON
       const isInsideLegacyIcon = iconElement && iconElement.contains(target);
-      
+
       const windowElements = document.querySelectorAll('.translation-window');
-      const isInsideLegacyWindow = Array.from(windowElements).some(element => 
+      const isInsideLegacyWindow = Array.from(windowElements).some(element =>
         element.contains(target)
       );
-      
+
       const isClickingOnTranslationUI = isInsideVueUIHost || isInsideLegacyIcon || isInsideLegacyWindow;
-      
+
       if (isClickingOnTranslationUI) {
         // If we're in window mode and clicking inside, set the flag
         if (this.state.isVisible && !this.state.isIconMode) {
           this.state._lastClickWasInsideWindow = true;
         }
 
-        this.logger.debug('Mousedown on translation UI element - not dismissing', {
+        this.logger.debug('Double-click on translation UI element - not dismissing', {
           target: target?.tagName,
           className: target?.className,
           closestIcon: !!target?.closest('.translation-icon'),
@@ -406,8 +391,8 @@ export class WindowsManager extends ResourceTracker {
         });
         return;
       }
-      
-      this.logger.debug('Mousedown detected - dismissing immediately', {
+
+      this.logger.debug('Outside double-click detected - dismissing window', {
         target: target?.tagName,
         className: target?.className,
         eventType: event.type,
@@ -416,11 +401,20 @@ export class WindowsManager extends ResourceTracker {
       });
       this.dismiss();
     };
-    
-    // Add listener with capture to catch drag start immediately
-    document.addEventListener('mousedown', this._dismissHandler, { capture: true, passive: true });
-    
-    this.logger.debug('Added immediate dismiss listener', {
+
+    // Use double-click instead of single click to avoid interfering with drag
+    document.addEventListener('dblclick', this._dismissHandler, { capture: false });
+
+    // Also add Escape key listener for better UX
+    this._escapeKeyHandler = (event) => {
+      if (event.key === 'Escape' && (this.state.isIconMode || this.state.isVisible)) {
+        this.logger.debug('Escape key pressed - dismissing window');
+        this.dismiss();
+      }
+    };
+    document.addEventListener('keydown', this._escapeKeyHandler, { capture: false });
+
+    this.logger.debug('Added double-click dismiss listener and Escape key handler', {
       forIcon: this.state.isIconMode,
       forWindow: this.state.isVisible
     });
@@ -431,10 +425,16 @@ export class WindowsManager extends ResourceTracker {
    */
   _removeDismissListener() {
     if (this._dismissHandler) {
-      document.removeEventListener('mousedown', this._dismissHandler, { capture: true });
+      document.removeEventListener('dblclick', this._dismissHandler, { capture: false });
       this._dismissHandler = null;
-      this.logger.debug('Removed dismiss listener');
     }
+
+    if (this._escapeKeyHandler) {
+      document.removeEventListener('keydown', this._escapeKeyHandler, { capture: false });
+      this._escapeKeyHandler = null;
+    }
+
+    this.logger.debug('Removed dismiss listeners');
   }
 
   /**
