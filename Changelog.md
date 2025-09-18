@@ -2,7 +2,7 @@
 
 ##### Added
 
-- **Proxy Support**: Added proxy configuration support in `Settings > Advanced Tab > Proxy Settings` to enable access to translation services with geographic restrictions
+- **Proxy Support**: Added proxy configuration support in [`Settings > Advanced Tab > Proxy Settings`](#/advance) to enable access to translation services with geographic restrictions
 
 ##### Fixed
 
