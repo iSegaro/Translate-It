@@ -4,6 +4,15 @@
 
 The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content. The system has been completely refactored to integrate with the modern toast notification system and follows a unified, service-oriented architecture.
 
+## 🔓 Module Independence (2025 Update)
+
+The Select Element system is now fully independent with no external dependencies to other feature modules:
+
+- ✅ **Self-Contained**: All required utilities are localized within `src/features/element-selection/`
+- ✅ **No Cross-Feature Dependencies**: Eliminated all `@/features/` imports
+- ✅ **Isolated Functionality**: Can be developed, tested, and deployed independently
+- ✅ **Simplified Integration**: Easy to integrate into any project without pulling unrelated features
+
 ## 🏗️ Architecture
 
 The system is built on a unified manager pattern with integrated toast notifications and decoupled services.
@@ -147,11 +156,12 @@ class TextExtractionService {
 
 ### TranslationOrchestrator
 ```javascript
-// Translation coordination
+// Translation coordination with local timeout utilities
 class TranslationOrchestrator {
   translateElement(element, text)  // Execute translation
   applyTranslation(element, result) // Apply to DOM
   handleTranslationError(error)    // Error management
+  calculateDynamicTimeout(segments) // Local timeout calculation
 }
 ```
 
@@ -222,6 +232,33 @@ preventNavigationHandler(event) {
     return false;
   }
 }
+```
+
+## 📁 Module Structure
+
+```
+src/features/element-selection/
+├── SelectElementManager.js                    # Unified manager
+├── SelectElementNotificationManager.js         # Notification handling
+├── utils/
+│   └── timeoutCalculator.js                   # Local timeout utilities
+├── managers/
+│   ├── services/
+│   │   ├── ElementHighlighter.js              # Visual feedback
+│   │   ├── TextExtractionService.js          # Text extraction
+│   │   ├── TranslationOrchestrator.js         # Translation coordination
+│   │   ├── ModeManager.js                    # Mode management
+│   │   ├── StateManager.js                   # State tracking
+│   │   └── ErrorHandlingService.js           # Error management
+│   └── constants/
+│       └── selectElementConstants.js          # Configuration constants
+├── handlers/
+│   ├── handleActivateSelectElementMode.js     # Activation handler
+│   ├── handleDeactivateSelectElementMode.js   # Deactivation handler
+│   ├── handleSetSelectElementState.js         # State setting handler
+│   └── selectElementStateManager.js          # State management
+└── constants/
+    └── SelectElementModes.js                  # Mode definitions
 ```
 
 ## 🎯 Usage Patterns
