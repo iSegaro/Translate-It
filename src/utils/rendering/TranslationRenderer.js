@@ -1,8 +1,8 @@
 // src/utils/rendering/TranslationRenderer.js
 // Unified translation content renderer for both Vue and vanilla JS contexts
 
-import { SimpleMarkdown } from '@/utils/text/markdown.js'
-import { shouldApplyRtl } from '@/utils/text/textDetection.js'
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
+import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';

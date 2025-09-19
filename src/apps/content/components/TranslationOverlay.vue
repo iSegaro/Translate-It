@@ -5,7 +5,7 @@
 
 <script setup>
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { shouldApplyRtl } from '@/utils/text/textDetection.js';
+import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

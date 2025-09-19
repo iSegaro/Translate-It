@@ -108,7 +108,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'

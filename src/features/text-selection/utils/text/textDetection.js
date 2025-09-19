@@ -1,8 +1,12 @@
-// src/utils/textDetection.js
+// src/features/text-selection/utils/text/textDetection.js
+// Extended text detection utilities specific to text-selection feature
 import browser from "webextension-polyfill";
 import { CONFIG } from "@/shared/config/config.js";
 import { languageList } from "../i18n/languages.js";
-// import  from "./helpers.js";
+import {
+  isPersianText as sharedIsPersianText,
+  shouldApplyRtl as sharedShouldApplyRtl
+} from "@/shared/utils/text/textAnalysis.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -16,21 +20,17 @@ const getLogger = () => {
   return logger;
 };
 
+// Re-export from shared for backward compatibility within text-selection
+export const isPersianText = sharedIsPersianText;
+export const shouldApplyRtl = sharedShouldApplyRtl;
 
-export const isPersianText = (text) => {
-  return CONFIG.PERSIAN_REGEX.test(text);
-};
-
+// Text-selection specific utilities
 export const isRtlText = (text) => {
   return CONFIG.RTL_REGEX.test(text);
 };
 
 export const containsPersian = (text) => {
   return /[\u0600-\u06FF]/.test(text);
-};
-
-export const shouldApplyRtl = (text) => {
-  return containsPersian(text) || isRtlText(text);
 };
 
 export const applyTextDirection = (element, text) => {
@@ -44,88 +44,89 @@ export const applyTextDirection = (element, text) => {
 export const applyElementDirection = (element, rtl_direction = false) => {
   if (!element || !element.style) return;
 
-  const isRtl = rtl_direction;
-  element.style.direction = isRtl ? "rtl" : "ltr";
-  element.style.textAlign = isRtl ? "right" : "left";
+  element.style.direction = rtl_direction ? "rtl" : "ltr";
+  element.style.textAlign = rtl_direction ? "right" : "left";
 };
 
 export const correctTextDirection = (element, text) => {
   if (!element) return;
 
-  // اگر 'text' آرایه‌ای از خطوط است، آن‌ها را برای بررسی جهت کلی به هم متصل کنید.
-  const textToCheck = Array.isArray(text) ? text.join("\n") : text;
-
-  const isRtl = shouldApplyRtl(textToCheck);
-  const direction = isRtl ? "rtl" : "ltr";
-
-  // Only set the dir attribute and let CSS inherit from it
-  // This prevents conflicts between CSS direction and dir attribute
-  element.setAttribute("dir", direction);
-  
-  // Remove any conflicting inline styles to prevent override issues
-  if (element.style) {
-    element.style.removeProperty('direction');
-    element.style.removeProperty('text-align');
-  }
-  
-  // Add CSS class for styling instead of inline styles
-  element.classList.add('aiwc-translated-text');
-  if (isRtl) {
-    element.classList.add('aiwc-rtl-text');
-  } else {
-    element.classList.add('aiwc-ltr-text');
-  }
+  const isRtl = sharedShouldApplyRtl(text);
+  applyElementDirection(element, isRtl);
 };
 
+// Language detection functions specific to text-selection
 export async function detectTextLanguage(text) {
   try {
-    const langInfo = await browser.i18n.detectLanguage(text);
-    if (langInfo && langInfo.languages && langInfo.languages.length > 0) {
-      // زبان با بالاترین درصد اطمینان را به عنوان زبان تشخیص داده شده در نظر می‌گیریم
-      const detectedLanguage = langInfo.languages[0].language;
-      // const confidencePercentage = langInfo.languages[0].percentage;
-      getLogger().debug(`Language detected: ${detectedLanguage}`);
-      return detectedLanguage; // Return detected language code
-    } else {
-      getLogger().debug('Language detection not available');
-      return null;
+    const result = await browser.i18n.detectLanguage(text);
+    if (result.languages.length > 0) {
+      return result.languages[0].language;
     }
   } catch (error) {
-    getLogger().debug('Error in language detection:', error);
-    return null;
+    getLogger().error("Language detection failed:", error);
   }
+  return null;
 }
 
 export function getLanguageInfoFromCode(detectedLanguageCode) {
-  if (!detectedLanguageCode) {
-    return null; // یا می‌توانید یک مقدار پیش‌فرض برگردانید
+  if (!detectedLanguageCode) return null;
+
+  const language = languageList.find(
+    (lang) => lang.code.toLowerCase() === detectedLanguageCode.toLowerCase()
+  );
+
+  if (language) {
+    return {
+      code: language.code,
+      name: language.name,
+      direction: language.direction || "ltr",
+    };
   }
 
-  // تبدیل کد تشخیص داده شده به حروف کوچک برای تطابق بهتر
-  const normalizedDetectedCode = detectedLanguageCode.toLowerCase();
+  // Fallback for common language codes
+  const fallbackMap = {
+    en: { code: "en", name: "English", direction: "ltr" },
+    fa: { code: "fa", name: "Persian", direction: "rtl" },
+    ar: { code: "ar", name: "Arabic", direction: "rtl" },
+    zh: { code: "zh", name: "Chinese", direction: "ltr" },
+    es: { code: "es", name: "Spanish", direction: "ltr" },
+    fr: { code: "fr", name: "French", direction: "ltr" },
+    de: { code: "de", name: "German", direction: "ltr" },
+    ja: { code: "ja", name: "Japanese", direction: "ltr" },
+    ko: { code: "ko", name: "Korean", direction: "ltr" },
+    ru: { code: "ru", name: "Russian", direction: "ltr" },
+  };
 
-  for (const lang of languageList) {
-    if (lang.code === normalizedDetectedCode) {
-      return lang;
-    }
-  }
-
-  return null; // اگر زبانی با این کد پیدا نشد
+  return fallbackMap[detectedLanguageCode.toLowerCase()] || null;
 }
 
 export function getLanguageInfoFromName(detectedLanguageName) {
-  if (!detectedLanguageName) {
-    return null; // یا می‌توانید یک مقدار پیش‌فرض برگردانید
+  if (!detectedLanguageName) return null;
+
+  const language = languageList.find(
+    (lang) => lang.name.toLowerCase() === detectedLanguageName.toLowerCase()
+  );
+
+  if (language) {
+    return {
+      code: language.code,
+      name: language.name,
+      direction: language.direction || "ltr",
+    };
   }
 
-  // تبدیل کد تشخیص داده شده به حروف کوچک برای تطابق بهتر
-  const normalizedDetectedCode = detectedLanguageName.toLowerCase();
+  // Try to find by partial match
+  const partialMatch = languageList.find((lang) =>
+    lang.name.toLowerCase().includes(detectedLanguageName.toLowerCase())
+  );
 
-  for (const lang of languageList) {
-    if (lang.name.toLocaleLowerCase() === normalizedDetectedCode) {
-      return lang;
-    }
+  if (partialMatch) {
+    return {
+      code: partialMatch.code,
+      name: partialMatch.name,
+      direction: partialMatch.direction || "ltr",
+    };
   }
 
-  return null; // اگر زبانی با این کد پیدا نشد
+  return null;
 }

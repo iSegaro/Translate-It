@@ -1,13 +1,13 @@
 /**
- * RE-EXPORT: Text Selection Markdown
- * This file re-exports SimpleMarkdown from the text-selection feature for backward compatibility
+ * RE-EXPORT: Shared Markdown Utilities
+ * This file re-exports markdown utilities from the shared utilities for backward compatibility
  *
  * Migration Guide:
  * - Replace: import { SimpleMarkdown } from '@/utils/text/markdown.js'
- * - With: import { SimpleMarkdown } from '@/features/text-selection/utils/text/markdown.js'
+ * - With: import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
  *
- * This maintains compatibility while making text-selection feature independent
+ * This maintains compatibility while moving to shared utilities
  */
 
-// Re-export from the text-selection feature location
-export * from "../../features/text-selection/utils/text/markdown.js";
+// Re-export from shared utilities
+export * from "../../shared/utils/text/markdown.js";

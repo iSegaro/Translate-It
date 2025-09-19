@@ -73,8 +73,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { shouldApplyRtl } from '@/utils/text/textDetection.js'
-import { SimpleMarkdown } from '@/utils/text/markdown.js'
+import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js'
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
 import DOMPurify from 'dompurify'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { useFont } from '@/composables/shared/useFont.js'

@@ -2,7 +2,7 @@
 // Vue composable for translation history management in sidepanel with improved API handling
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
-import { SimpleMarkdown } from "@/utils/text/markdown.js";
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

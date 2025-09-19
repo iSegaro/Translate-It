@@ -35,7 +35,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
