@@ -357,6 +357,11 @@
   background-color: var(--toolbar-link-hover-bg-color, rgba(255, 255, 255, 0.1));
 }
 
+// Dark theme dictionary label fixes
+.ti-window.dark .ti-window-body .simple-markdown strong {
+  color: var(--text-color, #e8eaed) !important;
+}
+
 // Light theme specific overrides
 .ti-window.light .ti-window-header {
   background-color: var(--header-bg-color, #f8f9fa);
