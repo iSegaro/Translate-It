@@ -20,12 +20,19 @@ export const DEFAULT_EXCLUDED_TEXT_FIELDS_ICON = [
   "docs.microsoft.com",
   "cloud.microsoft",
   "acrobat.adobe.com",
-  "docs.google.com",
+  "docs.google.com/document",
+  "docs.google.com/spreadsheets",
+  "docs.google.com/presentation",
+  "docs.google.com/forms",
+  "docs.google.com/drawings",
+  "docs.google.com/sites",
   "onedrive.live.com",
   "canva.com/design",
   "dochub.com",
   "edit-document.pdffiller.com",
-  "zoho.com",
+  "zoho.com/writer",
+  "zoho.com/sheet",
+  "zoho.com/show",
 ];
 
 /**
