@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "@/utils/messaging/messageId.js";
-import { calculateDynamicTimeout } from "@/features/translation/utils/timeoutCalculator.js";
+import { calculateDynamicTimeout } from "../../utils/timeoutCalculator.js";
 import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
