@@ -1077,11 +1077,35 @@ export class WindowsManager extends ResourceTracker {
     });
     // Clear text selection only when dismissing icon mode AND extension context is valid
     // AND we're not preserving selection (e.g., for icon->window transitions)
-    const shouldClearSelection = this.state.isIconMode && ExtensionContextManager.isValidSync() && !preserveSelection;
+    // AND we're not preventing dismissal due to drag operations
+    let textSelectionManager = null;
+    let preventDismissDueToDrag = false;
+
+    // Check for drag operations - get reference to textSelectionManager if available
+    if (window.textSelectionManager) {
+      textSelectionManager = window.textSelectionManager;
+    } else if (window.TranslateItTextSelectionManager) {
+      textSelectionManager = window.TranslateItTextSelectionManager;
+    }
+
+    // Check if we should prevent dismissal due to drag operations
+    if (textSelectionManager && textSelectionManager.preventDismissOnNextClear) {
+      preventDismissDueToDrag = true;
+      this.logger.debug('[Selection] Preventing dismissal due to preventDismissOnNextClear flag');
+
+      // Reset the flag after use to prevent it from affecting future dismissals
+      textSelectionManager.preventDismissOnNextClear = false;
+    }
+
+    const shouldClearSelection = this.state.isIconMode &&
+                               ExtensionContextManager.isValidSync() &&
+                               !preserveSelection &&
+                               !preventDismissDueToDrag;
     this.logger.debug('[Selection] Dismiss logic:', {
       isIconMode: this.state.isIconMode,
       extensionContextValid: ExtensionContextManager.isValidSync(),
       preserveSelection,
+      preventDismissDueToDrag,
       shouldClearSelection
     });
     
