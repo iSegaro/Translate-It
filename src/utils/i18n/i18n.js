@@ -1,7 +1,7 @@
 // src/utils/i18n.js
 
 import browser from "webextension-polyfill";
-import { applyElementDirection } from "../text/textDetection.js";
+import { applyElementDirection } from "@/shared/utils/language/languageUtils.js";
 import { getApplication_LocalizeAsync } from "@/shared/config/config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";

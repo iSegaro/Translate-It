@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'extraction');
 
-import { correctTextDirection } from "./textDetection.js";
+import { correctTextDirection } from "@/shared/utils/text/textAnalysis.js";
 
 
 const translationCache = new Map();
