@@ -97,21 +97,18 @@ export class TextFieldIconManager extends ResourceTracker {
   async isEditableElement(element) {
     if (!element) return false;
 
-    // Use the new FieldDetector system - lazy import to avoid circular dependencies
+    // Use the local TextFieldDetector
     try {
-      // Try to use fieldDetector if available
-      if (typeof window !== 'undefined' && window.fieldDetector) {
-        const detection = await window.fieldDetector.detect(element);
-        this.logger.debug('FieldDetector result:', {
-          tagName: element.tagName,
-          fieldType: detection.fieldType,
-          shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
-        });
-        return detection.shouldShowTextFieldIcon;
-      } else {
-        this.logger.debug('FieldDetector not available, using fallback');
-        return this._basicFieldDetection(element);
-      }
+      // Import the local detector
+      const { textFieldDetector } = await import('../utils/TextFieldDetector.js');
+
+      const detection = await textFieldDetector.detect(element);
+      this.logger.debug('TextFieldDetector result:', {
+        tagName: element.tagName,
+        fieldType: detection.fieldType,
+        shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+      });
+      return detection.shouldShowTextFieldIcon;
     } catch (error) {
       this.logger.debug('Error in field detection, using fallback:', error);
       return this._basicFieldDetection(element);
