@@ -155,39 +155,353 @@ export class TextFieldDetector {
    * @returns {boolean} Whether to show icon
    */
   _shouldShowTextFieldIcon(element, fieldType) {
-    // Only show for editable field types
-    const editableTypes = [
-      FieldTypes.TEXT_INPUT,
-      FieldTypes.TEXT_AREA,
-      FieldTypes.CONTENT_EDITABLE,
-      FieldTypes.RICH_TEXT_EDITOR
-    ];
-
-    if (!editableTypes.includes(fieldType)) {
+    // First, check if this is a field we should never show icon for
+    if (this._shouldNeverShowIcon(element, fieldType)) {
       return false;
     }
 
-    // Additional checks for input fields
-    if (fieldType === FieldTypes.TEXT_INPUT) {
-      // Check for authentication keywords
-      const name = (element.name || '').toLowerCase();
-      const placeholder = (element.placeholder || '').toLowerCase();
-      const id = (element.id || '').toLowerCase();
-      const autocomplete = (element.autocomplete || '').toLowerCase();
+    // Check if this field is in a chat/comment context
+    const isChatContext = this._isChatOrCommentContext(element);
 
-      const hasAuthKeyword = NonProcessableKeywords.some(keyword =>
-        name.includes(keyword) ||
-        placeholder.includes(keyword) ||
-        id.includes(keyword) ||
-        autocomplete.includes(keyword)
-      );
+    // For chat/comment contexts, show for all editable field types
+    if (isChatContext) {
+      const editableTypes = [
+        FieldTypes.TEXT_INPUT,
+        FieldTypes.TEXT_AREA,
+        FieldTypes.CONTENT_EDITABLE,
+        FieldTypes.RICH_TEXT_EDITOR
+      ];
 
-      if (hasAuthKeyword) {
+      return editableTypes.includes(fieldType);
+    } else {
+      // On other sites, only show for multiline or advanced editors
+      const allowedTypes = [
+        FieldTypes.TEXT_AREA,           // Multiline textarea
+        FieldTypes.CONTENT_EDITABLE,     // Content editable elements
+        FieldTypes.RICH_TEXT_EDITOR      // Advanced rich text editors
+      ];
+
+      // Don't show for single-line text inputs on non-chat sites
+      if (!allowedTypes.includes(fieldType)) {
         return false;
+      }
+
+      // For content editable elements on non-chat sites, ensure they're not simple single-line inputs
+      if (fieldType === FieldTypes.CONTENT_EDITABLE) {
+        const isSingleLine = this._isLikelySingleLineContentEditable(element);
+        if (isSingleLine) {
+          return false;
+        }
       }
     }
 
     return true;
+  }
+
+  /**
+   * Check if we should never show icon for this field
+   * @param {Element} element - Element to check
+   * @param {string} fieldType - Field type
+   * @returns {boolean} Whether to never show icon
+   */
+  _shouldNeverShowIcon(element, fieldType) {
+    if (!element) return false;
+
+    // Check input type first
+    if (element.tagName === 'INPUT') {
+      const inputType = (element.type || '').toLowerCase();
+
+      // Never show for these input types
+      const neverShowTypes = [
+        'password', 'hidden', 'file', 'image', 'button', 'submit',
+        'reset', 'checkbox', 'radio', 'color', 'date', 'datetime-local',
+        'email', 'month', 'number', 'range', 'search', 'tel', 'time',
+        'url', 'week', 'email'
+      ];
+
+      if (neverShowTypes.includes(inputType)) {
+        return true;
+      }
+    }
+
+    // Check for search fields
+    if (this._isSearchField(element)) {
+      return true;
+    }
+
+    // Check for authentication and sensitive fields
+    if (this._isAuthOrSensitiveField(element)) {
+      return true;
+    }
+
+    // Check for single-line inputs that are not in chat context
+    if (fieldType === FieldTypes.TEXT_INPUT && !this._isChatOrCommentContext(element)) {
+      // For single-line inputs, be more restrictive
+      const name = (element.name || '').toLowerCase();
+      const id = (element.id || '').toLowerCase();
+      const className = (element.className || '').toLowerCase();
+      const placeholder = (element.placeholder || '').toLowerCase();
+      const autocomplete = (element.autocomplete || '').toLowerCase();
+
+      const combined = name + ' ' + id + ' ' + className + ' ' + placeholder + ' ' + autocomplete;
+
+      // Additional single-line input patterns to exclude
+      const excludePatterns = [
+        /^user/i, /^name/i, /^login/i, /^signin/i, /^email/i,
+        /^fname/i, /^lname/i, /^first/i, /^last/i,
+        /^search/i, /^query/i, /^find/i, /^filter/i,
+        /^\d+$/, // Pure numeric IDs
+        /.*input.*/, // Generic input IDs
+        /.*field.*/, // Generic field IDs
+      ];
+
+      if (excludePatterns.some(pattern => pattern.test(combined))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if element is a search field
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is a search field
+   */
+  _isSearchField(element) {
+    if (!element) return false;
+
+    const attributes = [
+      element.name || '',
+      element.id || '',
+      element.className || '',
+      element.getAttribute('type') || '',
+      element.getAttribute('placeholder') || '',
+      element.getAttribute('aria-label') || '',
+      element.getAttribute('role') || ''
+    ].join(' ').toLowerCase();
+
+    const searchPatterns = [
+      'search', 'query', 'find', 'filter', 'lookup'
+    ];
+
+    return searchPatterns.some(pattern => attributes.includes(pattern));
+  }
+
+  /**
+   * Check if element is an authentication or sensitive field
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is auth/sensitive
+   */
+  _isAuthOrSensitiveField(element) {
+    if (!element) return false;
+
+    // Get all text attributes
+    const attributes = [
+      element.name || '',
+      element.id || '',
+      element.className || '',
+      element.getAttribute('placeholder') || '',
+      element.getAttribute('aria-label') || '',
+      element.getAttribute('autocomplete') || '',
+      element.getAttribute('data-testid') || ''
+    ].join(' ').toLowerCase();
+
+    // Extended auth and sensitive field patterns
+    const sensitivePatterns = [
+      // Authentication
+      'user', 'username', 'login', 'signin', 'email', 'password', 'pwd',
+      'pass', 'auth', 'verification', 'confirm', 'security', 'pin', 'code',
+      'token', 'captcha', 'otp', 'secret', 'credential',
+
+      // Personal information
+      'fname', 'lname', 'firstname', 'lastname', 'fullname', 'name',
+      'phone', 'mobile', 'telephone', 'zipcode', 'postal', 'address',
+      'ssn', 'social', 'birth', 'age', 'gender', 'id',
+
+      // Financial
+      'credit', 'card', 'cvv', 'expiry', 'bank', 'account', 'payment',
+      'billing', 'transaction', 'amount', 'price', 'cost',
+
+      // Other sensitive
+      'secret', 'private', 'confidential', 'secure'
+    ];
+
+    return sensitivePatterns.some(pattern => {
+      // Check for whole word matches to avoid false positives
+      const regex = new RegExp(`\\b${pattern}\\b`);
+      return regex.test(attributes);
+    });
+  }
+
+  /**
+   * Check if content editable element is likely a single-line input
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is likely single-line
+   */
+  _isLikelySingleLineContentEditable(element) {
+    // Check for single-line indicators
+    const singleLineIndicators = [
+      'input', 'chat', 'message', 'comment', 'search', 'query',
+      'prompt', 'command', 'terminal', 'console'
+    ];
+
+    // Check element attributes and classes
+    const id = (element.id || '').toLowerCase();
+    const className = (element.className || '').toLowerCase();
+    const placeholder = (element.getAttribute('placeholder') || '').toLowerCase();
+    const dataAttr = (element.getAttribute('data-placeholder') || '').toLowerCase();
+
+    const combinedText = id + ' ' + className + ' ' + placeholder + ' ' + dataAttr;
+
+    // Check for single-line keywords
+    const hasSingleLineKeyword = singleLineIndicators.some(keyword =>
+      combinedText.includes(keyword)
+    );
+
+    // Check if it's a simple div without block elements
+    const hasBlockElements = element.querySelector('p, div, br, h1, h2, h3, h4, h5, h6, blockquote, ul, ol, li');
+    const textContent = element.textContent || '';
+    const hasMultipleLines = textContent.includes('\n') || element.clientHeight > 50;
+
+    // If it has single-line keywords and no block elements, it's likely a chat input
+    if (hasSingleLineKeyword && !hasBlockElements && !hasMultipleLines) {
+      return true;
+    }
+
+    // Check for common single-line contenteditable patterns
+    const singleLinePatterns = [
+      '[contenteditable="true"][data-single-line]',
+      '[contenteditable="true"].single-line',
+      '[contenteditable="true"].chat-input',
+      '[contenteditable="true"].message-input'
+    ];
+
+    return singleLinePatterns.some(pattern => element.matches(pattern));
+  }
+
+  /**
+   * Check if element is in a chat or comment context
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is in chat/comment context
+   */
+  _isChatOrCommentContext(element) {
+    if (!element) return false;
+
+    // Check element itself for chat/comment patterns
+    const elementCheck = this._checkElementForChatPatterns(element);
+    if (elementCheck) return true;
+
+    // Check parent elements up the DOM tree
+    let parent = element.parentElement;
+    let depth = 0;
+    const maxDepth = 10; // Limit how far we look up
+
+    while (parent && depth < maxDepth) {
+      const parentCheck = this._checkElementForChatPatterns(parent);
+      if (parentCheck) return true;
+
+      // Also check for common chat container patterns
+      if (this._isChatContainer(parent)) return true;
+
+      parent = parent.parentElement;
+      depth++;
+    }
+
+    // Check page-level indicators
+    return this._hasPageLevelChatIndicators();
+  }
+
+  /**
+   * Check if element matches chat/comment patterns
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element has chat patterns
+   */
+  _checkElementForChatPatterns(element) {
+    if (!element) return false;
+
+    const attributes = [
+      element.id || '',
+      element.className || '',
+      element.getAttribute('data-testid') || '',
+      element.getAttribute('data-role') || '',
+      element.getAttribute('aria-label') || '',
+      element.getAttribute('placeholder') || '',
+      element.getAttribute('name') || ''
+    ].join(' ').toLowerCase();
+
+    // Chat/comment keywords
+    const chatKeywords = [
+      'chat', 'message', 'comment', 'reply', 'conversation',
+      'discussion', 'thread', 'post', 'tweet', 'status',
+      'input-message', 'chat-input', 'comment-input',
+      'message-box', 'chat-box', 'reply-box',
+      'compose', 'new-message', 'send-message'
+    ];
+
+    // Check if any keyword matches
+    return chatKeywords.some(keyword => attributes.includes(keyword));
+  }
+
+  /**
+   * Check if element is a chat container
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is a chat container
+   */
+  _isChatContainer(element) {
+    if (!element) return false;
+
+    const className = (element.className || '').toLowerCase();
+    const id = (element.id || '').toLowerCase();
+
+    // Common chat container patterns
+    const containerPatterns = [
+      // Class patterns
+      /chat-?container/i,
+      /chat-?list/i,
+      /message-?list/i,
+      /conversation-?list/i,
+      /comments?/i,
+      /replies?/i,
+      /thread/i,
+      /discussion/i,
+
+      // ID patterns
+      /chat-?container/i,
+      /message-?container/i,
+      /comment-?section/i
+    ];
+
+    return containerPatterns.some(pattern =>
+      pattern.test(className) || pattern.test(id)
+    );
+  }
+
+  /**
+   * Check if page has chat indicators
+   * @returns {boolean} Whether page has chat indicators
+   */
+  _hasPageLevelChatIndicators() {
+    if (typeof document === 'undefined') return false;
+
+    // Look for multiple chat-like elements on the page
+    const chatElements = document.querySelectorAll(
+      '[contenteditable="true"], ' +
+      'textarea, ' +
+      'input[type="text"], ' +
+      'input[type="search"]'
+    );
+
+    // Count elements with chat-like attributes
+    let chatLikeCount = 0;
+    chatElements.forEach(el => {
+      if (this._checkElementForChatPatterns(el)) {
+        chatLikeCount++;
+      }
+    });
+
+    // If we have multiple chat-like elements, it's likely a chat page
+    return chatLikeCount >= 2;
   }
 
   /**
