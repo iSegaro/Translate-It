@@ -9,7 +9,7 @@ import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
-} from "@/utils/framework/framework-compat/index.js";
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 
 
 export default class YoutubeStrategy extends PlatformStrategy {

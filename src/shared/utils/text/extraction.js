@@ -40,7 +40,7 @@ export function clearAllCaches(context) {
 
   // Clear Element Selection caches if available
   try {
-    import('../../features/element-selection/utils/textExtraction.js').then(({ clearAllCaches: clearElementSelectionCaches }) => {
+    import('@/features/element-selection/utils/textExtraction.js').then(({ clearAllCaches: clearElementSelectionCaches }) => {
       clearElementSelectionCaches(context);
       logger.debug('Element Selection caches cleared successfully');
     }).catch(() => {

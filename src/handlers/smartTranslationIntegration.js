@@ -8,7 +8,7 @@ import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
+import { isComplexEditor } from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
