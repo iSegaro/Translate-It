@@ -213,7 +213,7 @@ export const isTextDragOperation = (event) => {
     const selectionLength = selection.toString().trim().length;
 
     return targetInSelection && selectionLength > 0;
-  } catch (error) {
+  } catch {
     // If anything fails, assume it's not a drag operation
     return false;
   }

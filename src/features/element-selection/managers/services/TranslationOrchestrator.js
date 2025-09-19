@@ -20,10 +20,11 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 export class TranslationOrchestrator extends ResourceTracker {
   constructor(stateManager) {
     super('translation-orchestrator')
-    
+
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TranslationOrchestrator');
     this.stateManager = stateManager;
     this.translationRequests = new Map();
+    this.userCancelledRequests = new Set(); // Track user-cancelled requests
     this.escapeKeyListener = null;
     this.statusNotification = null;
     this.errorHandler = ErrorHandler.getInstance();
@@ -194,9 +195,25 @@ export class TranslationOrchestrator extends ResourceTracker {
       // Clear the global translation in progress flag on error
       window.isTranslationInProgress = false;
       
-      // Don't log or handle errors that are already handled
-      if (!error.alreadyHandled) {
+      // Use ExtensionContextManager to detect context errors
+      const isContextError = ExtensionContextManager.isContextError(error);
+
+      // Check if this request was user-cancelled
+      if (this.userCancelledRequests.has(messageId)) {
+        this.logger.info("Translation process cancelled by user", {
+          messageId,
+          context: 'translation-process'
+        });
+        this.userCancelledRequests.delete(messageId); // Clean up here
+      } else if (!error.alreadyHandled && !isContextError) {
         this.logger.error("Translation process failed", error);
+      } else if (isContextError) {
+        this.logger.debug("Translation process failed: extension context invalidated (expected behavior)", {
+          messageId,
+          context: 'translation-process'
+        });
+        // Handle context errors via ExtensionContextManager (will log as warn with details)
+        ExtensionContextManager.handleContextError(error, 'translation-process');
       }
 this.translationRequests.delete(messageId);
       // Dismiss the status notification on error
@@ -268,18 +285,39 @@ this.translationRequests.delete(messageId);
       
       this.logger.debug("Translation request sent successfully", result);
     } catch (error) {
-      this.logger.error("Failed to send translation request", error);
-      
+      // Use ExtensionContextManager to detect context errors
+      const isContextError = ExtensionContextManager.isContextError(error);
+
       // Check if this is a timeout error
       const isTimeoutError = error.message && (
-        error.message.includes('timeout') || 
+        error.message.includes('timeout') ||
         error.message.includes('Port messaging timeout')
       );
+
+      // Check if this request was user-cancelled
+      if (this.userCancelledRequests.has(messageId)) {
+        this.logger.info("Translation request cancelled by user", {
+          messageId,
+          context: 'translation-request'
+        });
+        // Don't delete here - let main process error handling delete it
+        throw error; // Still throw to maintain error flow
+      } else if (isContextError) {
+        this.logger.debug("Translation request failed: extension context invalidated (expected behavior)", {
+          messageId,
+          context: 'translation-request'
+        });
+        // Handle context errors via ExtensionContextManager (will log as warn with details)
+        ExtensionContextManager.handleContextError(error, 'translation-request');
+        throw error; // Still throw to maintain error flow
+      } else {
+        this.logger.error("Failed to send translation request", error);
+      }
       
       if (isTimeoutError) {
-        this.logger.warn("Translation request timed out, but background processing may continue", {
+        this.logger.warn("Translation request timed out (background processing may continue)", {
           messageId,
-          dynamicTimeout,
+          timeout: dynamicTimeout,
           segmentCount
         });
         
@@ -304,7 +342,7 @@ this.translationRequests.delete(messageId);
 
   async handleStreamUpdate(message) {
     const { messageId, data } = message;
-    
+
     this.logger.debug(`[TranslationOrchestrator] Received stream update:`, {
       messageId,
       success: data?.success,
@@ -313,12 +351,24 @@ this.translationRequests.delete(messageId);
       originalBatchLength: data?.originalData?.length
     });
 
+    // Check if the request still exists (may have been cancelled)
+    const request = this.translationRequests.get(messageId);
+    if (!request) {
+      this.logger.debug(`[TranslationOrchestrator] Ignoring stream update for unknown/cancelled request: ${messageId}`);
+      return;
+    }
+
+    // Check if request was cancelled
+    if (request.status === 'cancelled') {
+      this.logger.debug(`[TranslationOrchestrator] Ignoring stream update for cancelled request: ${messageId}`);
+      return;
+    }
+
     if (!data.success) {
         this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
-        
+
         // Mark request as having errors, but don't show error notification yet
         // The final error handling will be done in handleStreamEnd
-        const request = this.translationRequests.get(messageId);
         if (request) {
           request.hasErrors = true;
           request.lastError = data.error;
@@ -346,8 +396,9 @@ this.translationRequests.delete(messageId);
     window.isTranslationInProgress = true;
 
     const { data: translatedBatch, originalData: originalBatch, batchIndex: _batchIndex } = data; // eslint-disable-line no-unused-vars
-    
-    const request = this.translationRequests.get(messageId);
+
+    // Request is already retrieved at the beginning of this function (line 317)
+    // Just verify it still exists and hasn't been cancelled
     if (!request) {
       this.logger.debug("Received stream update for already completed message:", messageId);
       return;
@@ -680,18 +731,29 @@ this.translationRequests.delete(messageId);
     // Clear the global translation in progress flag
     window.isTranslationInProgress = false;
 
+    // Mark all requests as user-cancelled BEFORE any processing
+    for (const [messageId] of this.translationRequests) {
+      this.userCancelledRequests.add(messageId);
+      // Also mark in ExtensionContextManager for global tracking
+      ExtensionContextManager.markUserCancelled(messageId);
+    }
+
     this.logger.debug('[TranslationOrchestrator] Before cancellation:', {
       requestsSize: this.translationRequests.size,
       requestIds: Array.from(this.translationRequests.keys()),
-      requestStatuses: Array.from(this.translationRequests.values()).map(r => ({ id: r.messageId || 'unknown', status: r.status }))
+      requestStatuses: Array.from(this.translationRequests.values()).map(r => ({ id: r.messageId || 'unknown', status: r.status })),
+      userCancelledRequests: Array.from(this.userCancelledRequests)
     });
 
+    // Cancel all pending requests and remove them
+    const requestsToCancel = [];
     for (const [messageId, request] of this.translationRequests) {
       if (request.status === 'pending') {
         request.status = 'cancelled';
         request.error = 'Translation cancelled by user';
+        requestsToCancel.push(messageId);
         this.logger.debug('[TranslationOrchestrator] Cancelled request:', messageId);
-        
+
         // Notify background to cancel the network request
         sendMessage({
           action: MessageActions.CANCEL_TRANSLATION,
@@ -700,6 +762,12 @@ this.translationRequests.delete(messageId);
         }).catch(err => this.logger.warn('Failed to send cancellation message to background', err));
       }
     }
+
+    // Remove cancelled requests from the map
+    requestsToCancel.forEach(messageId => {
+      this.translationRequests.delete(messageId);
+      this.logger.debug('[TranslationOrchestrator] Removed cancelled request:', messageId);
+    });
     if (this.statusNotification) {
       pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
       this.statusNotification = null;
@@ -709,15 +777,35 @@ this.translationRequests.delete(messageId);
   async cleanup() {
     this.cancelAllTranslations();
     this.translationRequests.clear();
-    
+    this.userCancelledRequests.clear(); // Clear user cancellation tracking
+
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
+
     this.logger.debug('TranslationOrchestrator cleanup completed');
   }
 
   getDebugInfo() {
     return { activeRequests: this.translationRequests.size };
+  }
+
+  /**
+   * Get the current active message ID (if any)
+   * @returns {string|null} Current message ID
+   */
+  getCurrentMessageId() {
+    // Return the most recent messageId from active requests
+    const activeRequests = Array.from(this.translationRequests.keys());
+    return activeRequests.length > 0 ? activeRequests[activeRequests.length - 1] : null;
+  }
+
+  /**
+   * Check if a message ID was cancelled by user
+   * @param {string} messageId - Message ID to check
+   * @returns {boolean} True if user cancelled
+   */
+  isUserCancelled(messageId) {
+    return this.userCancelledRequests.has(messageId);
   }
 
   /**

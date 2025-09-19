@@ -7,7 +7,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isUrlExcluded } from "@/utils/ui/exclusion.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
-import { getEventPath, getSelectedTextWithDash, isTextDragOperation } from "@/utils/browser/events.js";
+import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';

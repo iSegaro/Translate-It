@@ -355,7 +355,7 @@ export class ElementTextExtraction {
 
     try {
       // Expand texts for translation
-      const { expandedTexts, originMapping, originalToExpandedIndices } =
+      const { expandedTexts, originMapping } =
         expandTextsForTranslation(textsToTranslate, { useOptimization });
 
       if (expandedTexts.length === 0) {

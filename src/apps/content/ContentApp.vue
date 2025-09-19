@@ -276,41 +276,24 @@ onMounted(() => {
 
   pageEventBus.on('dismiss_notification', (detail) => {
     logger.info('Received dismiss_notification event:', detail);
-    
+
+    // Skip select-element notifications - they are managed by SelectElementNotificationManager
+    if (detail.id.startsWith('select-element-') || detail.id.includes('select-element')) {
+      logger.debug('Ignoring dismiss_notification for select-element notification:', detail.id);
+      return;
+    }
+
     // Prevent double dismissal
     if (window.translateItDismissedNotifications.has(detail.id)) {
       logger.debug('Notification already dismissed, ignoring:', detail.id);
       return;
     }
-    
+
     window.translateItDismissedNotifications.add(detail.id);
-    
+
     // Force dismiss - try multiple methods to ensure cleanup
     toast.dismiss(detail.id);
-    
-    // If it's a select-element notification, also force dismiss all select-element toasts
-    if (detail.id.startsWith('select-element-')) {
-      logger.debug('Force dismissing all select-element toasts');
-      
-      // Use timeout to ensure the first dismiss has time to process
-      setTimeout(() => {
-        // Find all select-element notifications and dismiss them
-        const selectElementKeys = Array.from(window.translateItShownNotifications || [])
-          .filter(key => key.includes('select-element-'));
-        
-        selectElementKeys.forEach(key => {
-          const parts = key.split('-');
-          if (parts.length >= 3) {
-            const id = `${parts[0]}-${parts[1]}-${parts[2]}`;
-            toast.dismiss(id);
-          }
-        });
-        
-        // Also try dismissing by type pattern
-        toast.dismiss((t) => t.type === 'select-element' || (t.id && t.id.includes('select-element')));
-      }, 50);
-    }
-    
+
     // Clean up after a delay
     setTimeout(() => {
       window.translateItDismissedNotifications.delete(detail.id);
@@ -319,32 +302,15 @@ onMounted(() => {
 
   pageEventBus.on('dismiss_all_notifications', () => {
     logger.info('Received dismiss_all_notifications event');
-    toast.dismiss();
+    // Dismiss all notifications except select-element ones
+    toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
   });
 
-  // Handle select element notification dismissal for backward compatibility
+  // Select element notifications should NOT be auto-dismissed
+  // They are controlled by SelectElementNotificationManager only
   pageEventBus.on('dismiss-select-element-notification', () => {
-    logger.info('Received dismiss-select-element-notification event');
-    // Dismiss all select-element type notifications
-    const selectElementNotifications = Array.from(window.translateItShownNotifications || [])
-      .filter(key => key.startsWith('select-element-'));
-    selectElementNotifications.forEach(key => {
-      const id = key.split('-').slice(0, 3).join('-'); // Extract the ID part
-      
-      // Prevent double dismissal
-      if (window.translateItDismissedNotifications.has(id)) {
-        logger.debug('Select element notification already dismissed, ignoring:', id);
-        return;
-      }
-      
-      window.translateItDismissedNotifications.add(id);
-      toast.dismiss(id);
-      
-      // Clean up after a delay
-      setTimeout(() => {
-        window.translateItDismissedNotifications.delete(id);
-      }, 2000);
-    });
+    logger.debug('Received dismiss-select-element-notification event - ignoring (controlled by SelectElementNotificationManager)');
+    // Do nothing - select element notifications are managed by their own manager
   });
 
   // Test event to confirm communication

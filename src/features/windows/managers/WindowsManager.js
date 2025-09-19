@@ -16,7 +16,6 @@ import { TTSGlobalManager as globalTTSManager } from "@/features/tts/core/TTSGlo
 import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
-import { isTextDragOperation } from "@/utils/browser/events.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';

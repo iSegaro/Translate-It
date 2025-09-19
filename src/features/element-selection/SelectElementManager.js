@@ -6,6 +6,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Core services
 import { ElementHighlighter } from "./managers/services/ElementHighlighter.js";
@@ -224,35 +225,34 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug("SelectElementManager not active");
       return;
     }
-    
-    const { fromBackground = false, fromNotification = false } = options;
-    
+
+    const { fromBackground = false, fromNotification = false, fromCancel = false } = options;
+
     this.logger.debug("Deactivating SelectElementManager", {
       fromBackground,
       fromNotification,
+      fromCancel,
       instanceId: this.instanceId
     });
-    
+
     try {
       // Set active state immediately
       this.isActive = false;
-      
+
       // Cancel any ongoing translations
       await this.translationOrchestrator.cancelAllTranslations();
-      
+
       // Remove event listeners
       this.removeEventListeners();
-      
+
       // Clear highlights
       this.elementHighlighter.clearHighlight();
       await this.elementHighlighter.deactivateUI();
-      
-      // Dismiss notification (only in main frame)
-      if (window === window.top) {
-        // Dismiss notification (only in main frame)
-      if (window === window.top) {
+
+      // Only dismiss notification if deactivation is intentional (from cancel/background)
+      // Don't dismiss during automatic dismissal or notification hide
+      if (window === window.top && (fromCancel || fromBackground)) {
         this.dismissNotification();
-      }
       }
       
       // Cleanup state
@@ -542,7 +542,19 @@ class SelectElementManager extends ResourceTracker {
   async startTranslation(text, targetElement) {
     try {
       this.logger.debug("Starting translation process");
-      
+
+      // Double check that we're still active and not already processing
+      if (!this.isActive) {
+        this.logger.debug("SelectElementManager no longer active, aborting translation");
+        return;
+      }
+
+      // Check if translation is already in progress globally
+      if (window.isTranslationInProgress) {
+        this.logger.debug("Another translation is already in progress, aborting");
+        return;
+      }
+
       // Update notification to show translation in progress (only in main frame)
       if (window === window.top) {
         this.updateNotificationForTranslation();
@@ -606,7 +618,25 @@ class SelectElementManager extends ResourceTracker {
       }, 1000);
       
     } catch (error) {
-      this.logger.error("Error during translation:", error);
+      // Use ExtensionContextManager to detect context errors
+      const isContextError = ExtensionContextManager.isContextError(error);
+
+      if (isContextError) {
+        // Get current messageId for user cancellation check
+        const currentMessageId = this.translationOrchestrator.getCurrentMessageId();
+
+        this.logger.debug("Translation failed: extension context invalidated (expected behavior)", {
+          context: 'element-translation',
+          messageId: currentMessageId
+        });
+
+        // Handle context errors via ExtensionContextManager (will detect user cancellation)
+        ExtensionContextManager.handleContextError(error, 'element-translation', {
+          operationId: currentMessageId
+        });
+      } else {
+        this.logger.error("Error during translation:", error);
+      }
       this.performPostTranslationCleanup();
     }
   }
@@ -701,7 +731,7 @@ class SelectElementManager extends ResourceTracker {
     pageEventBus.on('cancel-select-element-mode', () => {
       if (this.isActive) {
         this.logger.debug('Cancel requested, deactivating SelectElement mode');
-        this.deactivate({ fromNotification: true });
+        this.deactivate({ fromCancel: true });
       }
     });
   }

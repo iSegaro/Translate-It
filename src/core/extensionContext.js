@@ -14,7 +14,41 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
  * Single source of truth for all extension context related operations
  */
 export class ExtensionContextManager {
-  
+  // Static state for tracking user cancellations across the app
+  static userCancelledOperations = new Set();
+
+  /**
+   * Mark an operation as user-cancelled
+   * @param {string} operationId - Operation identifier
+   */
+  static markUserCancelled(operationId) {
+    ExtensionContextManager.userCancelledOperations.add(operationId);
+  }
+
+  /**
+   * Check if an operation was user-cancelled
+   * @param {string} operationId - Operation identifier
+   * @returns {boolean} True if user cancelled
+   */
+  static isUserCancelled(operationId) {
+    return ExtensionContextManager.userCancelledOperations.has(operationId);
+  }
+
+  /**
+   * Clear user cancellation for an operation
+   * @param {string} operationId - Operation identifier
+   */
+  static clearUserCancelled(operationId) {
+    ExtensionContextManager.userCancelledOperations.delete(operationId);
+  }
+
+  /**
+   * Clear all user cancellations
+   */
+  static clearAllUserCancellations() {
+    ExtensionContextManager.userCancelledOperations.clear();
+  }
+
   /**
    * Synchronous extension context validation (fast check)
    * @returns {boolean} True if extension context is valid
@@ -53,6 +87,24 @@ export class ExtensionContextManager {
   }
 
   /**
+   * Get a human-readable reason for a context error
+   * @param {Error|string} error - The context error
+   * @returns {string} Human-readable reason
+   */
+  static getContextErrorReason(error) {
+    const msg = error?.message || error;
+
+    if (msg.includes('extension context invalidated')) return 'Extension reloaded';
+    if (msg.includes('message channel closed')) return 'Message channel closed';
+    if (msg.includes('receiving end does not exist')) return 'Background script unavailable';
+    if (msg.includes('page moved to cache') || msg.includes('back/forward cache')) return 'Page cached by browser';
+    if (msg.includes('could not establish connection')) return 'Connection failed';
+    if (msg.includes('message port closed')) return 'Message port closed';
+
+    return 'Unknown context issue';
+  }
+
+  /**
    * Handle context errors with appropriate logging and response
    * @param {Error|string} error - The context error
    * @param {string} context - Context where error occurred
@@ -61,13 +113,31 @@ export class ExtensionContextManager {
   static handleContextError(error, context = 'unknown', options = {}) {
     const {
       silent = true,
-      fallbackAction = null
+      fallbackAction = null,
+      operationId = null
     } = options;
 
     const message = error?.message || error;
-    
-    // Always use debug level for context errors to avoid console spam
-    logger.debug(`Extension context invalidated in ${context} - handled silently:`, message);
+    const reason = ExtensionContextManager.getContextErrorReason(error);
+
+    // Check if this error is from a user-cancelled operation
+    if (operationId && ExtensionContextManager.isUserCancelled(operationId)) {
+      logger.info(`Operation cancelled by user in ${context}`, {
+        context,
+        operationId,
+        reason: 'User cancelled operation'
+      });
+      // Clean up the cancellation flag
+      ExtensionContextManager.clearUserCancelled(operationId);
+      return;
+    }
+
+    // Use warn level to make context issues visible but not alarming
+    logger.warn(`Extension context error in ${context}: ${reason}`, {
+      context,
+      reason,
+      originalError: message
+    });
 
     // Execute fallback action if provided
     if (fallbackAction && typeof fallbackAction === 'function') {
