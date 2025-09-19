@@ -133,7 +133,7 @@ export class RevertHandler extends ResourceTracker {
         logger.debug('[RevertHandler] Element Selection revert not available, using legacy system');
 
         // Fallback to legacy system
-        const { revertTranslations } = await import("../../utils/text/extraction.js");
+        const { revertTranslations } = await import("@/shared/utils/text/extraction.js");
         return await revertTranslations(context);
       }
     } catch (error) {

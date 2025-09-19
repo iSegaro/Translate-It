@@ -5,7 +5,7 @@ import { applyElementDirection } from "@/shared/utils/language/languageUtils.js"
 import { getApplication_LocalizeAsync } from "@/shared/config/config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";
-import { SimpleMarkdown } from "../text/markdown.js";
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 // import  from "./helpers.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';

@@ -25,7 +25,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { logMethod } from "../core/helpers.js";
-import { clearAllCaches } from "../utils/text/extraction.js";
+import { clearAllCaches } from "@/shared/utils/text/extraction.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 
 export default class EventCoordinator {
