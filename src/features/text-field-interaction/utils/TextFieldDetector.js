@@ -3,6 +3,11 @@
  * Provides basic field detection without external dependencies
  */
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldDetector');
+
 // Field type constants
 export const FieldTypes = {
   TEXT_INPUT: 'text-input',
@@ -61,13 +66,6 @@ const RichEditorPatterns = [
  * Simplified field detector for text field interaction
  */
 export class TextFieldDetector {
-  constructor() {
-    // Simple logger using console
-    this.logger = {
-      debug: (...args) => console.debug('[TextFieldDetector]', ...args),
-      error: (...args) => console.error('[TextFieldDetector]', ...args)
-    };
-  }
 
   /**
    * Detect if element should show text field icon
@@ -91,7 +89,7 @@ export class TextFieldDetector {
         isRichEditor: this._isRichTextEditor(element)
       };
 
-      this.logger.debug('Field detected:', {
+      logger.debug('Field detected:', {
         tagName: element.tagName,
         fieldType,
         shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
@@ -100,7 +98,7 @@ export class TextFieldDetector {
       return detection;
 
     } catch (error) {
-      this.logger.error('Field detection failed:', error);
+      logger.error('Field detection failed:', error);
       return this._getDefaultDetection();
     }
   }
