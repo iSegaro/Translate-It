@@ -1,14 +1,14 @@
-// import { revertTranslations as revertTranslationsFromExtraction } from "../../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { getElementSelectionCache } from "../../utils/cache.js";
 
 export class StateManager extends ResourceTracker {
   constructor() {
     super('state-manager')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'StateManager');
-    this.originalTexts = new Map(); // This will be used by applyTranslationsToNodes
+    this.cache = getElementSelectionCache();
     this.translatedElements = new Map(); // Keep track of top-level translated elements
   }
 
@@ -25,7 +25,7 @@ export class StateManager extends ResourceTracker {
   getContext() {
     return {
       state: {
-        originalTexts: this.originalTexts
+        originalTexts: this.cache.getAllOriginalTexts()
       },
       // Mock other properties if needed by the utilities
       errorHandler: {
@@ -103,12 +103,14 @@ export class StateManager extends ResourceTracker {
     if (this.hasTranslatedElements()) {
       await this.revertTranslations();
     }
-    this.originalTexts.clear();
+
+    // Clear cache instead of this.originalTexts
+    this.cache.clearOriginalTexts();
     this.translatedElements.clear();
-    
+
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
+
     this.logger.debug('StateManager cleanup completed');
   }
 
@@ -116,7 +118,8 @@ export class StateManager extends ResourceTracker {
    * Clear all state data
    */
   clearState() {
-    this.originalTexts.clear();
+    // Clear cache instead of this.originalTexts
+    this.cache.clearOriginalTexts();
     this.translatedElements.clear();
     this.logger.debug('StateManager state cleared');
   }

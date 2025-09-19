@@ -1,5 +1,5 @@
 // import browser from "webextension-polyfill";
-import { applyTranslationsToNodes, expandTextsForTranslation, reassembleTranslations, separateCachedAndNewTexts } from "../../../../utils/text/extraction.js";
+import { applyTranslationsToNodes, expandTextsForTranslation, reassembleTranslations, separateCachedAndNewTexts } from "../../utils/textExtraction.js";
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { TranslationMode } from "@/shared/config/config.js";
@@ -393,9 +393,9 @@ this.translationRequests.delete(messageId);
             request.translatedSegments.set(expandedIndex, translatedText);
             
             // CACHE FIX: Store streaming translations in the global cache for future retrieval
-            const { getTranslationCache } = await import("../../../../utils/text/extraction.js");
-            const translationCache = getTranslationCache();
-            translationCache.set(originalText, translatedText);
+            const { getElementSelectionCache } = await import("../../utils/cache.js");
+            const cache = getElementSelectionCache();
+            cache.setTranslation(originalText, translatedText);
         }
     }
   }

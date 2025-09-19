@@ -112,20 +112,30 @@ export class RevertHandler extends ResourceTracker {
    */
   async revertLegacyTranslations() {
     try {
-      const { revertTranslations } = await import("../../utils/text/extraction.js");
-      const { state } = await import("../../config.js");
-      
       // Get translation handler for context
       const translationHandler = await this.getTranslationHandler();
-      
+      const { state } = await import("../../config.js");
+
       const context = {
         state,
         errorHandler: translationHandler?.errorHandler,
         notifier: translationHandler?.notifier,
         // IconManager removed as it doesn't exist in the current architecture
       };
-      
-      return await revertTranslations(context);
+
+      // Try to use Element Selection revert system first, fallback to legacy
+      try {
+        const { revertTranslations } = await import("../../features/element-selection/utils/textExtraction.js");
+        const elementSelectionResult = await revertTranslations(context);
+        logger.debug('[RevertHandler] Used Element Selection revert system');
+        return elementSelectionResult;
+      } catch (elementError) {
+        logger.debug('[RevertHandler] Element Selection revert not available, using legacy system');
+
+        // Fallback to legacy system
+        const { revertTranslations } = await import("../../utils/text/extraction.js");
+        return await revertTranslations(context);
+      }
     } catch (error) {
       logger.error('[RevertHandler] Error in legacy revert:', error);
       throw error;

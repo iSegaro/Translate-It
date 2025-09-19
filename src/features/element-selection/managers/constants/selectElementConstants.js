@@ -49,10 +49,10 @@ export const TRANSLATION_TIMEOUT_FALLBACK = 15000; // 15 seconds
 
 // Dynamic timeout calculation constants
 export const TIMEOUT_CONFIG = {
-  BASE_TIMEOUT: 60000, // 1 minute base timeout
-  TIME_PER_SEGMENT: 5000, // 5 seconds per segment
-  MAX_TIMEOUT: 1800000, // 30 minutes maximum timeout
-  MIN_TIMEOUT: 60000, // 1 minute minimum timeout
+  BASE_TIMEOUT: 30000, // 30 seconds base timeout
+  TIME_PER_SEGMENT: 2000, // 2 seconds per segment
+  MAX_TIMEOUT: 300000, // 5 minutes maximum timeout
+  MIN_TIMEOUT: 30000, // 30 seconds minimum timeout
 };
 
 // Cache configuration

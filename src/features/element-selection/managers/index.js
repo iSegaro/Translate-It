@@ -15,9 +15,11 @@ export { StateManager } from './services/StateManager.js';
 
 // Export utilities and constants
 export * from './utils/elementValidation.js';
-export * from './utils/textProcessing.js';
 export * from './utils/domHelpers.js';
 export * from './constants/selectElementConstants.js';
+
+// Export new dedicated utilities
+export * from '../utils/index.js';
 
 // Note: Legacy exports removed - Use FeatureManager to access SelectElementManager
 // Access pattern: window.featureManager.getFeatureHandler('selectElement')
