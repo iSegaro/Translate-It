@@ -1,4 +1,4 @@
-import { SimpleMarkdown } from '@/utils/text/markdown.js';
+import { SimpleMarkdown } from '@/features/text-selection/utils/text/markdown.js';
 import DOMPurify from 'dompurify';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

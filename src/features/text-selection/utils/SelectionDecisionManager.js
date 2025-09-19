@@ -1,5 +1,5 @@
-import { fieldDetector } from '@/utils/text/core/FieldDetector.js';
-import { FieldTypes } from '@/utils/text/core/types.js';
+import { fieldDetector } from './text/core/FieldDetector.js';
+import { FieldTypes } from './text/core/types.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 

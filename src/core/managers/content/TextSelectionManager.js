@@ -11,8 +11,8 @@ import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { fieldDetector, FieldTypes } from "@/utils/text/FieldDetector.js";
-import { selectionDetector } from "@/utils/text/SelectionDetector.js";
+import { fieldDetector, FieldTypes } from "@/features/text-selection/utils/text/FieldDetector.js";
+import { selectionDetector } from "@/features/text-selection/utils/text/SelectionDetector.js";
 // import { siteHandlerRegistry } from "@/utils/text/registry/SiteHandlerRegistry.js";
 
 export class TextSelectionManager extends ResourceTracker {
@@ -397,7 +397,7 @@ export class TextSelectionManager extends ResourceTracker {
           : range.commonAncestorContainer;
         
         if (contextElement) {
-          const { fieldDetector } = await import('@/utils/text/FieldDetector.js');
+          const { fieldDetector } = await import('@/features/text-selection/utils/text/FieldDetector.js');
           const detection = await fieldDetector.detect(contextElement);
           
           if (detection.selectionEventStrategy === 'selection-based') {
