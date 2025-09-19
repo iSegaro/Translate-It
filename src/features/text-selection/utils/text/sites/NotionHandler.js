@@ -26,7 +26,7 @@ export class NotionHandler extends BaseSiteHandler {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'NotionHandler');
   }
 
-  async detectSelection(element, ) {
+  async detectSelection(element) {
     try {
       let selectedText = '';
       

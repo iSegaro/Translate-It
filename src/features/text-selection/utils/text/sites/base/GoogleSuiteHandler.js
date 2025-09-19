@@ -26,7 +26,7 @@ export class GoogleSuiteHandler extends BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, ) {
+  async detectSelection(element) {
     try {
       let selectedText = '';
 

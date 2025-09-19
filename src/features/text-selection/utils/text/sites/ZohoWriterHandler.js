@@ -27,7 +27,7 @@ export class ZohoWriterHandler extends BaseSiteHandler {
    * @param {Object} options - Detection options
    * @returns {Promise<SiteHandlerResult>} Selection result
    */
-  async detectSelection(element, ) {
+  async detectSelection(element) {
     try {
       // Strategy 1: Temporarily enable selection visibility and try standard methods
       const originalStyle = this.enableSelectionVisibility();

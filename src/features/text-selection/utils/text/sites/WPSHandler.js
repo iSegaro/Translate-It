@@ -20,7 +20,7 @@ export class WPSHandler extends BaseSiteHandler {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WPSHandler');
   }
 
-  async detectSelection(element, ) {
+  async detectSelection(element) {
     try {
       let selectedText = '';
       
