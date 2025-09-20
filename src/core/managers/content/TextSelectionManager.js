@@ -1052,6 +1052,8 @@ export class TextSelectionManager extends ResourceTracker {
     this.doubleClickCleanupTimeout = setTimeout(() => {
       this.lastDoubleClickText = null;
       this.lastDoubleClickPosition = null;
+      this.doubleClickProcessing = false;
+      this.logger.debug('Double-click processing flag cleared by cleanup timeout');
     }, 1000);
     
     // Capture selection immediately to avoid interference
@@ -1157,11 +1159,6 @@ export class TextSelectionManager extends ResourceTracker {
     
     // Start with initial delay for complex editors
     setTimeout(() => handleSelection(1), initialDelay);
-    
-    // Clear processing flag after reasonable delay
-    setTimeout(() => {
-      this.doubleClickProcessing = false;
-    }, 300);
   }
 
   /**
