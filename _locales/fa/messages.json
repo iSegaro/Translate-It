@@ -195,7 +195,7 @@
     "message": "هنگام فعال بودن ترجمه انتخاب متن، نیاز است کلید Ctrl در حین انتخاب نگه داشته شود تا ترجمه فعال شود."
   },
   "active_selection_icon_on_textfields_label": {
-    "message": "فعال‌سازی آیکون انتخاب متن در فیلدهای متنی"
+    "message": "فعال‌سازی دوبار کلیک در فیلدهای متنی"
   },
   "active_selection_icon_on_textfields_description": {
     "message": "نمایش آیکون ترجمه هنگام دوبار کلیک روی متن‌های داخل فیلدهای متنی (textarea)."
