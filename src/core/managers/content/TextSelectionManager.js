@@ -53,6 +53,9 @@ export class TextSelectionManager extends ResourceTracker {
     this.justFinishedDrag = false;
     this.preventDismissOnNextClear = false;
     this.pendingSelection = null;
+
+    // Track Ctrl state during drag operations
+    this.dragCtrlState = null;
     
     // Track last processed selection to prevent duplicate processing
     this.lastProcessedText = null;
@@ -420,7 +423,9 @@ export class TextSelectionManager extends ResourceTracker {
         this.pendingSelection = {
           selection: event.selection,
           fieldType: event.fieldType,
-          target: event.target
+          target: event.target,
+          ctrlKey: this.dragCtrlState,
+          metaKey: this.dragCtrlState
         };
         return;
       } else {
@@ -749,9 +754,15 @@ export class TextSelectionManager extends ResourceTracker {
   /**
    * Start drag detection (mousedown)
    */
-  startDragDetection() {
+  startDragDetection(event) {
     this.isDragging = true;
     this.pendingSelection = null;
+
+    // Track Ctrl state at the start of drag
+    if (event) {
+      this.dragCtrlState = event.ctrlKey || event.metaKey;
+      this.logger.debug('Drag started with Ctrl state:', this.dragCtrlState);
+    }
   }
 
   /**
@@ -766,13 +777,27 @@ export class TextSelectionManager extends ResourceTracker {
       this.justFinishedDrag = false;
     }, 3000); // Keep flag for 3 seconds after drag completion
 
+    // Update Ctrl state at the end of drag
+    if (event) {
+      this.dragCtrlState = event.ctrlKey || event.metaKey;
+      this.logger.debug('Drag ended with Ctrl state:', this.dragCtrlState);
+    }
+
+    // Clear drag state after processing
+    setTimeout(() => {
+      this.dragCtrlState = null;
+    }, 100);
+
     // Process pending selection if exists
     if (this.pendingSelection) {
       const pendingEvent = {
         type: 'selectionchange',
         selection: this.pendingSelection.selection,
         fieldType: this.pendingSelection.fieldType,
-        target: this.pendingSelection.target
+        target: this.pendingSelection.target,
+        isDragging: true,
+        ctrlKey: this.pendingSelection.ctrlKey !== undefined ? this.pendingSelection.ctrlKey : (this.dragCtrlState || event.ctrlKey || event.metaKey),
+        metaKey: this.pendingSelection.metaKey !== undefined ? this.pendingSelection.metaKey : (this.dragCtrlState || event.ctrlKey || event.metaKey)
       };
 
       // Set flag to prevent dismissal for drag selections
@@ -809,9 +834,29 @@ export class TextSelectionManager extends ResourceTracker {
 
     const windowsManager = this._getWindowsManager();
     const currentTime = Date.now();
-    if (this.lastProcessedText === selectedText && windowsManager?.state.isVisible && (currentTime - this.lastProcessedTime < 2000)) {
+
+    // Check for duplicates, but be less aggressive for drag operations
+    const isDuplicateText = this.lastProcessedText === selectedText;
+    const isWindowVisible = windowsManager?.state.isVisible;
+    const isWithinCooldown = (currentTime - this.lastProcessedTime < 2000);
+    const isFromDrag = options.isFromDrag || this.justFinishedDrag;
+
+    // Skip duplicates only if not from drag or if window is already visible
+    if (isDuplicateText && isWindowVisible && isWithinCooldown && !isFromDrag) {
       this.logger.debug('Skipping duplicate processing of same text');
       return;
+    }
+
+    // For drag operations, allow processing if it's a new drag even with same text
+    if (isDuplicateText && isFromDrag && isWithinCooldown) {
+      // Check if this is likely a new drag operation (Ctrl state might have changed)
+      if (this.dragCtrlState !== null) {
+        this.logger.debug('Allowing drag processing with same text - checking Ctrl state');
+        // Continue processing - Ctrl check will happen in shouldProcessTextSelection
+      } else {
+        this.logger.debug('Skipping duplicate drag processing');
+        return;
+      }
     }
 
     // --- Position Calculation Logic ---
@@ -1233,23 +1278,26 @@ export class TextSelectionManager extends ResourceTracker {
     // فقط در حالت immediate باید Ctrl را چک کنیم
     if (selectionTranslationMode === "immediate") {
       const requireCtrl = await getRequireCtrlForTextSelectionAsync();
+      this.logger.debug('Ctrl check in immediate mode:', {
+        requireCtrl,
+        isDragging: event.isDragging,
+        ctrlPressed: event.ctrlKey,
+        metaPressed: event.metaKey,
+        trackedCtrl: this.ctrlKeyPressed
+      });
+
       if (requireCtrl) {
         // Check Ctrl key from event or from tracked state
         let ctrlPressed = event.ctrlKey || event.metaKey || this.ctrlKeyPressed;
 
-        // Special case for drag operations: if we're dragging and Ctrl is not currently pressed,
-        // check if this is a drag operation that started with Ctrl (from pending selection)
-        if (event.isDragging && !ctrlPressed && this.pendingSelection) {
-          // For drag operations in immediate mode, we should allow processing if the text is different
-          // from the last processed text to avoid duplicate processing
-          const currentText = event.selection ? event.selection.toString().trim() : '';
-          if (currentText && currentText !== this.lastProcessedText) {
-            // This is a new drag selection, allow it through
-            return true;
-          }
+        // For drag operations, use the tracked Ctrl state from when drag started/ended
+        if (event.isDragging && this.dragCtrlState !== null) {
+          ctrlPressed = this.dragCtrlState;
+          this.logger.debug('Using tracked Ctrl state for drag operation:', ctrlPressed);
         }
 
         if (!ctrlPressed) {
+          this.logger.debug('Ctrl requirement not met, returning false');
           return false;
         }
       }
