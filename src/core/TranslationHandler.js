@@ -168,9 +168,7 @@ export default class TranslationHandler {
       }
 
 
-      state.translateMode = params.selectionRange
-        ? TranslationMode.SelectElement
-        : TranslationMode.Field;
+      state.translateMode = TranslationMode.Field;
 
       //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
