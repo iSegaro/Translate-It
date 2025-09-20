@@ -1,4 +1,8 @@
-#### v1.X.X – Released on X, 2025
+#### v1.3.X – Released on X, 2025
+
+##### Added
+
+- Added option to enable or disable selection text in text fields
 
 ##### Fixed
 
