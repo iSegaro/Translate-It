@@ -198,7 +198,7 @@
     "message": "فعال‌سازی آیکون انتخاب متن در فیلدهای متنی"
   },
   "active_selection_icon_on_textfields_description": {
-    "message": "نمایش آیکون ترجمه هنگام انتخاب متن درون فیلدهای متنی (input, textarea)."
+    "message": "نمایش آیکون ترجمه هنگام دوبار کلیک روی متن‌های داخل فیلدهای متنی (textarea)."
   },
   "enable_dictionary_translation_label": {
     "message": "فعال‌سازی ترجمه دیکشنری"
