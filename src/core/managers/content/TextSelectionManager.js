@@ -6,7 +6,7 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isUrlExcluded } from "@/utils/ui/exclusion.js";
-import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
+import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, getActiveSelectionIconOnTextfieldsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { getEventPath, getSelectedTextWithDash } from "@/utils/browser/events.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
@@ -1040,7 +1040,7 @@ export class TextSelectionManager extends ResourceTracker {
       target: event.target?.tagName,
       timestamp: Date.now()
     });
-    
+
     // Mark the time of double-click and set processing flag
     this.lastDoubleClickTime = Date.now();
     this.doubleClickProcessing = true;
@@ -1056,9 +1056,23 @@ export class TextSelectionManager extends ResourceTracker {
       this.logger.debug('Double-click processing flag cleared by cleanup timeout');
     }, 1000);
     
+    // Get the current setting dynamically
+    const activeSelectionIconOnTextfields = await getActiveSelectionIconOnTextfieldsAsync();
+    this.logger.debug('Double-click on text field - checking setting', {
+      activeSelectionIconOnTextfields,
+      target: event.target?.tagName
+    });
+
+    // If double-click on text fields is disabled, ignore the event
+    if (!activeSelectionIconOnTextfields) {
+      this.logger.debug('Double-click ignored - selection icon on textfields is disabled');
+      this.doubleClickProcessing = false;
+      return;
+    }
+
     // Capture selection immediately to avoid interference
     const immediateText = await selectionDetector.detect(event.target);
-    
+
     // Use smart retry mechanism based on field type detection
     const detection = await fieldDetector.detect(event.target);
 

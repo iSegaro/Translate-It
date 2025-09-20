@@ -397,16 +397,9 @@ export const initializeSettingsListener = async () => {
 // Helper function to get a single setting value using StorageManager
 const getSettingValueAsync = async (key, defaultValue) => {
   try {
-    // Try to get from cache first (synchronous and fast)
-    if (storageManager.hasCached(key)) {
-      const cachedValue = storageManager.getCached(key, defaultValue);
-      logger.debug(`[config] Using cached value for ${key}:`, cachedValue ? 'present' : 'not present');
-      return cachedValue !== undefined ? cachedValue : defaultValue;
-    }
-    
-    // If not cached, get from storage with default
+    // Let StorageManager handle caching internally
     const result = await storageManager.get({ [key]: defaultValue });
-    logger.debug(`[config] Retrieved from storage for ${key}:`, result[key] ? 'present' : 'not present');
+    logger.debug(`[config] Retrieved value for ${key}:`, result[key] ? 'present' : 'not present');
     return result[key];
   } catch (error) {
     const handler = ErrorHandler.getInstance();
@@ -676,7 +669,10 @@ export const getEnableScreenCaptureAsync = async () => {
 };
 
 export const getActiveSelectionIconOnTextfieldsAsync = async () => {
-  return getSettingValueAsync("ACTIVE_SELECTION_ICON_ON_TEXTFIELDS", CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS);
+  return getSettingValueAsync(
+    "ACTIVE_SELECTION_ICON_ON_TEXTFIELDS",
+    CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS
+  );
 };
 
 // --- Font Settings Getters ---

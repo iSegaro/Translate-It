@@ -102,11 +102,55 @@ class StorageCore extends ResourceTracker {
   }
 
   /**
+   * Force immediate cache invalidation for specific keys
+   * This ensures that subsequent get calls will fetch fresh values
+   */
+  _invalidateCache(keys) {
+    if (!keys || !Array.isArray(keys)) return;
+
+    this.logger.debug(`Force invalidating cache for keys: ${keys.join(', ')}`);
+    for (const key of keys) {
+      this.cache.delete(key);
+    }
+  }
+
+  /**
    * Ensure storage manager is ready
    */
   async _ensureReady() {
     if (this._isReady) return;
     await this._readyPromise;
+  }
+
+  /**
+   * Normalize keys to a standard format
+   * @param {string|string[]|Object} keys - Keys to normalize
+   * @returns {string[]} Array of key names
+   */
+  _normalizeKeys(keys) {
+    if (typeof keys === "string") {
+      return [keys];
+    } else if (Array.isArray(keys)) {
+      return keys;
+    } else if (typeof keys === "object" && keys !== null) {
+      return Object.keys(keys);
+    }
+    return [];
+  }
+
+  /**
+   * Get fresh values from storage, bypassing cache
+   * This is useful for time-sensitive settings that need immediate consistency
+   * @param {string|string[]|Object} keys - Keys to retrieve
+   * @returns {Promise<Object>} Fresh values from storage
+   */
+  async getFresh(keys) {
+    // Force cache invalidation for requested keys
+    const keyList = this._normalizeKeys(keys);
+    this._invalidateCache(keyList);
+
+    // Get values (cache will be bypassed since we just invalidated)
+    return this.get(keys, false);
   }
 
   /**
@@ -120,19 +164,17 @@ class StorageCore extends ResourceTracker {
 
     try {
       // Handle different key formats
-      let keyList = [];
+      let keyList = null;
       let defaultValues = {};
 
-      if (typeof keys === "string") {
-        keyList = [keys];
-      } else if (Array.isArray(keys)) {
-        keyList = keys;
-      } else if (typeof keys === "object" && keys !== null) {
-        keyList = Object.keys(keys);
-        defaultValues = keys;
-      } else {
+      if (keys === null || keys === undefined) {
         // Get all keys
         keyList = null;
+      } else {
+        keyList = this._normalizeKeys(keys);
+        if (typeof keys === "object" && keys !== null) {
+          defaultValues = keys;
+        }
       }
 
       // Check cache first if requested

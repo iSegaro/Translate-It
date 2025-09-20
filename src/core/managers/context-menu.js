@@ -10,6 +10,7 @@ import { getTranslationApiAsync } from '@/shared/config/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
@@ -391,7 +392,7 @@ export class ContextMenuManager extends ResourceTracker {
       if (isApiProviderClick) {
         const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
         try {
-          await browser.storage.local.set({ TRANSLATION_API: newApiId });
+          await storageManager.set({ TRANSLATION_API: newApiId });
           logger.debug(`API Provider changed to: ${newApiId}`);
           // Refresh context menus to update radio button states
           await this.setupDefaultMenus();

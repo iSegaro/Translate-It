@@ -239,9 +239,10 @@ export class FeatureManager extends ResourceTracker {
       const relevantSettings = [
         'EXTENSION_ENABLED',
         'TRANSLATE_WITH_SELECT_ELEMENT',
-        'TRANSLATE_ON_TEXT_SELECTION', 
+        'TRANSLATE_ON_TEXT_SELECTION',
         'TRANSLATE_ON_TEXT_FIELDS',
         'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
+        'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
         'EXCLUDED_SITES'
       ];
       

@@ -6,7 +6,7 @@ import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import browser from "webextension-polyfill";
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.HISTORY, 'useHistory');
 
@@ -30,14 +30,14 @@ export function useHistory() {
     return [...historyItems.value];
   });
 
-  // Load history directly from storage (not from settings store)
+  // Load history from storage using StorageCore
   const loadHistory = async () => {
     isLoading.value = true;
     try {
-      // Load directly from browser storage to get the latest data
-      const result = await browser.storage.local.get(['translationHistory']);
+      // Use StorageCore for consistent storage access
+      const result = await storageManager.get({ translationHistory: [] });
       historyItems.value = result.translationHistory || [];
-      logger.info(`Loaded ${historyItems.value.length} history items directly from storage`);
+      logger.info(`Loaded ${historyItems.value.length} history items`);
     } catch (error) {
       logger.error("Error loading history", error);
       historyError.value = "Failed to load history";
@@ -65,8 +65,8 @@ export function useHistory() {
       );
       historyItems.value = newHistory;
 
-      // Save directly to browser storage (same as Translation Engine)
-      await browser.storage.local.set({
+      // Save using StorageCore for consistency
+      await storageManager.set({
         translationHistory: newHistory,
       });
 
@@ -85,8 +85,8 @@ export function useHistory() {
         newHistory.splice(index, 1);
         historyItems.value = newHistory;
 
-        // Save directly to browser storage
-        await browser.storage.local.set({
+        // Save using StorageCore for consistency
+        await storageManager.set({
           translationHistory: newHistory,
         });
 
@@ -110,8 +110,8 @@ export function useHistory() {
       if (userConfirmed) {
         historyItems.value = [];
 
-        // Save directly to browser storage
-        await browser.storage.local.set({
+        // Save using StorageCore for consistency
+        await storageManager.set({
           translationHistory: [],
         });
 
@@ -192,9 +192,9 @@ export function useHistory() {
   );
 
   // Storage change listener for real-time updates
-  const storageListener = (changes, area) => {
-    if (area === 'local' && 'translationHistory' in changes) {
-      const newHistory = changes.translationHistory.newValue || [];
+  const storageListener = (data) => {
+    if (data.key === 'translationHistory') {
+      const newHistory = data.newValue || [];
       historyItems.value = newHistory;
       logger.debug("History updated from storage change listener");
     }
@@ -203,14 +203,14 @@ export function useHistory() {
   // Lifecycle
   onMounted(() => {
     loadHistory();
-    
-    // Listen for storage changes for real-time updates
-    browser.storage.onChanged.addListener(storageListener);
+
+    // Listen for storage changes for real-time updates through StorageCore
+    storageManager.on('change', storageListener);
   });
 
   onUnmounted(() => {
     // Remove storage listener
-    browser.storage.onChanged.removeListener(storageListener);
+    storageManager.off('change', storageListener);
   });
 
   return {
