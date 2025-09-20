@@ -83,7 +83,22 @@ export class SelectionDecisionManager {
         };
       }
 
-      // 3. For all text fields, check if selection icon is enabled
+      // 3. Check if text field icon should be shown (respect TextFieldDetector result)
+      if (detection.shouldShowTextFieldIcon === false) {
+        return {
+          shouldShow: false,
+          reason: 'text-field-icon-disabled-by-detector',
+          details: {
+            fieldType: detection.fieldType,
+            elementTag: context.element?.tagName,
+            shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon,
+            note: 'TextFieldDetector determined icon should not be shown'
+          },
+          detection: detection
+        };
+      }
+
+      // 4. For all text fields, check if selection icon is enabled
       if (!activeSelectionIconOnTextfields) {
         return {
           shouldShow: false,
@@ -97,7 +112,7 @@ export class SelectionDecisionManager {
         };
       }
 
-      // 4. Handle text field specific strategies
+      // 5. Handle text field specific strategies
       const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
       if (needsDoubleClick && !context.isFromDoubleClick) {
         return {
@@ -112,7 +127,7 @@ export class SelectionDecisionManager {
         };
       }
 
-      // 5. Allow the selection for text fields
+      // 6. Allow the selection for text fields
       return {
         shouldShow: true,
         reason: 'text-field-allowed',
