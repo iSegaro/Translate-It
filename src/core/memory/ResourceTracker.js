@@ -90,7 +90,7 @@ class ResourceTracker {
 
     // Extract critical flag from options
     const trackingOptions = {};
-    if (options && typeof options === 'object' && options.critical) {
+    if (options && typeof options === 'object' && (options.critical || options.isCritical)) {
       trackingOptions.isCritical = true;
     }
 
