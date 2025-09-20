@@ -503,6 +503,29 @@ export class FieldDetector {
   _isNonProcessableField(element) {
     if (!element) return false;
 
+    const tagName = element.tagName?.toLowerCase() || '';
+
+    // For TEXTAREA elements, be more restrictive about marking as non-processable
+    if (tagName === 'textarea') {
+      const name = (element.name || '').toLowerCase();
+      const placeholder = (element.placeholder || '').toLowerCase();
+      const id = (element.id || '').toLowerCase();
+      const autocomplete = (element.autocomplete || '').toLowerCase();
+
+      // Only mark TEXTAREA as non-processable for very sensitive fields
+      const sensitiveKeywords = [
+        'password', 'pwd', 'pass', 'pin', 'security',
+        'ssn', 'social', 'credit', 'card', 'cvv'
+      ];
+
+      return sensitiveKeywords.some(keyword =>
+        name.includes(keyword) ||
+        placeholder.includes(keyword) ||
+        id.includes(keyword) ||
+        autocomplete.includes(keyword)
+      );
+    }
+
     const name = (element.name || '').toLowerCase();
     const placeholder = (element.placeholder || '').toLowerCase();
     const id = (element.id || '').toLowerCase();
