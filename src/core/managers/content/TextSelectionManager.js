@@ -1060,8 +1060,20 @@ export class TextSelectionManager extends ResourceTracker {
     // Use smart retry mechanism based on field type detection
     const detection = await fieldDetector.detect(event.target);
 
+    // For professional editors, we need to get the actual text (already captured in immediateText)
+    let selectionToCheck = window.getSelection();
+    if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR && immediateText && immediateText.trim()) {
+      // Use the text already detected by selectionDetector
+      selectionToCheck = {
+        toString: () => immediateText,
+        rangeCount: 1,
+        getRangeAt: () => ({ commonAncestorContainer: event.target })
+      };
+      this.logger.debug('Using immediateText for professional editor decision');
+    }
+
     // Use SelectionDecisionManager to determine if we should show the icon
-    const decision = await SelectionDecisionManager.shouldShowSelectionIcon(window.getSelection(), {
+    const decision = await SelectionDecisionManager.shouldShowSelectionIcon(selectionToCheck, {
       element: event.target,
       isFromDoubleClick: true,
       isDragging: false
