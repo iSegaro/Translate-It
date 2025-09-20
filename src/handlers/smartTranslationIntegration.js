@@ -45,7 +45,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
-  const mode = selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
+  const mode = TranslationMode.Field;
   const platform = detectPlatform(target);
   const timestamp = Date.now();
 
