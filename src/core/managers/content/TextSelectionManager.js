@@ -1103,6 +1103,21 @@ export class TextSelectionManager extends ResourceTracker {
       return;
     }
 
+    // Check Ctrl requirement for immediate mode
+    const settings = await getSettingsAsync();
+    const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+
+    if (selectionTranslationMode === "immediate") {
+      const requireCtrl = await getRequireCtrlForTextSelectionAsync();
+      if (requireCtrl) {
+        const ctrlPressed = event.ctrlKey || event.metaKey;
+        if (!ctrlPressed) {
+          this.logger.debug('Double-click ignored - Ctrl key not pressed in immediate mode');
+          return;
+        }
+      }
+    }
+
     const maxAttempts = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 5 : 3;
     const initialDelay = detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ? 150 : 100;
     
@@ -1200,7 +1215,7 @@ export class TextSelectionManager extends ResourceTracker {
 
     let settings;
     let selectionTranslationMode;
-    
+
     try {
       settings = await getSettingsAsync();
       selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
@@ -1220,7 +1235,20 @@ export class TextSelectionManager extends ResourceTracker {
       const requireCtrl = await getRequireCtrlForTextSelectionAsync();
       if (requireCtrl) {
         // Check Ctrl key from event or from tracked state
-        const ctrlPressed = event.ctrlKey || event.metaKey || this.ctrlKeyPressed;
+        let ctrlPressed = event.ctrlKey || event.metaKey || this.ctrlKeyPressed;
+
+        // Special case for drag operations: if we're dragging and Ctrl is not currently pressed,
+        // check if this is a drag operation that started with Ctrl (from pending selection)
+        if (event.isDragging && !ctrlPressed && this.pendingSelection) {
+          // For drag operations in immediate mode, we should allow processing if the text is different
+          // from the last processed text to avoid duplicate processing
+          const currentText = event.selection ? event.selection.toString().trim() : '';
+          if (currentText && currentText !== this.lastProcessedText) {
+            // This is a new drag selection, allow it through
+            return true;
+          }
+        }
+
         if (!ctrlPressed) {
           return false;
         }
