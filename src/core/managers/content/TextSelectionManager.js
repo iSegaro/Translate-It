@@ -13,6 +13,7 @@ import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { fieldDetector, FieldTypes } from "@/features/text-selection/utils/text/FieldDetector.js";
 import { selectionDetector } from "@/features/text-selection/utils/text/SelectionDetector.js";
+import { SelectionDecisionManager } from "@/features/text-selection/utils/SelectionDecisionManager.js";
 // import { siteHandlerRegistry } from "@/utils/text/registry/SiteHandlerRegistry.js";
 
 export class TextSelectionManager extends ResourceTracker {
@@ -1059,9 +1060,18 @@ export class TextSelectionManager extends ResourceTracker {
     // Use smart retry mechanism based on field type detection
     const detection = await fieldDetector.detect(event.target);
 
-    // Skip non-processable fields completely
-    if (detection.fieldType === FieldTypes.NON_PROCESSABLE) {
-      this.logger.debug('Ignoring double-click on non-processable field');
+    // Use SelectionDecisionManager to determine if we should show the icon
+    const decision = await SelectionDecisionManager.shouldShowSelectionIcon(window.getSelection(), {
+      element: event.target,
+      isFromDoubleClick: true,
+      isDragging: false
+    });
+
+    if (!decision.shouldShow) {
+      this.logger.debug('Double-click ignored by decision manager', {
+        reason: decision.reason,
+        fieldType: detection.fieldType
+      });
       return;
     }
 
@@ -1083,14 +1093,7 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
-        // Check if we should show selection icon for this field type
-        if (!detection.shouldShowSelectionIcon) {
-          this.logger.debug('Not showing selection icon for double-click on regular field', {
-            fieldType: detection.fieldType,
-            shouldShowSelectionIcon: detection.shouldShowSelectionIcon
-          });
-          return true;
-        }
+        // Already checked by SelectionDecisionManager above, proceed with processing
         
         // Store double-click context for duplicate detection
         this.lastDoubleClickText = selectedText;
@@ -1109,14 +1112,7 @@ export class TextSelectionManager extends ResourceTracker {
           fieldType: detection.fieldType
         });
         
-        // Check if we should show selection icon for this field type
-        if (!detection.shouldShowSelectionIcon) {
-          this.logger.debug('Not showing selection icon for double-click on regular field (immediate)', {
-            fieldType: detection.fieldType,
-            shouldShowSelectionIcon: detection.shouldShowSelectionIcon
-          });
-          return true;
-        }
+        // Already checked by SelectionDecisionManager above, proceed with processing
         
         // Store double-click context for duplicate detection
         this.lastDoubleClickText = immediateText;

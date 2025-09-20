@@ -2,6 +2,7 @@ import { fieldDetector } from './text/core/FieldDetector.js';
 import { FieldTypes } from './text/core/types.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getActiveSelectionIconOnTextfieldsAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectionDecisionManager');
 
@@ -30,6 +31,10 @@ export class SelectionDecisionManager {
     }
 
     try {
+      // Get the current setting for text field selection icon
+      const activeSelectionIconOnTextfields = await getActiveSelectionIconOnTextfieldsAsync();
+      logger.debug('Active selection icon on textfields setting:', activeSelectionIconOnTextfields);
+
       // Use the existing FieldDetector system
       let detection;
 
@@ -65,41 +70,39 @@ export class SelectionDecisionManager {
         };
       }
 
-      // 2. Regular input fields: only for double-click (but these shouldn't have text selection anyway)
-      if (detection.fieldType === FieldTypes.REGULAR_INPUT) {
+      // 2. Regular content (UNKNOWN type): always allow
+      if (detection.fieldType === FieldTypes.UNKNOWN) {
+        return {
+          shouldShow: true,
+          reason: 'regular-content',
+          details: {
+            fieldType: detection.fieldType,
+            note: 'Regular webpage content always shows selection icon'
+          },
+          detection: detection
+        };
+      }
+
+      // 3. For all text fields, check if selection icon is enabled
+      if (!activeSelectionIconOnTextfields) {
         return {
           shouldShow: false,
-          reason: 'regular-input-field',
+          reason: 'text-field-feature-disabled',
           details: {
             fieldType: detection.fieldType,
             elementTag: context.element?.tagName,
-            note: 'Regular input fields should not show selection icon'
+            note: 'Selection icon disabled for text fields'
           },
           detection: detection
         };
       }
 
-      // 3. Content editable fields (including textarea): check selection strategy
-      if (detection.fieldType === FieldTypes.CONTENT_EDITABLE) {
-        const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
-
-        if (needsDoubleClick && !context.isFromDoubleClick) {
-          return {
-            shouldShow: false,
-            reason: 'double-click-required',
-            details: {
-              fieldType: detection.fieldType,
-              selectionStrategy: detection.selectionStrategy,
-              isFromDoubleClick: context.isFromDoubleClick
-            },
-            detection: detection
-          };
-        }
-
-        // Allow double-click selections in content editable fields
+      // 4. Handle text field specific strategies
+      const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
+      if (needsDoubleClick && !context.isFromDoubleClick) {
         return {
-          shouldShow: true,
-          reason: 'content-editable-allowed',
+          shouldShow: false,
+          reason: 'double-click-required',
           details: {
             fieldType: detection.fieldType,
             selectionStrategy: detection.selectionStrategy,
@@ -109,43 +112,15 @@ export class SelectionDecisionManager {
         };
       }
 
-      // 4. Professional editors: respect their specific strategies
-      if (detection.fieldType === FieldTypes.PROFESSIONAL_EDITOR ||
-          detection.fieldType === FieldTypes.RICH_TEXT_EDITOR) {
-        const needsDoubleClick = detection.selectionStrategy === 'double-click-required';
-
-        if (needsDoubleClick && !context.isFromDoubleClick) {
-          return {
-            shouldShow: false,
-            reason: 'professional-editor-double-click-required',
-            details: {
-              fieldType: detection.fieldType,
-              selectionStrategy: detection.selectionStrategy,
-              isFromDoubleClick: context.isFromDoubleClick
-            },
-            detection: detection
-          };
-        }
-
-        return {
-          shouldShow: true,
-          reason: 'professional-editor-allowed',
-          details: {
-            fieldType: detection.fieldType,
-            selectionStrategy: detection.selectionStrategy,
-            isFromDoubleClick: context.isFromDoubleClick
-          },
-          detection: detection
-        };
-      }
-
-      // 5. Unknown/regular content: always allow
+      // 5. Allow the selection for text fields
       return {
         shouldShow: true,
-        reason: 'regular-content',
+        reason: 'text-field-allowed',
         details: {
           fieldType: detection.fieldType,
-          note: 'Regular webpage content always shows selection icon'
+          selectionStrategy: detection.selectionStrategy,
+          isFromDoubleClick: context.isFromDoubleClick,
+          note: 'Selection icon enabled for text fields'
         },
         detection: detection
       };

@@ -110,11 +110,22 @@
         </div>
 
         <div class="setting-group sub-setting-group">
-          <BaseCheckbox 
-            v-model="requireCtrlForTextSelection" 
+          <BaseCheckbox
+            v-model="requireCtrlForTextSelection"
             :disabled="!extensionEnabled || !translateOnTextSelection || selectionTranslationMode !== 'immediate'"
             :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
           />
+        </div>
+
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="activeSelectionIconOnTextfields"
+            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
+          />
+          <span class="setting-description">
+            {{ t('active_selection_icon_on_textfields_description') || 'Show translation icon when selecting text inside text fields (input, textarea).' }}
+          </span>
         </div>
       </div>
     </BaseFieldset>
@@ -204,6 +215,11 @@ const selectionTranslationMode = computed({
 const requireCtrlForTextSelection = computed({
   get: () => settingsStore.settings?.REQUIRE_CTRL_FOR_TEXT_SELECTION || false,
   set: (value) => settingsStore.updateSettingLocally('REQUIRE_CTRL_FOR_TEXT_SELECTION', value)
+})
+
+const activeSelectionIconOnTextfields = computed({
+  get: () => settingsStore.settings?.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS || false,
+  set: (value) => settingsStore.updateSettingLocally('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', value)
 })
 
 // Dictionary settings

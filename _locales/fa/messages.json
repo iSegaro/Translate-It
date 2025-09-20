@@ -194,6 +194,12 @@
   "require_ctrl_for_text_selection_description": {
     "message": "هنگام فعال بودن ترجمه انتخاب متن، نیاز است کلید Ctrl در حین انتخاب نگه داشته شود تا ترجمه فعال شود."
   },
+  "active_selection_icon_on_textfields_label": {
+    "message": "فعال‌سازی آیکون انتخاب متن در فیلدهای متنی"
+  },
+  "active_selection_icon_on_textfields_description": {
+    "message": "نمایش آیکون ترجمه هنگام انتخاب متن درون فیلدهای متنی (input, textarea)."
+  },
   "enable_dictionary_translation_label": {
     "message": "فعال‌سازی ترجمه دیکشنری"
   },

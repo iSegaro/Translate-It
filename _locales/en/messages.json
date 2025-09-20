@@ -193,6 +193,12 @@
   "require_ctrl_for_text_selection_description": {
     "message": "When text selection translation is enabled, require holding Ctrl key during selection to trigger translation."
   },
+  "active_selection_icon_on_textfields_label": {
+    "message": "Active Selection Icon on Textfields"
+  },
+  "active_selection_icon_on_textfields_description": {
+    "message": "Show translation icon when selecting text inside text fields (input, textarea)."
+  },
   "enable_dictionary_translation_label": {
     "message": "Enable Dictionary Translation"
   },

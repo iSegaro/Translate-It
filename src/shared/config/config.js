@@ -112,6 +112,7 @@ export const CONFIG = {
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
+  ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: false, // فعال کردن آیکون انتخاب متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
 
   // --- Proxy Settings ---
@@ -672,6 +673,10 @@ export const getOpenRouterModelSelectionAsync = async () => {
 
 export const getEnableScreenCaptureAsync = async () => {
   return getSettingValueAsync("ENABLE_SCREEN_CAPTURE", CONFIG.ENABLE_SCREEN_CAPTURE);
+};
+
+export const getActiveSelectionIconOnTextfieldsAsync = async () => {
+  return getSettingValueAsync("ACTIVE_SELECTION_ICON_ON_TEXTFIELDS", CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS);
 };
 
 // --- Font Settings Getters ---
