@@ -462,6 +462,12 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
     const strategy = new strategyModule.default();
     
     // Apply translation using the strategy
+    logger.debug('About to call strategy.updateElement', {
+      target,
+      targetIsConnected: target.isConnected,
+      translatedText,
+      strategy: strategyName
+    });
     const success = await strategy.updateElement(target, translatedText);
     logger.debug('Translation strategy completed', { success });
     
