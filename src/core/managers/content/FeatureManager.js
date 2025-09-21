@@ -205,8 +205,8 @@ export class FeatureManager extends ResourceTracker {
         }
 
         case 'textFieldIcon': {
-          const { TextFieldIconHandler } = await import('@/features/text-field-interaction/handlers/TextFieldIconHandler.js');
-          HandlerClass = TextFieldIconHandler;
+          const { TextFieldHandler } = await import('@/features/text-field-interaction/handlers/TextFieldHandler.js');
+          HandlerClass = TextFieldHandler;
           break;
         }
 
