@@ -17,6 +17,11 @@ const SILENT = new Set([
   ErrorTypes.CONTEXT,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
   ErrorTypes.PAGE_MOVED_TO_CACHE,
+  ErrorTypes.TAB_RESTRICTED,
+  ErrorTypes.TAB_BROWSER_INTERNAL,
+  ErrorTypes.TAB_EXTENSION_PAGE,
+  ErrorTypes.TAB_LOCAL_FILE,
+  ErrorTypes.TAB_NOT_ACCESSIBLE,
 ]);
 const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.CONTEXT,

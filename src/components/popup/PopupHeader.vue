@@ -150,36 +150,47 @@ const handleRevert = async () => {
   logger.debug('Revert button clicked!')
   try {
     logger.debug('[PopupHeader] Executing revert action')
-    
-    // Send revert message directly to content script (bypass background)
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
-    if (!tab?.id) {
-      throw new Error('No active tab found')
-    }
-    
-    const response = await browser.tabs.sendMessage(tab.id, {
+
+    // Use sendMessage (goes through background script) for proper error handling
+    const response = await sendMessage({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
       context: MessageContexts.POPUP,
       messageId: `popup-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
       timestamp: Date.now()
     })
-    
+
     if (response?.success) {
       logger.debug(`[PopupHeader] Revert successful: ${response.revertedCount || 0} translations reverted`)
+    } else if (response?.isRestrictedPage) {
+      // Tab is restricted - log as debug and exit gracefully
+      logger.debug('Revert action blocked (restricted page):', {
+        message: response.message,
+        tabUrl: response.tabUrl
+      });
+      return;
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
+      await handleError(new Error(`Revert failed: ${errorMsg}`), {
+        context: 'popup-header-revert-failed',
+        isSilent: true // Silent error handling for restricted pages
+      })
     }
-    
+
   } catch (error) {
-    // Check if it's a connection error first
-    const wasConnectionError = await handleConnectionError(error, 'PopupHeader-revert')
-    if (wasConnectionError) {
-      return // Exit gracefully
+    // Check if this is a restricted page error with response data
+    if (error.isRestrictedPage) {
+      logger.debug('Revert action blocked (restricted page):', {
+        message: error.message,
+        tabUrl: error.tabUrl
+      });
+      return; // Exit gracefully without showing error to user
     }
-    
-    // Handle other errors
-    await handleError(error, 'PopupHeader-revert')
+
+    // Handle all errors silently - ErrorHandler will automatically handle tab restriction errors silently
+    await handleError(error, {
+      context: 'PopupHeader-revert',
+      isSilent: true // Silent error handling for restricted pages
+    })
   }
 }
 

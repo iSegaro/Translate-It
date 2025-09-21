@@ -6,6 +6,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { generateRevertMessageId } from '@/utils/messaging/messageId.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleRevertTranslation');
 
@@ -22,10 +23,10 @@ const errorHandler = new ErrorHandler();
  */
 export async function handleRevertTranslation(message, sender, sendResponse) {
   logger.debug('[Handler:revertTranslation] Processing translation revert request:', message.data);
-  
+
   try {
     let targetTabId = message.data?.tabId || sender.tab?.id;
-    
+
     // If no tab ID available (e.g., from sidepanel), get active tab
     if (!targetTabId) {
       logger.debug('[Handler:revertTranslation] No tab ID in message, getting active tab');
@@ -37,7 +38,25 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
         throw new Error('Unable to determine target tab for translation revert');
       }
     }
-    
+
+    // Check tab permissions before proceeding (same pattern as Select Element)
+    logger.debug('[Handler:revertTranslation] Checking tab access for:', targetTabId);
+    const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    logger.debug('[Handler:revertTranslation] Tab access result:', access);
+
+    if (!access.isAccessible) {
+      logger.debug(`[Handler:revertTranslation] Attempted to revert on restricted tab ${targetTabId}: ${access.errorMessage}`);
+      sendResponse({
+        success: false,
+        message: access.errorMessage,
+        tabId: targetTabId,
+        revertedCount: 0,
+        isRestrictedPage: true,
+        tabUrl: access.fullUrl,
+      });
+      return true;
+    }
+
     // Send revert message to content script - let it decide which system to use
     const contentScriptResponse = await browser.tabs.sendMessage(targetTabId, {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
@@ -48,12 +67,12 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
         fromBackground: true
       }
     });
-    
+
     if (contentScriptResponse?.success) {
       logger.debug(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
-      
-      sendResponse({ 
-        success: true, 
+
+      sendResponse({
+        success: true,
         message: contentScriptResponse.message || 'Translation reverted successfully',
         tabId: targetTabId,
         revertedCount: contentScriptResponse.revertedCount || 0,
@@ -62,20 +81,21 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     } else {
       throw new Error(contentScriptResponse?.error || 'Content script revert failed');
     }
-    
+
     return true;
   } catch (error) {
     logger.error('[Handler:revertTranslation] Error:', error);
-    
+
     errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,
       context: "handleRevertTranslation",
-      messageData: message
+      messageData: message,
+      isSilent: true // Silent error handling for tab restrictions
     });
-    
-    sendResponse({ 
-      success: false, 
-      error: error.message || 'Translation revert failed' 
+
+    sendResponse({
+      success: false,
+      error: error.message || 'Translation revert failed'
     });
     return false;
   }

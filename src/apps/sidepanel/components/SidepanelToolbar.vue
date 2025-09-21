@@ -83,6 +83,7 @@ import { useSelectElementTranslation } from '@/features/translation/composables/
 import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -117,6 +118,7 @@ const emit = defineEmits(['historyToggle', 'clear-fields'])
 
 // Composables
 const { t } = useUnifiedI18n()
+const { sendMessage } = useMessaging('sidepanel')
 
 // Composables
 const { showVisualFeedback } = useUI()
@@ -166,44 +168,56 @@ const handleSelectElement = async () => {
 
 const handleRevertAction = async () => {
   getLogger().debug('Revert Action button clicked!')
-  
+
   try {
     getLogger().debug('[SidepanelToolbar] Executing revert action')
-    
-    // Send revert message directly to content script (bypass background)
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
-    if (!tab?.id) {
-      throw new Error('No active tab found')
-    }
-    
-    const response = await browser.tabs.sendMessage(tab.id, {
+
+    // Use sendMessage (goes through background script) for proper error handling
+    const response = await sendMessage({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
       context: MessageContexts.SIDEPANEL,
       messageId: `sidepanel-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
       timestamp: Date.now()
     })
-    
+
     getLogger().debug('[SidepanelToolbar] Revert response:', response)
-    
+
     if (response?.success) {
       getLogger().debug(`[SidepanelToolbar] Revert successful: ${response.revertedCount || 0} translations reverted`)
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
+    } else if (response?.isRestrictedPage) {
+      // Tab is restricted - log as debug and exit gracefully
+      getLogger().debug('Revert action blocked (restricted page):', {
+        message: response.message,
+        tabUrl: response.tabUrl
+      });
+      showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
+      return;
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      await handleError(new Error(`Revert failed: ${errorMsg}`), 'sidepanel-toolbar-revert-failed')
+      await handleError(new Error(`Revert failed: ${errorMsg}`), {
+        context: 'sidepanel-toolbar-revert-failed',
+        isSilent: true // Silent error handling for restricted pages
+      })
       showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
     }
-    
+
   } catch (error) {
-    // Check if it's a connection error first
-    const wasConnectionError = await handleConnectionError(error, 'SidepanelToolbar-revert')
-    if (wasConnectionError) {
+    // Check if this is a restricted page error with response data
+    if (error.isRestrictedPage) {
+      getLogger().debug('Revert action blocked (restricted page):', {
+        message: error.message,
+        tabUrl: error.tabUrl
+      });
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
-      return // Exit gracefully
+      return; // Exit gracefully without showing error to user
     }
-    
-    // Handle other errors
-    await handleError(error, 'SidepanelToolbar-revert')
+
+    // Handle all errors silently - ErrorHandler will automatically handle tab restriction errors silently
+    await handleError(error, {
+      context: 'SidepanelToolbar-revert',
+      isSilent: true // Silent error handling for restricted pages
+    })
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
   }
 }
