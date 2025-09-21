@@ -18,15 +18,21 @@ import { textFieldIconConfig } from '../config/positioning.js';
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
     super('text-field-icon-manager')
-    
+
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
     this.initialized = false;
     this.loggedInit = false; // Flag to prevent duplicate logging
-    
+
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
+
+    // Mark this instance as critical to prevent cleanup during memory management
+    this.trackResource('text-field-icon-manager-critical', () => {
+      // This is the core text field icon manager - should not be cleaned up
+      this.logger.debug('Critical TextFieldIconManager cleanup skipped');
+    }, { isCritical: true });
     
     // Track active icons and their attachments
     this.activeIcons = new Map();

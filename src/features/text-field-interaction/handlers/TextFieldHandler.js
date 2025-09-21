@@ -60,13 +60,8 @@ export class TextFieldHandler extends ResourceTracker {
       // Setup text field listeners (focus/blur/input)
       this.setupTextFieldListeners();
 
-      // Track resources for cleanup
-      this.trackResource('text-field-icon-manager', () => {
-        if (this.textFieldIconManager) {
-          this.textFieldIconManager.cleanup();
-          this.textFieldIconManager = null;
-        }
-      });
+      // Note: TextFieldIconManager is already a ResourceTracker and handles its own cleanup
+      // We just need to null our reference when we're deactivated
 
       this.trackResource('double-click-handler', () => {
         if (this.doubleClickHandler) {
@@ -99,10 +94,8 @@ export class TextFieldHandler extends ResourceTracker {
     try {
       logger.debug('Deactivating TextFieldHandler');
 
-      // Cleanup all managed components
-      if (this.textFieldIconManager) {
-        this.textFieldIconManager.cleanup();
-      }
+      // Clean up our references (components clean themselves up)
+      this.textFieldIconManager = null;
 
       if (this.doubleClickHandler) {
         await this.doubleClickHandler.deactivate();
@@ -118,6 +111,7 @@ export class TextFieldHandler extends ResourceTracker {
     } catch (error) {
       logger.error('Error deactivating TextFieldHandler:', error);
       try {
+        this.textFieldIconManager = null;
         this.cleanup();
         this.isActive = false;
         return true;
@@ -163,7 +157,9 @@ export class TextFieldHandler extends ResourceTracker {
           setTimeout(async () => {
             if (document.activeElement === element && this.textFieldIconManager) {
               try {
-                await this.textFieldIconManager.processEditableElement(element);
+                if (this.textFieldIconManager) {
+                  await this.textFieldIconManager.processEditableElement(element);
+                }
               } catch (error) {
                 const handler = ErrorHandler.getInstance();
                 await handler.handle(error, {
@@ -224,7 +220,9 @@ export class TextFieldHandler extends ResourceTracker {
         if (this.textFieldIconManager) {
           clearTimeout(this.scrollUpdateTimeout);
           this.scrollUpdateTimeout = setTimeout(() => {
-            this.textFieldIconManager.forceUpdateAllPositions();
+            if (this.textFieldIconManager) {
+              this.textFieldIconManager.forceUpdateAllPositions();
+            }
           }, 100);
         }
       }, { passive: true, critical: true });
@@ -299,8 +297,10 @@ export class TextFieldHandler extends ResourceTracker {
 
     const activeElement = document.activeElement;
     if (this.isEditableElement(activeElement)) {
-      await this.textFieldIconManager.processEditableElement(activeElement);
-      return true;
+      if (this.textFieldIconManager) {
+        await this.textFieldIconManager.processEditableElement(activeElement);
+        return true;
+      }
     }
 
     return false;
