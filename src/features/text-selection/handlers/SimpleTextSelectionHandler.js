@@ -37,6 +37,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     // Simple drag detection to prevent selection during drag
     this.isDragging = false;
     this.mouseDownTime = 0;
+    this.lastMouseUpEvent = null;
 
     // Bind methods
     this.handleSelectionChange = this.handleSelectionChange.bind(this);
@@ -180,7 +181,13 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       });
 
       if (!selectedText) {
-        // No text selected, dismiss any existing windows
+        // No text selected, check if user clicked inside translation window
+        if (this.isClickInsideTranslationWindow()) {
+          logger.debug('Click inside translation window, not dismissing');
+          return;
+        }
+
+        // No text selected and click outside translation window, dismiss
         this.selectionManager.dismissWindow();
         return;
       }
@@ -375,6 +382,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     });
 
     this.isDragging = false;
+    this.lastMouseUpEvent = event; // Store for translation window detection
 
     // If there's a selection after mouse up, process it with a small delay
     setTimeout(() => {
@@ -384,6 +392,64 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.processSelection();
       }
     }, 50); // Small delay to ensure selection is finalized
+  }
+
+  /**
+   * Check if the last click was inside a translation window
+   */
+  isClickInsideTranslationWindow() {
+    if (!this.lastMouseUpEvent) return false;
+
+    // Get WindowsManager from FeatureManager
+    const windowsManager = this.getWindowsManager();
+    if (!windowsManager) return false;
+
+    // Use WindowsManager's ClickManager to check if click is inside UI element
+    try {
+      const clickManager = windowsManager.clickManager;
+      if (clickManager && typeof clickManager.isClickOnUIElement === 'function') {
+        const uiElement = clickManager.isClickOnUIElement(this.lastMouseUpEvent);
+        if (uiElement) {
+          logger.debug('Click detected inside WindowsManager UI element', {
+            elementType: uiElement.type,
+            elementTag: uiElement.element?.tagName
+          });
+          return true;
+        }
+      }
+
+      // Fallback: check for common translation window selectors
+      const target = this.lastMouseUpEvent.target;
+      const translationWindow = target.closest('#translate-it-root') ||
+                              target.closest('[class*="translation"]') ||
+                              target.closest('[class*="window"]') ||
+                              target.closest('lt-div');
+
+      if (translationWindow) {
+        logger.debug('Click detected inside translation window (fallback)', {
+          elementTag: target.tagName,
+          windowClass: translationWindow.className || 'no-class'
+        });
+        return true;
+      }
+
+    } catch (error) {
+      logger.debug('Error checking click inside translation window:', error);
+    }
+
+    return false;
+  }
+
+  /**
+   * Get WindowsManager instance from FeatureManager
+   */
+  getWindowsManager() {
+    if (!this.featureManager) return null;
+
+    const windowsHandler = this.featureManager.getFeatureHandler('windowsManager');
+    if (!windowsHandler || !windowsHandler.getIsActive()) return null;
+
+    return windowsHandler.getWindowsManager();
   }
 
   // Public API methods
