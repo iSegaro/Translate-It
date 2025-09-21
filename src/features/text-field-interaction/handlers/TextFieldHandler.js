@@ -63,12 +63,8 @@ export class TextFieldHandler extends ResourceTracker {
       // Note: TextFieldIconManager is already a ResourceTracker and handles its own cleanup
       // We just need to null our reference when we're deactivated
 
-      this.trackResource('double-click-handler', () => {
-        if (this.doubleClickHandler) {
-          this.doubleClickHandler.deactivate();
-          this.doubleClickHandler = null;
-        }
-      });
+      // Note: TextFieldDoubleClickHandler is already a ResourceTracker and handles its own cleanup
+      // We just need to null our reference when we're deactivated
 
       this.isActive = true;
       logger.info('TextFieldHandler activated successfully');
@@ -96,10 +92,7 @@ export class TextFieldHandler extends ResourceTracker {
 
       // Clean up our references (components clean themselves up)
       this.textFieldIconManager = null;
-
-      if (this.doubleClickHandler) {
-        await this.doubleClickHandler.deactivate();
-      }
+      this.doubleClickHandler = null;
 
       // ResourceTracker will handle cleanup
       this.cleanup();
@@ -112,6 +105,7 @@ export class TextFieldHandler extends ResourceTracker {
       logger.error('Error deactivating TextFieldHandler:', error);
       try {
         this.textFieldIconManager = null;
+        this.doubleClickHandler = null;
         this.cleanup();
         this.isActive = false;
         return true;

@@ -26,6 +26,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     this.isActive = false;
     this.featureManager = options.featureManager;
 
+    // Mark this instance as critical to prevent cleanup during memory management
+    this.trackResource('text-field-double-click-handler-critical', () => {
+      // This is the core text field double click handler - should not be cleaned up
+      logger.debug('Critical TextFieldDoubleClickHandler cleanup skipped');
+    }, { isCritical: true });
+
     // Double-click state management
     this.doubleClickProcessing = false;
     this.lastDoubleClickTime = 0;
