@@ -99,7 +99,13 @@ export class SelectionManager extends ResourceTracker {
     // Calculate position for the translation UI
     const position = this.calculateSelectionPosition(selection);
     if (!position) {
-      this.logger.warn('Could not calculate position for selection');
+      this.logger.warn('Could not calculate position for selection', {
+        text: selectedText.substring(0, 30) + '...',
+        selectionType: selection?.type,
+        rangeCount: selection?.rangeCount,
+        anchorNode: selection?.anchorNode?.nodeName,
+        focusNode: selection?.focusNode?.nodeName
+      });
       return;
     }
 
@@ -126,6 +132,10 @@ export class SelectionManager extends ResourceTracker {
   calculateSelectionPosition(selection) {
     try {
       if (!selection || selection.rangeCount === 0) {
+        this.logger.debug('Position calculation failed: No selection or empty ranges', {
+          hasSelection: !!selection,
+          rangeCount: selection?.rangeCount
+        });
         return null;
       }
 
@@ -137,11 +147,21 @@ export class SelectionManager extends ResourceTracker {
         const activeElement = document.activeElement;
         if (activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT')) {
           const elementRect = activeElement.getBoundingClientRect();
+          this.logger.debug('Using input field position fallback', {
+            tagName: activeElement.tagName,
+            rect: elementRect
+          });
           return {
             x: elementRect.left + 10 + window.scrollX,
             y: elementRect.bottom + 10 + window.scrollY
           };
         }
+
+        this.logger.debug('Position calculation failed: Empty rectangle and not input field', {
+          rect: rect,
+          activeElement: activeElement?.tagName,
+          selectionText: selection.toString().substring(0, 50)
+        });
         return null;
       }
 
