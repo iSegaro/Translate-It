@@ -128,7 +128,16 @@ export async function sendMessage(message, options = {}) {
         errorType: typeof response.error,
         messageType: typeof response.message
       });
-      
+
+      // Import tabPermissions utilities to check for restricted pages
+      const { isRestrictedUrl } = await import('@/core/tabPermissions.js');
+
+      // Check if this is a restricted page error - if so, return the response instead of throwing
+      if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
+        logger.debug('Restricted page detected, returning response without throwing error');
+        return response;
+      }
+
       // Re-create the error object from the response for a proper stack trace
       const errorMessage = response.error?.message || response.message || response.error || 'An unknown error occurred';
       const error = new Error(errorMessage);
