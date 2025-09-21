@@ -237,26 +237,54 @@ export class ShortcutHandler extends ResourceTracker {
 
   triggerSelectionTranslation(selectedText, selection) {
     try {
-      // Import Windows Manager to show translation window
-      import('@/features/windows/managers/WindowsManager.js').then(({ WindowsManager }) => {
-        const windowsManager = new WindowsManager();
-        
-        // Calculate position for translation window
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        
-        const position = {
-          x: rect.left + (rect.width / 2),
-          y: rect.bottom + 10
-        };
-        
-        // Show translation window
-        windowsManager.show(selectedText, position);
-        
-      }).catch(error => {
-        getLogger().error('Failed to load Windows Manager:', error);
-      });
-      
+      // Ensure WindowsManager is activated through FeatureManager
+      if (this.featureManager) {
+        // Activate WindowsManager if not already active
+        if (!this.featureManager.activeFeatures.has('windowsManager')) {
+          this.featureManager.activateFeature('windowsManager').then(() => {
+            // Once activated, get the WindowsManager and show translation
+            const windowsManagerHandler = this.featureManager.getFeatureHandler('windowsManager');
+            if (windowsManagerHandler && windowsManagerHandler.getWindowsManager) {
+              const windowsManager = windowsManagerHandler.getWindowsManager();
+
+              // Calculate position for translation window
+              const range = selection.getRangeAt(0);
+              const rect = range.getBoundingClientRect();
+
+              const position = {
+                x: rect.left + (rect.width / 2),
+                y: rect.bottom + 10
+              };
+
+              // Show translation window
+              windowsManager.show(selectedText, position);
+            }
+          }).catch(error => {
+            getLogger().error('Failed to activate WindowsManager:', error);
+          });
+        } else {
+          // WindowsManager is already active
+          const windowsManagerHandler = this.featureManager.getFeatureHandler('windowsManager');
+          if (windowsManagerHandler && windowsManagerHandler.getWindowsManager) {
+            const windowsManager = windowsManagerHandler.getWindowsManager();
+
+            // Calculate position for translation window
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            const position = {
+              x: rect.left + (rect.width / 2),
+              y: rect.bottom + 10
+            };
+
+            // Show translation window
+            windowsManager.show(selectedText, position);
+          }
+        }
+      } else {
+        getLogger().warn('FeatureManager not available');
+      }
+
     } catch (error) {
       getLogger().error('Error triggering selection translation:', error);
     }

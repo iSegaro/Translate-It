@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
 import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
-import { TranslationHandler } from "./translation/TranslationHandler.js";
+import { TranslationHandler as WindowsTranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
 import { useTTSSmart } from "@/features/tts/composables/useTTSSmart.js";
@@ -55,7 +55,7 @@ export class WindowsManager extends ResourceTracker {
     this.ttsManager = globalTTSManager;
     
     // Initialize translation business logic
-    this.translationHandler = new TranslationHandler();
+    this.translationHandler = options.translationHandler || new WindowsTranslationHandler();
     
     // Initialize error handling
     this.errorHandler = ErrorHandler.getInstance();

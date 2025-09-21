@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
+import TranslationHandler from '@/core/TranslationHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManagerHandler');
@@ -10,11 +11,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManagerHandler');
  * Controls when WindowsManager is instantiated based on feature activation
  */
 export class WindowsManagerHandler extends ResourceTracker {
-  constructor() {
+  constructor({ featureManager }) {
     super('windows-manager-handler');
+    this.featureManager = featureManager;
     this.windowsManager = null;
     this.isActive = false;
-    
+
     logger.debug('WindowsManagerHandler initialized');
   }
 
@@ -36,8 +38,11 @@ export class WindowsManagerHandler extends ResourceTracker {
         return true;
       }
 
-      // Create WindowsManager instance
-      this.windowsManager = new WindowsManager({});
+      // Create TranslationHandler with the global FeatureManager
+      const translationHandler = new TranslationHandler(this.featureManager);
+
+      // Create WindowsManager instance with the shared TranslationHandler
+      this.windowsManager = new WindowsManager({ translationHandler });
       
       // Store globally for compatibility with existing TextSelectionManager code
       if (!window.windowsManagerInstance) {

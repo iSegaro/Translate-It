@@ -18,7 +18,7 @@ import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import FeatureManager from "@/core/managers/core/FeatureManager.js";
+import FeatureManager from "@/core/managers/content/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import ExtensionContextManager from "../core/extensionContext.js";
 
@@ -28,7 +28,7 @@ import { pageEventBus } from './PageEventBus.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 export default class TranslationHandler {
-  constructor() {
+  constructor(featureManager = null) {
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
     
@@ -55,7 +55,8 @@ export default class TranslationHandler {
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
 
-    this.featureManager = new FeatureManager({
+    // Use provided FeatureManager or create a new one (for backward compatibility)
+    this.featureManager = featureManager || new FeatureManager({
       TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS,
       SHORTCUT_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
       SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT,
