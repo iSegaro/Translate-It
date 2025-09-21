@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 /**
@@ -65,10 +66,10 @@ export class RevertHandler extends ResourceTracker {
       // Show a single, unified notification
       if (totalRevertedCount > 0) {
         const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
-        pageEventBus.emit('show-notification', { message, type: "revert" });
+        pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
       } else {
         const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
-        pageEventBus.emit('show-notification', { message, type: "warning" });
+        pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
       }
 
       return { success: true, revertedCount: totalRevertedCount, system: finalSystem };
