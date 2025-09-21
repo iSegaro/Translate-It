@@ -427,20 +427,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         return true;
       }
 
-      // Fallback: check for common translation window selectors
-      const target = this.lastMouseUpEvent.target;
-      const translationWindow = target.closest('#translate-it-root') ||
-                              target.closest('[class*="translation"]') ||
-                              target.closest('[class*="window"]') ||
-                              target.closest('lt-div');
-
-      if (translationWindow) {
-        logger.debug('Click detected inside translation window (fallback)', {
-          elementTag: target.tagName,
-          windowClass: translationWindow.className || 'no-class'
-        });
-        return true;
-      }
+      // Fallback: ElementDetectionService should catch all translation elements
+      // This is now redundant since we already use elementDetection.getClickedUIElement() above
+      // Keeping this log for debugging but the detection is already handled
 
     } catch (error) {
       logger.debug('Error checking click inside translation window:', error);
