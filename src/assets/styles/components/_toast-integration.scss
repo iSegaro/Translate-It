@@ -69,3 +69,87 @@ html[data-translate-it-select-mode="true"] {
     }
   }
 }
+
+/* ==========================================================================
+   Toast Content Layout - Select Element Notifications
+   ========================================================================== */
+
+// Vue Sonner toast layout improvements for action buttons
+[data-sonner-toast] {
+  // Main content container
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+
+    // Text content should take available space and align left
+    [data-title],
+    [data-description],
+    > div:first-child {
+      flex: 1;
+      text-align: left;
+      direction: ltr;
+    }
+
+    // Action button should stay on the right
+    [data-button],
+    button {
+      flex-shrink: 0;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+  }
+}
+
+// More specific targeting for vue-sonner structure
+li[data-sonner-toast] {
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+
+    // Text content container
+    > div:first-child {
+      flex: 1;
+      text-align: left;
+      direction: ltr;
+    }
+
+    // Button container
+    > button,
+    > div:last-child:has(button) {
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+  }
+}
+
+// Fallback for different vue-sonner versions
+[data-sonner-toast] {
+  // Force flex layout on the main content
+  &[data-sonner-toast] {
+    > div:first-child {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+
+      // All direct children except the last one (button) should flex-grow
+      > *:not(:last-child) {
+        flex: 1;
+        text-align: left;
+      }
+
+      // Last child (button) should stay right
+      > *:last-child {
+        flex-shrink: 0;
+        margin-left: auto;
+      }
+    }
+  }
+}
