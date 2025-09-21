@@ -21,8 +21,6 @@ export { SelectionManager } from './core/SelectionManager.js';
 // Vue integration
 export { useTextSelection } from './composables/useTextSelection.js';
 
-// Re-export useful utilities from old system (for backward compatibility)
-export { SelectionDecisionManager } from './utils/SelectionDecisionManager.js';
 
 // Default export for easy importing
 export { SimpleTextSelectionHandler as default } from './handlers/SimpleTextSelectionHandler.js';

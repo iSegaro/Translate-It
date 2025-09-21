@@ -143,7 +143,7 @@ export default class EventCoordinator {
    */
   async coordinateTextSelection(event, textSelectionHandler) {
     try {
-      const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+      const textSelectionManager = textSelectionHandler.getSelectionManager();
       
       if (!textSelectionManager) {
         this.logger.debug('No TextSelectionManager available in handler');
@@ -219,7 +219,7 @@ export default class EventCoordinator {
       // Update active TextSelectionManager key state if available
       const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
       if (textSelectionHandler?.isActive) {
-        const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+        const textSelectionManager = textSelectionHandler.getSelectionManager();
         if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
           textSelectionManager.updateCtrlKeyState(true);
         }
@@ -236,7 +236,7 @@ export default class EventCoordinator {
         // Update active TextSelectionManager key state if available
         const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
         if (textSelectionHandler?.isActive) {
-          const textSelectionManager = textSelectionHandler.getTextSelectionManager();
+          const textSelectionManager = textSelectionHandler.getSelectionManager();
           if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
             textSelectionManager.updateCtrlKeyState(false);
           }
@@ -301,7 +301,7 @@ export default class EventCoordinator {
   // === COMPATIBILITY GETTERS ===
   get textSelectionManager() {
     const handler = this.featureManager?.getFeatureHandler('textSelection');
-    return handler?.isActive ? handler.getTextSelectionManager() : null;
+    return handler?.isActive ? handler.getSelectionManager() : null;
   }
 
   get textFieldManager() {

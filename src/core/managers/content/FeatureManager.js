@@ -199,8 +199,8 @@ export class FeatureManager extends ResourceTracker {
         }
 
         case 'textSelection': {
-          const { TextSelectionHandler } = await import('@/features/text-selection/handlers/TextSelectionHandler.js');
-          HandlerClass = TextSelectionHandler;
+          const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
+          HandlerClass = SimpleTextSelectionHandler;
           break;
         }
 

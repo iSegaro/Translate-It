@@ -15,8 +15,6 @@
 export { TextFieldHandler } from './handlers/TextFieldHandler.js';
 export { TextFieldDoubleClickHandler } from './handlers/TextFieldDoubleClickHandler.js';
 
-// Legacy handler (for backward compatibility)
-export { TextFieldIconHandler } from './handlers/TextFieldIconHandler.js';
 
 // Managers
 export { TextFieldIconManager } from './managers/TextFieldIconManager.js';
