@@ -6,6 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
+import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldHandler');
 
@@ -36,6 +37,9 @@ export class TextFieldHandler extends ResourceTracker {
     this.focusHandler = null;
     this.blurHandler = null;
     this.inputHandler = null;
+
+    // Element detection service
+    this.elementDetection = ElementDetectionService;
   }
 
   async activate() {
@@ -179,11 +183,7 @@ export class TextFieldHandler extends ResourceTracker {
             // Check if focus moved to a translation-related element before cleanup
             const activeElement = document.activeElement;
             const isTranslationElement = activeElement && (
-              activeElement.closest('[data-translation-window]') ||
-              activeElement.closest('[data-translation-icon]') ||
-              activeElement.closest('.translation-window') ||
-              activeElement.closest('.translation-icon') ||
-              activeElement.closest(".AIWritingCompanion-translation-icon-extension") ||
+              this.elementDetection.isUIElement(activeElement) ||
               (this.textFieldIconManager?.state && this.textFieldIconManager.state.preventTextFieldIconCreation)
             );
 

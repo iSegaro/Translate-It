@@ -4,6 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
 /**
  * Manages click events and outside click detection for WindowsManager
@@ -14,16 +15,19 @@ export class ClickManager extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'ClickManager');
     this.crossFrameManager = crossFrameManager;
     this.state = state;
-    
+
     // Event handlers
     this.onOutsideClick = null;
     this.onIconClick = null;
-    
+
     // Click listener
     this.removeMouseDownListener = null;
-    
+
     // Bound methods
     this._handleOutsideClick = this._handleOutsideClick.bind(this);
+
+    // Element detection service
+    this.elementDetection = ElementDetectionService;
   }
 
   /**
@@ -153,11 +157,13 @@ export class ClickManager extends ResourceTracker {
     if (iconElement && iconElement.contains(e.target)) {
       return false;
     }
-    const windowElements = document.querySelectorAll('.translation-window');
-    for (const element of windowElements) {
-      if (element.contains(e.target)) {
-        return false;
-      }
+
+    // Use ElementDetectionService to check if click is on UI element
+    if (this.elementDetection.isUIElement(e.target)) {
+      this.logger.debug('Click is on UI element (detected by ElementDetectionService)', {
+        elementType: this.elementDetection.getElementType(e.target)
+      });
+      return false;
     }
     
     // If not inside Vue UI Host or legacy elements, dismiss
@@ -232,34 +238,16 @@ export class ClickManager extends ResourceTracker {
    * Check if click is on any UI element
    */
   isClickOnUIElement(event) {
-    // Check icon (both static ID and dynamic translation icons)
+    // Use ElementDetectionService for optimized UI element detection
+    const uiElement = this.elementDetection.getClickedUIElement(event);
+    if (uiElement) {
+      return uiElement;
+    }
+
+    // Fallback to legacy check for old-style elements
     const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
     if (iconElement && this.isClickInsideElement(event, iconElement)) {
       return { type: 'icon', element: iconElement };
-    }
-
-    // Check for dynamic translation icons (pattern: translation-icon-*)
-    const translationIcons = document.querySelectorAll('[id^="translation-icon-"]');
-    for (const icon of translationIcons) {
-      if (this.isClickInsideElement(event, icon)) {
-        return { type: 'translation-icon', element: icon };
-      }
-    }
-
-    // Check for text field icons (pattern: text-field-icon-*)
-    const textFieldIcons = document.querySelectorAll('[id^="text-field-icon-"]');
-    for (const icon of textFieldIcons) {
-      if (this.isClickInsideElement(event, icon)) {
-        return { type: 'text-field-icon', element: icon };
-      }
-    }
-
-    // Check popup windows
-    const popupElements = document.querySelectorAll(`.${WindowsConfig.CSS_CLASSES.POPUP_HOST}`);
-    for (const popup of popupElements) {
-      if (this.isClickInsideElement(event, popup)) {
-        return { type: 'popup', element: popup };
-      }
     }
 
     return null;

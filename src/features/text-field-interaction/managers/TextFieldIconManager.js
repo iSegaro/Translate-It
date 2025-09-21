@@ -14,6 +14,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { PositionCalculator } from '../utils/PositionCalculator.js';
 import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
+import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
@@ -33,11 +34,14 @@ export class TextFieldIconManager extends ResourceTracker {
       // This is the core text field icon manager - should not be cleaned up
       this.logger.debug('Critical TextFieldIconManager cleanup skipped');
     }, { isCritical: true });
-    
+
     // Track active icons and their attachments
     this.activeIcons = new Map();
     this.iconAttachments = new Map();
     this.cleanupTimeouts = new Map();
+
+    // Element detection service
+    this.elementDetection = ElementDetectionService;
     
     // Only log once during first initialization
     if (!this.loggedInit) {
@@ -384,12 +388,7 @@ export class TextFieldIconManager extends ResourceTracker {
       }
 
       // Don't cleanup if focus moved to any translation-related element
-      if (activeElement?.isConnected && (
-        activeElement.closest('[data-translation-window]') ||
-        activeElement.closest('[data-translation-icon]') ||
-        activeElement.closest('.translation-window') ||
-        activeElement.closest('.translation-icon')
-      )) {
+      if (activeElement?.isConnected && this.elementDetection.isUIElement(activeElement)) {
         this.logger.debug('Focus moved to translation element, keeping active');
         return;
       }
@@ -397,11 +396,7 @@ export class TextFieldIconManager extends ResourceTracker {
       // Cleanup if no active element or focus moved away from icon/translation area
       if (
         !activeElement?.isConnected ||
-        (!activeElement.closest(".AIWritingCompanion-translation-icon-extension") &&
-         !activeElement.closest('[data-translation-window]') &&
-         !activeElement.closest('[data-translation-icon]') &&
-         !activeElement.closest('.translation-window') &&
-         !activeElement.closest('.translation-icon'))
+        !this.elementDetection.isUIElement(activeElement)
       ) {
         this.logger.debug('Cleaning up after blur');
         this.cleanup();

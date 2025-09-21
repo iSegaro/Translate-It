@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SelectionManager } from '../core/SelectionManager.js';
+import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandler');
 
@@ -38,6 +39,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.isDragging = false;
     this.mouseDownTime = 0;
     this.lastMouseUpEvent = null;
+
+    // Element detection service
+    this.elementDetection = ElementDetectionService;
 
     // Bind methods
     this.handleSelectionChange = this.handleSelectionChange.bind(this);
@@ -412,22 +416,15 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   isClickInsideTranslationWindow() {
     if (!this.lastMouseUpEvent) return false;
 
-    // Get WindowsManager from FeatureManager
-    const windowsManager = this.getWindowsManager();
-    if (!windowsManager) return false;
-
-    // Use WindowsManager's ClickManager to check if click is inside UI element
+    // Use ElementDetectionService to check if click is on UI element
     try {
-      const clickManager = windowsManager.clickManager;
-      if (clickManager && typeof clickManager.isClickOnUIElement === 'function') {
-        const uiElement = clickManager.isClickOnUIElement(this.lastMouseUpEvent);
-        if (uiElement) {
-          logger.debug('Click detected inside WindowsManager UI element', {
-            elementType: uiElement.type,
-            elementTag: uiElement.element?.tagName
-          });
-          return true;
-        }
+      const uiElement = this.elementDetection.getClickedUIElement(this.lastMouseUpEvent);
+      if (uiElement) {
+        logger.debug('Click detected inside UI element', {
+          elementType: uiElement.type,
+          elementTag: uiElement.element?.tagName
+        });
+        return true;
       }
 
       // Fallback: check for common translation window selectors

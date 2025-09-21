@@ -26,6 +26,7 @@
 - ✅ **FeatureManager Architecture** - Smart handler lifecycle management with proper separation between feature initialization and activation
 - ✅ **Toast Integration System (2025)** - Comprehensive toast notification system with Vue Sonner integration, actionable notifications, and cross-context support
 - ✅ **Modern CSS Architecture (2025)** - Principled CSS with Grid layout, containment, safe variable functions, and future-proof SCSS patterns
+- ✅ **Element Detection Service (2025)** - Centralized element detection system eliminating hardcoded selectors and optimizing DOM queries
 
 ---
 
@@ -43,6 +44,7 @@
 - **[Proxy System](PROXY_SYSTEM.md)** - Extension-only proxy system with Strategy Pattern for accessing geo-restricted translation services
 - **[Toast Integration System](TOAST_INTEGRATION_SYSTEM.md)** - Comprehensive Vue Sonner toast integration with actionable notifications and event-driven architecture
 - **[CSS Architecture](CSS_ARCHITECTURE.md)** - Modern principled CSS with Grid layout, containment, safe variable functions, and future-proof SCSS patterns
+- **[Element Detection Service](ELEMENT_DETECTION_SERVICE.md)** - Centralized element detection system with optimized DOM queries and caching
 
 ### Feature-Specific Documentation
 - **[Smart Handler Registration System](SMART_HANDLER_REGISTRATION_SYSTEM.md)** - Dynamic feature lifecycle management with exclusion logic
@@ -247,6 +249,9 @@ src/
 │   ├── logging/               # Logging system
 │   │   ├── logger.js          # Main logger
 │   │   └── logConstants.js    # Log constants
+│   ├── services/              # Shared Services
+│   │   ├── ElementDetectionConfig.js # Centralized selector configuration
+│   │   └── ElementDetectionService.js # Optimized element detection with caching
 │   └── config/                # Configuration
 │       └── config.js          # Application config
 │

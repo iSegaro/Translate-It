@@ -21,6 +21,7 @@
 - **Logging System**: سیستم log ساختارمند
 - **UI Host System**: اپلیکیشن متمرکز Vue برای مدیریت تمام UIهای درون-صفحه در Shadow DOM
 - **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته با Critical Protection System برای جلوگیری از memory leaks و حفظ منابع حیاتی
+- **Element Detection Service (2025)**: سیستم متمرکز تشخیص المنت‌ها با حذف سلکتورهای هاردکد شده و بهینه‌سازی DOM queries
 - **Smart Handler Registration**: سیستم ثبت handler های هوشمند با فعال‌سازی و غیرفعال‌سازی پویا بر اساس تنظیمات و URL exclusion
 
 ## روش‌های ترجمه
@@ -78,8 +79,9 @@
   - `messaging/` - سیستم پیام‌رسانی هوشمند (شامل `SmartMessaging` که برای ارتباط با `StreamingManager` استفاده می‌شود)
   - `storage/` - مدیریت ذخیره‌سازی با caching
   - `error-management/` - مدیریت خطای متمرکز
-  - `logging/` - سیستم log ساختارمند  
+  - `logging/` - سیستم log ساختارمند
   - `config/` - تنظیمات کلی
+  - `services/` - **سیستم Element Detection Service (2025)** - ElementDetectionConfig و ElementDetectionService برای تشخیص متمرکز و بهینه‌سازی شده المنت‌ها
   - `toast/` - **سیستم Toast Integration (2025)** - ToastEventHandler، ToastElementDetector، ToastIntegration، و constants برای مدیریت اطلاع‌رسانی یکپارچه
 
 ### 🏗️ Core Infrastructure
@@ -139,6 +141,13 @@
 - **تست‌پذیری**: هر feature قابل تست مستقل
 - **IFrame Integration**: پشتیبانی ساده و مؤثر از iframe با ResourceTracker و ErrorHandler
 
+### 🔧 Element Detection Service (2025)
+- **Single Source of Truth**: تمام سلکتورها در ElementDetectionConfig.js تعریف شده‌اند
+- **Performance Optimization**: حذف DOM queries تکراری و استفاده از کش برای نتایج
+- **Centralized Management**: اضافه/حذف سلکتورها بدون نیاز به تغییر فایل‌های متعدد
+- **Consistency**: تمام کامپوننت‌ها از منطق تشخیص یکسان استفاده می‌کنند
+- **Shadow DOM Support**: پشتیبانی کامل از المنت‌های داخل Shadow DOM
+
 ### 🔧 Shared Systems  
 - **عدم تکرار**: سیستم‌های مشترک در یک مکان
 - **سازگاری**: API یکسان برای همه features
@@ -180,3 +189,4 @@
 - **Dynamic Feature Management**: سیستم FeatureManager برای مدیریت چرخه حیات handlers
 - **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector با Critical Protection System یکپارچه
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با حذف 600+ خط کد تکراری، fallback زبان خودکار (فارسی→عربی)، و هماهنگی کامل بین تمام contexts
+- **Element Detection Service (2025)**: سیستم تشخیص متمرکز المنت‌ها با حذف سلکتورهای هاردکد و بهینه‌سازی DOM queries
