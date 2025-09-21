@@ -176,10 +176,25 @@ export class TextFieldHandler extends ResourceTracker {
           logger.debug('Text field blurred:', element.tagName);
 
           setTimeout(() => {
-            if (document.activeElement !== element && this.textFieldIconManager) {
+            // Check if focus moved to a translation-related element before cleanup
+            const activeElement = document.activeElement;
+            const isTranslationElement = activeElement && (
+              activeElement.closest('[data-translation-window]') ||
+              activeElement.closest('[data-translation-icon]') ||
+              activeElement.closest('.translation-window') ||
+              activeElement.closest('.translation-icon') ||
+              activeElement.closest(".AIWritingCompanion-translation-icon-extension") ||
+              (this.textFieldIconManager?.state && this.textFieldIconManager.state.preventTextFieldIconCreation)
+            );
+
+            if (document.activeElement !== element &&
+                this.textFieldIconManager &&
+                !isTranslationElement) {
               this.textFieldIconManager.cleanupElement(element);
+            } else if (isTranslationElement) {
+              logger.debug('Focus moved to translation element, skipping cleanup');
             }
-          }, 150);
+          }, 200); // Increased delay to match TextFieldIconManager timing
         }
       };
 

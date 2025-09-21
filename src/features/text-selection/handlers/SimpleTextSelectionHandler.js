@@ -187,6 +187,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
           return;
         }
 
+        // Skip if currently dragging (prevents dismissal during drag operations)
+        if (this.isDragging) {
+          logger.debug('Currently dragging with no text selected, skipping dismissal');
+          return;
+        }
+
         // No text selected and click outside translation window, dismiss
         if (this.selectionManager) {
           this.selectionManager.dismissWindow();

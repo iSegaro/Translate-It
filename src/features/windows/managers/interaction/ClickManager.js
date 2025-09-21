@@ -232,10 +232,26 @@ export class ClickManager extends ResourceTracker {
    * Check if click is on any UI element
    */
   isClickOnUIElement(event) {
-    // Check icon
+    // Check icon (both static ID and dynamic translation icons)
     const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
     if (iconElement && this.isClickInsideElement(event, iconElement)) {
       return { type: 'icon', element: iconElement };
+    }
+
+    // Check for dynamic translation icons (pattern: translation-icon-*)
+    const translationIcons = document.querySelectorAll('[id^="translation-icon-"]');
+    for (const icon of translationIcons) {
+      if (this.isClickInsideElement(event, icon)) {
+        return { type: 'translation-icon', element: icon };
+      }
+    }
+
+    // Check for text field icons (pattern: text-field-icon-*)
+    const textFieldIcons = document.querySelectorAll('[id^="text-field-icon-"]');
+    for (const icon of textFieldIcons) {
+      if (this.isClickInsideElement(event, icon)) {
+        return { type: 'text-field-icon', element: icon };
+      }
     }
 
     // Check popup windows

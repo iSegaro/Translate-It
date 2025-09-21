@@ -366,7 +366,7 @@ export class TextFieldIconManager extends ResourceTracker {
     // Delay cleanup to allow user to interact with icon (using ResourceTracker)
     const cleanupTimeout = this.trackTimeout(() => {
       const activeElement = document.activeElement;
-      
+
       // Don't cleanup if focus moved to the translate icon or its children
       if (
         activeElement?.isConnected &&
@@ -377,15 +377,36 @@ export class TextFieldIconManager extends ResourceTracker {
         return;
       }
 
-      // Cleanup if no active element or focus moved away from icon area
+      // Don't cleanup if WindowsManager is processing a translation operation
+      if (this.state && this.state.preventTextFieldIconCreation) {
+        this.logger.debug('WindowsManager is processing translation, keeping icons active');
+        return;
+      }
+
+      // Don't cleanup if focus moved to any translation-related element
+      if (activeElement?.isConnected && (
+        activeElement.closest('[data-translation-window]') ||
+        activeElement.closest('[data-translation-icon]') ||
+        activeElement.closest('.translation-window') ||
+        activeElement.closest('.translation-icon')
+      )) {
+        this.logger.debug('Focus moved to translation element, keeping active');
+        return;
+      }
+
+      // Cleanup if no active element or focus moved away from icon/translation area
       if (
         !activeElement?.isConnected ||
-        !activeElement.closest(".AIWritingCompanion-translation-icon-extension")
+        (!activeElement.closest(".AIWritingCompanion-translation-icon-extension") &&
+         !activeElement.closest('[data-translation-window]') &&
+         !activeElement.closest('[data-translation-icon]') &&
+         !activeElement.closest('.translation-window') &&
+         !activeElement.closest('.translation-icon'))
       ) {
         this.logger.debug('Cleaning up after blur');
         this.cleanup();
       }
-    }, 100);
+    }, 150); // Increased delay to better coordinate with WindowsManager
 
     // Track timeout for potential cancellation
     this.cleanupTimeouts.set(element, cleanupTimeout);
