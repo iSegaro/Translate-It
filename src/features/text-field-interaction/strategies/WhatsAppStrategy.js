@@ -13,51 +13,119 @@ export default class WhatsAppStrategy extends PlatformStrategy {
     this.errorHandler = errorHandler;
   }
 
+  isInputField(field) {
+    return field.tagName === "INPUT" || field.tagName === "TEXTAREA";
+  }
+
+  isContentEditable(field) {
+    return field.isContentEditable;
+  }
+
+  getWhatsAppField(element) {
+    if (!element) return;
+
+    try {
+      if (this.isInputField(element) || this.isContentEditable(element)) {
+        return element;
+      }
+
+      // Look for WhatsApp-specific selectors
+      let field =
+        element.closest('[aria-label="Type a message"]') ||
+        element.closest('[aria-label^="Type to"]') ||
+        element.closest('[aria-label="Search input textbox"]') ||
+        element.closest('[role="textbox"]') ||
+        element.closest(".copyable-text.selectable-text");
+
+      // If no field found, search for any contenteditable in the area
+      if (!field) {
+        const editableFields = element.parentElement?.querySelectorAll('[contenteditable="true"]');
+        if (editableFields?.length === 1) {
+          field = editableFields[0];
+        }
+      }
+
+      return field;
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "whatsapp-strategy-getWhatsAppField",
+      });
+    }
+  }
+
   /**
    * شناسایی المان ویرایشگر واتس‌اپ
    * @param {HTMLElement} target - المان هدف
    * @returns {boolean}
    */
   isWhatsAppElement(target) {
-    return !!target.closest('[aria-label="Type a message"]');
+    return !!target.closest(
+      '[aria-label="Type a message"], ' +
+      '[aria-label^="Type to"], ' +
+      '[aria-label="Search input textbox"], ' +
+      '[role="textbox"], ' +
+      '.copyable-text.selectable-text'
+    );
   }
 
   async updateElement(element, translatedText) {
+    if (!translatedText) {
+      return false;
+    }
+    if (!element) {
+      return false;
+    }
+
     try {
-      const SELECTORS = '[role="textbox"], .copyable-text.selectable-text';
+      logger.debug('WhatsAppStrategy.updateElement called', {
+        element,
+        elementIsConnected: element.isConnected,
+        elementHasAttribute: element.hasAttribute('contenteditable'),
+        elementClassName: element.className,
+        translatedText
+      });
 
-      let whatsappField = this.findField(element, SELECTORS);
+      const SELECTORS = '[role="textbox"], .copyable-text.selectable-text, [contenteditable="true"]';
 
-      if (!whatsappField) {
-        logger.debug('فیلد واتساپ یافت نشد');
-        return;
-      }
+      await delay(100);
 
-      // استفاده مستقیم از بررسی نوع تگ و contenteditable به جای validateField
-      const isValidField =
-        (whatsappField.tagName === "INPUT" ||
-          whatsappField.tagName === "TEXTAREA" ||
-          whatsappField.hasAttribute("contenteditable")) &&
-        whatsappField.isConnected;
+      // Find WhatsApp field using multiple approaches
+      let whatsappField =
+        this.findField(element, SELECTORS) ||
+        this.getWhatsAppField(element) ||
+        document.querySelector('[aria-label="Type a message"], [aria-label^="Type to"], [aria-label="Search input textbox"]');
 
-      if (!isValidField) {
-        logger.debug('فیلد واتساپ نامعتبر است');
+      logger.debug('WhatsApp field detection result', {
+        hasField: !!whatsappField,
+        fieldTag: whatsappField?.tagName,
+        fieldAriaLabel: whatsappField?.getAttribute('aria-label'),
+        fieldClassList: whatsappField?.className
+      });
+
+      // Validate the field
+      if (!this.validateField(whatsappField)) {
+        logger.debug('فیلد واتساپ نامعتبر است یا یافت نشد', {
+          hasField: !!whatsappField,
+          fieldTag: whatsappField?.tagName,
+          isConnected: whatsappField?.isConnected,
+          isContentEditable: whatsappField?.isContentEditable
+        });
         return false;
       }
 
-      const isWhatsApp = this.isWhatsAppElement(element);
-      if (!isWhatsApp) {
-        return false;
-      }
-
-      // اعتبارسنجی وجود المان در DOM
-      if (!document.body.contains(element)) {
-        logger.debug('Element removed from DOM');
+      // Double-check it's still a WhatsApp element
+      const isWhatsAppField = this.isWhatsAppElement(whatsappField);
+      if (!isWhatsAppField) {
+        logger.debug('Element is not a WhatsApp field', {
+          element: whatsappField,
+          ariaLabel: whatsappField.getAttribute('aria-label')
+        });
         return false;
       }
 
       // اعمال فوکوس با تنظیمات ایمن
-      await this.safeFocus(element);
+      await this.safeFocus(whatsappField);
 
       await this.applyVisualFeedback(whatsappField);
 
@@ -168,6 +236,14 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         context: "whatsapp-strategy-simulatePaste",
       });
     }
+  }
+
+  validateField(element) {
+    return (
+      element &&
+      element.isConnected &&
+      (this.isInputField(element) || this.isContentEditable(element))
+    );
   }
 
   triggerStateUpdate(element) {
