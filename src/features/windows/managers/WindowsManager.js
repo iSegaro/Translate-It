@@ -1120,8 +1120,14 @@ export class WindowsManager extends ResourceTracker {
     // Cancel any ongoing translation when dismissing
     if (this.translationHandler) {
       this.state.setTranslationCancelled(true);
-      this.translationHandler.cancelAllTranslations();
-      this.logger.debug('[Translation] All pending translations cancelled during dismiss');
+
+      // Check if cancelAllTranslations method exists (compatibility between core and windows TranslationHandler)
+      if (typeof this.translationHandler.cancelAllTranslations === 'function') {
+        this.translationHandler.cancelAllTranslations();
+        this.logger.debug('[Translation] All pending translations cancelled during dismiss');
+      } else {
+        this.logger.debug('[Translation] cancelAllTranslations not available on this TranslationHandler instance');
+      }
     }
 
     // Stop any ongoing TTS when dismissing

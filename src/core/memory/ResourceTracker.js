@@ -110,6 +110,41 @@ class ResourceTracker {
     this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId, options);
   }
 
+  /**
+   * Remove event listener with proper cleanup
+   * @param {Element} element - The element to remove listener from
+   * @param {string} event - The event name
+   * @param {Function} handler - The event handler
+   * @param {Object} options - Event options
+   */
+  removeEventListener(element, event, handler, options = null) {
+    try {
+      // Handle custom event systems (like StorageCore with on/off methods)
+      if (element && typeof element.off === 'function') {
+        element.off(event, handler);
+      }
+      // Handle browser extension APIs (they use addListener/removeListener)
+      else if (element && typeof element.removeListener === 'function') {
+        element.removeListener(handler);
+      }
+      // Handle DOM EventTargets
+      else if (element && typeof element.removeEventListener === 'function') {
+        if (options) {
+          element.removeEventListener(event, handler, options);
+        } else {
+          element.removeEventListener(event, handler);
+        }
+      }
+
+      // Log removal in development
+      if (shouldEnableDebugging()) {
+        this.logger.debug('Event listener removed:', { event, element: element?.constructor?.name });
+      }
+    } catch (error) {
+      this.logger.error('Error removing event listener:', error);
+    }
+  }
+
   trackCache(cache, options = {}) {
     this.memoryManager.trackCache(cache, options, this.groupId);
     if (shouldEnableDebugging()) {

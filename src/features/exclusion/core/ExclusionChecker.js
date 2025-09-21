@@ -164,7 +164,7 @@ export class ExclusionChecker {
       logger.warn(`Unknown feature name: ${featureName}`);
       return false;
     }
-    
+
     return settingsManager.get(settingKey, false);
   }
 

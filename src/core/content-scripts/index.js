@@ -319,8 +319,8 @@ if (!access.isAccessible) {
     try {
       logger.info('🚀 [Content Script] Starting Smart Feature Management System initialization...');
       
-      // Create and initialize FeatureManager
-      featureManager = new FeatureManager();
+      // Create and initialize FeatureManager singleton
+      featureManager = FeatureManager.getInstance();
 
       // FeatureManager manages handlers - individual handlers handle their own Critical Protection
       featureManager.trackResource('feature-manager-core', () => {

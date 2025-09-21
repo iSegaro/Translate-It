@@ -8,14 +8,46 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FeatureManager');
 
+// Singleton instance
+let featureManagerInstance = null;
+
 export class FeatureManager extends ResourceTracker {
   constructor() {
+    // Enforce singleton pattern
+    if (featureManagerInstance) {
+      logger.debug('FeatureManager singleton already exists, returning existing instance');
+      return featureManagerInstance;
+    }
+
     super();
     this.activeFeatures = new Set();
     this.featureHandlers = new Map();
     this.exclusionChecker = new ExclusionChecker();
     this.initialized = false;
     this.settingsListener = null;
+    this._evaluationInProgress = false;
+    this._evaluationQueue = [];
+    this._evaluationDebounceTimer = null;
+
+    // Store singleton instance
+    featureManagerInstance = this;
+    logger.debug('FeatureManager singleton created');
+  }
+
+  // Static method to get singleton instance
+  static getInstance() {
+    if (!featureManagerInstance) {
+      featureManagerInstance = new FeatureManager();
+    }
+    return featureManagerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (featureManagerInstance) {
+      featureManagerInstance.cleanup();
+      featureManagerInstance = null;
+    }
   }
 
   async initialize() {
@@ -121,9 +153,19 @@ export class FeatureManager extends ResourceTracker {
       return;
     }
 
+    // Check if handler already exists (protection against double creation)
+    if (this.featureHandlers.has(featureName)) {
+      logger.warn(`Feature ${featureName} handler already exists but not marked as active - cleaning up`);
+      const existingHandler = this.featureHandlers.get(featureName);
+      if (existingHandler && typeof existingHandler.deactivate === 'function') {
+        await existingHandler.deactivate();
+      }
+      this.featureHandlers.delete(featureName);
+    }
+
     try {
       logger.debug(`Activating feature: ${featureName}`);
-      
+
       // Load and initialize feature handler
       const handler = await this.loadFeatureHandler(featureName);
       if (handler) {
@@ -156,7 +198,19 @@ export class FeatureManager extends ResourceTracker {
 
     try {
       logger.debug(`Deactivating feature: ${featureName}`);
-      
+
+      // Special handling for shortcut feature to deactivate ALL instances
+      if (featureName === 'shortcut') {
+        try {
+          const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
+          await ShortcutHandler.deactivateAllInstances();
+          logger.debug('All ShortcutHandler instances deactivated using static method');
+        } catch (importError) {
+          logger.error('Failed to import ShortcutHandler for global deactivation:', importError);
+          // Fall back to normal deactivation
+        }
+      }
+
       const handler = this.featureHandlers.get(featureName);
       if (handler && typeof handler.deactivate === 'function') {
         const success = await handler.deactivate();
@@ -164,19 +218,19 @@ export class FeatureManager extends ResourceTracker {
           logger.warn(`Feature ${featureName} deactivation returned false, but proceeding with cleanup`);
         }
       }
-      
+
       this.featureHandlers.delete(featureName);
       this.activeFeatures.delete(featureName);
-      
+
       logger.info(`Feature ${featureName} deactivated successfully`);
-      
+
     } catch (error) {
       logger.error(`Failed to deactivate feature ${featureName}:`, error);
       const handler = ErrorHandler.getInstance();
-      handler.handle(error, { 
-        type: ErrorTypes.SERVICE, 
+      handler.handle(error, {
+        type: ErrorTypes.SERVICE,
         context: `FeatureManager-deactivateFeature-${featureName}`,
-        showToast: false 
+        showToast: false
       });
     }
   }
@@ -212,8 +266,8 @@ export class FeatureManager extends ResourceTracker {
 
         case 'shortcut': {
           const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
-          HandlerClass = ShortcutHandler;
-          break;
+          // Use singleton pattern for ShortcutHandler
+          return ShortcutHandler.getInstance({ featureManager: this });
         }
 
         case 'windowsManager': {
@@ -269,34 +323,101 @@ export class FeatureManager extends ResourceTracker {
       await this.exclusionChecker.refreshSettings();
       
       // Re-evaluate all features
-      await this.reevaluateFeatures();
+      await this.reevaluateFeatures(`settings-change:${key}`);
       
     } catch (error) {
       logger.error('Error handling settings change:', error);
     }
   }
 
-  async reevaluateFeatures() {
-    // Order matters: contentMessageHandler should be evaluated first
-    // selectElement is managed directly by FeatureManager with its own Critical Protection
-    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
-    
-    logger.debug('Re-evaluating all features');
-    
-    for (const feature of features) {
-      const shouldBeActive = await this.shouldActivateFeature(feature);
-      const isCurrentlyActive = this.activeFeatures.has(feature);
-      
-      if (shouldBeActive && !isCurrentlyActive) {
-        await this.activateFeature(feature);
-      } else if (!shouldBeActive && isCurrentlyActive) {
-        await this.deactivateFeature(feature);
+  async reevaluateFeatures(reason = 'unknown') {
+    return new Promise((resolve, reject) => {
+      // Add to evaluation queue
+      this._evaluationQueue.push({ reason, resolve, reject });
+
+      // Clear existing debounce timer
+      if (this._evaluationDebounceTimer) {
+        clearTimeout(this._evaluationDebounceTimer);
+      }
+
+      // Debounce multiple rapid calls
+      this._evaluationDebounceTimer = setTimeout(() => {
+        this._processEvaluationQueue();
+      }, 100); // 100ms debounce
+    });
+  }
+
+  async _processEvaluationQueue() {
+    // Prevent multiple concurrent evaluations
+    if (this._evaluationInProgress) {
+      logger.debug('Feature evaluation already in progress, queueing...');
+      return;
+    }
+
+    if (this._evaluationQueue.length === 0) {
+      return;
+    }
+
+    // Get all pending requests
+    const requests = [...this._evaluationQueue];
+    this._evaluationQueue = [];
+
+    const reasons = requests.map(r => r.reason).join(', ');
+    logger.debug(`Processing ${requests.length} queued feature evaluation requests (reasons: ${reasons})`);
+
+    this._evaluationInProgress = true;
+
+    try {
+      // Order matters: contentMessageHandler should be evaluated first
+      // selectElement is managed directly by FeatureManager with its own Critical Protection
+      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
+
+      logger.debug('Re-evaluating all features');
+
+      for (const feature of features) {
+        const shouldBeActive = await this.shouldActivateFeature(feature);
+        const isCurrentlyActive = this.activeFeatures.has(feature);
+
+        logger.debug(`Feature ${feature}: shouldBeActive=${shouldBeActive}, isCurrentlyActive=${isCurrentlyActive}`);
+
+        if (shouldBeActive && !isCurrentlyActive) {
+          // Special handling for shortcut feature to enable globally before activation
+          if (feature === 'shortcut') {
+            try {
+              const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
+              ShortcutHandler.enableGlobally();
+              logger.debug('ShortcutHandler enabled globally before activation');
+            } catch (importError) {
+              logger.error('Failed to import ShortcutHandler for global enabling:', importError);
+            }
+          }
+          await this.activateFeature(feature);
+        } else if (!shouldBeActive && isCurrentlyActive) {
+          logger.debug(`About to deactivate feature: ${feature}`);
+          await this.deactivateFeature(feature);
+        }
+      }
+
+      logger.debug('Feature re-evaluation complete', {
+        activeFeatures: Array.from(this.activeFeatures),
+        processedRequests: requests.length
+      });
+
+      // Resolve all pending requests
+      requests.forEach(request => request.resolve());
+
+    } catch (error) {
+      logger.error('Feature re-evaluation failed:', error);
+      // Reject all pending requests
+      requests.forEach(request => request.reject(error));
+    } finally {
+      this._evaluationInProgress = false;
+
+      // Process any new requests that came in during evaluation
+      if (this._evaluationQueue.length > 0) {
+        setTimeout(() => this._processEvaluationQueue(), 50);
       }
     }
-    
-    logger.debug('Feature re-evaluation complete', {
-      activeFeatures: Array.from(this.activeFeatures)
-    });
   }
 
   setupUrlChangeDetection() {
@@ -348,7 +469,7 @@ export class FeatureManager extends ResourceTracker {
       this.exclusionChecker.updateUrl(newUrl);
       
       // Re-evaluate features for new URL
-      await this.reevaluateFeatures();
+      await this.reevaluateFeatures('url-change');
       
     } catch (error) {
       logger.error('Error handling URL change:', error);
@@ -371,7 +492,7 @@ export class FeatureManager extends ResourceTracker {
   async manualRefresh() {
     logger.debug('Manual refresh requested');
     await this.exclusionChecker.refreshSettings();
-    await this.reevaluateFeatures();
+    await this.reevaluateFeatures('manual-refresh');
   }
 
   getStatus() {
@@ -387,6 +508,15 @@ export class FeatureManager extends ResourceTracker {
   // Override cleanup to handle settings listener
   cleanup() {
     try {
+      // Clear debounce timer
+      if (this._evaluationDebounceTimer) {
+        clearTimeout(this._evaluationDebounceTimer);
+        this._evaluationDebounceTimer = null;
+      }
+
+      // Clear evaluation queue
+      this._evaluationQueue = [];
+
       if (this.settingsListener) {
         storageManager.off('change', this.settingsListener);
         this.settingsListener = null;
