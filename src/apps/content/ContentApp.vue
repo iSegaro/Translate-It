@@ -4,15 +4,18 @@
     <!--{{ $t('app_welcome') }} -->
     
     <!-- This will host all in-page UI components -->
-    <Toaster 
-      rich-colors 
+    <Toaster
+      rich-colors
       position="bottom-right"
       expand
-      :toast-options="{ 
-        style: { 
+      :toast-options="{
+        style: {
           pointerEvents: 'auto',
           cursor: 'auto',
-          zIndex: 2147483647
+          zIndex: 2147483647,
+          direction: 'ltr',
+          textAlign: 'left',
+          unicodeBidi: 'plaintext'
         }
       }"
     />
@@ -333,6 +336,7 @@ onMounted(() => {
   // Listen for TextFieldIcon events
   pageEventBus.on('add-field-icon', (detail) => {
     logger.info('Event: add-field-icon', detail);
+    console.log('ContentApp: Adding field icon', detail);
     // Ensure no duplicate icons for the same ID
     if (!activeIcons.value.some(icon => icon.id === detail.id)) {
       activeIcons.value.push({
@@ -342,6 +346,7 @@ onMounted(() => {
         targetElement: detail.targetElement,
         attachmentMode: detail.attachmentMode || 'smart'
       });
+      console.log('ContentApp: Active icons after adding:', activeIcons.value);
     }
   });
 
@@ -464,11 +469,11 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 2147483647; /* Max z-index */
-  pointer-events: none; /* Allow clicks to pass through the container */
+  pointer-events: none !important; /* Allow clicks to pass through the container */
 }
 
 /* Individual components inside will override this (e.g., toaster, toolbars) */
 .content-app-container > * {
-  pointer-events: auto; /* Re-enable pointer events for children */
+  pointer-events: all !important; /* Re-enable pointer events for children */
 }
 </style>

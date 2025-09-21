@@ -2,10 +2,10 @@
 @use '../base/mixins' as *;
 
 // TranslationWindow component styles - for Shadow DOM injection
-// Increased specificity approach to avoid !important declarations
+// CRITICAL: Complete isolation from host page styles
 
-// CSS Custom Properties for component-specific overrides
-:root {
+// CSS Custom Properties for component-specific overrides - scoped to :host
+:host {
   // Window-specific animation properties
   --ti-window-border-radius: #{$border-radius-lg};
   --ti-window-opacity-hidden: 0;
@@ -30,6 +30,11 @@
 
   // Window dimensions using proper SCSS->CSS conversion
   @include window-dimensions;
+
+  // CRITICAL: Ensure proper positioning and z-index
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
 }
 
 // Base window styles with CSS Grid layout and Modern Containment
@@ -43,6 +48,14 @@
   transform: var(--ti-window-transform-hidden);
   transition: var(--ti-window-transition);
   visibility: var(--ti-window-visibility-hidden);
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: plaintext !important;
+
+  // CRITICAL: Ensure proper positioning and z-index override external styles
+  position: absolute !important;
+  z-index: 2147483646 !important;
+  pointer-events: all !important;
 
   // Modern CSS containment for performance
   container-type: inline-size; // Enable container queries
@@ -70,7 +83,7 @@
     background: var(--ti-loading-bg-light);
     border: $border-width $border-style var(--ti-loading-border-light);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    position: fixed;
+    position: fixed !important;
 
     // Loading window visibility override
     &.visible {

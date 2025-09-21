@@ -9,3 +9,36 @@
 
 // Import vue-sonner styles for notifications
 @import 'vue-sonner/style.css';
+
+// ============================================================================
+// Minimal Shadow DOM Reset - Only reset what's necessary
+// ============================================================================
+:host {
+  display: block;
+  position: relative;
+  z-index: 2147483647;
+  pointer-events: none;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* Only force LTR for WindowsManager containers */
+.ti-field-icon,
+.translation-window,
+.translation-icon,
+.sonner-toaster,
+.sonner-toast,
+.ti-window-header {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: plaintext !important;
+}
+
+/* Ensure all interactive components have pointer-events enabled */
+.ti-field-icon,
+.translation-window,
+.translation-icon,
+.sonner-toaster,
+.sonner-toast {
+  pointer-events: all !important;
+}

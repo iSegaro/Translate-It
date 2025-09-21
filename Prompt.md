@@ -14,7 +14,7 @@
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
 - **IFrame Support**: سیستم ساده و مؤثر پشتیبانی از iframe با ResourceTracker integration و memory management یکپارچه
 - **Toast Integration System (2025)**: سیستم اطلاع‌رسانی یکپارچه با ToastEventHandler، ToastElementDetector، و پشتیبانی از action buttons برای تعامل کاربر
-- **Modern CSS Architecture (2025)**: معماری CSS اصولی با CSS Grid، containment، safe variable functions، و SCSS patterns آینده‌نگر
+- **Modern CSS Architecture (2025)**: معماری CSS اصولی با CSS Grid، containment، safe variable functions، SCSS patterns آینده‌نگر، و Shadow DOM isolation با استفاده از strategic !important declarations
 - **Provider System**: 10+ سرویس ترجمه با معماری سلسله‌مراتبی (BaseProvider, BaseTranslateProvider, BaseAIProvider) و مدیریت Rate Limiting و Circuit Breaker.
 - **Error Management**: سیستم مدیریت خطای متمرکز
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
@@ -120,7 +120,7 @@
 - **`docs/TTS_SYSTEM.md`**: سیستم **TTS یکپارچه (2025)** - منبع واحد حقیقت با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **`docs/TEXT_SELECTION_SYSTEM.md`**: سیستم **انتخاب متن ماژولار (2025)** - معماری مدرن با SiteHandlerRegistry، static imports، و پشتیبانی کامل از professional editors (Google Docs, Zoho Writer, WPS Office, Notion)
 - **`docs/TOAST_INTEGRATION_SYSTEM.md`**: **سیستم اطلاع‌رسانی یکپارچه (2025)** - معماری Toast Integration با ToastEventHandler، ToastElementDetector، و پشتیبانی از action buttons
-- **`docs/CSS_ARCHITECTURE.md`**: **معماری CSS مدرن (2025)** - CSS اصولی با Grid layout، containment، safe variable functions، و SCSS patterns آینده‌نگر
+- **`docs/CSS_ARCHITECTURE.md`**: **معماری CSS مدرن (2025)** - CSS اصولی با Grid layout، containment، safe variable functions، SCSS patterns آینده‌نگر، و استراتژی Shadow DOM isolation با strategic !important usage
 - **`src/assets/styles/README-CSS-VARIABLES.md`**: **راهنمای CSS Variables (2025)** - Best practices، mixins و functions برای جلوگیری از مشکلات interpolation
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
 - **`docs/SELECT_ELEMENT_SYSTEM.md`**: **سیستم انتخاب عنصر بازطراحی شده (2025)** - معماری یکپارچه با Toast Integration، سرویس‌های مجزا، و مدیریت منابع هوشمند
@@ -162,6 +162,12 @@
 - **نام‌گذاری consistent**: قابل پیش‌بینی
 - **جداسازی واضح**: business logic از utilities
 - **Import paths تمیز**: استفاده از aliases
+
+### 🎨 CSS Architecture Benefits
+- **Shadow DOM Isolation**: کامپوننت‌ها کاملاً از استایل‌های صفحه ایزوله هستند
+- **Strategic !important Usage**: فقط برای پراپرتی‌های حیاتی در Shadow DOM
+- **Dynamic Direction Support**: محتوای ترجمه direction خودش رو حفظ می‌کنه در حالی که UI همیشه LTR هست
+- **Cross-Page Compatibility**: کار کردن یکسان در تمام صفحات وب بدون تداخل استایلی
 
 ## مشخصات فنی
 - **Manifest V3**: استاندارد جدید مرورگرها

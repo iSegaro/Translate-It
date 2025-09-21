@@ -4,8 +4,10 @@
     appear
   >
     <button
-      v-show="visible"
+      v-show="internalVisible"
       class="ti-field-icon"
+      :data-id="id"
+      :data-translate-ui="true"
       :class="computedClasses"
       :style="computedStyle"
       :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
@@ -130,17 +132,26 @@ const computedStyle = computed(() => {
   const baseStyle = {
     position: 'fixed',
     top: `${internalPosition.value.top}px`,
-    left: `${internalPosition.value.left}px`,
-    width: `${currentSize.value.width}px`,
-    height: `${currentSize.value.height}px`,
-    zIndex: 2147483647,
+    left: `${internalPosition.value.left}px`
   };
+
+  // Set width and height based on size
+  if (props.size === 'small') {
+    baseStyle.width = '24px';
+    baseStyle.height = '24px';
+  } else if (props.size === 'medium') {
+    baseStyle.width = '28px';
+    baseStyle.height = '28px';
+  } else if (props.size === 'large') {
+    baseStyle.width = '32px';
+    baseStyle.height = '32px';
+  }
 
   // Add transform based on placement for better positioning
   const placement = props.position.placement;
   if (placement) {
     const transforms = [];
-    
+
     switch (placement) {
       case 'top-right':
         transforms.push('translate(-100%, 0)');
@@ -173,7 +184,7 @@ const computedStyle = computed(() => {
         transforms.push('translate(0, 0)');
         break;
     }
-    
+
     if (transforms.length > 0) {
       baseStyle.transform = transforms.join(' ');
     }
@@ -184,16 +195,16 @@ const computedStyle = computed(() => {
 
 const onClick = (event) => {
   if (props.disabled) return;
-  
+
   event.preventDefault();
   event.stopPropagation();
-  
+
   isActive.value = true;
   // Use ResourceTracker for timeout management
   tracker.trackTimeout(() => {
     isActive.value = false;
   }, 150);
-  
+
   emit('click', props.id, event);
 };
 
@@ -266,211 +277,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ti-field-icon {
-  /* Button reset */
-  padding: 0;
-  margin: 0;
-  background: none;
-  border: none;
-  outline: none;
-  font: inherit;
-
-  /* Positioning - handled by computedStyle */
-  position: fixed;
-
-  /* Default size - overridden by computedStyle */
-  width: 28px;
-  height: 28px;
-
-  /* Appearance */
-  background-color: #ffffff;
-  border: 1px solid #dadce0;
-  border-radius: 50%;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.08);
-
-  /* Layout */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* Interaction */
-  cursor: pointer;
-  user-select: none;
-
-  /* Z-index - handled by computedStyle */
-  z-index: 2147483647;
-
-  /* Animation - smooth position transitions */
-  transition:
-    all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    top 0.2s ease-out,
-    left 0.2s ease-out;
-  opacity: 1;
-}
-
-.ti-field-icon:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.ti-field-icon.is-hovering {
-  background-color: #f8f9fa;
-  border-color: #dadce0;
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.15),
-    0 2px 6px rgba(0, 0, 0, 0.1);
-  transform: scale(1.1) translateY(-1px);
-}
-
-.ti-field-icon.is-active {
-  background-color: #e8f0fe;
-  border-color: #4285f4;
-  transform: scale(0.95);
-}
-
-.ti-field-icon:focus-visible {
-  border-color: #4285f4;
-  box-shadow:
-    0 0 0 2px rgba(66, 133, 244, 0.2),
-    0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.ti-field-icon__svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  pointer-events: none;
-  transition: transform 0.2s ease;
-}
-
-.ti-field-icon.is-hovering .ti-field-icon__svg {
-  transform: scale(1.05);
-}
-
-.ti-field-icon.is-active .ti-field-icon__svg {
-  transform: scale(0.95);
-}
-
-/* Size variants */
-.ti-field-icon.size-small {
-  width: 24px;
-  height: 24px;
-}
-
-.ti-field-icon.size-medium {
-  width: 28px;
-  height: 28px;
-}
-
-.ti-field-icon.size-large {
-  width: 32px;
-  height: 32px;
-}
-
-.ti-field-icon.size-small .ti-field-icon__svg {
-  width: 14px;
-  height: 14px;
-}
-
-.ti-field-icon.size-medium .ti-field-icon__svg {
-  width: 16px;
-  height: 16px;
-}
-
-.ti-field-icon.size-large .ti-field-icon__svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* Placement-specific styles */
-.ti-field-icon.placement-inside-right,
-.ti-field-icon.placement-inside-left {
-  /* Inside placements have slightly different styling */
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(2px);
-}
-
-/* Smart attachment indicator */
-.ti-field-icon.smart-attached {
-  /* Visual indicator for smart positioning */
-  box-shadow:
-    0 2px 8px rgba(66, 133, 244, 0.1),
-    0 1px 3px rgba(66, 133, 244, 0.08),
-    inset 0 0 0 1px rgba(66, 133, 244, 0.1);
-}
-
-/* Vue transitions */
-.icon-enter-active,
-.icon-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.icon-enter-from {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-.icon-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-/* Animation keyframes */
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .ti-field-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .ti-field-icon__svg {
-    width: 18px;
-    height: 18px;
-  }
-}
-
-/* High contrast mode */
-@media (prefers-contrast: high) {
-  .ti-field-icon {
-    border-width: 2px;
-    border-color: #000;
-  }
-
-  .ti-field-icon.is-hovering {
-    background-color: #000;
-  }
-
-  .ti-field-icon__svg {
-    filter: invert(1);
-  }
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .ti-field-icon {
-    animation: none;
-    transition: none;
-  }
-}
-
-/* Print styles */
-@media print {
-  .ti-field-icon {
-    display: none;
-  }
-}
+/* Component-specific styles that don't conflict with global styles */
 </style>

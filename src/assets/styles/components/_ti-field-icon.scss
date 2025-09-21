@@ -6,33 +6,35 @@
 
 .ti-field-icon {
   // Button reset
-  padding: 0;
-  margin: 0;
-  background: none;
-  border: none;
-  outline: none;
-  font: inherit;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  font: inherit !important;
 
   // Positioning - handled by Vue component computedStyle
-  position: fixed;
+  position: fixed !important;
 
   // Default size - overridden by size classes
-  width: 28px;
-  height: 28px;
+  width: 28px !important;
+  height: 28px !important;
 
   // Appearance
-  background-color: var(--bg-color, #ffffff);
-  border: $border-width $border-style var(--border-color, #e0e0e0);
-  border-radius: 50%;
-  @include shadow-base;
+  background-color: #ffffff !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 50% !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.08) !important;
 
   // Layout
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 
   // Interaction
-  cursor: pointer;
+  cursor: pointer !important;
   user-select: none;
 
   // CSS containment for better isolation
@@ -40,15 +42,15 @@
   isolation: isolate;
 
   // High z-index using CSS custom property
-  z-index: var(--ti-z-max, #{$z-overlay + 1000000});
-  
+  z-index: 2147483647 !important;
+
   // Enhanced animations - smooth position transitions
-  transition: 
+  transition:
     all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.2s ease-out,
     left 0.2s ease-out,
-    transform 0.15s ease-out;
-  opacity: 1;
+    transform 0.15s ease-out !important;
+  opacity: 1 !important;
 
   &:disabled {
     opacity: 0.5;
@@ -57,71 +59,73 @@
   }
 
   &.is-hovering {
-    background-color: #f8f9fa;
-    border-color: #dadce0;
-    @include shadow-md;
-    transform: scale(1.1) translateY(-1px);
+    background-color: #f8f9fa !important;
+    border-color: #dadce0 !important;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.15),
+      0 2px 6px rgba(0, 0, 0, 0.1) !important;
+    transform: scale(1.1) translateY(-1px) !important;
   }
 
   &.is-active {
-    background-color: #e8f0fe;
-    border-color: #4285f4;
-    transform: scale(0.95);
+    background-color: #e8f0fe !important;
+    border-color: #4285f4 !important;
+    transform: scale(0.95) !important;
   }
 
   &:focus-visible {
-    border-color: #4285f4;
-    box-shadow: 
+    border-color: #4285f4 !important;
+    box-shadow:
       0 0 0 2px rgba(66, 133, 244, 0.2),
-      0 2px 8px rgba(0, 0, 0, 0.1);
+      0 2px 8px rgba(0, 0, 0, 0.1) !important;
   }
 }
 
 .ti-field-icon__svg {
-  width: 16px;
-  height: 16px;
-  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
   pointer-events: none;
-  @include transition-fast(transform);
+  transition: transform 0.2s ease !important;
 
   .ti-field-icon.is-hovering & {
-    transform: scale(1.05);
+    transform: scale(1.05) !important;
   }
 
   .ti-field-icon.is-active & {
-    transform: scale(0.95);
+    transform: scale(0.95) !important;
   }
 }
 
 // Size variants
 .ti-field-icon {
   &.size-small {
-    width: 24px;
-    height: 24px;
+    width: 24px !important;
+    height: 24px !important;
 
     .ti-field-icon__svg {
-      width: 14px;
-      height: 14px;
+      width: 14px !important;
+      height: 14px !important;
     }
   }
 
   &.size-medium {
-    width: 28px;
-    height: 28px;
+    width: 28px !important;
+    height: 28px !important;
 
     .ti-field-icon__svg {
-      width: 16px;
-      height: 16px;
+      width: 16px !important;
+      height: 16px !important;
     }
   }
 
   &.size-large {
-    width: 32px;
-    height: 32px;
+    width: 32px !important;
+    height: 32px !important;
 
     .ti-field-icon__svg {
-      width: 18px;
-      height: 18px;
+      width: 18px !important;
+      height: 18px !important;
     }
   }
 }
@@ -220,33 +224,33 @@
 @media (max-width: 768px) {
   .ti-field-icon {
     // Slightly larger on mobile for easier touch interaction
-    &.size-small { 
-      width: 28px; 
-      height: 28px; 
-      
-      .ti-field-icon__svg { 
-        width: 16px; 
-        height: 16px; 
+    &.size-small {
+      width: 28px !important;
+      height: 28px !important;
+
+      .ti-field-icon__svg {
+        width: 16px !important;
+        height: 16px !important;
       }
     }
-    
-    &.size-medium { 
-      width: 32px; 
-      height: 32px; 
-      
-      .ti-field-icon__svg { 
-        width: 18px; 
-        height: 18px; 
+
+    &.size-medium {
+      width: 32px !important;
+      height: 32px !important;
+
+      .ti-field-icon__svg {
+        width: 18px !important;
+        height: 18px !important;
       }
     }
-    
-    &.size-large { 
-      width: 36px; 
-      height: 36px; 
-      
-      .ti-field-icon__svg { 
-        width: 20px; 
-        height: 20px; 
+
+    &.size-large {
+      width: 36px !important;
+      height: 36px !important;
+
+      .ti-field-icon__svg {
+        width: 20px !important;
+        height: 20px !important;
       }
     }
   }

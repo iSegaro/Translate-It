@@ -221,11 +221,23 @@ if (!access.isAccessible) {
         appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
         appStyleEl.setAttribute('data-frame-context', executionMode);
         
-        // Include all app styles with iframe-specific adjustments
+        // Include all app styles with critical reset first
         appStyleEl.textContent = `
+          /* Minimal Shadow DOM Reset - Only essential properties */
+          :host {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 2147483647 !important;
+            pointer-events: none !important;
+          }
+
           /* App styles with Shadow DOM reset included */
           ${appStyles}
-          
+
           /* IFrame-specific adjustments */
           ${isInIframe ? `
           :host {

@@ -1,11 +1,12 @@
 <template>
   <!-- Small loading window -->
-  <div 
+  <div
     v-if="currentSize === 'small'"
     ref="windowElement"
     class="ti-window aiwc-selection-popup-host ti-loading-window"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
+    data-translate-ui="true"
     @mousedown.stop
     @click.stop
   >
@@ -18,12 +19,13 @@
   </div>
 
   <!-- Normal translation window -->
-  <div 
+  <div
     v-else
     ref="windowElement"
     class="ti-window aiwc-selection-popup-host normal-window"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
+    data-translate-ui="true"
     @mousedown.stop
     @click.stop
   >

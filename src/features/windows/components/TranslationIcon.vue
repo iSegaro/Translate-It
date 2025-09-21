@@ -5,6 +5,7 @@
     class="translation-icon"
     :class="{ 'is-hovering': isHovering, 'is-active': isActive }"
     :style="dynamicStyle"
+    data-translate-ui="true"
     :title="$t ? $t('translateSelectedText') : 'Translate selected text'"
     :aria-label="$t ? $t('translateSelectedText') : 'Translate selected text'"
     role="button"
@@ -123,7 +124,7 @@ const dynamicStyle = computed(() => {
     border: `1px solid ${brdColor}`,
     boxShadow: boxShadow,
     transform: xform,
-    
+
     // Static styles that might be overridden by user-agent
     display: 'flex',
     alignItems: 'center',
@@ -133,7 +134,12 @@ const dynamicStyle = computed(() => {
     padding: '0',
     margin: '0',
     outline: 'none',
-    
+
+    // Force LTR direction
+    direction: 'ltr',
+    textAlign: 'left',
+    unicodeBidi: 'plaintext',
+
     // Z-index and transition
     zIndex: 2147483645,
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',

@@ -16,10 +16,57 @@ This document describes the modern, principled CSS architecture implemented in t
 - CSS Containment for performance optimization
 - Logical properties for internationalization
 
-### 3. **Zero !important Policy**
-- Natural CSS cascade respected
-- Specificity wars eliminated
-- Maintainable and predictable styles
+### 3. **Strategic !important Usage**
+- Natural CSS cascade respected where possible
+- !important used only when necessary for Shadow DOM isolation
+- Prevents external page style interference
+- Maintains predictable styling in web page context
+
+## Shadow DOM Isolation
+
+### CSS Isolation Strategy
+The Translate-It extension renders all UI components in a Shadow DOM to prevent style conflicts with host pages. This requires special CSS considerations:
+
+#### 1. **Minimal Reset Approach**
+```scss
+:host {
+  display: block !important;
+  position: fixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+```
+
+#### 2. **Component-Specific Direction**
+- WindowsManager containers (header, window frame) are forced LTR
+- TranslationDisplay maintains dynamic direction based on content
+- All interactive components use LTR for consistent UI
+
+#### 3. **Selective !important Usage**
+```scss
+.ti-field-icon {
+  /* Essential properties need !important for Shadow DOM */
+  position: fixed !important;
+  pointer-events: all !important;
+  z-index: 2147483647 !important;
+
+  /* Non-essential properties follow natural cascade */
+  transition: all 0.25s ease;
+}
+```
+
+### Best Practices for Shadow DOM Styling
+
+#### DO ✅
+- Use !important for positioning and z-index in Shadow DOM
+- Force LTR on UI containers but keep content dynamic
+- Test on pages with aggressive CSS resets
+- Use `unicode-bidi: plaintext` for proper text direction
+
+#### DON'T ❌
+- Apply global resets with `all: initial/unset`
+- Override text direction in translation content
+- Neglect cross-browser Shadow DOM behavior
 
 ## Architecture Components
 
@@ -296,11 +343,12 @@ $font-size-base: 14px;
 - Establish design token system
 
 ### DON'T ❌
-- Use !important declarations
+- Use !important declarations unnecessarily (only for Shadow DOM isolation)
 - Hardcode values in CSS
 - Mix SCSS variables directly in CSS properties
 - Rely on complex CSS specificity
 - Ignore browser compatibility
+- Apply aggressive CSS resets that break component functionality
 
 ## Future Roadmap
 
