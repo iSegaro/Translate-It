@@ -5,6 +5,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandler');
 
@@ -34,6 +35,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     // Track Ctrl key state
     this.ctrlKeyPressed = false;
+    this.lastKeyEventTime = 0;
+    this.lastMouseEventTime = 0;
 
     // Simple drag detection to prevent selection during drag
     this.isDragging = false;
@@ -42,6 +45,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     // Element detection service
     this.elementDetection = ElementDetectionService;
+
+    // Settings change listeners
+    this._settingsListeners = [];
 
     // Bind methods
     this.handleSelectionChange = this.handleSelectionChange.bind(this);
@@ -67,6 +73,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Setup event listeners
       this.setupEventListeners();
+
+      // Setup settings listeners
+      this.setupSettingsListeners();
 
       // Note: SelectionManager is already a ResourceTracker and handles its own cleanup
       // We just need to null our reference when we're deactivated
@@ -102,6 +111,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.selectionTimeout = null;
       }
 
+      // Clean up settings listeners
+      this._settingsListeners.forEach(unsubscribe => {
+        if (unsubscribe) unsubscribe();
+      });
+      this._settingsListeners = [];
+
       // Clean up our reference (SelectionManager cleans itself up)
       this.selectionManager = null;
 
@@ -116,6 +131,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       logger.error('Error deactivating SimpleTextSelectionHandler:', error);
       try {
         this.selectionManager = null;
+        this._settingsListeners = [];
         this.cleanup();
         this.isActive = false;
         return true;
@@ -153,6 +169,55 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   }
 
   /**
+   * Setup settings change listeners for reactive updates
+   */
+  setupSettingsListeners() {
+    try {
+      // EXTENSION_ENABLED changes
+      this._settingsListeners.push(
+        settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
+          logger.debug('EXTENSION_ENABLED changed:', newValue);
+          if (!newValue && this.selectionManager) {
+            this.selectionManager.dismissWindow();
+          }
+        }, 'simple-text-selection')
+      );
+
+      // TRANSLATE_ON_TEXT_SELECTION changes
+      this._settingsListeners.push(
+        settingsManager.onChange('TRANSLATE_ON_TEXT_SELECTION', (newValue) => {
+          logger.debug('TRANSLATE_ON_TEXT_SELECTION changed:', newValue);
+          if (!newValue && this.selectionManager) {
+            this.selectionManager.dismissWindow();
+          }
+        }, 'simple-text-selection')
+      );
+
+      // REQUIRE_CTRL_FOR_TEXT_SELECTION changes
+      this._settingsListeners.push(
+        settingsManager.onChange('REQUIRE_CTRL_FOR_TEXT_SELECTION', (newValue) => {
+          logger.debug('REQUIRE_CTRL_FOR_TEXT_SELECTION changed:', newValue);
+        }, 'simple-text-selection')
+      );
+
+      // selectionTranslationMode changes
+      this._settingsListeners.push(
+        settingsManager.onChange('selectionTranslationMode', (newValue) => {
+          logger.debug('selectionTranslationMode changed:', newValue);
+          if (newValue === 'onClick' && this.selectionManager) {
+            this.selectionManager.dismissWindow();
+          }
+        }, 'simple-text-selection')
+      );
+
+      logger.debug('Settings listeners setup complete');
+
+    } catch (error) {
+      logger.error('Failed to setup settings listeners:', error);
+    }
+  }
+
+  /**
    * Handle selection change events - the heart of our simplified system
    */
   handleSelectionChange() {
@@ -165,6 +230,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     // Debounce to avoid excessive processing
     this.selectionTimeout = setTimeout(() => {
+      // Get current Ctrl key state from the SelectionEvent or use last known state
       this.processSelection();
     }, this.debounceDelay);
   }
@@ -251,17 +317,24 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    */
   async shouldProcessSelection() {
     try {
-      // Import settings dynamically to avoid circular dependencies
-      const { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG } =
-        await import('@/shared/config/config.js');
+      // Check if extension and text selection feature are enabled
+      const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+      const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', false);
 
-      const settings = await getSettingsAsync();
-      const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      if (!isExtensionEnabled || !isTextSelectionEnabled) {
+        return false;
+      }
+
+      const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
+      logger.debug('Selection translation mode:', selectionTranslationMode);
 
       // Only check Ctrl requirement in immediate mode
       if (selectionTranslationMode === "immediate") {
-        const requireCtrl = await getRequireCtrlForTextSelectionAsync();
-        if (requireCtrl && !this.ctrlKeyPressed) {
+        const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
+        const isCtrlPressed = this.isCtrlRecentlyPressed();
+        logger.debug('Ctrl requirement check:', { requireCtrl, ctrlPressed: isCtrlPressed });
+        if (requireCtrl && !isCtrlPressed) {
+          logger.debug('Ctrl key required but not pressed, skipping selection');
           return false;
         }
       }
@@ -359,11 +432,89 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   }
 
   /**
+   * Update Ctrl key state by checking actual keyboard state
+   */
+  updateCtrlKeyState() {
+    // Use Keyboard API if available (most reliable)
+    if (typeof navigator.keyboard !== 'undefined') {
+      try {
+        const hasCtrl = navigator.keyboard.getModifierState('Control');
+        const hasMeta = navigator.keyboard.getModifierState('Meta');
+        this.ctrlKeyPressed = hasCtrl || hasMeta;
+        logger.debug('Ctrl key state from Keyboard API:', this.ctrlKeyPressed);
+        return;
+      } catch (error) {
+        logger.debug('Keyboard API failed, using fallback');
+      }
+    }
+
+    // Simple and reliable fallback
+    // The issue is that we can't reliably get modifier state without Keyboard API
+    // So we'll use a simple time-based reset to prevent the "stuck Ctrl" issue
+    if (Date.now() - this.lastKeyEventTime > 300) {
+      // If no key event for 300ms, check if we should reset Ctrl state
+      // Only reset if it was previously true (to avoid false negatives)
+      if (this.ctrlKeyPressed) {
+        // We can't be sure, so let's assume Ctrl is not pressed
+        // This is better than having it stuck on true
+        this.ctrlKeyPressed = false;
+        logger.debug('Ctrl key state reset after timeout');
+      }
+    }
+  }
+
+  /**
+   * Check if a key event was recent (within last 100ms)
+   */
+  isKeyEventRecent() {
+    return Date.now() - this.lastKeyEventTime < 100;
+  }
+
+  /**
+   * Check if Ctrl key was pressed recently (within last 200ms)
+   * This is more reliable than trying to get the current keyboard state
+   */
+  isCtrlRecentlyPressed() {
+    const now = Date.now();
+
+    // If we have a recent keydown event, use the stored state
+    if (now - this.lastKeyEventTime < 200) {
+      return this.ctrlKeyPressed;
+    }
+
+    // If we have a recent mouse event, try to get the modifier state from the event
+    if (now - this.lastMouseEventTime < 100) {
+      // Check if the last mouse event had Ctrl pressed
+      // This helps when Ctrl is held during mouse operations
+      try {
+        // We can't get the actual modifier state from past events
+        // So we'll use a heuristic: if Ctrl was recently pressed and we're in a mouse operation,
+        // assume it's still pressed
+        return this.ctrlKeyPressed && (now - this.lastKeyEventTime < 1000);
+      } catch (error) {
+        // Fall back to simple check
+        return this.ctrlKeyPressed;
+      }
+    }
+
+    // If no recent events, check if we should maintain the Ctrl state
+    // Only maintain if it was set within the last second
+    if (this.ctrlKeyPressed && (now - this.lastKeyEventTime < 1000)) {
+      return true;
+    }
+
+    // Otherwise, assume Ctrl is not pressed
+    return false;
+  }
+
+  /**
    * Handle key down events for Ctrl tracking
    */
   handleKeyDown(event) {
+    this.lastKeyEventTime = Date.now();
     if (event.ctrlKey || event.metaKey) {
       this.ctrlKeyPressed = true;
+      logger.debug('Ctrl key pressed down');
     }
   }
 
@@ -371,8 +522,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Handle key up events for Ctrl tracking
    */
   handleKeyUp(event) {
+    this.lastKeyEventTime = Date.now();
     if (!event.ctrlKey && !event.metaKey) {
       this.ctrlKeyPressed = false;
+      logger.debug('Ctrl key released');
     }
   }
 
@@ -380,6 +533,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Handle mouse down - start drag detection
    */
   handleMouseDown(event) {
+    this.lastMouseEventTime = Date.now();
     this.isDragging = true;
     this.mouseDownTime = Date.now();
 
@@ -390,15 +544,24 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Handle mouse up - end drag detection and process selection if needed
    */
   handleMouseUp(event) {
+    this.lastMouseEventTime = Date.now();
     const dragDuration = Date.now() - this.mouseDownTime;
 
     logger.debug('Mouse up - drag detection ended', {
       dragDuration,
-      wasDragging: this.isDragging
+      wasDragging: this.isDragging,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey
     });
 
     this.isDragging = false;
     this.lastMouseUpEvent = event; // Store for translation window detection
+
+    // Update Ctrl state from mouse event if available
+    if (event.ctrlKey || event.metaKey) {
+      this.ctrlKeyPressed = true;
+      this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
+    }
 
     // If there's a selection after mouse up, process it with a small delay
     setTimeout(() => {

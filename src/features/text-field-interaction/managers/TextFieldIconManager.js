@@ -7,7 +7,6 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { detectPlatform, Platform } from "@/utils/browser/platform.js";
 import { state } from "@/shared/config/config.js";
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -15,6 +14,7 @@ import { PositionCalculator } from '../utils/PositionCalculator.js';
 import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
@@ -76,18 +76,18 @@ export class TextFieldIconManager extends ResourceTracker {
       const iconData = Array.from(this.activeIcons.values()).find(icon => icon.id === detail.id);
       if (iconData && iconData.targetElement) {
         this.logger.debug('Triggering translation for element:', iconData.targetElement.tagName);
-        
+
         // Debug: Check if translationHandler exists and has the method
         if (!this.translationHandler) {
           this.logger.error('Translation handler is not available!');
           return;
         }
-        
+
         if (typeof this.translationHandler.processTranslation_with_CtrlSlash !== 'function') {
           this.logger.error('processTranslation_with_CtrlSlash method not found on translation handler!');
           return;
         }
-        
+
         // Call the translation handler
         this.translationHandler.processTranslation_with_CtrlSlash({
           text: iconData.targetElement.value || iconData.targetElement.textContent,
@@ -97,6 +97,25 @@ export class TextFieldIconManager extends ResourceTracker {
         this.cleanupElement(iconData.targetElement);
       }
     });
+
+    // Listen for settings changes
+    this._settingsListeners = [
+      settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
+        this.logger.debug('EXTENSION_ENABLED changed:', newValue);
+        if (!newValue) {
+          // Clean up all icons when extension is disabled
+          this.cleanup();
+        }
+      }, 'text-field-icon-manager'),
+
+      settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', (newValue) => {
+        this.logger.debug('TRANSLATE_ON_TEXT_FIELDS changed:', newValue);
+        if (!newValue) {
+          // Clean up all icons when text field feature is disabled
+          this.cleanup();
+        }
+      }, 'text-field-icon-manager')
+    ];
   }
 
   /**
@@ -197,24 +216,18 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {boolean|null} Whether to process (null = skip silently)
    */
   async shouldProcessTextField(element) {
-    // Context validation: Ensure the extension context is valid BEFORE any storage calls
+    // Context validation: Ensure the extension context is valid BEFORE any settings calls
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Skipping icon creation: Extension context is invalid.');
       return null;
     }
 
-    // Get current settings from storage using safe operation
-    const settings = await ExtensionContextManager.safeStorageOperation(
-      () => storageManager.get([
-        'EXTENSION_ENABLED',
-        'TRANSLATE_ON_TEXT_FIELDS'
-      ]),
-      'text-field-icon-settings',
-      { EXTENSION_ENABLED: false, TRANSLATE_ON_TEXT_FIELDS: false }
-    );
+    // Get settings from SettingsManager
+    const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+    const isTextFieldFeatureEnabled = settingsManager.get('TRANSLATE_ON_TEXT_FIELDS', false);
 
     // Basic validation
-    if (!settings?.EXTENSION_ENABLED) {
+    if (!isExtensionEnabled) {
       this.logger.debug('Skipping icon creation: Extension is disabled.');
       return null;
     }
@@ -226,7 +239,7 @@ export class TextFieldIconManager extends ResourceTracker {
     }
 
     // Feature flag check
-    if (!settings?.TRANSLATE_ON_TEXT_FIELDS) {
+    if (!isTextFieldFeatureEnabled) {
       this.logger.debug('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
       return false;
     }
@@ -505,6 +518,27 @@ export class TextFieldIconManager extends ResourceTracker {
     super.cleanup();
 
     this.logger.debug('Enhanced cleanup completed');
+  }
+
+  /**
+   * Cleanup all resources including settings listeners
+   */
+  destroy() {
+    this.logger.debug('Destroying TextFieldIconManager');
+
+    // Cleanup settings listeners
+    if (this._settingsListeners) {
+      this._settingsListeners.forEach(unsubscribe => unsubscribe());
+      this._settingsListeners = null;
+    }
+
+    // Clean up all icons and attachments
+    this.cleanup();
+
+    // Remove all tracked resources
+    this.clearAllResources();
+
+    this.logger.debug('TextFieldIconManager destroyed');
   }
 
   /**

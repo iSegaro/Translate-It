@@ -33,6 +33,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { settingsManager } from '@/shared/managers/SettingsManager.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
@@ -73,6 +74,22 @@ const saveAllSettings = async () => {
   try {
     await settingsStore.saveAllSettings()
     logger.debug('✅ All settings saved successfully')
+
+    // Refresh settings in all content scripts
+    await settingsManager.refreshSettings()
+
+    // Notify all tabs about settings change
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      try {
+        await chrome.runtime.sendMessage({
+          type: 'SETTINGS_UPDATED',
+          timestamp: Date.now()
+        })
+        logger.debug('✅ Settings update notification sent to all tabs')
+      } catch (error) {
+        logger.debug('Could not send settings update notification:', error)
+      }
+    }
     statusType.value = 'success'
   statusMessage.value = t('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     

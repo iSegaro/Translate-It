@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isEditable } from "@/core/helpers.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -16,7 +17,7 @@ export class FieldShortcutManager {
     this.translationHandler = null;
     this.featureManager = null;
     this.initialized = false;
-    
+
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FieldShortcutManager');
     this.logger.init('FieldShortcutManager initialized');
@@ -30,7 +31,12 @@ export class FieldShortcutManager {
     this.translationHandler = dependencies.translationHandler;
     this.featureManager = dependencies.featureManager;
     this.initialized = true;
-    
+
+    // Listen for settings changes
+    this._settingsUnsubscribe = settingsManager.onChange('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', (newValue) => {
+      this.logger.debug('ENABLE_SHORTCUT_FOR_TEXT_FIELDS changed:', newValue);
+    }, 'field-shortcut-manager');
+
     this.logger.debug('Initialized with dependencies');
   }
 
@@ -51,9 +57,17 @@ export class FieldShortcutManager {
       return false;
     }
 
-    // Check if feature is enabled (SHORTCUT_TEXT_FIELDS)
-    if (!this.featureManager?.isOn("SHORTCUT_TEXT_FIELDS")) {
-      this.logger.debug('SHORTCUT_TEXT_FIELDS feature is disabled');
+    // Check if extension and feature are enabled
+    const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+    const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
+
+    if (!isExtensionEnabled) {
+      this.logger.debug('Extension is disabled');
+      return false;
+    }
+
+    if (!isShortcutEnabled) {
+      this.logger.debug('ENABLE_SHORTCUT_FOR_TEXT_FIELDS feature is disabled');
       return false;
     }
 
@@ -199,10 +213,16 @@ export class FieldShortcutManager {
    * Cleanup resources
    */
   cleanup() {
+    // Unsubscribe from settings changes
+    if (this._settingsUnsubscribe) {
+      this._settingsUnsubscribe();
+      this._settingsUnsubscribe = null;
+    }
+
     this.translationHandler = null;
     this.featureManager = null;
     this.initialized = false;
-    
+
     this.logger.debug('Cleaned up');
   }
 }

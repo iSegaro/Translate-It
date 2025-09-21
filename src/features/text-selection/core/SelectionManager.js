@@ -1,7 +1,7 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { isUrlExcluded } from "@/utils/ui/exclusion.js";
-import { getSettingsAsync, CONFIG } from "@/shared/config/config.js";
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';

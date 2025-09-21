@@ -1,4 +1,4 @@
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { isUrlExcluded, isUrlExcluded_TEXT_FIELDS_ICON } from '@/utils/ui/exclusion.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -12,42 +12,30 @@ export class ExclusionChecker {
     this.currentUrl = window.location.href;
     this.settings = null;
     this.initialized = false;
+    this.settingsListeners = [];
   }
 
   async initialize() {
     try {
       logger.debug('Initializing ExclusionChecker for URL:', this.currentUrl);
-      
-      this.settings = await storageManager.get([
-        'EXTENSION_ENABLED',
-        'TRANSLATE_WITH_SELECT_ELEMENT', 
-        'TRANSLATE_ON_TEXT_SELECTION',
-        'TRANSLATE_ON_TEXT_FIELDS',
-        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-        'EXCLUDED_SITES'
-      ]);
+
+      // Initialize settings from SettingsManager
+      await settingsManager.initialize();
+
+      // Setup settings change listeners
+      this.setupSettingsListeners();
 
       this.initialized = true;
-      logger.debug('ExclusionChecker initialized with settings:', Object.keys(this.settings));
-      
+      logger.debug('ExclusionChecker initialized');
+
     } catch (error) {
       const handler = ErrorHandler.getInstance();
-      handler.handle(error, { 
-        type: ErrorTypes.SERVICE, 
+      handler.handle(error, {
+        type: ErrorTypes.SERVICE,
         context: 'ExclusionChecker-initialize',
-        showToast: false 
+        showToast: false
       });
-      
-      // Fallback to defaults if storage fails
-      this.settings = {
-        EXTENSION_ENABLED: true,
-        TRANSLATE_WITH_SELECT_ELEMENT: true,
-        TRANSLATE_ON_TEXT_SELECTION: true,
-        TRANSLATE_ON_TEXT_FIELDS: false,
-        ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
-        EXCLUDED_SITES: []
-      };
-      
+
       this.initialized = true;
       logger.warn('ExclusionChecker initialized with fallback defaults due to error');
     }
@@ -64,6 +52,59 @@ export class ExclusionChecker {
     }
   }
 
+  /**
+   * Setup settings change listeners for reactive updates
+   */
+  setupSettingsListeners() {
+    try {
+      // Listen for EXTENSION_ENABLED changes
+      this.settingsListeners.push(
+        settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
+          logger.debug('EXTENSION_ENABLED changed, refreshing features:', newValue);
+          this.refreshFeaturesOnSettingsChange();
+        }, 'exclusion-checker')
+      );
+
+      // Listen for feature-specific setting changes
+      const featureSettings = [
+        'TRANSLATE_WITH_SELECT_ELEMENT',
+        'TRANSLATE_ON_TEXT_SELECTION',
+        'TRANSLATE_ON_TEXT_FIELDS',
+        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS'
+      ];
+
+      featureSettings.forEach(setting => {
+        this.settingsListeners.push(
+          settingsManager.onChange(setting, (newValue) => {
+            logger.debug(`${setting} changed, refreshing features:`, newValue);
+            this.refreshFeaturesOnSettingsChange();
+          }, 'exclusion-checker')
+        );
+      });
+
+      // Listen for EXCLUDED_SITES changes
+      this.settingsListeners.push(
+        settingsManager.onChange('EXCLUDED_SITES', (newValue) => {
+          logger.debug('EXCLUDED_SITES changed, refreshing features:', newValue);
+          this.refreshFeaturesOnSettingsChange();
+        }, 'exclusion-checker')
+      );
+
+    } catch (error) {
+      logger.error('Failed to setup settings listeners:', error);
+    }
+  }
+
+  /**
+   * Refresh features when settings change
+   */
+  refreshFeaturesOnSettingsChange() {
+    // Notify FeatureManager to re-evaluate features
+    if (window.featureManager && typeof window.featureManager.evaluateAndRegisterFeatures === 'function') {
+      window.featureManager.evaluateAndRegisterFeatures();
+    }
+  }
+
   async isFeatureAllowed(featureName) {
     if (!this.initialized) {
       await this.initialize();
@@ -71,17 +112,18 @@ export class ExclusionChecker {
 
     try {
       // Global extension check
-      if (!this.settings.EXTENSION_ENABLED) {
+      const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
+      if (!isExtensionEnabled) {
         logger.debug(`Feature ${featureName} blocked: extension disabled globally`);
         return false;
       }
-      
+
       // Feature-specific setting check
       if (!this.isFeatureEnabled(featureName)) {
         logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
         return false;
       }
-      
+
       // URL exclusion check
       if (this.isUrlExcludedForFeature(featureName)) {
         logger.debug(`Feature ${featureName} blocked: URL excluded`);
@@ -90,13 +132,13 @@ export class ExclusionChecker {
 
       logger.debug(`Feature ${featureName} allowed`);
       return true;
-      
+
     } catch (error) {
       const handler = ErrorHandler.getInstance();
-      handler.handle(error, { 
-        type: ErrorTypes.SERVICE, 
+      handler.handle(error, {
+        type: ErrorTypes.SERVICE,
         context: `ExclusionChecker-isFeatureAllowed-${featureName}`,
-        showToast: false 
+        showToast: false
       });
       
       // Default to blocked on error for safety
@@ -123,7 +165,7 @@ export class ExclusionChecker {
       return false;
     }
     
-    return this.settings[settingKey] ?? false;
+    return settingsManager.get(settingKey, false);
   }
 
   isUrlExcludedForFeature(featureName) {
@@ -134,7 +176,8 @@ export class ExclusionChecker {
       }
       
       // General exclusion for other features
-      return isUrlExcluded(this.currentUrl, this.settings.EXCLUDED_SITES || []);
+      const excludedSites = settingsManager.get('EXCLUDED_SITES', []);
+      return isUrlExcluded(this.currentUrl, excludedSites);
       
     } catch (error) {
       logger.error('Error checking URL exclusion:', error);
@@ -149,35 +192,49 @@ export class ExclusionChecker {
     }
 
     const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
+    const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,
       url: this.currentUrl,
-      globalEnabled: this.settings.EXTENSION_ENABLED,
+      globalEnabled: isExtensionEnabled,
       features: {}
     };
 
     features.forEach(feature => {
+      const featureEnabled = this.isFeatureEnabled(feature);
+      const urlExcluded = this.isUrlExcludedForFeature(feature);
       status.features[feature] = {
-        settingEnabled: this.isFeatureEnabled(feature),
-        urlExcluded: this.isUrlExcludedForFeature(feature),
-        allowed: this.settings.EXTENSION_ENABLED && 
-                this.isFeatureEnabled(feature) && 
-                !this.isUrlExcludedForFeature(feature)
+        settingEnabled: featureEnabled,
+        urlExcluded: urlExcluded,
+        allowed: isExtensionEnabled && featureEnabled && !urlExcluded
       };
     });
 
     return status;
   }
 
+  /**
+   * Cleanup resources
+   */
+  cleanup() {
+    // Remove all settings listeners
+    this.settingsListeners.forEach(unsubscribe => {
+      if (unsubscribe) unsubscribe();
+    });
+    this.settingsListeners = [];
+
+    logger.debug('ExclusionChecker cleaned up');
+  }
+
   // Static method to check if feature should be considered for a URL
   static shouldConsiderFeature(featureName, url) {
     // Quick pre-check without full initialization
     // Useful for avoiding unnecessary content script loading
-    
+
     if (featureName === 'textFieldIcon') {
       return !isUrlExcluded_TEXT_FIELDS_ICON(url);
     }
-    
+
     // For other features, we need settings so return true
     // and let the full check happen after initialization
     return true;

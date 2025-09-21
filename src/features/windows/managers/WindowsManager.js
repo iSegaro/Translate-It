@@ -13,7 +13,8 @@ import { TTSGlobalManager as globalTTSManager } from "@/features/tts/core/TTSGlo
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
-import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
@@ -230,20 +231,8 @@ export class WindowsManager extends ResourceTracker {
     
     // Check if this is an icon->window transition OR we're in onClick mode, preserve selection if so
     // In onClick mode, we show icons first and user will click later, so preserve selection
-    let isOnClickMode = false;
-    try {
-      const settings = await getSettingsAsync();
-      const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
-      isOnClickMode = selectionTranslationMode === 'onClick';
-    } catch (error) {
-      // If extension context is invalidated, use fallback values
-      if (ExtensionContextManager.isContextError(error)) {
-        const selectionTranslationMode = CONFIG.selectionTranslationMode;
-        isOnClickMode = selectionTranslationMode === 'onClick';
-      } else {
-        throw error;
-      }
-    }
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
+    const isOnClickMode = selectionTranslationMode === 'onClick';
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
     await this.dismiss(false, preserveSelection);
     
@@ -255,23 +244,7 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      let settings;
-      let selectionTranslationMode;
-      
-      try {
-        settings = await getSettingsAsync();
-        selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
-      } catch (error) {
-        // If extension context is invalidated, use fallback values
-        if (ExtensionContextManager.isContextError(error)) {
-          this.logger.debug('Extension context invalidated, using fallback settings for window display');
-          selectionTranslationMode = CONFIG.selectionTranslationMode;
-        } else {
-          // Re-throw non-context errors
-          throw error;
-        }
-      }
-
+      // Reuse the selectionTranslationMode from above
       this.logger.debug('Selection translation mode', { mode: selectionTranslationMode });
 
       if (selectionTranslationMode === "onClick") {

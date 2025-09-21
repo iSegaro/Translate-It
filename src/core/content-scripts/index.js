@@ -27,6 +27,9 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 // Import Notification System
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
+// Import Settings Update Handler
+import '@/shared/messaging/handlers/SettingsUpdateHandler.js';
+
 // Setup Trusted Types compatibility early
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
