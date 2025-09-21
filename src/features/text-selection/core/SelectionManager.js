@@ -18,6 +18,12 @@ export class SelectionManager extends ResourceTracker {
 
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectionManager');
 
+    // Mark this instance as critical to prevent cleanup during memory management
+    this.trackResource('selection-manager-critical', () => {
+      // This is the core selection manager - should not be cleaned up
+      this.logger.debug('Critical SelectionManager cleanup skipped');
+    }, { isCritical: true });
+
     // Check if current URL is excluded
     this.isExcluded = isUrlExcluded(window.location.href);
     if (this.isExcluded) {

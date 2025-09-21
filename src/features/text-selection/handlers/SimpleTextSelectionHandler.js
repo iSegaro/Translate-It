@@ -64,13 +64,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       // Setup event listeners
       this.setupEventListeners();
 
-      // Track resources for cleanup
-      this.trackResource('selection-manager', () => {
-        if (this.selectionManager) {
-          this.selectionManager.cleanup();
-          this.selectionManager = null;
-        }
-      });
+      // Note: SelectionManager is already a ResourceTracker and handles its own cleanup
+      // We just need to null our reference when we're deactivated
+      // No need to track it since it manages itself
 
       this.isActive = true;
       logger.info('SimpleTextSelectionHandler activated successfully');
@@ -102,6 +98,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.selectionTimeout = null;
       }
 
+      // Clean up our reference (SelectionManager cleans itself up)
+      this.selectionManager = null;
+
       // ResourceTracker will handle cleanup
       this.cleanup();
 
@@ -112,6 +111,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     } catch (error) {
       logger.error('Error deactivating SimpleTextSelectionHandler:', error);
       try {
+        this.selectionManager = null;
         this.cleanup();
         this.isActive = false;
         return true;
@@ -188,7 +188,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         }
 
         // No text selected and click outside translation window, dismiss
-        this.selectionManager.dismissWindow();
+        if (this.selectionManager) {
+          this.selectionManager.dismissWindow();
+        }
         return;
       }
 
@@ -217,7 +219,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       }
 
       // Process the selection
-      await this.selectionManager.processSelection(selectedText, selection);
+      if (this.selectionManager) {
+        await this.selectionManager.processSelection(selectedText, selection);
+      } else {
+        logger.warn('SelectionManager is null - this should not happen with critical protection');
+      }
 
     } catch (error) {
       logger.error('Error processing selection:', error);
