@@ -117,10 +117,18 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
     const target = event.target;
 
+    const isTextField = this.isTextField(target);
+
     logger.debug('Double-click detected', {
       target: target?.tagName,
       timestamp: Date.now(),
-      isTextField: this.isTextField(target)
+      isTextField: isTextField,
+      targetInfo: {
+        tagName: target?.tagName,
+        contentEditable: target?.contentEditable,
+        parentTagName: target?.parentElement?.tagName,
+        parentContentEditable: target?.parentElement?.contentEditable
+      }
     });
 
     // Only handle text fields and editable elements
@@ -156,6 +164,63 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    * Check if the target is a text field or editable element
    */
   isTextField(element) {
+    if (!element) {
+      logger.debug('isTextField: element is null');
+      return false;
+    }
+
+    logger.debug('isTextField: checking element', {
+      tagName: element.tagName,
+      contentEditable: element.contentEditable,
+      type: element.type
+    });
+
+    // Check the element itself first
+    if (this.isDirectTextField(element)) {
+      logger.debug('isTextField: element itself is text field');
+      return true;
+    }
+
+    // Check parent elements for contenteditable or professional editors
+    // This handles cases like Twitter where you click on SPAN inside contenteditable DIV
+    let currentElement = element.parentElement;
+    let depth = 0;
+    const maxDepth = 5; // Prevent infinite loops
+
+    logger.debug('isTextField: checking parent elements', {
+      hasParent: !!currentElement,
+      parentTag: currentElement?.tagName,
+      parentContentEditable: currentElement?.contentEditable
+    });
+
+    while (currentElement && depth < maxDepth) {
+      logger.debug('isTextField: checking parent at depth', {
+        depth: depth + 1,
+        parentTag: currentElement.tagName,
+        parentContentEditable: currentElement.contentEditable,
+        isDirectTextField: this.isDirectTextField(currentElement)
+      });
+
+      if (this.isDirectTextField(currentElement)) {
+        logger.debug('Found text field in parent element', {
+          clickedTag: element.tagName,
+          parentTag: currentElement.tagName,
+          depth: depth + 1
+        });
+        return true;
+      }
+      currentElement = currentElement.parentElement;
+      depth++;
+    }
+
+    logger.debug('isTextField: no text field found in element or parents');
+    return false;
+  }
+
+  /**
+   * Check if element is directly a text field (without checking parents)
+   */
+  isDirectTextField(element) {
     if (!element) return false;
 
     // Standard input fields
@@ -170,8 +235,10 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       return true;
     }
 
-    // Contenteditable elements
-    if (element.contentEditable === 'true') {
+    // Contenteditable elements (comprehensive check)
+    if (element.contentEditable === 'true' ||
+        element.isContentEditable === true ||
+        element.getAttribute('contenteditable') === 'true') {
       return true;
     }
 
@@ -187,35 +254,22 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    * Check if element is part of a professional editor
    */
   isProfessionalEditor(element) {
-    const hostname = window.location.hostname;
-
-    // Google Docs
-    if (hostname.includes('docs.google.com')) {
-      return element.closest('[contenteditable="true"]') ||
-             element.closest('.kix-page');
+    // General approach: look for contenteditable ancestors
+    // This works for most modern rich text editors
+    const editableAncestor = element.closest('[contenteditable="true"]');
+    if (editableAncestor) {
+      return true;
     }
 
-    // Microsoft Office Online
-    if (hostname.includes('office.live.com') || hostname.includes('office.com')) {
-      return element.closest('[contenteditable="true"]');
-    }
-
-    // Zoho Writer
-    if (hostname.includes('writer.zoho.com')) {
-      return element.closest('.zw-line-div') ||
-             element.closest('.zw-text-portion') ||
-             element.closest('#editorpane');
-    }
-
-    // WPS Office
-    if (hostname.includes('wps.com')) {
-      return element.closest('[contenteditable="true"]');
-    }
-
-    // Notion
-    if (hostname.includes('notion.so')) {
-      return element.closest('[contenteditable="true"]') ||
-             element.closest('.notion-text-block');
+    // Also check for isContentEditable property
+    let currentElement = element;
+    let depth = 0;
+    while (currentElement && depth < 5) {
+      if (currentElement.isContentEditable === true) {
+        return true;
+      }
+      currentElement = currentElement.parentElement;
+      depth++;
     }
 
     return false;
@@ -226,8 +280,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    */
   async processTextFieldDoubleClick(event) {
     try {
+      // Find the actual text field element (might be parent of clicked element)
+      const actualTextField = this.findActualTextField(event.target);
+
       // Get selected text
-      const selectedText = await this.getSelectedTextFromField(event.target);
+      const selectedText = await this.getSelectedTextFromField(actualTextField || event.target);
 
       if (!selectedText || !selectedText.trim()) {
         logger.debug('No text selected in text field');
@@ -236,11 +293,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
       logger.debug('Processing text field selection', {
         text: selectedText.substring(0, 30) + '...',
-        target: event.target?.tagName
+        clickedElement: event.target?.tagName,
+        actualTextField: actualTextField?.tagName || 'not found'
       });
 
-      // Calculate position
-      const position = this.calculateTextFieldPosition(event);
+      // Calculate position using the actual text field element
+      const position = this.calculateTextFieldPosition(event, actualTextField);
 
       if (!position) {
         logger.warn('Could not calculate position for text field');
@@ -253,6 +311,38 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     } catch (error) {
       logger.error('Error processing text field double-click:', error);
     }
+  }
+
+  /**
+   * Find the actual text field element (handles cases where we click on child elements)
+   */
+  findActualTextField(element) {
+    if (!element) return null;
+
+    // Check the element itself first
+    if (this.isDirectTextField(element)) {
+      return element;
+    }
+
+    // Check parent elements
+    let currentElement = element.parentElement;
+    let depth = 0;
+    const maxDepth = 5;
+
+    while (currentElement && depth < maxDepth) {
+      if (this.isDirectTextField(currentElement)) {
+        logger.debug('Found actual text field in parent', {
+          clickedTag: element.tagName,
+          actualFieldTag: currentElement.tagName,
+          depth: depth + 1
+        });
+        return currentElement;
+      }
+      currentElement = currentElement.parentElement;
+      depth++;
+    }
+
+    return null;
   }
 
   /**
@@ -311,9 +401,10 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   /**
    * Calculate position for text field translation UI
    */
-  calculateTextFieldPosition(event) {
+  calculateTextFieldPosition(event, actualTextField = null) {
     try {
-      const element = event.target;
+      // Use actual text field element if provided, otherwise use event target
+      const element = actualTextField || event.target;
       const rect = element.getBoundingClientRect();
 
       // Use double-click position if available
