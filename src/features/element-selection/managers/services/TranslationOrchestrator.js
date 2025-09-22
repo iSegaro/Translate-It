@@ -510,24 +510,56 @@ this.translationRequests.delete(messageId);
       // Check if stream ended with error OR if there were errors during streaming
       if (data?.error || !data?.success || request.hasErrors) {
         this.logger.warn(`Stream ended with error for messageId: ${messageId}`, data?.error || request.lastError);
-        
+
         // Handle error properly for user feedback
         const errorMessage = data?.error?.message || request.lastError?.message || 'Translation failed during streaming';
         const error = new Error(errorMessage);
         error.originalError = data?.error || request.lastError;
-        
+
+        // Check if we should retry with a fallback provider
+        const shouldRetry = !request.retryAttempt && (
+          error.originalError?.type === ErrorTypes.HTML_RESPONSE_ERROR ||
+          error.originalError?.type === ErrorTypes.JSON_PARSING_ERROR ||
+          error.originalError?.type === ErrorTypes.TRANSLATION_FAILED ||
+          (data?.error?.message && (
+            data.error.message.includes('HTML response') ||
+            data.error.message.includes('JSON parsing') ||
+            data.error.message.includes('Failed to execute \'json\' on \'Response\'')
+          ))
+        );
+
+        if (shouldRetry) {
+          this.logger.info('Attempting retry with fallback provider due to recoverable error', {
+            messageId,
+            errorType: error.originalError?.type || 'unknown'
+          });
+
+          // Try to retry with fallback provider
+          const retrySuccess = await this.retryWithFallbackProvider(
+            messageId,
+            JSON.stringify(request.textsToTranslate.map(t => ({ text: t }))),
+            error
+          );
+
+          if (retrySuccess) {
+            // Don't delete the original request yet - wait for retry to complete
+            return;
+          }
+          // If retry failed or wasn't possible, continue with normal error handling
+        }
+
         // Use centralized error handling to show error to user
         await this.errorHandler.handle(error, {
           context: 'select-element-streaming-translation-end',
           type: ErrorTypes.TRANSLATION_FAILED,
           showToast: true
         });
-        
+
         // Notify SelectElementManager to perform cleanup
         if (window.selectElementManagerInstance) {
           window.selectElementManagerInstance.performPostTranslationCleanup();
         }
-        
+
         this.translationRequests.delete(messageId);
         return;
       }
@@ -887,6 +919,219 @@ this.translationRequests.delete(messageId);
       window.selectElementManagerInstance.performPostTranslationCleanup();
     } else {
       this.logger.warn('Cannot trigger cleanup: SelectElementManager not available');
+    }
+  }
+
+  /**
+   * Retry translation with a fallback provider
+   * @param {string} messageId - Original message ID
+   * @param {string} jsonPayload - Translation payload
+   * @param {Error} originalError - Original error that triggered retry
+   * @returns {Promise<boolean>} - True if retry was successful
+   */
+  async retryWithFallbackProvider(messageId, jsonPayload, originalError) {
+    try {
+      this.logger.info('Attempting translation retry with fallback provider', {
+        messageId,
+        originalError: originalError.message
+      });
+
+      // Check if request still exists
+      const request = this.translationRequests.get(messageId);
+      if (!request) {
+        this.logger.warn('Cannot retry: request not found', { messageId });
+        return false;
+      }
+
+      // Get available providers
+      const { getAvailableProvidersAsync } = await import("../../../../config.js");
+      const availableProviders = await getAvailableProvidersAsync();
+
+      // Get current provider
+      const { getTranslationApiAsync } = await import("../../../../config.js");
+      const currentProvider = await getTranslationApiAsync();
+      const currentProviderName = currentProvider?.providerName || 'unknown';
+
+      // Find next available provider that isn't the current one
+      const fallbackProvider = availableProviders.find(p =>
+        p.name !== currentProviderName &&
+        p.enabled &&
+        p.configured
+      );
+
+      if (!fallbackProvider) {
+        this.logger.warn('No fallback provider available', {
+          currentProvider: currentProviderName,
+          availableProviders: availableProviders.map(p => p.name)
+        });
+        return false;
+      }
+
+      this.logger.info('Found fallback provider for retry', {
+        currentProvider: currentProviderName,
+        fallbackProvider: fallbackProvider.name
+      });
+
+      // Update request to indicate retry attempt
+      request.retryAttempt = (request.retryAttempt || 0) + 1;
+      request.status = 'retrying';
+
+      // Show retry notification
+      pageEventBus.emit('show-notification', {
+        type: 'info',
+        title: 'Retrying Translation',
+        message: `Failed with ${currentProviderName}, retrying with ${fallbackProvider.name}...`,
+        duration: 3000,
+        id: `retry-${messageId}`
+      });
+
+      // Create new message ID for retry to avoid conflicts
+      const retryMessageId = generateContentMessageId('select-element-retry');
+
+      // Prepare retry request
+      const retryRequest = {
+        ...request,
+        retryOriginalMessageId: messageId,
+        originalProvider: currentProviderName,
+        fallbackProvider: fallbackProvider.name
+      };
+
+      // Store retry request
+      this.translationRequests.set(retryMessageId, retryRequest);
+
+      // Send retry request with fallback provider
+      const { setTranslationApiAsync } = await import("../../../../config.js");
+      await setTranslationApiAsync(fallbackProvider.name);
+
+      // Send the translation request through unified messaging
+      const translationRequest = {
+        action: MessageActions.TRANSLATE,
+        data: {
+          text: jsonPayload,
+          sourceLang: request.sourceLang,
+          targetLang: request.targetLang,
+          mode: TranslationMode.SelectElement,
+          messageId: retryMessageId,
+          context: 'select-element-retry'
+        }
+      };
+
+      // Register streaming handler for retry
+      this.streamingHandler.registerHandler(retryMessageId, {
+        onStreamUpdate: (data) => this.handleStreamUpdate({ messageId: retryMessageId, data }),
+        onStreamEnd: (data) => this._handleRetryStreamEnd({ messageId: retryMessageId, originalMessageId: messageId, data }),
+        onTranslationResult: (data) => this.handleTranslationResult({ messageId: retryMessageId, data }),
+        onError: (error) => this._handleStreamingError(retryMessageId, error)
+      });
+
+      // Send retry request
+      const result = await sendMessage(translationRequest);
+
+      this.logger.info('Retry translation request sent successfully', {
+        retryMessageId,
+        fallbackProvider: fallbackProvider.name
+      });
+
+      return true;
+
+    } catch (retryError) {
+      this.logger.error('Failed to retry translation with fallback provider', retryError);
+
+      // Show error notification for retry failure
+      pageEventBus.emit('show-notification', {
+        type: 'error',
+        title: 'Translation Retry Failed',
+        message: `Failed to retry translation: ${retryError.message}`,
+        duration: 5000,
+        id: `retry-failed-${messageId}`
+      });
+
+      return false;
+    }
+  }
+
+  /**
+   * Handle stream end for retry requests
+   * @param {Object} params - Stream end parameters
+   */
+  async _handleRetryStreamEnd({ messageId, originalMessageId, data }) {
+    const retryRequest = this.translationRequests.get(messageId);
+    const originalRequest = this.translationRequests.get(originalMessageId);
+
+    this.logger.debug('Handling retry stream end', {
+      messageId,
+      originalMessageId,
+      success: data?.success
+    });
+
+    if (!retryRequest || !originalRequest) {
+      this.logger.warn('Missing request data for retry stream end');
+      return;
+    }
+
+    try {
+      if (data?.success && !data?.error) {
+        // Retry was successful - update original request with results
+        originalRequest.status = 'completed';
+        originalRequest.result = data;
+        originalRequest.translatedSegments = retryRequest.translatedSegments;
+        originalRequest.retrySuccessful = true;
+        originalRequest.fallbackProviderUsed = retryRequest.fallbackProvider;
+
+        // Clean up retry request
+        this.translationRequests.delete(messageId);
+
+        // Show success notification
+        pageEventBus.emit('show-notification', {
+          type: 'success',
+          title: 'Translation Successful',
+          message: `Successfully translated using ${retryRequest.fallbackProvider.name} after retry`,
+          duration: 5000,
+          id: `retry-success-${originalMessageId}`
+        });
+
+        this.logger.info('Translation retry successful', {
+          originalMessageId,
+          fallbackProvider: retryRequest.fallbackProvider.name
+        });
+      } else {
+        // Retry also failed
+        originalRequest.status = 'error';
+        originalRequest.error = data?.error || retryRequest.lastError;
+        originalRequest.retryFailed = true;
+
+        // Clean up retry request
+        this.translationRequests.delete(messageId);
+
+        // Show error notification
+        await this.errorHandler.handle(new Error(`Translation failed with both ${retryRequest.originalProvider} and ${retryRequest.fallbackProvider.name}`), {
+          context: 'select-element-retry-failed',
+          type: ErrorTypes.TRANSLATION_FAILED,
+          showToast: true
+        });
+
+        this.logger.error('Translation retry failed', {
+          originalMessageId,
+          originalProvider: retryRequest.originalProvider,
+          fallbackProvider: retryRequest.fallbackProvider.name,
+          error: data?.error
+        });
+      }
+    } catch (error) {
+      this.logger.error('Error handling retry stream end', error);
+    } finally {
+      // Always trigger cleanup for the original request
+      if (originalRequest.status === 'completed' || originalRequest.status === 'error') {
+        window.isTranslationInProgress = false;
+
+        if (this.statusNotification) {
+          pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+          this.statusNotification = null;
+        }
+
+        // Trigger cleanup
+        this.triggerPostTranslationCleanup();
+      }
     }
   }
 }

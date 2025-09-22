@@ -355,6 +355,63 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Bing Translate - Microsoft translation service settings
+  BingTranslate: {
+    rateLimit: {
+      maxConcurrent: 1, // Conservative due to HTML response issues
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 2000, // 2 seconds between subsequent requests
+      burstLimit: 2,
+      burstWindow: 3000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 2, // Aggressive backoff for HTML responses
+        maxDelay: 30000,
+        resetAfterSuccess: 3
+      }
+    },
+    batching: {
+      strategy: 'character_limit', // Use character-based chunking
+      characterLimit: 4000, // Conservative limit for Bing
+      maxChunksPerBatch: 5,
+      delimiter: '\n\n---\n\n', // Similar to Google
+      adaptiveChunking: true, // Enable adaptive chunking for errors
+      minChunkSize: 100, // Minimum chunk size for retry
+      maxRetries: 3 // Maximum retry attempts
+    },
+    streaming: {
+      enabled: true, // Enable streaming for real-time chunk translation
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'rate_limit',
+        'html_response', // Bing-specific error
+        'json_parsing_error',
+        'server_error'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 30000, temporary: true },
+        'html_response': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
+        'json_parsing_error': { delay: 5000, temporary: true, retryWithSmallerChunk: true },
+        'server_error': { delay: 10000, temporary: true }
+      },
+      enableCircuitBreaker: true,
+      circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true, // Supports batch via chunking
+      supportsThinking: false,
+      reliableJsonMode: true, // Bing usually provides reliable JSON
+      supportsDictionary: false // Bing doesn't support dictionary
+    }
+  },
+
   // Custom Provider - Flexible/configurable settings
   Custom: {
     rateLimit: {

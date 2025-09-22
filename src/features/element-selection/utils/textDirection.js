@@ -84,7 +84,8 @@ export function correctTextDirection(element, text, options = {}) {
     setTextAlign = true,
     addClasses = true,
     preserveExisting = false,
-    detectOptions = {}
+    detectOptions = {},
+    useWrapperElement = true  // New option to use wrapper elements instead of direct styling
   } = options;
 
   if (!element || !text) {
@@ -100,25 +101,59 @@ export function correctTextDirection(element, text, options = {}) {
   const direction = getTextDirection(text, detectOptions);
   const isRTL = direction === 'rtl';
 
-  // Apply direction
-  element.style.direction = direction;
+  // If using wrapper element approach, create a wrapper and apply styles to it
+  if (useWrapperElement && element.parentNode) {
+    // Check if element is already wrapped
+    if (!element.parentNode.classList.contains('aiwc-translation-wrapper')) {
+      const wrapper = document.createElement('span');
+      wrapper.className = 'aiwc-translation-wrapper';
+      wrapper.dataset.aiwcDirection = direction;
 
-  // Apply text alignment
-  if (setTextAlign) {
-    element.style.textAlign = isRTL ? 'right' : 'left';
-  }
+      // Move the element inside the wrapper
+      element.parentNode.insertBefore(wrapper, element);
+      wrapper.appendChild(element);
 
-  // Add CSS classes for styling
-  if (addClasses) {
-    element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
-    element.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+      // Apply direction classes to wrapper instead of element
+      if (addClasses) {
+        wrapper.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+      }
+    } else {
+      // Update existing wrapper
+      const wrapper = element.parentNode;
+      wrapper.dataset.aiwcDirection = direction;
+      if (addClasses) {
+        wrapper.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
+        wrapper.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+      }
+    }
+  } else {
+    // Legacy approach: apply styles directly to element
+    // Apply direction only if it doesn't conflict with existing styles
+    const currentStyle = window.getComputedStyle(element);
+    if (!currentStyle.direction || currentStyle.direction === 'ltr' || !preserveExisting) {
+      element.style.direction = direction;
+    }
+
+    // Apply text alignment only if needed
+    if (setTextAlign) {
+      if (!currentStyle.textAlign || currentStyle.textAlign === 'start' || !preserveExisting) {
+        element.style.textAlign = isRTL ? 'right' : 'left';
+      }
+    }
+
+    // Add CSS classes for styling
+    if (addClasses) {
+      element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
+      element.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+    }
   }
 
   logger.debug(`Applied ${direction} direction to element:`, {
     tagName: element.tagName,
     className: element.className,
     textLength: text.length,
-    textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : '')
+    textPreview: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
+    useWrapper: useWrapperElement
   });
 }
 
@@ -151,6 +186,17 @@ export function storeOriginalElementStyles(element) {
  */
 export function restoreOriginalElementStyles(element) {
   if (!element) return;
+
+  // Check if element is wrapped
+  const wrapper = element.parentNode;
+  if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
+    // Move element out of wrapper and remove wrapper
+    const parent = wrapper.parentNode;
+    if (parent) {
+      parent.insertBefore(element, wrapper);
+      wrapper.remove();
+    }
+  }
 
   // Restore direction
   if (element.dataset.aiwcOriginalDirection !== undefined) {

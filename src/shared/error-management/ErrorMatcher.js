@@ -98,6 +98,14 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
 
+  // Provider-specific response errors
+  if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json"))
+    return ErrorTypes.HTML_RESPONSE_ERROR;
+  if (msg.includes("json parsing") || msg.includes("json parse") || msg.includes("unexpected end of json input"))
+    return ErrorTypes.JSON_PARSING_ERROR;
+  if (msg.includes("unexpected response") || msg.includes("unexpected format"))
+    return ErrorTypes.UNEXPECTED_RESPONSE_FORMAT;
+
   // browser Translation API specific errors
   if (
     msg.includes("translation not available") ||

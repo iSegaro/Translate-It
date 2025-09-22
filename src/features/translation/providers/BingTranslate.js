@@ -51,26 +51,42 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Translate a single chunk of texts using Bing's API
+   * Translate a single chunk of texts using Bing's API with enhanced error handling and retry
    * @param {string[]} chunkTexts - Texts in this chunk
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
+   * @param {number} retryAttempt - Current retry attempt number (for recursive retries)
+   * @param {number} originalChunkSize - Original chunk size before retry splitting
+   * @param {number} chunkIndex - Index of this chunk in the batch
+   * @param {number} totalChunks - Total number of chunks in the batch
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
-    const context = `${this.providerName.toLowerCase()}-translate-chunk`;
-    
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length, chunkIndex = 0, totalChunks = 1) {
+    const context = `${this.providerName.toLowerCase()}-translate-chunk${retryAttempt > 0 ? `-retry-${retryAttempt}` : ''}`;
+    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const providerConfig = getProviderConfiguration(this.providerName);
+
     try {
       // Validate chunk size before processing
       if (chunkTexts.length > this.constructor.maxChunksPerBatch) {
         logger.info(`[Bing] Chunk too large (${chunkTexts.length} > ${this.constructor.maxChunksPerBatch}), splitting`);
-        // Split into smaller sub-chunks
+        // Split into smaller sub-chunks and preserve order
         const results = [];
         for (let i = 0; i < chunkTexts.length; i += this.constructor.maxChunksPerBatch) {
           const subChunk = chunkTexts.slice(i, i + this.constructor.maxChunksPerBatch);
-          const subResults = await this._translateChunk(subChunk, sourceLang, targetLang, translateMode, abortController);
+          const subResults = await this._translateChunk(
+            subChunk,
+            sourceLang,
+            targetLang,
+            translateMode,
+            abortController,
+            retryAttempt,
+            originalChunkSize,
+            Math.floor(i / this.constructor.maxChunksPerBatch),
+            Math.ceil(chunkTexts.length / this.constructor.maxChunksPerBatch)
+          );
           results.push(...subResults);
         }
         return results;
@@ -114,6 +130,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       url.searchParams.set("IID", tokenData.IID?.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
       url.searchParams.set("isVertical", "1");
 
+      // Enhanced API call with HTML response detection
       const result = await this._executeApiCall({
         url: url.toString(),
         fetchOptions: {
@@ -124,7 +141,49 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           },
           body: formData.toString(), // Convert URLSearchParams to string
         },
-        extractResponse: (data) => {
+        extractResponse: async (response) => {
+          // Check if response is HTML instead of JSON
+          const contentType = response.headers.get('content-type');
+          const responseText = await response.text();
+
+          if (contentType && contentType.includes('text/html')) {
+            logger.warn(`[Bing] Received HTML response instead of JSON. Chunk size: ${chunkTexts.length}`);
+            const htmlError = new Error('Bing returned HTML response instead of JSON');
+            htmlError.name = 'BingHtmlResponseError';
+            htmlError.context = context;
+            htmlError.chunkSize = chunkTexts.length;
+            htmlError.retryAttempt = retryAttempt;
+            throw htmlError;
+          }
+
+          // Try to parse as JSON
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            logger.warn(`[Bing] JSON parsing failed: ${parseError.message}. Response length: ${responseText.length}`);
+
+            // Check if response might be HTML despite content-type
+            if (responseText.trim().startsWith('<')) {
+              logger.warn(`[Bing] Response appears to be HTML despite content-type`);
+              const htmlError = new Error('Bing returned HTML response (detected after parsing)');
+              htmlError.name = 'BingHtmlResponseError';
+              htmlError.context = context;
+              htmlError.chunkSize = chunkTexts.length;
+              htmlError.retryAttempt = retryAttempt;
+              throw htmlError;
+            }
+
+            // Regular JSON parsing error
+            const jsonError = new Error(`JSON parsing failed: ${parseError.message}`);
+            jsonError.name = 'BingJsonParseError';
+            jsonError.context = context;
+            jsonError.chunkSize = chunkTexts.length;
+            jsonError.retryAttempt = retryAttempt;
+            jsonError.responseText = responseText.substring(0, 500); // Store first 500 chars for debugging
+            throw jsonError;
+          }
+
           if (data?.statusCode === 400) {
             const err = new Error('Bing API returned status 400');
             err.name = 'BingApiError';
@@ -187,12 +246,88 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       return result || chunkTexts.map(() => "");
       
     } catch (error) {
+      // Handle HTML response and JSON parsing errors with retry
+      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
+        const maxRetries = providerConfig?.batching?.maxRetries || 3;
+        const minChunkSize = providerConfig?.batching?.minChunkSize || 100;
+        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
+
+        logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${error.chunkSize || chunkTexts.length}`);
+
+        // Check if we should retry with smaller chunks
+        if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
+          // Calculate new chunk size with exponential backoff
+          const reductionFactor = Math.pow(2, retryAttempt + 1);
+          const newChunkSize = Math.max(
+            Math.ceil(chunkTexts.length / reductionFactor),
+            minChunkSize
+          );
+
+          logger.info(`[Bing] Retrying with smaller chunks: ${chunkTexts.length} → ${newChunkSize} texts per chunk`);
+
+          try {
+            // Split into smaller chunks and retry while preserving order
+            const results = [];
+            const subChunkCount = Math.ceil(chunkTexts.length / newChunkSize);
+
+            for (let i = 0; i < chunkTexts.length; i += newChunkSize) {
+              const subChunk = chunkTexts.slice(i, i + newChunkSize);
+              const subChunkIndex = Math.floor(i / newChunkSize);
+
+              const subResults = await this._translateChunk(
+                subChunk,
+                sourceLang,
+                targetLang,
+                translateMode,
+                abortController,
+                retryAttempt + 1,
+                originalChunkSize,
+                subChunkIndex,
+                subChunkCount
+              );
+
+              // Place results in correct position
+              results.push(...subResults);
+
+              // Add delay between retries to avoid rate limiting
+              if (i + newChunkSize < chunkTexts.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (retryAttempt + 1)));
+              }
+            }
+
+            logger.info(`[Bing] Retry successful: translated ${results.length} texts from original ${chunkTexts.length}`);
+            return results;
+
+          } catch (retryError) {
+            logger.error(`[Bing] Retry attempt ${retryAttempt + 1} failed:`, retryError);
+            // Continue to throw the original error
+          }
+        }
+
+        // If we've exhausted retries or can't split further, throw a properly typed error
+        const finalError = new Error(
+          error.name === 'BingHtmlResponseError'
+            ? 'Bing consistently returned HTML instead of JSON'
+            : `Bing JSON parsing consistently failed after ${retryAttempt + 1} attempts`
+        );
+        finalError.name = error.name;
+        finalError.type = error.name === 'BingHtmlResponseError'
+          ? ErrorTypes.HTML_RESPONSE_ERROR
+          : ErrorTypes.JSON_PARSING_ERROR;
+        finalError.context = context;
+        finalError.chunkSize = chunkTexts.length;
+        finalError.retryAttempt = retryAttempt;
+        finalError.originalChunkSize = originalChunkSize;
+
+        throw finalError;
+      }
+
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
         logger.warn(`[Bing] Chunk translation failed, will be handled by fallback. Chunk size: ${chunkTexts.length}`);
         // Let BaseTranslateProvider handle the error and fallback
         throw error;
       }
-      
+
       // Handle token-related errors and other errors with proper typing
       if (!error.type) {
         if (error.message?.includes("token")) {
@@ -203,7 +338,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           error.type = ErrorTypes.API;
         }
       }
-      
+
       error.context = context;
       throw error;
     }

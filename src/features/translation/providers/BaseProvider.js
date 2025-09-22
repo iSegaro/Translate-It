@@ -145,7 +145,7 @@ export class BaseProvider {
    * @returns {Promise<string[]>} - A promise that resolves to an array of translated strings.
    * @protected
    */
-  async _batchTranslate(/* texts, sourceLang, targetLang, translateMode, engine, messageId, abortController */) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`);
   }
 
@@ -239,8 +239,19 @@ export class BaseProvider {
         throw err;
       }
 
-      // Check if response is JSON before parsing
+      // Enhanced content type handling with support for async extractResponse
       const contentType = response.headers.get('content-type');
+
+      // Check if extractResponse is async (new pattern for providers that need to inspect raw response)
+      if (extractResponse.constructor.name === 'AsyncFunction' || extractResponse.length > 2) {
+        // Async extractResponse - pass the full response object for detailed inspection
+        logger.debug(`[${this.providerName}] Using async extractResponse for ${contentType || 'unknown content type'}`);
+        const result = await extractResponse(response);
+        logger.debug(`[${this.providerName}] Async extractResponse result:`, result);
+        return result;
+      }
+
+      // Traditional JSON response handling
       if (!contentType || !contentType.includes('application/json')) {
         // If we got HTML or other content, log the response for debugging
         const responseText = await response.text();
@@ -367,19 +378,25 @@ export class BaseProvider {
   async _processInBatches(segments, translateChunk, limits, abortController = null) {
     const { CHUNK_SIZE, CHAR_LIMIT } = limits;
     const chunks = [];
+    const chunkIndexMap = []; // Map to track which original indices each chunk contains
     let currentChunk = [];
     let currentCharCount = 0;
+    let currentIndices = [];
 
-    for (const segment of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
       const segmentLength = segment.length;
 
       if (segmentLength > CHAR_LIMIT) {
         if (currentChunk.length > 0) {
           chunks.push(currentChunk);
+          chunkIndexMap.push([...currentIndices]);
           currentChunk = [];
           currentCharCount = 0;
+          currentIndices = [];
         }
         chunks.push([segment]);
+        chunkIndexMap.push([i]);
         continue;
       }
 
@@ -389,23 +406,28 @@ export class BaseProvider {
           currentCharCount + segmentLength > CHAR_LIMIT)
       ) {
         chunks.push(currentChunk);
+        chunkIndexMap.push([...currentIndices]);
         currentChunk = [];
         currentCharCount = 0;
+        currentIndices = [];
       }
 
       currentChunk.push(segment);
       currentCharCount += segmentLength;
+      currentIndices.push(i);
     }
 
     if (currentChunk.length > 0) {
       chunks.push(currentChunk);
+      chunkIndexMap.push([...currentIndices]);
     }
 
     // Import rate limiting manager
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
 
     // Process chunks sequentially with rate limiting
-    const translatedChunks = [];
+    const translatedSegments = new Array(segments.length); // Pre-allocate array to maintain order
+
     for (let i = 0; i < chunks.length; i++) {
       // Check for cancellation
       if (abortController && abortController.signal.aborted) {
@@ -415,25 +437,38 @@ export class BaseProvider {
       }
 
       const chunk = chunks[i];
+      const indices = chunkIndexMap[i];
       const context = `batch-${i + 1}/${chunks.length}`;
 
       try {
         // Execute with rate limiting
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => translateChunk(chunk),
+          () => translateChunk(chunk, i, chunks.length), // Pass chunk index and total
           context,
           null // translateMode not available in this generic method
         );
-        
-        translatedChunks.push(result);
+
+        // Place translated results in correct positions
+        if (result.length === chunk.length) {
+          for (let j = 0; j < indices.length; j++) {
+            translatedSegments[indices[j]] = result[j];
+          }
+        } else {
+          // If result length doesn't match, use original text
+          for (let j = 0; j < indices.length; j++) {
+            translatedSegments[indices[j]] = chunk[j];
+          }
+        }
       } catch (error) {
         logger.error(`[${this.providerName}] Chunk ${i + 1} failed:`, error);
-        // For failed chunks, return the original text
-        translatedChunks.push(chunk);
+        // For failed chunks, use the original text
+        for (let j = 0; j < indices.length; j++) {
+          translatedSegments[indices[j]] = chunk[j];
+        }
       }
     }
 
-    return translatedChunks.flat();
+    return translatedSegments;
   }
 }

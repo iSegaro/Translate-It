@@ -7,6 +7,115 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getElementSelectionCache } from './cache.js';
 import { correctTextDirection } from './textDirection.js';
 
+// Inject translation styles
+let stylesInjected = false;
+function injectTranslationStyles() {
+  if (stylesInjected) return;
+
+  try {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'aiwc-translation-styles';
+    styleElement.textContent = `
+      /* Translation Styles - Minimal impact on original page styling */
+      .aiwc-translation-wrapper {
+        display: inline;
+        unicode-bidi: isolate;
+      }
+      .aiwc-rtl-text {
+        direction: rtl;
+        text-align: right;
+      }
+      .aiwc-ltr-text {
+        direction: ltr;
+        text-align: left;
+      }
+      .aiwc-translated-text {
+        unicode-bidi: isolate;
+      }
+      .aiwc-translation-wrapper *,
+      .aiwc-rtl-text *,
+      .aiwc-ltr-text * {
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        font-style: inherit;
+        line-height: inherit;
+        letter-spacing: inherit;
+        color: inherit;
+      }
+      .aiwc-translation-wrapper code,
+      .aiwc-translation-wrapper pre,
+      .aiwc-rtl-text code,
+      .aiwc-rtl-text pre,
+      .aiwc-ltr-text code,
+      .aiwc-ltr-text pre {
+        font-family: inherit;
+        direction: inherit;
+        text-align: inherit;
+        unicode-bidi: plaintext;
+      }
+      .aiwc-translation-wrapper table,
+      .aiwc-rtl-text table,
+      .aiwc-ltr-text table {
+        border-collapse: inherit;
+        border-spacing: inherit;
+        width: inherit;
+      }
+      .aiwc-translation-wrapper td,
+      .aiwc-translation-wrapper th,
+      .aiwc-rtl-text td,
+      .aiwc-rtl-text th,
+      .aiwc-ltr-text td,
+      .aiwc-ltr-text th {
+        text-align: inherit;
+        vertical-align: inherit;
+        padding: inherit;
+        border: inherit;
+      }
+      .aiwc-translation-wrapper li,
+      .aiwc-rtl-text li,
+      .aiwc-ltr-text li {
+        list-style-type: inherit;
+        list-style-position: inherit;
+        margin: inherit;
+        padding: inherit;
+      }
+      .aiwc-translation-wrapper[data-aiwc-direction="rtl"] {
+        direction: rtl !important;
+      }
+      .aiwc-translation-wrapper[data-aiwc-direction="ltr"] {
+        direction: ltr !important;
+      }
+
+      /* Preserve spacing between chunks */
+      [data-aiwc-leading-space="true"]::before {
+        content: " ";
+        white-space: pre;
+      }
+
+      [data-aiwc-trailing-space="true"]::after {
+        content: " ";
+        white-space: pre;
+      }
+
+      /* Ensure proper spacing between adjacent translated spans */
+      .aiwc-translation-wrapper span[data-aiwc-original-id] + span[data-aiwc-original-id] {
+        margin-left: 0.25em;
+      }
+
+      .aiwc-translation-wrapper .aiwc-rtl-text + .aiwc-ltr-text,
+      .aiwc-translation-wrapper .aiwc-ltr-text + .aiwc-rtl-text {
+        margin-left: 0.25em;
+      }
+    `;
+    document.head.appendChild(styleElement);
+    stylesInjected = true;
+    logger.debug('Translation styles injected');
+  } catch (error) {
+    logger.error('Failed to inject translation styles:', error);
+  }
+}
+
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'domManipulation');
 
 /**
@@ -167,17 +276,35 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
     return;
   }
 
+  // Inject styles before applying translations
+  injectTranslationStyles();
+
   const cache = getElementSelectionCache();
   let processedCount = 0;
 
-  textNodes.forEach((textNode) => {
+  // Handle chunked translations by maintaining node order
+  textNodes.forEach((textNode, nodeIndex) => {
     if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
       return;
     }
 
     const originalText = textNode.textContent;
     const trimmedOriginalText = originalText.trim();
-    const translatedText = translations.get(trimmedOriginalText);
+
+    // Look for translation with chunk index support
+    let translatedText = translations.get(trimmedOriginalText);
+
+    // If not found directly, check for chunked translations
+    if (!translatedText) {
+      // Look for chunk identifier in the translation map
+      const chunkPrefix = `chunk_${nodeIndex}_`;
+      for (const [key, value] of translations.entries()) {
+        if (key.startsWith(chunkPrefix) && key.endsWith(trimmedOriginalText)) {
+          translatedText = value;
+          break;
+        }
+      }
+    }
 
     if (translatedText && trimmedOriginalText) {
       try {
@@ -189,22 +316,48 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         containerSpan.setAttribute("data-aiwc-original-id", uniqueId);
         containerSpan.setAttribute("data-aiwc-original-text", originalText);
 
-        // Apply correct text direction to container
-        correctTextDirection(containerSpan, translatedText);
+        // Apply correct text direction to container using wrapper approach
+        correctTextDirection(containerSpan, translatedText, {
+          useWrapperElement: true,
+          preserveExisting: true
+        });
 
         // Handle multi-line text
         const originalLines = originalText.split("\n");
         const translatedLines = translatedText.split("\n");
 
+        // Ensure we have the same number of lines
+        while (translatedLines.length < originalLines.length) {
+          translatedLines.push("");
+        }
+
         originalLines.forEach((originalLine, index) => {
           const translatedLine = translatedLines[index] !== undefined ? translatedLines[index] : "";
           const innerSpan = document.createElement("span");
+
+          // Check if this line had leading/trailing spaces in original
+          const hasLeadingSpace = /^\s/.test(originalLine);
+          const hasTrailingSpace = /\s$/.test(originalLine);
+
+          // Add data attributes for spacing information
+          if (hasLeadingSpace) {
+            innerSpan.setAttribute("data-aiwc-leading-space", "true");
+          }
+          if (hasTrailingSpace) {
+            innerSpan.setAttribute("data-aiwc-trailing-space", "true");
+          }
+
           innerSpan.textContent = translatedLine;
 
-          // Store original text data in cache
-          cache.storeOriginalText(uniqueId, {
+          // Store original text data in cache with line info
+          cache.storeOriginalText(`${uniqueId}_line_${index}`, {
             originalText: originalLine,
+            translatedText: translatedLine,
             wrapperElement: innerSpan,
+            lineIndex: index,
+            totalLines: originalLines.length,
+            hasLeadingSpace,
+            hasTrailingSpace
           });
 
           containerSpan.appendChild(innerSpan);
@@ -249,26 +402,67 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 export async function revertTranslations(context) {
   const cache = getElementSelectionCache();
   let successfulReverts = 0;
+  let failedReverts = 0;
 
   // Find all span elements with translation data
   const containers = document.querySelectorAll("span[data-aiwc-original-text]");
 
+  logger.info(`Starting cleanup of ${containers.length} translated elements`);
+
   containers.forEach((container) => {
     const originalText = container.getAttribute("data-aiwc-original-text");
+    const originalId = container.getAttribute("data-aiwc-original-id");
+
     if (originalText !== null) {
       try {
         const parentElement = container.parentNode;
 
-        // Remove translation-related CSS classes
+        // Check if container is wrapped
+        let elementToReplace = container;
+        const wrapper = parentElement;
+        if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
+          elementToReplace = wrapper;
+        }
+
+        // Store computed styles before removal for potential restoration
+        const computedStyles = window.getComputedStyle(container);
+        const savedStyles = {
+          display: computedStyles.display,
+          visibility: computedStyles.visibility,
+          position: computedStyles.position,
+          opacity: computedStyles.opacity
+        };
+
+        // Remove translation-related CSS classes from container and wrapper
         container.classList.remove('aiwc-translated-text', 'aiwc-rtl-text', 'aiwc-ltr-text');
+        if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
+          wrapper.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
+        }
+
+        // Remove any inline styles added during translation
+        const inlineStylesToRemove = ['background-color', 'color', 'font-weight', 'text-decoration'];
+        inlineStylesToRemove.forEach(style => {
+          if (container.style[style]) {
+            container.style[style] = '';
+          }
+        });
 
         // Create original text node
         const originalTextNode = document.createTextNode(originalText);
-        parentElement.replaceChild(originalTextNode, container);
+
+        // Ensure parent element exists and is valid
+        if (!parentElement) {
+          logger.warn('Container has no parent element, skipping removal', { originalId });
+          failedReverts++;
+          return;
+        }
+
+        parentElement.replaceChild(originalTextNode, elementToReplace);
         successfulReverts++;
 
         // Remove associated <br> elements
         let nextNode = originalTextNode.nextSibling;
+        let removedBrCount = 0;
         while (
           nextNode &&
           nextNode.nodeName === "BR" &&
@@ -277,17 +471,42 @@ export async function revertTranslations(context) {
           const nodeToRemove = nextNode;
           nextNode = nextNode.nextSibling;
           nodeToRemove.parentNode.removeChild(nodeToRemove);
+          removedBrCount++;
         }
+
+        if (removedBrCount > 0) {
+          logger.debug(`Removed ${removedBrCount} associated <br> elements for element ${originalId}`);
+        }
+
       } catch (error) {
+        failedReverts++;
         logger.error('Failed to revert container:', error, {
-          containerId: container.getAttribute("data-aiwc-original-id")
+          containerId: container.getAttribute("data-aiwc-original-id"),
+          containerTagName: container.tagName,
+          parentElement: container.parentNode?.tagName || 'null'
         });
+
+        // Attempt cleanup even if revert fails
+        try {
+          if (container.parentNode) {
+            // Fallback: just remove the translated element
+            const fallbackNode = document.createTextNode(originalText || '');
+            const parentNode = container.parentNode;
+            const wrapperElement = parentNode.classList.contains('aiwc-translation-wrapper') ? parentNode : null;
+            const elementToRemove = wrapperElement || container;
+            parentNode.replaceChild(fallbackNode, elementToRemove);
+            logger.info('Fallback cleanup completed for failed element');
+          }
+        } catch (fallbackError) {
+          logger.error('Fallback cleanup also failed:', fallbackError);
+        }
 
         if (context.errorHandler && typeof context.errorHandler.handle === "function") {
           context.errorHandler.handle(error, {
             type: 'UI',
             context: "element-selection-revert-translations",
             elementId: container.getAttribute("data-aiwc-original-id"),
+            action: 'revert-failed'
           });
         }
       }
@@ -297,7 +516,48 @@ export async function revertTranslations(context) {
   // Clear cache
   cache.clearOriginalTexts();
 
-  logger.debug(`Reverted ${successfulReverts} translated elements`);
+  // Clean up any orphaned translation elements
+  try {
+    const orphanedElements = document.querySelectorAll('.aiwc-translated-text:not([data-aiwc-original-text])');
+    orphanedElements.forEach(element => {
+      element.remove();
+      logger.debug('Removed orphaned translation element');
+    });
+  } catch (cleanupError) {
+    logger.warn('Failed to cleanup orphaned elements:', cleanupError);
+  }
+
+  // Clean up injected styles if no translations remain
+  try {
+    const remainingTranslations = document.querySelectorAll('[data-aiwc-original-text]').length;
+    if (remainingTranslations === 0 && stylesInjected) {
+      const styleElement = document.getElementById('aiwc-translation-styles');
+      if (styleElement) {
+        styleElement.remove();
+        stylesInjected = false;
+        logger.debug('Translation styles removed');
+      }
+    }
+  } catch (styleCleanupError) {
+    logger.warn('Failed to cleanup translation styles:', styleCleanupError);
+  }
+
+  logger.info(`Cleanup completed: ${successfulReverts} successful, ${failedReverts} failed`);
+
+  // Dispatch event to notify UI of cleanup completion
+  try {
+    const cleanupEvent = new CustomEvent('aiwc-translation-cleanup', {
+      detail: {
+        successful: successfulReverts,
+        failed: failedReverts,
+        total: containers.length
+      }
+    });
+    document.dispatchEvent(cleanupEvent);
+  } catch (eventError) {
+    logger.warn('Failed to dispatch cleanup event:', eventError);
+  }
+
   return successfulReverts;
 }
 

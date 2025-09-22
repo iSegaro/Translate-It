@@ -203,7 +203,7 @@ export class BaseTranslateProvider extends BaseProvider {
         // Translate this chunk using provider's original implementation
         const chunkResults = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController),
+          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length),
           `streaming-chunk-${chunkIndex + 1}/${chunks.length}`,
           translateMode
         );
@@ -300,7 +300,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  _translateChunk(/* chunkTexts, sourceLang, targetLang, translateMode, abortController */) {
+  _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length, chunkIndex = 0, totalChunks = 1) {
     // This should be overridden by subclasses to call their existing chunk translation logic
     throw new Error(`_translateChunk not implemented by ${this.providerName}`);
   }
@@ -396,7 +396,7 @@ export class BaseTranslateProvider extends BaseProvider {
         // Execute chunk translation with rate limiting
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController),
+          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length),
           chunkContext,
           translateMode
         );
