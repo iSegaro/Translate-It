@@ -118,6 +118,27 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - **Fallback Handling**: Graceful degradation from streaming to regular translation
 - **Context-Aware Routing**: Automatic detection of streaming vs. regular translation needs
 
+### Unified Translation Service Integration (2025)
+
+The messaging system is now fully integrated with the **Unified Translation Service** for centralized coordination of all translation operations:
+
+**Field Mode Translation** (Direct Response):
+- **Request-Response Pattern**: Field mode uses direct response pattern with intelligent timeout management
+- **No Broadcast Needed**: Results are returned directly to the requesting content script
+- **Duplicate Prevention**: UnifiedTranslationService prevents duplicate processing via request tracking
+- **Element Recovery**: Smart element data recovery with TranslationRequestTracker
+
+**Select Element Mode** (Streaming/Broadcast):
+- **Streaming Coordination**: Large translations automatically use streaming via UnifiedTranslationCoordinator
+- **Broadcast Results**: Results are broadcast to all tabs for streaming updates
+- **Progress Tracking**: Real-time progress updates with proper request lifecycle management
+
+**Architecture Benefits**:
+- **Centralized Coordination**: All translation requests flow through UnifiedTranslationService
+- **Request Tracking**: Comprehensive tracking prevents duplicate processing
+- **Intelligent Dispatch**: Results are routed appropriately based on translation mode
+- **Error Handling**: Centralized error management with proper cleanup
+
 ### Performance Benefits
 
 - **Eliminated race conditions** between competing listeners
@@ -292,6 +313,11 @@ src/shared/messaging/
 │   └── useMessaging.js                   # Vue composable (uses UnifiedMessaging)
 └── __tests__/
     └── MessagingCore.test.js
+
+src/core/services/translation/
+├── UnifiedTranslationService.js          # 🆕 Centralized translation coordination
+├── TranslationRequestTracker.js          # 🆕 Request lifecycle management
+└── TranslationResultDispatcher.js         # 🆕 Intelligent result routing
 ```
 
 ## 🚨 Common Issues

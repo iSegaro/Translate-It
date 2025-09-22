@@ -59,7 +59,7 @@
 
 ### 🏪 Feature-Based Organization (جدید)
 - **`src/features/`**: هر feature خودکفا و مستقل
-  - `translation/` - موتور ترجمه، شامل `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
+  - `translation/` - **موتور ترجمه یکپارچه (2025)** - `UnifiedTranslationService` برای هماهنگی متمرکز، `TranslationRequestTracker` برای مدیریت چرخه حیات درخواست‌ها، `TranslationResultDispatcher` برای هوشمندانه ارسال نتایج، `BaseProvider`، `BaseTranslateProvider`، `BaseAIProvider`، پرووایدرهای خاص، `RateLimitManager`، `StreamingManager`، handlers و stores.
   - `tts/` - **سیستم TTS یکپارچه (2025)** - `useTTSSmart.js` به‌عنوان تنها منبع حقیقت با fallback زبان خودکار
   - `screen-capture/` - سیستم کپچر صفحه و OCR
   - `element-selection/` - **سیستم انتخاب عنصر بازطراحی شده (2025)** - SelectElementManager با معماری یکپارچه، Toast Integration، و سرویس‌های مجزا
@@ -77,6 +77,7 @@
 ### 🔧 Shared Systems (منتقل شده از سطح بالا)
 - **`src/shared/`**: سیستم‌های مشترک
   - `messaging/` - **سیستم پیام‌رسانی یکپارچه (2025)** - UnifiedMessaging با UnifiedTranslationCoordinator، StreamingTimeoutManager، و ContentScriptIntegration برای هماهنگی streaming و timeout management هوشمند
+  - `services/translation/` - **سرویس‌های ترجمه یکپارچه (2025)** - UnifiedTranslationService برای هماهنگی متمرکز همه عملیات ترجمه، TranslationRequestTracker برای ردیابی درخواست‌ها و جلوگیری از پردازش تکراری، TranslationResultDispatcher برای ارسال هوشمندانه نتایج بر اساس حالت ترجمه
   - `storage/` - مدیریت ذخیره‌سازی با caching
   - `error-management/` - مدیریت خطای متمرکز
   - `logging/` - سیستم log ساختارمند
@@ -90,6 +91,7 @@
   - `content-scripts/` - اسکریپت‌های محتوا
   - `memory/` - سیستم Memory Garbage Collector پیشرفته با Critical Protection (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
   - `managers/` - **FeatureManager** برای مدیریت چرخه حیات handler ها و TextSelectionManager
+  - `services/translation/` - **خدمات ترجمه اصلی (2025)** - UnifiedTranslationService، TranslationRequestTracker، TranslationResultDispatcher
 
 ### 🛠️ Pure Utilities (ساده‌سازی شده)
 - **`src/utils/`**: ابزارهای خالص بدون منطق business
@@ -166,6 +168,16 @@
 - **Event-Driven Architecture**: ارتباط هوشمند بین toast interactions و system responses
 - **Smart Detection**: ToastElementDetector برای تشخیص و استثناء المنت‌های extension
 
+### 🚀 Unified Translation Service (2025)
+- **Centralized Coordination**: تمام درخواست‌های ترجمه از طریق UnifiedTranslationService هماهنگ می‌شوند
+- **Duplicate Prevention**: TrackingRequestTracker از پردازش تکراری جلوگیری می‌کند
+- **Intelligent Routing**: نتایج بر اساس حالت ترجمه (Field، Select Element، Standard) ارسال می‌شوند
+- **Resilient Element Management**: بازیابی هوشمند داده‌های element برای ترجمه‌های Field mode
+- **Lifecycle Management**: مدیریت کامل چرخه حیات درخواست از شروع تا پایان
+- **Error Recovery**: مکانیزم‌های پیشرفته بازیابی خطا و cleanup خودکار
+- **Fire-and-Forget Pattern**: Field mode از الگوی request-response به جای broadcast استفاده می‌کند
+- **Streaming Coordination**: پشتیبانی از streaming برای ترجمه‌های حجیم در Select Element mode
+
 ### 📁 Clean Structure
 - **حداکثر 3 سطح عمق**: پیمایش آسان‌تر
 - **نام‌گذاری consistent**: قابل پیش‌بینی
@@ -190,3 +202,4 @@
 - **Advanced Memory Management**: ResourceTracker و Memory Garbage Collector با Critical Protection System یکپارچه
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با حذف 600+ خط کد تکراری، fallback زبان خودکار (فارسی→عربی)، و هماهنگی کامل بین تمام contexts
 - **Element Detection Service (2025)**: سیستم تشخیص متمرکز المنت‌ها با حذف سلکتورهای هاردکد و بهینه‌سازی DOM queries
+- **Unified Translation Service (2025)**: سیستم ترجمه متمرکز با جلوگیری از پردازش تکراری، مدیریت چرخه حیات درخواست‌ها، و ارسال هوشمندانه نتایج بر اساس حالت ترجمه

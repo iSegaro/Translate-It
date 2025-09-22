@@ -15,6 +15,7 @@
 - ✅ **IFrame Support System** - Streamlined iframe functionality with ResourceTracker integration and essential components
 - ✅ **Unified TTS System (2025)** - Complete TTS unification with automatic language fallback and cross-context coordination
 - ✅ **Text Selection System (2025)** - Modular architecture with SiteHandlerRegistry, static imports, and professional editor support
+- ✅ **Unified Translation Service (2025)** - Centralized translation coordination with duplicate prevention, intelligent routing, and comprehensive lifecycle management
 - ✅ **Storage Management** - Centralized storage with caching
 - ✅ **Logging System** - Production-ready structured logging
 - ✅ **Provider System** - 10+ translation providers with a hierarchical factory pattern (`BaseProvider`, `BaseTranslateProvider`, `BaseAIProvider`), integrated with `RateLimitManager` and `StreamingManager`.
@@ -34,8 +35,8 @@
 
 ### Core Documentation
 - **[Architecture](ARCHITECTURE.md)** - This file - Complete system overview and integration guide
-- **[Unified Messaging System](MessagingSystem.md)** - Race-condition-free inter-component communication with intelligent timeout management
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Translation engine, providers, and request handling
+- **[Unified Messaging System](MessagingSystem.md)** - Race-condition-free inter-component communication with intelligent timeout management and Unified Translation Service integration
+- **[Translation System](TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
 - **[Provider Implementation Guide](PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
@@ -100,8 +101,8 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
-│  Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager → Storage Manager → Error Handler → Toast Integration System │
-│  Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector → Toast Integration System │
+│  UnifiedTranslationService → TranslationRequestTracker → TranslationResultDispatcher → Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager │
+│  Storage Manager → Error Handler → Logger System → Unified TTS System → Windows Manager → Memory Garbage Collector → Toast Integration System │
 └─────────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -172,10 +173,11 @@ src/
 │   ├── translation/
 │   │   ├── core/              # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
-│   │   ├── handlers/          # handleTranslate.js, etc.
+│   │   ├── handlers/          # handleTranslate.js, handleTranslationResult.js
 │   │   ├── stores/            # translation.js store
 │   │   ├── composables/       # useTranslation, useTranslationModes
 │   │   ├── providers/         # BaseProvider, BaseTranslateProvider, BaseAIProvider, Google, OpenAI, DeepSeek, etc.
+│   │   ├── services/          # UnifiedTranslationService integration (moved to core/services)
 │   │   └── utils/             # Translation utilities
 │   ├── tts/                   # ✅ UNIFIED TTS SYSTEM (2025)
 │   │   ├── handlers/          # TTS background handlers
@@ -255,7 +257,7 @@ src/
 │   └── config/                # Configuration
 │       └── config.js          # Application config
 │
-├── 🏗️ core/                  # Core Infrastructure  
+├── 🏗️ core/                  # Core Infrastructure
 │   ├── background/            # Service worker & lifecycle
 │   │   ├── index.js           # Background entry point
 │   │   ├── feature-loader.js  # Feature loading
@@ -263,6 +265,11 @@ src/
 │   │   └── listeners/         # Event listeners
 │   ├── content-scripts/       # Content script entry
 │   │   └── index.js           # Content script entry
+│   ├── services/              # Core Services (NEW)
+│   │   └── translation/       # Unified Translation Service (2025)
+│   │       ├── UnifiedTranslationService.js     # Central translation coordinator
+│   │       ├── TranslationRequestTracker.js     # Request lifecycle management
+│   │       └── TranslationResultDispatcher.js   # Intelligent result routing
 │   ├── memory/                # Memory Garbage Collector System with Critical Protection
 │   │   ├── MemoryManager.js   # Core memory management with critical resource support
 │   │   ├── ResourceTracker.js # Resource tracking mixin with critical protection
@@ -271,7 +278,7 @@ src/
 │   │   ├── MemoryMonitor.js   # Memory usage monitoring
 │   │   └── index.js           # Module exports
 │   ├── managers/              # Core managers
-│   │   ├── core/              # LifecycleManager  
+│   │   ├── core/              # LifecycleManager
 │   │   ├── content/           # FeatureManager, TextSelectionManager
 │   │   └── browser-specific/  # Browser-specific managers
 │   ├── helpers.js             # Core helper functions
@@ -580,6 +587,132 @@ const handleStreamingTranslation = async (message) => {
 - **Dynamic Timeouts**: Timeout increases with streaming duration
 - **Chunk Processing**: Efficient handling of translation chunks
 - **Error Recovery**: Graceful handling of streaming errors
+
+---
+
+## 🚀 Unified Translation Service (2025)
+
+### Overview
+The **Unified Translation Service** is the central coordination system for all translation operations in the extension. It provides **centralized coordination**, **duplicate prevention**, and **intelligent result routing** while maintaining **comprehensive lifecycle management** for all translation requests.
+
+### Core Architecture
+
+**Three-Service Model:**
+```javascript
+UnifiedTranslationService (Coordinator)
+    ↓ (Manages requests)
+TranslationRequestTracker (Lifecycle)
+    ↓ (Routes results)
+TranslationResultDispatcher (Distribution)
+```
+
+### Key Components
+
+**UnifiedTranslationService.js** - Central coordinator:
+```javascript
+import { UnifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js'
+
+const service = UnifiedTranslationService.getInstance()
+
+// Centralized translation processing
+const result = await service.handleTranslationRequest(message, sender)
+
+// Automatic mode detection and routing
+// Field mode → Direct response
+// Select Element mode → Streaming/broadcast
+// Standard mode → Context-based routing
+```
+
+**TranslationRequestTracker.js** - Lifecycle management:
+```javascript
+import { TranslationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js'
+
+const tracker = new TranslationRequestTracker()
+
+// Prevent duplicate processing
+if (tracker.isRequestProcessing(messageId)) {
+  return { success: false, reason: 'duplicate' }
+}
+
+// Track request lifecycle
+tracker.trackRequest(messageId, requestData)
+tracker.completeRequest(messageId, result)
+```
+
+**TranslationResultDispatcher.js** - Intelligent routing:
+```javascript
+import { TranslationResultDispatcher } from '@/core/services/translation/TranslationResultDispatcher.js'
+
+const dispatcher = new TranslationResultDispatcher()
+
+// Mode-specific result delivery
+await dispatcher.dispatchResult(result, {
+  mode: translationMode,
+  tabId: sender.tab?.id,
+  context: message.context
+})
+```
+
+### Translation Modes
+
+**1. Field Mode** - Direct response pattern:
+- **Use Case**: Text field translations with smartTranslationIntegration
+- **Behavior**: Direct response to requesting content script
+- **Benefits**: No broadcast overhead, immediate element recovery
+
+**2. Select Element Mode** - Streaming/broadcast pattern:
+- **Use Case**: Large content translations with real-time updates
+- **Behavior**: Streaming coordination with progress updates
+- **Benefits**: User feedback during translation, efficient chunk processing
+
+**3. Standard Mode** - Context-based routing:
+- **Use Case**: Popup, sidepanel, and regular content translations
+- **Behavior**: Standard result delivery based on request context
+- **Benefits**: Traditional translation flow with context isolation
+
+### Integration Flow
+
+```javascript
+// Entry point: handleTranslate.js
+export default async function handleTranslate(message, sender) {
+  // Initialize UnifiedTranslationService
+  if (!unifiedTranslationService.translationEngine) {
+    unifiedTranslationService.initialize({
+      translationEngine: backgroundService.translationEngine,
+      backgroundService: backgroundService
+    })
+  }
+
+  // Central coordination
+  return await unifiedTranslationService.handleTranslationRequest(message, sender)
+}
+
+// Result processing: handleTranslationResult.js
+export default async function handleTranslationResult(message, sender) {
+  // Use UnifiedTranslationService for result processing
+  return await unifiedTranslationService.handleTranslationResult(message, sender)
+}
+```
+
+### Benefits
+
+**Architectural Benefits:**
+- **Centralized Coordination**: All translation operations flow through a single service
+- **Duplicate Prevention**: Request tracking eliminates redundant processing
+- **Intelligent Routing**: Results delivered optimally based on translation mode
+- **Lifecycle Management**: Complete request tracking from creation to completion
+
+**Performance Benefits:**
+- **Reduced Complexity**: Eliminated complex queueing mechanisms
+- **Memory Efficiency**: Smart cleanup and resource management
+- **Error Recovery**: Centralized error handling with automatic cleanup
+- **Element Resilience**: Robust element data recovery for field mode
+
+**Developer Benefits:**
+- **Single Source of Truth**: All translation logic centralized
+- **Maintainability**: Clear separation of concerns across three services
+- **Debugging**: Comprehensive logging and request tracking
+- **Extensibility**: Easy to add new translation modes and features
 
 ---
 
@@ -1056,6 +1189,13 @@ export const useTranslationStore = defineStore('translation', {
 - `src/background/feature-loader.js` - Feature loading system
 - `src/managers/core/LifecycleManager.js` - Central message router
 
+### Unified Translation Service (2025)
+- `src/core/services/translation/UnifiedTranslationService.js` - Central translation coordinator
+- `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
+- `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
+- `src/features/translation/handlers/handleTranslate.js` - Translation request handler
+- `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
+
 ### Provider System
 - `src/providers/core/ProviderFactory.js` - Provider factory and management
 - `src/providers/core/BaseProvider.js` - Base provider interface
@@ -1085,7 +1225,8 @@ export const useTranslationStore = defineStore('translation', {
 - `src/components/shared/ProviderSelector.vue` - Provider selection
 
 ### Background Handlers
-- `src/background/handlers/translation/handleTranslate.js` - Main translation handler
+- `src/features/translation/handlers/handleTranslate.js` - Main translation handler (integrated with UnifiedTranslationService)
+- `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processing
 - `src/background/handlers/vue-integration/` - Vue-specific handlers
 - `src/background/handlers/tts/` - Text-to-speech handlers
 - `src/background/handlers/element-selection/` - Element selection handlers
