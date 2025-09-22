@@ -526,7 +526,47 @@ export class FeatureManager extends ResourceTracker {
   }
 
 
-  // Override cleanup to handle settings listener
+  // Smart cleanup during memory pressure - only deactivate non-critical features
+  performSmartCleanup() {
+    try {
+      logger.debug('FeatureManager performing smart cleanup during memory pressure');
+
+      // Define critical features that should NEVER be cleaned up during memory pressure
+      const criticalFeatures = new Set([
+        'selectElement',        // Active translation mode should persist
+        'contentMessageHandler', // Core messaging must remain active
+        'textSelection'         // Text selection should remain active
+      ]);
+
+      // Define optional features that can be cleaned up to free memory
+      const optionalFeatures = new Set([
+        'textFieldIcon',       // Can be re-activated when needed
+        'shortcut'            // Can be re-activated when needed
+      ]);
+
+      // Only deactivate optional features, preserve critical ones
+      const activeFeatures = Array.from(this.activeFeatures);
+      for (const feature of activeFeatures) {
+        if (optionalFeatures.has(feature)) {
+          logger.debug(`Smart cleanup: deactivating optional feature '${feature}'`);
+          this.deactivateFeature(feature).catch(error => {
+            logger.error(`Error deactivating optional feature ${feature} during smart cleanup:`, error);
+          });
+        } else if (criticalFeatures.has(feature)) {
+          logger.debug(`Smart cleanup: preserving critical feature '${feature}'`);
+        } else {
+          logger.debug(`Smart cleanup: unknown feature '${feature}' - preserving by default`);
+        }
+      }
+
+      logger.debug('FeatureManager smart cleanup completed');
+
+    } catch (error) {
+      logger.error('Error during FeatureManager smart cleanup:', error);
+    }
+  }
+
+  // Override cleanup to handle settings listener (for full shutdown)
   cleanup() {
     try {
       // Clear debounce timer
@@ -543,7 +583,7 @@ export class FeatureManager extends ResourceTracker {
         this.settingsListener = null;
       }
 
-      // Deactivate all features
+      // Deactivate all features (full cleanup, not smart cleanup)
       const activeFeatures = Array.from(this.activeFeatures);
       for (const feature of activeFeatures) {
         this.deactivateFeature(feature).catch(error => {
@@ -552,7 +592,7 @@ export class FeatureManager extends ResourceTracker {
       }
 
       super.cleanup();
-      logger.debug('FeatureManager cleanup completed');
+      logger.debug('FeatureManager full cleanup completed');
 
     } catch (error) {
       logger.error('Error during FeatureManager cleanup:', error);

@@ -323,11 +323,11 @@ if (!access.isAccessible) {
       featureManager = FeatureManager.getInstance();
 
       // FeatureManager manages handlers - individual handlers handle their own Critical Protection
-      // CRITICAL: FeatureManager must be protected to prevent cleanup of active handlers like SelectElementManager
       featureManager.trackResource('feature-manager-core', () => {
-        logger.debug('FeatureManager core cleanup called - PROTECTED (critical resource)');
-        // FeatureManager is critical to prevent cleanup of active features during memory cleanup
-      }, { isCritical: true });
+        logger.debug('FeatureManager core cleanup called');
+        // Smart cleanup: only deactivate non-critical features during memory pressure
+        featureManager.performSmartCleanup();
+      });
 
       await featureManager.initialize();
 
