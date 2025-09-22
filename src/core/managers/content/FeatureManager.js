@@ -536,12 +536,13 @@ export class FeatureManager extends ResourceTracker {
         'selectElement',        // Active translation mode should persist
         'contentMessageHandler', // Core messaging must remain active
         'textSelection',        // Text selection should remain active
-        'textFieldIcon'        // Text field icons should remain active for UX consistency
+        'textFieldIcon',        // Text field icons should remain active for UX consistency
+        'shortcut'              // Keyboard shortcuts should remain active for UX consistency
       ]);
 
       // Define optional features that can be cleaned up to free memory
       const optionalFeatures = new Set([
-        'shortcut'             // Can be re-activated when needed
+        // No optional features currently - all features are critical for UX
       ]);
 
       // Only deactivate optional features, preserve critical ones
