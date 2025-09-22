@@ -76,80 +76,53 @@ html[data-translate-it-select-mode="true"] {
 
 // Vue Sonner toast layout improvements for action buttons
 [data-sonner-toast] {
-  // Main content container
-  > div {
+  // Ensure proper height and prevent overflow issues
+  min-height: auto;
+  height: auto;
+  max-height: none;
+
+  // Direct child content container
+  > div[data-content] {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 12px;
     width: 100%;
 
-    // Text content should take available space and align left
-    [data-title],
-    [data-description],
-    > div:first-child {
+    // Text content (title/description) container
+    > div {
       flex: 1;
       text-align: left;
       direction: ltr;
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.4;
+      align-self: flex-start;
     }
 
-    // Action button should stay on the right
-    [data-button],
-    button {
-      flex-shrink: 0;
-      margin-left: auto;
-      white-space: nowrap;
-    }
-  }
-}
-
-// More specific targeting for vue-sonner structure
-li[data-sonner-toast] {
-  > div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    width: 100%;
-
-    // Text content container
-    > div:first-child {
-      flex: 1;
-      text-align: left;
-      direction: ltr;
+    // Title specific styling
+    [data-title] {
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.4;
+      display: block;
     }
 
-    // Button container
-    > button,
-    > div:last-child:has(button) {
-      flex-shrink: 0;
-      margin-left: auto;
+    // Description specific styling
+    [data-description] {
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.4;
+      display: block;
     }
   }
-}
 
-// Fallback for different vue-sonner versions
-[data-sonner-toast] {
-  // Force flex layout on the main content
-  &[data-sonner-toast] {
-    > div:first-child {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      width: 100%;
-
-      // All direct children except the last one (button) should flex-grow
-      > *:not(:last-child) {
-        flex: 1;
-        text-align: left;
-      }
-
-      // Last child (button) should stay right
-      > *:last-child {
-        flex-shrink: 0;
-        margin-left: auto;
-      }
-    }
+  // Action button styling
+  [data-button],
+  > button {
+    flex-shrink: 0;
+    margin-left: auto;
+    white-space: nowrap;
+    align-self: flex-start;
   }
 }
