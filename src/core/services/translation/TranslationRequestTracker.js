@@ -170,6 +170,63 @@ export class TranslationRequestTracker {
   }
 
   /**
+   * Complete a request and immediately remove it from tracking
+   */
+  completeRequest(messageId, result) {
+    const request = this.requests.get(messageId);
+    if (!request) {
+      logger.warn(`[RequestTracker] Attempted to complete non-existent request: ${messageId}`);
+      return false;
+    }
+
+    // Update status based on result
+    const status = result?.success ? RequestStatus.COMPLETED : RequestStatus.FAILED;
+
+    // Apply final updates
+    Object.assign(request, {
+      status,
+      result,
+      updatedAt: Date.now(),
+      completedAt: Date.now()
+    });
+
+    // Immediately remove from all tracking structures
+    this.requests.delete(messageId);
+    this.requestTimes.delete(messageId);
+    this.retryCounts.delete(messageId);
+
+    // Remove from tab index
+    if (request.sender?.tab?.id) {
+      const tabRequests = this.tabRequests.get(request.sender.tab.id);
+      if (tabRequests) {
+        tabRequests.delete(messageId);
+        if (tabRequests.size === 0) {
+          this.tabRequests.delete(request.sender.tab.id);
+        }
+      }
+    }
+
+    // Remove from toast index
+    if (request.metadata?.toastId) {
+      this.toastRequests.delete(request.metadata.toastId);
+    }
+
+    // Update statistics
+    if (status === RequestStatus.COMPLETED) {
+      this.stats.totalCompleted++;
+    } else {
+      this.stats.totalFailed++;
+    }
+
+    logger.debug(`[RequestTracker] Completed and removed request: ${messageId}`, {
+      status,
+      success: result?.success
+    });
+
+    return true;
+  }
+
+  /**
    * Check if request is still active
    */
   isRequestActive(messageId) {

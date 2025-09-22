@@ -4,6 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
+import { generateMessageId } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -106,6 +107,19 @@ export async function sendMessage(message, options = {}) {
     } catch (error) {
       // If coordination fails, fall back to regular messaging
       logger.warn('Translation coordination failed, falling back to regular messaging:', error);
+
+      // Create a new message with a fresh messageId to avoid duplicate detection
+      const fallbackMessage = {
+        ...message,
+        messageId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+
+      logger.info('Using fallback message with new ID:', {
+        originalId: message.messageId,
+        fallbackId: fallbackMessage.messageId
+      });
+
+      return await sendRegularMessage(fallbackMessage, options);
     }
   }
 

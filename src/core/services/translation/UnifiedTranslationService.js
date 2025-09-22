@@ -70,13 +70,16 @@ export class UnifiedTranslationService {
         throw new Error(`Invalid message format: ${JSON.stringify(message)}`);
       }
 
-      // Check for duplicate request
+      // Check for duplicate active request
       const existingRequest = this.requestTracker.getRequest(messageId);
-      if (existingRequest) {
-        logger.debug(`[UnifiedService] Duplicate request detected: ${messageId}`);
-        return existingRequest.status === RequestStatus.COMPLETED
-          ? existingRequest.result
-          : { success: false, error: 'Request already processing' };
+      if (existingRequest && this.requestTracker.isRequestActive(messageId)) {
+        logger.debug(`[UnifiedService] Duplicate active request detected: ${messageId}`);
+        return { success: false, error: 'Request already processing' };
+      }
+
+      // If request exists but is not active (completed/failed), we can proceed with new request
+      if (existingRequest && !this.requestTracker.isRequestActive(messageId)) {
+        logger.debug(`[UnifiedService] Found inactive request, proceeding with new request: ${messageId}`);
       }
 
       // Create new request record
