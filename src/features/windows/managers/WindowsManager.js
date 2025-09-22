@@ -90,6 +90,14 @@ export class WindowsManager extends ResourceTracker {
     // State flags for selection preservation
     this._isIconToWindowTransition = false;
     this._lastDismissedIcon = null;
+
+    // State flags for text field typing handling
+    this._isDismissingDueToTyping = false;
+    this._preserveSelectionForTyping = false;
+
+    // Event handler references
+    this._inputHandler = null;
+    this._iconClickHandler = null;
     
     // External dependencies
     this.translationHandler.errorHandler = options.translationHandler?.errorHandler || ErrorHandler.getInstance();
@@ -422,7 +430,90 @@ export class WindowsManager extends ResourceTracker {
     };
 
     // Use click with delay to dismiss - allows drag operations to complete first
-    document.addEventListener('click', this._dismissHandler, { capture: false });
+    // Use passive event listener for better performance
+    document.addEventListener('click', this._dismissHandler, { capture: false, passive: true });
+
+    // Add input event listener specifically for text field typing when in icon mode
+    if (this.state.isIconMode) {
+      this._inputHandler = (event) => {
+        // Only handle input events on text fields
+        const target = event.target;
+        if (this.isTextFieldElement(target)) {
+          // Only handle input events (actual text changes)
+          if (event.type !== 'input') {
+            return;
+          }
+
+          // Debounce rapid successive input events
+          const currentTime = Date.now();
+          if (currentTime - this._lastInputTime < this._inputDebounceDelay) {
+            return;
+          }
+          this._lastInputTime = currentTime;
+
+          this.logger.debug('Input detected in text field - dismissing icon', {
+            target: target?.tagName,
+            targetType: target?.type || 'contenteditable',
+            eventType: event.type
+          });
+
+          // Don't prevent default - let the key be processed normally
+          // We just need to dismiss the icon and ensure focus stays
+
+          // Store the active element before dismissing
+          const elementToRefocus = target;
+
+          // Remove listeners first to prevent multiple dismissals
+          this._removeDismissListener();
+
+          // Set flag to prevent multiple dismissals from other components
+          this._isDismissingDueToTyping = true;
+
+          // Use requestAnimationFrame for better timing than setTimeout(..., 0)
+          requestAnimationFrame(() => {
+            // Store the element reference for focus restoration
+            const element = elementToRefocus;
+
+            // Set flag to preserve selection during dismissal
+            const wasPreservingSelection = this._preserveSelectionForTyping;
+            this._preserveSelectionForTyping = true;
+
+            // Dismiss the icon without clearing selection
+            this.dismiss(false, true);
+
+            // Use requestAnimationFrame again to ensure DOM is ready
+            requestAnimationFrame(() => {
+              // Restore focus to the text field after dismissal
+              if (element && element.isConnected && typeof element.focus === 'function') {
+                try {
+                  element.focus();
+                  this.logger.debug('Focus restored to text field after typing dismissal');
+                } catch (focusError) {
+                  this.logger.warn('Failed to restore focus to text field', focusError);
+                }
+              }
+
+              // Restore the flag after all operations
+              this._preserveSelectionForTyping = wasPreservingSelection;
+
+              // Clear the typing dismissal flag
+              this._isDismissingDueToTyping = false;
+            });
+          });
+        }
+      };
+
+      // Only listen for input events (after value has changed)
+      // This allows the key to be fully processed before we dismiss
+      // Use passive event listener for better performance
+      document.addEventListener('input', this._inputHandler, { capture: true, passive: true });
+
+      // Add debouncing for rapid successive input events
+      this._lastInputTime = 0;
+      this._inputDebounceDelay = 100; // ms
+
+      this.logger.debug('Added text field input listeners with passive event handling');
+    }
 
     // Also add Escape key listener for better UX
     this._escapeKeyHandler = (event) => {
@@ -431,6 +522,7 @@ export class WindowsManager extends ResourceTracker {
         this.dismiss();
       }
     };
+    // Note: Escape key listener cannot be passive as we may need to prevent default
     document.addEventListener('keydown', this._escapeKeyHandler, { capture: false });
 
     this.logger.debug('Added click dismiss listener with text element detection and Escape key handler', {
@@ -446,6 +538,11 @@ export class WindowsManager extends ResourceTracker {
     if (this._dismissHandler) {
       document.removeEventListener('click', this._dismissHandler, { capture: false });
       this._dismissHandler = null;
+    }
+
+    if (this._inputHandler) {
+      document.removeEventListener('input', this._inputHandler, { capture: true });
+      this._inputHandler = null;
     }
 
     if (this._escapeKeyHandler) {
@@ -1052,12 +1149,19 @@ export class WindowsManager extends ResourceTracker {
    * @param {boolean} preserveSelection - Whether to preserve text selection (for icon->window transitions)
    */
   async dismiss(withFadeOut = true, preserveSelection = false) {
+    // Check if we're already dismissing due to typing - prevent redundant dismissals
+    if (this._isDismissingDueToTyping && withFadeOut) {
+      this.logger.debug('[LOG] Skipping redundant dismiss call during typing dismissal');
+      return;
+    }
+
     this.logger.debug('[LOG] WindowsManager.dismiss called', {
       withFadeOut,
       isIconMode: this.state.isIconMode,
       isVisible: this.state.isVisible,
       iconId: this.state.iconClickContext?.iconId,
       windowId: this.state.activeWindowId,
+      isDismissingDueToTyping: this._isDismissingDueToTyping,
       stack: new Error().stack
     });
     // Clear text selection only when dismissing icon mode AND extension context is valid
@@ -1085,12 +1189,14 @@ export class WindowsManager extends ResourceTracker {
     const shouldClearSelection = this.state.isIconMode &&
                                ExtensionContextManager.isValidSync() &&
                                !preserveSelection &&
-                               !preventDismissDueToDrag;
+                               !preventDismissDueToDrag &&
+                               !this._preserveSelectionForTyping;
     this.logger.debug('[Selection] Dismiss logic:', {
       isIconMode: this.state.isIconMode,
       extensionContextValid: ExtensionContextManager.isValidSync(),
       preserveSelection,
       preventDismissDueToDrag,
+      preserveSelectionForTyping: this._preserveSelectionForTyping,
       shouldClearSelection
     });
     
@@ -1239,14 +1345,70 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Destroy the WindowsManager and cleanup all resources
    */
+  /**
+   * Check if an element is a text field (input, textarea, or contenteditable)
+   * Enhanced with better edge case handling
+   * @param {Element} element - The element to check
+   * @returns {boolean} True if the element is a text field
+   */
+  isTextFieldElement(element) {
+    if (!element) return false;
+
+    // Check if element is still connected to DOM
+    if (!element.isConnected) return false;
+
+    // Check for standard text input types
+    if (element.tagName === 'INPUT') {
+      // Exclude certain input types that shouldn't trigger text field behavior
+      const excludedTypes = ['checkbox', 'radio', 'submit', 'reset', 'button', 'file', 'image', 'hidden'];
+      const inputType = element.type || 'text';
+      return !excludedTypes.includes(inputType);
+    }
+
+    // Check for textarea
+    if (element.tagName === 'TEXTAREA') {
+      return true;
+    }
+
+    // Check for contenteditable elements
+    if (element.isContentEditable === true) {
+      return true;
+    }
+
+    // Check if element is inside a contenteditable container
+    if (element.closest && element.closest('[contenteditable="true"]')) {
+      return true;
+    }
+
+    // Additional check for elements with contenteditable attribute set to any truthy value
+    if (element.hasAttribute('contenteditable') &&
+        element.getAttribute('contenteditable') !== 'false') {
+      return true;
+    }
+
+    return false;
+  }
+
   destroy() {
     // Cleanup event listeners and resources
     this.cleanup();
-    
+
     // Clean up DOM references
     this.displayElement = null;
     this.innerContainer = null;
     this.icon = null;
+
+    // Clean up state flags
+    this._isIconToWindowTransition = false;
+    this._lastDismissedIcon = null;
+    this._isDismissingDueToTyping = false;
+    this._preserveSelectionForTyping = false;
+
+    // Clean up event handler references
+    this._inputHandler = null;
+    this._iconClickHandler = null;
+    this._dismissHandler = null;
+    this._escapeKeyHandler = null;
     
     // Destroy child managers if they have destroy methods
     if (this.crossFrameManager && typeof this.crossFrameManager.destroy === 'function') {
