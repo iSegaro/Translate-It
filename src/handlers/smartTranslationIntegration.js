@@ -349,38 +349,49 @@ function isEditableElement(element) {
 
 async function determineReplaceMode(mode, platform) {
   logger.debug('Determining replace mode', { mode, platform });
-  
-  if (mode === TranslationMode.SelectElement) {
+
+  // For Select Element mode, always replace
+  if (mode === TranslationMode.Select_Element || mode === 'select_element') {
     logger.debug('SelectElement mode detected, using replace mode');
     return true;
   }
 
-  // Check for special sites first, if platform is not default
+  // Check for special sites first - this takes precedence over COPY_REPLACE setting
   if (platform !== Platform.Default) {
     const replaceSpecial = await getREPLACE_SPECIAL_SITESAsync();
     logger.debug('Special platform detected', { platform, replaceSpecial });
-    // If REPLACE_SPECIAL_SITES is true, then replace. Otherwise, proceed to general COPY_REPLACE check.
+    // If REPLACE_SPECIAL_SITES is true, always replace regardless of COPY_REPLACE
     if (replaceSpecial) {
-      return true; // Replace on special sites if setting is true
+      logger.debug('REPLACE_SPECIAL_SITES enabled - forcing replace mode on special platform');
+      return true;
     }
   }
 
-  // Now check the general COPY_REPLACE setting
+  // For Field mode, check the COPY_REPLACE setting
+  if (mode === TranslationMode.Field || mode === 'field') {
+    logger.debug('Field mode detected, checking COPY_REPLACE setting');
+    const isCopy = await getCOPY_REPLACEAsync();
+    logger.debug('COPY_REPLACE setting for Field mode', { setting: isCopy });
+
+    // If COPY_REPLACE is "copy", then copy to clipboard
+    // If COPY_REPLACE is "replace", then replace the text
+    return isCopy === "replace";
+  }
+
+  // For other modes, check the COPY_REPLACE setting
   const isCopy = await getCOPY_REPLACEAsync();
-  logger.debug('COPY_REPLACE setting retrieved', { setting: isCopy });
+  logger.debug('COPY_REPLACE setting for other modes', { setting: isCopy });
 
   if (isCopy === "replace") {
     logger.debug('COPY_REPLACE set to replace mode');
     return true;
   }
-  // If isCopy is "copy", then it's copy mode unless overridden by special site logic (which is handled above)
   if (isCopy === "copy") {
     logger.debug('COPY_REPLACE set to copy mode');
     return false;
   }
 
-  // Fallback for when COPY_REPLACE is not explicitly 'copy' or 'replace' (shouldn't happen if it's an enum)
-  // Or if it's a default platform and COPY_REPLACE is not 'replace'
+  // Fallback logic
   const activeElement = document.activeElement;
   const isComplex = isComplexEditor(activeElement);
   const result = !activeElement || !isComplex;
