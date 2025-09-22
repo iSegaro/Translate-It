@@ -437,18 +437,21 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    * Show translation UI
    */
   async showTranslationUI(selectedText, position) {
+    // Get WindowsManager directly from FeatureManager
     const windowsManager = this.getWindowsManager();
-
-    if (windowsManager) {
-      logger.debug('Showing translation UI for text field', {
-        text: selectedText.substring(0, 30) + '...',
-        position
-      });
-
-      await windowsManager.show(selectedText, position);
-    } else {
-      logger.warn('WindowsManager not available for text field translation');
+    if (!windowsManager) {
+      logger.warn('WindowsManager not available');
+      return;
     }
+
+    logger.debug('Showing translation UI for text field', {
+      text: selectedText.substring(0, 30) + '...',
+      position
+    });
+
+    // For text fields, always show icon first regardless of user's selectionTranslationMode setting
+    // This provides consistent behavior for text field interactions
+    await windowsManager._showIcon(selectedText, position);
   }
 
   /**
