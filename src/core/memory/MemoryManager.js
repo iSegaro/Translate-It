@@ -255,8 +255,10 @@ class MemoryManager {
    * @param {string} resourceId - Unique identifier for the resource
    * @param {Function} cleanupFn - Function to cleanup the resource
    * @param {string} groupId - Group identifier for batch cleanup
+   * @param {Object} options - Options object
+   * @param {boolean} options.isCritical - Whether this resource is critical and should be protected from cleanup
    */
-  trackResource(resourceId, cleanupFn, groupId = 'default') {
+  trackResource(resourceId, cleanupFn, groupId = 'default', options = {}) {
     if (this.resources.has(resourceId)) {
       logger.debug(`Resource ${resourceId} already tracked`)
       return
@@ -265,7 +267,7 @@ class MemoryManager {
     // Store resource info with critical flag
     const resourceInfo = {
       cleanupFn,
-      isCritical: false
+      isCritical: options.isCritical || false
     };
 
     this.resources.set(resourceId, resourceInfo)
