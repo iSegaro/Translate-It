@@ -33,6 +33,9 @@ export class ContentMessageHandler extends ResourceTracker {
     this.iFrameManager = null;
     this.errorHandler = ErrorHandler.getInstance();
 
+    // Track processed message IDs to prevent duplicates
+    this.processedMessageIds = new Set();
+
     // Store singleton instance
     contentMessageHandlerInstance = this;
     this.logger.debug('ContentMessageHandler singleton created');

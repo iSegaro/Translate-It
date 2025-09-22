@@ -7,6 +7,7 @@ import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { handleTranslationResult } from '@/core/background/handlers/translation/handleTranslationResult.js';
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslate');
 const errorHandler = new ErrorHandler();
@@ -31,6 +32,14 @@ export async function handleTranslate(message, sender) {
       throw new Error("Background service or translation engine not initialized.");
     }
 
+    // Initialize UnifiedTranslationService if not already initialized
+    if (!unifiedTranslationService.translationEngine) {
+      unifiedTranslationService.initialize({
+        translationEngine: backgroundService.translationEngine,
+        backgroundService: backgroundService
+      });
+    }
+
     // Validate the incoming message format using MessagingStandards
     if (!MessageFormat.validate(message)) {
       throw new Error(`Invalid message format received: ${JSON.stringify(message)}`);
@@ -41,77 +50,11 @@ export async function handleTranslate(message, sender) {
       throw new Error(`Unexpected action: ${message.action}. Expected ${MessageActions.TRANSLATE}`);
     }
 
-    const result = await backgroundService.translationEngine.handleTranslateMessage(message, sender);
+    // Use UnifiedTranslationService for handling the request
+    const result = await unifiedTranslationService.handleTranslationRequest(message, sender);
 
-    if (result.streaming) {
-        logger.info(`[Handler:TRANSLATE] ✅ Streaming started for messageId: ${message.messageId}`);
-        return { success: true, streaming: true, messageId: message.messageId };
-    }
-
-    if (!result || typeof result !== 'object' || !Object.prototype.hasOwnProperty.call(result, 'success')) {
-      throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
-    }
-
-    if (result.success) {
-      logger.info(`[Handler:TRANSLATE] ✅ Success: "${result.translatedText?.slice(0, 50)}..."`);
-    } else {
-      logger.debug(`[Handler:TRANSLATE] ❌ Failed: ${result.error?.message || result.error || 'Unknown error'}`);
-    }
-
-    // Check if this is a field mode translation that needs broadcast
-    const isFieldMode = message.data?.mode === 'field' ||
-                       message.data?.mode === TranslationMode.Field ||
-                       message.data?.translationMode === 'field' ||
-                       message.data?.translationMode === TranslationMode.Field;
-
-    // For field mode translations, also broadcast the result via TRANSLATION_RESULT_UPDATE
-    // This ensures the content script receives the notification even with fire-and-forget pattern
-    if (isFieldMode) {
-      logger.debug(`[Handler:TRANSLATE] Broadcasting field mode result for messageId: ${message.messageId}`);
-
-      // Create broadcast message
-      const broadcastMessage = {
-        messageId: message.messageId,
-        action: MessageActions.TRANSLATION_RESULT_UPDATE,
-        data: {
-          success: result.success,
-          translatedText: result.success ? result.translatedText : null,
-          originalText: message.data.text,
-          translationMode: message.data.mode || TranslationMode.Field,
-          sourceLanguage: result.sourceLanguage,
-          targetLanguage: result.targetLanguage,
-          provider: result.provider || message.data.provider,
-          options: message.data.options || {},
-          error: result.success ? null : result.error,
-          context: 'field-mode-broadcast',
-          needsBroadcast: true
-        }
-      };
-
-      // Send broadcast asynchronously (don't wait)
-      handleTranslationResult(broadcastMessage).catch(broadcastError => {
-        logger.warn('[Handler:TRANSLATE] Failed to broadcast field mode result:', broadcastError);
-      });
-    }
-
-    // Return the actual translation result
-    const finalResult = result.success ? {
-      success: true,
-      messageId: message.messageId,
-      translatedText: result.translatedText,
-      sourceLanguage: result.sourceLanguage,
-      targetLanguage: result.targetLanguage,
-      provider: result.provider || message.data.provider,
-      timestamp: Date.now()
-    } : {
-      success: false,
-      messageId: message.messageId,
-      error: result.error,
-      timestamp: Date.now()
-    };
-
-    logger.debug('[Handler:TRANSLATE] Returning final result:', finalResult);
-    return finalResult;
+    logger.debug('[Handler:TRANSLATE] UnifiedService result:', result);
+    return result;
 
   } catch (translationError) {
     logger.debug('[Handler:TRANSLATE] Caught error from translation engine:', translationError.message);
@@ -132,7 +75,7 @@ export async function handleTranslate(message, sender) {
     );
 
     logger.debug('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
-    
+
     return errorResponse;
   }
 }
