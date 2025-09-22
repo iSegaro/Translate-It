@@ -1,7 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
-import TranslationHandler from '@/core/TranslationHandler.js';
+import { TranslationHandler as WindowsTranslationHandler } from '@/features/windows/managers/translation/TranslationHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 
@@ -41,9 +41,9 @@ export class WindowsManagerHandler extends ResourceTracker {
 
       // Use the global FeatureManager singleton
       const globalFeatureManager = FeatureManager.getInstance();
-      const translationHandler = TranslationHandler.getInstance(globalFeatureManager);
 
-      // Create WindowsManager instance with the shared TranslationHandler
+      // Create WindowsManager instance with its own TranslationHandler
+      const translationHandler = new WindowsTranslationHandler();
       this.windowsManager = WindowsManager.getInstance({ translationHandler });
       
       // Store globally for compatibility with existing TextSelectionManager code
