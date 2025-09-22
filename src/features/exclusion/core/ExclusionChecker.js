@@ -183,12 +183,21 @@ export class ExclusionChecker {
   isFeatureEnabled(featureName) {
     const featureSettingsMap = {
       'selectElement': 'TRANSLATE_WITH_SELECT_ELEMENT',
-      'textSelection': 'TRANSLATE_ON_TEXT_SELECTION', 
+      'textSelection': 'TRANSLATE_ON_TEXT_SELECTION',
       'textFieldIcon': 'TRANSLATE_ON_TEXT_FIELDS',
       'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
       'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION'
     };
-    
+
+    // Default values for each feature
+    const featureDefaults = {
+      'selectElement': true,
+      'textSelection': true,
+      'textFieldIcon': false,
+      'shortcut': true,
+      'windowsManager': true
+    };
+
     if (featureName === 'contentMessageHandler') {
       return true; // Core feature, always enabled
     }
@@ -199,7 +208,8 @@ export class ExclusionChecker {
       return false;
     }
 
-    return settingsManager.get(settingKey, false);
+    const defaultValue = featureDefaults[featureName] ?? false;
+    return settingsManager.get(settingKey, defaultValue);
   }
 
   isUrlExcludedForFeature(featureName) {
