@@ -80,7 +80,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     const newToastId = `status-${Date.now()}`;
     // Store the toast ID globally for cleanup in case of errors
     window.pendingTranslationToastId = newToastId;
-    pageEventBus.emit('show-notification', { id: newToastId, message: 'Translating...', type: 'status' });
+    const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+    pageEventBus.emit('show-notification', { id: newToastId, message: translatingMessage, type: 'status' });
 
     // Set a timeout to automatically dismiss the notification if no response is received
     // This prevents the "Translating..." message from staying stuck forever

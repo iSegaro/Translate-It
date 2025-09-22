@@ -186,7 +186,7 @@
             v-else
             class="btn-icon"
           >🌐</span>
-          <span class="btn-text">{{ isTranslating ? 'Translating...' : 'Translate' }}</span>
+          <span class="btn-text">{{ isTranslating ? translatingText : translateText }}</span>
         </button>
       </div>
       
@@ -294,6 +294,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { computed } from 'vue'
+import { getTranslationString } from '@/utils/i18n/i18n.js'
 
 const { handleError } = useErrorHandler()
 
@@ -335,6 +336,16 @@ const translationResult = ref(null)
 const error = ref(null)
 const detectedTextRegions = ref([])
 const selectedRegion = ref(null)
+
+// Localized messages
+const translatingText = ref('Translating...')
+const translateText = ref('Translate')
+
+// Initialize localized messages
+onMounted(async () => {
+  translatingText.value = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...'
+  translateText.value = await getTranslationString('TRANSLATE') || 'Translate'
+})
 
 // Form data
 const fromLanguage = ref('auto')

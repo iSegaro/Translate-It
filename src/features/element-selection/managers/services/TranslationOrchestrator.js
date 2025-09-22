@@ -115,7 +115,7 @@ export class TranslationOrchestrator extends ResourceTracker {
     // Only show status notification if not for SelectElement mode
     // SelectElement mode has its own notification management
     if (!context || context !== 'select-element') {
-      const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
+      const statusMessage = await getTranslationString("SELECT_ELEMENT_TRANSLATING") || "Translating...";
       this.statusNotification = `status-${messageId}`;
       pageEventBus.emit('show-notification', {
         id: this.statusNotification,
