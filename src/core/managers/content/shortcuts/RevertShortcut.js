@@ -49,7 +49,20 @@ export class RevertShortcut {
    * @returns {Promise<Object>} Execution result
    */
   async execute() {
-    // Priority 1: If translation is in progress, cancel it first
+    // Priority 0: If SelectElementManager is handling ESC, skip
+    if (window.selectElementHandlingESC) {
+      logger.debug('[RevertShortcut] SelectElementManager is handling ESC, skipping revert shortcut');
+      return { success: true, action: 'skipped_select_element_handling_esc' };
+    }
+
+    // Priority 1: If SelectElementManager is active, let it handle ESC key
+    const selectElementManager = getActiveSelectElementManager();
+    if (selectElementManager && selectElementManager.isActive) {
+      logger.debug('[RevertShortcut] SelectElementManager is active, skipping revert shortcut');
+      return { success: true, action: 'skipped_select_element_active' };
+    }
+
+    // Priority 2: If translation is in progress, cancel it first
     if (window.isTranslationInProgress) {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
 
@@ -88,7 +101,7 @@ export class RevertShortcut {
       }
     }
 
-    // Priority 2: If no active processes, revert completed translations
+    // Priority 3: If no active processes, revert completed translations
     logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
 
     try {

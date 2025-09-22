@@ -3,6 +3,7 @@ import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -86,14 +87,40 @@ function timeout(ms, action) {
 }
 
 /**
- * Unified messaging system - Refactored for targeted messaging.
- * Sends messages to the background script, which acts as a central dispatcher.
+ * Unified messaging system with streaming support
+ * Coordinates between regular messages and streaming operations
  */
 export async function sendMessage(message, options = {}) {
+  const { forceRegular = false } = options;
+
+  // Check if this should be handled as a streaming operation
+  if (!forceRegular && isTranslationAction(message.action)) {
+    logger.debug('Routing translation message through coordinator:', {
+      action: message.action,
+      messageId: message.messageId,
+      context: message.context
+    });
+
+    try {
+      return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
+    } catch (error) {
+      // If coordination fails, fall back to regular messaging
+      logger.warn('Translation coordination failed, falling back to regular messaging:', error);
+    }
+  }
+
+  // Regular messaging path
+  return await sendRegularMessage(message, options);
+}
+
+/**
+ * Send regular (non-streaming) message
+ */
+export async function sendRegularMessage(message, options = {}) {
   const { timeout: customTimeout } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action);
 
-  logger.debug('Sending message to background:', {
+  logger.debug('Sending regular message to background:', {
     action: message.action,
     messageId: message.messageId,
     context: message.context,
@@ -149,7 +176,7 @@ export async function sendMessage(message, options = {}) {
       throw error;
     }
 
-    logger.debug('Message response received:', {
+    logger.debug('Regular message response received:', {
       action: message.action,
       messageId: message.messageId,
       success: true,
@@ -203,4 +230,21 @@ export async function sendMessage(message, options = {}) {
   }
 }
 
-export default { sendMessage };
+/**
+ * Check if action is a translation action that may benefit from streaming coordination
+ * @param {string} action - Message action
+ * @returns {boolean} - Whether action is translation-related
+ */
+function isTranslationAction(action) {
+  const translationActions = [
+    'TRANSLATE',
+    'TRANSLATE_SELECTION',
+    'TRANSLATE_TEXT',
+    'TRANSLATE_PAGE',
+    'TRANSLATE_IMAGE'
+  ];
+
+  return translationActions.includes(action);
+}
+
+export default { sendMessage, sendRegularMessage };

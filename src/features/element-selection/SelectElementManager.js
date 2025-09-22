@@ -723,7 +723,15 @@ class SelectElementManager extends ResourceTracker {
     document.addEventListener('keydown', (event) => {
       if (event.key === KEY_CODES.ESCAPE && this.isActive) {
         this.logger.debug("ESC key pressed, deactivating SelectElement mode");
-        this.deactivate();
+
+        // Set a flag to prevent other ESC handlers from running
+        window.selectElementHandlingESC = true;
+        setTimeout(() => { window.selectElementHandlingESC = false; }, 100);
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        this.deactivate({ fromCancel: true });
       }
     });
   }

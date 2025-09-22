@@ -10,6 +10,8 @@ import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selec
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
+import { createStreamingResponseHandler } from '@/shared/messaging/core/StreamingResponseHandler.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -28,6 +30,9 @@ export class TranslationOrchestrator extends ResourceTracker {
     this.escapeKeyListener = null;
     this.statusNotification = null;
     this.errorHandler = ErrorHandler.getInstance();
+
+    // Initialize streaming response handler with coordinator integration
+    this.streamingHandler = createStreamingResponseHandler(unifiedTranslationCoordinator);
   }
 
   async initialize() {
@@ -229,18 +234,12 @@ this.translationRequests.delete(messageId);
   }
 
   async sendTranslationRequest(messageId, jsonPayload, context = 'select-element') {
-    // Parse JSON to count segments for dynamic timeout calculation
-    let segmentCount = 1; // Default fallback
-    let dynamicTimeout;
-
     try {
-      // Check if translation was cancelled (no longer using global flag)
+      // Check if translation was cancelled
       const request = this.translationRequests.get(messageId);
       if (request && request.status === 'cancelled') {
         this.logger.debug('[TranslationOrchestrator] Translation cancelled before sending request');
-        // Remove the request from our tracking since it won't be sent
-this.translationRequests.delete(messageId);
-        // Clear the translation in progress flag
+        this.translationRequests.delete(messageId);
         window.isTranslationInProgress = false;
         return;
       }
@@ -249,15 +248,14 @@ this.translationRequests.delete(messageId);
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
 
+      // Parse JSON to count segments
+      let segmentCount = 1;
       try {
         const parsedPayload = JSON.parse(jsonPayload);
         segmentCount = Array.isArray(parsedPayload) ? parsedPayload.length : 1;
       } catch {
-        this.logger.warn("Failed to parse JSON payload for segment count, using default timeout");
+        this.logger.warn("Failed to parse JSON payload for segment count");
       }
-
-      // Calculate dynamic timeout based on segment count
-      dynamicTimeout = this.calculateDynamicTimeout(segmentCount);
 
       const translationRequest = {
         action: MessageActions.TRANSLATE,
@@ -273,17 +271,24 @@ this.translationRequests.delete(messageId);
         messageId,
       };
 
-      this.logger.debug("Sending translation request with advanced payload", {
+      this.logger.debug("Sending unified translation request", {
         messageId,
         segmentCount,
-        dynamicTimeout,
         payloadSize: jsonPayload.length
       });
-      
-      // Use sendMessage with dynamic timeout for proper error propagation
-      const result = await sendMessage(translationRequest, { timeout: dynamicTimeout });
-      
-      this.logger.debug("Translation request sent successfully", result);
+
+      // Register streaming response handler for this request
+      this.streamingHandler.registerHandler(messageId, {
+        onStreamUpdate: (data) => this.handleStreamUpdate({ messageId, data }),
+        onStreamEnd: (data) => this.handleStreamEnd({ messageId, data }),
+        onTranslationResult: (data) => this.handleTranslationResult({ messageId, data }),
+        onError: (error) => this._handleStreamingError(messageId, error)
+      });
+
+      // Send through unified messaging system (will coordinate streaming/regular)
+      const result = await sendMessage(translationRequest);
+
+      this.logger.debug("Unified translation request completed", result);
     } catch (error) {
       // Use ExtensionContextManager to detect context errors
       const isContextError = ExtensionContextManager.isContextError(error);
@@ -316,9 +321,7 @@ this.translationRequests.delete(messageId);
       
       if (isTimeoutError) {
         this.logger.warn("Translation request timed out (background processing may continue)", {
-          messageId,
-          timeout: dynamicTimeout,
-          segmentCount
+          messageId
         });
         
         // Update request status to timeout but don't delete it
@@ -377,11 +380,15 @@ this.translationRequests.delete(messageId);
         // Clear the global translation in progress flag on error
         window.isTranslationInProgress = false;
         
-        // Dismiss notification on error 
+        // Dismiss notification on error
         if (this.statusNotification) {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
           this.logger.debug("Dismissed translating notification on stream error");
+        } else {
+          // For Select Element mode, dismiss the Select Element notification
+          pageEventBus.emit('dismiss-select-element-notification', {});
+          this.logger.debug("Dismissed Select Element notification on stream error");
         }
         
         // Notify SelectElementManager to perform cleanup
@@ -482,6 +489,10 @@ this.translationRequests.delete(messageId);
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
         this.logger.debug("Dismissed translating notification on stream completion");
+      } else {
+        // For Select Element mode, dismiss the Select Element notification
+        pageEventBus.emit('dismiss-select-element-notification', {});
+        this.logger.debug("Dismissed Select Element notification on stream completion");
       }
 
       // If this was a previously timed out request, show success notification
@@ -549,6 +560,10 @@ this.translationRequests.delete(messageId);
       if (this.statusNotification) {
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
+      } else {
+        // For Select Element mode, dismiss the Select Element notification
+        pageEventBus.emit('dismiss-select-element-notification', {});
+        this.logger.debug("Dismissed Select Element notification on stream end error");
       }
       
       // Show error to user
@@ -774,10 +789,54 @@ this.translationRequests.delete(messageId);
     }
   }
 
+  /**
+   * Handle streaming error from unified system
+   * @private
+   */
+  _handleStreamingError(messageId, error) {
+    this.logger.error(`Streaming error for ${messageId}:`, error);
+
+    const request = this.translationRequests.get(messageId);
+    if (request) {
+      request.status = 'error';
+      request.error = error;
+    }
+
+    // Clear global flags and notifications
+    window.isTranslationInProgress = false;
+    if (this.statusNotification) {
+      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+      this.statusNotification = null;
+    }
+
+    // Show error to user if not cancelled
+    if (!this.userCancelledRequests.has(messageId)) {
+      this.errorHandler.handle(error, {
+        context: 'select-element-streaming',
+        type: ErrorTypes.TRANSLATION_FAILED,
+        showToast: true
+      });
+    }
+
+    // Cleanup
+    this.translationRequests.delete(messageId);
+    this.userCancelledRequests.delete(messageId);
+
+    // Notify SelectElementManager
+    if (window.selectElementManagerInstance) {
+      window.selectElementManagerInstance.performPostTranslationCleanup();
+    }
+  }
+
   async cleanup() {
     this.cancelAllTranslations();
     this.translationRequests.clear();
     this.userCancelledRequests.clear(); // Clear user cancellation tracking
+
+    // Cleanup streaming handler
+    if (this.streamingHandler) {
+      this.streamingHandler.cleanup();
+    }
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
