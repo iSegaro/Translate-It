@@ -132,8 +132,8 @@ export class ExtensionContextManager {
       return;
     }
 
-    // Use warn level to make context issues visible but not alarming
-    logger.warn(`Extension context error in ${context}: ${reason}`, {
+    // Use debug level for context errors - these are expected during extension lifecycle
+    logger.debug(`Extension context error in ${context}`, {
       context,
       reason,
       originalError: message

@@ -60,7 +60,7 @@ export class IFrameManager extends ResourceTracker {
     try {
       // Check extension context safety
       if (!ExtensionContextManager.isValidSync()) {
-        this.logger.warn('Extension context invalid, skipping initialization');
+        this.logger.debug('Extension context invalid, skipping initialization');
         return;
       }
 

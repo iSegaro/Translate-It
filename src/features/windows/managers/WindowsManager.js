@@ -221,7 +221,7 @@ export class WindowsManager extends ResourceTracker {
    */
   async show(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
-      this.logger.warn('Extension context invalid, aborting show()');
+      this.logger.debug('Extension context invalid, aborting show()');
       return;
     }
 
@@ -287,7 +287,7 @@ export class WindowsManager extends ResourceTracker {
    */
   async _showIcon(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
-      this.logger.warn('Extension context invalid, cannot create icon');
+      this.logger.debug('Extension context invalid, cannot create icon');
       return;
     }
 

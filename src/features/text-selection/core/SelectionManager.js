@@ -72,7 +72,7 @@ export class SelectionManager extends ResourceTracker {
    */
   async processSelection(selectedText, selection) {
     if (!ExtensionContextManager.isValidSync()) {
-      this.logger.warn('Extension context invalid, skipping selection processing');
+      this.logger.debug('Extension context invalid, skipping selection processing');
       return;
     }
 
