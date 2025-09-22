@@ -13,25 +13,25 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 export default {
   setup() {
     const { sendMessage, createMessage } = useMessaging('popup')
-    
+
     const translateText = async (text) => {
       const message = createMessage(MessageActions.TRANSLATE, {
         text,
         targetLang: 'fa'
       })
-      
-      // UnifiedMessaging automatically applies appropriate timeout
+
+      // UnifiedMessaging with streaming coordination for large translations
       const response = await sendMessage(message)
       return response.success ? response.data : null
     }
-    
+
     const quickAction = async () => {
       // Settings operations use fast 3-second timeout
       const message = createMessage(MessageActions.GET_SETTINGS, {})
       const response = await sendMessage(message)
       return response
     }
-    
+
     return { translateText, quickAction }
   }
 }
@@ -89,13 +89,13 @@ messageHandler.listen()
 
 ## ⚡ Unified Messaging Features
 
-### Intelligent Timeout Management
+### Intelligent Timeout Management & Streaming Coordination
 
-UnifiedMessaging automatically applies appropriate timeouts based on action complexity:
+UnifiedMessaging automatically applies appropriate timeouts based on action complexity and provides streaming coordination for translation operations:
 
 **Fast Actions** (3-second timeout):
 - `GET_SETTINGS`, `SET_SETTINGS` - 3000ms
-- `GET_SELECT_ELEMENT_STATE` - 2000ms  
+- `GET_SELECT_ELEMENT_STATE` - 2000ms
 - `SHOW_NOTIFICATION` - 2000ms
 - `OPEN_SIDEPANEL` - 3000ms
 - UI and settings operations
@@ -112,12 +112,20 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - `PROCESS_IMAGE_OCR` - 30000ms
 - Media processing operations
 
+**Streaming Translation Support** (Select Element Mode):
+- **Smart Timeout Management**: Dynamic timeouts based on text size and segment count
+- **Progress Reporting**: Real-time streaming updates with UnifiedTranslationCoordinator
+- **Fallback Handling**: Graceful degradation from streaming to regular translation
+- **Context-Aware Routing**: Automatic detection of streaming vs. regular translation needs
+
 ### Performance Benefits
 
 - **Eliminated race conditions** between competing listeners
 - **Action-specific timeouts** prevent unnecessary delays
+- **Streaming coordination** for large translation operations
 - **Centralized error handling** with ExtensionContextManager
 - **Simplified architecture** - no complex port fallbacks
+- **Smart timeout calculation** based on content complexity
 
 ### Usage Control
 
@@ -138,13 +146,18 @@ All available actions in `MessageActions.js`:
 ```javascript
 // Translation
 MessageActions.TRANSLATE
-MessageActions.TRANSLATE_SELECTION  
+MessageActions.TRANSLATE_SELECTION
 MessageActions.TRANSLATE_PAGE
 MessageActions.GET_PROVIDERS
 
 // Select Element
 MessageActions.ACTIVATE_SELECT_ELEMENT_MODE
 MessageActions.PROCESS_SELECTED_ELEMENT
+
+// Streaming Translation (New)
+MessageActions.TRANSLATION_STREAM_UPDATE    // Real-time translation progress
+MessageActions.TRANSLATION_STREAM_END       // Translation completion
+MessageActions.TRANSLATION_RESULT_UPDATE    // Final result delivery
 
 // TTS
 MessageActions.TTS_SPEAK
@@ -153,6 +166,9 @@ MessageActions.TTS_STOP
 // Sidepanel
 MessageActions.OPEN_SIDEPANEL
 MessageActions.UPDATE_SIDEPANEL_STATE
+
+// Coordination
+MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
 ```
 
 ## 🔧 Message Structure
@@ -264,12 +280,16 @@ logger.error('Message failed:', error)
 ```
 src/shared/messaging/
 ├── core/
-│   ├── MessagingCore.js     # MessageFormat, Contexts, utilities
-│   ├── MessageActions.js    # All available actions  
-│   ├── UnifiedMessaging.js  # 🆕 Unified messaging system
-│   └── MessageHandler.js    # Centralized message handling
+│   ├── MessagingCore.js                  # MessageFormat, Contexts, utilities
+│   ├── MessageActions.js                 # All available actions
+│   ├── UnifiedMessaging.js               # 🆕 Unified messaging system
+│   ├── UnifiedTranslationCoordinator.js  # 🆕 Translation streaming coordination
+│   ├── StreamingTimeoutManager.js        # 🆕 Smart timeout management for streaming
+│   ├── StreamingResponseHandler.js       # 🆕 Streaming response coordination
+│   ├── ContentScriptIntegration.js       # 🆕 Content script integration layer
+│   └── MessageHandler.js                 # Centralized message handling
 ├── composables/
-│   └── useMessaging.js      # Vue composable (uses UnifiedMessaging)
+│   └── useMessaging.js                   # Vue composable (uses UnifiedMessaging)
 └── __tests__/
     └── MessagingCore.test.js
 ```
@@ -327,10 +347,51 @@ messageHandler.listen()
 ### Key Changes
 
 - **Eliminated race conditions**: Single unified messaging system
-- **Context-specific handlers**: No more listener conflicts  
+- **Context-specific handlers**: No more listener conflicts
 - **Centralized error handling**: ExtensionContextManager integration
 - **Simplified API**: Direct sendMessage() with automatic timeouts
+- **Streaming coordination**: UnifiedTranslationCoordinator for large translation operations
+- **Smart timeout management**: Dynamic timeout calculation based on content complexity
+- **Content script integration**: Seamless integration layer for streaming responses
+
+### New Streaming Features
+
+```javascript
+// Automatic streaming detection and coordination
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+
+// For Select Element mode with large content, streaming is automatically enabled
+const message = MessageFormat.create(
+  MessageActions.TRANSLATE,
+  { text: largeText, context: 'select-element' },
+  'content'
+)
+
+// UnifiedMessaging automatically routes through UnifiedTranslationCoordinator
+// if streaming conditions are met (context: 'select-element', text > 2000 chars)
+const response = await sendMessage(message)
+```
+
+### Integration Points
+
+```javascript
+// Content Script Integration for streaming responses
+import {
+  initializeContentScriptIntegration,
+  registerTranslation
+} from '@/shared/messaging/core/ContentScriptIntegration.js'
+
+// Initialize integration layer
+await initializeContentScriptIntegration()
+
+// Register for streaming responses
+registerTranslation(messageId, {
+  onStreamUpdate: (data) => console.log('Streaming update:', data),
+  onStreamEnd: (data) => console.log('Streaming completed:', data),
+  onError: (error) => console.error('Streaming error:', error)
+})
+```
 
 ---
 
-**Summary:** UnifiedMessaging provides **race-condition-free messaging** with **intelligent timeout management**. The new MessageHandler system ensures **single responsibility** and **context isolation**. 🚀
+**Summary:** UnifiedMessaging provides **race-condition-free messaging** with **intelligent timeout management** and **streaming coordination**. The new UnifiedTranslationCoordinator ensures **efficient handling of large translation operations** while maintaining **context isolation** and **automatic fallback capabilities**. 🚀

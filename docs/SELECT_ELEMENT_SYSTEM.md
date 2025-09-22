@@ -119,16 +119,16 @@ Integrated notification system for user feedback:
 5. Translation applied to DOM with state tracking for reverts
 
 ### Deactivation Flow
-1. User clicks cancel button in toast notification OR
+1. User clicks cancel button in Select Element notification OR
 2. User translates an element OR
-3. User presses Escape key
-4. `ToastEventHandler` detects cancel interaction
-5. `SelectElementManager.deactivate()` cleans up:
+3. User presses Escape key (with proper event propagation prevention)
+4. `SelectElementManager.deactivate()` cleans up:
    - Removes event listeners
    - Clears highlights
-   - Disables toast notifications
+   - Dismisses Select Element notification via `dismiss-select-element-notification` event
    - Resets UI behaviors
-6. System returns to normal state
+   - Prevents interference with other shortcut handlers (e.g., RevertShortcut)
+5. System returns to normal state
 
 ## 🔧 Service Details
 
@@ -209,28 +209,46 @@ class ToastIntegration {
 }
 ```
 
-### Navigation Prevention
+### Navigation Prevention & Event Handling
 ```javascript
 // Smart navigation blocking
 preventNavigationHandler(event) {
   if (!this.isActive || this.isProcessingClick) return;
-  
+
   const target = event.target;
   const isInteractiveElement = this.isInteractiveElement(target);
-  
+
   if (isInteractiveElement) {
     const hasTextContent = this.hasTextContent(target);
-    
+
     if (hasTextContent) {
       // Allow elements with text content to be translated
       return;
     }
-    
+
     // Block navigation on other interactive elements
     event.preventDefault();
     event.stopPropagation();
     return false;
   }
+}
+
+// ESC key handling with event propagation prevention
+setupKeyboardListeners() {
+  document.addEventListener('keydown', (event) => {
+    if (event.key === KEY_CODES.ESCAPE && this.isActive) {
+      // Prevent other handlers (like RevertShortcut) from processing ESC
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      // Set flag to prevent race conditions
+      window.selectElementHandlingESC = true;
+      setTimeout(() => { window.selectElementHandlingESC = false; }, 100);
+
+      this.deactivate({ fromCancel: true });
+    }
+  });
 }
 ```
 
@@ -276,10 +294,10 @@ src/features/element-selection/
 4. System handles nested content and styling
 
 ### Mode Deactivation
-- **Method 1**: Click cancel button in toast notification
-- **Method 2**: Press Escape key
+- **Method 1**: Click cancel button in Select Element notification
+- **Method 2**: Press Escape key (with event propagation prevention to avoid conflicts)
 - **Method 3**: Translate any element (auto-deactivation)
-- **Method 4**: Click outside any element (timeout-based)
+- **Method 4**: Background script deactivation (system-level cleanup)
 
 ## 🔧 Configuration
 
@@ -309,26 +327,45 @@ src/features/element-selection/
 
 ## 🔄 Integration Points
 
-### With Toast System
+### With Select Element Notification System
 ```javascript
-// Seamless toast integration
-this.toastIntegration.showNotification('success', 'Select Element mode activated', {
-  actions: [
-    {
-      label: 'Cancel',
-      callback: () => this.deactivate(),
-      type: 'cancel'
-    }
-  ]
+// Specialized notification management for Select Element
+pageEventBus.emit('show-select-element-notification', {
+  managerId: this.instanceId,
+  actions: {
+    cancel: () => this.deactivate({ fromNotification: true }),
+    revert: () => this.performRevert()
+  }
+});
+
+// Update notification during translation
+pageEventBus.emit('update-select-element-notification', {
+  status: 'translating'
+});
+
+// Dismiss notification on completion/cancellation
+pageEventBus.emit('dismiss-select-element-notification', {
+  managerId: this.instanceId
 });
 ```
 
-### With Translation System
+### With Translation System & Streaming Support
 ```javascript
-// Integration with translation providers
+// Integration with translation providers and streaming support
 this.translationOrchestrator.translateElement(element, text)
-  .then(result => this.applyTranslation(element, result))
-  .catch(error => this.errorHandlingService.handleError(error));
+  .then(result => {
+    this.applyTranslation(element, result);
+    // Notification dismissed automatically in streaming completion handler
+  })
+  .catch(error => {
+    this.errorHandlingService.handleError(error);
+    // Notification dismissed automatically in error handler
+  });
+
+// Streaming translation coordination for large content
+// - Automatic notification updates during streaming
+// - Smart timeout management based on content size
+// - Progress reporting through UnifiedTranslationCoordinator
 ```
 
 ### With State Management

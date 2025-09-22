@@ -76,7 +76,7 @@
 
 ### 🔧 Shared Systems (منتقل شده از سطح بالا)
 - **`src/shared/`**: سیستم‌های مشترک
-  - `messaging/` - سیستم پیام‌رسانی هوشمند (شامل `SmartMessaging` که برای ارتباط با `StreamingManager` استفاده می‌شود)
+  - `messaging/` - **سیستم پیام‌رسانی یکپارچه (2025)** - UnifiedMessaging با UnifiedTranslationCoordinator، StreamingTimeoutManager، و ContentScriptIntegration برای هماهنگی streaming و timeout management هوشمند
   - `storage/` - مدیریت ذخیره‌سازی با caching
   - `error-management/` - مدیریت خطای متمرکز
   - `logging/` - سیستم log ساختارمند
@@ -107,7 +107,7 @@
 ### مستندات اصلی
 - **`docs/ARCHITECTURE.md`**: معماری کامل پروژه و integration guide
 - **`docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`**: سیستم ثبت handler های هوشمند با مدیریت چرخه حیات پویا
-- **`docs/MessagingSystem.md`**: سیستم پیام‌رسانی بین کامپوننت‌ها
+- **`docs/MessagingSystem.md`**: **سیستم پیام‌رسانی یکپارچه (2025)** - UnifiedMessaging با streaming coordination، timeout management هوشمند، و integration layer برای content scripts
 - **`docs/TRANSLATION_SYSTEM.md`**: موتور ترجمه و provider ها
 - **`docs/PROVIDERS.md`**: راهنمای کامل پیاده‌سازی provider ها با BaseProvider، RateLimitManager، و Circuit Breaker
 - **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
@@ -125,7 +125,7 @@
 - **`docs/CSS_ARCHITECTURE.md`**: **معماری CSS مدرن (2025)** - CSS اصولی با Grid layout، containment، safe variable functions، SCSS patterns آینده‌نگر، و استراتژی Shadow DOM isolation با strategic !important usage
 - **`src/assets/styles/README-CSS-VARIABLES.md`**: **راهنمای CSS Variables (2025)** - Best practices، mixins و functions برای جلوگیری از مشکلات interpolation
 - **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
-- **`docs/SELECT_ELEMENT_SYSTEM.md`**: **سیستم انتخاب عنصر بازطراحی شده (2025)** - معماری یکپارچه با Toast Integration، سرویس‌های مجزا، و مدیریت منابع هوشمند
+- **`docs/SELECT_ELEMENT_SYSTEM.md`**: **سیستم انتخاب عنصر بازطراحی شده (2025)** - معماری یکپارچه با notification management مخصوص، event propagation prevention، و streaming coordination پشتیبانی
 
 ### منابع اضافی
 - **`docs/Images/`**: تصاویر و diagram های معماری

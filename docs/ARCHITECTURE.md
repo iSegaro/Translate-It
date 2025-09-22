@@ -419,7 +419,34 @@ toastIntegration.showNotification('success', 'Mode activated', {
 ### Unified Messaging System
 
 ### Overview
-The Unified Messaging system provides **race-condition-free communication** between Vue components, background scripts, and content scripts with **intelligent timeout management**. See [Unified Messaging System Documentation](MessagingSystem.md) for complete details.
+The Unified Messaging system provides **race-condition-free communication** between Vue components, background scripts, and content scripts with **intelligent timeout management** and **streaming coordination**. See [Unified Messaging System Documentation](MessagingSystem.md) for complete details.
+
+### Key Components
+
+**UnifiedMessaging.js** - Core messaging with intelligent timeout management:
+```javascript
+import { sendMessage, sendRegularMessage, sendStreamingMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+
+// Regular message with automatic timeout
+const response = await sendMessage(message)
+
+// Regular message with explicit timeout
+const result = await sendRegularMessage(message, { timeout: 5000 })
+
+// Streaming message with progressive timeout
+const streamResponse = await sendStreamingMessage(message, {
+  onChunk: (chunk) => updateUI(chunk),
+  onTimeout: (timeout) => updateTimeoutUI(timeout)
+})
+```
+
+**UnifiedTranslationCoordinator.js** - Prevents infinite recursion in translation coordination:
+```javascript
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+
+// Coordinates translation without creating loops
+const result = await sendRegularMessage(message, options)
+```
 
 ### Vue Integration
 
@@ -431,12 +458,32 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 // In Vue component setup()
 const { sendMessage, createMessage } = useMessaging('popup')
 
-// Automatic timeout management (recommended)
+// Regular translation with automatic timeout
 const response = await sendMessage(
-  createMessage(MessageActions.TRANSLATE, { 
+  createMessage(MessageActions.TRANSLATE, {
     text: 'Hello',
     targetLang: 'fa'
   })
+)
+
+// Streaming translation with progressive updates
+const streamResponse = await sendMessage(
+  createMessage(MessageActions.TRANSLATE_STREAMING, {
+    text: 'Long text to translate',
+    targetLang: 'fa',
+    streaming: true
+  }),
+  {
+    streaming: true,
+    onChunk: (chunk) => {
+      // Update UI with each chunk
+      translationResult.value += chunk.translatedText
+    },
+    onTimeout: (timeout) => {
+      // Show timeout progress
+      showTimeoutProgress(timeout)
+    }
+  }
 )
 
 // Settings operations with fast timeout
@@ -445,22 +492,27 @@ const settingsResponse = await sendMessage(
 )
 ```
 
-### Unified Messaging Architecture
+### Timeout Management System
 
-**UnifiedMessaging.js** - Intelligent timeout management system:
+The system implements intelligent timeout management based on operation type:
+
 ```javascript
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
-
-// Automatic timeout based on action type
-const response = await sendMessage(message)
-
-// Fast actions: 2-3 second timeout for UI operations
-// Medium actions: 8-15 second timeout for translation
-// Long actions: 20+ second timeout for media processing
+// Automatic timeout categories:
+// - Fast: 2-3 seconds (UI operations, settings)
+// - Medium: 8-15 seconds (regular translation)
+// - Long: 20+ seconds (streaming, media processing)
+// - Progressive: Increases for streaming operations
 
 // Custom timeout control
 const response = await sendMessage(message, {
   timeout: 10000
+})
+
+// Streaming with progressive timeout
+const response = await sendStreamingMessage(message, {
+  baseTimeout: 8000,
+  maxTimeout: 25000,
+  timeoutIncrement: 2000
 })
 ```
 
@@ -474,12 +526,13 @@ export const MessageFormat = {
 }
 ```
 
-**MessageActions.js** - All available message types:
+**MessageActions.js** - All available message types including streaming:
 ```javascript
 // Translation actions
 TRANSLATE: 'TRANSLATE'
 TRANSLATE_SELECTION: 'TRANSLATE_SELECTION'
 TRANSLATE_PAGE: 'TRANSLATE_PAGE'
+TRANSLATE_STREAMING: 'TRANSLATE_STREAMING'  // Streaming translation support
 
 // TTS actions
 TTS_SPEAK: 'TTS_SPEAK',
@@ -499,18 +552,34 @@ CAPTURE_SCREEN_AREA: 'CAPTURE_SCREEN_AREA'
 // ... and 30+ more actions
 ```
 
-### Context-Aware Messaging
+### Streaming Translation Support
 
-Each component filters messages by context to prevent cross-interference:
+The system supports streaming translation with progressive updates:
+
 ```javascript
-// In popup component
-browser.runtime.onMessage.addListener((message) => {
-  if (message.context !== MessageContexts.POPUP) {
-    return false // Ignore non-popup messages
-  }
-  // Handle popup-specific updates
-})
+// In translation handler
+const handleStreamingTranslation = async (message) => {
+  const coordinator = new UnifiedTranslationCoordinator()
+
+  return await coordinator.coordinateTranslation(message, {
+    streaming: true,
+    onChunk: (chunk) => {
+      // Send chunk back to UI
+      sendStreamingUpdate(chunk)
+    },
+    onTimeout: (timeout) => {
+      // Update timeout progress
+      sendTimeoutUpdate(timeout)
+    }
+  })
+}
 ```
+
+**Key Features:**
+- **Progressive Updates**: UI updates as translation progresses
+- **Dynamic Timeouts**: Timeout increases with streaming duration
+- **Chunk Processing**: Efficient handling of translation chunks
+- **Error Recovery**: Graceful handling of streaming errors
 
 ---
 
@@ -978,10 +1047,13 @@ export const useTranslationStore = defineStore('translation', {
 - `src/views/options/OptionsApp.vue` - Options page application
 
 ### Core System Files
-- `src/messaging/core/MessagingCore.js` - Message utilities and format
-- `src/messaging/composables/useMessaging.js` - Vue messaging integration
+- `src/shared/messaging/core/UnifiedMessaging.js` - Core messaging with timeout management
+- `src/shared/messaging/core/UnifiedTranslationCoordinator.js` - Translation coordination
+- `src/shared/messaging/core/MessageActions.js` - Message type definitions
+- `src/shared/messaging/core/MessageFormat.js` - Message format utilities
+- `src/shared/messaging/composables/useMessaging.js` - Vue messaging integration
 - `src/background/index.js` - Background service worker entry
-- `src/background/translation-engine.js` - Translation coordination
+- `src/background/feature-loader.js` - Feature loading system
 - `src/managers/core/LifecycleManager.js` - Central message router
 
 ### Provider System

@@ -13,6 +13,8 @@
 - **RateLimitManager**: مدیریت محدودیت نرخ درخواست و جلوگیری از تجاوز از محدودیت‌های API.
 - **StreamingManager**: مدیریت جلسات استریمینگ ترجمه، هماهنگی ارسال نتایج به صورت بلادرنگ به UI.
 - **TranslationEngine**: هماهنگی کلی ترجمه، انتخاب پرووایدر مناسب، و تصمیم‌گیری در مورد استفاده از استریمینگ.
+- **UnifiedTranslationCoordinator**: هماهنگی streaming translation operations با timeout management هوشمند و progress reporting.
+- **StreamingTimeoutManager**: مدیریت timeout های پویا برای streaming operations بر اساس اندازه محتوا.
 
 ## ✅ Provider Implementation Rules
 
@@ -103,7 +105,7 @@ async translate(text, sourceLang, targetLang, options) {
 
 ### 1. **Translation Services (Google, Bing, Yandex)**
 
-این پرووایدرها معمولاً APIهای سنتی دارند و ممکن است محدودیت‌های کاراکتری یا درخواست داشته باشند. استریمینگ برای این نوع پرووایدرها تنها برای متن‌های بسیار طولانی که نیاز به تکه‌تکه شدن دارند، فعال می‌شود.
+این پرووایدرها معمولاً APIهای سنتی دارند و ممکن است محدودیت‌های کاراکتری یا درخواست داشته باشند. استریمینگ برای این نوع پرووایدرها تنها برای متن‌های بسیار طولانی که نیاز به تکه‌تکه شدن دارند، فعال می‌شود. UnifiedTranslationCoordinator به صورت خودکار تصمیم می‌گیرد که آیا از streaming استفاده کند یا خیر بر اساس context (select-element) و اندازه متن.
 
 ```javascript
 export class TranslationServiceProvider extends BaseProvider {
@@ -155,7 +157,7 @@ export class TranslationServiceProvider extends BaseProvider {
 
 ### 2. **AI Services (OpenAI, Gemini, DeepSeek)**
 
-این پرووایدرها معمولاً قابلیت‌های پیشرفته‌تری مانند استریمینگ بلادرنگ و پردازش پیچیده‌تر را ارائه می‌دهند. استریمینگ برای این نوع پرووایدرها برای متن‌های طولانی‌تر یا در حالت‌های خاص (مانند `Selection`) فعال می‌شود.
+این پرووایدرها معمولاً قابلیت‌های پیشرفته‌تری مانند استریمینگ بلادرنگ و پردازش پیچیده‌تر را ارائه می‌دهند. استریمینگ برای این نوع پرووایدرها برای متن‌های طولانی‌تر یا در حالت‌های خاص (مانند `select-element`) فعال می‌شود. UnifiedTranslationCoordinator timeout management هوشمند بر اساس تعداد segments و پیچیدگی محتوا ارائه می‌دهد.
 
 ```javascript
 export class AIServiceProvider extends BaseProvider {
@@ -201,6 +203,37 @@ export class AIServiceProvider extends BaseProvider {
   }
 }
 ```
+
+## Streaming Coordination Integration
+
+### How Streaming Works with Providers
+
+سیستم streaming coordination به صورت شفاف با تمام provider ها کار می‌کند:
+
+1. **Automatic Detection**: UnifiedTranslationCoordinator تشخیص می‌دهد که آیا translation نیاز به streaming دارد
+2. **Smart Routing**: بر اساس context و اندازه متن، درخواست‌ها route می‌شوند
+3. **Progress Reporting**: StreamingTimeoutManager progress reports را مدیریت می‌کند
+4. **Timeout Management**: timeout های پویا بر اساس تعداد segments محاسبه می‌شود
+
+```javascript
+// Providers خودشان نیازی به تغییر برای streaming ندارند
+// همه چیز در لایه coordination انجام می‌شود
+
+export class YourProvider extends BaseProvider {
+  // Implementation بدون تغییر برای streaming
+  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
+    // Provider فقط translation logic خودش را implement می‌کند
+    // Streaming coordination خودکار است
+  }
+}
+```
+
+### Streaming Conditions
+
+Streaming فعال می‌شود وقتی:
+- Context برابر `'select-element'` باشد
+- Text length بیشتر از 2000 کاراکتر باشد، یا
+- JSON payload با بیش از 5 segment موجود باشد
 
 ## Rate Limiting Integration
 
@@ -318,6 +351,8 @@ When implementing/updating a provider:
 - [x] Processes requests sequentially (no `Promise.all()` for individual API calls within a batch/chunk)
 - [x] Has proper error handling and logging
 - [x] Added to RateLimitManager configuration
+- [x] **Compatible with streaming coordination** (automatic - no changes needed in provider implementation)
+- [x] **Timeout-aware** (supports cancellation and respects dynamic timeouts from UnifiedTranslationCoordinator)
 
 ## Rate Limiting Best Practices
 
@@ -379,9 +414,11 @@ const result = await provider.translate(
 3. `_getLangCode()` را implement کنید
 4. `_batchTranslate()` را implement کنید (یا به پیاده‌سازی ارث‌بری شده از `BaseTranslateProvider`/`BaseAIProvider` تکیه کنید)
 5. `_translateSingle` (برای AI) یا `_translateChunk` (برای سنتی) را برای فراخوانی‌های واقعی API پیاده‌سازی کنید
-6. هرگز `translate()` را override نکنید  
+6. هرگز `translate()` را override نکنید
 7. همیشه از `rateLimitManager.executeWithRateLimit()` استفاده کنید
 8. درخواست‌ها را sequential پردازش کنید (نه `Promise.all()` برای فراخوانی‌های API فردی در یک batch/chunk)
 9. Cancellation و error handling را رعایت کنید
+10. **Streaming coordination خودکار است** - provider ها نیازی به تغییر برای streaming support ندارند
+11. **Dynamic timeout management** توسط UnifiedTranslationCoordinator انجام می‌شود
 
-این راهنما تضمین می‌کند که تمام پرووایدرها با سیستم Rate Limiting و Circuit Breaker یکپارچه کار کنند و مشکلات HTTP 429 حل شود.
+این راهنما تضمین می‌کند که تمام پرووایدرها با سیستم Rate Limiting، Circuit Breaker، و **Streaming Coordination** یکپارچه کار کنند و مشکلات HTTP 429 و timeout های نامناسب حل شود.
