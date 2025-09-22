@@ -8,6 +8,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ref, computed, watchEffect } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager')
@@ -61,7 +62,7 @@ class SettingsManager {
     try {
       // Check if Vue is available
       if (typeof window === 'undefined' || !window.Vue) {
-        logger.warn('Vue not available, SettingsManager will use storage directly')
+        logger.debug('Vue not available, SettingsManager will use storage directly')
         this._fallbackMode = true
 
         // Load settings directly from storage
