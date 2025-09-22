@@ -236,13 +236,39 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       // <<<< اعمال جهت‌دهی صحیح به خود containerSpan بر اساس کل متن ترجمه شده >>>>
       correctTextDirection(containerSpan, translatedText);
 
-      const originalLines = originalText.split("\n");
-      const translatedLines = translatedText.split("\n");
+      // Check if parent is an inline element - if so, treat newlines as spaces
+      const parentDisplay = window.getComputedStyle(parentElement).display;
+      const isInlineContext = parentDisplay === 'inline' || parentDisplay === 'inline-block';
+
+      // For inline contexts, convert newlines to spaces to prevent unwanted line breaks
+      let processedOriginalText = originalText;
+      let processedTranslatedText = translatedText;
+
+      if (isInlineContext) {
+        processedOriginalText = originalText.replace(/\n/g, ' ');
+        processedTranslatedText = translatedText.replace(/\n/g, ' ');
+      }
+
+      const originalLines = processedOriginalText.split("\n");
+      const translatedLines = processedTranslatedText.split("\n");
 
       originalLines.forEach((originalLine, index) => {
         const translatedLine =
           translatedLines[index] !== undefined ? translatedLines[index] : "";
         const innerSpan = document.createElement("span");
+
+        // Check if this line had leading/trailing spaces in original
+        const hasLeadingSpace = /^\s/.test(originalLine);
+        const hasTrailingSpace = /\s$/.test(originalLine);
+
+        // Add data attributes for spacing information
+        if (hasLeadingSpace) {
+          innerSpan.setAttribute("data-aiwc-leading-space", "true");
+        }
+        if (hasTrailingSpace) {
+          innerSpan.setAttribute("data-aiwc-trailing-space", "true");
+        }
+
         innerSpan.textContent = translatedLine;
 
         // معمولاً نیازی به تنظیم direction برای هر innerSpan نیست اگر dir والد (containerSpan) صحیح باشد.
@@ -252,11 +278,14 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         context.state.originalTexts.set(uniqueId, {
           originalText: originalLine, // متن اصلی خط
           wrapperElement: innerSpan, // span ای که حاوی خط ترجمه شده است
+          hasLeadingSpace,
+          hasTrailingSpace
         });
 
         containerSpan.appendChild(innerSpan);
 
-        if (index < originalLines.length - 1) {
+        // Only add <br> if this is not the last line AND the next line is not empty
+        if (index < originalLines.length - 1 && originalLines[index + 1].trim() !== "") {
           const br = document.createElement("br");
           br.setAttribute("data-aiwc-br", "true"); // برای شناسایی و حذف احتمالی هنگام بازگردانی
           containerSpan.appendChild(br);

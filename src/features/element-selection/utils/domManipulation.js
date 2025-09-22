@@ -322,9 +322,22 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
           preserveExisting: true
         });
 
+        // Check if parent is an inline element - if so, treat newlines as spaces
+        const parentDisplay = window.getComputedStyle(parentElement).display;
+        const isInlineContext = parentDisplay === 'inline' || parentDisplay === 'inline-block';
+
+        // For inline contexts, convert newlines to spaces to prevent unwanted line breaks
+        let processedOriginalText = originalText;
+        let processedTranslatedText = translatedText;
+
+        if (isInlineContext) {
+          processedOriginalText = originalText.replace(/\n/g, ' ');
+          processedTranslatedText = translatedText.replace(/\n/g, ' ');
+        }
+
         // Handle multi-line text
-        const originalLines = originalText.split("\n");
-        const translatedLines = translatedText.split("\n");
+        const originalLines = processedOriginalText.split("\n");
+        const translatedLines = processedTranslatedText.split("\n");
 
         // Ensure we have the same number of lines
         while (translatedLines.length < originalLines.length) {
@@ -362,7 +375,8 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
           containerSpan.appendChild(innerSpan);
 
-          if (index < originalLines.length - 1) {
+          // Only add <br> if this is not the last line AND the next line is not empty
+          if (index < originalLines.length - 1 && originalLines[index + 1].trim() !== "") {
             const br = document.createElement("br");
             br.setAttribute("data-aiwc-br", "true");
             containerSpan.appendChild(br);
