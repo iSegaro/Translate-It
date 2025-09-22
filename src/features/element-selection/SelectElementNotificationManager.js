@@ -214,13 +214,17 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   dismissNotification(data = {}) {
+    this.logger.debug('dismissNotification called with data:', data);
+
     if (!this.currentNotification) {
       this.logger.debug('No notification to dismiss');
       return;
     }
-    
+
     const notificationId = this.currentNotification.id;
     const { managerId } = data;
+
+    this.logger.debug('Current notification managerId:', this.currentNotification.managerId, 'Requested managerId:', managerId);
     
     // Verify this is the correct manager dismissing the notification
     if (managerId && this.currentNotification.managerId !== managerId) {

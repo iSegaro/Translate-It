@@ -710,10 +710,11 @@ class SelectElementManager extends ResourceTracker {
   }
   
   dismissNotification() {
+    this.logger.debug("dismissNotification called with instanceId:", this.instanceId);
     pageEventBus.emit('dismiss-select-element-notification', {
       managerId: this.instanceId
     });
-    
+
     this.logger.debug("Select Element notification dismissal requested");
   }
   
@@ -728,10 +729,13 @@ class SelectElementManager extends ResourceTracker {
   }
   
   setupCancelListener() {
-    pageEventBus.on('cancel-select-element-mode', () => {
+    pageEventBus.on('cancel-select-element-mode', (data) => {
+      this.logger.debug('cancel-select-element-mode event received', { data, isActive: this.isActive, instanceId: this.instanceId });
       if (this.isActive) {
         this.logger.debug('Cancel requested, deactivating SelectElement mode');
         this.deactivate({ fromCancel: true });
+      } else {
+        this.logger.debug('Cancel event received but SelectElement is not active');
       }
     });
   }
