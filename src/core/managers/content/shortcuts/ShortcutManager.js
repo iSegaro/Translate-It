@@ -47,12 +47,12 @@ export class ShortcutManager extends ResourceTracker {
 
     // Register default shortcuts
     await this.registerDefaultShortcuts();
-    
+
     // Initialize shortcuts with dependencies
-    if (dependencies.translationHandler && dependencies.featureManager) {
+    if (dependencies.featureManager) {
       this.initializeShortcuts(dependencies);
     }
-    
+
     this.initialized = true;
     this.logger.init('Shortcut manager initialized');
   }
@@ -106,7 +106,6 @@ export class ShortcutManager extends ResourceTracker {
     // Initialize CtrlSlashShortcut with dependencies
     if (this.ctrlSlashShortcut) {
       this.ctrlSlashShortcut.initialize({
-        translationHandler: dependencies.translationHandler,
         featureManager: dependencies.featureManager
       });
       this.logger.debug('FieldShortcutManager initialized with dependencies');

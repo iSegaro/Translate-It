@@ -98,7 +98,6 @@ export class ShortcutHandler extends ResourceTracker {
 
       // Initialize ShortcutManager with dependencies
       await shortcutManager.initialize({
-        translationHandler: this.translationHandler,
         featureManager: this.featureManager
       });
 

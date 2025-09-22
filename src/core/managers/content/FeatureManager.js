@@ -139,18 +139,16 @@ export class FeatureManager extends ResourceTracker {
       }
     }
 
-    // Inject TranslationHandler into ShortcutHandler
+    // Inject TranslationHandler into ShortcutHandler if available
     if (shortcutHandler && contentMessageHandler) {
       try {
         const translationHandler = await contentMessageHandler.getTranslationHandler?.();
         if (translationHandler && typeof shortcutHandler.setTranslationHandler === 'function') {
           shortcutHandler.setTranslationHandler(translationHandler);
           logger.debug('Injected TranslationHandler into ShortcutHandler');
-        } else {
-          logger.warn('TranslationHandler not available for ShortcutHandler injection');
         }
       } catch (error) {
-        logger.error('Error injecting TranslationHandler into ShortcutHandler:', error);
+        logger.debug('Could not inject TranslationHandler into ShortcutHandler - not needed for new implementation');
       }
     }
   }
@@ -229,18 +227,6 @@ export class FeatureManager extends ResourceTracker {
 
     try {
       logger.debug(`Deactivating feature: ${featureName}`);
-
-      // Special handling for shortcut feature to deactivate ALL instances
-      if (featureName === 'shortcut') {
-        try {
-          const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
-          await ShortcutHandler.deactivateAllInstances();
-          logger.debug('All ShortcutHandler instances deactivated using static method');
-        } catch (importError) {
-          logger.error('Failed to import ShortcutHandler for global deactivation:', importError);
-          // Fall back to normal deactivation
-        }
-      }
 
       // Special handling for textFieldIcon feature to destroy singleton
       if (featureName === 'textFieldIcon') {
@@ -426,16 +412,6 @@ export class FeatureManager extends ResourceTracker {
         logger.debug(`Feature ${feature}: shouldBeActive=${shouldBeActive}, isCurrentlyActive=${isCurrentlyActive}`);
 
         if (shouldBeActive && !isCurrentlyActive) {
-          // Special handling for shortcut feature to enable globally before activation
-          if (feature === 'shortcut') {
-            try {
-              const { ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
-              ShortcutHandler.enableGlobally();
-              logger.debug('ShortcutHandler enabled globally before activation');
-            } catch (importError) {
-              logger.error('Failed to import ShortcutHandler for global enabling:', importError);
-            }
-          }
           await this.activateFeature(feature);
         } else if (!shouldBeActive && isCurrentlyActive) {
           logger.debug(`About to deactivate feature: ${feature}`);

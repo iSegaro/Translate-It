@@ -35,7 +35,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // Store singleton instance
     contentMessageHandlerInstance = this;
-    logger.debug('ContentMessageHandler singleton created');
+    this.logger.debug('ContentMessageHandler singleton created');
 
     // CRITICAL: Protect ContentMessageHandler itself from Memory Garbage Collector
     this.trackResource('content-message-handler-core', () => {
@@ -368,6 +368,7 @@ export class ContentMessageHandler extends ResourceTracker {
         break;
 
       case TranslationMode.Field:
+      case 'field': // Handle both enum and string for robustness
         this.logger.debug('Processing Text Field translation result');
         
         // Check if translation failed at background level

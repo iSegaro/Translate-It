@@ -9,6 +9,9 @@ import { isEditable } from "@/core/helpers.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -28,7 +31,6 @@ export class FieldShortcutManager {
    * @param {Object} dependencies - Required dependencies
    */
   initialize(dependencies) {
-    this.translationHandler = dependencies.translationHandler;
     this.featureManager = dependencies.featureManager;
     this.initialized = true;
 
@@ -52,8 +54,8 @@ export class FieldShortcutManager {
     }
 
     // Check if required dependencies are available
-    if (!this.initialized || !this.translationHandler) {
-      this.logger.debug('Not initialized or missing translationHandler');
+    if (!this.initialized) {
+      this.logger.debug('Not initialized');
       return false;
     }
 
@@ -71,21 +73,15 @@ export class FieldShortcutManager {
       return false;
     }
 
-    // Check if translation is already in progress
-    if (this.translationHandler.isProcessing) {
-      this.logger.debug('Translation already in progress');
-      return false;
-    }
-
     // Check if active element is editable
-    const { activeElement } = this.translationHandler.getSelectElementContext();
-    if (!isEditable(activeElement)) {
+    const activeElement = document.activeElement;
+    if (!this.isEditableElement(activeElement)) {
       this.logger.debug('Active element is not editable');
       return false;
     }
 
     // Extract text from active element
-    const text = this.translationHandler.extractFromActiveElement(activeElement);
+    const text = this.extractTextFromElement(activeElement);
     if (!text) {
       this.logger.debug('No text found in active element');
       return false;
@@ -104,66 +100,121 @@ export class FieldShortcutManager {
     this.logger.debug('Executing Ctrl+/ shortcut');
 
     try {
-      // Set processing flag
-      this.translationHandler.isProcessing = true;
+      // Get active element
+      const activeElement = document.activeElement;
 
-      // Get active element context
-      const { activeElement } = this.translationHandler.getSelectElementContext();
-      
       // Extract text from active element
-      const text = this.translationHandler.extractFromActiveElement(activeElement);
+      const text = this.extractTextFromElement(activeElement);
 
-      this.logger.debug(`Processing translation for text: "${text.substring(0, 50)}..."`);
+      if (!text) {
+        this.logger.debug('No text found in active element');
+        return {
+          success: false,
+          error: 'No text found',
+          type: 'ctrl-slash'
+        };
+      }
 
-      // Process translation using TranslationHandler
-      // Note: Future enhancement could support selected text within field
-      await this.translationHandler.processTranslation_with_CtrlSlash({
-        text,
-        originalText: text,
-        target: activeElement,
-        selectionRange: null, // Currently not supporting selection within field
-      });
+      this.logger.debug(`Translating text via Ctrl+/: "${text.substring(0, 50)}..."`);
 
-      this.logger.debug('Translation completed successfully');
+      // Send translation request using UnifiedMessaging
+      const message = MessageFormat.create(
+        MessageActions.TRANSLATE,
+        {
+          text: text,
+          provider: settingsManager.get('TRANSLATION_API', 'google-translate'),
+          sourceLanguage: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
+          targetLanguage: settingsManager.get('TARGET_LANGUAGE', 'fa'),
+          mode: 'field',
+          options: {
+            element: activeElement.tagName,
+            fieldType: activeElement.type || 'text'
+          }
+        },
+        MessagingContexts.CONTENT
+      );
 
-      return {
-        success: true,
-        type: 'ctrl-slash',
-        textLength: text.length,
-        target: activeElement.tagName
-      };
+      // Use UnifiedMessaging with appropriate timeout
+      const response = await sendMessage(message, { timeout: 15000 });
+
+      if (response.success) {
+        this.logger.debug('Translation completed successfully');
+        return {
+          success: true,
+          type: 'ctrl-slash',
+          textLength: text.length,
+          target: activeElement.tagName
+        };
+      } else {
+        this.logger.error('Translation failed:', response.error);
+        return {
+          success: false,
+          error: response.error || 'Translation failed',
+          type: 'ctrl-slash'
+        };
+      }
 
     } catch (error) {
-      this.logger.error('Error during translation:', error);
+      this.logger.error('Error in Ctrl+/ handler:', error);
 
-      // Process error using ErrorHandler
-      const errorHandle = await ErrorHandler.processError(error);
-      
-      if (!errorHandle.isFinal && !errorHandle.originalError?.isPrimary) {
-        const errorType = errorHandle.type || ErrorTypes.API;
-        const statusCode = errorHandle.statusCode || 500;
-
-        // Handle error using TranslationHandler's error system
-        await this.translationHandler.errorHandler.handle(errorHandle, {
-          type: errorType,
-          statusCode: statusCode,
-          context: "ctrl-slash-shortcut",
-          suppressSecondary: true,
-        });
-      }
+      // Use centralized error handling
+      const errorHandler = ErrorHandler.getInstance();
+      await errorHandler.handle(error, {
+        type: ErrorTypes.TRANSLATION_FAILED,
+        context: 'ctrl-slash-shortcut',
+        showToast: true
+      });
 
       return {
         success: false,
-        error: errorHandle.message || 'Shortcut execution failed',
+        error: error.message || 'Shortcut execution failed',
         type: 'ctrl-slash'
       };
-
-    } finally {
-      // Always reset processing flag
-      if (this.translationHandler) {
-        this.translationHandler.isProcessing = false;
-      }
     }
+  }
+
+  /**
+   * Check if element is editable
+   * @param {Element} element - DOM element
+   * @returns {boolean} Whether element is editable
+   */
+  isEditableElement(element) {
+    if (!element) return false;
+
+    if (element.tagName === 'INPUT') {
+      const type = (element.type || '').toLowerCase();
+      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
+      return textTypes.includes(type);
+    }
+
+    if (element.tagName === 'TEXTAREA') {
+      return true;
+    }
+
+    if (element.contentEditable === 'true') {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Extract text from element
+   * @param {Element} element - DOM element
+   * @returns {string|null} Extracted text
+   */
+  extractTextFromElement(element) {
+    if (!element) return null;
+
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+      return element.value || null;
+    }
+
+    if (element.contentEditable === 'true') {
+      return element.textContent || null;
+    }
+
+    return null;
   }
 
   /**
@@ -173,8 +224,8 @@ export class FieldShortcutManager {
    */
   isCtrlSlashEvent(event) {
     return (
-      (event.ctrlKey || event.metaKey) && 
-      event.key === "/" && 
+      (event.ctrlKey || event.metaKey) &&
+      event.key === "/" &&
       !event.repeat
     );
   }
@@ -219,7 +270,6 @@ export class FieldShortcutManager {
       this._settingsUnsubscribe = null;
     }
 
-    this.translationHandler = null;
     this.featureManager = null;
     this.initialized = false;
 
