@@ -419,7 +419,7 @@ export class ContentMessageHandler extends ResourceTracker {
         // If success or no explicit error, proceed with normal flow
         this.logger.debug('Forwarding result to applyTranslationToTextField');
         try {
-          return await applyTranslationToTextField(translatedText, originalText, translationMode, toastId);
+          return await applyTranslationToTextField(translatedText, originalText, translationMode, toastId, message.messageId);
         } catch (error) {
           // Don't handle errors that are already handled
           if (error.alreadyHandled) {

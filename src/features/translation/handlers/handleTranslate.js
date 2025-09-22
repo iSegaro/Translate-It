@@ -2,9 +2,11 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { TranslationMode } from '@/shared/config/config.js';
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { handleTranslationResult } from '@/core/background/handlers/translation/handleTranslationResult.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslate');
 const errorHandler = new ErrorHandler();
@@ -56,63 +58,40 @@ export async function handleTranslate(message, sender) {
       logger.debug(`[Handler:TRANSLATE] ❌ Failed: ${result.error?.message || result.error || 'Unknown error'}`);
     }
 
-    // Send TRANSLATION_RESULT_UPDATE for ALL cases (success AND error) due to Firefox MV3 issues
-    const targetTabId = sender.tab?.id;
-    let updateMessage;
+    // Check if this is a field mode translation that needs broadcast
+    const isFieldMode = message.data?.mode === 'field' ||
+                       message.data?.mode === TranslationMode.Field ||
+                       message.data?.translationMode === 'field' ||
+                       message.data?.translationMode === TranslationMode.Field;
 
-    if (result.success && result.translatedText) {
-      updateMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_RESULT_UPDATE,
-        {
-          success: true,
-          translatedText: result.translatedText,
-          originalText: result.originalText,
-          provider: result.provider,
+    // For field mode translations, also broadcast the result via TRANSLATION_RESULT_UPDATE
+    // This ensures the content script receives the notification even with fire-and-forget pattern
+    if (isFieldMode) {
+      logger.debug(`[Handler:TRANSLATE] Broadcasting field mode result for messageId: ${message.messageId}`);
+
+      // Create broadcast message
+      const broadcastMessage = {
+        messageId: message.messageId,
+        action: MessageActions.TRANSLATION_RESULT_UPDATE,
+        data: {
+          success: result.success,
+          translatedText: result.success ? result.translatedText : null,
+          originalText: message.data.text,
+          translationMode: message.data.mode || TranslationMode.Field,
           sourceLanguage: result.sourceLanguage,
           targetLanguage: result.targetLanguage,
-          timestamp: result.timestamp,
-          translationMode: result.mode || message.data.mode || message.data.translationMode,
-          options: {
-            toastId: message.data.options?.toastId // Pass the toastId to dismiss the notification
-          }
-        },
-        message.context, // Use original message context
-        { messageId: message.messageId } // Use original messageId for correlation
-      );
-    } else {
-      // ERROR case - send error information
-      logger.debug('[Handler:TRANSLATE] Sending error response to caller');
-      
-      updateMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_RESULT_UPDATE,
-        {
-          success: false,
-          error: result.error,
-          originalText: message.data.text,
-          provider: message.data.provider,
-          sourceLanguage: message.data.sourceLanguage,
-          targetLanguage: message.data.targetLanguage,
-          timestamp: Date.now(),
-          translationMode: message.data.mode || message.data.translationMode,
-          options: {
-            toastId: message.data.options?.toastId
-          }
-        },
-        message.context, // Use original message context
-        { messageId: message.messageId } // Use original messageId for correlation
-      );
-    }
+          provider: result.provider || message.data.provider,
+          options: message.data.options || {},
+          error: result.success ? null : result.error,
+          context: 'field-mode-broadcast',
+          needsBroadcast: true
+        }
+      };
 
-    // Send the update message (for both success and error cases)
-    if (targetTabId) {
-      logger.debug(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, updateMessage);
-      browser.tabs.sendMessage(targetTabId, updateMessage).catch(error => {
-        logger.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
+      // Send broadcast asynchronously (don't wait)
+      handleTranslationResult(broadcastMessage).catch(broadcastError => {
+        logger.warn('[Handler:TRANSLATE] Failed to broadcast field mode result:', broadcastError);
       });
-    } else {
-      // For requests from sidepanel/popup without tab context, 
-      // the response will be sent via the port that called this handler
-      logger.debug("[Handler:TRANSLATE] No tab ID found in sender - response will be handled by port or original caller");
     }
 
     // Return the actual translation result

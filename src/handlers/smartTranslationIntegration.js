@@ -17,7 +17,60 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 // Create a global resource tracker for this module
 const resourceTracker = new ResourceTracker('smart-translation-integration');
 
+// Use WeakMap to store pending translation data - more resilient to cleanup
+const pendingTranslationData = new WeakMap();
 
+// Also store a reference with the toast ID as fallback
+const pendingTranslationByToastId = new Map();
+
+// Track message IDs to prevent duplicate processing
+const processedMessageIds = new Set();
+
+// Track message sources to prevent duplicate processing
+const messageSources = new Map(); // messageId -> source info
+
+// Track successfully completed toast IDs to prevent any post-processing
+const successfullyCompletedToastIds = new Set();
+
+// Track active processing by messageId to prevent race conditions
+const activeProcessing = new Map();
+
+// Message queue to ensure sequential processing of translation results
+const messageQueue = [];
+let isProcessingQueue = false;
+
+// Maximum queue size to prevent memory issues
+const MAX_QUEUE_SIZE = 50;
+
+
+
+// Helper function to process the message queue sequentially
+async function processMessageQueue() {
+  if (isProcessingQueue || messageQueue.length === 0) {
+    return;
+  }
+
+  isProcessingQueue = true;
+  logger.debug('Starting to process message queue', { queueLength: messageQueue.length });
+
+  try {
+    while (messageQueue.length > 0) {
+      const { translatedText, originalText, translationMode, toastId, messageId, resolve } = messageQueue.shift();
+
+      try {
+        logger.debug('Processing queued message', { messageId, queueLength: messageQueue.length });
+        const result = await processTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId);
+        resolve(result);
+      } catch (error) {
+        logger.error('Error processing queued message', { messageId, error: error.message });
+        resolve({ applied: false, mode: 'queue-processing-error', error: error.message });
+      }
+    }
+  } finally {
+    isProcessingQueue = false;
+    logger.debug('Finished processing message queue');
+  }
+}
 
 // Helper function to clear pending notification data and timeout
 function clearPendingNotificationData(context = 'cleanup') {
@@ -28,6 +81,179 @@ function clearPendingNotificationData(context = 'cleanup') {
   }
 
   logger.debug('Pending notification data cleared', { context });
+}
+
+// Helper function to clean up old data to prevent memory leaks
+function cleanupOldData() {
+  const now = Date.now();
+  const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+
+  // Clean up old message sources
+  for (const [messageId, sourceInfo] of messageSources.entries()) {
+    if (now - sourceInfo.timestamp > MAX_AGE) {
+      messageSources.delete(messageId);
+    }
+  }
+
+  // Clean up old processed message IDs
+  if (processedMessageIds.size > 1000) {
+    // Keep only recent ones
+    const recentIds = Array.from(processedMessageIds).slice(-500);
+    processedMessageIds.clear();
+    recentIds.forEach(id => processedMessageIds.add(id));
+  }
+
+  // Clean up old completed toast IDs
+  if (successfullyCompletedToastIds.size > 100) {
+    const recentIds = Array.from(successfullyCompletedToastIds).slice(-50);
+    successfullyCompletedToastIds.clear();
+    recentIds.forEach(id => successfullyCompletedToastIds.add(id));
+  }
+
+  logger.debug('Cleaned up old data', {
+    messageSources: messageSources.size,
+    processedIds: processedMessageIds.size,
+    completedToasts: successfullyCompletedToastIds.size
+  });
+}
+
+// Schedule periodic cleanup
+setInterval(cleanupOldData, 60000); // Clean up every minute
+
+// Helper function to store pending translation data
+function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null) {
+  // Store recovery information for the target element
+  let targetId = null;
+  let targetSelector = null;
+
+  if (target) {
+    // Store element ID if available
+    if (target.id) {
+      targetId = target.id;
+    }
+
+    // Store a unique selector for recovery
+    if (target.className) {
+      const classes = target.className.split(' ').filter(c => c.trim()).join('.');
+      if (classes) {
+        targetSelector = `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ''}.${classes}`;
+      }
+    }
+
+    // Fallback selector
+    if (!targetSelector) {
+      targetSelector = target.tagName.toLowerCase();
+      if (target.id) targetSelector += `#${target.id}`;
+      if (target.name) targetSelector += `[name="${target.name}"]`;
+    }
+  }
+
+  // Store in WeakMap using the target element as key
+  const data = {
+    target,
+    mode,
+    platform,
+    tabId,
+    selectionRange,
+    timestamp,
+    toastId,
+    messageId,
+    targetId,
+    targetSelector
+  };
+
+  pendingTranslationData.set(target, data);
+
+  // Also store by toast ID for more reliable retrieval
+  if (toastId) {
+    // Check if we already have pending data for this toast ID
+    if (pendingTranslationByToastId.has(toastId)) {
+      logger.debug('Toast ID already exists in pending data, replacing');
+    }
+    pendingTranslationByToastId.set(toastId, data);
+  }
+
+  // Track message source to detect duplicates
+  if (messageId) {
+    messageSources.set(messageId, {
+      source: 'direct-request',
+      timestamp,
+      toastId
+    });
+  }
+
+  // Also store on window as fallback for compatibility
+  window.pendingTranslationTarget = target;
+  window.pendingTranslationMode = mode;
+  window.pendingTranslationPlatform = platform;
+  window.pendingTranslationTabId = tabId;
+  window.pendingSelectionRange = selectionRange;
+  window.pendingTranslationTimestamp = timestamp;
+  window.pendingTranslationToastId = toastId;
+
+  logger.debug('Stored pending translation data with recovery info', {
+    targetId,
+    targetSelector,
+    toastId,
+    messageId
+  });
+}
+
+// Helper function to retrieve pending translation data
+function getPendingTranslationData(fallbackTarget, toastId) {
+  logger.debug('getPendingTranslationData called', {
+    hasFallbackTarget: !!fallbackTarget,
+    fallbackTargetTag: fallbackTarget?.tagName,
+    weakMapHasTarget: fallbackTarget ? pendingTranslationData.has(fallbackTarget) : false,
+    hasWindowTarget: !!window.pendingTranslationTarget,
+    windowTargetTag: window.pendingTranslationTarget?.tagName,
+    toastId: toastId,
+    hasToastIdData: toastId ? pendingTranslationByToastId.has(toastId) : false
+  });
+
+  // First try to get by toast ID - most reliable
+  if (toastId && pendingTranslationByToastId.has(toastId)) {
+    const data = pendingTranslationByToastId.get(toastId);
+    logger.debug('Retrieved data by toast ID', {
+      targetTag: data.target?.tagName,
+      mode: data.mode,
+      hasData: !!data
+    });
+    return data;
+  }
+
+  // Try to get from WeakMap
+  if (fallbackTarget && pendingTranslationData.has(fallbackTarget)) {
+    const data = pendingTranslationData.get(fallbackTarget);
+    logger.debug('Retrieved data from WeakMap', {
+      targetTag: data.target?.tagName,
+      mode: data.mode,
+      hasData: !!data
+    });
+    return data;
+  }
+
+  // Fallback to window properties
+  if (window.pendingTranslationTarget) {
+    const data = {
+      target: window.pendingTranslationTarget,
+      mode: window.pendingTranslationMode,
+      platform: window.pendingTranslationPlatform,
+      tabId: window.pendingTranslationTabId,
+      selectionRange: window.pendingSelectionRange,
+      timestamp: window.pendingTranslationTimestamp,
+      toastId: window.pendingTranslationToastId
+    };
+    logger.debug('Retrieved data from window properties', {
+      targetTag: data.target?.tagName,
+      mode: data.mode,
+      hasData: !!data
+    });
+    return data;
+  }
+
+  logger.debug('No pending translation data found');
+  return null;
 }
 
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId }) {
@@ -50,34 +276,31 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   const timestamp = Date.now();
 
   try {
-    // Store target element for later use when translation result arrives
-    // Add timestamp to track stale data
-    window.pendingTranslationTarget = target;
-    window.pendingTranslationMode = mode;
-    window.pendingTranslationPlatform = platform;
-    window.pendingTranslationTabId = tabId;
-    window.pendingSelectionRange = selectionRange;
-    window.pendingTranslationTimestamp = timestamp;
-    
-    logger.debug('Stored pending translation data', { 
-      target: target?.tagName, 
-      mode, 
-      platform, 
-      timestamp 
-    });
-    
     // Get current settings from storage
     const currentProvider = await getTranslationApiAsync();
     const currentSourceLang = await getSourceLanguageAsync();
     const currentTargetLang = await getTargetLanguageAsync();
-    
-    logger.debug('Retrieved current settings for translation', { 
-      provider: currentProvider, 
-      source: currentSourceLang, 
-      target: currentTargetLang 
+
+    logger.debug('Retrieved current settings for translation', {
+      provider: currentProvider,
+      source: currentSourceLang,
+      target: currentTargetLang
     });
 
     const newToastId = `status-${Date.now()}`;
+
+    // Generate a unique message ID for this request
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store target element for later use when translation result arrives
+    storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, newToastId, messageId);
+
+    logger.debug('Stored pending translation data', {
+      target: target?.tagName,
+      mode,
+      platform,
+      timestamp
+    });
     // Store the toast ID globally for cleanup in case of errors
     window.pendingTranslationToastId = newToastId;
     const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
@@ -105,7 +328,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         sourceLanguage: currentSourceLang || 'auto',
         targetLanguage: currentTargetLang || 'fa',
         mode: mode,
-        options: { toastId: newToastId }
+        options: {
+          toastId: newToastId,
+          messageId: messageId,
+          isDirectRequest: true
+        }
       },
       MessagingContexts.CONTENT
     );
@@ -150,20 +377,80 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 }
 
 /**
- * Apply translation result to active text field
- * This function is called when TRANSLATION_RESULT_UPDATE message is received
+ * Process translation result to active text field (internal implementation)
+ * This function processes the actual translation after queue management
  * @param {string} translatedText - The translated text
  * @param {string} originalText - The original text
  * @param {string} translationMode - Translation mode
+ * @param {string} toastId - Toast ID for tracking
+ * @param {string} messageId - Message ID for duplicate detection
  * @returns {Promise<Object>} Application result
  */
-export async function applyTranslationToTextField(translatedText, originalText, translationMode, toastId) {
-  logger.info('Applying translation to text field', { 
-    translatedLength: translatedText?.length, 
-    originalLength: originalText?.length, 
+async function processTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId) {
+  logger.info('Applying translation to text field', {
+    translatedLength: translatedText?.length,
+    originalLength: originalText?.length,
     translationMode,
-    hasToastId: !!toastId
+    hasToastId: !!toastId,
+    toastId,
+    messageId
   });
+
+  // Check if we've already processed this message ID
+  if (messageId && processedMessageIds.has(messageId)) {
+    logger.debug('Message ID already processed, skipping', { messageId });
+    return { applied: false, mode: 'message-id-already-processed' };
+  }
+
+  // Check if this message is currently being processed (simple lock)
+  if (messageId && activeProcessing.has(messageId)) {
+    logger.debug('Message ID is already being processed, skipping duplicate', { messageId });
+    return { applied: false, mode: 'already-processing' };
+  }
+
+  // Mark this message as being processed
+  if (messageId) {
+    activeProcessing.set(messageId, true);
+    logger.debug('Marked message ID as actively processing', { messageId });
+  }
+
+  // Check if we've already processed this translation
+  logger.debug('Checking for existing translation data', { toastId, hasToastId: !!toastId });
+
+  if (toastId && pendingTranslationByToastId.has(toastId)) {
+    const pendingData = pendingTranslationByToastId.get(toastId);
+    logger.debug('Found existing translation data', {
+      toastId,
+      processed: pendingData.processed,
+      processing: pendingData.processing,
+      processedAt: pendingData.processedAt,
+      processingStarted: pendingData.processingStarted
+    });
+
+    if (pendingData.processed) {
+      logger.debug('Translation already processed, skipping', {
+        toastId,
+        processedAt: pendingData.processedAt,
+        text: translatedText?.substring(0, 50)
+      });
+      return { applied: false, mode: 'already-processed' };
+    }
+
+    // Mark as being processed to prevent race conditions
+    if (pendingData.processing) {
+      logger.debug('Translation already being processed, skipping', {
+        toastId,
+        processingStarted: pendingData.processingStarted
+      });
+      return { applied: false, mode: 'already-processing' };
+    }
+    pendingData.processing = true;
+    pendingData.processingStarted = Date.now();
+    pendingTranslationByToastId.set(toastId, pendingData);
+    logger.debug('Marked translation as processing', { toastId });
+  } else if (toastId) {
+    logger.debug('No existing data found for toastId', { toastId });
+  }
   
   // Debug: Log the actual texts for verification
   logger.debug('Translation details:', {
@@ -197,7 +484,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     });
 
     // Clear pending translation data
-    clearPendingTranslationData();
+    clearPendingTranslationData(toastId);
     throw new Error(errorMessage);
   }
   
@@ -214,17 +501,27 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         age: currentTime - pendingTimestamp,
         threshold: STALE_DATA_THRESHOLD
       });
-      clearPendingTranslationData();
+      clearPendingTranslationData(toastId);
+
+      // Clear the active processing lock for stale data
+      if (messageId) {
+        activeProcessing.delete(messageId);
+        logger.debug('Cleared processing lock due to stale data', { messageId });
+      }
     }
-    
-    // Use stored pending data or fallback to active element
-    const target = window.pendingTranslationTarget || document.activeElement;
-    const mode = window.pendingTranslationMode || translationMode;
-    const platform = window.pendingTranslationPlatform || detectPlatform(target);
-    const selectionRange = window.pendingSelectionRange || null;
-    const tabId = window.pendingTranslationTabId || null;
-    
+
+    // Get pending translation data using the robust retrieval method
+    const pendingData = getPendingTranslationData(document.activeElement, toastId);
+
+    // Use retrieved data or fallback to active element
+    let target = pendingData?.target || document.activeElement;
+    const mode = pendingData?.mode || translationMode;
+    const platform = pendingData?.platform || detectPlatform(target);
+    const selectionRange = pendingData?.selectionRange || null;
+    const tabId = pendingData?.tabId || null;
+
     logger.debug('Target element info', {
+      hasPendingData: !!pendingData,
       hasPendingTarget: !!window.pendingTranslationTarget,
       activeElement: document.activeElement?.tagName,
       targetElement: target?.tagName,
@@ -243,7 +540,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     // For dictionary mode (text selection), we don't need an editable target
     const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === 'dictionary';
     const isSelectElementMode = mode === TranslationMode.Select_Element || mode === 'select_element';
-    
+
     if (!isDictionaryMode && (!target || !isEditableElement(target))) {
       logger.warn('Invalid target for non-dictionary mode', {
         mode,
@@ -253,7 +550,57 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         targetTag: target?.tagName,
         isEditable: isEditableElement(target)
       });
-      throw new Error('No valid target element found');
+
+      // Try element recovery strategies
+      let recoveredTarget = null;
+
+      // Strategy 1: Try active element
+      const activeElement = document.activeElement;
+      if (activeElement && isEditableElement(activeElement)) {
+        logger.debug('Using active element as fallback target');
+        recoveredTarget = activeElement;
+      }
+
+      // Strategy 2: Try to find by element ID if stored
+      if (!recoveredTarget && pendingData?.targetId) {
+        const elementById = document.getElementById(pendingData.targetId);
+        if (elementById && isEditableElement(elementById)) {
+          logger.debug('Recovered target by element ID');
+          recoveredTarget = elementById;
+        }
+      }
+
+      // Strategy 3: Try to find by selector if stored
+      if (!recoveredTarget && pendingData?.targetSelector) {
+        const elements = document.querySelectorAll(pendingData.targetSelector);
+        for (const elem of elements) {
+          if (isEditableElement(elem)) {
+            logger.debug('Recovered target by selector');
+            recoveredTarget = elem;
+            break;
+          }
+        }
+      }
+
+      // Strategy 4: Try all editable elements (last resort)
+      if (!recoveredTarget) {
+        const editableElements = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+        if (editableElements.length === 1) {
+          logger.debug('Using single editable element as fallback');
+          recoveredTarget = editableElements[0];
+        }
+      }
+
+      if (recoveredTarget) {
+        target = recoveredTarget;
+        // Update stored data with recovered target
+        if (pendingData) {
+          pendingData.target = target;
+          pendingTranslationByToastId.set(toastId, pendingData);
+        }
+      } else {
+        throw new Error('No valid target element found');
+      }
     }
     
     // For dictionary mode, we can proceed without editable target (copy mode)
@@ -264,6 +611,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     // For dictionary mode, we usually just display in tooltip/popup, not replace text
     if (isDictionaryMode) {
       logger.debug('Dictionary mode translation completed');
+      clearPendingTranslationData(toastId);
       return { applied: true, mode: 'dictionary' };
     }
     
@@ -272,12 +620,38 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     
     if (isReplaceMode && target && isEditableElement(target)) {
       logger.debug('Calling applyTranslation');
-      const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target);
+      const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target, toastId);
       logger.debug('applyTranslation completed', { success: wasApplied });
       
-      // Clear pending data after successful application
-      if (wasApplied) {
-        clearPendingTranslationData();
+      // Mark as processed but don't clear - we need to remember it was processed
+      if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)) {
+        const data = pendingTranslationByToastId.get(toastId);
+        data.processed = true;
+        data.applied = true;
+        data.processedAt = Date.now();
+        data.processing = false;
+        pendingTranslationByToastId.set(toastId, data);
+        logger.debug('Marked translation as processed and applied', {
+          toastId,
+          processingTime: data.processedAt - data.processingStarted
+        });
+
+        // Mark this toast ID as successfully completed to prevent any post-processing
+        successfullyCompletedToastIds.add(toastId);
+
+        // Clean up old completed toast IDs to prevent memory growth (keep last 100)
+        if (successfullyCompletedToastIds.size > 100) {
+          const oldest = successfullyCompletedToastIds.values().next().value;
+          successfullyCompletedToastIds.delete(oldest);
+          logger.debug('Cleaned up oldest completed toast ID', { oldest });
+        }
+      }
+
+      // Clear the active processing lock
+      if (messageId) {
+        activeProcessing.delete(messageId);
+        processedMessageIds.add(messageId);
+        logger.debug('Cleared processing lock and marked as processed', { messageId });
       }
       
       return { applied: wasApplied, mode: 'replace' };
@@ -297,14 +671,28 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       })(translatedText);
       
       // Clear pending data after copy operation
-      clearPendingTranslationData();
-      
+      clearPendingTranslationData(toastId);
+
+      // Clear the active processing lock
+      if (messageId) {
+        activeProcessing.delete(messageId);
+        processedMessageIds.add(messageId);
+        logger.debug('Cleared processing lock after copy operation', { messageId });
+      }
+
       return { applied: true, mode: 'copy' };
     }
     
   } catch (error) {
     logger.error('Error in applyTranslationToTextField', error);
-    
+
+    // Clear processing flag on error
+    if (toastId && pendingTranslationByToastId.has(toastId)) {
+      const data = pendingTranslationByToastId.get(toastId);
+      data.processing = false;
+      pendingTranslationByToastId.set(toastId, data);
+    }
+
     // Use centralized error handling
     const errorHandler = ErrorHandler.getInstance();
     await errorHandler.handle(error, {
@@ -312,17 +700,114 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       type: ErrorTypes.TRANSLATION_FAILED,
       showToast: true
     });
-    
+
     // Clear pending data on error as well
-    clearPendingTranslationData();
+    clearPendingTranslationData(toastId);
+
+    // Clear the active processing lock on error
+    if (messageId) {
+      activeProcessing.delete(messageId);
+      // Don't mark as processed on error - allow retries
+      logger.debug('Cleared processing lock due to error', { messageId });
+    }
+
     throw error;
   }
 }
 
 /**
- * Clear pending translation data
+ * Apply translation result to active text field (public API)
+ * This function is called when TRANSLATION_RESULT_UPDATE message is received
+ * Uses a queue to ensure sequential processing and prevent race conditions
+ * @param {string} translatedText - The translated text
+ * @param {string} originalText - The original text
+ * @param {string} translationMode - Translation mode
+ * @param {string} toastId - Toast ID for tracking
+ * @param {string} messageId - Message ID for duplicate detection
+ * @returns {Promise<Object>} Application result
  */
-function clearPendingTranslationData() {
+export async function applyTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId) {
+  logger.info('Queueing translation application', {
+    translatedLength: translatedText?.length,
+    originalLength: originalText?.length,
+    translationMode,
+    hasToastId: !!toastId,
+    toastId,
+    messageId
+  });
+
+  // Check if we've already completed this translation successfully
+  if (toastId && successfullyCompletedToastIds.has(toastId)) {
+    logger.debug('Toast ID already successfully completed, skipping', { toastId });
+    return { applied: false, mode: 'already-completed' };
+  }
+
+  // Check message source to determine if this is a duplicate
+  if (messageId && messageSources.has(messageId)) {
+    const sourceInfo = messageSources.get(messageId);
+    logger.debug('Message source tracking', {
+      messageId,
+      source: sourceInfo.source,
+      age: Date.now() - sourceInfo.timestamp
+    });
+
+    // If this was a direct request, we might be getting a broadcast duplicate
+    if (sourceInfo.source === 'direct-request' && sourceInfo.toastId === toastId) {
+      // Check if we've already processed this via direct response
+      if (processedMessageIds.has(messageId)) {
+        logger.debug('Already processed direct request, skipping broadcast', { messageId });
+        return { applied: false, mode: 'already-processed-direct' };
+      }
+    }
+  }
+
+  // Check if we've already processed this message ID (early check before queuing)
+  if (messageId && processedMessageIds.has(messageId)) {
+    logger.debug('Message ID already processed, skipping', { messageId });
+    return { applied: false, mode: 'message-id-already-processed' };
+  }
+
+  // Check queue size and prevent overflow
+  if (messageQueue.length >= MAX_QUEUE_SIZE) {
+    logger.warn('Translation queue full, dropping message', {
+      messageId,
+      queueSize: messageQueue.length,
+      maxSize: MAX_QUEUE_SIZE
+    });
+    return { applied: false, mode: 'queue-full' };
+  }
+
+  // Return a promise that will be resolved when the message is processed
+  return new Promise((resolve) => {
+    // Add to queue
+    messageQueue.push({
+      translatedText,
+      originalText,
+      translationMode,
+      toastId,
+      messageId,
+      resolve
+    });
+
+    logger.debug('Added message to processing queue', {
+      messageId,
+      queueLength: messageQueue.length,
+      isProcessing: isProcessingQueue
+    });
+
+    // Start processing the queue if not already processing
+    processMessageQueue().catch(error => {
+      logger.error('Error in queue processing', error);
+    });
+  });
+}
+
+/**
+ * Clear pending translation data
+ * @param {string} specificToastId - Optional toast ID to clear only specific entry
+ */
+function clearPendingTranslationData(specificToastId) {
+  // Clear window properties
   window.pendingTranslationTarget = null;
   window.pendingTranslationMode = null;
   window.pendingTranslationPlatform = null;
@@ -330,6 +815,46 @@ function clearPendingTranslationData() {
   window.pendingSelectionRange = null;
   window.pendingTranslationTimestamp = null;
   window.pendingTranslationToastId = null;
+
+  // Only clear unprocessed entries from the toast ID map
+  if (specificToastId) {
+    const data = pendingTranslationByToastId.get(specificToastId);
+    if (data && !data.processed) {
+      pendingTranslationByToastId.delete(specificToastId);
+    }
+  } else {
+    // Clear only unprocessed entries
+    for (const [toastId, data] of pendingTranslationByToastId.entries()) {
+      if (!data.processed) {
+        pendingTranslationByToastId.delete(toastId);
+      }
+    }
+  }
+
+  // Clean up old processed entries (older than 5 minutes)
+  const now = Date.now();
+  for (const [toastId, data] of pendingTranslationByToastId.entries()) {
+    if (data.processed && now - data.timestamp > 300000) {
+      pendingTranslationByToastId.delete(toastId);
+      logger.debug('Cleaned up old processed translation entry', { toastId, age: now - data.timestamp });
+    }
+  }
+
+  // Clean up old message IDs - keep only the most recent 1000
+  if (processedMessageIds.size > 1000) {
+    const idsToArray = Array.from(processedMessageIds);
+    const idsToDelete = idsToArray.slice(0, idsToArray.length - 1000);
+    for (const id of idsToDelete) {
+      processedMessageIds.delete(id);
+    }
+    logger.debug('Cleaned up old message IDs', {
+      deletedCount: idsToDelete.length,
+      remainingCount: processedMessageIds.size
+    });
+  }
+
+  // Note: WeakMap entries are automatically cleared when the target element is garbage collected
+  // No need to manually clear WeakMap entries
 }
 
 /**
@@ -399,12 +924,13 @@ async function determineReplaceMode(mode, platform) {
   return result;
 }
 
-async function applyTranslation(translatedText, selectionRange, platform, tabId, targetElement = null) {
+async function applyTranslation(translatedText, selectionRange, platform, tabId, targetElement = null, toastId = null) {
   logger.debug('Applying translation directly to element', { platform, tabId });
   
   try {
-    // Use provided target element or fallback
-    const target = targetElement || window.pendingTranslationTarget || document.activeElement;
+    // Use provided target element or get from pending data
+    const pendingData = getPendingTranslationData(document.activeElement, toastId);
+    const target = targetElement || pendingData?.target || document.activeElement;
     
     logger.debug('Target element info for translation', {
       providedTarget: !!targetElement,
@@ -495,9 +1021,21 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
 export function cleanupSmartTranslationIntegration() {
   // Clear any pending timeouts
   clearPendingNotificationData('module-cleanup');
-  
+
+  // Clear message queue
+  messageQueue.length = 0;
+  isProcessingQueue = false;
+
+  // Clear tracking maps
+  processedMessageIds.clear();
+  activeProcessing.clear();
+  successfullyCompletedToastIds.clear();
+
+  // Clear all pending translation data
+  pendingTranslationByToastId.clear();
+
   // Cleanup all tracked resources
   resourceTracker.cleanup();
-  
+
   logger.debug('SmartTranslationIntegration cleanup completed');
 }
