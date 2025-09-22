@@ -226,12 +226,18 @@ class SelectElementManager extends ResourceTracker {
       return;
     }
 
-    const { fromBackground = false, fromNotification = false, fromCancel = false } = options;
+    const {
+      fromBackground = false,
+      fromNotification = false,
+      fromCancel = false,
+      preserveTranslations = false
+    } = options;
 
     this.logger.debug("Deactivating SelectElementManager", {
       fromBackground,
       fromNotification,
       fromCancel,
+      preserveTranslations,
       instanceId: this.instanceId
     });
 
@@ -254,17 +260,22 @@ class SelectElementManager extends ResourceTracker {
       if (window === window.top && (fromCancel || fromBackground)) {
         this.dismissNotification();
       }
-      
-      // Cleanup state
-      this.stateManager.clearState();
-      
+
+      // Only cleanup state if not preserving translations
+      if (!preserveTranslations) {
+        this.stateManager.clearState();
+        this.logger.debug("State cleared during deactivation");
+      } else {
+        this.logger.debug("Preserving translations during deactivation");
+      }
+
       // Notify background script (unless initiated from background)
       if (!fromBackground) {
         await this.notifyBackgroundDeactivation();
       }
-      
+
       this.logger.info("SelectElementManager deactivated successfully");
-      
+
     } catch (error) {
       this.logger.error("Error deactivating SelectElementManager:", error);
       // Continue with cleanup even if error occurs
@@ -275,28 +286,28 @@ class SelectElementManager extends ResourceTracker {
   
   async forceDeactivate() {
     this.logger.debug("Force deactivating SelectElementManager");
-    
+
     // Set active state immediately
     this.isActive = false;
     this.isProcessingClick = false;
-    
+
     try {
       // Cancel all translations immediately
       await this.translationOrchestrator.cancelAllTranslations();
-      
+
       // Remove event listeners immediately
       this.removeEventListeners();
-      
+
       // Clear highlights immediately
       this.elementHighlighter.clearHighlight();
       await this.elementHighlighter.deactivateUI();
-      
+
       // Dismiss notification immediately (only in main frame)
       if (window === window.top) {
         this.dismissNotification();
       }
-      
-      // Clear state
+
+      // Clear state (force deactivation should always clear state)
       this.stateManager.clearState();
       
       this.logger.info("SelectElementManager force deactivated successfully");
@@ -381,34 +392,42 @@ class SelectElementManager extends ResourceTracker {
       event.stopPropagation();
       event.stopImmediatePropagation();
       
-      // Extract text from clicked element
-      const text = await this.textExtractionService.extractTextFromElement(event.target);
-      
-      this.logger.info("Text extraction result:", { 
+      // Get the highlighted element (which might be different from event.target)
+      const elementToTranslate = this.elementHighlighter.currentHighlighted || event.target;
+
+      // Extract text from the highlighted element
+      const text = await this.textExtractionService.extractTextFromElement(elementToTranslate);
+
+      this.logger.info("Text extraction result:", {
         text: text,
         textLength: text?.length || 0,
-        elementType: event.target.tagName,
+        elementType: elementToTranslate.tagName,
         hasText: !!(text && text.trim())
       });
-      
+
       if (text && text.trim()) {
-        this.logger.debug("Text extracted from clicked element", { 
+        this.logger.debug("Text extracted from highlighted element", {
           textLength: text.length,
-          elementType: event.target.tagName 
+          elementType: elementToTranslate.tagName,
+          isTargetSameAsHighlighted: elementToTranslate === event.target
         });
-        
+
         // Clear all highlights and UI immediately after click
         this.elementHighlighter.clearAllHighlights();
         this.elementHighlighter.deactivateUI();
-        
+
         // Remove mouse event listeners temporarily to prevent re-highlighting
         this.removeEventListeners();
-        
-        // Start translation process
-        await this.startTranslation(text, event.target);
+
+        // Start translation process with the highlighted element
+        await this.startTranslation(text, elementToTranslate);
         
       } else {
-        this.logger.debug("No text found in clicked element");
+        this.logger.debug("No text found in element", {
+          element: elementToTranslate.tagName,
+          isHighlighted: elementToTranslate === this.elementHighlighter.currentHighlighted,
+          usedFallback: elementToTranslate === event.target
+        });
       }
       
     } catch (error) {
@@ -672,10 +691,10 @@ class SelectElementManager extends ResourceTracker {
         }
       }
     } else {
-      // This is main frame, deactivate directly
+      // This is main frame, deactivate directly but preserve translations
       if (this.isActive) {
         this.logger.debug("Deactivating main frame SelectElementManager after translation");
-        this.deactivate().catch(error => {
+        this.deactivate({ preserveTranslations: true }).catch(error => {
           this.logger.warn('Error during post-translation cleanup:', error);
         });
       }
