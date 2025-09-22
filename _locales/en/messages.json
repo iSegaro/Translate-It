@@ -420,12 +420,10 @@
   "STATUS_REVERT_NOT_FOUND": { "message": "No text found to revert." },
   "STATUS_FROM_MEMORY": { "message": "From Memory" },
   "STATUS_REMOVE_MEMORY": { "message": "Memory Cleared" },
-  "STATUS_SMART_TRANSLATE_COPIED": {
+  "STATUS_SMARTTRANSLATE_COPIED": {
     "message": "Translation copied to clipboard (Ctrl+V)."
   },
-  "STATUS_SMART_TRANSLATE_COPY_ERROR": {
-    "message": "Error copying translated text to clipboard"
-  },
+  
 
   "SIDEPANEL_API_PROVIDER_TOOLTIP": {
     "message": "Change API Provider"
