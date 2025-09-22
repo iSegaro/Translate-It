@@ -555,6 +555,9 @@ this.translationRequests.delete(messageId);
           showToast: true
         });
 
+        // Notify UnifiedTranslationCoordinator about the streaming error
+        unifiedTranslationCoordinator.handleStreamingError(messageId, error);
+
         // Notify SelectElementManager to perform cleanup
         if (window.selectElementManagerInstance) {
           window.selectElementManagerInstance.performPostTranslationCleanup();
@@ -575,8 +578,14 @@ this.translationRequests.delete(messageId);
       });
       this.stateManager.addTranslatedElement(request.element, request.translatedSegments);
 
+      // Notify UnifiedTranslationCoordinator that streaming completed successfully
+      unifiedTranslationCoordinator.completeStreamingOperation(messageId, {
+        success: true,
+        translations: request.translatedSegments
+      });
+
       this.translationRequests.delete(messageId);
-      
+
       // Notify SelectElementManager to perform cleanup
       if (window.selectElementManagerInstance) {
         window.selectElementManagerInstance.performPostTranslationCleanup();
@@ -584,6 +593,9 @@ this.translationRequests.delete(messageId);
     } catch (error) {
       this.logger.error("Error during stream end processing:", error);
       
+      // Notify UnifiedTranslationCoordinator about the error
+      unifiedTranslationCoordinator.handleStreamingError(messageId, error);
+
       // Ensure cleanup happens even if there's an error
       this.translationRequests.delete(messageId);
       window.isTranslationInProgress = false;
@@ -827,6 +839,9 @@ this.translationRequests.delete(messageId);
    */
   _handleStreamingError(messageId, error) {
     this.logger.error(`Streaming error for ${messageId}:`, error);
+
+    // Notify UnifiedTranslationCoordinator about the streaming error
+    unifiedTranslationCoordinator.handleStreamingError(messageId, error);
 
     const request = this.translationRequests.get(messageId);
     if (request) {
