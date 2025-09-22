@@ -11,9 +11,20 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 
+// Singleton instance for ContentMessageHandler
+let contentMessageHandlerInstance = null;
+
 export class ContentMessageHandler extends ResourceTracker {
-  constructor() {
+  constructor(options = {}) {
     super('content-message-handler')
+
+    // Enforce singleton pattern
+    if (contentMessageHandlerInstance) {
+      const tempLogger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentMessageHandler');
+      tempLogger.debug('ContentMessageHandler singleton already exists, returning existing instance');
+      return contentMessageHandlerInstance;
+    }
+
     this.handlers = new Map();
     this.initialized = false;
     this.context = MessagingContexts.CONTENT;
@@ -21,6 +32,10 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.errorHandler = ErrorHandler.getInstance();
+
+    // Store singleton instance
+    contentMessageHandlerInstance = this;
+    logger.debug('ContentMessageHandler singleton created');
 
     // CRITICAL: Protect ContentMessageHandler itself from Memory Garbage Collector
     this.trackResource('content-message-handler-core', () => {
@@ -112,8 +127,11 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.debug('ContentMessageHandler not active');
       return true;
     }
-    
+
     try {
+      // Unregister all handlers to prevent duplicate registrations
+      this.unregisterAllHandlers();
+
       // Cleanup will handle message handler through ResourceTracker
       this.cleanup();
       this.isActive = false;
@@ -149,6 +167,18 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.warn(`Overwriting handler for action: ${action}`);
     }
     this.handlers.set(action, handler);
+  }
+
+  unregisterHandler(action) {
+    if (this.handlers.has(action)) {
+      this.handlers.delete(action);
+      this.logger.debug(`Handler unregistered for action: ${action}`);
+    }
+  }
+
+  unregisterAllHandlers() {
+    this.handlers.clear();
+    this.logger.debug('All handlers unregistered');
   }
 
   async handleMessage(message, sender, sendResponse) {
@@ -520,12 +550,43 @@ export class ContentMessageHandler extends ResourceTracker {
     this.handlers.clear();
     this.selectElementManager = null;
     this.iFrameManager = null;
-    
+
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
+
     this.logger.debug('ContentMessageHandler cleanup completed');
+  }
+
+  // Static method to get singleton instance
+  static getInstance(options = {}) {
+    if (!contentMessageHandlerInstance) {
+      contentMessageHandlerInstance = new ContentMessageHandler(options);
+    }
+    return contentMessageHandlerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (contentMessageHandlerInstance) {
+      contentMessageHandlerInstance.cleanup();
+      contentMessageHandlerInstance = null;
+    }
+  }
+
+  // Static cleanup method for global reset
+  static cleanupAll() {
+    ContentMessageHandler.resetInstance();
   }
 }
 
-export const contentMessageHandler = new ContentMessageHandler();
+// Export default instance for backward compatibility
+// Note: This creates the singleton instance when first accessed
+let _contentMessageHandlerInstance = null;
+export const contentMessageHandler = new Proxy({}, {
+  get: function(target, prop) {
+    if (!_contentMessageHandlerInstance) {
+      _contentMessageHandlerInstance = ContentMessageHandler.getInstance();
+    }
+    return _contentMessageHandlerInstance[prop];
+  }
+});

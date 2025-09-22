@@ -41,10 +41,10 @@ export class WindowsManagerHandler extends ResourceTracker {
 
       // Use the global FeatureManager singleton
       const globalFeatureManager = FeatureManager.getInstance();
-      const translationHandler = new TranslationHandler(globalFeatureManager);
+      const translationHandler = TranslationHandler.getInstance(globalFeatureManager);
 
       // Create WindowsManager instance with the shared TranslationHandler
-      this.windowsManager = new WindowsManager({ translationHandler });
+      this.windowsManager = WindowsManager.getInstance({ translationHandler });
       
       // Store globally for compatibility with existing TextSelectionManager code
       if (!window.windowsManagerInstance) {
@@ -77,10 +77,8 @@ export class WindowsManagerHandler extends ResourceTracker {
         await this.windowsManager.dismiss();
         
         // Clean up the instance
-        if (this.windowsManager && typeof this.windowsManager.destroy === 'function') {
-          this.windowsManager.destroy();
-        }
-        
+        WindowsManager.resetInstance();
+
         this.windowsManager = null;
       }
 

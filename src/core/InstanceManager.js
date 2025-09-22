@@ -9,7 +9,7 @@ let _handler = null;
  */
 export function getTranslationHandlerInstance() {
   if (!_handler) {
-    _handler = new TranslationHandler();
+    _handler = TranslationHandler.getInstance();
   }
   return _handler;
 }
@@ -20,4 +20,5 @@ export function getTranslationHandlerInstance() {
  */
 export function resetInstances() {
   _handler = null;
+  TranslationHandler.resetInstance();
 }

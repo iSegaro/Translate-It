@@ -9,6 +9,9 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandler');
 
+// Singleton instance for SimpleTextSelectionHandler
+let simpleTextSelectionHandlerInstance = null;
+
 /**
  * Simplified Text Selection Handler
  *
@@ -24,6 +27,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandl
 export class SimpleTextSelectionHandler extends ResourceTracker {
   constructor(options = {}) {
     super('simple-text-selection-handler');
+
+    // Enforce singleton pattern
+    if (simpleTextSelectionHandlerInstance) {
+      logger.debug('SimpleTextSelectionHandler singleton already exists, returning existing instance');
+      return simpleTextSelectionHandlerInstance;
+    }
 
     this.isActive = false;
     this.selectionManager = null;
@@ -55,6 +64,30 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
+
+    // Store singleton instance
+    simpleTextSelectionHandlerInstance = this;
+    logger.debug('SimpleTextSelectionHandler singleton created');
+  }
+
+  // Static method to get singleton instance
+  static getInstance(options = {}) {
+    if (!simpleTextSelectionHandlerInstance) {
+      simpleTextSelectionHandlerInstance = new SimpleTextSelectionHandler(options);
+    } else if (options.featureManager && !simpleTextSelectionHandlerInstance.featureManager) {
+      // Update featureManager if it wasn't set initially
+      simpleTextSelectionHandlerInstance.featureManager = options.featureManager;
+      logger.debug('Updated SimpleTextSelectionHandler with FeatureManager');
+    }
+    return simpleTextSelectionHandlerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (simpleTextSelectionHandlerInstance) {
+      simpleTextSelectionHandlerInstance.cleanup();
+      simpleTextSelectionHandlerInstance = null;
+    }
   }
 
   async activate() {
@@ -65,6 +98,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     try {
       logger.debug('Activating SimpleTextSelectionHandler');
+
+      // If selectionManager already exists, clean it up first
+      if (this.selectionManager) {
+        this.selectionManager = null;
+      }
 
       // Create selection manager
       this.selectionManager = new SelectionManager({
@@ -117,10 +155,15 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       });
       this._settingsListeners = [];
 
+      // Dismiss any active selection window
+      if (this.selectionManager) {
+        this.selectionManager.dismissWindow();
+      }
+
       // Clean up our reference (SelectionManager cleans itself up)
       this.selectionManager = null;
 
-      // ResourceTracker will handle cleanup
+      // Manually clean up event listeners to be sure
       this.cleanup();
 
       this.isActive = false;
@@ -144,22 +187,23 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
   setupEventListeners() {
     try {
+
       // Main selection change listener
       this.addEventListener(document, 'selectionchange', this.handleSelectionChange, {
         critical: true
       });
 
-      // Simple drag detection
-      this.addEventListener(document, 'mousedown', this.handleMouseDown, {
+      // Simple drag detection - use window to prevent duplicate events
+      this.addEventListener(window, 'mousedown', this.handleMouseDown, {
         critical: true
       });
-      this.addEventListener(document, 'mouseup', this.handleMouseUp, {
+      this.addEventListener(window, 'mouseup', this.handleMouseUp, {
         critical: true
       });
 
       // Ctrl key tracking for requirement checking
-      this.addEventListener(document, 'keydown', this.handleKeyDown);
-      this.addEventListener(document, 'keyup', this.handleKeyUp);
+      this.addEventListener(window, 'keydown', this.handleKeyDown);
+      this.addEventListener(window, 'keyup', this.handleKeyUp);
 
       logger.debug('Simple text selection listeners setup complete');
 
@@ -173,15 +217,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    */
   setupSettingsListeners() {
     try {
-      // EXTENSION_ENABLED changes
-      this._settingsListeners.push(
-        settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
-          logger.debug('EXTENSION_ENABLED changed:', newValue);
-          if (!newValue && this.selectionManager) {
-            this.selectionManager.dismissWindow();
-          }
-        }, 'simple-text-selection')
-      );
+      // Note: EXTENSION_ENABLED listener is handled by FeatureManager
+      // We don't need to duplicate it here as FeatureManager will handle activation/deactivation
 
       // TRANSLATE_ON_TEXT_SELECTION changes
       this._settingsListeners.push(
@@ -533,6 +570,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Handle mouse down - start drag detection
    */
   handleMouseDown(event) {
+
     this.lastMouseEventTime = Date.now();
     this.isDragging = true;
     this.mouseDownTime = Date.now();
@@ -544,6 +582,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Handle mouse up - end drag detection and process selection if needed
    */
   handleMouseUp(event) {
+
     this.lastMouseEventTime = Date.now();
     const dragDuration = Date.now() - this.mouseDownTime;
 
@@ -639,6 +678,14 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       mouseDownTime: this.mouseDownTime,
       currentSelection: this.getCurrentSelection()?.substring(0, 100)
     };
+  }
+
+  destroy() {
+    this.cleanup();
+    // Reset singleton instance
+    if (simpleTextSelectionHandlerInstance === this) {
+      simpleTextSelectionHandlerInstance = null;
+    }
   }
 }
 

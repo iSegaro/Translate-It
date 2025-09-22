@@ -16,18 +16,28 @@ import { textFieldIconConfig } from '../config/positioning.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
+// Singleton instance for TextFieldIconManager
+let textFieldIconManagerInstance = null;
+
 export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
     super('text-field-icon-manager')
+
+    // Initialize logger first
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
+
+    // Enforce singleton pattern
+    if (textFieldIconManagerInstance) {
+      this.logger.debug('TextFieldIconManager singleton already exists, returning existing instance');
+      return textFieldIconManagerInstance;
+    }
 
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
     this.initialized = false;
     this.loggedInit = false; // Flag to prevent duplicate logging
-
-    // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
+    this._settingsListenersSetup = false; // Flag to prevent duplicate listeners
 
     // Mark this instance as critical to prevent cleanup during memory management
     this.trackResource('text-field-icon-manager-critical', () => {
@@ -42,11 +52,31 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Element detection service
     this.elementDetection = ElementDetectionService;
-    
+
     // Only log once during first initialization
     if (!this.loggedInit) {
       this.logger.init('TextFieldIconManager initialized');
       this.loggedInit = true;
+    }
+
+    // Store singleton instance
+    textFieldIconManagerInstance = this;
+    this.logger.debug('TextFieldIconManager singleton created');
+  }
+
+  // Static method to get singleton instance
+  static getInstance(options = {}) {
+    if (!textFieldIconManagerInstance) {
+      textFieldIconManagerInstance = new TextFieldIconManager(options);
+    }
+    return textFieldIconManagerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (textFieldIconManagerInstance) {
+      textFieldIconManagerInstance.destroy();
+      textFieldIconManagerInstance = null;
     }
   }
 
@@ -98,15 +128,23 @@ export class TextFieldIconManager extends ResourceTracker {
       }
     });
 
-    // Listen for settings changes
+    // Setup settings listeners (only once)
+    this.setupSettingsListeners();
+  }
+
+  /**
+   * Setup settings change listeners (only once)
+   */
+  setupSettingsListeners() {
+    // Only setup listeners once
+    if (this._settingsListenersSetup) {
+      this.logger.debug('Settings listeners already setup, skipping');
+      return;
+    }
+
     this._settingsListeners = [
-      settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
-        this.logger.debug('EXTENSION_ENABLED changed:', newValue);
-        if (!newValue) {
-          // Clean up all icons when extension is disabled
-          this.cleanup();
-        }
-      }, 'text-field-icon-manager'),
+      // Note: EXTENSION_ENABLED listener is handled by FeatureManager
+      // We don't need to duplicate it here as FeatureManager will handle activation/deactivation
 
       settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', (newValue) => {
         this.logger.debug('TRANSLATE_ON_TEXT_FIELDS changed:', newValue);
@@ -116,6 +154,9 @@ export class TextFieldIconManager extends ResourceTracker {
         }
       }, 'text-field-icon-manager')
     ];
+
+    this._settingsListenersSetup = true;
+    this.logger.debug('Settings listeners setup complete');
   }
 
   /**
@@ -531,12 +572,15 @@ export class TextFieldIconManager extends ResourceTracker {
       this._settingsListeners.forEach(unsubscribe => unsubscribe());
       this._settingsListeners = null;
     }
+    this._settingsListenersSetup = false;
 
     // Clean up all icons and attachments
     this.cleanup();
 
-    // Remove all tracked resources
-    this.clearAllResources();
+    // Reset singleton instance
+    if (textFieldIconManagerInstance === this) {
+      textFieldIconManagerInstance = null;
+    }
 
     this.logger.debug('TextFieldIconManager destroyed');
   }

@@ -52,7 +52,7 @@ export class TextFieldHandler extends ResourceTracker {
       logger.debug('Activating TextFieldHandler');
 
       // Initialize text field icon manager
-      this.textFieldIconManager = new TextFieldIconManager();
+      this.textFieldIconManager = TextFieldIconManager.getInstance();
       await this.initializeIconManager();
 
       // Initialize double-click handler
@@ -94,8 +94,13 @@ export class TextFieldHandler extends ResourceTracker {
     try {
       logger.debug('Deactivating TextFieldHandler');
 
-      // Clean up our references (components clean themselves up)
+      // For singleton TextFieldIconManager, we don't destroy it but just clear our reference
+      // The singleton will be destroyed when the feature is globally disabled
       this.textFieldIconManager = null;
+
+      if (this.doubleClickHandler && typeof this.doubleClickHandler.deactivate === 'function') {
+        await this.doubleClickHandler.deactivate();
+      }
       this.doubleClickHandler = null;
 
       // ResourceTracker will handle cleanup

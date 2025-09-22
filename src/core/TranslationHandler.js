@@ -27,11 +27,20 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from './PageEventBus.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
+// Singleton instance
+let translationHandlerInstance = null;
+
 export default class TranslationHandler {
   constructor(featureManager = null) {
+    // Enforce singleton pattern
+    if (translationHandlerInstance) {
+      const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
+      logger.debug('TranslationHandler singleton already exists, returning existing instance');
+      return translationHandlerInstance;
+    }
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
-    
+
     this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
 
@@ -55,18 +64,16 @@ export default class TranslationHandler {
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
 
-    // Use provided FeatureManager or create a new one (for backward compatibility)
-    this.featureManager = featureManager || new FeatureManager({
-      TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS,
-      SHORTCUT_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
-      SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT,
-      TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
-      DICTIONARY: CONFIG.ENABLE_DICTIONARY,
-    });
+    // Use provided FeatureManager or get singleton instance (for backward compatibility)
+    this.featureManager = featureManager || FeatureManager.getInstance();
 
     this.logger.debug('Creating EventCoordinator...');
     this.eventCoordinator = new EventCoordinator(this, this.featureManager);
     this.logger.debug('EventCoordinator created successfully');
+
+    // Store singleton instance
+    translationHandlerInstance = this;
+    this.logger.debug('TranslationHandler singleton created');
   }
 
   @logMethod
@@ -321,6 +328,21 @@ export default class TranslationHandler {
         context: "paste-content",
         platform: detectPlatform(element),
       });
+    }
+  }
+
+  // Static method to get singleton instance
+  static getInstance(featureManager = null) {
+    if (!translationHandlerInstance) {
+      translationHandlerInstance = new TranslationHandler(featureManager);
+    }
+    return translationHandlerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (translationHandlerInstance) {
+      translationHandlerInstance = null;
     }
   }
 }

@@ -13,7 +13,7 @@ export function useExclusionChecker() {
   
   const initializeChecker = async () => {
     if (!checkerInstance) {
-      checkerInstance = new ExclusionChecker();
+      checkerInstance = ExclusionChecker.getInstance();
     }
     
     if (!isInitialized.value) {

@@ -22,7 +22,7 @@ export class FeatureManager extends ResourceTracker {
     super();
     this.activeFeatures = new Set();
     this.featureHandlers = new Map();
-    this.exclusionChecker = new ExclusionChecker();
+    this.exclusionChecker = ExclusionChecker.getInstance();
     this.initialized = false;
     this.settingsListener = null;
     this._evaluationInProgress = false;
@@ -47,6 +47,25 @@ export class FeatureManager extends ResourceTracker {
     if (featureManagerInstance) {
       featureManagerInstance.cleanup();
       featureManagerInstance = null;
+    }
+    // Also reset other singletons
+    ExclusionChecker.resetInstance();
+    // Reset ContentMessageHandler singleton
+    try {
+      import('@/handlers/content/ContentMessageHandler.js').then(({ ContentMessageHandler }) => {
+        ContentMessageHandler.resetInstance();
+      });
+    } catch (e) {
+      // Import might not be available
+    }
+
+    // Reset WindowsManager singleton
+    try {
+      import('@/features/windows/managers/WindowsManager.js').then(({ WindowsManager }) => {
+        WindowsManager.resetInstance();
+      });
+    } catch (e) {
+      // Import might not be available
     }
   }
 
@@ -167,7 +186,19 @@ export class FeatureManager extends ResourceTracker {
       logger.debug(`Activating feature: ${featureName}`);
 
       // Load and initialize feature handler
-      const handler = await this.loadFeatureHandler(featureName);
+      let handler;
+      if (featureName === 'textSelection') {
+        // Use singleton pattern for SimpleTextSelectionHandler
+        const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
+        handler = SimpleTextSelectionHandler.getInstance({ featureManager: this });
+      } else if (featureName === 'contentMessageHandler') {
+        // Use singleton pattern for ContentMessageHandler
+        const { ContentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
+        handler = ContentMessageHandler.getInstance({ featureManager: this });
+      } else {
+        handler = await this.loadFeatureHandler(featureName);
+      }
+
       if (handler) {
         const success = await handler.activate();
         if (success !== false) { // Consider true or undefined as success
@@ -211,6 +242,30 @@ export class FeatureManager extends ResourceTracker {
         }
       }
 
+      // Special handling for textFieldIcon feature to destroy singleton
+      if (featureName === 'textFieldIcon') {
+        try {
+          const { TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
+          TextFieldIconManager.resetInstance();
+          logger.debug('TextFieldIconManager singleton destroyed');
+        } catch (importError) {
+          logger.error('Failed to import TextFieldIconManager for singleton destruction:', importError);
+          // Fall back to normal deactivation
+        }
+      }
+
+      // Special handling for textSelection feature to destroy singleton
+      if (featureName === 'textSelection') {
+        try {
+          const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
+          SimpleTextSelectionHandler.resetInstance();
+          logger.debug('SimpleTextSelectionHandler singleton destroyed');
+        } catch (importError) {
+          logger.error('Failed to import SimpleTextSelectionHandler for singleton destruction:', importError);
+          // Fall back to normal deactivation
+        }
+      }
+
       const handler = this.featureHandlers.get(featureName);
       if (handler && typeof handler.deactivate === 'function') {
         const success = await handler.deactivate();
@@ -240,24 +295,14 @@ export class FeatureManager extends ResourceTracker {
       let HandlerClass;
       
       switch (featureName) {
-        case 'contentMessageHandler': {
-          const { ContentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
-          HandlerClass = ContentMessageHandler;
-          break;
-        }
-
+        // Note: contentMessageHandler and textSelection are handled as special cases in activateFeature
         case 'selectElement': {
           const { SelectElementManager } = await import('@/features/element-selection/SelectElementManager.js');
           HandlerClass = SelectElementManager;
           break;
         }
 
-        case 'textSelection': {
-          const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
-          HandlerClass = SimpleTextSelectionHandler;
-          break;
-        }
-
+  
         case 'textFieldIcon': {
           const { TextFieldHandler } = await import('@/features/text-field-interaction/handlers/TextFieldHandler.js');
           HandlerClass = TextFieldHandler;

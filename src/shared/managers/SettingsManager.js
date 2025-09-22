@@ -24,6 +24,7 @@ class SettingsManager {
     this._store = null
     this._initialized = false
     this._fallbackMode = false
+    this._storageListenerSetup = false
     this._eventListeners = new Map()
     this._pendingUpdates = new Map()
     this._reactiveCache = new Map()
@@ -425,6 +426,12 @@ class SettingsManager {
    * Setup chrome.storage listener for fallback mode
    */
   _setupStorageListener() {
+    // Only setup listener once
+    if (this._storageListenerSetup) {
+      logger.debug('Storage listener already setup, skipping')
+      return
+    }
+
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) {
       logger.warn('Chrome storage API not available, cannot setup storage listener')
       return
@@ -448,6 +455,7 @@ class SettingsManager {
       }
     })
 
+    this._storageListenerSetup = true
     logger.debug('Storage listener setup complete')
   }
 

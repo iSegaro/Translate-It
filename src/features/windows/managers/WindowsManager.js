@@ -25,6 +25,9 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
  * Modular WindowsManager for translation windows and icons
  * Refactored to use specialized modules for better maintainability
  */
+// Singleton instance
+let windowsManagerInstance = null;
+
 export class WindowsManager extends ResourceTracker {
   /**
    * Get pageEventBus instance at runtime
@@ -34,6 +37,11 @@ export class WindowsManager extends ResourceTracker {
   }
 
   constructor(options = {}) {
+    // Enforce singleton pattern
+    if (windowsManagerInstance) {
+      logger.debug('WindowsManager singleton already exists, returning existing instance');
+      return windowsManagerInstance;
+    }
     // Initialize ResourceTracker first
     super('windows-manager');
     
@@ -41,6 +49,10 @@ export class WindowsManager extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsManager');
     this.logger.debug('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
     this.logger.debug('WindowsManager constructor called', options);
+
+    // Store singleton instance
+    windowsManagerInstance = this;
+    this.logger.debug('WindowsManager singleton created');
     
     // Initialize cross-frame communication first to get frameId
     this.crossFrameManager = new CrossFrameManager({
@@ -1252,5 +1264,21 @@ export class WindowsManager extends ResourceTracker {
     // TTS composable doesn't need explicit cleanup - handled by Vue lifecycle
     
     this.logger.debug('🗑️ WindowsManager destroyed');
+  }
+
+  // Static method to get singleton instance
+  static getInstance(options = {}) {
+    if (!windowsManagerInstance) {
+      windowsManagerInstance = new WindowsManager(options);
+    }
+    return windowsManagerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (windowsManagerInstance) {
+      windowsManagerInstance.destroy();
+      windowsManagerInstance = null;
+    }
   }
 }

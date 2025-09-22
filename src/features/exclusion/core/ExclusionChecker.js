@@ -7,12 +7,42 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ExclusionChecker');
 
+// Singleton instance for ExclusionChecker
+let exclusionCheckerInstance = null;
+
 export class ExclusionChecker {
   constructor() {
+    // Enforce singleton pattern
+    if (exclusionCheckerInstance) {
+      logger.debug('ExclusionChecker singleton already exists, returning existing instance');
+      return exclusionCheckerInstance;
+    }
+
     this.currentUrl = window.location.href;
     this.settings = null;
     this.initialized = false;
     this.settingsListeners = [];
+    this.listenersSetup = false;
+
+    // Store singleton instance
+    exclusionCheckerInstance = this;
+    logger.debug('ExclusionChecker singleton created');
+  }
+
+  // Static method to get singleton instance
+  static getInstance() {
+    if (!exclusionCheckerInstance) {
+      exclusionCheckerInstance = new ExclusionChecker();
+    }
+    return exclusionCheckerInstance;
+  }
+
+  // Method to reset singleton (for testing or cleanup)
+  static resetInstance() {
+    if (exclusionCheckerInstance) {
+      exclusionCheckerInstance.cleanup();
+      exclusionCheckerInstance = null;
+    }
   }
 
   async initialize() {
@@ -22,8 +52,11 @@ export class ExclusionChecker {
       // Initialize settings from SettingsManager
       await settingsManager.initialize();
 
-      // Setup settings change listeners
-      this.setupSettingsListeners();
+      // Setup settings change listeners (only once)
+      if (!this.listenersSetup) {
+        this.setupSettingsListeners();
+        this.listenersSetup = true;
+      }
 
       this.initialized = true;
       logger.debug('ExclusionChecker initialized');
@@ -42,7 +75,13 @@ export class ExclusionChecker {
   }
 
   async refreshSettings() {
-    await this.initialize();
+    try {
+      // Just refresh settings without full reinitialization
+      await settingsManager.initialize();
+      logger.debug('ExclusionChecker settings refreshed');
+    } catch (error) {
+      logger.error('Error refreshing ExclusionChecker settings:', error);
+    }
   }
 
   updateUrl(newUrl) {
@@ -57,13 +96,8 @@ export class ExclusionChecker {
    */
   setupSettingsListeners() {
     try {
-      // Listen for EXTENSION_ENABLED changes
-      this.settingsListeners.push(
-        settingsManager.onChange('EXTENSION_ENABLED', (newValue) => {
-          logger.debug('EXTENSION_ENABLED changed, refreshing features:', newValue);
-          this.refreshFeaturesOnSettingsChange();
-        }, 'exclusion-checker')
-      );
+      // Note: EXTENSION_ENABLED listener is handled by FeatureManager
+      // We don't need to duplicate it here as FeatureManager will trigger re-evaluation
 
       // Listen for feature-specific setting changes
       const featureSettings = [
@@ -97,12 +131,12 @@ export class ExclusionChecker {
 
   /**
    * Refresh features when settings change
+   * Note: FeatureManager handles its own re-evaluation through its settings listener
    */
   refreshFeaturesOnSettingsChange() {
-    // Notify FeatureManager to re-evaluate features
-    if (window.featureManager && typeof window.featureManager.evaluateAndRegisterFeatures === 'function') {
-      window.featureManager.evaluateAndRegisterFeatures();
-    }
+    // Just refresh internal settings cache - FeatureManager will handle re-evaluation
+    logger.debug('Settings changed, refreshing exclusion cache');
+    // No need to trigger FeatureManager - it has its own debounced evaluation system
   }
 
   async isFeatureAllowed(featureName) {
@@ -222,6 +256,7 @@ export class ExclusionChecker {
       if (unsubscribe) unsubscribe();
     });
     this.settingsListeners = [];
+    this.listenersSetup = false;
 
     logger.debug('ExclusionChecker cleaned up');
   }

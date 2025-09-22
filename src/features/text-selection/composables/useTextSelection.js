@@ -27,7 +27,7 @@ export function useTextSelection(options = {}) {
     try {
       logger.debug('Initializing text selection handler');
 
-      selectionHandler = new SimpleTextSelectionHandler({
+      selectionHandler = SimpleTextSelectionHandler.getInstance({
         featureManager,
         ...options
       });
