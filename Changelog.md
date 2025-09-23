@@ -1,4 +1,4 @@
-#### v1.3.X – Released on X, 2025
+#### v1.3.0 – Released on X, 2025
 
 ##### Added
 
@@ -7,6 +7,7 @@
 ##### Fixed
 
 - Fixed issue where translated text did not appear in the floating window when using dark theme
+- **[#66](https://github.com/iSegaro/Translate-It/issues/66)**: Fixed text field deactivation issue
 
 ---
 
