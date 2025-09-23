@@ -99,7 +99,7 @@ export class SelectionManager extends ResourceTracker {
     // Calculate position for the translation UI
     const position = this.calculateSelectionPosition(selection);
     if (!position) {
-      this.logger.warn('Could not calculate position for selection', {
+      this.logger.debug('Could not calculate position for selection', {
         text: selectedText.substring(0, 30) + '...',
         selectionType: selection?.type,
         rangeCount: selection?.rangeCount,
