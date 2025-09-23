@@ -32,54 +32,88 @@ export class RevertHandler extends ResourceTracker {
     }
 
     this.isExecuting = true;
-    logger.debug('[RevertHandler] Starting unified revert process');
-    
+    logger.info('[RevertHandler] 🔄 Starting unified revert process');
+
     try {
       let totalRevertedCount = 0;
       let systemsUsed = [];
+      let errors = [];
 
       // Attempt to revert Vue / SelectElementManager translations
       try {
+        logger.info('[RevertHandler] 🎯 Attempting Vue revert...');
         const vueRevertedCount = await this.revertVueTranslations();
+        logger.info(`[RevertHandler] ✅ Vue revert result: ${vueRevertedCount} items reverted`);
         if (vueRevertedCount > 0) {
           totalRevertedCount += vueRevertedCount;
           systemsUsed.push('vue');
         }
       } catch (error) {
-        logger.error('[RevertHandler] Error during Vue revert portion:', error);
+        logger.error('[RevertHandler] ❌ Error during Vue revert portion:', {
+          error: error.message,
+          stack: error.stack,
+          errorType: error.name
+        });
+        errors.push({ system: 'vue', error: error.message });
       }
 
       // Attempt to revert legacy translations
       try {
+        logger.info('[RevertHandler] 🎯 Attempting legacy revert...');
         const legacyRevertedCount = await this.revertLegacyTranslations();
+        logger.info(`[RevertHandler] ✅ Legacy revert result: ${legacyRevertedCount} items reverted`);
         if (legacyRevertedCount > 0) {
           totalRevertedCount += legacyRevertedCount;
           systemsUsed.push('legacy');
         }
       } catch (error) {
-        logger.error('[RevertHandler] Error during legacy revert portion:', error);
+        logger.error('[RevertHandler] ❌ Error during legacy revert portion:', {
+          error: error.message,
+          stack: error.stack,
+          errorType: error.name
+        });
+        errors.push({ system: 'legacy', error: error.message });
       }
-      
+
       const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
-      logger.debug(`[RevertHandler] Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+      logger.info(`[RevertHandler] 🏁 Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+
+      if (errors.length > 0) {
+        logger.warn('[RevertHandler] ⚠️ Revert completed with errors:', errors);
+      }
 
       // Show a single, unified notification
       if (totalRevertedCount > 0) {
         const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
         pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
+        logger.info('[RevertHandler] 📢 Success notification sent');
       } else {
         const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
         pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
+        logger.info('[RevertHandler] 📢 Warning notification sent - no translations found');
       }
 
-      return { success: true, revertedCount: totalRevertedCount, system: finalSystem };
-      
+      const result = {
+        success: true,
+        revertedCount: totalRevertedCount,
+        system: finalSystem,
+        errors: errors.length > 0 ? errors : undefined
+      };
+
+      logger.info('[RevertHandler] 🎉 Returning result:', result);
+      return result;
+
     } catch (error) {
-      logger.error('[RevertHandler] Error in executeRevert:', error);
+      logger.error('[RevertHandler] 💥 Critical error in executeRevert:', {
+        error: error.message,
+        stack: error.stack,
+        errorType: error.name
+      });
       return { success: false, error: error.message };
     } finally {
       // Reset execution flag
       this.isExecuting = false;
+      logger.debug('[RevertHandler] 🔄 Execution flag reset');
     }
   }
 
@@ -150,12 +184,26 @@ export class RevertHandler extends ResourceTracker {
   async getSelectElementManagerFromFeatureManager() {
     try {
       // Try to get FeatureManager from global window object
+      logger.debug('[RevertHandler] Checking for window.featureManager...', {
+        hasFeatureManager: !!window.featureManager,
+        hasGetFeatureHandler: !!(window.featureManager && typeof window.featureManager.getFeatureHandler === 'function')
+      });
+
       if (window.featureManager && typeof window.featureManager.getFeatureHandler === 'function') {
         const selectElementManager = window.featureManager.getFeatureHandler('selectElement');
+        logger.debug('[RevertHandler] FeatureManager.getFeatureHandler result:', {
+          hasSelectElementManager: !!selectElementManager,
+          managerType: typeof selectElementManager
+        });
+
         if (selectElementManager) {
           logger.debug('[RevertHandler] Found SelectElementManager through FeatureManager');
           return selectElementManager;
+        } else {
+          logger.debug('[RevertHandler] FeatureManager returned null for selectElement');
         }
+      } else {
+        logger.debug('[RevertHandler] FeatureManager not available or invalid');
       }
 
       return null;

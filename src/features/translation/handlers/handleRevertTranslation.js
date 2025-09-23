@@ -58,7 +58,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     }
 
     // Send revert message to content script - let it decide which system to use
-    const contentScriptResponse = await browser.tabs.sendMessage(targetTabId, {
+    const revertMessage = {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
       context: 'revert-handler',
       messageId: generateRevertMessageId('background'),
@@ -66,10 +66,24 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
         ...message.data,
         fromBackground: true
       }
+    };
+
+    logger.debug(`📤 [revertTranslation] Sending revert message to content script:`, {
+      tabId: targetTabId,
+      action: revertMessage.action,
+      messageId: revertMessage.messageId
     });
 
-    if (contentScriptResponse?.success) {
-      logger.debug(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+    const contentScriptResponse = await browser.tabs.sendMessage(targetTabId, revertMessage);
+
+    logger.info(`📨 [revertTranslation] Content script response:`, {
+      response: contentScriptResponse,
+      responseType: typeof contentScriptResponse
+    });
+
+    // Handle response directly
+    if (contentScriptResponse && contentScriptResponse.success) {
+      logger.info(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
 
       sendResponse({
         success: true,
@@ -79,7 +93,12 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
         system: contentScriptResponse.system || 'unknown'
       });
     } else {
-      throw new Error(contentScriptResponse?.error || 'Content script revert failed');
+      const errorMessage = contentScriptResponse?.error || 'Content script revert failed';
+      logger.warn(`❌ [revertTranslation] Content script returned failure for tab ${targetTabId}:`, {
+        response: contentScriptResponse,
+        error: errorMessage
+      });
+      throw new Error(errorMessage);
     }
 
     return true;

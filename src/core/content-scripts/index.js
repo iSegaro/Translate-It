@@ -1,7 +1,7 @@
 // Content script entry point for Vue build
 // Modern modular architecture with smart feature management
 
-// import browser from "webextension-polyfill";
+import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
@@ -314,6 +314,51 @@ if (!access.isAccessible) {
       logger.error('Failed to mount the Vue UI Host:', error);
     }
 
+    // Add direct revert translation listener BEFORE FeatureManager (high priority)
+    if (!window.revertTranslationListenerAdded) {
+      logger.info('[ContentScript] 🔧 Setting up direct revert translation listener (high priority)...', {
+        hasRuntime: !!browser?.runtime,
+        hasOnMessage: !!browser?.runtime?.onMessage
+      });
+
+      const directRevertListener = (message, sender, sendResponse) => {
+        if (message.action === 'revertTranslation') {
+          logger.info('[ContentScript] 📨 HIGH PRIORITY: Direct revert translation request received:', {
+            messageId: message.messageId,
+            context: message.context
+          });
+
+          // Import and execute revert handler directly
+          import('@/handlers/content/RevertHandler.js').then(({ revertHandler }) => {
+            revertHandler.executeRevert()
+              .then(result => {
+                logger.info('[ContentScript] ✅ HIGH PRIORITY: Direct revert completed:', result);
+                logger.info('[ContentScript] 📤 HIGH PRIORITY: Sending response back to background:', result);
+                sendResponse(result);
+              })
+              .catch(error => {
+                logger.error('[ContentScript] ❌ HIGH PRIORITY: Direct revert failed:', error);
+                const errorResult = { success: false, error: error.message };
+                sendResponse(errorResult);
+              });
+          }).catch(importError => {
+            logger.error('[ContentScript] ❌ HIGH PRIORITY: Failed to import RevertHandler:', importError);
+            const importErrorResult = { success: false, error: 'Failed to load revert handler' };
+            sendResponse(importErrorResult);
+          });
+
+          return true; // Indicates async response
+        }
+        return false; // Let other listeners handle
+      };
+
+      // Add listener with HIGHEST priority (before FeatureManager)
+      browser.runtime.onMessage.addListener(directRevertListener);
+
+      window.revertTranslationListenerAdded = true;
+      logger.info('[ContentScript] ✅ HIGH PRIORITY: Direct revert translation listener added');
+    }
+
     // Initialize Smart Feature Management System
     let featureManager = null;
     try {
@@ -400,6 +445,8 @@ if (!access.isAccessible) {
     // The EventCoordinator was causing duplicate event processing with the new selection event strategy system
     // All event handling is now properly managed through TextSelectionHandler and other feature handlers
     logger.debug('EventCoordinator disabled - using modern FeatureManager event handling');
+
+
     })();
   }
   })(); // Close first async IIFE

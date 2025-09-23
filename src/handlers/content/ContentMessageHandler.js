@@ -82,18 +82,19 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.debug('ContentMessageHandler already active');
       return true;
     }
-    
+
     try {
       this.initialize();
-      
+
       // Connect to message handler for smart feature management
       this.messageHandler = createMessageHandler();
-      
+
       // Register all handlers with the central message handler
       for (const [action, handler] of this.handlers.entries()) {
-        this.messageHandler.registerHandler(action, async (message, sender) => {
+        this.messageHandler.registerHandler(action, async (message, sender, sendResponse) => {
           try {
-            const result = await handler.call(this, message, sender);
+            // Pass sendResponse to handlers that need it
+            const result = await handler.call(this, message, sender, sendResponse);
             return result;
           } catch (error) {
             this.logger.error(`Error in content handler for ${action}:`, error);
@@ -101,13 +102,21 @@ export class ContentMessageHandler extends ResourceTracker {
           }
         });
       }
-      
+
+      this.logger.info('🔧 ContentMessageHandler registered handlers:', {
+        registeredActions: Array.from(this.handlers.keys()),
+        totalHandlers: this.handlers.size,
+        hasRevertHandler: this.handlers.has('revertTranslation')
+      });
+
       // Activate the message listener
       if (!this.messageHandler.isListenerActive) {
         this.messageHandler.listen();
-        this.logger.debug('ContentMessageHandler message listener activated');
+        this.logger.info('✅ ContentMessageHandler message listener activated');
+      } else {
+        this.logger.warn('⚠️ ContentMessageHandler message listener was already active');
       }
-      
+
       // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
       this.trackResource('messageHandler', () => {
         this.logger.debug('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
@@ -115,12 +124,12 @@ export class ContentMessageHandler extends ResourceTracker {
         // because this resource is marked as critical. This is the expected behavior.
         this.logger.debug('Message handler is protected from cleanup and remains active');
       }, { isCritical: true });
-      
+
       this.isActive = true;
-      this.logger.info('ContentMessageHandler activated successfully with smart message handling');
+      this.logger.info('🎉 ContentMessageHandler activated successfully with smart message handling');
       return true;
     } catch (error) {
-      this.logger.error('Failed to activate ContentMessageHandler:', error);
+      this.logger.error('❌ Failed to activate ContentMessageHandler:', error);
       return false;
     }
   }
@@ -150,7 +159,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
-    this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
+    // NOTE: REVERT_SELECT_ELEMENT_MODE handler removed - now handled by direct listener in content script index.js
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
     
@@ -458,10 +467,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return false;
   }
 
-  async handleRevertTranslation() {
-    this.logger.debug('Handling revertTranslation action');
-    return await revertHandler.executeRevert();
-  }
+  // NOTE: handleRevertTranslation method removed - revert functionality now handled by direct listener in content script index.js
 
   // IFrame support handlers
   async handleIFrameActivateSelectElement(data) {

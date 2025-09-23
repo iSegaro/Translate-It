@@ -46,12 +46,14 @@ class MessageHandler {
 
     // Normalize message format if needed
     const normalizedMessage = this._normalizeMessage(message);
-    
+
     const { action, messageId } = normalizedMessage;
     const handler = this.handlers.get(action);
 
     if (handler) {
       logger.debug(`Handler found for action: ${action}`);
+
+
       const result = handler(normalizedMessage, sender, sendResponse);
 
       if (result instanceof Promise) {
@@ -70,10 +72,16 @@ class MessageHandler {
           });
         // Return true to indicate that the response will be sent asynchronously
         return true;
+      } else if (result === true) {
+        // Handler indicates it will send response asynchronously
+        logger.debug(`Async response handler for ${action}`);
+        return true;
       } else {
         logger.debug(`Synchronous handler for ${action}. Sending response immediately.`);
         try {
-          sendResponse(result);
+          if (sendResponse && result !== undefined) {
+            sendResponse(result);
+          }
         } catch (error) {
           logger.warn(`Failed to send synchronous response for ${action}:`, error);
         }
@@ -82,6 +90,7 @@ class MessageHandler {
     } else {
       logger.debug(`No handler registered for action: ${action}. Available handlers:`, Array.from(this.handlers.keys()));
       // No handler, so we don't need to keep the message channel open
+      // Return false to allow other listeners to handle the message
       return false;
     }
   }
