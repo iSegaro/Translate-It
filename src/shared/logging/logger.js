@@ -53,7 +53,7 @@ const componentLogLevels = {
   Windows: LOG_LEVELS.INFO,      // Windows feature
 
   // سیستم‌های مشترک (Shared systems)
-  Messaging: LOG_LEVELS.INFO,
+  Messaging: LOG_LEVELS.DEBUG,
   Storage: LOG_LEVELS.WARN,
   Error: LOG_LEVELS.INFO,
   Config: LOG_LEVELS.INFO,       // Config system
