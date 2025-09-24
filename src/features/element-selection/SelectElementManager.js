@@ -230,7 +230,8 @@ class SelectElementManager extends ResourceTracker {
       fromBackground = false,
       fromNotification = false,
       fromCancel = false,
-      preserveTranslations = false
+      preserveTranslations = false,
+      skipTranslationCancel = false
     } = options;
 
     this.logger.debug("Deactivating SelectElementManager", {
@@ -238,6 +239,7 @@ class SelectElementManager extends ResourceTracker {
       fromNotification,
       fromCancel,
       preserveTranslations,
+      skipTranslationCancel,
       instanceId: this.instanceId
     });
 
@@ -245,8 +247,10 @@ class SelectElementManager extends ResourceTracker {
       // Set active state immediately
       this.isActive = false;
 
-      // Cancel any ongoing translations
-      await this.translationOrchestrator.cancelAllTranslations();
+      // Cancel any ongoing translations (unless we're preserving them)
+      if (!skipTranslationCancel && !preserveTranslations) {
+        await this.translationOrchestrator.cancelAllTranslations();
+      }
 
       // Remove event listeners
       this.removeEventListeners();
@@ -616,20 +620,75 @@ class SelectElementManager extends ResourceTracker {
       
       // Perform translation via orchestrator with context
       const result = await this.translationOrchestrator.processSelectedElement(targetElement, originalTextsMap, textNodes, 'select-element');
-      
+
       // Check if result is valid before accessing properties
       if (result && typeof result === 'object') {
-        this.logger.debug("Translation completed", { 
+        this.logger.debug("Translation completed", {
           hasResult: true,
-          success: result.success || false
+          success: result.success || false,
+          resultKeys: Object.keys(result),
+          hasTranslatedText: !!result.translatedText,
+          hasData: !!result.data,
+          fullResult: result
         });
+
+        // For non-streaming translations, we need to apply the result here
+        if (result.success && result.translatedText) {
+          try {
+            const translatedData = JSON.parse(result.translatedText);
+            const translationMap = new Map();
+
+            this.logger.debug("Processing non-streaming translation result:", {
+              translatedData: translatedData,
+              originalTextsMap: originalTextsMap,
+              textNodes: textNodes.map(node => node.textContent)
+            });
+
+            // Create translation map from result
+            if (Array.isArray(translatedData)) {
+              // originalTextsMap is an array of [originalText, nodes] arrays
+              originalTextsMap.forEach(([originalText, nodes]) => {
+                if (originalText && translatedData[0] && translatedData[0].text) {
+                  translationMap.set(originalText, translatedData[0].text);
+                  this.logger.debug("Added translation to map:", {
+                    original: originalText,
+                    translated: translatedData[0].text
+                  });
+                }
+              });
+            }
+
+            this.logger.debug("Translation map created:", {
+              size: translationMap.size,
+              entries: Array.from(translationMap.entries())
+            });
+
+            // Apply translations to DOM
+            if (translationMap.size > 0) {
+              this.logger.debug("Applying translations to DOM nodes...");
+              this.translationOrchestrator.applyTranslationsToNodes(textNodes, translationMap);
+              this.stateManager.addTranslatedElement(targetElement, translationMap);
+              this.logger.debug("Translation applied successfully from non-streaming result");
+            } else {
+              this.logger.warn("No translations to apply - translation map is empty");
+            }
+          } catch (error) {
+            this.logger.error("Error applying non-streaming translation result:", error);
+          }
+        } else {
+          this.logger.debug("Skipping non-streaming translation application:", {
+            hasResult: !!result,
+            success: result?.success,
+            hasTranslatedText: !!result?.translatedText
+          });
+        }
       } else {
-        this.logger.warn("Translation completed but result is invalid", { 
+        this.logger.warn("Translation completed but result is invalid", {
           result: result,
           type: typeof result
         });
       }
-      
+
       // Cleanup after translation - immediately
       this.performPostTranslationCleanup();
       
@@ -691,7 +750,7 @@ class SelectElementManager extends ResourceTracker {
       // This is main frame, deactivate directly but preserve translations
       if (this.isActive) {
         this.logger.debug("Deactivating main frame SelectElementManager after translation");
-        this.deactivate({ preserveTranslations: true }).catch(error => {
+        this.deactivate({ preserveTranslations: true, skipTranslationCancel: true }).catch(error => {
           this.logger.warn('Error during post-translation cleanup:', error);
         });
       }

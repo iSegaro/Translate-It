@@ -708,24 +708,26 @@ this.translationRequests.delete(messageId);
    * @param {Map} translations - Map of original text to translated text
    */
   applyTranslationsToNodes(textNodes, translations) {
-    // this.logger.debug("Applying translations directly to DOM nodes", {
-    //   textNodesCount: textNodes.length,
-    //   translationsSize: translations.size
-    // });
-    
+    this.logger.debug("Applying translations directly to DOM nodes", {
+      textNodesCount: textNodes.length,
+      translationsSize: translations.size,
+      translations: Array.from(translations.entries())
+    });
+
     // Create simple context for the extraction utility
     const context = {
       state: {
         originalTexts: this.stateManager.originalTexts || new Map()
       }
     };
-    
+
     // Use the existing applyTranslationsToNodes from extraction utilities
-    applyTranslationsToNodes(textNodes, translations, context);
-    
-    // this.logger.debug("Translations applied directly to DOM nodes", {
-    //   appliedCount: translations.size
-    // });
+    const result = applyTranslationsToNodes(textNodes, translations, context);
+
+    this.logger.debug("Translations applied directly to DOM nodes", {
+      appliedCount: translations.size,
+      result: result
+    });
   }
 
   /**
