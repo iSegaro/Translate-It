@@ -178,9 +178,9 @@ export class BuildReporter {
         const filePath = path.join(buildPath, file)
         if (fs.existsSync(filePath)) {
           const size = fs.statSync(filePath).size
-          const sizeKB = (size / 1024).toFixed(1)
+          const sizeStr = this.formatFileSize(size)
           const improvement = this.calculateImprovement(file, size)
-          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeKB.padStart(8)} KB  ${improvement}`)
+          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeStr.padStart(8)}  ${improvement}`)
         }
       })
 
@@ -189,18 +189,18 @@ export class BuildReporter {
       if (fs.existsSync(jsDir)) {
         const jsFiles = this.getMainJSFiles(jsDir)
         jsFiles.forEach(({ file, size }) => {
-          const sizeKB = (size / 1024).toFixed(1)
+          const sizeStr = this.formatFileSize(size)
           const improvement = this.calculateImprovement(file, size)
-          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeKB.padStart(8)} KB  ${improvement}`)
+          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeStr.padStart(8)}  ${improvement}`)
         })
       }
 
       // Calculate total
       const totalStats = this.calculateTotalSize(buildPath)
-      const totalSizeKB = (totalStats.totalSize / 1024).toFixed(1)
+      const totalSizeStr = this.formatFileSize(totalStats.totalSize)
       const totalImprovement = this.calculateImprovement('total', totalStats.totalSize)
-      
-      console.log(`└─ 📊 Total Size:         → ${totalSizeKB.padStart(8)} KB  ${totalImprovement}\n`)
+
+      console.log(`└─ 📊 Total Size:         → ${totalSizeStr.padStart(8)}  ${totalImprovement}\n`)
       
       return totalStats
     } catch (error) {
@@ -292,6 +292,17 @@ export class BuildReporter {
   }
 
   /**
+   * Format file size to show KB or MB
+   */
+  formatFileSize(bytes) {
+    const kb = bytes / 1024
+    if (kb >= 1024) {
+      return `${(kb / 1024).toFixed(1)} MB`
+    }
+    return `${kb.toFixed(1)} KB`
+  }
+
+  /**
    * Get file icon based on type
    */
   getFileIcon(file) {
@@ -323,7 +334,8 @@ export class BuildReporter {
     console.log(`║${this.centerText(timeLine)}║`)
 
     if (buildStats) {
-      const sizeInfo = `${(buildStats.totalSize / 1024).toFixed(0)}KB total, ${buildStats.fileCount} files`
+      const sizeStr = this.formatFileSize(buildStats.totalSize)
+      const sizeInfo = `${sizeStr} total, ${buildStats.fileCount} files`
       console.log(`║${this.centerText(`📊 ${sizeInfo}`)}║`)
     }
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
