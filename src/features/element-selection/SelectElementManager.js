@@ -638,23 +638,25 @@ class SelectElementManager extends ResourceTracker {
         });
 
         // For non-streaming translations or cached translations, we need to apply the result here
-        // Note: If it's a cached streaming result without translatedText, we should skip
         this.logger.debug("Checking translation result for application:", {
           success: result.success,
           hasTranslatedText: !!result.translatedText,
           streaming: result.streaming,
           fromCache: result.fromCache,
-          willApply: result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))
+          hasOriginalTextsMap: !!result.originalTextsMap
         });
 
-        // Special case: cached streaming result without translated text - this indicates a timeout issue
-        if (result.success && result.streaming && result.fromCache && !result.translatedText) {
-          this.logger.debug("Cached streaming result received without translated text - this indicates a timeout occurred", {
-            result,
-            messageId: result.messageId
-          });
-          // Skip application as we don't have the translated data
-        } else if (result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))) {
+        // Apply translation if:
+        // 1. Success and has translatedText (regular non-streaming)
+        // 2. Success and streaming is false (direct translation)
+        // 3. Success and from cache with translatedText (cached result)
+        const shouldApply = result.success && (
+          (result.translatedText && !result.streaming) ||                    // Non-streaming with text
+          (result.translatedText && result.fromCache) ||                     // Cached with text
+          (result.originalTextsMap && result.translatedText)                 // Has text map data
+        );
+
+        if (shouldApply) {
           try {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();
@@ -714,10 +716,16 @@ class SelectElementManager extends ResourceTracker {
             this.logger.error("Error applying non-streaming translation result:", error);
           }
         } else {
-          this.logger.debug("Skipping non-streaming translation application:", {
+          this.logger.debug("Skipping translation application:", {
             hasResult: !!result,
             success: result?.success,
-            hasTranslatedText: !!result?.translatedText
+            hasTranslatedText: !!result?.translatedText,
+            streaming: result?.streaming,
+            fromCache: result?.fromCache,
+            shouldApply: false,
+            reason: !result.success ? 'not_successful' :
+                   !result.translatedText ? 'no_translated_text' :
+                   result.streaming && !result.fromCache ? 'streaming_without_cache' : 'unknown'
           });
         }
       } else {

@@ -272,55 +272,35 @@ this.translationRequests.delete(messageId);
       }
       throw error;
     }
-    
-    // Send translation request based on streaming requirement
-    if (this.isStreamingTranslation(jsonPayload)) {
-      // Use streaming for long content
-      await this.sendTranslationRequest(messageId, jsonPayload, context);
-      return { success: true, streaming: true };
-    } else {
-      // Use direct request for short content - register handler first
-      this.translationRequests.set(messageId, {
-        status: 'pending',
-        element,
-        textNodes,
-        originalTexts: originalTextsMap,
-        translatedSegments: new Map(),
-        cachedTranslations: cachedTranslations || new Map(),
-        textsToTranslate,
-        originMapping,
-        expandedTexts
-      });
-
-      // Send the request
-      const result = await this.sendDirectTranslationRequest(messageId, jsonPayload, context);
-
-      // If the result indicates streaming, let streaming handlers handle it
-      if (result.streaming) {
-        return result;
-      }
-
-      // Otherwise, handle the result directly
-      if (result.success && result.translatedText) {
-        await this.handleTranslationResult({ messageId, data: result });
-        // Return the result with originalTextsMap for non-streaming handling
-        return {
-          success: true,
-          translatedText: result.translatedText,
-          originalTextsMap: originalTextsMap
-        };
-      }
-
-      return result;
-    }
   }
 
   /**
    * Determine if a translation should use streaming based on payload size
    */
-  isStreamingTranslation(_jsonPayload) {
-    // Always use streaming for Select Element mode to avoid requestTracker issues
-    return true;
+  isStreamingTranslation(jsonPayload) {
+    // Use streaming for large payloads (>1000 characters) or multiple segments
+    const payloadSize = jsonPayload.length;
+    const STREAMING_THRESHOLD = 1000;
+
+    // Check segment count as well
+    let segmentCount = 1;
+    try {
+      const parsedPayload = JSON.parse(jsonPayload);
+      segmentCount = Array.isArray(parsedPayload) ? parsedPayload.length : 1;
+    } catch {
+      this.logger.warn("Failed to parse JSON payload for streaming decision");
+    }
+
+    const shouldUseStreaming = payloadSize > STREAMING_THRESHOLD || segmentCount > 3;
+
+    this.logger.debug("Streaming decision:", {
+      payloadSize,
+      segmentCount,
+      threshold: STREAMING_THRESHOLD,
+      shouldUseStreaming
+    });
+
+    return shouldUseStreaming;
   }
 
   /**
