@@ -578,7 +578,8 @@ class SelectElementManager extends ResourceTracker {
       }
 
       // Update notification to show translation in progress (only in main frame)
-      if (window === window.top) {
+      // Skip if translation was already completed from cache
+      if (window === window.top && !this.translationOrchestrator?.cacheCompleted) {
         this.updateNotificationForTranslation();
       }
       
@@ -728,6 +729,11 @@ class SelectElementManager extends ResourceTracker {
 
       // Cleanup after translation - immediately
       this.performPostTranslationCleanup();
+
+      // Reset cache completed flag for next translation
+      if (this.translationOrchestrator) {
+        this.translationOrchestrator.cacheCompleted = false;
+      }
       
     } catch (error) {
       // Use ExtensionContextManager to detect context errors
@@ -750,6 +756,11 @@ class SelectElementManager extends ResourceTracker {
         this.logger.error("Error during translation:", error);
       }
       this.performPostTranslationCleanup();
+
+      // Reset cache completed flag for next translation
+      if (this.translationOrchestrator) {
+        this.translationOrchestrator.cacheCompleted = false;
+      }
     }
   }
   

@@ -29,6 +29,7 @@ export class TranslationOrchestrator extends ResourceTracker {
     this.userCancelledRequests = new Set(); // Track user-cancelled requests
     this.escapeKeyListener = null;
     this.statusNotification = null;
+    this.cacheCompleted = false;
     this.errorHandler = ErrorHandler.getInstance();
 
     // Initialize streaming response handler with coordinator integration
@@ -143,6 +144,8 @@ export class TranslationOrchestrator extends ResourceTracker {
 
       if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
         this.logger.info("Applying translations from cache only.");
+        // Mark that cache was completed to prevent notification update
+        this.cacheCompleted = true;
         // Store translations in state manager
         this.stateManager.addTranslatedElement(element, cachedTranslations);
         // Apply translations directly to DOM nodes (like OLD system)
@@ -152,6 +155,10 @@ export class TranslationOrchestrator extends ResourceTracker {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
         }
+        // Also dismiss SelectElement notification since translation is complete from cache
+        pageEventBus.emit('dismiss-select-element-notification', {
+          reason: 'cache-complete'
+        });
         return { success: true, cached: true };
       }
 
