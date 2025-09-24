@@ -31,30 +31,34 @@ class LifecycleManager extends ResourceTracker {
     this.featureLoader = featureLoader;
     this.messageHandler = createMessageHandler();
     this.dynamicIconManager = actionbarIconManager;
-    if (!this.messageHandler.isListenerActive) {
-      this.messageHandler.listen();
-    }
+    // Note: messageHandler.listen() will be called after handlers are registered
   }
 
   async initialize() {
     if (this.initialized) {
       return;
     }
-    
+
+    // Register message handlers FIRST to prevent race conditions
+    this.registerMessageHandlers();
+
+    // Activate message listener AFTER handlers are registered
+    if (!this.messageHandler.isListenerActive) {
+      this.messageHandler.listen();
+    }
+
     await this.initializebrowserAPI();
 
     await this.initializeTranslationEngine();
 
     await this.initializeDynamicIconManager();
 
-    this.registerMessageHandlers();
-
     await this.initializeErrorHandlers();
 
     await this.preloadFeatures();
 
     await this.refreshContextMenus();
-    
+
     this.initialized = true;
     logger.debug("✅ [LifecycleManager] Background service initialized successfully");
   }
