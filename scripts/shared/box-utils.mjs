@@ -25,6 +25,8 @@ function getVisibleLength(str) {
     visibleLength -= 0;  // 🦊 needs 0 less spaces
   } else if (str.includes('✅')) {
     visibleLength += 1;  // ✅ needs 1 more space
+  } else if (str.includes('❌')) {
+    visibleLength += 1;  // ❌ needs 1 more space
   }
 
   return visibleLength

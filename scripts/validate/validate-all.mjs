@@ -59,8 +59,10 @@ async function validateAll() {
     } else {
       console.log(`║${centerText('❌ VALIDATION FAILED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
+      console.log('')
       console.log(`║${centerText(`Failed validations: ${totalErrors}`)}║`)
       console.log(`║${centerText('Please fix the issues above and re-run validation.')}║`)
+      console.log('')
     }
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
