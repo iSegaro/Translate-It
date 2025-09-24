@@ -646,7 +646,14 @@ class SelectElementManager extends ResourceTracker {
           willApply: result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))
         });
 
-        if (result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))) {
+        // Special case: cached streaming result without translated text - this indicates a timeout issue
+        if (result.success && result.streaming && result.fromCache && !result.translatedText) {
+          this.logger.debug("Cached streaming result received without translated text - this indicates a timeout occurred", {
+            result,
+            messageId: result.messageId
+          });
+          // Skip application as we don't have the translated data
+        } else if (result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))) {
           try {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();
