@@ -327,6 +327,20 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         const parentElement = textNode.parentNode;
         const uniqueId = generateUniqueId();
 
+        // Preserve original whitespace by reconstructing it
+        // If original had leading/trailing spaces, preserve them in the translation
+        let finalTranslatedText = translatedText;
+
+        // Check if original text had leading spaces
+        if (originalText !== trimmedOriginalText && originalText.startsWith(' ')) {
+          finalTranslatedText = ' ' + finalTranslatedText;
+        }
+
+        // Check if original text had trailing spaces
+        if (originalText !== trimmedOriginalText && originalText.endsWith(' ')) {
+          finalTranslatedText = finalTranslatedText + ' ';
+        }
+
         // Create outer wrapper (similar to working extension)
         const wrapperSpan = document.createElement("span");
         wrapperSpan.className = "aiwc-translation-wrapper";
@@ -335,7 +349,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         // Create inner span for translated content
         const translationSpan = document.createElement("span");
         translationSpan.className = "aiwc-translation-inner";
-        translationSpan.textContent = translatedText;
+        translationSpan.textContent = finalTranslatedText;
 
         // Apply text direction to the wrapper with target language if available
         const detectOptions = context.targetLanguage ? {

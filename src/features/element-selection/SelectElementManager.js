@@ -597,16 +597,21 @@ class SelectElementManager extends ResourceTracker {
       
       let textNode;
       while ((textNode = walker.nextNode())) {
-        const nodeText = textNode.textContent.trim();
-        if (nodeText) {
+        const nodeText = textNode.textContent;
+        // Only skip completely empty nodes (whitespace-only nodes are important for spacing)
+        if (nodeText.length > 0) {
           textNodes.push(textNode);
           nodeToTextMap.set(textNode, nodeText);
-          
-          // Add to originalTextsMap in the format expected by translation system
-          if (originalTextsMap.has(nodeText)) {
-            originalTextsMap.get(nodeText).push(textNode);
-          } else {
-            originalTextsMap.set(nodeText, [textNode]);
+
+          // Use trimmed text for translation lookup, but preserve original for replacement
+          const trimmedText = nodeText.trim();
+          if (trimmedText) { // Only translate if there's actual content
+            // Add to originalTextsMap in the format expected by translation system
+            if (originalTextsMap.has(trimmedText)) {
+              originalTextsMap.get(trimmedText).push(textNode);
+            } else {
+              originalTextsMap.set(trimmedText, [textNode]);
+            }
           }
         }
       }
