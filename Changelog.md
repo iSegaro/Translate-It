@@ -1,4 +1,4 @@
-#### v1.3.0 – Released on X, 2025
+#### v1.3.0 – Released September on 24, 2025
 
 ##### Added
 
@@ -349,7 +349,7 @@
 
 ---
 
-#### v0.1.0 - Released 30 Apr 2025
+#### v0.1.0 - Released 30 April 2025
 
 
 - First public release
