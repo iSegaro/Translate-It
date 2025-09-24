@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
-import { createBox, createErrorBox, centerText } from '../shared/box-utils.mjs'
+import { createBox, createErrorBox, centerText, emptyBoxLine } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -196,12 +196,12 @@ async function validateFirefoxExtension() {
     const warningLine = `Warnings:  ${results.warnings.toString().padStart(3, ' ')}`
     const noticeLine = `Notices:   ${results.notices.toString().padStart(3, ' ')}`
 
-    console.log(`║${' '.repeat(64)}║`)
+    console.log(emptyBoxLine())
     console.log(`║${centerText(statusLine)}║`)
     console.log(`║${centerText(errorLine)}║`)
     console.log(`║${centerText(warningLine)}║`)
     console.log(`║${centerText(noticeLine)}║`)
-    console.log(`║${' '.repeat(64)}║`)
+    console.log(emptyBoxLine())
     console.log('╠════════════════════════════════════════════════════════════════╣')
     console.log(`║${centerText('🦊 Firefox Extension Ready for Add-ons Store Submission!')}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')

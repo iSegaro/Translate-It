@@ -33,6 +33,13 @@ function getVisibleLength(str) {
 }
 
 /**
+ * Create empty box line with borders
+ */
+function emptyBoxLine() {
+  return `║${' '.repeat(BOX_WIDTH - 2)}║`
+}
+
+/**
  * Center text within box width
  */
 function centerText(str, width = BOX_WIDTH) {
@@ -84,4 +91,4 @@ function createErrorBox(headerText) {
   return lines.join('\n')
 }
 
-export { createBox, createSuccessBox, createErrorBox, centerText, BOX_WIDTH }
+export { createBox, createSuccessBox, createErrorBox, centerText, emptyBoxLine, BOX_WIDTH }

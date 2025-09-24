@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
-import { createBox, createErrorBox, centerText } from '../shared/box-utils.mjs'
+import { createBox, createErrorBox, centerText, emptyBoxLine } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -176,12 +176,12 @@ async function validateChromeExtension() {
     console.log('╔════════════════════════════════════════════════════════════════╗')
     console.log(`║${centerText('🕸 CHROME VALIDATION SUMMARY')}║`)
     console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log(`║${' '.repeat(64)}║`)
+    console.log(emptyBoxLine())
     console.log(`║${centerText(`Status: ${results.errors === 0 ? '✅ PASSED' : '❌ FAILED'}`)}║`)
     console.log(`║${centerText(`Errors:   ${results.errors.toString().padStart(3, ' ')}`)}║`)
     console.log(`║${centerText(`Warnings: ${results.warnings.toString().padStart(3, ' ')}`)}║`)
     console.log(`║${centerText(`Notices:  ${results.notices.toString().padStart(3, ' ')}`)}║`)
-    console.log(`║${' '.repeat(64)}║`)
+    console.log(emptyBoxLine())
     console.log('╠════════════════════════════════════════════════════════════════╣')
     console.log(`║${centerText('🕸 Chrome Extension Ready for Web Store Submission!')}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
