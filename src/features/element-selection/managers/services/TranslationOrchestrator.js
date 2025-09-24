@@ -249,11 +249,13 @@ export class TranslationOrchestrator extends ResourceTracker {
         // Otherwise, handle the result directly
         if (result.success && result.translatedText) {
           await this.handleTranslationResult({ messageId, data: result });
-          // Return the result with originalTextsMap for non-streaming handling
+          // Return the result with originalTextsMap and expansion data for non-streaming handling
           return {
             success: true,
             translatedText: result.translatedText,
-            originalTextsMap: originalTextsMap
+            originalTextsMap: originalTextsMap,
+            expandedTexts: expandedTexts,
+            originMapping: originMapping
           };
         }
 

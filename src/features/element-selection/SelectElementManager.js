@@ -16,6 +16,9 @@ import { ModeManager } from "./managers/services/ModeManager.js";
 import { StateManager } from "./managers/services/StateManager.js";
 import { ErrorHandlingService } from "./managers/services/ErrorHandlingService.js";
 
+// Text processing utilities
+import { reassembleTranslations } from "./utils/textProcessing.js";
+
 // Constants
 import { KEY_CODES } from "./managers/constants/selectElementConstants.js";
 
@@ -658,7 +661,8 @@ class SelectElementManager extends ResourceTracker {
         // 3. Success and from cache with translatedText (cached result)
         // Note: For streaming translations, the translation will be applied via streaming handlers
         // Note: If translation was already applied in TranslationOrchestrator, skip to avoid double application
-        const shouldApply = result.success && result.translatedText && (
+        // Note: Skip cache-only results since they're already applied
+        const shouldApply = result.success && result.translatedText && !result.cacheOnly && (
           !result.streaming ||                                               // Non-streaming
           result.fromCache ||                                                // Cached result
           result.originalTextsMap                                           // Has text map data
@@ -667,7 +671,7 @@ class SelectElementManager extends ResourceTracker {
         if (shouldApply) {
           try {
             const translatedData = JSON.parse(result.translatedText);
-            const translationMap = new Map();
+            let translationMap = new Map();
 
             // Use originalTextsMap from result if available (for non-streaming)
             const workingOriginalTextsMap = result.originalTextsMap || originalTextsMap;
@@ -680,9 +684,38 @@ class SelectElementManager extends ResourceTracker {
             });
 
             // Create translation map from result
-            if (Array.isArray(translatedData)) {
-              // workingOriginalTextsMap is an array of [originalText, nodes] arrays
+            this.logger.debug("Creating translation map from translatedData:", {
+              translatedDataType: typeof translatedData,
+              translatedDataLength: Array.isArray(translatedData) ? translatedData.length : 'not array',
+              translatedData: translatedData,
+              workingOriginalTextsMapSize: workingOriginalTextsMap.size,
+              fromCache: result.fromCache
+            });
+
+            if (Array.isArray(translatedData) && result.expandedTexts && result.originMapping) {
+              // For expanded translations, use reassembleTranslations function
+              this.logger.debug("Using reassembleTranslations for expanded texts");
+
+              // Convert workingOriginalTextsMap to textsToTranslate array
+              const textsToTranslate = Array.from(workingOriginalTextsMap.keys());
+
+              translationMap = reassembleTranslations(
+                translatedData,
+                result.expandedTexts,
+                result.originMapping,
+                textsToTranslate,
+                new Map() // No additional cached translations at this point
+              );
+            } else if (Array.isArray(translatedData)) {
+              // For direct translation results (non-expanded), create map directly
               workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+                this.logger.debug("Processing translation entry:", {
+                  index,
+                  originalText,
+                  hasTranslatedData: !!translatedData[index],
+                  translatedText: translatedData[index]?.text
+                });
+
                 if (originalText && translatedData[index] && translatedData[index].text) {
                   translationMap.set(originalText, translatedData[index].text);
                   this.logger.debug("Added translation to map:", {
@@ -690,11 +723,23 @@ class SelectElementManager extends ResourceTracker {
                     translated: translatedData[index].text,
                     index: index
                   });
+                } else {
+                  this.logger.warn("Skipping translation entry:", {
+                    index,
+                    reason: !originalText ? 'no original text' : !translatedData[index] ? 'no translated data' : 'no translated text'
+                  });
                 }
               });
             } else if (result.fromCache) {
               // For cached translations, the structure is an array of {text: "..."} objects
               workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+                this.logger.debug("Processing cached translation entry:", {
+                  index,
+                  originalText,
+                  hasTranslatedData: !!translatedData[index],
+                  translatedText: translatedData[index]?.text
+                });
+
                 if (originalText && translatedData[index] && translatedData[index].text) {
                   translationMap.set(originalText, translatedData[index].text);
                   this.logger.debug("Added cached translation to map:", {
@@ -702,7 +747,17 @@ class SelectElementManager extends ResourceTracker {
                     translated: translatedData[index].text,
                     index: index
                   });
+                } else {
+                  this.logger.warn("Skipping cached translation entry:", {
+                    index,
+                    reason: !originalText ? 'no original text' : !translatedData[index] ? 'no translated data' : 'no translated text'
+                  });
                 }
+              });
+            } else {
+              this.logger.warn("Unexpected translatedData format:", {
+                translatedDataType: typeof translatedData,
+                translatedData: translatedData
               });
             }
 
@@ -718,7 +773,16 @@ class SelectElementManager extends ResourceTracker {
               this.stateManager.addTranslatedElement(targetElement, translationMap);
               this.logger.debug("Translation applied successfully from non-streaming result");
             } else {
-              this.logger.warn("No translations to apply - translation map is empty");
+              this.logger.warn("No translations to apply - translation map is empty", {
+                resultKeys: Object.keys(result),
+                success: result.success,
+                hasTranslatedText: !!result.translatedText,
+                streaming: result.streaming,
+                fromCache: result.fromCache,
+                cacheOnly: result.cacheOnly,
+                translatedDataLength: Array.isArray(translatedData) ? translatedData.length : 0,
+                workingOriginalTextsMapSize: workingOriginalTextsMap.size
+              });
             }
           } catch (error) {
             this.logger.error("Error applying non-streaming translation result:", error);
