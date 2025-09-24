@@ -86,6 +86,16 @@ class SelectElementNotificationManager extends ResourceTracker {
       this.dismissNotification(data);
     });
 
+    // Listen for cancel event from notification
+    pageEventBus.on('cancel-select-element-mode', (data) => {
+      this.logger.debug('cancel-select-element-mode event received', { data });
+      // Force dismiss notification on cancel regardless of manager ID
+      this.dismissNotification({
+        managerId: data?.managerId,
+        isCancelAction: true
+      });
+    });
+
     this.logger.debug('Event listeners setup for notification manager');
   }
   
@@ -225,9 +235,12 @@ class SelectElementNotificationManager extends ResourceTracker {
     const { managerId } = data;
 
     this.logger.debug('Current notification managerId:', this.currentNotification.managerId, 'Requested managerId:', managerId);
-    
-    // Verify this is the correct manager dismissing the notification
-    if (managerId && this.currentNotification.managerId !== managerId) {
+
+    // For cancel actions, always dismiss regardless of managerId to prevent stuck notifications
+    const isCancelAction = data?.isCancelAction;
+
+    // Verify this is the correct manager dismissing the notification (unless it's a cancel action)
+    if (!isCancelAction && managerId && this.currentNotification.managerId !== managerId) {
       this.logger.debug('Notification dismissal requested by different manager, ignoring', {
         requestedManagerId: managerId,
         notificationManagerId: this.currentNotification.managerId
@@ -249,18 +262,19 @@ class SelectElementNotificationManager extends ResourceTracker {
 
       // Dismiss through notification manager
       this.notificationManager.dismiss(notificationId);
-      
+
       // Clear current notification reference
       this.currentNotification = null;
-      
-      this.logger.debug('Select Element notification dismissed', { 
+
+      this.logger.debug('Select Element notification dismissed', {
         notificationId,
-        managerId 
+        managerId,
+        isCancelAction
       });
-      
+
     } catch (error) {
       this.logger.warn('Error during notification dismissal:', error);
-      
+
       // Fallback: clear references even if dismiss fails
       this.currentNotification = null;
     }

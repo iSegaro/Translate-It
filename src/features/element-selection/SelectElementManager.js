@@ -255,9 +255,8 @@ class SelectElementManager extends ResourceTracker {
       this.elementHighlighter.clearHighlight();
       await this.elementHighlighter.deactivateUI();
 
-      // Only dismiss notification if deactivation is intentional (from cancel/background)
-      // Don't dismiss during automatic dismissal or notification hide
-      if (window === window.top && (fromCancel || fromBackground)) {
+      // Always dismiss notification when deactivating (not just from cancel/background)
+      if (window === window.top) {
         this.dismissNotification();
       }
 
@@ -631,10 +630,8 @@ class SelectElementManager extends ResourceTracker {
         });
       }
       
-      // Cleanup after translation
-      setTimeout(() => {
-        this.performPostTranslationCleanup();
-      }, 1000);
+      // Cleanup after translation - immediately
+      this.performPostTranslationCleanup();
       
     } catch (error) {
       // Use ExtensionContextManager to detect context errors
@@ -663,7 +660,7 @@ class SelectElementManager extends ResourceTracker {
   performPostTranslationCleanup() {
     this.logger.debug("Performing post-translation cleanup");
 
-    // Dismiss notification (only in main frame)
+    // Always dismiss notification first (only in main frame)
     if (window === window.top) {
       this.dismissNotification();
     }
@@ -685,7 +682,7 @@ class SelectElementManager extends ResourceTracker {
         this.logger.warn('Failed to notify main frame:', error);
         // Fallback: deactivate this iframe instance
         if (this.isActive) {
-          this.deactivate().catch(error => {
+          this.deactivate({ preserveTranslations: true }).catch(error => {
             this.logger.warn('Error during iframe deactivation:', error);
           });
         }
@@ -731,7 +728,8 @@ class SelectElementManager extends ResourceTracker {
   dismissNotification() {
     this.logger.debug("dismissNotification called with instanceId:", this.instanceId);
     pageEventBus.emit('dismiss-select-element-notification', {
-      managerId: this.instanceId
+      managerId: this.instanceId,
+      isCancelAction: true
     });
 
     this.logger.debug("Select Element notification dismissal requested");
