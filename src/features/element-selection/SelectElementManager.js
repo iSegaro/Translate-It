@@ -577,11 +577,7 @@ class SelectElementManager extends ResourceTracker {
         return;
       }
 
-      // Update notification to show translation in progress (only in main frame)
-      // Skip if translation was already completed from cache
-      if (window === window.top && !this.translationOrchestrator?.cacheCompleted) {
-        this.updateNotificationForTranslation();
-      }
+      // We'll update notification after translation call to avoid race conditions with cache
       
       // Create text nodes map and original texts map for translation
       const textNodes = [];
@@ -626,6 +622,15 @@ class SelectElementManager extends ResourceTracker {
       // Perform translation via orchestrator with context
       const result = await this.translationOrchestrator.processSelectedElement(targetElement, originalTextsMap, textNodes, 'select-element');
 
+      // Update notification to show translation in progress ONLY if:
+      // 1. Not a cached result (cached results don't need progress notification)
+      // 2. Not "noTexts" result (nothing to translate)
+      // 3. Is a streaming translation (non-streaming completes immediately)
+      // 4. We're in main frame
+      if (window === window.top && result && !result.cached && !result.noTexts && result.streaming) {
+        this.updateNotificationForTranslation();
+      }
+
       // Check if result is valid before accessing properties
       if (result && typeof result === 'object') {
         this.logger.debug("Translation completed", {
@@ -651,6 +656,7 @@ class SelectElementManager extends ResourceTracker {
         // 2. Success and streaming is false (direct translation)
         // 3. Success and from cache with translatedText (cached result)
         // Note: For streaming translations, the translation will be applied via streaming handlers
+        // Note: If translation was already applied in TranslationOrchestrator, skip to avoid double application
         const shouldApply = result.success && result.translatedText && (
           !result.streaming ||                                               // Non-streaming
           result.fromCache ||                                                // Cached result
