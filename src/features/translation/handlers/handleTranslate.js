@@ -2,11 +2,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { TranslationMode } from '@/shared/config/config.js';
-import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { handleTranslationResult } from '@/core/background/handlers/translation/handleTranslationResult.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslate');

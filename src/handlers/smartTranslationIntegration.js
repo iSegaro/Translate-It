@@ -341,7 +341,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
-  const mode = TranslationMode.Field;
+  const mode = 'field';
   const platform = detectPlatform(target);
   const timestamp = Date.now();
 
@@ -437,7 +437,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         const result = await applyTranslationToTextField(
           messageResult.translatedText,
           messageResult.originalText,
-          messageResult.mode || translationMode,
+          messageResult.mode || TranslationMode.Field,
           newToastId,
           messageId
         );

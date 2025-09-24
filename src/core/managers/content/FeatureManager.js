@@ -55,7 +55,7 @@ export class FeatureManager extends ResourceTracker {
       import('@/handlers/content/ContentMessageHandler.js').then(({ ContentMessageHandler }) => {
         ContentMessageHandler.resetInstance();
       });
-    } catch (e) {
+    } catch {
       // Import might not be available
     }
 
@@ -64,7 +64,7 @@ export class FeatureManager extends ResourceTracker {
       import('@/features/windows/managers/WindowsManager.js').then(({ WindowsManager }) => {
         WindowsManager.resetInstance();
       });
-    } catch (e) {
+    } catch {
       // Import might not be available
     }
   }
@@ -147,7 +147,7 @@ export class FeatureManager extends ResourceTracker {
           shortcutHandler.setTranslationHandler(translationHandler);
           logger.debug('Injected TranslationHandler into ShortcutHandler');
         }
-      } catch (error) {
+      } catch {
         logger.debug('Could not inject TranslationHandler into ShortcutHandler - not needed for new implementation');
       }
     }

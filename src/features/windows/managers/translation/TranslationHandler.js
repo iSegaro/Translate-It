@@ -4,10 +4,8 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
-import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import ExtensionContextManager from "@/core/extensionContext.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
@@ -33,7 +31,7 @@ export class TranslationHandler {
         TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'google')
       };
 
-      const translationMode = determineTranslationMode(selectedText, TranslationMode.Selection);
+      const translationMode = TranslationMode.Selection;
 
       // Generate unique messageId
       const messageId = generateTranslationMessageId('content');

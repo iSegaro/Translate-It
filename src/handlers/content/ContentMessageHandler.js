@@ -15,7 +15,7 @@ import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
 let contentMessageHandlerInstance = null;
 
 export class ContentMessageHandler extends ResourceTracker {
-  constructor(options = {}) {
+  constructor() {
     super('content-message-handler')
 
     // Enforce singleton pattern
@@ -469,7 +469,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return false;
   }
 
-  async handleRevertTranslation(message) {
+  async handleRevertTranslation() {
     this.logger.debug('Handling revert translation request');
 
     try {

@@ -145,7 +145,7 @@ export class BaseProvider {
    * @returns {Promise<string[]>} - A promise that resolves to an array of translated strings.
    * @protected
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _batchTranslate(/*texts, sourceLang, targetLang, translateMode, engine, messageId, abortController*/) {
     throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`);
   }
 

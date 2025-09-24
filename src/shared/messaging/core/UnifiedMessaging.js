@@ -4,7 +4,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
-import { generateMessageId } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 

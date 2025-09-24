@@ -63,7 +63,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
    * @param {number} totalChunks - Total number of chunks in the batch
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length, chunkIndex = 0, totalChunks = 1) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk${retryAttempt > 0 ? `-retry-${retryAttempt}` : ''}`;
     const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
     const providerConfig = getProviderConfiguration(this.providerName);

@@ -3,7 +3,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 import { TranslationHandler as WindowsTranslationHandler } from '@/features/windows/managers/translation/TranslationHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManagerHandler');
 
@@ -39,9 +38,7 @@ export class WindowsManagerHandler extends ResourceTracker {
         return true;
       }
 
-      // Use the global FeatureManager singleton
-      const globalFeatureManager = FeatureManager.getInstance();
-
+  
       // Create WindowsManager instance with its own TranslationHandler
       const translationHandler = new WindowsTranslationHandler();
       this.windowsManager = WindowsManager.getInstance({ translationHandler });

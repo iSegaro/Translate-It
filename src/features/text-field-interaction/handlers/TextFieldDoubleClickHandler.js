@@ -3,7 +3,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ExtensionContextManager } from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldDoubleClickHandler');
 
@@ -383,7 +382,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   /**
    * Detect text using site-specific handlers (simplified version)
    */
-  async detectTextUsingSiteHandler(element) {
+  async detectTextUsingSiteHandler() {
     try {
       const hostname = window.location.hostname;
 

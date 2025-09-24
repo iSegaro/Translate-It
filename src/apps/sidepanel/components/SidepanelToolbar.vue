@@ -117,8 +117,8 @@ const emit = defineEmits(['historyToggle', 'clear-fields'])
 const { t } = useUnifiedI18n()
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
-const { revertTranslation, isProcessing } = useSidepanelActions()
-const { handleError, handleConnectionError } = useErrorHandler()
+const { revertTranslation } = useSidepanelActions()
+const { handleError } = useErrorHandler()
 
 // Icon URLs using runtime.getURL
 const selectIcon = browser.runtime.getURL('icons/ui/select.png')

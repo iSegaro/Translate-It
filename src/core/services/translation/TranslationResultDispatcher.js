@@ -64,7 +64,7 @@ export class TranslationResultDispatcher {
   /**
    * Main entry point for result dispatch
    */
-  async dispatchResult({ messageId, result, request, options = {} }) {
+  async dispatchResult({ messageId, result, request }) {
     logger.debug(`[ResultDispatcher] Dispatching result for: ${messageId}`);
 
     try {
@@ -218,7 +218,7 @@ export class TranslationResultDispatcher {
   /**
    * Handle direct delivery (return result)
    */
-  async handleDirectDelivery({ messageId, result }) {
+  async handleDirectDelivery({ messageId }) {
     logger.debug(`[ResultDispatcher] Direct delivery: ${messageId}`);
 
     // For direct delivery, we just mark as processed
@@ -329,7 +329,7 @@ export class TranslationResultDispatcher {
       try {
         await browser.tabs.sendMessage(tab.id, message);
         delivered = true;
-      } catch (error) {
+      } catch {
         // Tab might not have content script, ignore
       }
     }
@@ -353,7 +353,7 @@ export class TranslationResultDispatcher {
   /**
    * Retry failed delivery
    */
-  async retryDelivery({ messageId, result, request, error }) {
+  async retryDelivery({ messageId, result, request }) {
     const attempts = this.deliveryAttempts.get(messageId) || 0;
 
     if (attempts >= this.maxRetries) {

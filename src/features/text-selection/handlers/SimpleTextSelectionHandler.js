@@ -391,7 +391,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     try {
       return window.translateItNewSelectManager ||
              (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive);
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -480,7 +480,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.ctrlKeyPressed = hasCtrl || hasMeta;
         logger.debug('Ctrl key state from Keyboard API:', this.ctrlKeyPressed);
         return;
-      } catch (error) {
+      } catch {
         logger.debug('Keyboard API failed, using fallback');
       }
     }
@@ -528,7 +528,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         // So we'll use a heuristic: if Ctrl was recently pressed and we're in a mouse operation,
         // assume it's still pressed
         return this.ctrlKeyPressed && (now - this.lastKeyEventTime < 1000);
-      } catch (error) {
+      } catch {
         // Fall back to simple check
         return this.ctrlKeyPressed;
       }
@@ -569,7 +569,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   /**
    * Handle mouse down - start drag detection
    */
-  handleMouseDown(event) {
+  handleMouseDown() {
 
     this.lastMouseEventTime = Date.now();
     this.isDragging = true;
@@ -581,7 +581,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   /**
    * Handle mouse up - end drag detection and process selection if needed
    */
-  handleMouseUp(event) {
+  handleMouseUp() {
 
     this.lastMouseEventTime = Date.now();
     const dragDuration = Date.now() - this.mouseDownTime;

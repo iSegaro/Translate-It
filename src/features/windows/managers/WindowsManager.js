@@ -37,13 +37,14 @@ export class WindowsManager extends ResourceTracker {
   }
 
   constructor(options = {}) {
-    // Enforce singleton pattern
-    if (windowsManagerInstance) {
-      logger.debug('WindowsManager singleton already exists, returning existing instance');
-      return windowsManagerInstance;
-    }
     // Initialize ResourceTracker first
     super('windows-manager');
+
+    // Enforce singleton pattern
+    if (windowsManagerInstance) {
+      this.logger.debug('WindowsManager singleton already exists, returning existing instance');
+      return windowsManagerInstance;
+    }
     
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsManager');

@@ -224,7 +224,7 @@ class TranslationResultDispatcher {
   /**
    * Dispatch field mode translation result
    */
-  async dispatchFieldResult({ messageId, result, request, originalMessage }) {
+  async dispatchFieldResult({ messageId, result, request }) {
     logger.debug(`[ResultDispatcher] Dispatching field result: ${messageId}`);
 
     // Send back to original tab
@@ -252,7 +252,7 @@ class TranslationResultDispatcher {
   /**
    * Dispatch select-element translation result
    */
-  async dispatchSelectElementResult({ messageId, result, request, originalMessage }) {
+  async dispatchSelectElementResult({ messageId, result, request }) {
     logger.debug(`[ResultDispatcher] Dispatching select-element result: ${messageId}`);
 
     // For select-element, we might need broadcast
@@ -281,7 +281,7 @@ class TranslationResultDispatcher {
             isBroadcast: true // Mark as broadcast to prevent duplicate processing
           }
         });
-      } catch (error) {
+      } catch {
         // Tab might not have content script, ignore
       }
     }
@@ -328,7 +328,7 @@ class TranslationModeCoordinator {
    * Process request based on mode
    */
   async processRequest(request, { translationEngine }) {
-    const { messageId, data, mode } = request;
+    const { messageId, mode } = request;
 
     logger.debug(`[ModeCoordinator] Processing ${mode} request: ${messageId}`);
 

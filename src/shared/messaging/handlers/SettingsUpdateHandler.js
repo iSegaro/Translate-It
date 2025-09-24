@@ -19,7 +19,7 @@ export class SettingsUpdateHandler {
       return
     }
 
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message) => {
       if (message.type === 'SETTINGS_UPDATED') {
         logger.debug('Received settings update notification from options page')
 

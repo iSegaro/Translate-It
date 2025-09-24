@@ -12,7 +12,7 @@ import NotificationManager from "@/core/managers/core/NotificationManager.js";
 
 
 import { debounce } from "../core/debounce.js";
-import { state, TranslationMode, CONFIG } from "@/shared/config/config.js";
+import { state, TranslationMode } from "@/shared/config/config.js";
 import { logMethod } from "../core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";

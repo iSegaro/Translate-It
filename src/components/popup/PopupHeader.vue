@@ -94,7 +94,7 @@ const {
   isSelectModeActive,
   toggleSelectElement
 } = useSelectElementTranslation()
-const { handleError, handleConnectionError } = useErrorHandler()
+const { handleError } = useErrorHandler()
 const { sendMessage } = useMessaging('popup')
 const { t } = useUnifiedI18n()
 

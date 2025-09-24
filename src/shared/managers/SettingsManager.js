@@ -444,7 +444,7 @@ class SettingsManager {
       if (areaName !== 'local') return
 
       for (const [key, change] of Object.entries(changes)) {
-        if (this._defaults.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(this._defaults, key)) {
           // Update internal settings
           this._settings.value[key] = change.newValue
 
@@ -472,7 +472,7 @@ class SettingsManager {
       const currentSettings = await storageManager.get(Object.keys(this._defaults))
 
       for (const key in currentSettings) {
-        if (this._defaults.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(this._defaults, key)) {
           const newValue = currentSettings[key]
           const oldValue = this._settings.value[key]
 
@@ -510,7 +510,7 @@ class SettingsManager {
     // Notify listeners
     const listeners = this._eventListeners.get(key)
     if (listeners) {
-      for (const [id, listener] of listeners) {
+      for (const listener of listeners) {
         try {
           listener.callback(newValue, oldValue, key)
         } catch (error) {

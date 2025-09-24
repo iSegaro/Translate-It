@@ -514,7 +514,6 @@ export async function revertTranslations(context) {
   const oldStyleContainers = document.querySelectorAll("span[data-aiwc-original-text]");
   oldStyleContainers.forEach((container) => {
     const originalText = container.getAttribute("data-aiwc-original-text");
-    const containerId = container.getAttribute("data-aiwc-original-id");
 
     if (originalText !== null) {
       try {

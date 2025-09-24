@@ -300,7 +300,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length, chunkIndex = 0, totalChunks = 1) {
+  _translateChunk(/*chunkTexts, sourceLang, targetLang, translateMode, abortController*/) {
     // This should be overridden by subclasses to call their existing chunk translation logic
     throw new Error(`_translateChunk not implemented by ${this.providerName}`);
   }

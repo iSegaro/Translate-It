@@ -93,17 +93,11 @@ const isHovering = ref(false);
 const isActive = ref(false);
 const isFocused = ref(false);
 
-const sizeMap = {
-  small: { width: 24, height: 24, iconSize: 14 },
-  medium: { width: 28, height: 28, iconSize: 16 },
-  large: { width: 32, height: 32, iconSize: 18 }
-};
 
 // Internal position state for smooth updates
 const internalPosition = ref({ ...props.position });
 const internalVisible = ref(props.visible);
 
-const currentSize = computed(() => sizeMap[props.size]);
 
 // Watch for position prop changes and animate to new position
 watch(() => props.position, (newPosition) => {

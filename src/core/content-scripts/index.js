@@ -1,7 +1,6 @@
 // Content script entry point for Vue build
 // Modern modular architecture with smart feature management
 
-import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";

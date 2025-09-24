@@ -5,7 +5,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ExtensionContextManager } from '@/core/extensionContext.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldHandler');

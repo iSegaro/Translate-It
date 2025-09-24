@@ -713,7 +713,7 @@ class SelectElementManager extends ResourceTracker {
               );
             } else if (Array.isArray(translatedData)) {
               // For direct translation results (non-expanded), create map directly
-              workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+              workingOriginalTextsMap.forEach(([originalText], index) => {
                 this.logger.debug("Processing translation entry:", {
                   index,
                   originalText,
@@ -737,7 +737,7 @@ class SelectElementManager extends ResourceTracker {
               });
             } else if (result.fromCache) {
               // For cached translations, the structure is an array of {text: "..."} objects
-              workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+              workingOriginalTextsMap.forEach(([originalText], index) => {
                 this.logger.debug("Processing cached translation entry:", {
                   index,
                   originalText,

@@ -208,8 +208,7 @@ export class ElementDetectionService {
    */
   findElements(container = document, selector, options = {}) {
     const {
-      includeShadowDOM = DETECTION_OPTIONS.INCLUDE_SHADOW_DOM,
-      timeout = DETECTION_OPTIONS.DETECTION_TIMEOUT
+      includeShadowDOM = DETECTION_OPTIONS.INCLUDE_SHADOW_DOM
     } = options;
 
     const elements = [];
