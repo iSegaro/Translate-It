@@ -217,12 +217,13 @@ export class UnifiedTranslationCoordinator {
   _shouldUseStreaming(message) {
     const { data, context } = message;
 
-    // Only Select Element mode should use streaming coordination
-    if (context !== 'select-element') {
-      return false;
+    // For Select Element mode, check text length
+    if (context === 'select-element') {
+      const textLength = data?.text?.length || 0;
+      return textLength > 500;
     }
 
-    // For Select Element with JSON payload (multiple segments)
+    // For other contexts with JSON payload (multiple segments)
     if (data?.options?.rawJsonPayload) {
       try {
         const jsonData = JSON.parse(data.text);
@@ -234,7 +235,7 @@ export class UnifiedTranslationCoordinator {
       }
     }
 
-    // For Select Element with long text
+    // For other contexts with long text
     const textLength = data?.text?.length || 0;
     return textLength > 2000;
   }
@@ -244,7 +245,7 @@ export class UnifiedTranslationCoordinator {
    * @private
    */
   _calculateStreamingTimeouts(data, customTimeout) {
-    const textLength = data?.text?.length || 0;
+    let textLength = data?.text?.length || 0;
     let segmentCount = 1;
 
     // Estimate segment count for JSON payload
@@ -253,6 +254,8 @@ export class UnifiedTranslationCoordinator {
         const jsonData = JSON.parse(data.text);
         if (Array.isArray(jsonData)) {
           segmentCount = jsonData.length;
+          // Calculate actual text length from JSON
+          textLength = jsonData.reduce((sum, item) => sum + (item.text || '').length, 0);
         }
       } catch {
         // Fallback to text length estimation

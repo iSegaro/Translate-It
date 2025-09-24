@@ -200,8 +200,10 @@ class SelectElementNotificationManager extends ResourceTracker {
           }
         );
 
-        // Dismiss the old notification
-        this.notificationManager.dismiss(this.currentNotification.id);
+        // Dismiss the old notification (if it has an ID)
+        if (this.currentNotification.id) {
+          this.notificationManager.dismiss(this.currentNotification.id);
+        }
 
         // Update notification reference
         this.currentNotification.id = updatedNotificationId;
@@ -260,8 +262,10 @@ class SelectElementNotificationManager extends ResourceTracker {
       // Mark as inactive first
       this.currentNotification.isActive = false;
 
-      // Dismiss through notification manager
-      this.notificationManager.dismiss(notificationId);
+      // Dismiss through notification manager (if we have a valid ID)
+      if (notificationId) {
+        this.notificationManager.dismiss(notificationId);
+      }
 
       // Clear current notification reference
       this.currentNotification = null;

@@ -15,19 +15,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { TranslationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
-/**
- * Translation Request Status
- */
-const RequestStatus = {
-  PENDING: 'pending',
-  PROCESSING: 'processing',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-  CANCELLED: 'cancelled'
-};
 
 /**
  * Unified Translation Service
@@ -189,123 +180,6 @@ export class UnifiedTranslationService {
   }
 }
 
-/**
- * Translation Request Tracker
- * Manages the lifecycle of translation requests
- */
-class TranslationRequestTracker {
-  constructor() {
-    this.requests = new Map(); // messageId -> request data
-    this.cleanupInterval = null;
-
-    // Start periodic cleanup
-    this.startCleanup();
-  }
-
-  /**
-   * Create a new request record
-   */
-  createRequest({ messageId, data, sender, timestamp }) {
-    const request = {
-      messageId,
-      data,
-      sender,
-      timestamp,
-      status: RequestStatus.PENDING,
-      mode: this.detectTranslationMode(data),
-      elementData: this.extractElementData(data),
-      result: null
-    };
-
-    this.requests.set(messageId, request);
-    logger.debug(`[RequestTracker] Created request: ${messageId}`);
-
-    return request;
-  }
-
-  /**
-   * Get request by ID
-   */
-  getRequest(messageId) {
-    return this.requests.get(messageId);
-  }
-
-  /**
-   * Update request data
-   */
-  updateRequest(messageId, updates) {
-    const request = this.requests.get(messageId);
-    if (request) {
-      Object.assign(request, updates);
-    }
-  }
-
-  /**
-   * Detect translation mode from request data
-   */
-  detectTranslationMode(data) {
-    if (data?.mode === TranslationMode.Field || data?.translationMode === TranslationMode.Field) {
-      return TranslationMode.Field;
-    }
-    if (data?.context === 'select-element') {
-      return 'select-element';
-    }
-    return data?.mode || 'unknown';
-  }
-
-  /**
-   * Extract element data for recovery
-   */
-  extractElementData(data) {
-    return {
-      targetId: data?.elementId,
-      targetSelector: data?.elementSelector,
-      toastId: data?.toastId,
-      selectionRange: data?.selectionRange
-    };
-  }
-
-  /**
-   * Clean up old completed requests
-   */
-  cleanup() {
-    const now = Date.now();
-    const maxAge = 5 * 60 * 1000; // 5 minutes
-
-    let cleaned = 0;
-    for (const [messageId, request] of this.requests.entries()) {
-      if (request.status === RequestStatus.COMPLETED ||
-          request.status === RequestStatus.FAILED ||
-          request.status === RequestStatus.CANCELLED) {
-        if (now - request.timestamp > maxAge) {
-          this.requests.delete(messageId);
-          cleaned++;
-        }
-      }
-    }
-
-    return cleaned;
-  }
-
-  /**
-   * Start periodic cleanup
-   */
-  startCleanup() {
-    this.cleanupInterval = setInterval(() => {
-      this.cleanup();
-    }, 60000); // Clean up every minute
-  }
-
-  /**
-   * Stop cleanup
-   */
-  stopCleanup() {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-  }
-}
 
 /**
  * Translation Result Dispatcher

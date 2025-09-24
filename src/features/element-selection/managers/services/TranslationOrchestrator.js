@@ -9,7 +9,7 @@ import { calculateDynamicTimeout } from "../../utils/timeoutCalculator.js";
 import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
-import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { sendMessage, sendRegularMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
 import { createStreamingResponseHandler } from '@/shared/messaging/core/StreamingResponseHandler.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
@@ -104,15 +104,16 @@ export class TranslationOrchestrator extends ResourceTracker {
 
   async processSelectedElement(element, originalTextsMap, textNodes, context = 'select-element') {
     this.logger.operation("Starting advanced translation process for selected element");
-    
+
     // Check extension context before proceeding
     if (!ExtensionContextManager.isValidSync()) {
       const contextError = new Error('Extension context invalidated');
       ExtensionContextManager.handleContextError(contextError, 'select-element-translation');
       throw contextError;
     }
-    
+
     const messageId = generateContentMessageId();
+    let jsonPayload = ''; // Declare at function scope
 
     // Set global flag to indicate translation is in progress
     window.isTranslationInProgress = true;
@@ -177,24 +178,55 @@ export class TranslationOrchestrator extends ResourceTracker {
       }
 
       const { expandedTexts, originMapping } = expandTextsForTranslation(textsToTranslate);
-      const jsonPayload = JSON.stringify(expandedTexts.map(t => ({ text: t })));
+      jsonPayload = JSON.stringify(expandedTexts.map(t => ({ text: t })));
 
-      this.translationRequests.set(messageId, {
-        element,
-        textNodes,
-        textsToTranslate,
-        originMapping,
-        expandedTexts,
-        cachedTranslations,
-        translatedSegments: new Map(),
-        status: 'pending',
-        timestamp: Date.now(),
-        hasErrors: false,
-        lastError: null
-      });
+      if (this.isStreamingTranslation(jsonPayload)) {
+        // For streaming, set up the request with full data
+        this.translationRequests.set(messageId, {
+          element,
+          textNodes,
+          textsToTranslate,
+          originMapping,
+          expandedTexts,
+          cachedTranslations,
+          translatedSegments: new Map(),
+          status: 'pending',
+          timestamp: Date.now(),
+          hasErrors: false,
+          lastError: null
+        });
 
+        await this.sendTranslationRequest(messageId, jsonPayload, context);
+      } else {
+        // For non-streaming, set up minimal request data
+        this.translationRequests.set(messageId, {
+          element,
+          textNodes,
+          originalTexts: originalTextsMap,
+          translatedSegments: new Map(),
+          cachedTranslations: cachedTranslations || new Map(),
+          textsToTranslate,
+          originMapping,
+          expandedTexts,
+          status: 'pending'
+        });
 
-      await this.sendTranslationRequest(messageId, jsonPayload, context);
+        // Send the request
+        const result = await this.sendDirectTranslationRequest(messageId, jsonPayload, context);
+
+        // If the result indicates streaming, let streaming handlers handle it
+        if (result.streaming) {
+          return result;
+        }
+
+        // Otherwise, handle the result directly
+        if (result.success && result.translatedText) {
+          await this.handleTranslationResult({ messageId, data: result });
+          return { success: true, translatedText: result.translatedText };
+        }
+
+        return result;
+      }
       // Removed setupTranslationWaiting to handle streaming results
     } catch (error) {
       // Clear the global translation in progress flag on error
@@ -229,9 +261,109 @@ this.translationRequests.delete(messageId);
       throw error;
     }
     
-    // Return a default success result for streaming translations
-    return { success: true, streaming: true };
+    // Send translation request based on streaming requirement
+    if (this.isStreamingTranslation(jsonPayload)) {
+      // Use streaming for long content
+      await this.sendTranslationRequest(messageId, jsonPayload, context);
+      return { success: true, streaming: true };
+    } else {
+      // Use direct request for short content - register handler first
+      this.translationRequests.set(messageId, {
+        status: 'pending',
+        element,
+        textNodes,
+        originalTexts: originalTextsMap,
+        translatedSegments: new Map(),
+        cachedTranslations: cachedTranslations || new Map(),
+        textsToTranslate,
+        originMapping,
+        expandedTexts
+      });
+
+      // Send the request
+      const result = await this.sendDirectTranslationRequest(messageId, jsonPayload, context);
+
+      // If the result indicates streaming, let streaming handlers handle it
+      if (result.streaming) {
+        return result;
+      }
+
+      // Otherwise, handle the result directly
+      if (result.success && result.translatedText) {
+        await this.handleTranslationResult({ messageId, data: result });
+        return { success: true, translatedText: result.translatedText };
+      }
+
+      return result;
+    }
   }
+
+  /**
+   * Determine if a translation should use streaming based on payload size
+   */
+  isStreamingTranslation(jsonPayload) {
+    // Only use streaming for content longer than 500 characters
+    try {
+      const parsedPayload = JSON.parse(jsonPayload);
+      const totalLength = Array.isArray(parsedPayload)
+        ? parsedPayload.reduce((sum, item) => sum + (item.text || '').length, 0)
+        : (parsedPayload.text || '').length;
+      return totalLength > 500;
+    } catch {
+      // If parsing fails, use string length
+      return jsonPayload.length > 500;
+    }
+  }
+
+  /**
+   * Send a direct (non-streaming) translation request
+   */
+  async sendDirectTranslationRequest(messageId, jsonPayload, context = 'select-element') {
+    try {
+      // Check if translation was cancelled
+      const request = this.translationRequests.get(messageId);
+      if (request && request.status === 'cancelled') {
+        this.logger.debug('[TranslationOrchestrator] Translation cancelled before sending request');
+        this.translationRequests.delete(messageId);
+        window.isTranslationInProgress = false;
+        return { success: false, error: 'Translation cancelled' };
+      }
+
+      const { getTranslationApiAsync, getTargetLanguageAsync } = await import("../../../../config.js");
+      const provider = await getTranslationApiAsync();
+      const targetLanguage = await getTargetLanguageAsync();
+
+      const translationRequest = {
+        action: MessageActions.TRANSLATE,
+        data: {
+          text: jsonPayload,
+          provider,
+          sourceLanguage: AUTO_DETECT_VALUE,
+          targetLanguage,
+          mode: TranslationMode.Select_Element,
+          options: { rawJsonPayload: true },
+        },
+        context: context,
+        messageId,
+      };
+
+      this.logger.debug("Sending direct translation request", {
+        messageId,
+        payloadSize: jsonPayload.length
+      });
+
+      // Send request and wait for result
+      const result = await sendRegularMessage(translationRequest);
+
+      this.logger.debug("Direct translation request completed", result);
+
+      return result;
+    } catch (error) {
+      this.logger.error("Failed to send direct translation request", error);
+      throw error;
+    }
+  }
+
 
   async sendTranslationRequest(messageId, jsonPayload, context = 'select-element') {
     try {
@@ -289,6 +421,9 @@ this.translationRequests.delete(messageId);
       const result = await sendMessage(translationRequest);
 
       this.logger.debug("Unified translation request completed", result);
+
+      // Return the result for non-streaming translations
+      return result;
     } catch (error) {
       // Use ExtensionContextManager to detect context errors
       const isContextError = ExtensionContextManager.isContextError(error);
