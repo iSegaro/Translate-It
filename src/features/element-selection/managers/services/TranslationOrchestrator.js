@@ -159,6 +159,8 @@ export class TranslationOrchestrator extends ResourceTracker {
         pageEventBus.emit('dismiss-select-element-notification', {
           reason: 'cache-complete'
         });
+        // Clear the global translation in progress flag since translation is complete
+        window.isTranslationInProgress = false;
         return { success: true, cached: true };
       }
 
@@ -181,6 +183,8 @@ export class TranslationOrchestrator extends ResourceTracker {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
         }
+        // Clear the global translation in progress flag since translation is complete
+        window.isTranslationInProgress = false;
         return { success: true, noTexts: true };
       }
 
