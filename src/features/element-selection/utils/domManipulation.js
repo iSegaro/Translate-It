@@ -554,7 +554,7 @@ export async function revertTranslations(context) {
       detail: {
         successful: successfulReverts,
         failed: failedReverts,
-        total: containers.length
+        total: wrappers.length
       }
     });
     document.dispatchEvent(cleanupEvent);
