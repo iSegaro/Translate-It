@@ -318,7 +318,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       try {
         // Additional safety check for parentNode
         if (!textNode.parentNode) {
-          logger.warn('Text node has no parent, skipping translation', {
+          logger.debug('Text node has no parent, skipping translation', {
             textContent: textNode.textContent.substring(0, 50)
           });
           return;
@@ -432,14 +432,14 @@ export async function revertTranslations(context) {
         const originalTextNode = document.querySelector(`[data-aiwc-translation-id="${originalId}"]`);
 
         if (!originalTextNode) {
-          logger.warn('Original text node not found for wrapper', { originalId });
+          logger.debug('Original text node not found for wrapper - likely removed by page DOM manipulation', { originalId });
           failedReverts++;
           return;
         }
 
         // Ensure parent element exists and is valid
         if (!parentElement) {
-          logger.warn('Wrapper has no parent element, skipping removal', { originalId });
+          logger.debug('Wrapper has no parent element, skipping removal', { originalId });
           failedReverts++;
           return;
         }
@@ -528,7 +528,7 @@ export async function revertTranslations(context) {
       logger.debug('Removed orphaned translation element');
     });
   } catch (cleanupError) {
-    logger.warn('Failed to cleanup orphaned elements:', cleanupError);
+    logger.debug('Failed to cleanup orphaned elements:', cleanupError);
   }
 
   // Clean up injected styles if no translations remain
@@ -543,7 +543,7 @@ export async function revertTranslations(context) {
       }
     }
   } catch (styleCleanupError) {
-    logger.warn('Failed to cleanup translation styles:', styleCleanupError);
+    logger.debug('Failed to cleanup translation styles:', styleCleanupError);
   }
 
   logger.info(`Cleanup completed: ${successfulReverts} successful, ${failedReverts} failed`);
@@ -559,7 +559,7 @@ export async function revertTranslations(context) {
     });
     document.dispatchEvent(cleanupEvent);
   } catch (eventError) {
-    logger.warn('Failed to dispatch cleanup event:', eventError);
+    logger.debug('Failed to dispatch cleanup event:', eventError);
   }
 
   return successfulReverts;
