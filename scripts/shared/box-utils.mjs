@@ -91,4 +91,25 @@ function createErrorBox(headerText) {
   return lines.join('\n')
 }
 
-export { createBox, createSuccessBox, createErrorBox, centerText, emptyBoxLine, BOX_WIDTH }
+/**
+ * Format package size for display (simpler version for packages)
+ */
+function formatPackageSize(bytes) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)}MB`
+  }
+  return `${(bytes / 1024).toFixed(0)}KB`
+}
+
+/**
+ * Format file size with more precision for analysis
+ */
+function formatFileSize(bytes) {
+  const kb = bytes / 1024
+  if (kb >= 1024) {
+    return `${(kb / 1024).toFixed(2)} MB`
+  }
+  return `${kb.toFixed(2)} KB`
+}
+
+export { createBox, createSuccessBox, createErrorBox, centerText, emptyBoxLine, formatPackageSize, formatFileSize, BOX_WIDTH }

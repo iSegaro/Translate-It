@@ -6,6 +6,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { BuildReporter } from '../shared/build-reporter.mjs'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
+import { formatPackageSize } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -59,7 +60,8 @@ async function buildChromeExtension() {
     })
     
     const zipStats = fs.statSync(path.join(rootDir, CHROME_ZIP_PATH))
-    logSuccess(`Chrome package created: ${(zipStats.size / 1024).toFixed(0)}KB`)
+    const sizeStr = formatPackageSize(zipStats.size)
+    logSuccess(`Chrome package created: ${sizeStr}`)
 
     // Step 4: Analyze build output
     const buildStats = reporter.analyzeBuild(path.join(rootDir, CHROME_BUILD_DIR))

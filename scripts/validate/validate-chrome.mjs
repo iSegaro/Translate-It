@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
-import { createBox, createErrorBox, centerText, emptyBoxLine } from '../shared/box-utils.mjs'
+import { createBox, createErrorBox, centerText, emptyBoxLine, formatPackageSize, formatFileSize } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -87,7 +87,7 @@ async function validateChromeExtension() {
         const zipPath = output.match(/Your web extension is ready: (.+)/)?.[1]
         if (zipPath && fs.existsSync(zipPath.trim())) {
           const zipStats = fs.statSync(zipPath.trim())
-          console.log(`├─ ✅ Package created: ${(zipStats.size / 1024).toFixed(2)} KB`)
+          console.log(`├─ ✅ Package created: ${formatFileSize(zipStats.size)}`)
         }
       }
       console.log('└─ ✅ Cross-browser validation completed\n')
@@ -150,17 +150,17 @@ async function validateChromeExtension() {
     // Step 6: Package size analysis
     logStep('Analyzing package size...')
     const stats = getDirectoryStats(CHROME_BUILD_DIR)
-    const sizeMB = (stats.totalSize / 1024 / 1024).toFixed(2)
+    const sizeStr = formatFileSize(stats.totalSize)
     const sizeLimit = 128 // Chrome limit in MB
-    
+
     console.log('├─ PACKAGE STATISTICS:')
     console.log(`├─   Total Files: ${stats.fileCount}`)
-    console.log(`├─   Total Size:  ${sizeMB} MB`)
+    console.log(`├─   Total Size:  ${sizeStr}`)
     console.log(`├─   Size Limit:  ${sizeLimit} MB (Chrome Web Store)`)
-    
+
     if (stats.totalSize > sizeLimit * 1024 * 1024) {
       console.log('└─ ❌ Package size exceeds Chrome limit\n')
-      throw new Error(`Extension size (${sizeMB}MB) exceeds Chrome limit (${sizeLimit}MB)`)
+      throw new Error(`Extension size (${sizeStr}) exceeds Chrome limit (${sizeLimit}MB)`)
     } else {
       const percentageUsed = ((stats.totalSize / (sizeLimit * 1024 * 1024)) * 100).toFixed(1)
       console.log(`├─   Usage:       ${percentageUsed}% of allowed size`)

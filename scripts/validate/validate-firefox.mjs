@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
-import { createBox, createErrorBox, centerText, emptyBoxLine } from '../shared/box-utils.mjs'
+import { createBox, createErrorBox, centerText, emptyBoxLine, formatPackageSize, formatFileSize } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -169,17 +169,17 @@ async function validateFirefoxExtension() {
     // Step 5: Package size analysis
     logStep('Analyzing package size...')
     const stats = getDirectoryStats(FIREFOX_BUILD_DIR)
-    const sizeMB = (stats.totalSize / 1024 / 1024).toFixed(2)
+    const sizeStr = formatFileSize(stats.totalSize)
     const sizeLimit = 200 // Firefox limit in MB
-    
+
     console.log('├─ PACKAGE STATISTICS:')
     console.log(`├─   Total Files: ${stats.fileCount}`)
-    console.log(`├─   Total Size:  ${sizeMB} MB`)
+    console.log(`├─   Total Size:  ${sizeStr}`)
     console.log(`├─   Size Limit:  ${sizeLimit} MB (Firefox Add-ons)`)
-    
+
     if (stats.totalSize > sizeLimit * 1024 * 1024) {
       console.log('└─ ❌ Package size exceeds Firefox limit\n')
-      throw new Error(`Extension size (${sizeMB}MB) exceeds Firefox limit (${sizeLimit}MB)`)
+      throw new Error(`Extension size (${sizeStr}) exceeds Firefox limit (${sizeLimit}MB)`)
     } else {
       const percentageUsed = ((stats.totalSize / (sizeLimit * 1024 * 1024)) * 100).toFixed(1)
       console.log(`├─   Usage:       ${percentageUsed}% of allowed size`)
