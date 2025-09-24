@@ -123,7 +123,7 @@ export class BuildReporter {
     )
 
     // Browser line
-    const browserValue = this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V2)'
+    const browserValue = this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V3)'
     const browserLine = this.padRight(`${browserLabel}:`, LABEL_WIDTH - 3) // -3 for "├─ "
     console.log(`├─ ${browserLine} ${browserValue}`)
 
@@ -166,7 +166,7 @@ export class BuildReporter {
     }
 
     if (status === 'completed') {
-      const browserType = this.browser === 'chrome' ? 'Chrome V3' : 'Firefox V2'
+      const browserType = this.browser === 'chrome' ? 'Chrome V3' : 'Firefox V3'
       const manifestLine = this.padRight(`${icon} Manifest generation...`, LABEL_WIDTH - 3)
       const assetLine = this.padRight(`${icon} Asset optimization...`, LABEL_WIDTH - 3)
       const bundleLine = this.padRight(`${icon} Bundle compression...`, LABEL_WIDTH - 3)
