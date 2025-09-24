@@ -9,6 +9,7 @@ import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
@@ -77,6 +78,7 @@ const _registerSelectStateListener = async () => {
         _uiMessageHandler = createMessageHandler();
       }
       _uiMessageHandler.registerHandler(MessageActions.SELECT_ELEMENT_STATE_CHANGED, _selectStateHandler);
+
       if (!_uiMessageHandler.isListenerActive) {
         _uiMessageHandler.listen();
         logger.debug('[useTranslationModes] UI MessageHandler activated');
@@ -365,20 +367,50 @@ export function useSidepanelActions() {
   const isProcessing = ref(false);
   const error = ref(null);
 
+  // Use useMessaging like Popup does
+  const { sendMessage: sendMessageViaMessaging } = useMessaging('sidepanel');
+
   const revertTranslation = async () => {
     isProcessing.value = true;
     error.value = null;
 
     try {
-      logger.debug('Reverting translation');
-      await sendMessage({
+      logger.debug('[SidepanelActions] Executing revert action');
+
+      // Use sendMessage (goes through background script) for proper error handling - same as Popup
+      const response = await sendMessageViaMessaging({
         action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
-        context: 'sidepanel',
+        context: MessageContexts.SIDEPANEL,
+        messageId: `sidepanel-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
         timestamp: Date.now()
       });
-      logger.init('Translation reverted successfully');
-      return true;
+
+      if (response?.success) {
+        logger.debug(`[SidepanelActions] Revert successful: ${response.revertedCount || 0} translations reverted`);
+        return true;
+      } else if (response?.isRestrictedPage) {
+        // Tab is restricted - log as debug and exit gracefully
+        logger.debug('Revert action blocked (restricted page):', {
+          message: response.message,
+          tabUrl: response.tabUrl
+        });
+        return true; // Return true to avoid error handling
+      } else {
+        const errorMsg = response?.error || response?.message || 'Unknown error';
+        error.value = `Revert failed: ${errorMsg}`;
+        logger.error('Revert failed:', errorMsg);
+        return false;
+      }
     } catch (err) {
+      // Check if this is a restricted page error with response data
+      if (err.isRestrictedPage) {
+        logger.debug('Revert action blocked (restricted page):', {
+          message: err.message,
+          tabUrl: err.tabUrl
+        });
+        return true; // Exit gracefully without showing error to user
+      }
+
       const errorMsg = err.message || "Failed to revert translation";
       error.value = errorMsg;
       logger.error('Error reverting translation:', err);

@@ -29,7 +29,13 @@ export class SettingsUpdateHandler {
         }).catch(error => {
           logger.error('Error refreshing settings after update notification:', error)
         })
+
+        // Return true to indicate we handled this message
+        return true
       }
+
+      // Return false to allow other listeners to handle the message
+      return false
     })
 
     logger.debug('Settings update message listener setup complete')

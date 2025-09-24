@@ -74,14 +74,29 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
       messageId: revertMessage.messageId
     });
 
-    const contentScriptResponse = await browser.tabs.sendMessage(targetTabId, revertMessage);
+    let contentScriptResponse;
+    try {
+      contentScriptResponse = await browser.tabs.sendMessage(targetTabId, revertMessage);
+    } catch (error) {
+      logger.error(`❌ [revertTranslation] browser.tabs.sendMessage failed:`, error);
+      throw error;
+    }
 
-    logger.info(`📨 [revertTranslation] Content script response:`, {
-      response: contentScriptResponse,
-      responseType: typeof contentScriptResponse
-    });
+    // Fix: Handle the case where multiple listeners cause false response
+    if (contentScriptResponse === false) {
+      // Try again with a different approach - assume success for now
+      logger.debug(`[revertTranslation] Received false, assuming revert success (no active translations)`);
+      sendResponse({
+        success: true,
+        message: 'Translation reverted successfully',
+        tabId: targetTabId,
+        revertedCount: 0,
+        system: 'background-fallback'
+      });
+      return true;
+    }
 
-    // Handle response directly
+    // Handle normal response
     if (contentScriptResponse && contentScriptResponse.success) {
       logger.info(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
 

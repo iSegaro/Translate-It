@@ -91,10 +91,10 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Register all handlers with the central message handler
       for (const [action, handler] of this.handlers.entries()) {
-        this.messageHandler.registerHandler(action, async (message, sender, sendResponse) => {
+        this.messageHandler.registerHandler(action, (message, sender, sendResponse) => {
           try {
-            // Pass sendResponse to handlers that need it
-            const result = await handler.call(this, message, sender, sendResponse);
+            // Call handler and return result directly (preserve Promise nature)
+            const result = handler.call(this, message, sender, sendResponse);
             return result;
           } catch (error) {
             this.logger.error(`Error in content handler for ${action}:`, error);
@@ -106,7 +106,9 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.info('🔧 ContentMessageHandler registered handlers:', {
         registeredActions: Array.from(this.handlers.keys()),
         totalHandlers: this.handlers.size,
-        hasRevertHandler: this.handlers.has('revertTranslation')
+        hasRevertHandler: this.handlers.has('revertTranslation'),
+        revertActionValue: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+        allHandlerKeys: Array.from(this.handlers.keys()).join(', ')
       });
 
       // Activate the message listener
@@ -159,7 +161,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
-    // NOTE: REVERT_SELECT_ELEMENT_MODE handler removed - now handled by direct listener in content script index.js
+    this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
     
@@ -467,7 +469,19 @@ export class ContentMessageHandler extends ResourceTracker {
     return false;
   }
 
-  // NOTE: handleRevertTranslation method removed - revert functionality now handled by direct listener in content script index.js
+  async handleRevertTranslation(message) {
+    this.logger.debug('Handling revert translation request');
+
+    try {
+      // Use the existing revertHandler to execute revert
+      const result = await revertHandler.executeRevert();
+      this.logger.debug('Revert completed successfully:', result);
+      return result;
+    } catch (error) {
+      this.logger.error('Revert failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
 
   // IFrame support handlers
   async handleIFrameActivateSelectElement(data) {
