@@ -44,18 +44,21 @@ async function validateChromeExtension() {
     }
     
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-    
+
+    // Substitute extension name
+    const substitutedManifest = await substituteMessages(manifest)
+
     // Chrome-specific manifest checks
-    if (manifest.manifest_version !== 3) {
+    if (substitutedManifest.manifest_version !== 3) {
       throw new Error('Chrome extension must use Manifest V3')
     }
-    console.log(`├─ ✅ Manifest Version: V${manifest.manifest_version}`)
-    
-    if (!manifest.name || !manifest.version || !manifest.description) {
+    console.log(`├─ ✅ Manifest Version: V${substitutedManifest.manifest_version}`)
+
+    if (!substitutedManifest.name || !substitutedManifest.version || !substitutedManifest.description) {
       throw new Error('Missing required manifest fields')
     }
-    console.log(`├─ ✅ Extension Name: ${manifest.name}`)
-    console.log(`├─ ✅ Extension Version: ${manifest.version}`)
+    console.log(`├─ ✅ Extension Name: ${substitutedManifest.name}`)
+    console.log(`├─ ✅ Extension Version: ${substitutedManifest.version}`)
     console.log(`└─ ✅ Manifest validation completed\n`)
     
     // Step 3: Check web-ext availability
@@ -208,14 +211,14 @@ async function validateChromeExtension() {
 function getDirectoryStats(dirPath) {
   let fileCount = 0
   let totalSize = 0
-  
+
   function traverse(currentPath) {
     const items = fs.readdirSync(currentPath)
-    
+
     for (const item of items) {
       const itemPath = path.join(currentPath, item)
       const stats = fs.statSync(itemPath)
-      
+
       if (stats.isDirectory()) {
         traverse(itemPath)
       } else {
@@ -224,9 +227,43 @@ function getDirectoryStats(dirPath) {
       }
     }
   }
-  
+
   traverse(dirPath)
   return { fileCount, totalSize }
+}
+
+/**
+ * Substitute extension name from package.json
+ * @param {Object} obj - Object to process
+ * @returns {Object} Object with substituted name
+ */
+async function substituteMessages(obj) {
+  const processed = JSON.parse(JSON.stringify(obj))
+  const extensionName = pkg.name === 'translate-it' ? 'Translate It' : pkg.name
+
+  function substituteValue(value) {
+    if (typeof value === 'string') {
+      return value.replace(/__MSG_nameChrome__|__MSG_nameFirefox__|__MSG_name__/g, extensionName)
+    }
+    return value
+  }
+
+  function processObject(current) {
+    if (typeof current === 'string') {
+      return substituteValue(current)
+    } else if (Array.isArray(current)) {
+      return current.map(item => processObject(item))
+    } else if (typeof current === 'object' && current !== null) {
+      const result = {}
+      for (const [key, value] of Object.entries(current)) {
+        result[key] = processObject(value)
+      }
+      return result
+    }
+    return current
+  }
+
+  return processObject(processed)
 }
 
 // Run validation
