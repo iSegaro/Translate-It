@@ -7,6 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
+// Constants for box formatting
+const BOX_WIDTH = 66
+const SECTION_PADDING = 10
+
 /**
  * Beautiful build reporter with consistent formatting
  */
@@ -24,14 +28,65 @@ export class BuildReporter {
   }
 
   /**
+   * Get visible length of string (accounting for emojis and wide characters)
+   */
+  getVisibleLength(str) {
+    // Emojis and wide characters take 2 visual width but count as 1 in JS length
+    const emojiPattern = /[\p{Emoji_Presentation}\p{Emoji}\u200D]+/gu
+    const wideCharPattern = /[\u1100-\u115F\u2329-\u232A\u2E80-\u303F\u3040-\u30FF\u3130-\u318F\u3190-\u319F\u31C0-\u31EF\u3200-\u32FF\u3300-\u33FF\u3400-\u4DBF\u4E00-\u9FFF\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF\uF900-\uFAFF\uFE10-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6]/gu
+
+    let visibleLength = str.length
+
+    // Note: Modern JavaScript emojis already have length 2, so no extra space needed
+    // However, some emojis might display differently in certain terminals
+    if (str.includes('🕸')) {
+      visibleLength -= 1;  // 🕸 needs 1 less space
+    } else if (str.includes('🦊')) {
+      visibleLength -= 0;  // 🦊 needs 0 less spaces
+    } else if (str.includes('✅')) {
+      visibleLength += 1;  // ✅ needs 1 more space
+    }
+
+    return visibleLength
+  }
+
+  /**
+   * Pad string to the right with spaces
+   */
+  padRight(str, totalLength) {
+    const visibleLength = this.getVisibleLength(str)
+    const paddingNeeded = Math.max(0, totalLength - visibleLength)
+    return str + ' '.repeat(paddingNeeded)
+  }
+
+  /**
+   * Center text within box width
+   */
+  centerText(str, width = BOX_WIDTH) {
+    const visibleLength = this.getVisibleLength(str)
+    // Internal width is BOX_WIDTH - 2 (for the border characters)
+    const internalWidth = width - 2
+    const paddingNeeded = internalWidth - visibleLength
+    const leftPadding = Math.floor(paddingNeeded / 2)
+    const rightPadding = paddingNeeded - leftPadding
+    return ' '.repeat(Math.max(0, leftPadding)) + str + ' '.repeat(Math.max(0, rightPadding))
+  }
+
+  /**
    * Start build reporting
    */
   start() {
     const browserName = this.browser.toUpperCase()
+    this._buildProcessStarted = false
+
+    const headerText = `${this.browserIcon} ${browserName} EXTENSION BUILD`
+
     console.log('╔════════════════════════════════════════════════════════════════╗')
-    console.log(`║                ${this.browserIcon} ${browserName} EXTENSION BUILD${' '.repeat(28 - browserName.length)}║`)
+
+    const centeredText = this.centerText(headerText)
+    console.log(`║${centeredText}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
-    
+
     logStep('Starting build process...')
     this.logConfiguration()
   }
@@ -41,10 +96,45 @@ export class BuildReporter {
    */
   logConfiguration() {
     console.log('┌─ CONFIGURATION')
-    console.log(`├─ Browser:          ${this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V2)'}`)
-    console.log(`├─ Output Directory: dist/${this.browser}/Translate-It-v${pkg.version}/`)
-    console.log(`├─ Build Mode:       ${process.env.NODE_ENV || 'Production'}`)
-    console.log(`└─ Vue Version:      3.5.18\n`)
+
+    // Define the spacing after the prefix (├─ or └─)
+    const prefixWidth = 2 // Width of "├─" or "└─"
+    const labelSpacing = 2 // Spaces after label before colon
+    const valueSpacing = 2 // Spaces after colon before value
+    const totalWidth = 60
+
+    // Calculate label positions
+    const browserLabel = 'Browser'
+    const outputLabel = 'Output Directory'
+    const modeLabel = 'Build Mode'
+    const versionLabel = 'Vue Version'
+
+    // Find the maximum label length
+    const maxLabelLength = Math.max(
+      browserLabel.length,
+      outputLabel.length,
+      modeLabel.length,
+      versionLabel.length
+    )
+
+    // Browser line
+    const browserValue = this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V2)'
+    const browserPadding = ' '.repeat(maxLabelLength - browserLabel.length + labelSpacing)
+    console.log(`├─ ${browserLabel}:${browserPadding} ${this.padRight(browserValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+
+    // Output Directory line
+    const outputValue = `dist/${this.browser}/Translate-It-v${pkg.version}/`
+    const outputPadding = ' '.repeat(maxLabelLength - outputLabel.length + labelSpacing)
+    console.log(`├─ ${outputLabel}:${outputPadding} ${this.padRight(outputValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+
+    // Build Mode line
+    const modeValue = process.env.NODE_ENV || 'Production'
+    const modePadding = ' '.repeat(maxLabelLength - modeLabel.length + labelSpacing)
+    console.log(`├─ ${modeLabel}:${modePadding} ${this.padRight(modeValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+
+    // Vue Version line
+    const versionPadding = ' '.repeat(maxLabelLength - versionLabel.length + labelSpacing)
+    console.log(`└─ ${versionLabel}:${versionPadding} ${this.padRight('3.5.18', totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}\n`)
   }
 
   /**
@@ -53,14 +143,23 @@ export class BuildReporter {
   logBuildStep(step, status = 'in-progress') {
     const icon = status === 'completed' ? '✅' : status === 'failed' ? '❌' : '⚡'
     const duration = status === 'completed' ? `(${((Date.now() - this.startTime) / 1000).toFixed(1)}s)` : ''
-    
-    console.log('┌─ BUILD PROCESS')
-    console.log(`├─ ${icon} ${step}${' '.repeat(50 - step.length)}${duration}`)
-    
+
+    // Only print header for first call
+    if (!this._buildProcessStarted) {
+      console.log('┌─ BUILD PROCESS')
+      this._buildProcessStarted = true
+    }
+
+    const contentWidth = 50
+    const textWidth = contentWidth - (duration ? duration.length + 1 : 0)
+    const alignedStep = this.padRight(step, textWidth)
+    console.log(`├─ ${icon} ${alignedStep}${duration ? ' ' + duration : ''}`)
+
     if (status === 'completed') {
-      console.log(`├─ ${icon} Manifest generation...                      ✅ ${this.browser === 'chrome' ? 'Chrome V3' : 'Firefox V2'} Ready`)
-      console.log(`├─ ${icon} Asset optimization...                       ✅ Optimized`)
-      console.log(`└─ ${icon} Bundle compression...                        ✅ Compressed\n`)
+      const browserType = this.browser === 'chrome' ? 'Chrome V3' : 'Firefox V2'
+      console.log(`├─ ${icon} ${this.padRight('Manifest generation...', 45)}✅ ${browserType} Ready`)
+      console.log(`├─ ${icon} ${this.padRight('Asset optimization...', 45)}✅ Optimized`)
+      console.log(`└─ ${icon} ${this.padRight('Bundle compression...', 45)}✅ Compressed\n`)
     }
   }
 
@@ -209,14 +308,21 @@ export class BuildReporter {
     const duration = ((Date.now() - this.startTime) / 1000).toFixed(1)
     const browserName = this.browser.toUpperCase()
     const storeName = this.browser === 'chrome' ? 'Chrome Web Store' : 'Firefox Add-ons'
-    
+
     console.log('╔════════════════════════════════════════════════════════════════╗')
-    console.log(`║                     ✅ BUILD SUCCESSFUL                        ║`)
-    console.log(`║  ${this.browserIcon} Ready for ${storeName} submission!${' '.repeat(30 - storeName.length)}║`)
-    console.log(`║  ⏱️ Build completed in ${duration}s${' '.repeat(40 - duration.length)}║`)
+
+    const centeredText = this.centerText('✅ BUILD SUCCESSFUL')
+    console.log(`║${centeredText}║`)
+
+    const storeLine = `${this.browserIcon} Ready for ${storeName} submission!`
+    console.log(`║${this.centerText(storeLine)}║`)
+
+    const timeLine = `⏱ Build completed in ${duration}s`
+    console.log(`║${this.centerText(timeLine)}║`)
+
     if (buildStats) {
       const sizeInfo = `${(buildStats.totalSize / 1024).toFixed(0)}KB total, ${buildStats.fileCount} files`
-      console.log(`║  📊 ${sizeInfo}${' '.repeat(55 - sizeInfo.length)}║`)
+      console.log(`║${this.centerText(`📊 ${sizeInfo}`)}║`)
     }
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
   }
@@ -226,13 +332,21 @@ export class BuildReporter {
    */
   error(errorMessage) {
     const browserName = this.browser.toUpperCase()
-    
+
     console.log('╔════════════════════════════════════════════════════════════════╗')
-    console.log(`║                ${this.browserIcon} ${browserName} BUILD FAILED${' '.repeat(31 - browserName.length)}║`)
+
+    const centeredText = this.centerText(`${this.browserIcon} ${browserName} BUILD FAILED`)
+    console.log(`║${centeredText}║`)
     console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log(`║  ❌ Error: ${errorMessage.slice(0, 51).padEnd(51, ' ')}║`)
+
+    // Content width is 58 (62 - 4 for the 2-space indent)
+    const contentWidth = 58
+
+    const errorText = `❌ Error: ${errorMessage.slice(0, 51)}`
+    console.log(`║  ${this.padRight(errorText, contentWidth)}║`)
+
     console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log('║  Please fix the above issues and run build again.             ║')
+    console.log(`║  ${this.padRight('Please fix the above issues and run build again.', contentWidth)}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
   }
 }

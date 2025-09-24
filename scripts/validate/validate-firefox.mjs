@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
+import { createBox, createErrorBox, centerText } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -17,9 +18,7 @@ const FIREFOX_BUILD_DIR = path.join(rootDir, `dist/firefox/Translate-It-v${pkg.v
  */
 async function validateFirefoxExtension() {
   try {
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                 🦊 FIREFOX EXTENSION VALIDATOR                ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log(createBox('🦊 FIREFOX EXTENSION VALIDATOR') + '\n')
     
     const results = {
       errors: 0,
@@ -188,29 +187,35 @@ async function validateFirefoxExtension() {
     }
     
     // Final summary
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                  🦊 FIREFOX VALIDATION SUMMARY                ║')
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log(`║  Status:  ${results.errors === 0 ? '✅ PASSED' : '❌ FAILED'}                                           ║`)
-    console.log(`║  Errors:    ${results.errors.toString().padStart(3, ' ')}                                               ║`)
-    console.log(`║  Warnings:  ${results.warnings.toString().padStart(3, ' ')}                                               ║`) 
-    console.log(`║  Notices:   ${results.notices.toString().padStart(3, ' ')}                                               ║`)
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log('║  🦊 Firefox Extension Ready for Add-ons Store Submission!     ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log('╔════════════════════════════════════════════════════════════════╗')
+    console.log(`║${centerText('🦊 FIREFOX VALIDATION SUMMARY')}║`)
+    console.log('╠════════════════════════════════════════════════════════════════╣')
+    const statusText = results.errors === 0 ? '✅ PASSED' : '❌ FAILED'
+    const statusLine = `Status:  ${statusText}`
+    const errorLine = `Errors:    ${results.errors.toString().padStart(3, ' ')}`
+    const warningLine = `Warnings:  ${results.warnings.toString().padStart(3, ' ')}`
+    const noticeLine = `Notices:   ${results.notices.toString().padStart(3, ' ')}`
+
+    console.log(`║${centerText(statusLine)}║`)
+    console.log(`║${centerText(errorLine)}║`)
+    console.log(`║${centerText(warningLine)}║`)
+    console.log(`║${centerText(noticeLine)}║`)
+    console.log('╠════════════════════════════════════════════════════════════════╣')
+    console.log(`║${centerText('🦊 Firefox Extension Ready for Add-ons Store Submission!')}║`)
+    console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
     if (results.errors > 0) {
       process.exit(1)
     }
     
   } catch (error) {
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                 🦊 FIREFOX VALIDATION FAILED                  ║')
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log(`║  ❌ Error: ${error.message.slice(0, 51).padEnd(51, ' ')}║`)
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log('║  Please fix the above issues and run validation again.        ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log(createErrorBox('🦊 FIREFOX VALIDATION FAILED') + '\n')
+    const horizontalLine = '═'.repeat(64)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText(`❌ Error: ${error.message.slice(0, 51)}`)}║`)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText('Please fix the above issues and run validation again.')}║`)
+    console.log(`╚${horizontalLine}╝\n`)
     
     logError('Firefox validation failed:', error.message)
     process.exit(1)

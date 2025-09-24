@@ -2,15 +2,14 @@
 
 import { execSync } from 'child_process'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
+import { createBox, centerText } from '../shared/box-utils.mjs'
 
 /**
  * Validate all browser extensions
  */
 async function validateAll() {
   try {
-    console.log('╔════════════════════════════════════════════════════════════════╗')
-    console.log('║               🔍 VALIDATING ALL EXTENSIONS                     ║')
-    console.log('╚════════════════════════════════════════════════════════════════╝\n')
+    console.log(createBox('🔍 VALIDATING ALL EXTENSIONS') + '\n')
     
     const startTime = Date.now()
     let totalErrors = 0
@@ -48,18 +47,20 @@ async function validateAll() {
     
     console.log('\n╔════════════════════════════════════════════════════════════════╗')
     if (totalErrors === 0) {
-      console.log('║                    ✅ ALL VALIDATIONS PASSED                   ║')
+      console.log(`║${centerText('✅ ALL VALIDATIONS PASSED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
-      console.log('║  🕸️ Chrome Extension: Ready for Web Store                      ║')
-      console.log('║  🦊 Firefox Extension: Ready for Add-ons Store                ║')
+      console.log('')
+      console.log(`║${centerText('🕸️ Chrome Extension: Ready for Web Store')}║`)
+      console.log(`║${centerText('🦊 Firefox Extension: Ready for Add-ons Store')}║`)
+      console.log('')
       console.log('╠════════════════════════════════════════════════════════════════╣')
-      console.log(`║  ⏱️ Total validation time: ${duration}s${' '.repeat(32 - duration.length)}║`)
-      console.log('║  🚀 Extensions ready for submission!                          ║')
+      console.log(`║${centerText(`⏱️ Total validation time: ${duration}s`)}║`)
+      console.log(`║${centerText('🚀 Extensions ready for submission!')}║`)
     } else {
-      console.log('║                     ❌ VALIDATION FAILED                       ║')
+      console.log(`║${centerText('❌ VALIDATION FAILED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
-      console.log(`║  Failed validations: ${totalErrors}${' '.repeat(38)}║`)
-      console.log('║  Please fix the issues above and re-run validation.           ║')
+      console.log(`║${centerText(`Failed validations: ${totalErrors}`)}║`)
+      console.log(`║${centerText('Please fix the issues above and re-run validation.')}║`)
     }
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
@@ -72,9 +73,9 @@ async function validateAll() {
     
   } catch (error) {
     console.log('\n╔════════════════════════════════════════════════════════════════╗')
-    console.log('║                    ❌ VALIDATION ERROR                         ║')
+    console.log(`║${centerText('❌ VALIDATION ERROR')}║`)
     console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log(`║  Error: ${error.message.slice(0, 51).padEnd(51, ' ')}║`)
+    console.log(`║${centerText(`Error: ${error.message.slice(0, 45)}`)}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
     logError('Validation process failed:', error.message)

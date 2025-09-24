@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
+import { centerText, createBox, createSuccessBox, createErrorBox } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -14,9 +15,7 @@ const rootDir = path.resolve(__dirname, '../..')
  */
 async function buildAll() {
   try {
-    console.log('╔════════════════════════════════════════════════════════════════╗')
-    console.log('║                 🚀 BUILDING ALL EXTENSIONS                     ║')  
-    console.log('╚════════════════════════════════════════════════════════════════╝\n')
+    console.log(createBox('🚀 BUILDING ALL EXTENSIONS') + '\n')
     
     const startTime = Date.now()
     
@@ -83,26 +82,26 @@ Build time: ${((Date.now() - startTime) / 1000).toFixed(1)}s
     // Step 5: Success summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1)
     
-    console.log('\n╔════════════════════════════════════════════════════════════════╗')
-    console.log('║                    🎉 ALL BUILDS COMPLETED                     ║')
-    console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log('║  ✅ Chrome Extension Ready                                     ║')
-    console.log('║  ✅ Firefox Extension Ready                                    ║') 
-    console.log('║  ✅ Publish Packages Created                                   ║')
-    console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log(`║  ⏱️ Total build time: ${duration}s${' '.repeat(38 - duration.length)}║`)
-    console.log('║  📦 Ready for Web Store submission!                           ║')
-    console.log('╚════════════════════════════════════════════════════════════════╝\n')
+    console.log('\n' + createSuccessBox('🎉 ALL BUILDS COMPLETED'))
+    const horizontalLine = '═'.repeat(64)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText('✅ Chrome Extension Ready')}║`)
+    console.log(`║${centerText('✅ Firefox Extension Ready')}║`)
+    console.log(`║${centerText('✅ Publish Packages Created')}║`)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText(`⏱️ Total build time: ${duration}s`)}║`)
+    console.log(`║${centerText('📦 Ready for Web Store submission!')}║`)
+    console.log(`╚${horizontalLine}╝\n`)
     
     logSuccess('All extensions built successfully!')
     logStep('Publish packages location: dist/Publish/')
     
   } catch (error) {
-    console.log('\n╔════════════════════════════════════════════════════════════════╗')
-    console.log('║                      ❌ BUILD FAILED                           ║')
-    console.log('╠════════════════════════════════════════════════════════════════╣')
-    console.log(`║  Error: ${error.message.slice(0, 51).padEnd(51, ' ')}║`)
-    console.log('╚════════════════════════════════════════════════════════════════╝\n')
+    console.log('\n' + createErrorBox('❌ BUILD FAILED'))
+    const horizontalLine = '═'.repeat(64)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText(`Error: ${error.message.slice(0, 51)}`)}║`)
+    console.log(`╚${horizontalLine}╝\n`)
     
     logError('Build failed:', error.message)
     process.exit(1)

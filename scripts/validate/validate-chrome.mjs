@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError } from '../shared/logger.mjs'
+import { createBox, createErrorBox, centerText } from '../shared/box-utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -18,9 +19,7 @@ const TEMP_ARTIFACTS_DIR = path.join(rootDir, 'temp/validation/chrome')
  */
 async function validateChromeExtension() {
   try {
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                 🕸️ CHROME EXTENSION VALIDATOR                 ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log(createBox('🕸 CHROME EXTENSION VALIDATOR') + '\n')
     
     const results = {
       errors: 0,
@@ -174,16 +173,16 @@ async function validateChromeExtension() {
     }
     
     // Final summary
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                 🕸️ CHROME VALIDATION SUMMARY                  ║')
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log(`║  Status: ${results.errors === 0 ? '✅ PASSED' : '❌ FAILED'}                                            ║`)
-    console.log(`║  Errors:   ${results.errors.toString().padStart(3, ' ')}                                                ║`)
-    console.log(`║  Warnings: ${results.warnings.toString().padStart(3, ' ')}                                                ║`)
-    console.log(`║  Notices:  ${results.notices.toString().padStart(3, ' ')}                                                ║`)
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log('║  🕸️ Chrome Extension Ready for Web Store Submission!          ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log('╔════════════════════════════════════════════════════════════════╗')
+    console.log(`║${centerText('🕸 CHROME VALIDATION SUMMARY')}║`)
+    console.log('╠════════════════════════════════════════════════════════════════╣')
+    console.log(`║${centerText(`Status: ${results.errors === 0 ? '✅ PASSED' : '❌ FAILED'}`)}║`)
+    console.log(`║${centerText(`Errors:   ${results.errors.toString().padStart(3, ' ')}`)}║`)
+    console.log(`║${centerText(`Warnings: ${results.warnings.toString().padStart(3, ' ')}`)}║`)
+    console.log(`║${centerText(`Notices:  ${results.notices.toString().padStart(3, ' ')}`)}║`)
+    console.log('╠════════════════════════════════════════════════════════════════╣')
+    console.log(`║${centerText('🕸 Chrome Extension Ready for Web Store Submission!')}║`)
+    console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
     if (results.errors > 0) {
       process.exit(1)
@@ -195,13 +194,13 @@ async function validateChromeExtension() {
       fs.rmSync(TEMP_ARTIFACTS_DIR, { recursive: true, force: true })
     }
     
-    console.log('╔═══════════════════════════════════════════════════════════════╗')
-    console.log('║                🕸️ CHROME VALIDATION FAILED                    ║')
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log(`║  ❌ Error: ${error.message.slice(0, 51).padEnd(51, ' ')}║`)
-    console.log('╠═══════════════════════════════════════════════════════════════╣')
-    console.log('║  Please fix the above issues and run validation again.       ║')
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n')
+    console.log(createErrorBox('🕸 CHROME VALIDATION FAILED') + '\n')
+    const horizontalLine = '═'.repeat(64)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText(`❌ Error: ${error.message.slice(0, 51)}`)}║`)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText('Please fix the above issues and run validation again.')}║`)
+    console.log(`╚${horizontalLine}╝\n`)
     
     logError('Chrome validation failed:', error.message)
     process.exit(1)
