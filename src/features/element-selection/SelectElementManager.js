@@ -1029,6 +1029,9 @@ class SelectElementManager extends ResourceTracker {
       return 0;
     }
 
+    // Clear the global translation in progress flag since revert completes the translation process
+    window.isTranslationInProgress = false;
+
     return await this.stateManager.revertTranslations();
   }
   
