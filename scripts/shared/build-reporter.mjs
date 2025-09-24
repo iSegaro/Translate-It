@@ -10,6 +10,8 @@ const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8
 
 // Constants for box formatting
 const BOX_WIDTH = 66
+const CONTENT_WIDTH = 60  // Consistent width for all sections
+const LABEL_WIDTH = 45    // Consistent width for all labels (includes prefix and spacing)
 const SECTION_PADDING = 10
 
 /**
@@ -104,7 +106,7 @@ export class BuildReporter {
     const prefixWidth = 2 // Width of "├─" or "└─"
     const labelSpacing = 2 // Spaces after label before colon
     const valueSpacing = 2 // Spaces after colon before value
-    const totalWidth = 60
+    const totalWidth = CONTENT_WIDTH
 
     // Calculate label positions
     const browserLabel = 'Browser'
@@ -122,22 +124,23 @@ export class BuildReporter {
 
     // Browser line
     const browserValue = this.browser === 'chrome' ? 'Chrome (Manifest V3)' : 'Firefox (Manifest V2)'
-    const browserPadding = ' '.repeat(maxLabelLength - browserLabel.length + labelSpacing)
-    console.log(`├─ ${browserLabel}:${browserPadding} ${this.padRight(browserValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+    const browserLine = this.padRight(`${browserLabel}:`, LABEL_WIDTH - 3) // -3 for "├─ "
+    console.log(`├─ ${browserLine} ${browserValue}`)
 
     // Output Directory line
     const outputValue = `dist/${this.browser}/Translate-It-v${pkg.version}/`
-    const outputPadding = ' '.repeat(maxLabelLength - outputLabel.length + labelSpacing)
-    console.log(`├─ ${outputLabel}:${outputPadding} ${this.padRight(outputValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+    const outputLine = this.padRight(`${outputLabel}:`, LABEL_WIDTH - 3)
+    console.log(`├─ ${outputLine} ${outputValue}`)
 
     // Build Mode line
     const modeValue = process.env.NODE_ENV || 'Production'
-    const modePadding = ' '.repeat(maxLabelLength - modeLabel.length + labelSpacing)
-    console.log(`├─ ${modeLabel}:${modePadding} ${this.padRight(modeValue, totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}`)
+    const modeLine = this.padRight(`${modeLabel}:`, LABEL_WIDTH - 3)
+    console.log(`├─ ${modeLine} ${modeValue}`)
 
     // Vue Version line
-    const versionPadding = ' '.repeat(maxLabelLength - versionLabel.length + labelSpacing)
-    console.log(`└─ ${versionLabel}:${versionPadding} ${this.padRight('3.5.18', totalWidth - maxLabelLength - labelSpacing - valueSpacing - prefixWidth)}\n`)
+    const versionValue = '3.5.18'
+    const versionLine = this.padRight(`${versionLabel}:`, LABEL_WIDTH - 3)
+    console.log(`└─ ${versionLine} ${versionValue}\n`)
   }
 
   /**
@@ -153,21 +156,24 @@ export class BuildReporter {
       this._buildProcessStarted = true
     }
 
-    // Calculate consistent alignment
-    const stepWidth = 40
-    const alignedStep = this.padRight(step, stepWidth)
+    // Use consistent label width for alignment
+    const stepLine = this.padRight(`${icon} ${step}`, LABEL_WIDTH - 3) // -3 for "├─ "
 
     if (duration) {
-      console.log(`├─ ${icon} ${alignedStep} ${duration}`)
+      console.log(`├─ ${stepLine} ${duration}`)
     } else {
-      console.log(`├─ ${icon} ${alignedStep}`)
+      console.log(`├─ ${stepLine}`)
     }
 
     if (status === 'completed') {
       const browserType = this.browser === 'chrome' ? 'Chrome V3' : 'Firefox V2'
-      console.log(`├─ ${icon} ${this.padRight('Manifest generation...', stepWidth)} ✅ ${browserType} Ready`)
-      console.log(`├─ ${icon} ${this.padRight('Asset optimization...', stepWidth)} ✅ Optimized`)
-      console.log(`└─ ${icon} ${this.padRight('Bundle compression...', stepWidth)} ✅ Compressed\n`)
+      const manifestLine = this.padRight(`${icon} Manifest generation...`, LABEL_WIDTH - 3)
+      const assetLine = this.padRight(`${icon} Asset optimization...`, LABEL_WIDTH - 3)
+      const bundleLine = this.padRight(`${icon} Bundle compression...`, LABEL_WIDTH - 3)
+
+      console.log(`├─ ${manifestLine} ✅ ${browserType} Ready`)
+      console.log(`├─ ${assetLine} ✅ Optimized`)
+      console.log(`└─ ${bundleLine} ✅ Compressed\n`)
     }
   }
 
@@ -186,7 +192,8 @@ export class BuildReporter {
           const size = fs.statSync(filePath).size
           const sizeStr = formatFileSize(size)
           const improvement = this.calculateImprovement(file, size)
-          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeStr.padStart(8)}  ${improvement}`)
+          const fileAligned = this.padRight(`${this.getFileIcon(file)} ${file}`, LABEL_WIDTH - 3)
+          console.log(`├─ ${fileAligned} → ${sizeStr.padStart(9)} ${improvement}`)
         }
       })
 
@@ -197,7 +204,8 @@ export class BuildReporter {
         jsFiles.forEach(({ file, size }) => {
           const sizeStr = formatFileSize(size)
           const improvement = this.calculateImprovement(file, size)
-          console.log(`├─ ${this.getFileIcon(file)} ${file.padEnd(18)} → ${sizeStr.padStart(8)}  ${improvement}`)
+          const fileAligned = this.padRight(`${this.getFileIcon(file)} ${file}`, LABEL_WIDTH - 3)
+          console.log(`├─ ${fileAligned} → ${sizeStr.padStart(9)} ${improvement}`)
         })
       }
 
@@ -206,7 +214,8 @@ export class BuildReporter {
       const totalSizeStr = formatFileSize(totalStats.totalSize)
       const totalImprovement = this.calculateImprovement('total', totalStats.totalSize)
 
-      console.log(`└─ 📊 Total Size:         → ${totalSizeStr.padStart(9)} ${totalImprovement}\n`)
+      const totalAligned = this.padRight(`📊 Total Size:`, LABEL_WIDTH - 3)
+      console.log(`└─ ${totalAligned} → ${totalSizeStr.padStart(9)} ${totalImprovement}\n`)
       
       return totalStats
     } catch (error) {
