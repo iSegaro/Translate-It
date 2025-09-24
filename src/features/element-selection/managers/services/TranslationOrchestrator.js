@@ -204,6 +204,7 @@ export class TranslationOrchestrator extends ResourceTracker {
         });
 
         await this.sendTranslationRequest(messageId, jsonPayload, context);
+        return { success: true, streaming: true, messageId };
       } else {
         // For non-streaming, set up minimal request data
         this.translationRequests.set(messageId, {

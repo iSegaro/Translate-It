@@ -650,10 +650,11 @@ class SelectElementManager extends ResourceTracker {
         // 1. Success and has translatedText (regular non-streaming)
         // 2. Success and streaming is false (direct translation)
         // 3. Success and from cache with translatedText (cached result)
-        const shouldApply = result.success && (
-          (result.translatedText && !result.streaming) ||                    // Non-streaming with text
-          (result.translatedText && result.fromCache) ||                     // Cached with text
-          (result.originalTextsMap && result.translatedText)                 // Has text map data
+        // Note: For streaming translations, the translation will be applied via streaming handlers
+        const shouldApply = result.success && result.translatedText && (
+          !result.streaming ||                                               // Non-streaming
+          result.fromCache ||                                                // Cached result
+          result.originalTextsMap                                           // Has text map data
         );
 
         if (shouldApply) {
@@ -715,6 +716,13 @@ class SelectElementManager extends ResourceTracker {
           } catch (error) {
             this.logger.error("Error applying non-streaming translation result:", error);
           }
+        } else if (result.success && result.streaming && !result.translatedText) {
+          // This is a streaming translation that will be handled by streaming handlers
+          this.logger.debug("Streaming translation initiated, will be handled by streaming system:", {
+            messageId: result.messageId,
+            streaming: true,
+            success: true
+          });
         } else {
           this.logger.debug("Skipping translation application:", {
             hasResult: !!result,
