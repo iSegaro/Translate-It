@@ -636,8 +636,8 @@ class SelectElementManager extends ResourceTracker {
           fullResult: result
         });
 
-        // For non-streaming translations, we need to apply the result here
-        if (result.success && result.translatedText && !result.streaming) {
+        // For non-streaming translations or cached translations, we need to apply the result here
+        if (result.success && result.translatedText && (!result.streaming || result.fromCache)) {
           try {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();
@@ -648,7 +648,8 @@ class SelectElementManager extends ResourceTracker {
             this.logger.debug("Processing non-streaming translation result:", {
               translatedData: translatedData,
               originalTextsMap: workingOriginalTextsMap,
-              textNodes: textNodes.map(node => node.textContent)
+              textNodes: textNodes.map(node => node.textContent),
+              fromCache: result.fromCache
             });
 
             // Create translation map from result
@@ -658,6 +659,18 @@ class SelectElementManager extends ResourceTracker {
                 if (originalText && translatedData[index] && translatedData[index].text) {
                   translationMap.set(originalText, translatedData[index].text);
                   this.logger.debug("Added translation to map:", {
+                    original: originalText,
+                    translated: translatedData[index].text,
+                    index: index
+                  });
+                }
+              });
+            } else if (result.fromCache) {
+              // For cached translations, the structure is an array of {text: "..."} objects
+              workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+                if (originalText && translatedData[index] && translatedData[index].text) {
+                  translationMap.set(originalText, translatedData[index].text);
+                  this.logger.debug("Added cached translation to map:", {
                     original: originalText,
                     translated: translatedData[index].text,
                     index: index
