@@ -207,9 +207,21 @@ class SelectElementNotificationManager extends ResourceTracker {
         }
 
         // Update notification reference
-        this.currentNotification.id = updatedNotificationId;
-        this.currentNotification.data.message = translatingMessage;
-        this.currentNotification.data.actions = [cancelAction];
+        if (this.currentNotification) {
+          this.currentNotification.id = updatedNotificationId;
+          this.currentNotification.data.message = translatingMessage;
+          this.currentNotification.data.actions = [cancelAction];
+        } else {
+          // Create new notification reference if it was null
+          this.currentNotification = {
+            id: updatedNotificationId,
+            isActive: true,
+            data: {
+              message: translatingMessage,
+              actions: [cancelAction]
+            }
+          };
+        }
         
         this.logger.debug('Select Element notification updated for translation', {
           oldNotificationId: this.currentNotification.id,
