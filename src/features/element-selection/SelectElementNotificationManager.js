@@ -201,8 +201,9 @@ class SelectElementNotificationManager extends ResourceTracker {
         );
 
         // Dismiss the old notification (if it has an ID)
-        if (this.currentNotification.id) {
-          this.notificationManager.dismiss(this.currentNotification.id);
+        const oldNotificationId = this.currentNotification?.id;
+        if (oldNotificationId) {
+          this.notificationManager.dismiss(oldNotificationId);
         }
 
         // Update notification reference
