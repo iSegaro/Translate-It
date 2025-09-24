@@ -638,21 +638,25 @@ class SelectElementManager extends ResourceTracker {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();
 
+            // Use originalTextsMap from result if available (for non-streaming)
+            const workingOriginalTextsMap = result.originalTextsMap || originalTextsMap;
+
             this.logger.debug("Processing non-streaming translation result:", {
               translatedData: translatedData,
-              originalTextsMap: originalTextsMap,
+              originalTextsMap: workingOriginalTextsMap,
               textNodes: textNodes.map(node => node.textContent)
             });
 
             // Create translation map from result
             if (Array.isArray(translatedData)) {
-              // originalTextsMap is an array of [originalText, nodes] arrays
-              originalTextsMap.forEach(([originalText, nodes]) => {
-                if (originalText && translatedData[0] && translatedData[0].text) {
-                  translationMap.set(originalText, translatedData[0].text);
+              // workingOriginalTextsMap is an array of [originalText, nodes] arrays
+              workingOriginalTextsMap.forEach(([originalText, nodes], index) => {
+                if (originalText && translatedData[index] && translatedData[index].text) {
+                  translationMap.set(originalText, translatedData[index].text);
                   this.logger.debug("Added translation to map:", {
                     original: originalText,
-                    translated: translatedData[0].text
+                    translated: translatedData[index].text,
+                    index: index
                   });
                 }
               });

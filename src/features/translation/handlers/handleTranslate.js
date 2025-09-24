@@ -32,14 +32,6 @@ export async function handleTranslate(message, sender) {
       throw new Error("Background service or translation engine not initialized.");
     }
 
-    // Initialize UnifiedTranslationService if not already initialized
-    if (!unifiedTranslationService.translationEngine) {
-      unifiedTranslationService.initialize({
-        translationEngine: backgroundService.translationEngine,
-        backgroundService: backgroundService
-      });
-    }
-
     // Validate the incoming message format using MessagingStandards
     if (!MessageFormat.validate(message)) {
       throw new Error(`Invalid message format received: ${JSON.stringify(message)}`);

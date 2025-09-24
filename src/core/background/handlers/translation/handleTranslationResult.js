@@ -18,6 +18,12 @@ export async function handleTranslationResult(message) {
   try {
     logger.debug('Handling TRANSLATION_RESULT_UPDATE via UnifiedService:', message.messageId);
 
+    // Check if UnifiedTranslationService is initialized
+    if (!unifiedTranslationService.translationEngine) {
+      logger.warn('UnifiedTranslationService not initialized, skipping result handling');
+      return { success: false, error: 'Service not initialized' };
+    }
+
     // Check for duplicate processing
     if (processedResults.has(message.messageId)) {
       logger.debug('Skipping duplicate translation result:', message.messageId);

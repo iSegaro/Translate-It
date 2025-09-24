@@ -3,6 +3,7 @@
 
 import { LifecycleManager } from "@/core/managers/core/LifecycleManager.js";
 import { registerAllProviders } from "@/features/translation/providers/register-providers.js";
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
@@ -40,7 +41,14 @@ globalThis.backgroundService = backgroundService;
 
 backgroundService.initialize().then(() => {
   logger.debug("✅ [Background] Background service initialization completed!");
-  
+
+  // Initialize UnifiedTranslationService with dependencies
+  unifiedTranslationService.initialize({
+    translationEngine: backgroundService.translationEngine,
+    backgroundService: backgroundService
+  });
+  logger.debug("✅ [Background] UnifiedTranslationService initialized!");
+
   // Initialize Memory Garbage Collector
   initializeGlobalCleanup();
   if (isDevelopmentMode()) {

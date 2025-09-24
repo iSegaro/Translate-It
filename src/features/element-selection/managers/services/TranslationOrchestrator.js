@@ -222,7 +222,12 @@ export class TranslationOrchestrator extends ResourceTracker {
         // Otherwise, handle the result directly
         if (result.success && result.translatedText) {
           await this.handleTranslationResult({ messageId, data: result });
-          return { success: true, translatedText: result.translatedText };
+          // Return the result with originalTextsMap for non-streaming handling
+          return {
+            success: true,
+            translatedText: result.translatedText,
+            originalTextsMap: originalTextsMap
+          };
         }
 
         return result;
@@ -291,7 +296,12 @@ this.translationRequests.delete(messageId);
       // Otherwise, handle the result directly
       if (result.success && result.translatedText) {
         await this.handleTranslationResult({ messageId, data: result });
-        return { success: true, translatedText: result.translatedText };
+        // Return the result with originalTextsMap for non-streaming handling
+        return {
+          success: true,
+          translatedText: result.translatedText,
+          originalTextsMap: originalTextsMap
+        };
       }
 
       return result;
@@ -302,17 +312,8 @@ this.translationRequests.delete(messageId);
    * Determine if a translation should use streaming based on payload size
    */
   isStreamingTranslation(jsonPayload) {
-    // Only use streaming for content longer than 500 characters
-    try {
-      const parsedPayload = JSON.parse(jsonPayload);
-      const totalLength = Array.isArray(parsedPayload)
-        ? parsedPayload.reduce((sum, item) => sum + (item.text || '').length, 0)
-        : (parsedPayload.text || '').length;
-      return totalLength > 500;
-    } catch {
-      // If parsing fails, use string length
-      return jsonPayload.length > 500;
-    }
+    // Always use streaming for Select Element mode to avoid requestTracker issues
+    return true;
   }
 
   /**
