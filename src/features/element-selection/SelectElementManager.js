@@ -612,6 +612,10 @@ class SelectElementManager extends ResourceTracker {
       }
       
       this.logger.info("Prepared translation data:", {
+        targetElement: targetElement,
+        targetElementTag: targetElement.tagName,
+        targetElementClass: targetElement.className,
+        targetInnerHTML: targetElement.innerHTML.substring(0, 500),
         textNodesCount: textNodes.length,
         foundTexts: textNodes.map(node => node.textContent.trim()),
         originalTextsMap: Array.from(originalTextsMap.entries()),
@@ -633,7 +637,7 @@ class SelectElementManager extends ResourceTracker {
         });
 
         // For non-streaming translations, we need to apply the result here
-        if (result.success && result.translatedText) {
+        if (result.success && result.translatedText && !result.streaming) {
           try {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();

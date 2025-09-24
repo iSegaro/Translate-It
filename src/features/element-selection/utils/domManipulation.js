@@ -282,8 +282,16 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
   const cache = getElementSelectionCache();
   let processedCount = 0;
 
+  // Filter out undefined or null text nodes to prevent errors
+  const validTextNodes = textNodes.filter(node => node && node.nodeType === Node.TEXT_NODE);
+
+  logger.debug('Filtered text nodes', {
+    originalCount: textNodes.length,
+    validCount: validTextNodes.length
+  });
+
   // Handle chunked translations by maintaining node order
-  textNodes.forEach((textNode, nodeIndex) => {
+  validTextNodes.forEach((textNode, nodeIndex) => {
     if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
       return;
     }
@@ -308,108 +316,98 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
     if (translatedText && trimmedOriginalText) {
       try {
+        // Additional safety check for parentNode
+        if (!textNode.parentNode) {
+          logger.warn('Text node has no parent, skipping translation', {
+            textContent: textNode.textContent.substring(0, 50)
+          });
+          return;
+        }
+
         const parentElement = textNode.parentNode;
         const uniqueId = generateUniqueId();
 
-        // Create container span for translation
-        const containerSpan = document.createElement("span");
-        containerSpan.setAttribute("data-aiwc-original-id", uniqueId);
-        containerSpan.setAttribute("data-aiwc-original-text", originalText);
+        // Create outer wrapper (similar to working extension)
+        const wrapperSpan = document.createElement("span");
+        wrapperSpan.className = "aiwc-translation-wrapper";
+        wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
 
-        // Apply correct text direction to container using wrapper approach
-        correctTextDirection(containerSpan, translatedText, {
-          useWrapperElement: true,
+        // Create inner span for translated content
+        const translationSpan = document.createElement("span");
+        translationSpan.className = "aiwc-translation-inner";
+        translationSpan.textContent = translatedText;
+
+        // Apply text direction to the wrapper
+        correctTextDirection(wrapperSpan, translatedText, {
+          useWrapperElement: false,
           preserveExisting: true
         });
 
-        // Check if parent is an inline element - if so, treat newlines as spaces
-        const parentDisplay = window.getComputedStyle(parentElement).display;
-        const isInlineContext = parentDisplay === 'inline' || parentDisplay === 'inline-block';
+        // Add the translation span to the wrapper
+        wrapperSpan.appendChild(translationSpan);
 
-        // For inline contexts, convert newlines to spaces to prevent unwanted line breaks
-        let processedOriginalText = originalText;
-        let processedTranslatedText = translatedText;
+        // Replace the original text node with the wrapper
+        // This is more atomic and reduces the chance of DOM interference
+        try {
+          // Store reference to next sibling before replacement
+          const nextSibling = textNode.nextSibling;
 
-        if (isInlineContext) {
-          processedOriginalText = originalText.replace(/\n/g, ' ');
-          processedTranslatedText = translatedText.replace(/\n/g, ' ');
-        }
+          // Remove the original text node
+          parentElement.removeChild(textNode);
 
-        // Handle multi-line text
-        const originalLines = processedOriginalText.split("\n");
-        const translatedLines = processedTranslatedText.split("\n");
-
-        // Ensure we have the same number of lines
-        while (translatedLines.length < originalLines.length) {
-          translatedLines.push("");
-        }
-
-        originalLines.forEach((originalLine, index) => {
-          const translatedLine = translatedLines[index] !== undefined ? translatedLines[index] : "";
-          const innerSpan = document.createElement("span");
-
-          // Check if this line had leading/trailing spaces in original
-          const hasLeadingSpace = /^\s/.test(originalLine);
-          const hasTrailingSpace = /\s$/.test(originalLine);
-
-          // Add data attributes for spacing information
-          if (hasLeadingSpace) {
-            innerSpan.setAttribute("data-aiwc-leading-space", "true");
-          }
-          if (hasTrailingSpace) {
-            innerSpan.setAttribute("data-aiwc-trailing-space", "true");
+          // Insert the wrapper at the same position
+          if (nextSibling) {
+            parentElement.insertBefore(wrapperSpan, nextSibling);
+          } else {
+            parentElement.appendChild(wrapperSpan);
           }
 
-          innerSpan.textContent = translatedLine;
+          // Store the original text content in the wrapper for potential revert
+          wrapperSpan.setAttribute("data-aiwc-original-text", originalText);
 
-          // Store original text data in cache with line info
-          cache.storeOriginalText(`${uniqueId}_line_${index}`, {
-            originalText: originalLine,
-            translatedText: translatedLine,
-            wrapperElement: innerSpan,
-            lineIndex: index,
-            totalLines: originalLines.length,
-            hasLeadingSpace,
-            hasTrailingSpace
+          logger.debug('Successfully replaced text node with wrapper', {
+            uniqueId: uniqueId,
+            originalText: originalText.substring(0, 50)
           });
+        } catch (error) {
+          logger.error('Failed to replace text node with wrapper', error, {
+            uniqueId: uniqueId,
+            parentElement: parentElement.tagName
+          });
+          return;
+        }
 
-          containerSpan.appendChild(innerSpan);
-
-          // Only add <br> if this is not the last line AND the next line is not empty
-          if (index < originalLines.length - 1 && originalLines[index + 1].trim() !== "") {
-            const br = document.createElement("br");
-            br.setAttribute("data-aiwc-br", "true");
-            containerSpan.appendChild(br);
-          }
+        // Store translation data in cache
+        cache.storeOriginalText(uniqueId, {
+          originalText: originalText,
+          translatedText: translatedText,
+          wrapperElement: wrapperSpan,
+          originalTextNode: textNode,
+          isWrapperBased: true
         });
 
-        // Replace text node with container
-        parentElement.replaceChild(containerSpan, textNode);
         processedCount++;
 
-      } catch (error) {
-        logger.error('Error replacing text node:', error, {
-          textNode,
-          originalText: originalText.substring(0, 50)
+        logger.debug('Translation applied with wrapper', {
+          originalText: originalText.substring(0, 50),
+          translatedText: translatedText.substring(0, 50),
+          uniqueId: uniqueId
         });
 
-        // Handle error through context if available
-        if (context.errorHandler && typeof context.errorHandler.handle === "function") {
-          context.errorHandler.handle(error, {
-            type: 'UI',
-            context: "element-selection-apply-translations",
-            elementId: "text-node-replacement",
-          });
-        }
+      } catch (error) {
+        logger.error('Error applying translation to text node:', error, {
+          originalText: originalText.substring(0, 50),
+          nodeIndex: nodeIndex
+        });
       }
     }
   });
 
-  logger.debug(`Applied translations to ${processedCount} text nodes`);
+  logger.debug(`Applied translations to ${processedCount} text nodes using wrapper approach`);
 }
 
 /**
- * Revert all translations by finding and replacing span elements
+ * Revert all translations by removing wrapper elements and showing original text nodes
  * @param {Object} context - Context object with state and error handling
  * @returns {Promise<number>} Number of successfully reverted elements
  */
@@ -418,98 +416,63 @@ export async function revertTranslations(context) {
   let successfulReverts = 0;
   let failedReverts = 0;
 
-  // Find all span elements with translation data
-  const containers = document.querySelectorAll("span[data-aiwc-original-text]");
+  // Find all wrapper elements with translation data
+  const wrappers = document.querySelectorAll("span.aiwc-translation-wrapper");
 
-  logger.info(`Starting cleanup of ${containers.length} translated elements`);
+  logger.info(`Starting cleanup of ${wrappers.length} translated wrapper elements`);
 
-  containers.forEach((container) => {
-    const originalText = container.getAttribute("data-aiwc-original-text");
-    const originalId = container.getAttribute("data-aiwc-original-id");
+  wrappers.forEach((wrapper) => {
+    const originalId = wrapper.getAttribute("data-aiwc-original-id");
 
-    if (originalText !== null) {
+    if (originalId) {
       try {
-        const parentElement = container.parentNode;
+        const parentElement = wrapper.parentNode;
 
-        // Check if container is wrapped
-        let elementToReplace = container;
-        const wrapper = parentElement;
-        if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
-          elementToReplace = wrapper;
-        }
+        // Find the hidden original text node
+        const originalTextNode = document.querySelector(`[data-aiwc-translation-id="${originalId}"]`);
 
-        // Store computed styles before removal for potential restoration
-        const computedStyles = window.getComputedStyle(container);
-        const savedStyles = {
-          display: computedStyles.display,
-          visibility: computedStyles.visibility,
-          position: computedStyles.position,
-          opacity: computedStyles.opacity
-        };
-
-        // Remove translation-related CSS classes from container and wrapper
-        container.classList.remove('aiwc-translated-text', 'aiwc-rtl-text', 'aiwc-ltr-text');
-        if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
-          wrapper.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
-        }
-
-        // Remove any inline styles added during translation
-        const inlineStylesToRemove = ['background-color', 'color', 'font-weight', 'text-decoration'];
-        inlineStylesToRemove.forEach(style => {
-          if (container.style[style]) {
-            container.style[style] = '';
-          }
-        });
-
-        // Create original text node
-        const originalTextNode = document.createTextNode(originalText);
-
-        // Ensure parent element exists and is valid
-        if (!parentElement) {
-          logger.warn('Container has no parent element, skipping removal', { originalId });
+        if (!originalTextNode) {
+          logger.warn('Original text node not found for wrapper', { originalId });
           failedReverts++;
           return;
         }
 
-        parentElement.replaceChild(originalTextNode, elementToReplace);
+        // Ensure parent element exists and is valid
+        if (!parentElement) {
+          logger.warn('Wrapper has no parent element, skipping removal', { originalId });
+          failedReverts++;
+          return;
+        }
+
+        // Show the original text node again
+        originalTextNode.style.display = "";
+        originalTextNode.removeAttribute("data-aiwc-translation-id");
+
+        // Remove the wrapper element
+        parentElement.removeChild(wrapper);
         successfulReverts++;
 
-        // Remove associated <br> elements
-        let nextNode = originalTextNode.nextSibling;
-        let removedBrCount = 0;
-        while (
-          nextNode &&
-          nextNode.nodeName === "BR" &&
-          nextNode.getAttribute("data-aiwc-br") === "true"
-        ) {
-          const nodeToRemove = nextNode;
-          nextNode = nextNode.nextSibling;
-          nodeToRemove.parentNode.removeChild(nodeToRemove);
-          removedBrCount++;
-        }
-
-        if (removedBrCount > 0) {
-          logger.debug(`Removed ${removedBrCount} associated <br> elements for element ${originalId}`);
-        }
+        logger.debug(`Reverted translation for element ${originalId}`);
 
       } catch (error) {
         failedReverts++;
-        logger.error('Failed to revert container:', error, {
-          containerId: container.getAttribute("data-aiwc-original-id"),
-          containerTagName: container.tagName,
-          parentElement: container.parentNode?.tagName || 'null'
+        logger.error('Failed to revert wrapper:', error, {
+          wrapperId: originalId,
+          parentElement: wrapper.parentNode?.tagName || 'null'
         });
 
         // Attempt cleanup even if revert fails
         try {
-          if (container.parentNode) {
-            // Fallback: just remove the translated element
-            const fallbackNode = document.createTextNode(originalText || '');
-            const parentNode = container.parentNode;
-            const wrapperElement = parentNode.classList.contains('aiwc-translation-wrapper') ? parentNode : null;
-            const elementToRemove = wrapperElement || container;
-            parentNode.replaceChild(fallbackNode, elementToRemove);
-            logger.info('Fallback cleanup completed for failed element');
+          if (wrapper.parentNode) {
+            // Find and show the original text node
+            const originalTextNode = document.querySelector(`[data-aiwc-translation-id="${originalId}"]`);
+            if (originalTextNode) {
+              originalTextNode.style.display = "";
+              originalTextNode.removeAttribute("data-aiwc-translation-id");
+            }
+            // Remove the wrapper
+            wrapper.parentNode.removeChild(wrapper);
+            logger.info('Fallback cleanup completed for failed wrapper');
           }
         } catch (fallbackError) {
           logger.error('Fallback cleanup also failed:', fallbackError);
@@ -519,10 +482,37 @@ export async function revertTranslations(context) {
           context.errorHandler.handle(error, {
             type: 'UI',
             context: "element-selection-revert-translations",
-            elementId: container.getAttribute("data-aiwc-original-id"),
+            elementId: originalId,
             action: 'revert-failed'
           });
         }
+      }
+    }
+  });
+
+  // Also clean up any old-style translations for backward compatibility
+  const oldStyleContainers = document.querySelectorAll("span[data-aiwc-original-text]");
+  oldStyleContainers.forEach((container) => {
+    const originalText = container.getAttribute("data-aiwc-original-text");
+    const containerId = container.getAttribute("data-aiwc-original-id");
+
+    if (originalText !== null) {
+      try {
+        const parentElement = container.parentNode;
+        let elementToReplace = container;
+        const wrapper = parentElement;
+        if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
+          elementToReplace = wrapper;
+        }
+
+        if (parentElement) {
+          const originalTextNode = document.createTextNode(originalText);
+          parentElement.replaceChild(originalTextNode, elementToReplace);
+          successfulReverts++;
+        }
+      } catch (error) {
+        failedReverts++;
+        logger.error('Failed to revert old-style container:', error);
       }
     }
   });

@@ -311,7 +311,7 @@ this.translationRequests.delete(messageId);
   /**
    * Determine if a translation should use streaming based on payload size
    */
-  isStreamingTranslation(jsonPayload) {
+  isStreamingTranslation(_jsonPayload) {
     // Always use streaming for Select Element mode to avoid requestTracker issues
     return true;
   }
@@ -579,13 +579,67 @@ this.translationRequests.delete(messageId);
         // eslint-disable-next-line no-unused-vars
         const _originalTextKey = textsToTranslate[originalIndex];
         
-        const nodesToUpdate = textNodes.filter(node => node.textContent.trim() === originalText.trim());
+        // Try exact match first
+      let nodesToUpdate = textNodes.filter(node => node.textContent.trim() === originalText.trim());
+
+        // If no exact match, the text might be split across multiple nodes
+        if (nodesToUpdate.length === 0) {
+          // Look for nodes that contain parts of the original text
+          const originalTextClean = originalText.trim();
+
+          // Special handling for tweet text which might contain newlines
+          if (originalTextClean.includes('\n') || originalTextClean.includes('...')) {
+            // The text might be split, try to find nodes that contain the key parts
+            const textParts = originalTextClean.split(/[\n...]+/).filter(part => part.length > 10);
+
+            if (textParts.length > 0) {
+              // Find nodes that contain any of the significant parts
+              nodesToUpdate = textNodes.filter(node => {
+                const nodeText = node.textContent.trim();
+                return textParts.some(part =>
+                  nodeText.includes(part) || part.includes(nodeText)
+                );
+              });
+            }
+          } else {
+            // For non-split text, try substring matching
+            const firstPart = originalTextClean.substring(0, Math.min(50, originalTextClean.length));
+            nodesToUpdate = textNodes.filter(node => {
+              const nodeText = node.textContent.trim();
+              return nodeText.includes(firstPart) || firstPart.includes(nodeText);
+            });
+          }
+        }
+
+        this.logger.debug("Looking for nodes to update:", {
+          originalText: originalText,
+          translatedText: translatedText,
+          textNodesContents: textNodes.map(n => n.textContent.trim()),
+          foundNodes: nodesToUpdate.length,
+          usedPartialMatch: nodesToUpdate.length > 0 && textNodes.filter(node => node.textContent.trim() === originalText.trim()).length === 0
+        });
 
         if (nodesToUpdate.length > 0) {
-            const translationMap = new Map([[originalText, translatedText]]);
+            // With wrapper-based approach, we simply map each node to the full translation
+            // The wrapper will hide the original text and show the translation
+            const translationMap = new Map();
+
+            // For each node to update, create a mapping from its current text to the translation
+            nodesToUpdate.forEach(node => {
+                const nodeText = node.textContent.trim();
+                translationMap.set(nodeText, translatedText);
+            });
+
+            this.logger.debug("Built translation map for wrapper approach:", {
+                originalText,
+                translatedText,
+                nodeCount: nodesToUpdate.length,
+                mapEntries: Array.from(translationMap.entries()).slice(0, 3) // Show first 3 entries
+            });
+
             this.applyTranslationsToNodes(nodesToUpdate, translationMap);
             request.translatedSegments.set(expandedIndex, translatedText);
-            
+
             // CACHE FIX: Store streaming translations in the global cache for future retrieval
             const { getElementSelectionCache } = await import("../../utils/cache.js");
             const cache = getElementSelectionCache();
@@ -1178,7 +1232,7 @@ this.translationRequests.delete(messageId);
       });
 
       // Send retry request
-      const result = await sendMessage(translationRequest);
+      await sendMessage(translationRequest);
 
       this.logger.info('Retry translation request sent successfully', {
         retryMessageId,

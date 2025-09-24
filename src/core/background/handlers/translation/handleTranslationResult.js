@@ -6,7 +6,7 @@ import browser from 'webextension-polyfill';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 // Track processed results to prevent duplicates
-const processedResults = new Set();
+const processedResults = new Map();
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslationResult');
 
@@ -25,18 +25,27 @@ export async function handleTranslationResult(message) {
     }
 
     // Check for duplicate processing
-    if (processedResults.has(message.messageId)) {
-      logger.debug('Skipping duplicate translation result:', message.messageId);
-      return { success: true, skipped: true, reason: 'duplicate' };
+    // Only skip if this is a non-streaming result that was already processed
+    const isStreaming = message.data?.streaming;
+    const isFinalResult = !isStreaming && message.data?.success;
+
+    if (processedResults.has(message.messageId) && isFinalResult) {
+      // Check if the previous processed result was a streaming update
+      // If so, allow this final result to proceed
+      const wasStreaming = processedResults.get(message.messageId) === 'streaming';
+      if (!wasStreaming) {
+        logger.debug('Skipping duplicate translation result:', message.messageId);
+        return { success: true, skipped: true, reason: 'duplicate' };
+      }
     }
 
-    // Mark as processed
-    processedResults.add(message.messageId);
+    // Mark as processed with type
+    processedResults.set(message.messageId, isStreaming ? 'streaming' : 'final');
 
     // Clean up old processed results (prevent memory leak)
     if (processedResults.size > 1000) {
-      const oldest = processedResults.values().next().value;
-      processedResults.delete(oldest);
+      const oldestKey = processedResults.keys().next().value;
+      processedResults.delete(oldestKey);
     }
 
     // Check if this is a streaming update
