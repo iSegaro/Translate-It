@@ -196,10 +196,12 @@ async function validateFirefoxExtension() {
     const warningLine = `Warnings:  ${results.warnings.toString().padStart(3, ' ')}`
     const noticeLine = `Notices:   ${results.notices.toString().padStart(3, ' ')}`
 
+    console.log(`║${' '.repeat(64)}║`)
     console.log(`║${centerText(statusLine)}║`)
     console.log(`║${centerText(errorLine)}║`)
     console.log(`║${centerText(warningLine)}║`)
     console.log(`║${centerText(noticeLine)}║`)
+    console.log(`║${' '.repeat(64)}║`)
     console.log('╠════════════════════════════════════════════════════════════════╣')
     console.log(`║${centerText('🦊 Firefox Extension Ready for Add-ons Store Submission!')}║`)
     console.log('╚════════════════════════════════════════════════════════════════╝\n')

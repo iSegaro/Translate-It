@@ -82,8 +82,9 @@ Build time: ${((Date.now() - startTime) / 1000).toFixed(1)}s
     // Step 5: Success summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1)
     
-    console.log('\n' + createSuccessBox('🎉 ALL BUILDS COMPLETED'))
     const horizontalLine = '═'.repeat(64)
+    console.log('\n╔' + horizontalLine + '╗')
+    console.log(`║${centerText('🎉 ALL BUILDS COMPLETED')}║`)
     console.log(`╠${horizontalLine}╣`)
     console.log(`║${centerText('✅ Chrome Extension Ready')}║`)
     console.log(`║${centerText('✅ Firefox Extension Ready')}║`)

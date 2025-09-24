@@ -49,20 +49,20 @@ async function validateAll() {
     if (totalErrors === 0) {
       console.log(`║${centerText('✅ ALL VALIDATIONS PASSED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
-      console.log('')
-      console.log(`║${centerText('🕸️ Chrome Extension: Ready for Web Store')}║`)
+      console.log(`║${' '.repeat(64)}║`)
+      console.log(`║${centerText('🕸 Chrome Extension: Ready for Web Store')}║`)
       console.log(`║${centerText('🦊 Firefox Extension: Ready for Add-ons Store')}║`)
-      console.log('')
+      console.log(`║${' '.repeat(64)}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
       console.log(`║${centerText(`⏱️ Total validation time: ${duration}s`)}║`)
       console.log(`║${centerText('🚀 Extensions ready for submission!')}║`)
     } else {
       console.log(`║${centerText('❌ VALIDATION FAILED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')
-      console.log('')
+      console.log(`║${' '.repeat(64)}║`)
       console.log(`║${centerText(`Failed validations: ${totalErrors}`)}║`)
       console.log(`║${centerText('Please fix the issues above and re-run validation.')}║`)
-      console.log('')
+      console.log(`║${' '.repeat(64)}║`)
     }
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
     
