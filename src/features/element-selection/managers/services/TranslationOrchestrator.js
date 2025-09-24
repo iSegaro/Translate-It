@@ -563,6 +563,9 @@ this.translationRequests.delete(messageId);
 
     const { textsToTranslate, originMapping, expandedTexts, textNodes } = request;
 
+    // Track multi-segment translations to avoid duplicate node replacement
+    const processedNodeIds = new Set();
+
     for (let i = 0; i < translatedBatch.length; i++) {
         const translatedText = translatedBatch[i];
         const originalText = originalBatch[i];
@@ -576,11 +579,20 @@ this.translationRequests.delete(messageId);
         }
 
         const { originalIndex } = originMapping[expandedIndex];
-        // eslint-disable-next-line no-unused-vars
-        const _originalTextKey = textsToTranslate[originalIndex];
-        
+        const originalTextKey = textsToTranslate[originalIndex];
+
+        // Check if this is part of a multi-segment translation
+        const isMultiSegment = originalText.includes('\n') ||
+                              (originalTextKey && originalTextKey !== originalText &&
+                               (originalTextKey.includes('\n') || originalTextKey.length > 100));
+
         // Try exact match first
-      let nodesToUpdate = textNodes.filter(node => node.textContent.trim() === originalText.trim());
+        let nodesToUpdate = textNodes.filter(node => {
+            const nodeText = node.textContent.trim();
+            // Skip nodes that have already been processed
+            if (processedNodeIds.has(node)) return false;
+            return nodeText === originalText.trim();
+        });
 
         // If no exact match, the text might be split across multiple nodes
         if (nodesToUpdate.length === 0) {
@@ -595,6 +607,7 @@ this.translationRequests.delete(messageId);
             if (textParts.length > 0) {
               // Find nodes that contain any of the significant parts
               nodesToUpdate = textNodes.filter(node => {
+                if (processedNodeIds.has(node)) return false;
                 const nodeText = node.textContent.trim();
                 return textParts.some(part =>
                   nodeText.includes(part) || part.includes(nodeText)
@@ -605,45 +618,113 @@ this.translationRequests.delete(messageId);
             // For non-split text, try substring matching
             const firstPart = originalTextClean.substring(0, Math.min(50, originalTextClean.length));
             nodesToUpdate = textNodes.filter(node => {
+              if (processedNodeIds.has(node)) return false;
               const nodeText = node.textContent.trim();
               return nodeText.includes(firstPart) || firstPart.includes(nodeText);
             });
           }
         }
 
+        // If this is a multi-segment translation and we found nodes, mark them as processed
+        if (isMultiSegment && nodesToUpdate.length > 0) {
+            nodesToUpdate.forEach(node => processedNodeIds.add(node));
+        }
+
         this.logger.debug("Looking for nodes to update:", {
-          originalText: originalText,
-          translatedText: translatedText,
-          textNodesContents: textNodes.map(n => n.textContent.trim()),
-          foundNodes: nodesToUpdate.length,
-          usedPartialMatch: nodesToUpdate.length > 0 && textNodes.filter(node => node.textContent.trim() === originalText.trim()).length === 0
+            originalText: originalText,
+            translatedText: translatedText,
+            textNodesContents: textNodes.map(n => n.textContent.trim()),
+            foundNodes: nodesToUpdate.length,
+            usedPartialMatch: nodesToUpdate.length > 0 && textNodes.filter(node => node.textContent.trim() === originalText.trim()).length === 0,
+            isMultiSegment
         });
 
         if (nodesToUpdate.length > 0) {
-            // With wrapper-based approach, we simply map each node to the full translation
-            // The wrapper will hide the original text and show the translation
-            const translationMap = new Map();
+            // For multi-segment translations, we need to handle them differently
+            if (isMultiSegment) {
+                // Collect all related translations for this multi-segment text
+                const allSegments = [];
 
-            // For each node to update, create a mapping from its current text to the translation
-            nodesToUpdate.forEach(node => {
-                const nodeText = node.textContent.trim();
-                translationMap.set(nodeText, translatedText);
-            });
+                // Find all segments that belong to the same original text
+                for (let j = 0; j < expandedTexts.length; j++) {
+                    const { originalIndex: segOriginalIndex } = originMapping[j];
+                    if (segOriginalIndex === originalIndex) {
+                        // Find the translated text for this segment
+                        const originalSegment = expandedTexts[j];
+                        const segmentIndex = originalBatch.indexOf(originalSegment);
+                        if (segmentIndex !== -1 && segmentIndex < translatedBatch.length) {
+                            allSegments.push(translatedBatch[segmentIndex]);
+                        }
+                    }
+                }
 
-            this.logger.debug("Built translation map for wrapper approach:", {
-                originalText,
-                translatedText,
-                nodeCount: nodesToUpdate.length,
-                mapEntries: Array.from(translationMap.entries()).slice(0, 3) // Show first 3 entries
-            });
+                // Combine all segments into a single translation with proper spacing
+                let combinedTranslation = allSegments.join(' ');
 
-            this.applyTranslationsToNodes(nodesToUpdate, translationMap);
+                // If the original text had newlines, preserve the paragraph structure
+                if (originalTextKey && originalTextKey.includes('\n')) {
+                    // Split the original text by newlines to see the structure
+                    const originalLines = originalTextKey.split('\n').filter(line => line.trim());
+                    if (originalLines.length > 1 && allSegments.length >= originalLines.length) {
+                        // Reconstruct with line breaks
+                        combinedTranslation = allSegments.slice(0, originalLines.length).join('\n\n');
+                    }
+                }
+
+                // Create a translation map with the combined translation
+                const translationMap = new Map();
+                nodesToUpdate.forEach(node => {
+                    const nodeText = node.textContent.trim();
+                    translationMap.set(nodeText, combinedTranslation);
+                });
+
+                this.logger.debug("Built translation map for multi-segment wrapper approach:", {
+                    originalText: originalTextKey,
+                    combinedTranslation,
+                    segments: allSegments.length,
+                    nodeCount: nodesToUpdate.length
+                });
+
+                this.applyTranslationsToNodes(nodesToUpdate, translationMap);
+
+                // Cache all segments
+                for (let j = 0; j < expandedTexts.length; j++) {
+                    const { originalIndex: segOriginalIndex } = originMapping[j];
+                    if (segOriginalIndex === originalIndex) {
+                        const originalSegment = expandedTexts[j];
+                        const segmentIndex = originalBatch.indexOf(originalSegment);
+                        if (segmentIndex !== -1 && segmentIndex < translatedBatch.length) {
+                            const segmentKey = originalSegment;
+                            const { getElementSelectionCache } = await import("../../utils/cache.js");
+                            const cache = getElementSelectionCache();
+                            cache.setTranslation(segmentKey, translatedBatch[segmentIndex]);
+                        }
+                    }
+                }
+            } else {
+                // Single segment translation - use existing logic
+                const translationMap = new Map();
+                nodesToUpdate.forEach(node => {
+                    const nodeText = node.textContent.trim();
+                    translationMap.set(nodeText, translatedText);
+                });
+
+                this.logger.debug("Built translation map for wrapper approach:", {
+                    originalText,
+                    translatedText,
+                    nodeCount: nodesToUpdate.length,
+                    mapEntries: Array.from(translationMap.entries()).slice(0, 3)
+                });
+
+                this.applyTranslationsToNodes(nodesToUpdate, translationMap);
+
+                // Cache the translation
+                const { getElementSelectionCache } = await import("../../utils/cache.js");
+                const cache = getElementSelectionCache();
+                cache.setTranslation(originalText, translatedText);
+            }
+
             request.translatedSegments.set(expandedIndex, translatedText);
-
-            // CACHE FIX: Store streaming translations in the global cache for future retrieval
-            const { getElementSelectionCache } = await import("../../utils/cache.js");
-            const cache = getElementSelectionCache();
-            cache.setTranslation(originalText, translatedText);
         }
     }
   }
