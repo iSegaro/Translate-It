@@ -637,7 +637,16 @@ class SelectElementManager extends ResourceTracker {
         });
 
         // For non-streaming translations or cached translations, we need to apply the result here
-        if (result.success && result.translatedText && (!result.streaming || result.fromCache)) {
+        // Note: If it's a cached streaming result without translatedText, we should skip
+        this.logger.debug("Checking translation result for application:", {
+          success: result.success,
+          hasTranslatedText: !!result.translatedText,
+          streaming: result.streaming,
+          fromCache: result.fromCache,
+          willApply: result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))
+        });
+
+        if (result.success && result.translatedText && (!result.streaming || (result.fromCache && result.translatedText))) {
           try {
             const translatedData = JSON.parse(result.translatedText);
             const translationMap = new Map();
