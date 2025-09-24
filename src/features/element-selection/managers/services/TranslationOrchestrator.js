@@ -103,6 +103,21 @@ export class TranslationOrchestrator extends ResourceTracker {
     return timeout;
   }
 
+  /**
+   * Check if all texts are cached (for SelectElement mode optimization)
+   * @param {Map} originalTextsMap - Map of original texts to nodes
+   * @returns {boolean} - True if all texts are cached
+   */
+  checkIfAllCached(originalTextsMap) {
+    try {
+      const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
+      return textsToTranslate.length === 0 && cachedTranslations.size > 0;
+    } catch (error) {
+      this.logger.warn("Error checking cache status:", error);
+      return false;
+    }
+  }
+
   async processSelectedElement(element, originalTextsMap, textNodes, context = 'select-element') {
     this.logger.operation("Starting advanced translation process for selected element");
 
@@ -161,7 +176,7 @@ export class TranslationOrchestrator extends ResourceTracker {
         });
         // Clear the global translation in progress flag since translation is complete
         window.isTranslationInProgress = false;
-        return { success: true, cached: true };
+        return { success: true, cached: true, cacheOnly: true };
       }
 
       // CACHE FIX: Also handle mixed case where some translations are cached

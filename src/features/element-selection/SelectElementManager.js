@@ -618,18 +618,19 @@ class SelectElementManager extends ResourceTracker {
         originalTextsMap: Array.from(originalTextsMap.entries()),
         nodeToTextMap: Array.from(nodeToTextMap.entries())
       });
-      
-      // Perform translation via orchestrator with context
-      const result = await this.translationOrchestrator.processSelectedElement(targetElement, originalTextsMap, textNodes, 'select-element');
 
-      // Update notification to show translation in progress ONLY if:
-      // 1. Not a cached result (cached results don't need progress notification)
-      // 2. Not "noTexts" result (nothing to translate)
-      // 3. Is a streaming translation (non-streaming completes immediately)
-      // 4. We're in main frame
-      if (window === window.top && result && !result.cached && !result.noTexts && result.streaming) {
+      // Check if all texts are cached before showing notification
+      // For cache-only translations, don't show "Translating..." since they complete instantly
+      const isAllCached = this.translationOrchestrator.checkIfAllCached(originalTextsMap);
+
+      // Update notification to show translation in progress before starting
+      // This gives immediate feedback to the user when they click on an element
+      if (window === window.top && !isAllCached) {
         this.updateNotificationForTranslation();
       }
+
+      // Perform translation via orchestrator with context
+      const result = await this.translationOrchestrator.processSelectedElement(targetElement, originalTextsMap, textNodes, 'select-element');
 
       // Check if result is valid before accessing properties
       if (result && typeof result === 'object') {
