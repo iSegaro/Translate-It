@@ -20,7 +20,7 @@ const RTL_PATTERNS = {
   // Specific language patterns
   ARABIC: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/,
   HEBREW: /[\u0590-\u05FF\uFB1D-\uFB4F]/,
-  PERSIAN: /[\u06A9\u06AF\u06C0-\u06D3\u06F0-\u06F9]/,
+  PERSIAN: /[\u0600-\u06FF]/,  // Complete Persian/Arabic Unicode range
 };
 
 /**
@@ -32,16 +32,28 @@ const RTL_PATTERNS = {
 export function isRTLText(text, options = {}) {
   const {
     comprehensive = true,
-    threshold = 0.3 // Minimum ratio of RTL characters to consider text as RTL
+    threshold = 0.1, // Minimum ratio of RTL characters to consider text as RTL (reduced from 0.3)
+    targetLanguage = null, // Optional: target language for better detection
+    simpleDetection = false // If true, any RTL character makes it RTL
   } = options;
 
   if (!text || typeof text !== 'string') {
     return false;
   }
 
+  // For Persian/Arabic target languages, use more sensitive detection
+  if (targetLanguage && ['fa', 'ar', 'ur', 'he'].includes(targetLanguage)) {
+    // Use simple detection for RTL target languages - any RTL character makes it RTL
+    const rtlPattern = comprehensive ? RTL_PATTERNS.COMPREHENSIVE : RTL_PATTERNS.ARABIC_HEBREW;
+    if (rtlPattern.test(text)) {
+      logger.debug(`RTL detected by target language (${targetLanguage}): using simple detection`);
+      return true;
+    }
+  }
+
   const pattern = comprehensive ? RTL_PATTERNS.COMPREHENSIVE : RTL_PATTERNS.ARABIC_HEBREW;
 
-  if (threshold <= 0) {
+  if (threshold <= 0 || simpleDetection) {
     // Simple detection - any RTL character makes it RTL
     return pattern.test(text);
   }

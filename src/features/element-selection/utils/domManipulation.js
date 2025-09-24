@@ -337,10 +337,16 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         translationSpan.className = "aiwc-translation-inner";
         translationSpan.textContent = translatedText;
 
-        // Apply text direction to the wrapper
+        // Apply text direction to the wrapper with target language if available
+        const detectOptions = context.targetLanguage ? {
+          targetLanguage: context.targetLanguage,
+          simpleDetection: true  // Use simple detection for RTL languages
+        } : {};
+
         correctTextDirection(wrapperSpan, translatedText, {
           useWrapperElement: false,
-          preserveExisting: true
+          preserveExisting: true,
+          detectOptions: detectOptions
         });
 
         // Add the translation span to the wrapper

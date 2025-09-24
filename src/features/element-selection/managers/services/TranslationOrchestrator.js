@@ -987,18 +987,23 @@ this.translationRequests.delete(messageId);
    * @param {Array} textNodes - Array of text nodes to translate
    * @param {Map} translations - Map of original text to translated text
    */
-  applyTranslationsToNodes(textNodes, translations) {
+  async applyTranslationsToNodes(textNodes, translations) {
     this.logger.debug("Applying translations directly to DOM nodes", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
       translations: Array.from(translations.entries())
     });
 
-    // Create simple context for the extraction utility
+    // Get target language for better RTL detection
+    const { getTargetLanguageAsync } = await import("../../../../config.js");
+    const targetLanguage = await getTargetLanguageAsync();
+
+    // Create context with target language for improved RTL detection
     const context = {
       state: {
         originalTexts: this.stateManager.originalTexts || new Map()
-      }
+      },
+      targetLanguage: targetLanguage
     };
 
     // Use the existing applyTranslationsToNodes from extraction utilities
@@ -1006,7 +1011,8 @@ this.translationRequests.delete(messageId);
 
     this.logger.debug("Translations applied directly to DOM nodes", {
       appliedCount: translations.size,
-      result: result
+      result: result,
+      targetLanguage: targetLanguage
     });
   }
 
