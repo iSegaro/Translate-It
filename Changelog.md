@@ -1,3 +1,11 @@
+#### v1.3.1 – Released September on 25, 2025
+
+#### Fixed
+
+- Fixed issue where the floating window was not displayed in Firefox
+
+---
+
 #### v1.3.0 – Released September on 25, 2025
 
 ##### Added
