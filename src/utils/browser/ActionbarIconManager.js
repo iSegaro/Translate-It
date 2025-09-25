@@ -141,13 +141,13 @@ class ActionbarIconManager extends ResourceTracker {
   async createCompositeIcon(provider) {
     try {
       // Load main extension icon
-      const mainIconData = await this.loadImageData('icons/extension/extension_icon_128.png');
+      const mainIconBitmap = await this.loadImageBitmap('icons/extension/extension_icon_128.png');
 
       // Load provider overlay icon
       const providerIconPath = this.getProviderIconPath(provider);
-      const providerIconData = await this.loadImageData(providerIconPath);
+      const providerIconBitmap = await this.loadImageBitmap(providerIconPath);
 
-      if (!mainIconData || !providerIconData) {
+      if (!mainIconBitmap || !providerIconBitmap) {
         logger.error('Failed to load main icon or provider icon');
         return null;
       }
@@ -160,24 +160,59 @@ class ActionbarIconManager extends ResourceTracker {
         const canvas = new OffscreenCanvas(size, size);
         const ctx = canvas.getContext('2d');
 
-        // Draw main icon
-        ctx.putImageData(mainIconData[size], 0, 0);
+        // Draw main icon (scaled to full size)
+        ctx.drawImage(mainIconBitmap, 0, 0, size, size);
 
         // Calculate overlay size and position (bottom-right corner)
-        const overlaySize = Math.floor(size * 0.4); // 40% of main icon size
-        const overlayX = size - overlaySize - Math.floor(size * 0.05); // 5% padding
-        const overlayY = size - overlaySize - Math.floor(size * 0.05);
+        const overlaySize = Math.floor(size * 0.65); // 65% of main icon size for better visibility
+        const overlayX = size - overlaySize - Math.floor(size * 0.02); // 2% padding
+        const overlayY = size - overlaySize - Math.floor(size * 0.02);
 
-        // Draw provider overlay
-        ctx.putImageData(providerIconData[size], overlayX, overlayY);
+        // Create temporary canvas for provider icon with transparency
+        const providerCanvas = new OffscreenCanvas(overlaySize, overlaySize);
+        const providerCtx = providerCanvas.getContext('2d');
+
+        // Draw provider icon with scaling and transparency
+        providerCtx.globalAlpha = 0.9; // Slight transparency for better blending
+        providerCtx.drawImage(providerIconBitmap, 0, 0, overlaySize, overlaySize);
+
+        // Draw provider overlay onto main canvas
+        ctx.drawImage(providerCanvas, overlayX, overlayY);
 
         // Get final composite image data
         compositeImageData[size] = ctx.getImageData(0, 0, size, size);
       }
 
+      // Cleanup
+      mainIconBitmap.close();
+      providerIconBitmap.close();
+
       return compositeImageData;
     } catch (error) {
       logger.error('Error creating composite icon:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Load image and return as ImageBitmap
+   */
+  async loadImageBitmap(iconPath) {
+    try {
+      // Get full URL for the icon
+      const fullUrl = browser.runtime.getURL(iconPath);
+
+      // Fetch the image
+      const response = await fetch(fullUrl);
+      if (!response.ok) {
+        logger.error(`Failed to fetch image: ${fullUrl}`);
+        return null;
+      }
+
+      // Create bitmap from image
+      return await createImageBitmap(await response.blob());
+    } catch (error) {
+      logger.error('Error in loadImageBitmap:', error);
       return null;
     }
   }
