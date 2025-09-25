@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
 import analyzerPkg from 'rollup-plugin-analyzer'
-const { analyzer } = analyzerPkg
+const analyzer = analyzerPkg.default || analyzerPkg
 
 export default defineConfig({
   plugins: [
