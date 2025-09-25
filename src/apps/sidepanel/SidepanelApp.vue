@@ -43,7 +43,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
-import { applyTheme } from '@/utils/ui/theme.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -71,6 +71,12 @@ const loadingText = ref('Loading Sidepanel...')
 const hasError = ref(false)
 const errorMessage = ref('')
 
+// Lazy-loaded theme application
+const applyThemeLazy = async (theme) => {
+  const { applyTheme } = await utilsFactory.getUIUtils();
+  return applyTheme(theme);
+};
+
 // Message listener
 const handleMessage = (message, _sender, _sendResponse) => {
   // Only handle specific sidepanel messages, let other messages be handled by background
@@ -80,13 +86,13 @@ const handleMessage = (message, _sender, _sendResponse) => {
   } else if (message.action === 'LANGUAGE_CHANGED') {
     logger.debug('Language changed from options:', message.payload.lang);
     changeLanguage(message.payload.lang);
-    return false; // Don't keep channel open  
+    return false; // Don't keep channel open
   } else if (message.action === 'THEME_CHANGED') {
     logger.debug('Theme changed from options:', message.payload.theme);
-    applyTheme(message.payload.theme).catch(error => logger.error('Failed to apply theme:', error));
+    applyThemeLazy(message.payload.theme).catch(error => logger.error('Failed to apply theme:', error));
     return false; // Don't keep channel open
   }
-  
+
   // Let other messages (like TRANSLATE) be handled by background service worker
   return false;
 };
@@ -97,7 +103,7 @@ const handleSystemThemeChange = (event) => {
   if (currentTheme === 'auto') {
     const systemTheme = event.matches ? 'dark' : 'light'
     logger.debug('System theme changed in auto mode:', systemTheme)
-    applyTheme('auto').catch(error => logger.error('Failed to apply auto theme:', error))
+    applyThemeLazy('auto').catch(error => logger.error('Failed to apply auto theme:', error))
   }
 };
 
@@ -120,7 +126,7 @@ const initialize = async () => {
     // Step 3: Apply theme
     const settings = settingsStore.settings
     logger.debug('Applying initial theme:', settings.THEME)
-    await applyTheme(settings.THEME)
+    await applyThemeLazy(settings.THEME)
 
     // Step 4: Add message listener with automatic cleanup
     tracker.addEventListener(browser.runtime.onMessage, 'addListener', handleMessage)

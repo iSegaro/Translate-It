@@ -3,7 +3,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
-import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -101,6 +101,7 @@ export function useHistory() {
   // Clear all history
   const clearAllHistory = async () => {
     try {
+      const { getTranslationString } = await utilsFactory.getI18nUtils();
       const confirmMessage =
         (await getTranslationString("CONFIRM_CLEAR_ALL_HISTORY")) ||
         "Are you sure you want to clear all translation history?";

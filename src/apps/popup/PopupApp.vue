@@ -108,7 +108,7 @@ import TranslationForm from '@/components/popup/TranslationForm.vue'
 import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
-import { applyTheme } from '@/utils/ui/theme.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -174,10 +174,16 @@ const toggleEnhancedVersion = () => {
   logger.debug('🔄 Enhanced Version toggle clicked! Current:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
   useEnhancedVersion.value = !useEnhancedVersion.value
   logger.debug('[PopupApp] Switched to version:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
-  
+
   // Store preference
   localStorage.setItem('popup-enhanced-version', useEnhancedVersion.value.toString())
 }
+
+// Lazy-loaded theme application
+const applyThemeLazy = async (theme) => {
+  const { applyTheme } = await utilsFactory.getUIUtils();
+  return applyTheme(theme);
+};
 
 const initialize = async () => {
   try {
@@ -194,7 +200,7 @@ const initialize = async () => {
     
     // Step 3: Apply theme
     const settings = settingsStore.settings
-    await applyTheme(settings.THEME)
+    await applyThemeLazy(settings.THEME)
     
     // Step 4: Check for saved version preference
     const savedVersion = localStorage.getItem('popup-enhanced-version')
