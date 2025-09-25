@@ -128,9 +128,40 @@ export default defineConfig({
             return 'components-content'
           }
           
-          // Utility chunks
+          // Utils splitting - organized by functionality
           if (id.includes('src/utils')) {
-            return 'utils'
+            // Text processing utilities
+            if (id.includes('utils/rendering') || id.includes('utils/text')) {
+              return 'utils-text'
+            }
+
+            // i18n and language utilities (heaviest)
+            if (id.includes('utils/i18n') || id.includes('utils/languages')) {
+              return 'utils-i18n'
+            }
+
+            // Browser-specific utilities
+            if (id.includes('utils/browser')) {
+              return 'utils-browser'
+            }
+
+            // UI utilities
+            if (id.includes('utils/ui')) {
+              return 'utils-ui'
+            }
+
+            // Security and storage utilities
+            if (id.includes('utils/secureStorage') || id.includes('utils/security')) {
+              return 'utils-security'
+            }
+
+            // Provider and HTML generation utilities
+            if (id.includes('utils/provider') || id.includes('utils/html')) {
+              return 'utils-provider'
+            }
+
+            // Small core utilities (messaging, etc.)
+            return 'utils-core'
           }
           
           // Store chunks
@@ -160,7 +191,11 @@ export default defineConfig({
           if (name.startsWith('components-')) {
             return `js/components/${name}.${hash}.js`
           }
-          
+
+          if (name.startsWith('utils-')) {
+            return `js/utils/${name}.${hash}.js`
+          }
+
           return `js/${name}.${hash}.js`
         },
         
@@ -283,7 +318,14 @@ export default defineConfig({
       // Exclude large features for code splitting
       'src/features/screen-capture',
       'src/features/element-selection',
-      'src/features/iframe-support'
+      'src/features/iframe-support',
+      // Exclude utils modules for lazy loading and code splitting
+      'src/utils/i18n',
+      'src/utils/browser',
+      'src/utils/rendering',
+      'src/utils/ui',
+      'src/utils/secureStorage.js',
+      'src/utils/providerHtmlGenerator.js'
     ]
   },
   
