@@ -53,15 +53,14 @@ class ActionbarIconManager extends ResourceTracker {
     try {
       logger.debug(`🎨 Updating icon for: ${provider}`);
 
-      // Get icon path and convert to imageData
-      const iconPath = this.getProviderIconPath(provider);
-      const imageData = await this.loadImageData(iconPath);
+      // Create composite icon with provider overlay
+      const compositeImageData = await this.createCompositeIcon(provider);
 
-      if (imageData) {
-        await this.setBrowserIconWithImageData(imageData);
+      if (compositeImageData) {
+        await this.setBrowserIconWithImageData(compositeImageData);
         logger.debug(`✅ Icon updated for: ${provider}`);
       } else {
-        logger.warn(`⚠️ Failed to load image data for: ${provider}`);
+        logger.warn(`⚠️ Failed to create composite icon for: ${provider}`);
       }
 
     } catch (error) {
@@ -132,6 +131,53 @@ class ActionbarIconManager extends ResourceTracker {
       return imageData;
     } catch (error) {
       logger.error('Error in loadImageData:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create composite icon with provider overlay
+   */
+  async createCompositeIcon(provider) {
+    try {
+      // Load main extension icon
+      const mainIconData = await this.loadImageData('icons/extension/extension_icon_128.png');
+
+      // Load provider overlay icon
+      const providerIconPath = this.getProviderIconPath(provider);
+      const providerIconData = await this.loadImageData(providerIconPath);
+
+      if (!mainIconData || !providerIconData) {
+        logger.error('Failed to load main icon or provider icon');
+        return null;
+      }
+
+      // Create composite for all sizes
+      const compositeImageData = {};
+      const sizes = [16, 32, 48, 128];
+
+      for (const size of sizes) {
+        const canvas = new OffscreenCanvas(size, size);
+        const ctx = canvas.getContext('2d');
+
+        // Draw main icon
+        ctx.putImageData(mainIconData[size], 0, 0);
+
+        // Calculate overlay size and position (bottom-right corner)
+        const overlaySize = Math.floor(size * 0.4); // 40% of main icon size
+        const overlayX = size - overlaySize - Math.floor(size * 0.05); // 5% padding
+        const overlayY = size - overlaySize - Math.floor(size * 0.05);
+
+        // Draw provider overlay
+        ctx.putImageData(providerIconData[size], overlayX, overlayY);
+
+        // Get final composite image data
+        compositeImageData[size] = ctx.getImageData(0, 0, size, size);
+      }
+
+      return compositeImageData;
+    } catch (error) {
+      logger.error('Error creating composite icon:', error);
       return null;
     }
   }
