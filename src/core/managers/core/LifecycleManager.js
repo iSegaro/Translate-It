@@ -121,11 +121,11 @@ class LifecycleManager extends ResourceTracker {
       'TTS_STOP': Handlers.handleTTSStopLazy,
       'OFFSCREEN_READY': Handlers.handleOffscreenReadyLazy,
       
-      // Element selection handlers
-      'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
-      'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementMode,
-      'setSelectElementState': Handlers.handleSetSelectElementState,
-      'getSelectElementState': Handlers.handleGetSelectElementState,
+      // Element selection handlers - Lazy loaded for better performance
+      'activateSelectElementMode': Handlers.handleActivateSelectElementModeLazy,
+      'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementModeLazy,
+      'setSelectElementState': Handlers.handleSetSelectElementStateLazy,
+      'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
       
       // Screen capture handlers

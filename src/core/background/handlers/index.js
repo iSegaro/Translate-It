@@ -25,11 +25,8 @@ export * from "@/features/translation/handlers/handleCancelTranslation.js";
 // TTS handlers - Lazy loaded for better performance
 export * from "./lazy/handleTTSLazy.js";
 
-// Element selection handlers  
-export * from "@/features/element-selection/handlers/handleActivateSelectElementMode.js";
-export * from "@/features/element-selection/handlers/handleDeactivateSelectElementMode.js";
-export * from "@/features/element-selection/handlers/handleSetSelectElementState.js";
-export * from "@/features/element-selection/handlers/handleGetSelectElementState.js";
+// Element selection handlers - Lazy loaded for better performance
+export * from "./lazy/handleElementSelectionLazy.js";
 export * from "./selection/handleSelectElement.js";
 
 // Screen capture handlers
