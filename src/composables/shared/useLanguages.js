@@ -2,7 +2,8 @@
 // Composable for language management
 
 import { ref, computed } from "vue";
-import { languageList } from "@/utils/i18n/languages.js";
+// TDZ-Safe import for languageList
+import { getLanguageList } from "@/utils/i18n/i18n-wrapper.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
@@ -24,7 +25,7 @@ export function useLanguages() {
     try {
       if (!isLoaded.value) {
         // زبان‌ها از فایل استاتیک بارگذاری می‌شوند
-        languages.value = languageList || [];
+        languages.value = await getLanguageList() || [];
         isLoaded.value = true;
   logger.init('Languages loaded successfully:', languages.value.length,
   );

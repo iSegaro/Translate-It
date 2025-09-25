@@ -128,39 +128,85 @@ export default defineConfig({
             return 'components-content'
           }
           
-          // Utils splitting - organized by functionality
+          // Utils splitting - organized by functionality with more granular chunks
           if (id.includes('src/utils')) {
+            // Messaging utilities (small, critical)
+            if (id.includes('utils/messaging')) {
+              return 'utils-messaging'
+            }
+
             // Text processing utilities
-            if (id.includes('utils/rendering') || id.includes('utils/text')) {
+            if (id.includes('utils/rendering')) {
+              return 'utils-rendering'
+            }
+
+            if (id.includes('utils/text')) {
               return 'utils-text'
             }
 
-            // i18n and language utilities (heaviest)
-            if (id.includes('utils/i18n') || id.includes('utils/languages')) {
-              return 'utils-i18n'
+            // i18n utilities - split further for better code splitting
+            if (id.includes('utils/i18n/i18n')) {
+              return 'utils-i18n-main'
             }
 
-            // Browser-specific utilities
-            if (id.includes('utils/browser')) {
-              return 'utils-browser'
+            if (id.includes('utils/i18n/languages')) {
+              return 'utils-i18n-languages'
+            }
+
+            if (id.includes('utils/i18n/plugin')) {
+              return 'utils-i18n-plugin'
+            }
+
+            if (id.includes('utils/i18n/wrapper')) {
+              return 'utils-i18n-wrapper'
+            }
+
+            // Browser-specific utilities - split by size
+            if (id.includes('utils/browser/compatibility')) {
+              return 'utils-browser-compat'
+            }
+
+            if (id.includes('utils/browser/platform')) {
+              return 'utils-browser-platform'
+            }
+
+            if (id.includes('utils/browser/events')) {
+              return 'utils-browser-events'
+            }
+
+            if (id.includes('utils/browser/ActionbarIconManager')) {
+              return 'utils-browser-actionbar'
             }
 
             // UI utilities
-            if (id.includes('utils/ui')) {
-              return 'utils-ui'
+            if (id.includes('utils/ui/theme')) {
+              return 'utils-ui-theme'
+            }
+
+            if (id.includes('utils/ui/exclusion')) {
+              return 'utils-ui-exclusion'
+            }
+
+            if (id.includes('utils/ui/html-sanitizer')) {
+              return 'utils-ui-sanitizer'
             }
 
             // Security and storage utilities
-            if (id.includes('utils/secureStorage') || id.includes('utils/security')) {
+            if (id.includes('utils/secureStorage')) {
               return 'utils-security'
             }
 
-            // Provider and HTML generation utilities
-            if (id.includes('utils/provider') || id.includes('utils/html')) {
-              return 'utils-provider'
+            // Provider utilities
+            if (id.includes('utils/providerHtmlGenerator')) {
+              return 'utils-provider-html'
             }
 
-            // Small core utilities (messaging, etc.)
+            // UtilsFactory itself
+            if (id.includes('utils/UtilsFactory')) {
+              return 'utils-factory'
+            }
+
+            // Small core utilities that didn't match above
             return 'utils-core'
           }
           
@@ -320,10 +366,17 @@ export default defineConfig({
       'src/features/element-selection',
       'src/features/iframe-support',
       // Exclude utils modules for lazy loading and code splitting
-      'src/utils/i18n',
-      'src/utils/browser',
-      'src/utils/rendering',
-      'src/utils/ui',
+      'src/utils/i18n/i18n.js',
+      'src/utils/i18n/languages.js',
+      'src/utils/i18n/plugin.js',
+      'src/utils/browser/compatibility.js',
+      'src/utils/browser/platform.js',
+      'src/utils/browser/events.js',
+      'src/utils/browser/ActionbarIconManager.js',
+      'src/utils/rendering/TranslationRenderer.js',
+      'src/utils/ui/theme.js',
+      'src/utils/ui/exclusion.js',
+      'src/utils/ui/html-sanitizer.js',
       'src/utils/secureStorage.js',
       'src/utils/providerHtmlGenerator.js'
     ]

@@ -283,7 +283,7 @@ if (!access.isAccessible) {
         // 4. Create the root element for the Vue app and mount it.
         const appRoot = document.createElement('div');
         shadowRoot.appendChild(appRoot);
-        mountContentApp(appRoot);
+        await mountContentApp(appRoot);
 
         logger.info(`Vue UI Host mounted into Shadow DOM with all styles (${executionMode})`, {
           hostId,

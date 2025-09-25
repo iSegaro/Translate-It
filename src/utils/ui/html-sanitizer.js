@@ -4,7 +4,14 @@
 import { filterXSS } from "xss";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'html-sanitizer');
+
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UI, 'html-sanitizer');
+  }
+  return logger;
+};
 
 /**
  * XSS configuration that matches the project's security requirements
@@ -52,7 +59,7 @@ export function safeSetHTML(element, htmlContent) {
     });
   } catch (error) {
     // Fallback to safe text content on error
-    logger.warn("safeSetHTML failed, falling back to textContent:", error);
+    getLogger().warn("safeSetHTML failed, falling back to textContent:", error);
     element.textContent = htmlContent.replace(/<[^>]*>/g, ""); // Strip HTML tags
   }
 }

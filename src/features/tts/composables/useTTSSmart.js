@@ -1,5 +1,6 @@
 import { ref, computed } from "vue";
-import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+// TDZ-Safe import for TTS language utilities
+import { getLanguageCodeForTTS } from "@/utils/i18n/i18n-wrapper.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
@@ -73,7 +74,7 @@ export function useTTSSmart() {
       progress.value = 0;
       currentTTSId.value = generateTTSId();
       
-      let language = getLanguageCodeForTTS(lang) || "en";
+      let language = await getLanguageCodeForTTS(lang) || "en";
       
       // Fallback mapping for languages with limited Google TTS support
       const ttsLanguageFallbacks = {

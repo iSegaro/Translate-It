@@ -5,12 +5,20 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "@/shared/config/config.js";
 
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'TranslationRenderer');
+  }
+  return logger;
+};
+
 /**
  * Renders translation content for WindowsManager
  */
 export class TranslationRenderer {
   constructor(factory, ttsManager) {
-    this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'TranslationRenderer');
+    this.logger = getLogger();
     this.factory = factory;
     this.ttsManager = ttsManager;
   }

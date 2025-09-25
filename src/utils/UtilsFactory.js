@@ -4,7 +4,14 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'UtilsFactory');
+// Lazy initialization to avoid TDZ issues
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'UtilsFactory');
+  }
+  return logger;
+};
 
 /**
  * Factory class for lazy loading utils modules
@@ -16,6 +23,50 @@ class UtilsFactory {
     this.loadedModules = new Map();
     // Loading promises to prevent duplicate loads
     this.loadingPromises = new Map();
+    // Modules that need TDZ-safe loading
+    this.tzdSafeModules = new Set(['i18n', 'languages', 'text', 'ui', 'browser']);
+  }
+
+  /**
+   * TDZ-Safe module loader for problematic modules
+   */
+  async getModuleSafe(moduleName) {
+    if (this.tzdSafeModules.has(moduleName)) {
+      return await this._loadTzdSafeModule(moduleName);
+    }
+    // Fallback to regular loading
+    switch (moduleName) {
+      case 'i18n':
+        return await this.getI18nUtils();
+      case 'browser':
+        return await this.getBrowserUtils();
+      case 'text':
+        return await this.getTextUtils();
+      case 'ui':
+        return await this.getUIUtils();
+      default:
+        throw new Error(`Unknown module: ${moduleName}`);
+    }
+  }
+
+  async _loadTzdSafeModule(moduleName) {
+    getLogger().debug(`Loading ${moduleName} utils with TDZ-safe mode`);
+
+    try {
+      // Use dynamic import to avoid TDZ during module evaluation
+      switch (moduleName) {
+        case 'i18n':
+          return await this._loadI18nUtilsTzdSafe();
+        case 'languages':
+          return await this._loadLanguagesUtilsTzdSafe();
+        default:
+          return await this.getModule(moduleName);
+      }
+    } catch (error) {
+      getLogger().error(`Failed to load ${moduleName} in TDZ-safe mode:`, error);
+      // Fallback to regular loading
+      return await this.getModule(moduleName);
+    }
   }
 
   /**
@@ -41,7 +92,7 @@ class UtilsFactory {
   }
 
   async _loadI18nUtils() {
-    logger.debug('Loading i18n utils lazily');
+    getLogger().debug('Loading i18n utils lazily');
 
     const [
       { translateText, getTranslatedMessage, clearTranslationCache },
@@ -61,6 +112,37 @@ class UtilsFactory {
       normalizeLanguageCode,
       languageList,
       i18nPlugin: i18nPlugin.default
+    };
+  }
+
+  async _loadI18nUtilsTzdSafe() {
+    getLogger().debug('Loading i18n utils with TDZ-safe mode');
+
+    // Load modules one by one to avoid TDZ
+    const i18nModule = await import('./i18n/i18n.js');
+    const languagesModule = await import('./i18n/languages.js');
+    const pluginModule = await import('./i18n/plugin.js');
+
+    return {
+      translateText: i18nModule.translateText,
+      getTranslatedMessage: i18nModule.getTranslatedMessage,
+      clearTranslationCache: i18nModule.clearTranslationCache,
+      getLanguageCodeForTTS: languagesModule.getLanguageCodeForTTS,
+      normalizeLanguageCode: languagesModule.normalizeLanguageCode,
+      languageList: languagesModule.languageList,
+      i18nPlugin: pluginModule.default
+    };
+  }
+
+  async _loadLanguagesUtilsTzdSafe() {
+    getLogger().debug('Loading languages utils with TDZ-safe mode');
+
+    const languagesModule = await import('./i18n/languages.js');
+
+    return {
+      getLanguageCodeForTTS: languagesModule.getLanguageCodeForTTS,
+      normalizeLanguageCode: languagesModule.normalizeLanguageCode,
+      languageList: languagesModule.languageList
     };
   }
 
@@ -87,7 +169,7 @@ class UtilsFactory {
   }
 
   async _loadBrowserUtils() {
-    logger.debug('Loading browser utils lazily');
+    getLogger().debug('Loading browser utils lazily');
 
     const [
       platformUtils,
@@ -132,7 +214,7 @@ class UtilsFactory {
   }
 
   async _loadTextUtils() {
-    logger.debug('Loading text utils lazily');
+    getLogger().debug('Loading text utils lazily');
 
     const [
       rendererModule
@@ -168,7 +250,7 @@ class UtilsFactory {
   }
 
   async _loadUIUtils() {
-    logger.debug('Loading UI utils lazily');
+    getLogger().debug('Loading UI utils lazily');
 
     const [
       themeUtils,
@@ -210,7 +292,7 @@ class UtilsFactory {
   }
 
   async _loadSecurityUtils() {
-    logger.debug('Loading security utils lazily');
+    getLogger().debug('Loading security utils lazily');
 
     const [
       secureStorageModule
@@ -246,7 +328,7 @@ class UtilsFactory {
   }
 
   async _loadProviderUtils() {
-    logger.debug('Loading provider utils lazily');
+    getLogger().debug('Loading provider utils lazily');
 
     const [
       providerHtmlModule
@@ -282,7 +364,7 @@ class UtilsFactory {
   }
 
   async _loadCoreUtils() {
-    logger.debug('Loading core utils lazily');
+    getLogger().debug('Loading core utils lazily');
 
     const [
       messageIdModule
@@ -299,7 +381,7 @@ class UtilsFactory {
    * Clear all cached modules (useful for testing/development)
    */
   clearCache() {
-    logger.debug('Clearing utils factory cache');
+    getLogger().debug('Clearing utils factory cache');
     this.loadedModules.clear();
     this.loadingPromises.clear();
   }

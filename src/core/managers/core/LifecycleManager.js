@@ -8,21 +8,18 @@ import * as Handlers from "@/core/background/handlers/index.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
-import { actionbarIconManager } from '@/utils/browser/ActionbarIconManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
-class LifecycleManager extends ResourceTracker {
+class LifecycleManager {
   constructor() {
-    super('lifecycle-manager')
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
     this.featureLoader = featureLoader;
     this.messageHandler = createMessageHandler();
-    this.dynamicIconManager = actionbarIconManager;
+    this.dynamicIconManager = null;
     // Note: messageHandler.listen() will be called after handlers are registered
   }
 
@@ -83,7 +80,8 @@ class LifecycleManager extends ResourceTracker {
 
   async initializeDynamicIconManager() {
     logger.debug('Initializing ActionbarIconManager...');
-    await this.dynamicIconManager.initialize();
+    const { getActionbarIconManager } = await import('@/utils/browser/ActionbarIconManager.js');
+    this.dynamicIconManager = await getActionbarIconManager();
     logger.debug('ActionbarIconManager initialized');
   }
 
@@ -276,9 +274,6 @@ class LifecycleManager extends ResourceTracker {
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
-    
-    // Use ResourceTracker cleanup for automatic resource management
-    super.cleanup();
     
     logger.debug('LifecycleManager cleanup completed');
   }
