@@ -280,13 +280,21 @@ class SettingsManager {
    * Listen for settings changes
    */
   onChange(key, callback, context = null) {
+    // Validate callback
+    if (typeof callback !== 'function') {
+      logger.error(`Invalid callback provided for ${key}:`, typeof callback, callback)
+      return () => {} // Return noop function
+    }
+
     const listenerId = `${key}_${Date.now()}_${Math.random()}`
 
     if (!this._eventListeners.has(key)) {
       this._eventListeners.set(key, new Map())
     }
 
-    this._eventListeners.get(key).set(listenerId, { callback, context })
+    const listenerObj = { callback, context }
+    Object.freeze(listenerObj) // Prevent modification
+    this._eventListeners.get(key).set(listenerId, listenerObj)
 
     logger.debug(`Listener added for setting: ${key}`)
 
@@ -512,9 +520,14 @@ class SettingsManager {
     // Notify listeners
     const listeners = this._eventListeners.get(key)
     if (listeners) {
-      for (const listener of listeners) {
+      logger.debug(`Notifying ${listeners.size} listeners for ${key}`)
+      for (const listener of listeners.values()) {
         try {
-          listener.callback(newValue, oldValue, key)
+          if (typeof listener.callback === 'function') {
+            listener.callback(newValue, oldValue, key)
+          } else {
+            logger.error(`Invalid callback for ${key}:`, typeof listener.callback, listener)
+          }
         } catch (error) {
           logger.error(`Error in settings listener for ${key}:`, error)
         }
