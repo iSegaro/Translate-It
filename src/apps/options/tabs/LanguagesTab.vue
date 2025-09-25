@@ -2,23 +2,28 @@
   <section class="languages-tab">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
     
-    <div class="setting-group">
-      <label>{{ t('source_language_label') || 'Source Language' }}</label>
-      <LanguageDropdown
-        v-model="sourceLanguage"
-        :languages="sourceLanguages"
-        type="source"
-      />
+    <div v-if="!isLoaded" class="loading-message">
+      Loading languages...
     </div>
-    
-    <div class="setting-group">
-      <label>{{ t('target_language_label') || 'Target Language' }}</label>
-      <LanguageDropdown
-        v-model="targetLanguage"
-        :languages="targetLanguages"
-        type="target"
-      />
-    </div>
+    <template v-else>
+      <div class="setting-group">
+        <label>{{ t('source_language_label') || 'Source Language' }}</label>
+        <LanguageDropdown
+          v-model="sourceLanguage"
+          :languages="sourceLanguages"
+          type="source"
+        />
+      </div>
+      
+      <div class="setting-group">
+        <label>{{ t('target_language_label') || 'Target Language' }}</label>
+        <LanguageDropdown
+          v-model="targetLanguage"
+          :languages="targetLanguages"
+          type="target"
+        />
+      </div>
+    </template>
     
     <!-- Validation errors -->
     <div
@@ -40,7 +45,7 @@ import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
-const { sourceLanguages, targetLanguages } = useLanguages()
+const { sourceLanguages, targetLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
 
@@ -49,7 +54,8 @@ const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
 
 // Sync with settings on mount
-onMounted(() => {
+onMounted(async () => {
+  await loadLanguages();
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
   targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'English'
 })
