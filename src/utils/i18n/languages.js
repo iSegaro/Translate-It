@@ -1,5 +1,7 @@
 // src/utils/i18n/languages.js - Dynamically loaded language packs
 
+import { loadLanguagePack, preloadCoreLanguagePacks, getAvailableLanguageCodes } from './LanguagePackLoader.js';
+
 // A minimal list of languages for UI elements to avoid loading all language data.
 export const basicLanguageList = [
   { code: "en", name: "English" },
@@ -16,11 +18,11 @@ export const basicLanguageList = [
   // Add other frequently used languages here if needed
 ];
 
-// Cache for loaded language data
+// Cache for loaded language data (now managed by LanguagePackLoader)
 const languageCache = new Map();
 
 /**
- * Dynamically imports the data for a specific language.
+ * Dynamically imports the data for a specific language using the new loader.
  * @param {string} code - The language code (e.g., 'en', 'fa').
  * @returns {Promise<Object|null>} The language data object or null if not found.
  */
@@ -30,9 +32,10 @@ export async function getLanguageData(code) {
   }
 
   try {
-    const langModule = await import(`./locales/${code}.json`);
-    const langData = langModule.default;
-    languageCache.set(code, langData);
+    const langData = await loadLanguagePack(code);
+    if (langData) {
+      languageCache.set(code, langData);
+    }
     return langData;
   } catch (error) {
     // console.error(`Failed to load language data for ${code}:`, error);
@@ -46,13 +49,8 @@ export async function getLanguageData(code) {
  * @returns {Promise<Array<Object>>} A promise that resolves to the full list of language objects.
  */
 export async function getFullLanguageList() {
-    const allLanguageCodes = basicLanguageList.map(l => l.code);
-    // Add codes that are not in the basic list
-    // This should be generated from the file system in a real build step
-    const otherCodes = ['bn', 'ur', 'id', 'it', 'sw', 'mr', 'te', 'ta', 'tr', 'vi', 'ko', 'th', 'ms', 'pl', 'nl', 'fil', 'uk', 'ro', 'el', 'cs', 'hu', 'sv', 'no', 'da', 'fi', 'he', 'af', 'sq', 'bg', 'ca', 'hr', 'et', 'lv', 'lt', 'sk', 'sl', 'sr', 'ml', 'kn', 'or', 'pa', 'si', 'ne', 'az', 'be', 'kk', 'uz', 'ps', 'tl'];
-    const allCodes = [...new Set([...allLanguageCodes, ...otherCodes])];
-
-    const promises = allCodes.map(code => getLanguageData(code));
+    const allLanguageCodes = getAvailableLanguageCodes();
+    const promises = allLanguageCodes.map(code => getLanguageData(code));
     const results = await Promise.all(promises);
     return results.filter(Boolean); // Filter out any nulls from failed loads
 }

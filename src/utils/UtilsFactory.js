@@ -97,18 +97,31 @@ class UtilsFactory {
     const [
       i18nUtils,
       languagesUtils,
-      pluginModule
+      pluginModule,
+      languagePackLoader
     ] = await Promise.all([
       import('./i18n/i18n.js'),
       import('./i18n/languages.js'),
-      import('./i18n/plugin.js')
+      import('./i18n/plugin.js'),
+      import('./i18n/LanguagePackLoader.js')
     ]);
+
+    // Preload core languages in background
+    languagePackLoader.preloadCoreLanguagePacks().catch(err => {
+      getLogger().debug('Failed to preload core languages:', err);
+    });
 
     return {
       ...i18nUtils,
       ...languagesUtils,
       i18nPlugin: pluginModule.default,
-      setI18nLocale: pluginModule.setI18nLocale
+      setI18nLocale: pluginModule.setI18nLocale,
+      languagePackLoader: {
+        preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
+        loadLanguagePack: languagePackLoader.loadLanguagePack,
+        isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
+        getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
+      }
     };
   }
 

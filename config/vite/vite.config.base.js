@@ -138,6 +138,14 @@ export const createBaseConfig = (browser, options = {}) => {
             
             // Utility chunks
             if (id.includes('src/utils')) {
+              // Special handling for locale files - create separate chunks
+              if (id.includes('src/utils/i18n/locales')) {
+                const localeMatch = id.match(/locales\/([a-z]{2,3})\.json$/);
+                if (localeMatch) {
+                  return `locales/${localeMatch[1]}`;
+                }
+                return 'utils/locales-other';
+              }
               return 'utils/utils'
             }
             
