@@ -31,11 +31,15 @@ const translationsCache = new Map();
 
 /**
  * Clear translations cache (useful when language changes)
+ * @alias clearTranslationCache - for backward compatibility
  */
 export function clearTranslationsCache() {
   translationsCache.clear();
   getLogger().debug('Translations cache cleared');
 }
+
+// Export with backward compatibility name
+export const clearTranslationCache = clearTranslationsCache;
 
 /**
  * بارگذاری ترجمه‌ها برای زبان مشخص به همراه استفاده از کش.
