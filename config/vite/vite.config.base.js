@@ -116,6 +116,10 @@ export const createBaseConfig = (browser, options = {}) => {
             }
             
             if (id.includes('src/components/feature')) {
+              // Split FontSelector and font detector into separate chunk
+              if (id.includes('FontSelector') || id.includes('SystemFontDetector')) {
+                return 'components/components-fonts'
+              }
               return 'components/components-feature'
             }
             
@@ -127,13 +131,27 @@ export const createBaseConfig = (browser, options = {}) => {
             if (id.includes('src/capture') || id.includes('ScreenCapture')) {
               return 'features/feature-capture'
             }
-            
+
             if (id.includes('src/subtitle') || id.includes('Subtitle')) {
               return 'features/feature-subtitle'
             }
-            
+
             if (id.includes('src/utils/tts') || id.includes('TTS')) {
               return 'features/feature-tts'
+            }
+
+            // API settings - split into separate chunk
+            if (id.includes('src/apps/options/tabs/ApiTab') ||
+                id.includes('OpenAIOptions') ||
+                id.includes('GoogleOptions') ||
+                id.includes('GeminiOptions') ||
+                id.includes('ClaudeOptions') ||
+                id.includes('GroqOptions') ||
+                id.includes('DeepSeekOptions') ||
+                id.includes('MistralOptions') ||
+                id.includes('PerplexityOptions') ||
+                id.includes('LLaMAOptions')) {
+              return 'features/api-settings'
             }
             
             // Utility chunks - more granular splitting
