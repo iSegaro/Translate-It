@@ -167,8 +167,10 @@ if (!access.isAccessible) {
     if (!validateExtensionContext('content-script-initialization')) {
       return;
     }
-    // Initialize IFrameManager for enhanced iframe support
-    const { iFrameManager } = await import('@/features/iframe-support/managers/IFrameManager.js');
+    // Initialize IFrameManager for enhanced iframe support - lazy loaded
+    const { IFrameSupportFactory } = await import('@/features/iframe-support/IFrameSupportFactory.js');
+    const iFrameCore = await IFrameSupportFactory.getIFrameManager();
+    const iFrameManager = iFrameCore.iFrameManager;
     
     // Determine execution mode based on frame context
     const isInIframe = window !== window.top;

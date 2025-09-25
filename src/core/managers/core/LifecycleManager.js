@@ -3,9 +3,8 @@ import { featureLoader } from "@/core/background/feature-loader.js";
 
 import { initializeSettingsListener } from "@/shared/config/config.js";
 import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
-// TTS imports removed - now using lazy loading
 import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
-import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
+import * as Handlers from "@/core/background/handlers/index.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';

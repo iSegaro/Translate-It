@@ -8,7 +8,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/shared/config/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
+// Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
@@ -358,7 +358,10 @@ export class ContextMenuManager extends ResourceTracker {
         data: { active: true, tabId: tab.id }
       };
       const sender = { tab };
-      await handleActivateSelectElementMode(message, sender);
+
+      // Load Element Selection handler lazily
+      const { handleActivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
+      await handleActivateSelectElementModeLazy(message, sender);
     } catch (error) {
       logger.error(`Could not activate select element mode for tab ${tab.id}:`, error);
     }

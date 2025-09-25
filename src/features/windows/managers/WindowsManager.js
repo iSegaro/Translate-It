@@ -8,8 +8,7 @@ import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
 import { TranslationHandler as WindowsTranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
-import { useTTSSmart } from "@/features/tts/composables/useTTSSmart.js";
-import { TTSGlobalManager as globalTTSManager } from "@/features/tts/core/TTSGlobalManager.js";
+// TTS functionality will be loaded lazily when needed
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
@@ -63,9 +62,9 @@ export class WindowsManager extends ResourceTracker {
     // Initialize core modules for business logic only
     this.state = new WindowsState(this.crossFrameManager.frameId);
     
-    // Initialize TTS system with unified composable
-    this.tts = useTTSSmart();
-    this.ttsManager = globalTTSManager;
+    // Initialize TTS system - will be loaded lazily when needed
+    this.tts = null;
+    this.ttsManager = null;
     
     // Initialize translation business logic
     this.translationHandler = options.translationHandler || new WindowsTranslationHandler();
@@ -78,14 +77,10 @@ export class WindowsManager extends ResourceTracker {
     
     // Initialize theme management
     this.themeManager = new ThemeManager();
-    
+
     // UI-related modules removed - now handled by Vue UI Host
     // - factory, positionCalculator, smartPositioner
     // - animationManager, translationRenderer, dragHandler
-    
-    // UI elements - deprecated (now handled by Vue UI Host)
-    // this.displayElement = null;
-    // this.innerContainer = null;
     // this.icon = null;
     
     // State flags for selection preservation
@@ -108,6 +103,32 @@ export class WindowsManager extends ResourceTracker {
     
     this._setupEventHandlers();
     this._initialize();
+  }
+
+  /**
+   * Lazy load TTS functionality when needed
+   * @private
+   */
+  async _ensureTTSLoaded() {
+    if (!this.tts || !this.ttsManager) {
+      try {
+        const { TTSFactory } = await import('@/features/tts/TTSFactory.js');
+
+        // Load TTS Smart composable
+        const useTTSSmart = await TTSFactory.getTTSSmart();
+        this.tts = useTTSSmart();
+
+        // Load TTS Global Manager
+        const ttsGlobal = await TTSFactory.getTTSGlobal();
+        this.ttsManager = ttsGlobal.TTSGlobalManager;
+
+        this.logger.debug('[TTS] TTS functionality loaded lazily');
+      } catch (error) {
+        this.logger.error('[TTS] Failed to load TTS functionality:', error);
+        throw error;
+      }
+    }
+    return this.tts;
   }
 
   /**
@@ -562,13 +583,16 @@ export class WindowsManager extends ResourceTracker {
     if (!detail || !detail.text) return;
 
     try {
+      // Load TTS lazily when needed
+      const tts = await this._ensureTTSLoaded();
+
       if (detail.isSpeaking) {
         // Use unified TTS composable
-        await this.tts.speak(detail.text, detail.language || 'auto');
+        await tts.speak(detail.text, detail.language || 'auto');
         this.logger.debug('TTS started via unified composable');
       } else {
         // Stop current TTS
-        await this.tts.stop();
+        await tts.stop();
         this.logger.debug('TTS stopped via unified composable');
       }
     } catch (error) {
@@ -1057,7 +1081,9 @@ export class WindowsManager extends ResourceTracker {
     await this.dismiss();
     this.state.setTranslationCancelled(true);
     try {
-      await this.tts.stopAll();
+      if (this.tts) {
+        await this.tts.stopAll();
+      }
     } catch (error) {
       this.logger.warn('Failed to stop TTS during translation cancellation:', error);
     }
@@ -1251,8 +1277,10 @@ export class WindowsManager extends ResourceTracker {
 
     // Stop any ongoing TTS when dismissing
     try {
-      await this.tts.stopAll();
-      this.logger.debug('[TTS] TTS stopped during WindowsManager dismiss');
+      if (this.tts) {
+        await this.tts.stopAll();
+        this.logger.debug('[TTS] TTS stopped during WindowsManager dismiss');
+      }
     } catch (error) {
       this.logger.warn('[TTS] Failed to stop TTS during dismiss:', error);
     }
