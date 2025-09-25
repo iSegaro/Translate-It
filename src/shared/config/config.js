@@ -110,6 +110,7 @@ export const CONFIG = {
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
+  ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
@@ -619,6 +620,13 @@ export const getRequireCtrlForTextSelectionAsync = async () => {
   return getSettingValueAsync(
     "REQUIRE_CTRL_FOR_TEXT_SELECTION",
     CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION
+  );
+};
+
+export const getEnhancedTripleClickDragAsync = async () => {
+  return getSettingValueAsync(
+    "ENHANCED_TRIPLE_CLICK_DRAG",
+    CONFIG.ENHANCED_TRIPLE_CLICK_DRAG
   );
 };
 

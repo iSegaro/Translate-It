@@ -127,6 +127,17 @@
             {{ t('active_selection_icon_on_textfields_description') || 'Show translation icon when selecting text inside text fields (input, textarea).' }}
           </span>
         </div>
+
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="enhancedTripleClickDrag"
+            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
+          />
+          <span class="setting-description">
+            {{ t('enhanced_triple_click_drag_description') || 'When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs.' }}
+          </span>
+        </div>
       </div>
     </BaseFieldset>
 
@@ -220,6 +231,11 @@ const requireCtrlForTextSelection = computed({
 const activeSelectionIconOnTextfields = computed({
   get: () => settingsStore.settings?.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS || false,
   set: (value) => settingsStore.updateSettingLocally('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', value)
+})
+
+const enhancedTripleClickDrag = computed({
+  get: () => settingsStore.settings?.ENHANCED_TRIPLE_CLICK_DRAG || false,
+  set: (value) => settingsStore.updateSettingLocally('ENHANCED_TRIPLE_CLICK_DRAG', value)
 })
 
 // Dictionary settings
