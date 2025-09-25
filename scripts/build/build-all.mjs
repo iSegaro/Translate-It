@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -10,28 +10,128 @@ import { centerText, createBox, createSuccessBox, createErrorBox } from '../shar
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 
+// Check if parallel mode is enabled
+const isParallel = process.argv.includes('--parallel') || process.argv.includes('--p')
+
+/**
+ * Build Chrome extension asynchronously
+ */
+async function buildChromeAsync() {
+  return new Promise((resolve, reject) => {
+    let stdout = ''
+    let stderr = ''
+
+    const child = spawn('node', ['scripts/build/build-chrome.mjs'], {
+      cwd: rootDir,
+      stdio: 'pipe'
+    })
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true, stdout, stderr })
+      } else {
+        reject(new Error(`Chrome build failed with exit code ${code}`))
+      }
+    })
+
+    child.on('error', (error) => {
+      reject(new Error(`Chrome build process error: ${error.message}`))
+    })
+  })
+}
+
+/**
+ * Build Firefox extension asynchronously
+ */
+async function buildFirefoxAsync() {
+  return new Promise((resolve, reject) => {
+    let stdout = ''
+    let stderr = ''
+
+    const child = spawn('node', ['scripts/build/build-firefox.mjs'], {
+      cwd: rootDir,
+      stdio: 'pipe'
+    })
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true, stdout, stderr })
+      } else {
+        reject(new Error(`Firefox build failed with exit code ${code}`))
+      }
+    })
+
+    child.on('error', (error) => {
+      reject(new Error(`Firefox build process error: ${error.message}`))
+    })
+  })
+}
+
 /**
  * Build all browser extensions and create publish packages
  */
 async function buildAll() {
   try {
     console.log(createBox('🚀 BUILDING ALL EXTENSIONS') + '\n')
-    
+
     const startTime = Date.now()
-    
-    // Step 1: Build Chrome
-    logStep('Building Chrome extension...')
-    execSync('node scripts/build/build-chrome.mjs', { 
-      cwd: rootDir,
-      stdio: 'inherit'
-    })
-    
-    // Step 2: Build Firefox  
-    logStep('Building Firefox extension...')
-    execSync('node scripts/build/build-firefox.mjs', {
-      cwd: rootDir, 
-      stdio: 'inherit'
-    })
+
+    // Build extensions (parallel or sequential based on flag)
+    if (isParallel) {
+      logStep('Building Chrome and Firefox extensions in parallel...')
+
+      // Run builds in parallel and capture outputs
+      const [chromeResult, firefoxResult] = await Promise.all([
+        buildChromeAsync(),
+        buildFirefoxAsync()
+      ])
+
+      // Display Chrome output first
+      if (chromeResult.success) {
+        process.stdout.write(chromeResult.stdout)
+        if (chromeResult.stderr) {
+          process.stderr.write(chromeResult.stderr)
+        }
+      }
+
+      // Display Firefox output second
+      if (firefoxResult.success) {
+        process.stdout.write(firefoxResult.stdout)
+        if (firefoxResult.stderr) {
+          process.stderr.write(firefoxResult.stderr)
+        }
+      }
+    } else {
+      // Step 1: Build Chrome
+      logStep('Building Chrome extension...')
+      execSync('node scripts/build/build-chrome.mjs', {
+        cwd: rootDir,
+        stdio: 'inherit'
+      })
+
+      // Step 2: Build Firefox
+      logStep('Building Firefox extension...')
+      execSync('node scripts/build/build-firefox.mjs', {
+        cwd: rootDir,
+        stdio: 'inherit'
+      })
+    }
     
     // Step 3: Create publish packages
     logStep('Creating publish packages...')
@@ -63,9 +163,9 @@ async function buildAll() {
 - **Manifest**: Version 3
 - **Compatible**: Chrome 88+
 
-## Firefox Extension  
+## Firefox Extension
 - **File**: Translate-It-v${version}-for-Firefox.zip
-- **Manifest**: Version 2
+- **Manifest**: Version 3
 - **Compatible**: Firefox 112+
 
 ## Installation
