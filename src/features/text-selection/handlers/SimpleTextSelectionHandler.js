@@ -42,10 +42,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.selectionTimeout = null;
     this.debounceDelay = 100; // 100ms debounce
 
-    // Enhanced timing for triple-click + drag scenarios
-    this.tripleClickDelay = 300; // Wait time after triple-click to detect drag
-    this.dragThresholdDistance = 5; // Minimum pixels to consider as significant drag
-    this.dragThresholdTime = 200; // Minimum ms to consider as significant drag
+    // Timing for triple-click detection
+    this.tripleClickDelay = 300; // Wait time to detect triple-click
 
     // Settings
     this.enhancedTripleClickDrag = false; // Will be loaded from settings
@@ -60,18 +58,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.mouseDownTime = 0;
     this.lastMouseUpEvent = null;
 
-    // Triple-click detection for improved drag support
-    this.lastClickTime = 0;
-    this.clickCount = 0;
-    this.lastClickTarget = null;
-    this.isTripleClickDetected = false;
-    this.tripleClickSelectionTimeout = null;
-    this.isProcessingTripleClickSelection = false;
-
-    // Enhanced drag detection with timing
+    // Simplified triple-click + drag support
+    this.lastTripleClickTime = 0;
+    this.isWaitingForDragEnd = false;
     this.dragStartTime = 0;
-    this.hasSignificantDrag = false;
-    this.lastMousePosition = { x: 0, y: 0 };
 
     // Element detection service
     this.elementDetection = ElementDetectionService;
@@ -301,18 +291,16 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       clearTimeout(this.selectionTimeout);
     }
 
-    // If enhanced triple-click + drag is enabled and triple-click was detected,
-    // use a longer delay to allow drag operations to complete
-    const effectiveDelay = (this.enhancedTripleClickDrag && this.isTripleClickDetected) ?
-      Math.max(this.debounceDelay, this.tripleClickDelay) : this.debounceDelay;
+    // If waiting for drag end after triple-click, don't process selection yet
+    if (this.isWaitingForDragEnd) {
+      logger.debug('Waiting for drag end after triple-click, skipping selection processing');
+      return;
+    }
 
     // Debounce to avoid excessive processing
     this.selectionTimeout = setTimeout(() => {
-      // Only process if not in the middle of a triple-click + drag operation
-      if (!this.isProcessingTripleClickSelection) {
-        this.processSelection();
-      }
-    }, effectiveDelay);
+      this.processSelection();
+    }, this.debounceDelay);
   }
 
   /**
@@ -616,14 +604,6 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.lastMouseEventTime = Date.now();
     this.isDragging = true;
     this.mouseDownTime = Date.now();
-    this.dragStartTime = Date.now();
-    this.hasSignificantDrag = false;
-
-    // Store mouse position for drag detection
-    this.lastMousePosition = {
-      x: event.clientX,
-      y: event.clientY
-    };
 
     // Update Ctrl state from mouse event if available
     if (event.ctrlKey || event.metaKey) {
@@ -631,56 +611,28 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this.lastKeyEventTime = Date.now();
     }
 
-    // Detect triple-click (only if enhanced mode is enabled)
+    // Simple triple-click detection (only if enhanced mode is enabled)
     if (this.enhancedTripleClickDrag) {
       const currentTime = Date.now();
-      const timeSinceLastClick = currentTime - this.lastClickTime;
+      const timeSinceLastClick = currentTime - this.lastTripleClickTime;
 
-      if (timeSinceLastClick < 300 && // Within 300ms of last click
-          event.target === this.lastClickTarget) { // Same target
-        this.clickCount++;
-        if (this.clickCount >= 3) {
-          this.isTripleClickDetected = true;
-          logger.debug('Triple-click detected - will wait for potential drag');
-        }
-      } else {
-        this.clickCount = 1;
-        this.isTripleClickDetected = false;
+      // Check if this is a triple-click (within 300ms)
+      if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
+        this.isWaitingForDragEnd = true;
+        this.dragStartTime = currentTime;
+        logger.debug('Triple-click detected - waiting for drag end');
       }
 
-      this.lastClickTime = currentTime;
-      this.lastClickTarget = event.target;
+      this.lastTripleClickTime = currentTime;
     }
-
-    logger.debug('Mouse down - drag detection started', {
-      clickCount: this.clickCount,
-      isTripleClick: this.isTripleClickDetected
-    });
   }
 
   /**
-   * Handle mouse move - detect significant drag operations
+   * Handle mouse move - simple drag detection
    */
   handleMouseMove(event) {
-    if (!this.isDragging) return;
-
-    // Calculate distance from last position
-    const distance = Math.sqrt(
-      Math.pow(event.clientX - this.lastMousePosition.x, 2) +
-      Math.pow(event.clientY - this.lastMousePosition.y, 2)
-    );
-
-    // Update last position
-    this.lastMousePosition = {
-      x: event.clientX,
-      y: event.clientY
-    };
-
-    // Check if this qualifies as a significant drag
-    if (distance >= this.dragThresholdDistance ||
-        Date.now() - this.dragStartTime >= this.dragThresholdTime) {
-      this.hasSignificantDrag = true;
-    }
+    // Not needed for simplified triple-click + drag
+    // We only care about mouse up to end the drag
   }
 
   /**
@@ -688,17 +640,6 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    */
   handleMouseUp(event) {
     this.lastMouseEventTime = Date.now();
-    const dragDuration = Date.now() - this.mouseDownTime;
-
-    logger.debug('Mouse up - drag detection ended', {
-      dragDuration,
-      wasDragging: this.isDragging,
-      hasSignificantDrag: this.hasSignificantDrag,
-      isTripleClick: this.isTripleClickDetected,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey
-    });
-
     this.isDragging = false;
     this.lastMouseUpEvent = event; // Store for translation window detection
 
@@ -709,26 +650,14 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     }
 
     // Handle triple-click + drag scenario (only if enhanced mode is enabled)
-    if (this.enhancedTripleClickDrag && this.isTripleClickDetected && this.hasSignificantDrag) {
-      // This was a triple-click followed by drag - wait a bit longer
-      // to ensure the selection is completely finalized
-      this.isProcessingTripleClickSelection = true;
+    if (this.enhancedTripleClickDrag && this.isWaitingForDragEnd) {
+      // This was a triple-click followed by drag - process the selection now
+      this.isWaitingForDragEnd = false;
 
       setTimeout(() => {
         const selection = window.getSelection();
         if (selection && selection.toString().trim()) {
           logger.debug('Processing triple-click + drag selection');
-          this.processSelection();
-        }
-        this.isProcessingTripleClickSelection = false;
-        this.isTripleClickDetected = false;
-      }, 150); // Longer delay for triple-click + drag
-    } else {
-      // Normal selection processing
-      setTimeout(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().trim()) {
-          logger.debug('Processing normal selection after mouse up');
           this.processSelection();
         }
       }, 50); // Small delay to ensure selection is finalized
