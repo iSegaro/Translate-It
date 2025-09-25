@@ -9,6 +9,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -28,10 +29,23 @@ export class TranslationHandler {
     settings = {
         SOURCE_LANGUAGE: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
         TARGET_LANGUAGE: settingsManager.get('TARGET_LANGUAGE', 'fa'),
-        TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'google')
+        TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'google'),
+        ENABLE_DICTIONARY: settingsManager.get('ENABLE_DICTIONARY', true)
       };
 
-      const translationMode = TranslationMode.Selection;
+      // Determine translation mode (same logic as Sidepanel and Popup)
+      let translationMode = TranslationMode.Selection;
+      const isDictionaryCandidate = isSingleWordOrShortPhrase(selectedText);
+      if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+        translationMode = TranslationMode.Dictionary_Translation;
+      }
+
+      this.logger.debug('Translation mode determination:', {
+        text: selectedText?.substring(0, 30) + '...',
+        isDictionaryCandidate,
+        enableDictionary: settings.ENABLE_DICTIONARY,
+        finalMode: translationMode
+      });
 
       // Generate unique messageId
       const messageId = generateTranslationMessageId('content');
