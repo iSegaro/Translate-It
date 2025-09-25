@@ -569,11 +569,16 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   /**
    * Handle mouse down - start drag detection
    */
-  handleMouseDown() {
-
+  handleMouseDown(event) {
     this.lastMouseEventTime = Date.now();
     this.isDragging = true;
     this.mouseDownTime = Date.now();
+
+    // Update Ctrl state from mouse event if available
+    if (event.ctrlKey || event.metaKey) {
+      this.ctrlKeyPressed = true;
+      this.lastKeyEventTime = Date.now();
+    }
 
     logger.debug('Mouse down - drag detection started');
   }
@@ -581,8 +586,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   /**
    * Handle mouse up - end drag detection and process selection if needed
    */
-  handleMouseUp() {
-
+  handleMouseUp(event) {
     this.lastMouseEventTime = Date.now();
     const dragDuration = Date.now() - this.mouseDownTime;
 
