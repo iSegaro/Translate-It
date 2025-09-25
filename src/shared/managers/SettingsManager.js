@@ -44,7 +44,8 @@ class SettingsManager {
       SOURCE_LANGUAGE: 'auto',
       TARGET_LANGUAGE: 'fa',
       TRANSLATION_API: 'google',
-      EXCLUDED_SITES: []
+      EXCLUDED_SITES: [],
+      ENHANCED_TRIPLE_CLICK_DRAG: false
     }
 
     logger.debug('SettingsManager singleton created')
@@ -399,7 +400,8 @@ class SettingsManager {
       'REQUIRE_CTRL_FOR_TEXT_SELECTION',
       'TRANSLATE_WITH_SELECT_ELEMENT',
       'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
-      'ENABLE_DICTIONARY'
+      'ENABLE_DICTIONARY',
+      'ENHANCED_TRIPLE_CLICK_DRAG'
     ]
 
     for (const key of frequentlyAccessed) {
