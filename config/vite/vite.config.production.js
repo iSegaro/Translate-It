@@ -26,14 +26,14 @@ export default defineConfig({
   
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@components': resolve(__dirname, 'src/components'),
-      '@views': resolve(__dirname, 'src/views'),
-      '@store': resolve(__dirname, 'src/store'),
-      '@composables': resolve(__dirname, 'src/composables'),
-      '@utils': resolve(__dirname, 'src/utils'),
-      '@providers': resolve(__dirname, 'src/providers'),
-      '@assets': resolve(__dirname, 'src/assets')
+      '@': resolve(__dirname, '../../src'),
+      '@components': resolve(__dirname, '../../src/components'),
+      '@views': resolve(__dirname, '../../src/views'),
+      '@store': resolve(__dirname, '../../src/store'),
+      '@composables': resolve(__dirname, '../../src/composables'),
+      '@utils': resolve(__dirname, '../../src/utils'),
+      '@providers': resolve(__dirname, '../../src/providers'),
+      '@assets': resolve(__dirname, '../../src/assets')
     }
   },
 
@@ -41,9 +41,9 @@ export default defineConfig({
     outDir: 'dist-vue',
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'popup.html'),
-        sidepanel: resolve(__dirname, 'sidepanel.html'),
-        options: resolve(__dirname, 'options.html')
+        popup: resolve(__dirname, '../../popup.html'),
+        sidepanel: resolve(__dirname, '../../sidepanel.html'),
+        options: resolve(__dirname, '../../options.html')
       },
       
       external: [
@@ -83,22 +83,36 @@ export default defineConfig({
           if (id.includes('src/providers')) {
             return 'providers-core'
           }
-          
+
+          // Provider chunks - lazy loaded (highest priority)
+          if (id.includes('src/features/translation/providers/') && !id.includes('ProviderFactory') && !id.includes('ProviderRegistry') && !id.includes('register-providers')) {
+            const providerMatch = id.match(/providers\/(.+?)\.js/)
+            if (providerMatch) {
+              const providerName = providerMatch[1].toLowerCase()
+              return `provider-${providerName}`
+            }
+            return 'providers'
+          }
+
           // Feature-based chunks
-          if (id.includes('src/capture') || id.includes('ScreenCapture') || id.includes('screen-capture')) {
+          if (id.includes('src/features/screen-capture') || id.includes('ScreenCapture')) {
             return 'feature-capture'
           }
-          
-          if (id.includes('src/subtitle') || id.includes('Subtitle')) {
-            return 'feature-subtitle'
+
+          if (id.includes('src/features/element-selection') || id.includes('SelectElement')) {
+            return 'feature-element-selection'
           }
-          
-          if (id.includes('src/utils/tts') || id.includes('TTS') || id.includes('speech')) {
+
+          if (id.includes('src/features/iframe-support') || id.includes('IFrame')) {
+            return 'feature-iframe'
+          }
+
+          if (id.includes('src/features/text-actions') || id.includes('TextActions')) {
+            return 'feature-text-actions'
+          }
+
+          if (id.includes('src/features/tts') || id.includes('TTS') || id.includes('speech')) {
             return 'feature-tts'
-          }
-          
-          if (id.includes('src/utils/ocr') || id.includes('OCR')) {
-            return 'feature-ocr'
           }
           
           // Component chunks
@@ -134,7 +148,7 @@ export default defineConfig({
           if (name.startsWith('vue-') || name === 'vendor') {
             return `js/vendor/${name}.${hash}.js`
           }
-          
+
           if (name.startsWith('provider-')) {
             return `js/providers/${name}.${hash}.js`
           }
@@ -256,10 +270,20 @@ export default defineConfig({
     ],
     exclude: [
       // Exclude provider implementations for lazy loading
-      'src/providers/implementations',
+      'src/features/translation/providers/GoogleTranslate.js',
+      'src/features/translation/providers/OpenAI.js',
+      'src/features/translation/providers/Gemini.js',
+      'src/features/translation/providers/DeepSeek.js',
+      'src/features/translation/providers/YandexTranslate.js',
+      'src/features/translation/providers/BingTranslate.js',
+      'src/features/translation/providers/OpenRouter.js',
+      'src/features/translation/providers/WebAI.js',
+      'src/features/translation/providers/CustomProvider.js',
+      'src/features/translation/providers/BrowserAPI.js',
       // Exclude large features for code splitting
-      'src/capture',
-      'src/subtitle'
+      'src/features/screen-capture',
+      'src/features/element-selection',
+      'src/features/iframe-support'
     ]
   },
   

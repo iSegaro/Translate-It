@@ -173,7 +173,22 @@ const baseConfig = createBaseConfig('chrome')
 
 // Use production config if in production, otherwise use base config
 const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
-  ? { ...productionConfig, ...baseConfig }
+  ? {
+      ...baseConfig,
+      ...productionConfig,
+      build: {
+        ...baseConfig.build,
+        ...productionConfig.build,
+        rollupOptions: {
+          ...baseConfig.build?.rollupOptions,
+          ...productionConfig.build?.rollupOptions,
+          output: {
+            ...baseConfig.build?.rollupOptions?.output,
+            ...productionConfig.build?.rollupOptions?.output
+          }
+        }
+      }
+    }
   : baseConfig;
 
 export default defineConfig({
@@ -181,6 +196,15 @@ export default defineConfig({
   build: {
     ...(finalConfig.build || {}),
     outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+    rollupOptions: {
+      ...(finalConfig.build?.rollupOptions || {}),
+      // Override entry points to remove them from production config
+      input: undefined,
+      output: {
+        ...(finalConfig.build?.rollupOptions?.output || {}),
+        format: 'es'
+      }
+    }
   },
   plugins: [
     ...(baseConfig.plugins || []),
