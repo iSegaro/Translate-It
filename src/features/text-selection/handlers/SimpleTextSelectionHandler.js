@@ -649,19 +649,15 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
     }
 
-    // Handle triple-click + drag scenario (only if enhanced mode is enabled)
-    if (this.enhancedTripleClickDrag && this.isWaitingForDragEnd) {
-      // This was a triple-click followed by drag - process the selection now
-      this.isWaitingForDragEnd = false;
+    // Process selection after drag ends
+    setTimeout(() => {
+       const selection = window.getSelection();
+       if (selection && selection.toString().trim()) {
+       logger.debug('Processing selection after drag end');
+       this.processSelection();
+       }
+       }, 50); // Small delay to ensure selection is finalized
 
-      setTimeout(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().trim()) {
-          logger.debug('Processing triple-click + drag selection');
-          this.processSelection();
-        }
-      }, 50); // Small delay to ensure selection is finalized
-    }
   }
 
   /**
