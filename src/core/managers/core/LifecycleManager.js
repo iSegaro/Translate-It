@@ -3,14 +3,7 @@ import { featureLoader } from "@/core/background/feature-loader.js";
 
 import { initializeSettingsListener } from "@/shared/config/config.js";
 import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
-import {
-  handleGoogleTTSSpeak,
-  handleGoogleTTSStopAll,
-  handleGoogleTTSPause,
-  handleGoogleTTSResume,
-  handleGoogleTTSGetStatus,
-  handleGoogleTTSEnded,
-} from '@/features/tts/handlers/handleGoogleTTS.js';
+// TTS imports removed - now using lazy loading
 import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
 import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -122,13 +115,11 @@ class LifecycleManager extends ResourceTracker {
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
       'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResult,
 
-      // TTS handlers
-      'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
-      'TTS_STOP': handleGoogleTTSStopAll,
-      'GOOGLE_TTS_PAUSE': handleGoogleTTSPause,
-      'GOOGLE_TTS_RESUME': handleGoogleTTSResume,
-      'GOOGLE_TTS_GET_STATUS': handleGoogleTTSGetStatus,
-      'GOOGLE_TTS_ENDED': handleGoogleTTSEnded,
+      // TTS handlers - Lazy loaded for better performance
+      'GOOGLE_TTS_SPEAK': Handlers.handleTTSSpeakLazy,
+      'TTS_SPEAK': Handlers.handleTTSSpeakLazy,
+      'TTS_STOP': Handlers.handleTTSStopLazy,
+      'OFFSCREEN_READY': Handlers.handleOffscreenReadyLazy,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
