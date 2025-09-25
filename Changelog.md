@@ -4,6 +4,10 @@
 
 - Added support for triple-click
 
+#### Fixed
+
+- Fixed issue with dynamic display of provider icons in Chrome
+
 ---
 
 #### v1.3.2 – Released September on 25, 2025
