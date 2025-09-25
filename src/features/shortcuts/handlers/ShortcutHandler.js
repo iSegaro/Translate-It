@@ -3,8 +3,15 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { detectPlatform, Platform } from '@/utils/browser/platform.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
+
+const Platform = {
+  MAC: 'MAC',
+  WINDOWS: 'WINDOWS',
+  LINUX: 'LINUX',
+  UNKNOWN: 'UNKNOWN'
+};
 
 // Global tracking for debugging multiple instances and singleton enforcement
 if (!window.__shortcutHandlerInstances) {
@@ -37,9 +44,9 @@ export class ShortcutHandler extends ResourceTracker {
     this.translationHandler = null;
     this.featureManager = options.featureManager;
 
-    // Detect platform for proper key combination
-    this.platform = detectPlatform();
-    this.modifierKey = this.platform === Platform.MAC ? 'metaKey' : 'ctrlKey';
+    // Platform will be detected asynchronously in activate()
+    this.platform = null;
+    this.modifierKey = 'ctrlKey'; // Default value, will be updated in activate()
 
     // Track this instance for debugging
     window.__shortcutHandlerInstances.add(this);
@@ -82,6 +89,20 @@ export class ShortcutHandler extends ResourceTracker {
   }
 
   async activate() {
+    // Detect platform if not already done
+    if (!this.platform) {
+      try {
+        const { detectPlatform } = await utilsFactory.getBrowserUtils();
+        this.platform = detectPlatform();
+        this.modifierKey = this.platform === Platform.MAC ? 'metaKey' : 'ctrlKey';
+        getLogger().debug(`Platform detected: ${this.platform}`);
+      } catch (error) {
+        getLogger().error('Failed to detect platform:', error);
+        // Keep default modifierKey if detection fails
+        this.platform = Platform.UNKNOWN;
+      }
+    }
+
     // Check global disable flag - don't activate if disabled
     if (window.__shortcutHandlerDisabled) {
       getLogger().debug('🚫 ShortcutHandler activation blocked - feature is globally disabled');

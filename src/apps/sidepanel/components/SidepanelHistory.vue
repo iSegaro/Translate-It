@@ -98,7 +98,7 @@ import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useUI } from '@/composables/ui/useUI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { languageList } from '@/utils/i18n/languages.js'
+import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
@@ -107,12 +107,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
 
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
-
-// Helper function
-const getLanguageNameByCode = (code) => {
-  const lang = languageList.find(l => l.code === code)
-  return lang?.name || code
-}
+const languages = useLanguages()
 
 // Extract text content from various data types
 const extractTextContent = (content) => {
@@ -203,8 +198,8 @@ const formattedHistoryItems = computed(() => {
       ...item,
       index,
       formattedTime: formatTime(item.timestamp),
-      sourceLanguageName: getLanguageNameByCode(item.sourceLanguage) || item.sourceLanguage,
-      targetLanguageName: getLanguageNameByCode(item.targetLanguage) || item.targetLanguage,
+      sourceLanguageName: languages.getLanguageName(item.sourceLanguage) || item.sourceLanguage,
+      targetLanguageName: languages.getLanguageName(item.targetLanguage) || item.targetLanguage,
       markdownContent: createMarkdownContent(processedTranslatedText),
       // Ensure we have normalized field names
       sourceText: processedSourceText,
@@ -293,6 +288,7 @@ const renderHistoryItems = () => {
 // Initialize component
 const initialize = async () => {
   try {
+    await languages.loadLanguages();
     await loadHistory()
     renderHistoryItems()
     

@@ -92,11 +92,11 @@ class LifecycleManager {
     // Hybrid approach: explicit mapping with validation
     const handlerMappings = {
       // Common handlers
-      'ping': Handlers.handlePing,
-      'openOptionsPage': Handlers.handleOpenOptionsPage,
-      'openURL': Handlers.handleOpenURL,
+      'ping': Handlers.handlePingLazy,
+      'openOptionsPage': Handlers.handleOpenOptionsPageLazy,
+      'openURL': Handlers.handleOpenURLLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
-      'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenus,
+      'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
       
       // Lifecycle handlers
@@ -106,11 +106,11 @@ class LifecycleManager {
       'backgroundReloadExtension': Handlers.handleBackgroundReloadExtension,
       
       // Translation handlers
-      'TRANSLATE': Handlers.handleTranslate,
-      'translateText': Handlers.handleTranslateText,
-      'revertTranslation': Handlers.handleRevertTranslation,
-      'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
-      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResult,
+      'TRANSLATE': Handlers.handleTranslateLazy,
+      'translateText': Handlers.handleTranslateTextLazy,
+      'revertTranslation': Handlers.handleRevertTranslationLazy,
+      'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
+      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResultLazy,
 
       // TTS handlers - Lazy loaded for better performance
       'GOOGLE_TTS_SPEAK': Handlers.handleTTSSpeakLazy,

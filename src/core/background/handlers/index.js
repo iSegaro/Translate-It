@@ -2,11 +2,8 @@
 // This file serves as a barrel file, importing and exporting all individual handlers.
 
 // Common handlers
-export * from "./common/handlePing.js";
-export * from "./common/handleOpenOptionsPage.js";
-export * from "./common/handleOpenURL.js";
+export * from "./lazy/handleCommonLazy.js";
 export * from "./common/handleShowOSNotification.js";
-export * from "./common/handleRefreshContextMenus.js";
 export * from "./common/handleContentScriptWillReload.js";
 
 // Lifecycle handlers
@@ -16,11 +13,7 @@ export * from "./lifecycle/handleRestartContentScript.js";
 export * from "./lifecycle/handleBackgroundReloadExtension.js";
 
 // Translation handlers
-export * from "@/features/translation/handlers/handleTranslate.js";
-export * from "@/features/translation/handlers/handleTranslateText.js";
-export * from "./translation/handleTranslationResult.js";
-export * from "@/features/translation/handlers/handleRevertTranslation.js";
-export * from "@/features/translation/handlers/handleCancelTranslation.js";
+export * from "./lazy/handleTranslationLazy.js";
 
 // TTS handlers - Lazy loaded for better performance
 export * from "./lazy/handleTTSLazy.js";

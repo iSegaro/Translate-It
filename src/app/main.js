@@ -1,8 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import ContentApp from '../apps/content/ContentApp.vue';
-// Async loader for i18n to prevent TDZ
-import { loadI18nPlugin } from '@/utils/i18n/plugin-async-loader.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
@@ -69,8 +68,8 @@ export async function mountContentApp(rootElement) {
 
   // Load i18n plugin asynchronously to prevent TDZ
   try {
-    const i18n = await loadI18nPlugin();
-    app.use(i18n);
+    const { i18nPlugin } = await utilsFactory.getI18nUtils();
+    app.use(i18nPlugin);
   } catch (error) {
     console.warn('Failed to load i18n plugin in content app:', error);
   }

@@ -3,7 +3,7 @@
 
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
 
@@ -174,6 +174,7 @@ class SelectElementNotificationManager extends ResourceTracker {
     try {
       // Update notification based on status
       if (data.status === 'translating') {
+        const { getTranslationString } = await utilsFactory.getI18nUtils();
         // Update the current notification with translation status but keep cancel button
         const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
         const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
@@ -298,6 +299,7 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async createNotificationData(data = {}) {
+    const { getTranslationString } = await utilsFactory.getI18nUtils();
     // Get localized strings
     const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
     const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';

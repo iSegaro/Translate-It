@@ -62,7 +62,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
-import { getLanguageCodeForTTS as getLanguageCode } from '@/utils/i18n/i18n-wrapper.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguageSelector');
 
 
@@ -140,7 +140,7 @@ const swapIcon = computed(() => {
 // Methods
 const handleSwapLanguages = async () => {
   try {
-    // Use CONFIG defaults which have the latest values (migrations ensure storage is up-to-date)
+    const { getLanguageCodeForTTS: getLanguageCode } = await utilsFactory.getI18nUtils();
     const defaultTarget = await getLanguageCode(CONFIG?.TARGET_LANGUAGE) || 'en';
 
     logger.debug('[LanguageSelector] Swap requested:', {

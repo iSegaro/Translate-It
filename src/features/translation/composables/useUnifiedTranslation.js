@@ -15,7 +15,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/config/constants.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
 
@@ -53,12 +53,13 @@ export function useUnifiedTranslation(context = 'popup') {
   // --- Language Management ---
   const resetLanguagesToDefaults = async () => {
     try {
+      const { findLanguageCode } = await utilsFactory.getI18nUtils();
       const [savedSource, savedTarget] = await Promise.all([
         getSourceLanguageAsync(),
         getTargetLanguageAsync()
       ]);
-      sourceLanguage.value = getLanguageCode(savedSource) || AUTO_DETECT_VALUE;
-      targetLanguage.value = getLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
+      sourceLanguage.value = await findLanguageCode(savedSource) || AUTO_DETECT_VALUE;
+      targetLanguage.value = await findLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
       logger.debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
     } catch (error) {
       logger.error(`[${context}] Failed to reset languages:`, error);
@@ -216,13 +217,14 @@ export function useUnifiedTranslation(context = 'popup') {
   };
 
   // --- Lifecycle & Watchers ---
-  watch(() => translationStore.currentTranslation, (newTranslation) => {
+  watch(() => translationStore.currentTranslation, async (newTranslation) => {
     if (newTranslation) {
+      const { findLanguageCode } = await utilsFactory.getI18nUtils();
       logger.debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
       sourceText.value = newTranslation.sourceText || '';
       translatedText.value = newTranslation.translatedText || '';
-      sourceLanguage.value = getLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
-      targetLanguage.value = getLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
+      sourceLanguage.value = await findLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
+      targetLanguage.value = await findLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
       errorManager.clearError();
     }
   }, { deep: true });

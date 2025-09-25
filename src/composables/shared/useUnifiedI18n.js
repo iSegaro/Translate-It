@@ -4,9 +4,7 @@
 import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-// TDZ-Safe imports for i18n utilities
-import { getTranslationString as getTranslationStringAsync, clearTranslationsCache as clearTranslationsCacheAsync } from '@/utils/i18n/i18n-wrapper.js'
-import { getI18nPlugin } from '@/utils/i18n/plugin-wrapper.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -77,13 +75,14 @@ export function useUnifiedI18n() {
    */
   const tAsync = async (key, langCode) => {
     try {
-      const translation = await getTranslationStringAsync(key, langCode)
+      const { getTranslationString } = await utilsFactory.getI18nUtils()
+      const translation = await getTranslationString(key, langCode)
       return translation || key
     } catch (error) {
       logger.debug('Async translation failed for key:', key, error)
       return key
     }
-  }
+  };
 
   /**
    * Change language across the entire extension
@@ -92,24 +91,26 @@ export function useUnifiedI18n() {
   const changeLanguage = async (langCode) => {
     try {
       logger.debug('Changing unified language to:', langCode)
-      
+
       // Normalize the locale code
       const normalizedLocale = normalizeLocale(langCode)
       logger.debug('Normalized locale:', normalizedLocale)
 
+      // Get utils from factory
+      const { clearTranslationCache, setI18nLocale } = await utilsFactory.getI18nUtils()
+
       // 1. Clear legacy translations cache to ensure fresh translations
-      await clearTranslationsCacheAsync()
-      
+      await clearTranslationCache()
+
       // 2. Update vue-i18n locale and load messages if needed
-      const i18nPlugin = await getI18nPlugin()
-      await i18nPlugin.setI18nLocale(normalizedLocale)
+      await setI18nLocale(normalizedLocale)
 
       // 3. Update settings store with original value (for backward compatibility)
       await settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', langCode)
 
       // 4. Send message to background to refresh context menus with new locale
       try {
-        await browser.runtime.sendMessage({ 
+        await browser.runtime.sendMessage({
           action: MessageActions.REFRESH_CONTEXT_MENUS,
           locale: normalizedLocale
         })
@@ -150,8 +151,8 @@ export function useUnifiedI18n() {
       if (newLang) {
         const normalizedLang = normalizeLocale(newLang)
         if (normalizedLang !== locale.value) {
-          const i18nPlugin = await getI18nPlugin()
-          i18nPlugin.setI18nLocale(normalizedLang).catch(err =>
+          const { setI18nLocale } = await utilsFactory.getI18nUtils()
+          setI18nLocale(normalizedLang).catch(err =>
             logger.warn('Failed to sync locale from settings:', err)
           )
         }

@@ -95,9 +95,9 @@ class UtilsFactory {
     getLogger().debug('Loading i18n utils lazily');
 
     const [
-      { translateText, getTranslatedMessage, clearTranslationCache },
-      { getLanguageCodeForTTS, normalizeLanguageCode, languageList },
-      i18nPlugin
+      i18nUtils,
+      languagesUtils,
+      pluginModule
     ] = await Promise.all([
       import('./i18n/i18n.js'),
       import('./i18n/languages.js'),
@@ -105,13 +105,10 @@ class UtilsFactory {
     ]);
 
     return {
-      translateText,
-      getTranslatedMessage,
-      clearTranslationCache,
-      getLanguageCodeForTTS,
-      normalizeLanguageCode,
-      languageList,
-      i18nPlugin: i18nPlugin.default
+      ...i18nUtils,
+      ...languagesUtils,
+      i18nPlugin: pluginModule.default,
+      setI18nLocale: pluginModule.setI18nLocale
     };
   }
 
@@ -124,13 +121,10 @@ class UtilsFactory {
     const pluginModule = await import('./i18n/plugin.js');
 
     return {
-      translateText: i18nModule.translateText,
-      getTranslatedMessage: i18nModule.getTranslatedMessage,
-      clearTranslationCache: i18nModule.clearTranslationCache,
-      getLanguageCodeForTTS: languagesModule.getLanguageCodeForTTS,
-      normalizeLanguageCode: languagesModule.normalizeLanguageCode,
-      languageList: languagesModule.languageList,
-      i18nPlugin: pluginModule.default
+      ...i18nModule,
+      ...languagesModule,
+      i18nPlugin: pluginModule.default,
+      setI18nLocale: pluginModule.setI18nLocale
     };
   }
 

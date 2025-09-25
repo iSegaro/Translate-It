@@ -56,8 +56,8 @@ export function useExclusionChecker() {
   };
 
   // Static helper for quick checks
-  const shouldConsiderFeature = (featureName, url = window.location.href) => {
-    return ExclusionChecker.shouldConsiderFeature(featureName, url);
+  const shouldConsiderFeature = async (featureName, url = window.location.href) => {
+    return await ExclusionChecker.shouldConsiderFeature(featureName, url);
   };
 
   return {

@@ -3,7 +3,7 @@ import browser from 'webextension-polyfill';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { generateRevertMessageId } from '@/utils/messaging/messageId.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
@@ -57,6 +57,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
       return true;
     }
 
+    const { generateRevertMessageId } = await utilsFactory.getCoreUtils();
     // Send revert message to content script - let it decide which system to use
     const revertMessage = {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,

@@ -7,7 +7,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/shared/config/config.js';
-import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -142,6 +142,9 @@ export class ContextMenuManager extends ResourceTracker {
     }
     this._menuSetupLock = true;
     try {
+      // Get i18n utility from factory
+      const { getTranslationString } = await utilsFactory.getI18nUtils();
+
       // Clear existing menus first and wait for completion
       await browser.contextMenus.removeAll();
       this.createdMenus.clear();
