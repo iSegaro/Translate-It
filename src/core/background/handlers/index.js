@@ -29,17 +29,8 @@ export * from "./lazy/handleTTSLazy.js";
 export * from "./lazy/handleElementSelectionLazy.js";
 export * from "./selection/handleSelectElement.js";
 
-// Screen capture handlers
-export * from "@/features/screen-capture/handlers/handleStartAreaCapture.js";
-export * from "@/features/screen-capture/handlers/handleStartFullScreenCapture.js";
-export * from "@/features/screen-capture/handlers/handleRequestFullScreenCapture.js";
-export * from "@/features/screen-capture/handlers/handleProcessAreaCaptureImage.js";
-export * from "@/features/screen-capture/handlers/handlePreviewConfirmed.js";
-export * from "@/features/screen-capture/handlers/handlePreviewCancelled.js";
-export * from "@/features/screen-capture/handlers/handlePreviewRetry.js";
-export * from "@/features/screen-capture/handlers/handleResultClosed.js";
-export * from "@/features/screen-capture/handlers/handleCaptureError.js";
-export * from "@/features/screen-capture/handlers/handleAreaSelectionCancel.js";
+// Screen capture handlers - Lazy loaded for better performance
+export * from "./lazy/handleScreenCaptureLazy.js";
 
 // Text selection handlers
 export * from "./text-selection/handleGetSelectedText.js";
@@ -51,15 +42,5 @@ export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 // Sidepanel handlers
 export * from "./sidepanel/handleOpenSidePanel.js";
 
-// Vue integration handlers
-export * from "./vue-integration/handleTranslateImage.js";
-export * from "./vue-integration/handleProviderStatus.js";
-export * from "./vue-integration/handleTestProviderConnection.js";
-export * from "./vue-integration/handleSaveProviderConfig.js";
-export * from "./vue-integration/handleGetProviderConfig.js";
-export * from "./vue-integration/handleStartScreenCapture.js";
-export * from "./vue-integration/handleCaptureScreenArea.js";
-export * from "./vue-integration/handleUpdateContextMenu.js";
-export * from "./vue-integration/handleGetExtensionInfo.js";
-export * from "./vue-integration/handleLogError.js";
-export * from "./vue/handleVueBridge.js";
+// Vue integration handlers - Lazy loaded for better performance
+export * from "./lazy/handleVueIntegrationLazy.js";

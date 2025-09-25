@@ -127,17 +127,17 @@ class LifecycleManager extends ResourceTracker {
       'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
       
-      // Screen capture handlers
-      'startAreaCapture': Handlers.handleStartAreaCapture,
-      'startFullScreenCapture': Handlers.handleStartFullScreenCapture,
-      'requestFullScreenCapture': Handlers.handleRequestFullScreenCapture,
-      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImage,
-      'previewConfirmed': Handlers.handlePreviewConfirmed,
-      'previewCancelled': Handlers.handlePreviewCancelled,
-      'previewRetry': Handlers.handlePreviewRetry,
-      'resultClosed': Handlers.handleResultClosed,
-      'captureError': Handlers.handleCaptureError,
-      'areaSelectionCancel': Handlers.handleAreaSelectionCancel,
+      // Screen capture handlers - Lazy loaded for better performance
+      'startAreaCapture': Handlers.handleStartAreaCaptureLazy,
+      'startFullScreenCapture': Handlers.handleStartFullScreenCaptureLazy,
+      'requestFullScreenCapture': Handlers.handleRequestFullScreenCaptureLazy,
+      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImageLazy,
+      'previewConfirmed': Handlers.handlePreviewConfirmedLazy,
+      'previewCancelled': Handlers.handlePreviewCancelledLazy,
+      'previewRetry': Handlers.handlePreviewRetryLazy,
+      'resultClosed': Handlers.handleResultClosedLazy,
+      'captureError': Handlers.handleCaptureErrorLazy,
+      'areaSelectionCancel': Handlers.handleAreaSelectionCancelLazy,
       
       // Text selection handlers
       'getSelectedText': Handlers.handleGetSelectedText,
@@ -149,23 +149,23 @@ class LifecycleManager extends ResourceTracker {
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,
       
-      // Vue integration handlers
-      'translateImage': Handlers.handleTranslateImage,
-      'providerStatus': Handlers.handleProviderStatus,
-      'testProviderConnection': Handlers.handleTestProviderConnection,
-      'saveProviderConfig': Handlers.handleSaveProviderConfig,
-      'getProviderConfig': Handlers.handleGetProviderConfig,
-      'startScreenCapture': Handlers.handleStartScreenCapture,
-      'captureScreenArea': Handlers.handleCaptureScreenArea,
-      'updateContextMenu': Handlers.handleUpdateContextMenu,
-      'getExtensionInfo': Handlers.handleGetExtensionInfo,
-      'logError': Handlers.handleLogError,
-      
-      // Vue Bridge handlers
-      'CREATE_VUE_MICRO_APP': Handlers.handleVueBridge,
-      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridge,
-      'START_SCREEN_CAPTURE': Handlers.handleVueBridge,
-      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridge
+      // Vue integration handlers - Lazy loaded for better performance
+      'translateImage': Handlers.handleTranslateImageLazy,
+      'providerStatus': Handlers.handleProviderStatusLazy,
+      'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
+      'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
+      'getProviderConfig': Handlers.handleGetProviderConfigLazy,
+      'startScreenCapture': Handlers.handleStartScreenCaptureLazy,
+      'captureScreenArea': Handlers.handleCaptureScreenAreaLazy,
+      'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
+      'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
+      'logError': Handlers.handleLogErrorLazy,
+
+      // Vue Bridge handlers - Lazy loaded for better performance
+      'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
+      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy,
+      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridgeLazy
     };
     
     // Add browser-specific handlers
