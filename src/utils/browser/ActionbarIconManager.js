@@ -4,7 +4,6 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import SmartCache from '@/core/memory/SmartCache.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
 
@@ -17,22 +16,6 @@ class ActionbarIconManager extends ResourceTracker {
     super('actionbar-icon-manager')
     this.currentProvider = null;
     this.isInitialized = false;
-    this.iconCache = new SmartCache({ maxSize: 50, defaultTTL: 1800000, isCritical: true }); // 30 minutes TTL, mark as critical
-    
-    // Provider icon mapping
-    this.providerIcons = {
-      'google': 'icons/providers/google.png',
-      'gemini': 'icons/providers/gemini.png', 
-      'bing': 'icons/providers/bing.png',
-      'yandex': 'icons/providers/yandex.png',
-      'openai': 'icons/providers/openai.png',
-      'openrouter': 'icons/providers/openrouter.png',
-      'deepseek': 'icons/providers/deepseek.png',
-      'webai': 'icons/providers/webai.png',
-      'custom': 'icons/providers/custom.png',
-      'browserapi': 'icons/providers/chrome-translate.png',
-      'browser': 'icons/providers/provider.png'
-    };
   }
 
   async initialize() {
@@ -69,137 +52,119 @@ class ActionbarIconManager extends ResourceTracker {
   async updateIcon(provider) {
     try {
       logger.debug(`🎨 Updating icon for: ${provider}`);
-      
-      // Check simple cache first
-      let imageData = this.iconCache.get(provider);
-      
-      if (!imageData) {
-        // Generate new icon
-        imageData = await this.generateCompositeIcon(provider);
-        if (imageData) {
-          this.iconCache.set(provider, imageData);
-          logger.debug(`💾 Cached icon for: ${provider}`);
-        }
-      } else {
-        logger.debug(`📦 Using cached icon for: ${provider}`);
-      }
+
+      // Get icon path and convert to imageData
+      const iconPath = this.getProviderIconPath(provider);
+      const imageData = await this.loadImageData(iconPath);
 
       if (imageData) {
-        await this.setBrowserIcon(imageData);
+        await this.setBrowserIconWithImageData(imageData);
         logger.debug(`✅ Icon updated for: ${provider}`);
+      } else {
+        logger.warn(`⚠️ Failed to load image data for: ${provider}`);
       }
-      
+
     } catch (error) {
       logger.error(`❌ Failed to update icon for ${provider}:`, error);
     }
   }
 
+
   /**
-   * Generate composite icon (base + provider overlay)
+   * Get icon path for provider
    */
-  async generateCompositeIcon(provider) {
+  getProviderIconPath(provider) {
+    // Map provider to icon path
+    const providerIconPaths = {
+      'google': 'icons/providers/google.png',
+      'gemini': 'icons/providers/gemini.png',
+      'bing': 'icons/providers/bing.png',
+      'yandex': 'icons/providers/yandex.png',
+      'openai': 'icons/providers/openai.png',
+      'openrouter': 'icons/providers/openrouter.png',
+      'deepseek': 'icons/providers/deepseek.png',
+      'webai': 'icons/providers/webai.png',
+      'custom': 'icons/providers/custom.png',
+      'browserapi': 'icons/providers/chrome-translate.png',
+      'browser': 'icons/providers/provider.png'
+    };
+
+    return providerIconPaths[provider] || 'icons/providers/provider.png';
+  }
+
+  // Note: The following methods are no longer needed with the new path-based approach:
+// - generateCompositeIcon: Removed in favor of static icon paths
+// - fetchIcon: Removed as we now use direct paths
+// - fetchProviderIcon: Removed as we now use direct paths
+
+  /**
+   * Load image and convert to imageData using fetch and OffscreenCanvas
+   */
+  async loadImageData(iconPath) {
     try {
-      // Fetch icons
-      const baseIconPath = typeof browser !== 'undefined' && browser.runtime
-        ? browser.runtime.getURL('icons/extension/extension_icon_32.png')
-        : 'icons/extension/extension_icon_32.png';
-      const baseIconBlob = await this.fetchIcon(baseIconPath);
-      const providerIconBlob = await this.fetchProviderIcon(provider);
+      // Get full URL for the icon
+      const fullUrl = browser.runtime.getURL(iconPath);
 
-      if (!baseIconBlob) {
-        throw new Error('Base icon not found');
+      // Fetch the image
+      const response = await fetch(fullUrl);
+      if (!response.ok) {
+        logger.error(`Failed to fetch image: ${fullUrl}`);
+        return null;
       }
 
-      // Create ImageBitmaps
-      const baseImageBitmap = await createImageBitmap(baseIconBlob);
-      const providerImageBitmap = providerIconBlob ? await createImageBitmap(providerIconBlob) : null;
+      // Create bitmap from image
+      const bitmap = await createImageBitmap(await response.blob());
 
-      // Create OffscreenCanvas
-      const canvas = new OffscreenCanvas(32, 32);
-      const ctx = canvas.getContext('2d');
+      // Convert to imageData for all sizes
+      const imageData = {};
+      const sizes = [16, 32, 48, 128];
 
-      // Draw base icon
-      ctx.drawImage(baseImageBitmap, 0, 0, 32, 32);
-
-      // Draw provider overlay
-      if (providerImageBitmap) {
-        const overlaySize = 20;
-        const overlayX = 32 - overlaySize - 2;
-        const overlayY = 32 - overlaySize - 2;
-        ctx.drawImage(providerImageBitmap, overlayX, overlayY, overlaySize, overlaySize);
+      for (const size of sizes) {
+        const canvas = new OffscreenCanvas(size, size);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, size, size);
+        imageData[size] = ctx.getImageData(0, 0, size, size);
       }
 
-      // Get ImageData
-      const imageData = ctx.getImageData(0, 0, 32, 32);
-      
       // Cleanup
-      baseImageBitmap.close();
-      if (providerImageBitmap) providerImageBitmap.close();
-      
+      bitmap.close();
+
       return imageData;
-      
     } catch (error) {
-      logger.debug(`❌ Icon generation failed: ${error.message}`);
+      logger.error('Error in loadImageData:', error);
       return null;
     }
   }
 
   /**
-   * Fetch icon blob
+   * Set browser icon with imageData
    */
-  async fetchIcon(iconPath) {
+  async setBrowserIconWithImageData(imageData) {
     try {
-      const resolvedPath = browser.runtime.getURL(iconPath);
-      const response = await fetch(resolvedPath);
-      return response.ok ? await response.blob() : null;
-      } catch {
-      logger.debug(`Failed to fetch: ${iconPath}`);
-      return null;
-    }
-  }
-
-  /**
-   * Fetch provider icon
-   */
-  async fetchProviderIcon(provider) {
-    const iconPath = this.providerIcons[provider] || 'icons/providers/provider.png';
-    // Use runtime.getURL for extension icons
-    if (typeof browser !== 'undefined' && browser.runtime) {
-      return this.fetchIcon(browser.runtime.getURL(iconPath));
-    }
-    return this.fetchIcon(iconPath);
-  }
-
-  /**
-   * Set browser icon
-   */
-  async setBrowserIcon(imageData) {
-    try {
-      const iconSizes = { 16: imageData, 32: imageData };
-      
       if (browser.action && browser.action.setIcon) {
-        await browser.action.setIcon({ imageData: iconSizes });
+        await browser.action.setIcon({ imageData: imageData });
       } else if (browser.browserAction && browser.browserAction.setIcon) {
-        await browser.browserAction.setIcon({ imageData: iconSizes });
+        await browser.browserAction.setIcon({ imageData: imageData });
       }
     } catch (error) {
-      logger.debug('❌ Failed to set browser icon:', error);
+      logger.error('Failed to set browser icon with imageData:', error);
+      throw error;
     }
   }
 
   /**
-   * Clear cache
+   * Clear cache - No longer needed with path-based approach
    */
   clearCache() {
-    this.iconCache.clear();
-    logger.debug('🧹 Icon cache cleared');
+    // Cache is no longer used with path-based approach
+    logger.debug('🧹 Icon cache cleared (no-op)');
   }
 
   /**
    * Destroy the icon manager and cleanup all resources
    */
   destroy() {
-    this.iconCache.destroy();
+    // No cache to destroy with path-based approach
     // Call parent destroy
     super.destroy();
     logger.debug('🗑️ ActionbarIconManager destroyed');
