@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
-import { analyzer } from 'rollup-plugin-analyzer'
+import analyzerPkg from 'rollup-plugin-analyzer'
+const { analyzer } = analyzerPkg
 
 export default defineConfig({
   plugins: [
@@ -201,11 +202,7 @@ export default defineConfig({
         drop_console: true,
         drop_debugger: true,
         pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn'],
-        passes: 2,
-        unsafe_arrows: true,
-        unsafe_comps: true,
-        unsafe_math: true,
-        unsafe_methods: true
+        passes: 2
       },
       mangle: {
         safari10: true,

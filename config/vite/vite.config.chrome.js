@@ -6,6 +6,12 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
+// Import production config for production builds
+let productionConfig = null;
+if (process.env.NODE_ENV === 'production') {
+  productionConfig = (await import('./vite.config.production.js')).default;
+}
+
 // Plugin to copy static files and fix HTML paths for extension structure
 function fixExtensionPaths() {
   const copyStaticFiles = async (outDir) => {
@@ -165,10 +171,15 @@ function fixExtensionPaths() {
 
 const baseConfig = createBaseConfig('chrome')
 
+// Use production config if in production, otherwise use base config
+const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
+  ? { ...productionConfig, ...baseConfig }
+  : baseConfig;
+
 export default defineConfig({
-  ...baseConfig,
+  ...finalConfig,
   build: {
-    ...baseConfig.build,
+    ...(finalConfig.build || {}),
     outDir: `dist/chrome/Translate-It-v${pkg.version}`,
   },
   plugins: [
