@@ -1,3 +1,11 @@
+#### v1.X.X – Released X on X, 2025
+
+#### Added
+
+- Added support for triple-click
+
+---
+
 #### v1.3.2 – Released September on 25, 2025
 
 #### Fixed
