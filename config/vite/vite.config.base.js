@@ -136,7 +136,7 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'features/feature-tts'
             }
             
-            // Utility chunks
+            // Utility chunks - more granular splitting
             if (id.includes('src/utils')) {
               // Special handling for locale files - create separate chunks
               if (id.includes('src/utils/i18n/locales')) {
@@ -146,7 +146,69 @@ export const createBaseConfig = (browser, options = {}) => {
                 }
                 return 'utils/locales-other';
               }
-              return 'utils/utils'
+
+              // I18n utilities - more granular splitting
+              if (id.includes('src/utils/i18n')) {
+                // LanguagePackLoader stays separate for dynamic loading
+                if (id.includes('LanguagePackLoader')) {
+                  return 'utils/i18n-loader';
+                }
+                // Main i18n functionality
+                if (id.includes('i18n.js')) {
+                  return 'utils/i18n-main';
+                }
+                // Languages utilities
+                if (id.includes('languages.js')) {
+                  return 'utils/i18n-languages';
+                }
+                // Helper functions
+                if (id.includes('helper.js')) {
+                  return 'utils/i18n-helper';
+                }
+                // Plugin and utilities
+                if (id.includes('plugin.js') || id.includes('localization.js') ||
+                    id.includes('langUtils.js') || id.includes('vue-i18n-macro.js')) {
+                  return 'utils/i18n-utils';
+                }
+                return 'utils/i18n-core';
+              }
+
+              // Browser utilities
+              if (id.includes('src/utils/browser')) {
+                return 'utils/browser';
+              }
+
+              // UI utilities
+              if (id.includes('src/utils/ui')) {
+                return 'utils/ui';
+              }
+
+              // Rendering utilities
+              if (id.includes('src/utils/rendering')) {
+                return 'utils/rendering';
+              }
+
+              // Security utilities
+              if (id.includes('src/utils/secureStorage')) {
+                return 'utils/security';
+              }
+
+              // Messaging utilities
+              if (id.includes('src/utils/messaging')) {
+                return 'utils/messaging';
+              }
+
+              // Provider utilities
+              if (id.includes('src/utils/providerHtmlGenerator')) {
+                return 'utils/provider';
+              }
+
+              // Utils factory itself (keep separate as it's the entry point)
+              if (id.includes('src/utils/UtilsFactory')) {
+                return 'utils/factory';
+              }
+
+              return 'utils/core';
             }
             
             // Store chunks
