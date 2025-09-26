@@ -16,6 +16,9 @@ import ContentApp from '@/apps/content/ContentApp.vue';
 // Import UI utilities
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 
+// Import global styles for the app
+import contentAppStyles from '@/assets/styles/content-app-global.scss?inline';
+
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyVueApp');
 
 let vueApp = null;
@@ -125,6 +128,12 @@ async function createMountPoint() {
     `;
 
     shadowRoot.appendChild(resetStyles);
+
+    // Add main app styles
+    const appStyles = document.createElement('style');
+    appStyles.textContent = contentAppStyles;
+    shadowRoot.appendChild(appStyles);
+
     shadowRoot.appendChild(appContainer);
 
     // Add to document
