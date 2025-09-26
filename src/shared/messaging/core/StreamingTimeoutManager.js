@@ -8,7 +8,14 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
+  }
+  return logger;
+}
 
 export class StreamingTimeoutManager {
   constructor() {
@@ -35,7 +42,7 @@ export class StreamingTimeoutManager {
       gracePeriod = 30000 // Grace period after initial timeout
     } = options;
 
-    logger.debug(`Registering streaming operation: ${messageId}`, {
+    getLogger().debug(`Registering streaming operation: ${messageId}`, {
       initialTimeout,
       maxProgressTimeout,
       gracePeriod
@@ -88,7 +95,7 @@ export class StreamingTimeoutManager {
     streamState.progressCount++;
     this.progressTrackers.set(messageId, now);
 
-    logger.debug(`Progress reported for ${messageId}:`, {
+    getLogger().debug(`Progress reported for ${messageId}:`, {
       progressCount: streamState.progressCount,
       timeSinceStart: now - streamState.startTime,
       progressData
@@ -98,7 +105,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onProgress(progressData);
     } catch (error) {
-      logger.warn(`Error in progress callback for ${messageId}:`, error);
+      getLogger().warn(`Error in progress callback for ${messageId}:`, error);
     }
 
     // Reset timeout since we got progress
@@ -116,7 +123,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    logger.debug(`Streaming completed for ${messageId}:`, {
+    getLogger().debug(`Streaming completed for ${messageId}:`, {
       duration: Date.now() - streamState.startTime,
       progressCount: streamState.progressCount
     });
@@ -131,7 +138,7 @@ export class StreamingTimeoutManager {
       streamState.onComplete(result);
       streamState.resolve(result);
     } catch (error) {
-      logger.warn(`Error in completion callback for ${messageId}:`, error);
+      getLogger().warn(`Error in completion callback for ${messageId}:`, error);
     }
 
     // Cleanup
@@ -149,7 +156,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    logger.debug(`Streaming error for ${messageId}:`, error);
+    getLogger().debug(`Streaming error for ${messageId}:`, error);
 
     streamState.isCompleted = true;
 
@@ -161,7 +168,7 @@ export class StreamingTimeoutManager {
       streamState.onError(error);
       streamState.reject(error);
     } catch (callbackError) {
-      logger.warn(`Error in error callback for ${messageId}:`, callbackError);
+      getLogger().warn(`Error in error callback for ${messageId}:`, callbackError);
     }
 
     // Cleanup
@@ -179,7 +186,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    logger.debug(`Cancelling streaming for ${messageId}: ${reason}`);
+    getLogger().debug(`Cancelling streaming for ${messageId}: ${reason}`);
 
     // Abort the operation
     const abortController = this.abortControllers.get(messageId);
@@ -250,7 +257,7 @@ export class StreamingTimeoutManager {
 
     if (timeSinceProgress < 30000 && streamState.progressCount > 0) {
       // We have recent progress, extend timeout with grace period
-      logger.debug(`Initial timeout reached for ${messageId}, but streaming is active. Extending with grace period.`);
+      getLogger().debug(`Initial timeout reached for ${messageId}, but streaming is active. Extending with grace period.`);
 
       const graceTimeoutHandle = setTimeout(() => {
         this._handleFinalTimeout(messageId);
@@ -276,7 +283,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    logger.warn(`Progress timeout for streaming operation ${messageId}`);
+    getLogger().warn(`Progress timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out - no progress for too long`);
     timeoutError.type = 'PROGRESS_TIMEOUT';
@@ -286,7 +293,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onTimeout();
     } catch (error) {
-      logger.warn(`Error in timeout callback for ${messageId}:`, error);
+      getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
     this.errorStreaming(messageId, timeoutError);
@@ -302,7 +309,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    logger.warn(`Final timeout for streaming operation ${messageId}`);
+    getLogger().warn(`Final timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out completely`);
     timeoutError.type = 'FINAL_TIMEOUT';
@@ -312,7 +319,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onTimeout();
     } catch (error) {
-      logger.warn(`Error in timeout callback for ${messageId}:`, error);
+      getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
     this.errorStreaming(messageId, timeoutError);
@@ -384,7 +391,7 @@ export class StreamingTimeoutManager {
    * Cleanup all operations (for shutdown)
    */
   cleanup() {
-    logger.debug('Cleaning up StreamingTimeoutManager');
+    getLogger().debug('Cleaning up StreamingTimeoutManager');
 
     // Cancel all active operations
     for (const messageId of this.activeStreams.keys()) {

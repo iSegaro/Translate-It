@@ -7,7 +7,15 @@
 import { MessageActions } from './MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessagingCore');
+
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessagingCore');
+  }
+  return logger;
+}
 
 
 /**
@@ -43,7 +51,7 @@ export class MessageFormat {
    */
   static validate(message) {
     if (!message || typeof message !== "object") {
-  logger.warn('Invalid message type or null', message);
+  getLogger().warn('Invalid message type or null', message);
       return false;
     }
 
@@ -57,7 +65,7 @@ export class MessageFormat {
     );
 
     if (!isValid) {
-  logger.warn('Validation failed for message', {
+  getLogger().warn('Validation failed for message', {
         message,
         actionValid: message.action && typeof message.action === "string",
         contextValid: message.context && typeof message.context === "string",
