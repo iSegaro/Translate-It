@@ -9,7 +9,35 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationError')
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationError');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 /**
  * Translation error management composable
@@ -59,7 +87,7 @@ export function useTranslationError(context = 'unknown') {
     }
     
     try {
-      logger.debug(`[${context}] Handling translation error:`, error)
+      getLogger().debug(`[${context}] Handling translation error:`, error)
       
       // Get error information
       const errorInfo = await getErrorForDisplay(error, context)
@@ -85,10 +113,10 @@ export function useTranslationError(context = 'unknown') {
       
       await handleTranslationError(error, context, enhancedOptions)
       
-      logger.debug(`[${context}] Error handled with strategy:`, strategy)
+      getLogger().debug(`[${context}] Error handled with strategy:`, strategy)
       
     } catch (handlerError) {
-      logger.error(`[${context}] Failed to handle translation error:`, handlerError)
+      getLogger().error(`[${context}] Failed to handle translation error:`, handlerError)
       
       // Fallback error state
       currentError.value = error
@@ -111,7 +139,7 @@ export function useTranslationError(context = 'unknown') {
     canRetry.value = false
     canOpenSettings.value = false
     
-    logger.debug(`[${context}] Error state cleared`)
+    getLogger().debug(`[${context}] Error state cleared`)
   }
   
   /**
@@ -131,16 +159,16 @@ export function useTranslationError(context = 'unknown') {
   const getRetryCallback = (retryFunction) => {
     return async () => {
       if (!canRetry.value || !retryFunction) {
-        logger.warn(`[${context}] Retry attempted but not available`)
+        getLogger().warn(`[${context}] Retry attempted but not available`)
         return
       }
       
       try {
-        logger.info(`[${context}] Retrying after error: ${errorType.value}`)
+        getLogger().info(`[${context}] Retrying after error: ${errorType.value}`)
         clearError() // Clear error before retry
         await retryFunction()
       } catch (retryError) {
-        logger.error(`[${context}] Retry failed:`, retryError)
+        getLogger().error(`[${context}] Retry failed:`, retryError)
         await handleError(retryError)
       }
     }
@@ -153,16 +181,16 @@ export function useTranslationError(context = 'unknown') {
   const getSettingsCallback = () => {
     return () => {
       if (!canOpenSettings.value) {
-        logger.warn(`[${context}] Settings attempted but not available`)
+        getLogger().warn(`[${context}] Settings attempted but not available`)
         return
       }
       
       try {
-        logger.info(`[${context}] Opening settings for error: ${errorType.value}`)
+        getLogger().info(`[${context}] Opening settings for error: ${errorType.value}`)
         // Use ErrorHandler's settings callback
         errorHandler.openOptionsPageCallback?.()
       } catch (settingsError) {
-        logger.error(`[${context}] Failed to open settings:`, settingsError)
+        getLogger().error(`[${context}] Failed to open settings:`, settingsError)
       }
     }
   }
@@ -179,7 +207,7 @@ export function useTranslationError(context = 'unknown') {
         return
       }
       
-      logger.debug(`[${context}] Received UI error update:`, errorData)
+      getLogger().debug(`[${context}] Received UI error update:`, errorData)
       
       // Update error state from listener
       currentError.value = errorData
@@ -193,7 +221,7 @@ export function useTranslationError(context = 'unknown') {
     }
     
     unsubscribeListener = errorHandler.addUIErrorListener(listener)
-    logger.debug(`[${context}] Error listener setup`)
+    getLogger().debug(`[${context}] Error listener setup`)
   }
   
   /**
@@ -203,7 +231,7 @@ export function useTranslationError(context = 'unknown') {
     if (unsubscribeListener) {
       unsubscribeListener()
       unsubscribeListener = null
-      logger.debug(`[${context}] Error listener cleaned up`)
+      getLogger().debug(`[${context}] Error listener cleaned up`)
     }
   }
   
