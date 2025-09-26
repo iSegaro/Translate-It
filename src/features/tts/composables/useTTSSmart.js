@@ -6,10 +6,12 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
-const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+// Logger will be initialized inside the function to avoid TDZ
 
 export function useTTSSmart() {
-  
+  // Initialize logger to avoid TDZ
+  const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+
   // Simplified state management
   const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
   const currentTTSId = ref(null);

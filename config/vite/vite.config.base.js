@@ -254,6 +254,37 @@ export const createBaseConfig = (browser, options = {}) => {
             if (id.includes('src/store')) {
               return 'store/store'
             }
+
+            // Content script chunks - new lazy loading architecture
+            if (id.includes('src/core/content-scripts/index')) {
+              // Main entry point - minimal
+              return 'content/content-entry';
+            }
+
+            if (id.includes('src/core/content-scripts/ContentScriptCore')) {
+              // Core infrastructure only
+              return 'content/content-core';
+            }
+
+            if (id.includes('src/core/content-scripts/chunks/lazy-vue-app')) {
+              // Vue app and all UI components
+              return 'content/content-vue';
+            }
+
+            if (id.includes('src/core/content-scripts/chunks/lazy-features')) {
+              // FeatureManager and all features
+              return 'content/content-features';
+            }
+
+            if (id.includes('src/core/content-scripts/legacy-handlers')) {
+              // Legacy fallback handlers
+              return 'content/content-legacy';
+            }
+
+            // Vue apps and components (for content script)
+            if (id.includes('src/apps/') || id.includes('src/components/shared/')) {
+              return 'content/vue-components';
+            }
           },
           
           chunkFileNames: 'js/[name].[hash].js',
