@@ -1,16 +1,44 @@
 // src/core/content-scripts/ContentScriptCore.js
 // Critical infrastructure for content script - minimal initial load
 
-import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { checkContentScriptAccess } from "@/core/tabPermissions.js";
-import ExtensionContextManager from '@/core/extensionContext.js';
-import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
+// Lazy load all dependencies to reduce initial bundle size
+let logger = null;
+let getScopedLogger = null;
+let LOG_COMPONENTS = null;
+let checkContentScriptAccess = null;
+let ExtensionContextManager = null;
+let createMessageHandler = null;
+let mainDomCss = '';
 
-// Import Main DOM CSS as raw string for injection
-import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
+// Async initialization function to load dependencies
+async function loadDependencies() {
+  if (logger) return; // Already loaded
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
+  const [
+    loggerModule,
+    logConstantsModule,
+    tabPermissionsModule,
+    extensionContextModule,
+    messageHandlerModule,
+    cssModule
+  ] = await Promise.all([
+    import("@/shared/logging/logger.js"),
+    import("@/shared/logging/logConstants.js"),
+    import("@/core/tabPermissions.js"),
+    import('@/core/extensionContext.js'),
+    import('@/shared/messaging/core/MessageHandler.js'),
+    import('@/assets/styles/content-main-dom.scss?inline')
+  ]);
+
+  getScopedLogger = loggerModule.getScopedLogger;
+  LOG_COMPONENTS = logConstantsModule.LOG_COMPONENTS;
+  checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
+  ExtensionContextManager = extensionContextModule.default;
+  createMessageHandler = messageHandlerModule.createMessageHandler;
+  mainDomCss = cssModule.default;
+
+  logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
+}
 
 export class ContentScriptCore extends EventTarget {
   constructor() {
@@ -25,11 +53,14 @@ export class ContentScriptCore extends EventTarget {
 
   async initialize() {
     if (this.initialized) {
-      logger.debug('ContentScriptCore already initialized');
+      if (logger) logger.debug('ContentScriptCore already initialized');
       return;
     }
 
     try {
+      // Load dependencies first
+      await loadDependencies();
+
       logger.init('Initializing ContentScriptCore...');
 
       // Check access first
@@ -80,7 +111,11 @@ export class ContentScriptCore extends EventTarget {
       return true;
 
     } catch (error) {
-      logger.error('Failed to initialize ContentScriptCore:', error);
+      if (logger) {
+        logger.error('Failed to initialize ContentScriptCore:', error);
+      } else {
+        console.error('Failed to initialize ContentScriptCore:', error);
+      }
       return false;
     }
   }
@@ -94,7 +129,7 @@ export class ContentScriptCore extends EventTarget {
     // Setup basic infrastructure
     // Note: Heavy imports like Vue, FeatureManager are loaded lazily
 
-    logger.debug('Core infrastructure initialized');
+    if (logger) logger.debug('Core infrastructure initialized');
   }
 
   async initializeMessaging() {
@@ -112,11 +147,15 @@ export class ContentScriptCore extends EventTarget {
       // Activate the message listener
       if (!this.messageHandler.isListenerActive) {
         this.messageHandler.listen();
-        logger.debug('Core message handler activated');
+        if (logger) logger.debug('Core message handler activated');
       }
 
     } catch (error) {
-      logger.error('Failed to initialize messaging:', error);
+      if (logger) {
+        logger.error('Failed to initialize messaging:', error);
+      } else {
+        console.error('Failed to initialize messaging:', error);
+      }
     }
   }
 
@@ -228,8 +267,10 @@ export class ContentScriptCore extends EventTarget {
   }
 
   validateExtensionContext(operation = 'unknown') {
-    if (!ExtensionContextManager.isValidSync()) {
-      logger.debug(`Extension context invalid - ${operation} skipped`);
+    if (!ExtensionContextManager || !ExtensionContextManager.isValidSync()) {
+      if (logger) {
+        logger.debug(`Extension context invalid - ${operation} skipped`);
+      }
       return false;
     }
     return true;
@@ -257,7 +298,9 @@ export class ContentScriptCore extends EventTarget {
 
   // Cleanup method
   cleanup() {
-    logger.debug('Cleaning up ContentScriptCore...');
+    if (logger) {
+      logger.debug('Cleaning up ContentScriptCore...');
+    }
 
     if (this.messageHandler) {
       this.messageHandler.cleanup();
@@ -267,7 +310,9 @@ export class ContentScriptCore extends EventTarget {
     this.featuresLoaded = false;
     this.initialized = false;
 
-    logger.debug('ContentScriptCore cleaned up');
+    if (logger) {
+      logger.debug('ContentScriptCore cleaned up');
+    }
   }
 }
 

@@ -1,11 +1,15 @@
 // Content script entry point - Optimized for lazy loading
 // Minimal initial load with on-demand feature loading
 
-import { contentScriptCore } from './ContentScriptCore.js';
+let contentScriptCore = null;
 
 // Initialize the content script with minimal footprint
 (async () => {
   try {
+    // Dynamically import ContentScriptCore to enable better code splitting
+    const { contentScriptCore: core } = await import('./ContentScriptCore.js');
+    contentScriptCore = core;
+
     // Initialize only critical infrastructure
     const initialized = await contentScriptCore.initialize();
 

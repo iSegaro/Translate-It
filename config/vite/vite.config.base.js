@@ -281,6 +281,19 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'content/content-legacy';
             }
 
+            // Additional content script chunking - force separation of large modules
+            if (id.includes('src/apps/content/')) {
+              return 'content/content-apps';
+            }
+
+            if (id.includes('src/components/content/')) {
+              return 'content/content-components';
+            }
+
+            if (id.includes('@/apps/content/') || id.includes('@/components/content/')) {
+              return 'content/content-ui';
+            }
+
             // Vue apps and components (for content script)
             if (id.includes('src/apps/') || id.includes('src/components/shared/')) {
               return 'content/vue-components';
