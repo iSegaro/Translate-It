@@ -167,17 +167,38 @@ export const createBaseConfig = (browser, options = {}) => {
 
               // I18n utilities - more granular splitting
               if (id.includes('src/utils/i18n')) {
-                // LanguagePackLoader stays separate for dynamic loading
+                // Language loaders - separate chunks for different language types
                 if (id.includes('LanguagePackLoader')) {
-                  return 'utils/i18n-loader';
+                  return 'languages/loader-main';
+                }
+                if (id.includes('TranslationLanguageLoader')) {
+                  return 'languages/loader-translation';
+                }
+                if (id.includes('InterfaceLanguageLoader')) {
+                  return 'languages/loader-interface';
+                }
+                if (id.includes('TtsLanguageLoader')) {
+                  return 'languages/loader-tts';
                 }
                 // Main i18n functionality
                 if (id.includes('i18n.js')) {
                   return 'utils/i18n-main';
                 }
-                // Languages utilities
-                if (id.includes('languages.js')) {
-                  return 'utils/i18n-languages';
+                // Translation languages (65+ languages)
+                if (id.includes('languages.js') && id.includes('translation')) {
+                  return 'languages/translation-data';
+                }
+                // TTS languages (~80 languages)
+                if (id.includes('languages.js') && id.includes('tts')) {
+                  return 'languages/tts-data';
+                }
+                // Interface languages (currently 2 languages)
+                if (id.includes('languages.js') && id.includes('interface')) {
+                  return 'languages/interface-data';
+                }
+                // Language detection utilities
+                if (id.includes('LanguageDetector')) {
+                  return 'languages/detection';
                 }
                 // Helper functions
                 if (id.includes('helper.js')) {

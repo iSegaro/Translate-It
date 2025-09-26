@@ -98,17 +98,26 @@ class UtilsFactory {
       i18nUtils,
       languagesUtils,
       pluginModule,
-      languagePackLoader
+      languagePackLoader,
+      lazyLoader,
+      languageDetector
     ] = await Promise.all([
       import('./i18n/i18n.js'),
       import('./i18n/languages.js'),
       import('./i18n/plugin.js'),
-      import('./i18n/LanguagePackLoader.js')
+      import('./i18n/LanguagePackLoader.js'),
+      import('./i18n/LazyLanguageLoader.js'),
+      import('./i18n/LanguageDetector.js')
     ]);
 
     // Preload core languages in background
     languagePackLoader.preloadCoreLanguagePacks().catch(err => {
       getLogger().debug('Failed to preload core languages:', err);
+    });
+
+    // Preload user languages based on preferences
+    lazyLoader.preloadUserLanguages().catch(err => {
+      getLogger().debug('Failed to preload user languages:', err);
     });
 
     return {
@@ -119,8 +128,28 @@ class UtilsFactory {
       languagePackLoader: {
         preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
         loadLanguagePack: languagePackLoader.loadLanguagePack,
+        loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
         isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
+        isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
         getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
+      },
+      lazyLanguageLoader: {
+        lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
+        lazyLoadInterfaceLanguage: lazyLoader.lazyLoadInterfaceLanguage,
+        lazyLoadTtsLanguage: lazyLoader.lazyLoadTtsLanguage,
+        preloadUserLanguages: lazyLoader.preloadUserLanguages,
+        getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
+        detectLanguageLazy: lazyLoader.detectLanguageLazy,
+        clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
+        getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
+      },
+      languageDetector: {
+        detectBrowserLanguage: languageDetector.detectBrowserLanguage,
+        detectLanguageFromText: languageDetector.detectLanguageFromText,
+        clearDetectionCache: languageDetector.clearDetectionCache,
+        getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
+        configureDetection: languageDetector.configureDetection,
+        getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
       }
     };
   }
@@ -132,12 +161,51 @@ class UtilsFactory {
     const i18nModule = await import('./i18n/i18n.js');
     const languagesModule = await import('./i18n/languages.js');
     const pluginModule = await import('./i18n/plugin.js');
+    const languagePackLoader = await import('./i18n/LanguagePackLoader.js');
+    const lazyLoader = await import('./i18n/LazyLanguageLoader.js');
+    const languageDetector = await import('./i18n/LanguageDetector.js');
+
+    // Preload core languages in background
+    languagePackLoader.preloadCoreLanguagePacks().catch(err => {
+      getLogger().debug('Failed to preload core languages:', err);
+    });
+
+    // Preload user languages based on preferences
+    lazyLoader.preloadUserLanguages().catch(err => {
+      getLogger().debug('Failed to preload user languages:', err);
+    });
 
     return {
       ...i18nModule,
       ...languagesModule,
       i18nPlugin: pluginModule.default,
-      setI18nLocale: pluginModule.setI18nLocale
+      setI18nLocale: pluginModule.setI18nLocale,
+      languagePackLoader: {
+        preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
+        loadLanguagePack: languagePackLoader.loadLanguagePack,
+        loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
+        isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
+        isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
+        getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
+      },
+      lazyLanguageLoader: {
+        lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
+        lazyLoadInterfaceLanguage: lazyLoader.lazyLoadInterfaceLanguage,
+        lazyLoadTtsLanguage: lazyLoader.lazyLoadTtsLanguage,
+        preloadUserLanguages: lazyLoader.preloadUserLanguages,
+        getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
+        detectLanguageLazy: lazyLoader.detectLanguageLazy,
+        clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
+        getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
+      },
+      languageDetector: {
+        detectBrowserLanguage: languageDetector.detectBrowserLanguage,
+        detectLanguageFromText: languageDetector.detectLanguageFromText,
+        clearDetectionCache: languageDetector.clearDetectionCache,
+        getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
+        configureDetection: languageDetector.configureDetection,
+        getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
+      }
     };
   }
 

@@ -1,261 +1,149 @@
 // src/utils/i18n/LanguagePackLoader.js
-// Dynamic language pack loading system for code splitting
+// Main language pack loading system - now uses specialized loaders
 
-// Cache for loaded language packs
-const languagePackCache = new Map();
+// Import specialized loaders
+import {
+  loadTranslationLanguagePack,
+  preloadCoreTranslationLanguagePacks,
+  getAvailableTranslationLanguageCodes,
+  isTranslationLanguagePackAvailable,
+  clearTranslationLanguageCache,
+  getTranslationLanguageCacheInfo
+} from './TranslationLanguageLoader.js';
 
-// Map of language codes to their chunk names
-const LANGUAGE_CHUNKS = {
-  'en': 'locales/en',
-  'fa': 'locales/fa',
-  'de': 'locales/de',
-  'fr': 'locales/fr',
-  'es': 'locales/es',
-  'it': 'locales/it',
-  'pt': 'locales/pt',
-  'ru': 'locales/ru',
-  'zh': 'locales/zh',
-  'ja': 'locales/ja',
-  'ko': 'locales/ko',
-  'ar': 'locales/ar',
-  'hi': 'locales/hi',
-  'bn': 'locales/bn',
-  'ur': 'locales/ur',
-  'tr': 'locales/tr',
-  'nl': 'locales/nl',
-  'sv': 'locales/sv',
-  'da': 'locales/da',
-  'no': 'locales/no',
-  'fi': 'locales/fi',
-  'pl': 'locales/pl',
-  'cs': 'locales/cs',
-  'sk': 'locales/sk',
-  'hu': 'locales/hu',
-  'ro': 'locales/ro',
-  'bg': 'locales/bg',
-  'hr': 'locales/hr',
-  'sr': 'locales/sr',
-  'sl': 'locales/sl',
-  'et': 'locales/et',
-  'lv': 'locales/lv',
-  'lt': 'locales/lt',
-  'mt': 'locales/mt',
-  'ga': 'locales/ga',
-  'cy': 'locales/cy',
-  'eu': 'locales/eu',
-  'ca': 'locales/ca',
-  'gl': 'locales/gl',
-  'is': 'locales/is',
-  'mk': 'locales/mk',
-  'sq': 'locales/sq',
-  'bs': 'locales/bs',
-  'me': 'locales/me',
-  'hr': 'locales/hr',
-  'el': 'locales/el',
-  'he': 'locales/he',
-  'id': 'locales/id',
-  'ms': 'locales/ms',
-  'tl': 'locales/tl',
-  'vi': 'locales/vi',
-  'th': 'locales/th',
-  'ml': 'locales/ml',
-  'ta': 'locales/ta',
-  'te': 'locales/te',
-  'kn': 'locales/kn',
-  'gu': 'locales/gu',
-  'mr': 'locales/mr',
-  'ne': 'locales/ne',
-  'pa': 'locales/pa',
-  'si': 'locales/si',
-  'my': 'locales/my',
-  'km': 'locales/km',
-  'lo': 'locales/lo',
-  'ka': 'locales/ka',
-  'hy': 'locales/hy',
-  'az': 'locales/az',
-  'kk': 'locales/kk',
-  'ky': 'locales/ky',
-  'uz': 'locales/uz',
-  'tg': 'locales/tg',
-  'tk': 'locales/tk',
-  'mn': 'locales/mn',
-  'bo': 'locales/bo',
-  'dz': 'locales/dz',
-  'am': 'locales/am',
-  'ti': 'locales/ti',
-  'so': 'locales/so',
-  'sw': 'locales/sw',
-  'zu': 'locales/zu',
-  'af': 'locales/af',
-  'xh': 'locales/xh',
-  'st': 'locales/st',
-  'nso': 'locales/nso',
-  'tn': 'locales/tn',
-  'ss': 'locales/ss',
-  'ts': 'locales/ts',
-  've': 'locales/ve',
-  'nr': 'locales/nr',
-  'om': 'locales/om',
-  'ti': 'locales/ti',
-  'rw': 'locales/rw',
-  'rn': 'locales/rn',
-  'lg': 'locales/lg',
-  'sn': 'locales/sn',
-  'yo': 'locales/yo',
-  'ig': 'locales/ig',
-  'ha': 'locales/ha',
-  'tw': 'locales/tw',
-  'ak': 'locales/ak',
-  'ee': 'locales/ee',
-  'ff': 'locales/ff',
-  'wo': 'locales/wo',
-  'bm': 'locales/bm',
-  'ki': 'locales/ki',
-  'sw': 'locales/sw',
-  'mg': 'locales/mg',
-  'ny': 'locales/ny',
-  'ss': 'locales/ss',
-  'ts': 'locales/ts',
-  'tn': 'locales/tn',
-  've': 'locales/ve',
-  'xh': 'locales/xh',
-  'zu': 'locales/zu',
-  'st': 'locales/st',
-  'nso': 'locales/nso',
-  'nr': 'locales/nr',
-  'om': 'locales/om',
-  'ti': 'locales/ti',
-  'rw': 'locales/rw',
-  'rn': 'locales/rn',
-  'lg': 'locales/lg',
-  'sn': 'locales/sn',
-  'yo': 'locales/yo',
-  'ig': 'locales/ig',
-  'ha': 'locales/ha',
-  'tw': 'locales/tw',
-  'ak': 'locales/ak',
-  'ee': 'locales/ee',
-  'ff': 'locales/ff',
-  'wo': 'locales/wo',
-  'bm': 'locales/bm',
-  'ki': 'locales/ki',
-  'mg': 'locales/mg',
-  'ny': 'locales/ny'
-};
+import {
+  loadInterfaceLanguagePack,
+  preloadCoreInterfaceLanguagePacks,
+  getAvailableInterfaceLanguageCodes,
+  isInterfaceLanguagePackAvailable,
+  clearInterfaceLanguageCache,
+  getInterfaceLanguageCacheInfo
+} from './InterfaceLanguageLoader.js';
 
-// Core languages that should be preloaded
-const CORE_LANGUAGES = ['en', 'fa'];
+import {
+  loadTtsLanguagePack,
+  preloadCoreTtsLanguagePacks,
+  getAvailableTtsLanguageCodes,
+  isTtsLanguagePackAvailable,
+  clearTtsLanguageCache,
+  getTtsLanguageCacheInfo
+} from './TtsLanguageLoader.js';
 
 /**
- * Load a language pack dynamically
+ * Load a language pack dynamically (legacy function - uses translation loader)
  * @param {string} langCode - Language code to load
  * @returns {Promise<Object>} Language data
  */
 export async function loadLanguagePack(langCode) {
-  // Normalize language code
-  const normalizedCode = normalizeLanguageCode(langCode);
-
-  // Check cache first
-  if (languagePackCache.has(normalizedCode)) {
-    return languagePackCache.get(normalizedCode);
-  }
-
-  try {
-    // Determine the chunk path
-    const chunkPath = LANGUAGE_CHUNKS[normalizedCode];
-    if (!chunkPath) {
-      console.warn(`No language chunk found for: ${normalizedCode}`);
-      return null;
-    }
-
-    // Dynamically import the language chunk
-    const langModule = await import(
-      /* webpackChunkName: "locales/[request]" */
-      /* webpackMode: "lazy-once" */
-      `./locales/${normalizedCode}.json`
-    );
-
-    const langData = langModule.default || langModule;
-
-    // Cache the loaded data
-    languagePackCache.set(normalizedCode, langData);
-
-    return langData;
-  } catch (error) {
-    console.error(`Failed to load language pack for ${normalizedCode}:`, error);
-
-    // Fallback to English if available
-    if (normalizedCode !== 'en') {
-      try {
-        const fallback = await loadLanguagePack('en');
-        if (fallback) {
-          languagePackCache.set(normalizedCode, fallback);
-          return fallback;
-        }
-      } catch (fallbackError) {
-        console.error('Failed to load fallback language pack:', fallbackError);
-      }
-    }
-
-    return null;
-  }
+  // For backward compatibility, use translation language loader
+  return loadTranslationLanguagePack(langCode);
 }
 
 /**
- * Preload core language packs
+ * Preload core language packs (legacy function)
  */
 export async function preloadCoreLanguagePacks() {
-  const promises = CORE_LANGUAGES.map(lang => loadLanguagePack(lang));
-  await Promise.allSettled(promises);
+  // Preload all specialized loaders
+  await Promise.allSettled([
+    preloadCoreTranslationLanguagePacks(),
+    preloadCoreInterfaceLanguagePacks(),
+    preloadCoreTtsLanguagePacks()
+  ]);
 }
 
 /**
- * Get all available language codes
+ * Get all available language codes (legacy function - returns translation languages)
  * @returns {Array<string>} List of available language codes
  */
 export function getAvailableLanguageCodes() {
-  return Object.keys(LANGUAGE_CHUNKS);
+  return getAvailableTranslationLanguageCodes();
 }
 
 /**
- * Check if a language pack is available
+ * Check if a language pack is available (legacy function)
  * @param {string} langCode - Language code to check
  * @returns {boolean} True if available
  */
 export function isLanguagePackAvailable(langCode) {
-  return normalizeLanguageCode(langCode) in LANGUAGE_CHUNKS;
+  return isTranslationLanguagePackAvailable(langCode);
 }
 
 /**
- * Normalize language code (handle variants like en-US, en-GB, etc.)
- * @param {string} langCode - Language code to normalize
- * @returns {string} Normalized language code
- */
-function normalizeLanguageCode(langCode) {
-  if (!langCode) return 'en';
-
-  // Convert to lowercase and extract primary language code
-  const normalized = langCode.toLowerCase().split('-')[0];
-
-  // Return the normalized code if it exists in our chunks, otherwise default to 'en'
-  return LANGUAGE_CHUNKS[normalized] ? normalized : 'en';
-}
-
-/**
- * Clear language pack cache
+ * Clear all language pack caches
  */
 export function clearLanguagePackCache() {
-  languagePackCache.clear();
+  clearTranslationLanguageCache();
+  clearInterfaceLanguageCache();
+  clearTtsLanguageCache();
 }
 
 /**
- * Get loaded language packs info
- * @returns {Object} Cache statistics
+ * Get loaded language packs info for all loaders
+ * @returns {Object} Combined cache statistics
  */
 export function getLanguagePackCacheInfo() {
   return {
-    size: languagePackCache.size,
-    loadedLanguages: Array.from(languagePackCache.keys()),
-    totalAvailable: Object.keys(LANGUAGE_CHUNKS).length
+    translation: getTranslationLanguageCacheInfo(),
+    interface: getInterfaceLanguageCacheInfo(),
+    tts: getTtsLanguageCacheInfo()
   };
+}
+
+/**
+ * Load language pack by type
+ * @param {string} langCode - Language code to load
+ * @param {string} type - Type of language pack ('translation', 'interface', 'tts')
+ * @returns {Promise<Object>} Language data
+ */
+export async function loadLanguagePackByType(langCode, type = 'translation') {
+  switch (type) {
+    case 'translation':
+      return loadTranslationLanguagePack(langCode);
+    case 'interface':
+      return loadInterfaceLanguagePack(langCode);
+    case 'tts':
+      return loadTtsLanguagePack(langCode);
+    default:
+      console.warn(`Unknown language pack type: ${type}`);
+      return loadTranslationLanguagePack(langCode);
+  }
+}
+
+/**
+ * Get available languages by type
+ * @param {string} type - Type of language pack ('translation', 'interface', 'tts')
+ * @returns {Array<string>} List of available language codes
+ */
+export function getAvailableLanguagesByType(type = 'translation') {
+  switch (type) {
+    case 'translation':
+      return getAvailableTranslationLanguageCodes();
+    case 'interface':
+      return getAvailableInterfaceLanguageCodes();
+    case 'tts':
+      return getAvailableTtsLanguageCodes();
+    default:
+      console.warn(`Unknown language pack type: ${type}`);
+      return getAvailableTranslationLanguageCodes();
+  }
+}
+
+/**
+ * Check if language pack is available by type
+ * @param {string} langCode - Language code to check
+ * @param {string} type - Type of language pack ('translation', 'interface', 'tts')
+ * @returns {boolean} True if available
+ */
+export function isLanguagePackAvailableByType(langCode, type = 'translation') {
+  switch (type) {
+    case 'translation':
+      return isTranslationLanguagePackAvailable(langCode);
+    case 'interface':
+      return isInterfaceLanguagePackAvailable(langCode);
+    case 'tts':
+      return isTtsLanguagePackAvailable(langCode);
+    default:
+      console.warn(`Unknown language pack type: ${type}`);
+      return isTranslationLanguagePackAvailable(langCode);
+  }
 }

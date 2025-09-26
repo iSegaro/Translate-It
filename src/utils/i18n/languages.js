@@ -1,6 +1,7 @@
-// src/utils/i18n/languages.js - Dynamically loaded language packs
+// src/utils/i18n/languages.js - Dynamically loaded language packs with lazy loading
 
-import { loadLanguagePack, preloadCoreLanguagePacks, getAvailableLanguageCodes } from './LanguagePackLoader.js';
+import { loadLanguagePack, preloadCoreLanguagePacks, getAvailableLanguageCodes, loadLanguagePackByType } from './LanguagePackLoader.js';
+import { lazyLoadTranslationLanguage, preloadUserLanguages, getLanguageDataLazy } from './LazyLanguageLoader.js';
 
 // A minimal list of languages for UI elements to avoid loading all language data.
 export const basicLanguageList = [
@@ -22,7 +23,7 @@ export const basicLanguageList = [
 const languageCache = new Map();
 
 /**
- * Dynamically imports the data for a specific language using the new loader.
+ * Dynamically imports the data for a specific language using lazy loading.
  * @param {string} code - The language code (e.g., 'en', 'fa').
  * @returns {Promise<Object|null>} The language data object or null if not found.
  */
@@ -32,7 +33,8 @@ export async function getLanguageData(code) {
   }
 
   try {
-    const langData = await loadLanguagePack(code);
+    // Use lazy loading for better performance
+    const langData = await lazyLoadTranslationLanguage(code);
     if (langData) {
       languageCache.set(code, langData);
     }
@@ -82,10 +84,15 @@ export async function getLanguageCodeForTTS(languageName) {
 /**
  * Asynchronously gets a language object by its code.
  * @param {string} code - The language code.
+ * @param {string} [type='translation'] - Language type ('translation', 'interface', 'tts')
  * @returns {Promise<Object|null>} The language object or null.
  */
-export async function getLanguageByCode(code) {
-  return await getLanguageData(code);
+export async function getLanguageByCode(code, type = 'translation') {
+  if (type === 'translation') {
+    return await getLanguageData(code);
+  }
+  // Use lazy loading for other types
+  return await getLanguageDataLazy(code, type);
 }
 
 /**
@@ -124,4 +131,37 @@ export async function findLanguageCode(identifier) {
 
   // Fallback
   return identifier;
+}
+
+/**
+ * Clear all language caches
+ */
+export function clearLanguageCache() {
+  languageCache.clear();
+}
+
+/**
+ * Get available languages by type
+ * @param {string} [type='translation'] - Language type ('translation', 'interface', 'tts')
+ * @returns {Array<string>} List of available language codes
+ */
+export function getAvailableLanguagesByType(type = 'translation') {
+  return getAvailableLanguageCodes();
+}
+
+/**
+ * Preload user languages based on preferences
+ */
+export async function preloadLanguages() {
+  await preloadUserLanguages();
+}
+
+/**
+ * Get language data by type with lazy loading
+ * @param {string} code - Language code
+ * @param {string} [type='translation'] - Language type
+ * @returns {Promise<Object|null>} Language data
+ */
+export async function getLanguageByType(code, type = 'translation') {
+  return await getLanguageDataLazy(code, type);
 }
