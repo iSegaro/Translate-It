@@ -23,7 +23,35 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUITransition')
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUITransition');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 export function useUITransition(options = {}) {
   const {
@@ -48,7 +76,7 @@ export function useUITransition(options = {}) {
     try {
       displayValue.value = watchSource()
     } catch (error) {
-      logger.warn('Failed to initialize display value:', error.message)
+      getLogger().warn('Failed to initialize display value:', error.message)
     }
   }
 
@@ -57,7 +85,7 @@ export function useUITransition(options = {}) {
     if (containerSelector) {
       const element = document.querySelector(containerSelector)
       if (!element) {
-        logger.warn(`Container not found: ${containerSelector}`)
+        getLogger().warn(`Container not found: ${containerSelector}`)
       }
       return element
     }
@@ -103,7 +131,7 @@ export function useUITransition(options = {}) {
   const startTransition = async (newValue = null) => {
     // Stop any existing transition first
     if (isTransitioning.value) {
-      logger.debug('Stopping existing transition before starting new one')
+      getLogger().debug('Stopping existing transition before starting new one')
       stopTransition()
       await nextTick() // Wait for cleanup
     }
@@ -112,7 +140,7 @@ export function useUITransition(options = {}) {
     const container = getContainer()
     
     try {
-      logger.debug(`Starting ${transitionType} transition`, { newValue, duration })
+      getLogger().debug(`Starting ${transitionType} transition`, { newValue, duration })
       
       // Set transition state
       isTransitioning.value = true
@@ -129,7 +157,7 @@ export function useUITransition(options = {}) {
       setTimeout(async () => {
         if (transitionId.value !== currentId) return // Prevent race conditions
         
-        logger.debug(`Mid-transition: applying value change for ${transitionType}`)
+        getLogger().debug(`Mid-transition: applying value change for ${transitionType}`)
         displayValue.value = pendingValue.value
         
         await nextTick()
@@ -140,7 +168,7 @@ export function useUITransition(options = {}) {
       setTimeout(async () => {
         if (transitionId.value !== currentId) return // Prevent race conditions
         
-        logger.debug(`Completed ${transitionType} transition`)
+        getLogger().debug(`Completed ${transitionType} transition`)
         
         // Reset state
         isTransitioning.value = false
@@ -160,7 +188,7 @@ export function useUITransition(options = {}) {
       }, duration)
       
     } catch (error) {
-      logger.error(`Failed to start ${transitionType} transition:`, error)
+      getLogger().error(`Failed to start ${transitionType} transition:`, error)
       
       // Reset state on error
       isTransitioning.value = false
@@ -182,7 +210,7 @@ export function useUITransition(options = {}) {
   const stopTransition = () => {
     if (!isTransitioning.value) return
     
-    logger.debug(`Stopping ${transitionType} transition`)
+    getLogger().debug(`Stopping ${transitionType} transition`)
     
     const container = getContainer()
     
@@ -213,7 +241,7 @@ export function useUITransition(options = {}) {
       try {
         displayValue.value = watchSource()
       } catch (error) {
-        logger.warn('Failed to reset display value:', error.message)
+        getLogger().warn('Failed to reset display value:', error.message)
       }
     }
     

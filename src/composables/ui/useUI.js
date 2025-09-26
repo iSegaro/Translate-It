@@ -4,7 +4,35 @@ import { ref, nextTick } from "vue";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 export function useUI() {
   // State
@@ -142,7 +170,7 @@ export function useUI() {
       element.focus();
       return true;
     } catch (error) {
-      logger.warn("Could not focus element:", error);
+      getLogger().warn("Could not focus element:", error);
       return false;
     }
   };
@@ -155,7 +183,7 @@ export function useUI() {
       element.scrollIntoView({ behavior, block: "nearest" });
       return true;
     } catch (error) {
-      logger.warn("Could not scroll to element:", error);
+      getLogger().warn("Could not scroll to element:", error);
       return false;
     }
   };
