@@ -79,14 +79,15 @@ class ProviderRegistry {
   }
 
   getAllAvailable() {
-    const loadedProviders = Array.from(this.providers.values());
+    // Only return lazy providers with metadata for UI purposes
+    // Loaded provider classes should not be used directly in UI components
     const lazyProviders = Array.from(this.providerImports.entries()).map(([id, info]) => ({
       id,
       ...info.metadata,
       isLazy: true
     }));
 
-    return [...loadedProviders, ...lazyProviders];
+    return lazyProviders;
   }
 
   isProviderLoaded(id) {

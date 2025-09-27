@@ -31,13 +31,115 @@ async function getApiProviders() {
     // Get all available providers (both loaded and lazy registered)
     const availableProviders = providerRegistry.getAllAvailable();
 
-    return availableProviders.map(provider => ({
-      id: provider.id || provider,
-      defaultTitle: provider.name || provider.displayName || provider
-    }));
+    // Debug: Log all available providers to understand the structure
+    logger.debug("Available providers structure:", availableProviders.map(p => ({
+      isLazy: p.isLazy,
+      id: p.id,
+      name: p.name,
+      displayName: p.displayName,
+      constructor: p.constructor?.name,
+      keys: Object.keys(p)
+    })));
+
+    const validProviders = [];
+
+    for (const provider of availableProviders) {
+      // Handle both lazy providers and loaded provider classes
+      let id, name;
+
+      if (provider.isLazy) {
+        // This is a lazy provider with metadata
+        id = provider.id;
+        name = provider.name;
+      } else {
+        // This is a loaded provider class - should have been filtered out at registry level
+        // But we handle it defensively
+        logger.warn("Unexpected loaded provider class found in context menu:", provider.constructor?.name);
+        continue;
+      }
+
+      // Validate required fields
+      if (!id || !name) {
+        logger.warn("Provider missing required id or name:", { id, name, provider });
+        continue;
+      }
+
+      // Validate field types
+      if (typeof id !== 'string' || typeof name !== 'string') {
+        logger.warn("Provider id or name is not a string:", { id, name, provider });
+        continue;
+      }
+
+      // Validate field content
+      if (id.includes('undefined') || name.includes('undefined')) {
+        logger.warn("Provider id or name contains undefined:", { id, name });
+        continue;
+      }
+
+      // Validate ID format - should match registered provider IDs
+      if (!/^[a-z][a-z0-9_-]*$/i.test(id)) {
+        logger.warn("Provider ID doesn't match expected format:", { id, name });
+        continue;
+      }
+
+      // Validate name content
+      if (name.length < 2 || name.length > 50) {
+        logger.warn("Provider name length seems invalid:", { id, name });
+        continue;
+      }
+
+      // Check against known provider IDs for extra validation
+      const knownProviderIds = [
+        'google', 'yandex', 'gemini', 'openai', 'openrouter',
+        'deepseek', 'webai', 'bing', 'browser', 'custom'
+      ];
+
+      if (!knownProviderIds.includes(id.toLowerCase())) {
+        logger.warn("Unknown provider ID detected:", { id, name });
+        // Don't filter out unknown providers, just warn - they might be newly added
+      }
+
+      validProviders.push({
+        id: id.toLowerCase(), // Normalize ID to lowercase
+        defaultTitle: name
+      });
+    }
+
+    // Remove duplicates based on id (case-insensitive)
+    const uniqueProviders = [];
+    const seenIds = new Set();
+
+    for (const provider of validProviders) {
+      const normalizedId = provider.id.toLowerCase();
+      if (!seenIds.has(normalizedId)) {
+        seenIds.add(normalizedId);
+        uniqueProviders.push({
+          ...provider,
+          id: normalizedId // Ensure consistent case
+        });
+      } else {
+        logger.warn(`Removing duplicate provider with id: ${provider.id}`);
+      }
+    }
+
+    logger.debug("Final provider list:", uniqueProviders);
+    return uniqueProviders;
   } catch (error) {
     logger.error("Failed to get providers dynamically, using fallback:", error);
-    return [];
+
+    // Fallback to basic provider list if dynamic loading fails
+    return [
+      { id: "google", defaultTitle: "Google Translate" },
+      { id: "yandex", defaultTitle: "Yandex Translate" },
+      { id: "gemini", defaultTitle: "Google Gemini" },
+      { id: "openai", defaultTitle: "OpenAI" },
+      { id: "openrouter", defaultTitle: "OpenRouter" },
+      { id: "deepseek", defaultTitle: "DeepSeek" },
+      { id: "webai", defaultTitle: "WebAI" },
+      { id: "bing", defaultTitle: "Bing Translate" },
+      { id: "browser", defaultTitle: "Browser API" },
+      { id: "custom", defaultTitle: "Custom Provider" }
+    ];
   }
 }
 
