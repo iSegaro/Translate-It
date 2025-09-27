@@ -29,22 +29,22 @@ const getDeviceMemory = () => {
 
 export const MEMORY_TIMING = {
   // Cache cleanup intervals
-  CACHE_CLEANUP_INTERVAL: 5 * 60 * 1000,        // 5 minutes - general cache cleanup
+  CACHE_CLEANUP_INTERVAL: 10 * 60 * 1000,       // 10 minutes - general cache cleanup (optimized for production)
 
   // Garbage collection intervals
-  GC_INTERVAL: 5 * 60 * 1000,                   // 5 minutes - periodic garbage collection
+  GC_INTERVAL: 10 * 60 * 1000,                  // 10 minutes - periodic garbage collection (optimized for production)
 
   // Central timer intervals
-  CENTRAL_TIMER_INTERVAL: 60 * 1000,            // 1 minute - central memory manager timer
+  CENTRAL_TIMER_INTERVAL: 5 * 60 * 1000,        // 5 minutes - central memory manager timer (reduced from 1min)
 
   // Memory monitoring intervals - dynamic based on environment
   MEMORY_MONITOR_INTERVAL: IS_DEVELOPMENT
     ? 60 * 1000                                  // 60 seconds - development
-    : 120 * 1000,                                // 120 seconds - production
+    : 5 * 60 * 1000,                             // 5 minutes - production (reduced from 2min)
 
-  // Cache TTL (Time To Live) settings
-  CACHE_DEFAULT_TTL: 30 * 60 * 1000,            // 30 minutes - default cache expiration
-  CRITICAL_CACHE_TTL: 60 * 60 * 1000,           // 1 hour - critical cache expiration (storage, config)
+  // Cache TTL (Time To Live) settings - extended for better performance
+  CACHE_DEFAULT_TTL: 60 * 60 * 1000,            // 1 hour - default cache expiration (extended from 30min)
+  CRITICAL_CACHE_TTL: 2 * 60 * 60 * 1000,       // 2 hours - critical cache expiration (extended from 1hour)
 
   // Memory monitoring thresholds (in bytes) - environment-aware
   MEMORY_WARNING_THRESHOLD: IS_CONTENT_SCRIPT
