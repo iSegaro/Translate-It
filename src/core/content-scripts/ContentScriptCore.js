@@ -152,6 +152,18 @@ export class ContentScriptCore extends EventTarget {
         await this.injectMainDOMStyles();
       }
 
+      // Pre-initialize FeatureManager for RevertShortcut and other features
+      // This ensures FeatureManager is available globally before any features need it
+      try {
+        console.log('[ContentScriptCore] 🚀 Pre-initializing FeatureManager...');
+        const { loadCoreFeatures } = await import('./chunks/lazy-features.js');
+        await loadCoreFeatures();
+        console.log('[ContentScriptCore] ✅ FeatureManager pre-initialized successfully');
+      } catch (error) {
+        console.warn('[ContentScriptCore] ⚠️ Failed to pre-initialize FeatureManager:', error);
+        // Don't fail critical initialization if FeatureManager fails
+      }
+
       this.initialized = true;
 
       if (logger) {

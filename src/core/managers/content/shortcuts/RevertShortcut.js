@@ -9,13 +9,34 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
  * Get active SelectElementManager via FeatureManager
  * @returns {Object|null} Active SelectElementManager or null
  */
-function getActiveSelectElementManager() {
+async function getActiveSelectElementManager() {
   // FeatureManager should always be available and manage everything
-  const featureManager = window.featureManager;
+  let featureManager = window.featureManager;
 
   if (!featureManager) {
-    logger.error('FeatureManager not available - this should not happen');
-    return null;
+    // FeatureManager might not be initialized yet, this can happen during startup
+    logger.warn('FeatureManager not available - attempting to initialize it');
+    console.log('[RevertShortcut] ⚠️ FeatureManager not available, trying to initialize...');
+
+    try {
+      // Try to initialize FeatureManager dynamically
+      const { loadCoreFeatures } = await import('@/core/content-scripts/chunks/lazy-features.js');
+      await loadCoreFeatures();
+
+      featureManager = window.featureManager;
+      if (featureManager) {
+        console.log('[RevertShortcut] ✅ FeatureManager initialized successfully');
+        logger.info('FeatureManager initialized successfully');
+      } else {
+        console.log('[RevertShortcut] ❌ Failed to initialize FeatureManager');
+        logger.warn('Failed to initialize FeatureManager after attempt');
+        return null;
+      }
+    } catch (error) {
+      console.error('[RevertShortcut] ❌ Error initializing FeatureManager:', error);
+      logger.error('Error initializing FeatureManager:', error);
+      return null;
+    }
   }
 
   return featureManager.getFeatureHandler('selectElement') || null;
@@ -56,7 +77,7 @@ export class RevertShortcut {
     }
 
     // Priority 1: If SelectElementManager is active, let it handle ESC key
-    const selectElementManager = getActiveSelectElementManager();
+    const selectElementManager = await getActiveSelectElementManager();
     if (selectElementManager && selectElementManager.isActive) {
       logger.debug('[RevertShortcut] SelectElementManager is active, skipping revert shortcut');
       return { success: true, action: 'skipped_select_element_active' };
@@ -68,7 +89,7 @@ export class RevertShortcut {
 
       try {
         // Cancel via SelectElementManager
-        const selectElementManager = getActiveSelectElementManager();
+        const selectElementManager = await getActiveSelectElementManager();
         if (selectElementManager && selectElementManager.translationOrchestrator) {
           await selectElementManager.translationOrchestrator.cancelAllTranslations();
           logger.debug('[RevertShortcut] Cancelled translations via SelectElementManager');

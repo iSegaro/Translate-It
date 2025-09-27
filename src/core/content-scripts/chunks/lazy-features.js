@@ -47,6 +47,10 @@ const loadingPromises = new Map();
 let featureManager = null;
 let featuresInitialized = false;
 
+// Ensure global featureManager is available for RevertShortcut and other components
+// This must be done immediately when FeatureManager is created
+window.featureManager = window.featureManager || null;
+
 // Core features that should be available
 const CORE_FEATURES = new Set([
   'contentMessageHandler',
@@ -307,6 +311,8 @@ async function loadShortcutFeature() {
     if (!featureManager) {
       const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
       featureManager = FeatureManager.getInstance();
+      // Also set globally for RevertShortcut
+      window.featureManager = featureManager;
     }
 
     // Load and activate ShortcutHandler through FeatureManager
@@ -337,6 +343,10 @@ async function loadShortcutFeature() {
 export async function loadCoreFeatures() {
   const logger = getLogger();
   logger.debug('Loading core features...');
+  console.log('[FeatureManager] 🚀 Starting loadCoreFeatures()');
+
+  // Ensure global reference exists
+  console.log('[FeatureManager] 📍 Current window.featureManager before loading:', window.featureManager);
 
   try {
     // Try to get ErrorHandler for better error handling
@@ -360,7 +370,9 @@ export async function loadCoreFeatures() {
     logger.info('Core features loaded');
 
     // Initialize and activate FeatureManager after features are loaded
+    console.log('[FeatureManager] 🔄 About to call initializeAndActivateFeatures()');
     await initializeAndActivateFeatures();
+    console.log('[FeatureManager] ✅ initializeAndActivateFeatures() completed');
   } catch (error) {
     // Fallback if ErrorHandler is not available
     logger.warn('ErrorHandler not available in loadCoreFeatures, using simple error handling');
@@ -375,19 +387,29 @@ export async function loadCoreFeatures() {
     logger.info('Core features loaded (with fallback error handling)');
 
     // Initialize and activate FeatureManager after features are loaded
+    console.log('[FeatureManager] 🔄 About to call initializeAndActivateFeatures() (fallback path)');
     await initializeAndActivateFeatures();
+    console.log('[FeatureManager] ✅ initializeAndActivateFeatures() completed (fallback path)');
   }
 }
 
 // Initialize FeatureManager and activate features
 async function initializeAndActivateFeatures() {
   const logger = getLogger();
+  logger.debug('initializeAndActivateFeatures called');
   try {
     // Initialize FeatureManager if not already initialized
     if (!featureManager) {
+      logger.debug('Creating new FeatureManager instance');
       const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
       featureManager = FeatureManager.getInstance();
-      logger.debug('FeatureManager initialized');
+      // Expose globally for RevertShortcut and other components
+      window.featureManager = featureManager;
+      logger.debug('✅ FeatureManager initialized and set to window.featureManager');
+      console.log('[FeatureManager] ✅ FeatureManager is now available globally:', window.featureManager);
+    } else {
+      logger.debug('FeatureManager already exists');
+      console.log('[FeatureManager] 📝 FeatureManager already initialized');
     }
 
     // Activate core features
