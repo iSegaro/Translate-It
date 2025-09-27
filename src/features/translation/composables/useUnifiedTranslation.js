@@ -15,9 +15,37 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/config/constants.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 export function useUnifiedTranslation(context = 'popup') {
   // Validate context
@@ -53,15 +81,16 @@ export function useUnifiedTranslation(context = 'popup') {
   // --- Language Management ---
   const resetLanguagesToDefaults = async () => {
     try {
+      const { findLanguageCode } = await utilsFactory.getI18nUtils();
       const [savedSource, savedTarget] = await Promise.all([
         getSourceLanguageAsync(),
         getTargetLanguageAsync()
       ]);
-      sourceLanguage.value = getLanguageCode(savedSource) || AUTO_DETECT_VALUE;
-      targetLanguage.value = getLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
-      logger.debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
+      sourceLanguage.value = await findLanguageCode(savedSource) || AUTO_DETECT_VALUE;
+      targetLanguage.value = await findLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
+      getLogger().debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
     } catch (error) {
-      logger.error(`[${context}] Failed to reset languages:`, error);
+      getLogger().error(`[${context}] Failed to reset languages:`, error);
       // Fallback to hardcoded defaults in case of storage error
       sourceLanguage.value = AUTO_DETECT_VALUE;
       targetLanguage.value = DEFAULT_TARGET_LANGUAGE;
@@ -111,7 +140,7 @@ export function useUnifiedTranslation(context = 'popup') {
       sourceLanguage: resultData.sourceLanguage,
       targetLanguage: resultData.targetLanguage
     };
-    logger.info(`[${context}] Translation updated successfully`);
+    getLogger().info(`[${context}] Translation updated successfully`);
   };
 
   const handleTranslationError = (error, messageId = null) => {
@@ -124,7 +153,7 @@ export function useUnifiedTranslation(context = 'popup') {
       pendingRequests.value.delete(messageId);
     }
     
-    logger.error(`[${context}] Translation error:`, errorMessage);
+    getLogger().error(`[${context}] Translation error:`, errorMessage);
   };
 
   const ensureMinimumLoadingDuration = async () => {
@@ -154,7 +183,7 @@ export function useUnifiedTranslation(context = 'popup') {
       const messageId = generateMessageId(context);
       const requestData = createTranslationRequest(sourceLang, targetLang, messageId);
       
-      logger.debug(`[${context}] Translation request:`, requestData.data);
+      getLogger().debug(`[${context}] Translation request:`, requestData.data);
 
       if (context === 'sidepanel') {
         pendingRequests.value.add(messageId);
@@ -186,12 +215,12 @@ export function useUnifiedTranslation(context = 'popup') {
       }
 
       if (context === 'popup') {
-        logger.operation('Translation request sent. Waiting for result...');
+        getLogger().operation('Translation request sent. Waiting for result...');
       }
       return true;
 
     } catch (error) {
-      logger.error(`[${context}] Failed to send/process translation request:`, error);
+      getLogger().error(`[${context}] Failed to send/process translation request:`, error);
       handleTranslationError(error);
       isTranslating.value = false;
       await ensureMinimumLoadingDuration();
@@ -216,13 +245,14 @@ export function useUnifiedTranslation(context = 'popup') {
   };
 
   // --- Lifecycle & Watchers ---
-  watch(() => translationStore.currentTranslation, (newTranslation) => {
+  watch(() => translationStore.currentTranslation, async (newTranslation) => {
     if (newTranslation) {
-      logger.debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
+      const { findLanguageCode } = await utilsFactory.getI18nUtils();
+      getLogger().debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
       sourceText.value = newTranslation.sourceText || '';
       translatedText.value = newTranslation.translatedText || '';
-      sourceLanguage.value = getLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
-      targetLanguage.value = getLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
+      sourceLanguage.value = await findLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
+      targetLanguage.value = await findLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
       errorManager.clearError();
     }
   }, { deep: true });
@@ -234,7 +264,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
     messageListener = (message) => {
       if (context === 'popup') {
-        logger.debug(`[${context}] Raw message received:`, message);
+        getLogger().debug(`[${context}] Raw message received:`, message);
         let resultData = message.result || message.data || (message.translatedText ? message : null);
 
         if (resultData && (resultData.translatedText || resultData.success === false)) {
@@ -279,7 +309,7 @@ export function useUnifiedTranslation(context = 'popup') {
         const messageTarget = context === 'popup' && browserAPI ? browserAPI.onMessage : browser.runtime.onMessage;
         messageTarget.removeListener(messageListener);
       } catch (err) {
-        logger.warn(`[${context}] Failed to remove message listener:`, err);
+        getLogger().warn(`[${context}] Failed to remove message listener:`, err);
       }
     }
     if (context === 'sidepanel') {

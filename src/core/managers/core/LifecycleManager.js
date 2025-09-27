@@ -3,34 +3,24 @@ import { featureLoader } from "@/core/background/feature-loader.js";
 
 import { initializeSettingsListener } from "@/shared/config/config.js";
 import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
-import {
-  handleGoogleTTSSpeak,
-  handleGoogleTTSStopAll,
-  handleGoogleTTSPause,
-  handleGoogleTTSResume,
-  handleGoogleTTSGetStatus,
-  handleGoogleTTSEnded,
-} from '@/features/tts/handlers/handleGoogleTTS.js';
 import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
-import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
+import * as Handlers from "@/core/background/handlers/index.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
-import { actionbarIconManager } from '@/utils/browser/ActionbarIconManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
-class LifecycleManager extends ResourceTracker {
+class LifecycleManager {
   constructor() {
-    super('lifecycle-manager')
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
     this.featureLoader = featureLoader;
     this.messageHandler = createMessageHandler();
-    this.dynamicIconManager = actionbarIconManager;
+    this.dynamicIconManager = null;
     // Note: messageHandler.listen() will be called after handlers are registered
   }
 
@@ -85,13 +75,22 @@ class LifecycleManager extends ResourceTracker {
   }
 
   async initializeTranslationEngine() {
-    this.translationEngine = new TranslationEngine();
-    await this.translationEngine.initialize();
+    try {
+      logger.debug('🔧 [LifecycleManager] Creating TranslationEngine...');
+      this.translationEngine = new TranslationEngine();
+      logger.debug('🔧 [LifecycleManager] Initializing TranslationEngine...');
+      await this.translationEngine.initialize();
+      logger.debug('✅ [LifecycleManager] TranslationEngine initialized successfully');
+    } catch (error) {
+      logger.error('❌ [LifecycleManager] Failed to initialize TranslationEngine:', error);
+      throw error;
+    }
   }
 
   async initializeDynamicIconManager() {
     logger.debug('Initializing ActionbarIconManager...');
-    await this.dynamicIconManager.initialize();
+    const { getActionbarIconManager } = await utilsFactory.getBrowserUtils();
+    this.dynamicIconManager = await getActionbarIconManager();
     logger.debug('ActionbarIconManager initialized');
   }
 
@@ -102,11 +101,11 @@ class LifecycleManager extends ResourceTracker {
     // Hybrid approach: explicit mapping with validation
     const handlerMappings = {
       // Common handlers
-      'ping': Handlers.handlePing,
-      'openOptionsPage': Handlers.handleOpenOptionsPage,
-      'openURL': Handlers.handleOpenURL,
+      'ping': Handlers.handlePingLazy,
+      'openOptionsPage': Handlers.handleOpenOptionsPageLazy,
+      'openURL': Handlers.handleOpenURLLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
-      'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenus,
+      'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
       
       // Lifecycle handlers
@@ -116,38 +115,36 @@ class LifecycleManager extends ResourceTracker {
       'backgroundReloadExtension': Handlers.handleBackgroundReloadExtension,
       
       // Translation handlers
-      'TRANSLATE': Handlers.handleTranslate,
-      'translateText': Handlers.handleTranslateText,
-      'revertTranslation': Handlers.handleRevertTranslation,
-      'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
-      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResult,
+      'TRANSLATE': Handlers.handleTranslateLazy,
+      'translateText': Handlers.handleTranslateTextLazy,
+      'revertTranslation': Handlers.handleRevertTranslationLazy,
+      'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
+      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResultLazy,
 
-      // TTS handlers
-      'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
-      'TTS_STOP': handleGoogleTTSStopAll,
-      'GOOGLE_TTS_PAUSE': handleGoogleTTSPause,
-      'GOOGLE_TTS_RESUME': handleGoogleTTSResume,
-      'GOOGLE_TTS_GET_STATUS': handleGoogleTTSGetStatus,
-      'GOOGLE_TTS_ENDED': handleGoogleTTSEnded,
+      // TTS handlers - Lazy loaded for better performance
+      'GOOGLE_TTS_SPEAK': Handlers.handleTTSSpeakLazy,
+      'TTS_SPEAK': Handlers.handleTTSSpeakLazy,
+      'TTS_STOP': Handlers.handleTTSStopLazy,
+      'OFFSCREEN_READY': Handlers.handleOffscreenReadyLazy,
       
-      // Element selection handlers
-      'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
-      'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementMode,
-      'setSelectElementState': Handlers.handleSetSelectElementState,
-      'getSelectElementState': Handlers.handleGetSelectElementState,
+      // Element selection handlers - Lazy loaded for better performance
+      'activateSelectElementMode': Handlers.handleActivateSelectElementModeLazy,
+      'deactivateSelectElementMode': Handlers.handleDeactivateSelectElementModeLazy,
+      'setSelectElementState': Handlers.handleSetSelectElementStateLazy,
+      'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
       
-      // Screen capture handlers
-      'startAreaCapture': Handlers.handleStartAreaCapture,
-      'startFullScreenCapture': Handlers.handleStartFullScreenCapture,
-      'requestFullScreenCapture': Handlers.handleRequestFullScreenCapture,
-      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImage,
-      'previewConfirmed': Handlers.handlePreviewConfirmed,
-      'previewCancelled': Handlers.handlePreviewCancelled,
-      'previewRetry': Handlers.handlePreviewRetry,
-      'resultClosed': Handlers.handleResultClosed,
-      'captureError': Handlers.handleCaptureError,
-      'areaSelectionCancel': Handlers.handleAreaSelectionCancel,
+      // Screen capture handlers - Lazy loaded for better performance
+      'startAreaCapture': Handlers.handleStartAreaCaptureLazy,
+      'startFullScreenCapture': Handlers.handleStartFullScreenCaptureLazy,
+      'requestFullScreenCapture': Handlers.handleRequestFullScreenCaptureLazy,
+      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImageLazy,
+      'previewConfirmed': Handlers.handlePreviewConfirmedLazy,
+      'previewCancelled': Handlers.handlePreviewCancelledLazy,
+      'previewRetry': Handlers.handlePreviewRetryLazy,
+      'resultClosed': Handlers.handleResultClosedLazy,
+      'captureError': Handlers.handleCaptureErrorLazy,
+      'areaSelectionCancel': Handlers.handleAreaSelectionCancelLazy,
       
       // Text selection handlers
       'getSelectedText': Handlers.handleGetSelectedText,
@@ -159,23 +156,23 @@ class LifecycleManager extends ResourceTracker {
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,
       
-      // Vue integration handlers
-      'translateImage': Handlers.handleTranslateImage,
-      'providerStatus': Handlers.handleProviderStatus,
-      'testProviderConnection': Handlers.handleTestProviderConnection,
-      'saveProviderConfig': Handlers.handleSaveProviderConfig,
-      'getProviderConfig': Handlers.handleGetProviderConfig,
-      'startScreenCapture': Handlers.handleStartScreenCapture,
-      'captureScreenArea': Handlers.handleCaptureScreenArea,
-      'updateContextMenu': Handlers.handleUpdateContextMenu,
-      'getExtensionInfo': Handlers.handleGetExtensionInfo,
-      'logError': Handlers.handleLogError,
-      
-      // Vue Bridge handlers
-      'CREATE_VUE_MICRO_APP': Handlers.handleVueBridge,
-      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridge,
-      'START_SCREEN_CAPTURE': Handlers.handleVueBridge,
-      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridge
+      // Vue integration handlers - Lazy loaded for better performance
+      'translateImage': Handlers.handleTranslateImageLazy,
+      'providerStatus': Handlers.handleProviderStatusLazy,
+      'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
+      'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
+      'getProviderConfig': Handlers.handleGetProviderConfigLazy,
+      'startScreenCapture': Handlers.handleStartScreenCaptureLazy,
+      'captureScreenArea': Handlers.handleCaptureScreenAreaLazy,
+      'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
+      'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
+      'logError': Handlers.handleLogErrorLazy,
+
+      // Vue Bridge handlers - Lazy loaded for better performance
+      'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
+      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy,
+      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridgeLazy
     };
     
     // Add browser-specific handlers
@@ -270,15 +267,69 @@ class LifecycleManager extends ResourceTracker {
   }
 
   async refreshContextMenus(locale) {
+    logger.debug("🔄 [LifecycleManager] Starting context menu refresh...");
+
     try {
+      logger.debug("📋 [LifecycleManager] Loading context menu manager via featureLoader...");
       const contextMenuManager = await this.featureLoader.loadContextMenuManager();
+      logger.debug("✅ [LifecycleManager] Context menu manager loaded successfully");
+
+      logger.debug("🔄 [LifecycleManager] Refreshing context menus...");
       await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+      logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via featureLoader");
+
     } catch (error) {
-      logger.error("❌ Failed to refresh context menus via featureLoader:", error);
-      // Fallback to direct import of new context menu manager
-      const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
-      const contextMenuManager = new ContextMenuManager();
-      await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+      logger.error("❌ [LifecycleManager] Failed to refresh context menus via featureLoader:", error);
+      logger.debug("🔄 [LifecycleManager] Attempting fallback initialization...");
+
+      try {
+        // Fallback to direct import of new context menu manager
+        const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
+        const contextMenuManager = new ContextMenuManager();
+
+        logger.debug("🔧 [LifecycleManager] Initializing context menus via fallback...");
+        await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+        logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via fallback");
+
+      } catch (fallbackError) {
+        logger.error("❌ [LifecycleManager] Fallback context menu initialization also failed:", fallbackError);
+        // Try one more direct approach
+        await this.createContextMenuDirectly(locale);
+      }
+    }
+  }
+
+  /**
+   * Direct context menu creation as ultimate fallback
+   */
+  async createContextMenuDirectly(locale) {
+    try {
+      logger.debug("🚨 [LifecycleManager] Attempting direct context menu creation...");
+
+      const browser = await import("webextension-polyfill");
+      const { getTranslationString } = await import('@/utils/i18n/i18n.js');
+
+      // Clear existing menus
+      await browser.contextMenus.removeAll();
+
+      // Create basic action menu
+      await browser.contextMenus.create({
+        id: "action-translate-element-direct",
+        title: "Translate Element (Direct)",
+        contexts: ["action"]
+      });
+
+      // Create options menu
+      await browser.contextMenus.create({
+        id: "open-options-page-direct",
+        title: "Options (Direct)",
+        contexts: ["action"]
+      });
+
+      logger.debug("✅ [LifecycleManager] Direct context menu creation completed");
+
+    } catch (directError) {
+      logger.error("❌ [LifecycleManager] Direct context menu creation failed:", directError);
     }
   }
 
@@ -286,9 +337,6 @@ class LifecycleManager extends ResourceTracker {
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
-    
-    // Use ResourceTracker cleanup for automatic resource management
-    super.cleanup();
     
     logger.debug('LifecycleManager cleanup completed');
   }

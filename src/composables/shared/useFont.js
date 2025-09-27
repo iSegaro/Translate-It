@@ -10,7 +10,35 @@ import { systemFontDetector } from '@/shared/fonts/SystemFontDetector.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont')
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 // Font CSS mapping with fallbacks
 const FONT_CSS_MAP = {
@@ -100,7 +128,7 @@ export function useFont(targetLanguage = 'English', options = {}) {
     try {
       return systemFontDetector.getFontCSSFamily(fontValue)
     } catch (error) {
-      logger.warn('Failed to get font CSS from SystemFontDetector, using fallback:', error)
+      getLogger().warn('Failed to get font CSS from SystemFontDetector, using fallback:', error)
       return FONT_CSS_MAP[fontValue] || FONT_CSS_MAP[fallbackFont]
     }
   })
@@ -147,9 +175,9 @@ export function useFont(targetLanguage = 'English', options = {}) {
         root.style.setProperty(property, value)
       })
       appliedVariables.value = true
-      logger.debug('Applied global CSS variables for fonts', cssVariables.value)
+      getLogger().debug('Applied global CSS variables for fonts', cssVariables.value)
     } catch (error) {
-      logger.warn('Failed to apply global CSS variables:', error)
+      getLogger().warn('Failed to apply global CSS variables:', error)
     }
   }
   
@@ -163,9 +191,9 @@ export function useFont(targetLanguage = 'English', options = {}) {
         root.style.removeProperty(property)
       })
       appliedVariables.value = false
-      logger.debug('Removed global CSS variables for fonts')
+      getLogger().debug('Removed global CSS variables for fonts')
     } catch (error) {
-      logger.warn('Failed to remove global CSS variables:', error)
+      getLogger().warn('Failed to remove global CSS variables:', error)
     }
   }
   
@@ -216,7 +244,7 @@ export function useFont(targetLanguage = 'English', options = {}) {
       const fonts = await systemFontDetector.getAvailableFonts()
       availableFonts.value = fonts
     } catch (error) {
-      logger.warn('Failed to load available fonts:', error)
+      getLogger().warn('Failed to load available fonts:', error)
       availableFonts.value = []
     }
   }
@@ -233,7 +261,7 @@ export function useFont(targetLanguage = 'English', options = {}) {
       isFontLoaded.value = true
       return true
     } catch (error) {
-      logger.warn('Font loading check failed:', error)
+      getLogger().warn('Font loading check failed:', error)
       isFontLoaded.value = false
       return false
     }

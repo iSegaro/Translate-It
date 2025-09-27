@@ -4,7 +4,15 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage as sendUnifiedMessage } from '../core/UnifiedMessaging.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
-const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
+
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
+  }
+  return logger;
+}
 
 
 /**
@@ -39,9 +47,9 @@ export function useMessaging(context) {
     } catch (error) {
       // Handle context errors silently (they're expected when extension reloads)
       if (ExtensionContextManager.isContextError(error)) {
-        logger.debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
+        getLogger().debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
       } else {
-        logger.error('sendMessage failed via UnifiedMessaging:', error);
+        getLogger().error('sendMessage failed via UnifiedMessaging:', error);
       }
       throw error;
     }
@@ -70,9 +78,9 @@ export function useMessaging(context) {
     sendUnifiedMessage(message, options).catch(error => {
       // Handle context errors silently, log other errors
       if (ExtensionContextManager.isContextError(error)) {
-        logger.debug(`[useMessaging:${context}] Fire-and-forget failed due to extension context invalidated (expected):`, error.message);
+        getLogger().debug(`[useMessaging:${context}] Fire-and-forget failed due to extension context invalidated (expected):`, error.message);
       } else {
-        logger.debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
+        getLogger().debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
       }
     });
   };

@@ -3,7 +3,7 @@
 import browser from "webextension-polyfill";
 import { applyElementDirection } from "@/shared/utils/language/languageUtils.js";
 import { getApplication_LocalizeAsync } from "@/shared/config/config.js";
-import { languageList } from "./languages.js";
+import { getLanguageByCode, getLanguageByName } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 // import  from "./helpers.js";
@@ -31,11 +31,15 @@ const translationsCache = new Map();
 
 /**
  * Clear translations cache (useful when language changes)
+ * @alias clearTranslationCache - for backward compatibility
  */
 export function clearTranslationsCache() {
   translationsCache.clear();
   getLogger().debug('Translations cache cleared');
 }
+
+// Export with backward compatibility name
+export const clearTranslationCache = clearTranslationsCache;
 
 /**
  * بارگذاری ترجمه‌ها برای زبان مشخص به همراه استفاده از کش.
@@ -99,17 +103,13 @@ export async function getTranslationString(key, lang) {
       'fa': 'fa'
     };
     
-    // First try direct mapping
     if (LANGUAGE_MAP[App_Language]) {
       langCode = LANGUAGE_MAP[App_Language];
     } else {
-      // Fallback to existing logic
-      const foundLang = languageList.find(
-        (language) =>
-          language.name === App_Language || language.locale === App_Language,
-      );
+      // Fallback to new async logic
+      const foundLang = await getLanguageByName(App_Language);
 
-      // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم.
+      // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم。
       langCode =
         foundLang?.code || (App_Language?.length === 2 ? App_Language : "en");
     }
@@ -142,11 +142,10 @@ export async function app_localize(lang_code) {
   let langCode = lang_code;
 
   if (langCode?.length !== 2) {
-    languageList.forEach((language) => {
-      if (language.name === App_Language) {
-        langCode = language.code;
-      }
-    });
+    const foundLang = await getLanguageByName(App_Language);
+    if (foundLang) {
+      langCode = foundLang.code;
+    }
   }
 
   if (langCode) {
@@ -255,11 +254,10 @@ export async function app_localize_popup(lang_code) {
   let langCode = lang_code;
 
   if (!langCode || langCode?.length > 2) {
-    languageList.forEach((language) => {
-      if (language.name === App_Language || language.locale === App_Language) {
-        langCode = language.locale;
-      }
-    });
+    const foundLang = await getLanguageByName(App_Language);
+    if (foundLang) {
+      langCode = foundLang.locale;
+    }
   }
 
   // در صورت ارائه زبان، تلاش می‌کنیم فایل ترجمه مربوطه را بارگذاری کنیم

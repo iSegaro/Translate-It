@@ -1,5 +1,5 @@
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { isUrlExcluded, isUrlExcluded_TEXT_FIELDS_ICON } from '@/utils/ui/exclusion.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -159,7 +159,7 @@ export class ExclusionChecker {
       }
 
       // URL exclusion check
-      if (this.isUrlExcludedForFeature(featureName)) {
+      if (await this.isUrlExcludedForFeature(featureName)) {
         logger.debug(`Feature ${featureName} blocked: URL excluded`);
         return false;
       }
@@ -212,8 +212,10 @@ export class ExclusionChecker {
     return settingsManager.get(settingKey, defaultValue);
   }
 
-  isUrlExcludedForFeature(featureName) {
+  async isUrlExcludedForFeature(featureName) {
     try {
+      const { isUrlExcluded, isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
+
       // Feature-specific exclusion logic
       if (featureName === 'textFieldIcon') {
         return isUrlExcluded_TEXT_FIELDS_ICON(this.currentUrl);
@@ -272,12 +274,17 @@ export class ExclusionChecker {
   }
 
   // Static method to check if feature should be considered for a URL
-  static shouldConsiderFeature(featureName, url) {
+  static async shouldConsiderFeature(featureName, url) {
     // Quick pre-check without full initialization
     // Useful for avoiding unnecessary content script loading
-
-    if (featureName === 'textFieldIcon') {
-      return !isUrlExcluded_TEXT_FIELDS_ICON(url);
+    try {
+      const { isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
+      if (featureName === 'textFieldIcon') {
+        return !isUrlExcluded_TEXT_FIELDS_ICON(url);
+      }
+    } catch (error) {
+      logger.error('Error in shouldConsiderFeature:', error);
+      return false; // On error, assume feature should not be considered
     }
 
     // For other features, we need settings so return true

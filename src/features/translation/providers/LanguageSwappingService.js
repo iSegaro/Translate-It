@@ -1,6 +1,5 @@
 import browser from 'webextension-polyfill';
 import { isPersianText } from "@/shared/utils/text/textAnalysis.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -51,7 +50,7 @@ export class LanguageSwappingService {
         
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+        const targetLangCode = targetNorm.split("-")[0];
         logger.debug(`${providerName}: Language detection details:`, {
           text: text.slice(0, 50),
           detectedLang: mainDetection.language,
@@ -99,7 +98,7 @@ export class LanguageSwappingService {
   static _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
-    const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+    const targetLangCode = targetNorm.split("-")[0];
 
     if (
       isPersianText(text) &&

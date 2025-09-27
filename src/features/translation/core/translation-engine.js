@@ -17,7 +17,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine')
 
 export class TranslationEngine {
   constructor() {
-    this.providers = new Map();
     this.cache = new Map();
     this.history = [];
     this.factory = new ProviderFactory();
@@ -937,23 +936,17 @@ export class TranslationEngine {
    * Get or create provider instance
    */
   async getProvider(providerId) {
-    // Return cached provider if available
-    if (this.providers.has(providerId)) {
-      return this.providers.get(providerId);
-    }
-
     try {
-      // Create new provider instance
-      const ProviderClass = providerRegistry.get(providerId);
-      const provider = new ProviderClass();
+      logger.debug(`[TranslationEngine] Getting provider '${providerId}'`);
+      const provider = await this.factory.getProvider(providerId);
 
       if (provider) {
-        this.providers.set(providerId, provider);
+        logger.debug(`[TranslationEngine] Provider '${providerId}' loaded successfully`);
         return provider;
       }
     } catch (error) {
       logger.error(
-        `[TranslationEngine] Failed to create provider '${providerId}':`,
+        `[TranslationEngine] Failed to get provider '${providerId}':`,
         error,
       );
     }

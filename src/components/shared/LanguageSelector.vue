@@ -62,7 +62,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
-import { getLanguageCode } from '@/utils/i18n/languages.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguageSelector');
 
 
@@ -126,11 +126,14 @@ const targetLanguage = computed({
   set: (value) => emit('update:targetLanguage', value)
 })
 
-const availableLanguages = computed(() => languages.allLanguages.value || [])
+const availableLanguages = computed(() => {
+  // Return cached languages if available, otherwise show loading indicator
+  return languages.allLanguages.value || []
+})
 
 const targetLanguages = computed(() => {
   // Filter out Auto-Detect from target languages
-  return (languages.allLanguages.value || []).filter(lang => lang.code !== AUTO_DETECT_VALUE)
+  return availableLanguages.value.filter(lang => lang.code !== AUTO_DETECT_VALUE)
 })
 
 const swapIcon = computed(() => {
@@ -140,8 +143,8 @@ const swapIcon = computed(() => {
 // Methods
 const handleSwapLanguages = async () => {
   try {
-    // Use CONFIG defaults which have the latest values (migrations ensure storage is up-to-date)
-    const defaultTarget = getLanguageCode(CONFIG?.TARGET_LANGUAGE) || 'en';
+    const { getLanguageCodeForTTS: getLanguageCode } = await utilsFactory.getI18nUtils();
+    const defaultTarget = await getLanguageCode(CONFIG?.TARGET_LANGUAGE) || 'en';
 
     logger.debug('[LanguageSelector] Swap requested:', {
       current: { source: sourceLanguage.value, target: targetLanguage.value },
@@ -195,11 +198,14 @@ const handleDropdownClick = () => {
 }
 
 // Initialize languages
-onMounted(() => {
-  // Load languages asynchronously (non-blocking)
-  languages.loadLanguages().catch(error => {
-    handleError(error, 'language-selector-languages')
-  });
+onMounted(async () => {
+  // Languages should already be preloaded by SidepanelApp
+  // If not, load them asynchronously
+  if (!languages.isLoaded.value) {
+    await languages.loadLanguages().catch(error => {
+      handleError(error, 'language-selector-languages')
+    })
+  }
 });
 </script>
 

@@ -1,19 +1,38 @@
-// src/utils/browser/ActionbarIconManager.js
 import browser from 'webextension-polyfill';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
+// Lazy logger initialization to avoid TDZ
+let logger = null;
+let loggerPromise = null;
+const getLogger = () => {
+  if (!logger) {
+    if (!loggerPromise) {
+      loggerPromise = Promise.all([
+        import('@/shared/logging/logger.js'),
+        import('@/shared/logging/logConstants.js')
+      ]).then(([loggerModule, logConstantsModule]) => {
+        logger = loggerModule.getScopedLogger(logConstantsModule.LOG_COMPONENTS.CORE, 'ActionbarIconManager');
+        return logger;
+      });
+    }
+    // Return a temporary logger that buffers calls until the real logger is loaded
+    return {
+      debug: (...args) => loggerPromise.then(l => l.debug(...args)),
+      info: (...args) => loggerPromise.then(l => l.info(...args)),
+      warn: (...args) => loggerPromise.then(l => l.warn(...args)),
+      error: (...args) => loggerPromise.then(l => l.error(...args))
+    };
+  }
+  return logger;
+};
 
 /**
  * Actionbar Icon Manager - Minimal, fast, reliable
  * Manages browser action bar icons with dynamic provider overlays
  */
-class ActionbarIconManager extends ResourceTracker {
+class ActionbarIconManager {
   constructor() {
-    super('actionbar-icon-manager')
+    this.resourceTracker = null;
     this.currentProvider = null;
     this.isInitialized = false;
   }
@@ -21,20 +40,25 @@ class ActionbarIconManager extends ResourceTracker {
   async initialize() {
     if (this.isInitialized) return;
 
+    const { default: ResourceTracker } = await import('@/core/memory/ResourceTracker.js');
+    this.resourceTracker = new ResourceTracker('actionbar-icon-manager');
+
     try {
       // Get current provider
       const storedProvider = await storageManager.get('TRANSLATION_API');
       this.currentProvider = storedProvider.TRANSLATION_API || 'google';
 
+      const logger = getLogger();
       logger.debug(`🎯 Simple icon manager initialized for: ${this.currentProvider}`);
 
       // Update icon immediately
       await this.updateIcon(this.currentProvider);
 
       // Listen for provider changes using tracked event listener
-      this.addEventListener(storageManager, 'change', async (data) => {
-        if (data.key === 'TRANSLATION_API' && data.newValue !== this.currentProvider) {
-          this.currentProvider = data.newValue;
+      this.resourceTracker.addEventListener(storageManager, 'change', async (changes) => {
+        // StorageCore emits change events as { key, newValue, oldValue }
+        if (changes.key === 'TRANSLATION_API' && changes.newValue !== this.currentProvider) {
+          this.currentProvider = changes.newValue;
           await this.updateIcon(this.currentProvider);
         }
       });
@@ -42,6 +66,7 @@ class ActionbarIconManager extends ResourceTracker {
       this.isInitialized = true;
       
     } catch (error) {
+      const logger = getLogger();
       logger.error('❌ Failed to initialize ActionbarIconManager:', error);
     }
   }
@@ -51,6 +76,7 @@ class ActionbarIconManager extends ResourceTracker {
    */
   async updateIcon(provider) {
     try {
+      const logger = getLogger();
       logger.debug(`🎨 Updating icon for: ${provider}`);
 
       // Create composite icon with provider overlay
@@ -58,12 +84,15 @@ class ActionbarIconManager extends ResourceTracker {
 
       if (compositeImageData) {
         await this.setBrowserIconWithImageData(compositeImageData);
+        const logger = getLogger();
         logger.debug(`✅ Icon updated for: ${provider}`);
       } else {
+        const logger = getLogger();
         logger.warn(`⚠️ Failed to create composite icon for: ${provider}`);
       }
 
     } catch (error) {
+      const logger = getLogger();
       logger.error(`❌ Failed to update icon for ${provider}:`, error);
     }
   }
@@ -107,6 +136,7 @@ class ActionbarIconManager extends ResourceTracker {
       // Fetch the image
       const response = await fetch(fullUrl);
       if (!response.ok) {
+        const logger = getLogger();
         logger.error(`Failed to fetch image: ${fullUrl}`);
         return null;
       }
@@ -130,6 +160,7 @@ class ActionbarIconManager extends ResourceTracker {
 
       return imageData;
     } catch (error) {
+      const logger = getLogger();
       logger.error('Error in loadImageData:', error);
       return null;
     }
@@ -148,7 +179,8 @@ class ActionbarIconManager extends ResourceTracker {
       const providerIconBitmap = await this.loadImageBitmap(providerIconPath);
 
       if (!mainIconBitmap || !providerIconBitmap) {
-        logger.error('Failed to load main icon or provider icon');
+        const logger = getLogger();
+      logger.error('Failed to load main icon or provider icon');
         return null;
       }
 
@@ -189,6 +221,7 @@ class ActionbarIconManager extends ResourceTracker {
 
       return compositeImageData;
     } catch (error) {
+      const logger = getLogger();
       logger.error('Error creating composite icon:', error);
       return null;
     }
@@ -205,6 +238,7 @@ class ActionbarIconManager extends ResourceTracker {
       // Fetch the image
       const response = await fetch(fullUrl);
       if (!response.ok) {
+        const logger = getLogger();
         logger.error(`Failed to fetch image: ${fullUrl}`);
         return null;
       }
@@ -212,6 +246,7 @@ class ActionbarIconManager extends ResourceTracker {
       // Create bitmap from image
       return await createImageBitmap(await response.blob());
     } catch (error) {
+      const logger = getLogger();
       logger.error('Error in loadImageBitmap:', error);
       return null;
     }
@@ -228,6 +263,7 @@ class ActionbarIconManager extends ResourceTracker {
         await browser.browserAction.setIcon({ imageData: imageData });
       }
     } catch (error) {
+      const logger = getLogger();
       logger.error('Failed to set browser icon with imageData:', error);
       throw error;
     }
@@ -238,20 +274,24 @@ class ActionbarIconManager extends ResourceTracker {
    */
   clearCache() {
     // Cache is no longer used with path-based approach
+    const logger = getLogger();
     logger.debug('🧹 Icon cache cleared (no-op)');
   }
 
-  /**
-   * Destroy the icon manager and cleanup all resources
-   */
   destroy() {
-    // No cache to destroy with path-based approach
-    // Call parent destroy
-    super.destroy();
-    logger.debug('🗑️ ActionbarIconManager destroyed');
+    this.resourceTracker.destroy();
   }
+
+
 }
 
-// Export singleton
-export const actionbarIconManager = new ActionbarIconManager();
-export default actionbarIconManager;
+let instance = null;
+export async function getActionbarIconManager() {
+  if (!instance) {
+    instance = new ActionbarIconManager();
+    await instance.initialize();
+  }
+  return instance;
+}
+
+export default getActionbarIconManager;

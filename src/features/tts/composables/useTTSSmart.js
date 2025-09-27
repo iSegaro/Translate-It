@@ -1,15 +1,17 @@
 import { ref, computed } from "vue";
-import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
-const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+// Logger will be initialized inside the function to avoid TDZ
 
 export function useTTSSmart() {
-  
+  // Initialize logger to avoid TDZ
+  const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+
   // Simplified state management
   const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
   const currentTTSId = ref(null);
@@ -73,7 +75,8 @@ export function useTTSSmart() {
       progress.value = 0;
       currentTTSId.value = generateTTSId();
       
-      let language = getLanguageCodeForTTS(lang) || "en";
+      const { getLanguageCodeForTTS } = await utilsFactory.getI18nUtils();
+      let language = await getLanguageCodeForTTS(lang) || "en";
       
       // Fallback mapping for languages with limited Google TTS support
       const ttsLanguageFallbacks = {

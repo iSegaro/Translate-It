@@ -299,6 +299,10 @@ export class TextFieldHandler extends ResourceTracker {
     return this.textFieldIconManager?.activeIcons?.size || 0;
   }
 
+  getManager() {
+    return this.textFieldIconManager;
+  }
+
   cleanupAllIcons() {
     if (this.textFieldIconManager) {
       this.textFieldIconManager.cleanup();

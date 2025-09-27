@@ -2,10 +2,24 @@
 // Composable for language management
 
 import { ref, computed } from "vue";
-import { languageList } from "@/utils/i18n/languages.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
+
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
+  }
+  return logger;
+}
+
+// Shared state for cache optimization
+let sharedState = {
+  loadingPromise: null,
+  isLoaded: false
+};
 
 
 /**
@@ -17,24 +31,54 @@ export function useLanguages() {
   const languages = ref([]);
 
   /**
-   * Load languages list
+   * Load languages list asynchronously using the utils factory
    * @returns {Promise<void>}
    */
   const loadLanguages = async () => {
-    try {
-      if (!isLoaded.value) {
-        // زبان‌ها از فایل استاتیک بارگذاری می‌شوند
-        languages.value = languageList || [];
+    // Return immediately if languages are already loaded globally
+    if (sharedState.isLoaded) {
+      // Update local state from shared state if needed
+      if (!isLoaded.value && sharedState.languageList) {
+        languages.value = sharedState.languageList;
         isLoaded.value = true;
-  logger.init('Languages loaded successfully:', languages.value.length,
-  );
       }
-    } catch (error) {
-  logger.error('Failed to load languages:', error);
-      // در صورت خطا، از لیست خالی استفاده می‌کنیم
-      languages.value = [];
-      isLoaded.value = true;
+      return;
     }
+
+    // Return existing loading promise to prevent duplicate requests
+    if (sharedState.loadingPromise) {
+      await sharedState.loadingPromise;
+      return;
+    }
+
+    // Create new loading promise
+    sharedState.loadingPromise = (async () => {
+      try {
+        const { getFullLanguageList } = await utilsFactory.getI18nUtils();
+        const languageList = await getFullLanguageList() || [];
+
+        // Update shared state
+        sharedState.languageList = languageList;
+        sharedState.isLoaded = true;
+
+        // Update component state
+        languages.value = languageList;
+        isLoaded.value = true;
+
+        getLogger().init('Languages loaded successfully:', languages.value.length);
+      } catch (error) {
+        getLogger().error('Failed to load languages:', error);
+        // In case of error, use an empty list but mark as loaded
+        languages.value = [];
+        isLoaded.value = true;
+        sharedState.isLoaded = true;
+      } finally {
+        // Clear loading promise
+        sharedState.loadingPromise = null;
+      }
+    })();
+
+    await sharedState.loadingPromise;
   };
 
   /**
@@ -42,7 +86,7 @@ export function useLanguages() {
    * @returns {Array} Array of translation languages with code and name
    */
   const getTranslationLanguages = () => {
-    return (languages.value || languageList || []).map((lang) => ({
+    return (languages.value || []).map((lang) => ({
       code: lang.code,
       name: lang.name,
       promptName: lang.promptName,
@@ -90,8 +134,7 @@ export function useLanguages() {
     if (code === "auto") {
       return { code: "auto", name: "Auto-Detect", promptName: "Auto Detect" };
     }
-    const langList = languages.value || languageList || [];
-    return langList.find((lang) => lang.code === code) || null;
+    return (languages.value || []).find((lang) => lang.code === code) || null;
   };
 
   /**
@@ -117,7 +160,7 @@ export function useLanguages() {
       return "auto";
     }
 
-    const langList = languages.value || languageList || [];
+    const langList = languages.value || [];
 
     // Find by name (display value)
     const langByName = langList.find((lang) => lang.name === identifier);
@@ -146,29 +189,17 @@ export function useLanguages() {
       return "Auto-Detect";
     }
 
-    const langList = languages.value || languageList || [];
+    const langList = languages.value || [];
     const language = langList.find((lang) => lang.code === code);
     return language ? language.name : code;
   };
 
   // Computed reactive references
-  const allLanguages = computed(() => {
-    if (!isLoaded.value) {
-      // اگر هنوز load نشده، از languageList استاتیک استفاده کنیم
-      return languageList || [];
-    }
-    return languages.value || [];
-  });
-
+  const allLanguages = computed(() => languages.value || []);
   const translationLanguages = computed(() => getTranslationLanguages());
   const sourceLanguages = computed(() => getSourceLanguages());
   const targetLanguages = computed(() => getTargetLanguages());
   const interfaceLanguages = computed(() => getInterfaceLanguages());
-
-  // Auto-load در صورت دسترسی به languageList
-  if (languageList && languageList.length > 0 && !isLoaded.value) {
-    loadLanguages();
-  }
 
   return {
     // State

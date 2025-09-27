@@ -1,7 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import ContentApp from '../apps/content/ContentApp.vue';
-import i18n from '@/utils/i18n/plugin.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
@@ -62,10 +62,18 @@ export function getAppCss() {
  * 
  * @param {HTMLElement} rootElement - The element inside the shadow root to mount the Vue app.
  */
-export function mountContentApp(rootElement) {
+export async function mountContentApp(rootElement) {
   const app = configureVueForCSP(createApp(ContentApp));
   app.use(createPinia());
-  app.use(i18n);
+
+  // Load i18n plugin asynchronously to prevent TDZ
+  try {
+    const { i18nPlugin } = await utilsFactory.getI18nUtils();
+    app.use(i18nPlugin);
+  } catch (error) {
+    console.warn('Failed to load i18n plugin in content app:', error);
+  }
+
   app.mount(rootElement);
   const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'mountContentApp');
   logger.info('Vue app mounted into shadow DOM.');

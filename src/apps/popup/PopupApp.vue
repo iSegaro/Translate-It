@@ -108,7 +108,7 @@ import TranslationForm from '@/components/popup/TranslationForm.vue'
 import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
-import { applyTheme } from '@/utils/ui/theme.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -121,6 +121,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('popup-app')
+
+// Language preloading utility
+const usePreloadLanguages = async () => {
+  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
+  const { loadLanguages } = useLanguages()
+  // Preload languages in parallel with other initialization tasks
+  return loadLanguages()
+}
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
@@ -174,45 +182,55 @@ const toggleEnhancedVersion = () => {
   logger.debug('🔄 Enhanced Version toggle clicked! Current:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
   useEnhancedVersion.value = !useEnhancedVersion.value
   logger.debug('[PopupApp] Switched to version:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
-  
+
   // Store preference
   localStorage.setItem('popup-enhanced-version', useEnhancedVersion.value.toString())
 }
+
+// Lazy-loaded theme application
+const applyThemeLazy = async (theme) => {
+  const { applyTheme } = await utilsFactory.getUIUtils();
+  return applyTheme(theme);
+};
 
 const initialize = async () => {
   try {
     // Step 1: Set loading text
     loadingText.value = t('popup_loading') || 'Loading Popup...'
-    
-    // Step 2: Load settings store
+
+    // Step 2: Load settings store and preload essential data
     await Promise.race([
-      settingsStore.loadSettings(),
-      new Promise((_, reject) => 
+      Promise.all([
+        settingsStore.loadSettings(),
+        // Preload languages to ensure LanguageSelector has cached values
+        usePreloadLanguages()
+      ]),
+      new Promise((_, reject) =>
         tracker.trackTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-    
+
     // Step 3: Apply theme
     const settings = settingsStore.settings
-    await applyTheme(settings.THEME)
-    
+    await applyThemeLazy(settings.THEME)
+
     // Step 4: Check for saved version preference
     const savedVersion = localStorage.getItem('popup-enhanced-version')
     if (savedVersion !== null) {
       useEnhancedVersion.value = savedVersion === 'true'
     }
-    
+
     // Add clear-storage event listener to reset languages using ResourceTracker
     tracker.addEventListener(document, 'clear-storage', async () => {
       logger.debug("🔄 Clear storage event - resetting languages via composable");
       await clearTranslation();
     })
-    
+
     logger.debug('[PopupApp] Popup initialized successfully', {
       useEnhancedVersion: useEnhancedVersion.value,
       isDevelopment: isDevelopment.value
     })
-    
+
   } catch (error) {
     const isSilent = await handleError(error, 'popup-initialization')
     if (!isSilent) {

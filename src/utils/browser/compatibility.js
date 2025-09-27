@@ -4,9 +4,31 @@
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BROWSER, 'compatibility');
+
+// Lazy logger initialization to avoid TDZ
+let logger = null;
+let loggerPromise = null;
+const getLogger = () => {
+  if (!logger) {
+    if (!loggerPromise) {
+      loggerPromise = Promise.all([
+        import('@/shared/logging/logger.js'),
+        import('@/shared/logging/logConstants.js')
+      ]).then(([loggerModule, logConstantsModule]) => {
+        logger = loggerModule.getScopedLogger(logConstantsModule.LOG_COMPONENTS.BROWSER, 'compatibility');
+        return logger;
+      });
+    }
+    // Return a temporary logger that buffers calls until the real logger is loaded
+    return {
+      debug: (...args) => loggerPromise.then(l => l.debug(...args)),
+      info: (...args) => loggerPromise.then(l => l.info(...args)),
+      warn: (...args) => loggerPromise.then(l => l.warn(...args)),
+      error: (...args) => loggerPromise.then(l => l.error(...args))
+    };
+  }
+  return logger;
+};
 
 /**
  * Modern browser detection without deprecated APIs
@@ -21,7 +43,7 @@ export async function isFirefox() {
         return browserInfo.name.toLowerCase() === "firefox";
       } catch (error) {
         // getBrowserInfo might not be available in all contexts
-        logger.debug('[browserCompat] getBrowserInfo not available:', error);
+        getLogger().debug('[browserCompat] getBrowserInfo not available:', error);
       }
     }
     

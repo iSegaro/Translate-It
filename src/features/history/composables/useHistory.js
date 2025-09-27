@@ -3,12 +3,40 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
-import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.HISTORY, 'useHistory');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.HISTORY, 'useHistory');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 const MAX_HISTORY_ITEMS = 100;
 
@@ -37,9 +65,9 @@ export function useHistory() {
       // Use StorageCore for consistent storage access
       const result = await storageManager.get({ translationHistory: [] });
       historyItems.value = result.translationHistory || [];
-      logger.info(`Loaded ${historyItems.value.length} history items`);
+      getLogger().info(`Loaded ${historyItems.value.length} history items`);
     } catch (error) {
-      logger.error("Error loading history", error);
+      getLogger().error("Error loading history", error);
       historyError.value = "Failed to load history";
       historyItems.value = [];
     } finally {
@@ -70,9 +98,9 @@ export function useHistory() {
         translationHistory: newHistory,
       });
 
-      logger.info("Added to history:", translationData.sourceText, "Translated:", translationData.translatedText);
+      getLogger().info("Added to history:", translationData.sourceText, "Translated:", translationData.translatedText);
     } catch (error) {
-      logger.error("Error adding to history", error);
+      getLogger().error("Error adding to history", error);
       historyError.value = "Failed to save to history";
     }
   };
@@ -90,10 +118,10 @@ export function useHistory() {
           translationHistory: newHistory,
         });
 
-        logger.info("Deleted history item at index:", index);
+        getLogger().info("Deleted history item at index:", index);
       }
     } catch (error) {
-      logger.error("Error deleting history item", error);
+      getLogger().error("Error deleting history item", error);
       historyError.value = "Failed to delete history item";
     }
   };
@@ -101,6 +129,7 @@ export function useHistory() {
   // Clear all history
   const clearAllHistory = async () => {
     try {
+      const { getTranslationString } = await utilsFactory.getI18nUtils();
       const confirmMessage =
         (await getTranslationString("CONFIRM_CLEAR_ALL_HISTORY")) ||
         "Are you sure you want to clear all translation history?";
@@ -115,12 +144,12 @@ export function useHistory() {
           translationHistory: [],
         });
 
-        logger.info("Cleared all history");
+        getLogger().info("Cleared all history");
         return true;
       }
       return false;
     } catch (error) {
-      logger.error("Error clearing history", error);
+      getLogger().error("Error clearing history", error);
       historyError.value = "Failed to clear history";
       return false;
     }
@@ -148,7 +177,7 @@ export function useHistory() {
     try {
       return SimpleMarkdown.render(text);
     } catch (error) {
-      logger.error("Error parsing markdown", error);
+      getLogger().error("Error parsing markdown", error);
       return null;
     }
   };
@@ -168,12 +197,12 @@ export function useHistory() {
   // Convenience functions for opening/closing history panel
   const openHistoryPanel = () => {
     isHistoryPanelOpen.value = true;
-    logger.info("History panel opened");
+    getLogger().info("History panel opened");
   };
 
   const closeHistoryPanel = () => {
     isHistoryPanelOpen.value = false;
-    logger.info("History panel closed");
+    getLogger().info("History panel closed");
   };
 
   // Watch for changes in settingsStore.settings.translationHistory
@@ -184,7 +213,7 @@ export function useHistory() {
         historyItems.value = newHistory;
         // Only log in development mode to reduce console noise
         if (import.meta.env.DEV) {
-          logger.debug("History updated from settings store");
+          getLogger().debug("History updated from settings store");
         }
       }
     },
@@ -196,7 +225,7 @@ export function useHistory() {
     if (data.key === 'translationHistory') {
       const newHistory = data.newValue || [];
       historyItems.value = newHistory;
-      logger.debug("History updated from storage change listener");
+      getLogger().debug("History updated from storage change listener");
     }
   };
 

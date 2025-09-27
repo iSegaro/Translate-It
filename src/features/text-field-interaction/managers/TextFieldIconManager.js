@@ -5,7 +5,7 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { detectPlatform, Platform } from "@/utils/browser/platform.js";
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
@@ -314,11 +314,14 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Target element
    * @returns {boolean} Whether element should be processed (false = skip)
    */
-  applyPlatformFiltering(element) {
+  async applyPlatformFiltering(element) {
+    // Get browser utils from factory
+    const { detectPlatform, Platform } = await utilsFactory.getBrowserUtils();
+
     // YouTube platform-specific handling
     if (detectPlatform() === Platform.Youtube) {
       const youtubeStrategy = this.strategies?.["youtube"];
-      
+
       // Skip processing for recognized special fields on YouTube (search query, etc.)
       // This is a temporary implementation - may need more robust handling in the future
       if (youtubeStrategy?.isYoutube_ExtraField?.(element)) {

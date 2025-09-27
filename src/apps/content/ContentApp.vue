@@ -76,6 +76,8 @@ import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 
 const pageEventBus = window.pageEventBus;
 
@@ -93,10 +95,13 @@ const {
 } = useWindowsManager();
 
 // Resource tracker for automatic cleanup
-useResourceTracker('content-app')
+const tracker = useResourceTracker('content-app')
 
 // Toast integration
 let toastIntegration = null;
+
+// SelectElement Notification Manager
+let selectElementNotificationManager = null;
 
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
@@ -140,7 +145,7 @@ const setupOutsideClickHandler = () => {
 
 logger.info('ContentApp script setup executed.');
 
-onMounted(() => {
+onMounted(async () => {
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
   
@@ -194,6 +199,15 @@ onMounted(() => {
     // Continue without toast integration if it fails
   }
 
+  // Initialize SelectElement Notification Manager
+  try {
+    const notificationManager = new NotificationManager();
+    selectElementNotificationManager = await getSelectElementNotificationManager(notificationManager);
+    logger.debug('SelectElementNotificationManager initialized successfully');
+  } catch (error) {
+    logger.warn('Failed to initialize SelectElementNotificationManager:', error);
+  }
+
   const toastMap = {
     error: toast.error,
     warning: toast.warning,
@@ -216,7 +230,7 @@ onMounted(() => {
   
     
   
-  pageEventBus.on('show-notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'show-notification', (detail) => {
     // Create a unique key for this notification
     const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
     
@@ -277,7 +291,7 @@ onMounted(() => {
     toastFn(message, toastOptions);
   });
 
-  pageEventBus.on('dismiss_notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'dismiss_notification', (detail) => {
     logger.info('Received dismiss_notification event:', detail);
 
     // Skip select-element notifications - they are managed by SelectElementNotificationManager
@@ -303,7 +317,7 @@ onMounted(() => {
     }, 2000);
   });
 
-  pageEventBus.on('dismiss_all_notifications', () => {
+  tracker.addEventListener(pageEventBus, 'dismiss_all_notifications', () => {
     logger.info('Received dismiss_all_notifications event');
     // Dismiss all notifications except select-element ones
     toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
@@ -311,30 +325,30 @@ onMounted(() => {
 
   // Select element notifications should NOT be auto-dismissed
   // They are controlled by SelectElementNotificationManager only
-  pageEventBus.on('dismiss-select-element-notification', () => {
+  tracker.addEventListener(pageEventBus, 'dismiss-select-element-notification', () => {
     logger.debug('Received dismiss-select-element-notification event - ignoring (controlled by SelectElementNotificationManager)');
     // Do nothing - select element notifications are managed by their own manager
   });
 
   // Test event to confirm communication
-  pageEventBus.on('ui-host-mounted', () => {
+  tracker.addEventListener(pageEventBus, 'ui-host-mounted', () => {
     logger.info('Successfully received the ui-host-mounted test event!');
   });
 
 
   // Listen for Select Element Mode changes
-  pageEventBus.on('select-mode-activated', () => {
+  tracker.addEventListener(pageEventBus, 'select-mode-activated', () => {
     logger.info('Event: select-mode-activated');
     isSelectModeActive.value = true;
   });
 
-  pageEventBus.on('select-mode-deactivated', () => {
+  tracker.addEventListener(pageEventBus, 'select-mode-deactivated', () => {
     logger.info('Event: select-mode-deactivated');
     isSelectModeActive.value = false;
   });
 
   // Listen for TextFieldIcon events
-  pageEventBus.on('add-field-icon', (detail) => {
+  tracker.addEventListener(pageEventBus, 'add-field-icon', (detail) => {
     logger.info('Event: add-field-icon', detail);
     console.log('ContentApp: Adding field icon', detail);
     // Ensure no duplicate icons for the same ID
@@ -350,7 +364,7 @@ onMounted(() => {
     }
   });
 
-  pageEventBus.on('remove-field-icon', (detail) => {
+  tracker.addEventListener(pageEventBus, 'remove-field-icon', (detail) => {
     logger.info('Event: remove-field-icon', detail);
     const iconIndex = activeIcons.value.findIndex(icon => icon.id === detail.id);
     if (iconIndex !== -1) {
@@ -361,7 +375,7 @@ onMounted(() => {
     }
   });
 
-  pageEventBus.on('remove-all-field-icons', () => {
+  tracker.addEventListener(pageEventBus, 'remove-all-field-icons', () => {
     logger.info('Event: remove-all-field-icons');
     // Clear all component references
     iconRefs.value.clear();
@@ -370,7 +384,7 @@ onMounted(() => {
   });
 
   // Listen for enhanced TextFieldIcon events
-  pageEventBus.on('update-field-icon-position', (detail) => {
+  tracker.addEventListener(pageEventBus, 'update-field-icon-position', (detail) => {
     logger.debug('Event: update-field-icon-position', detail);
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
@@ -385,7 +399,7 @@ onMounted(() => {
     }
   });
 
-  pageEventBus.on('update-field-icon-visibility', (detail) => {
+  tracker.addEventListener(pageEventBus, 'update-field-icon-visibility', (detail) => {
     logger.debug('Event: update-field-icon-visibility', detail);
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
@@ -407,7 +421,7 @@ onMounted(() => {
   setupEventListeners();
   
   // Listen for navigation events to clean up UI state
-  pageEventBus.on('navigation-detected', (detail) => {
+  tracker.addEventListener(pageEventBus, 'navigation-detected', (detail) => {
     logger.info('Navigation detected, cleaning up UI state:', detail);
     
     // Close all translation windows
@@ -435,7 +449,7 @@ onMounted(() => {
   });
 });
 
-onUnmounted(() => {
+onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
   
   // Clear cancel timeout if exists
@@ -451,6 +465,18 @@ onUnmounted(() => {
     }
   } catch (error) {
     logger.warn('Error shutting down ToastIntegration:', error);
+  }
+
+  // Cleanup SelectElement Notification Manager
+  try {
+    if (selectElementNotificationManager) {
+      await selectElementNotificationManager.cleanup();
+      // Clear the singleton instance
+      const { SelectElementNotificationManager } = await import('@/features/element-selection/SelectElementNotificationManager.js');
+      SelectElementNotificationManager.clearInstance();
+    }
+  } catch (error) {
+    logger.warn('Error cleaning up SelectElementNotificationManager:', error);
   }
   
     

@@ -36,7 +36,13 @@ class MemoryManager {
       memoryUsage: 0
     };
 
-    // Dev-only properties  
+    // Initialize essential properties for both development and production
+    this.registeredCaches = new Set();
+    this.registeredMonitors = new Set();
+    this.centralTimer = null;
+    this.centralTimerInterval = options.centralTimerInterval || MEMORY_TIMING.CENTRAL_TIMER_INTERVAL;
+
+    // Dev-only properties
     const enableDebugFeatures = shouldEnableDebugging();
     if (enableDebugFeatures) {
       this.eventStats = {
@@ -44,10 +50,6 @@ class MemoryManager {
         totalCleaned: 0,
         byType: new Map()
       };
-      this.registeredCaches = new Set();
-      this.registeredMonitors = new Set();
-      this.centralTimer = null;
-      this.centralTimerInterval = options.centralTimerInterval || MEMORY_TIMING.CENTRAL_TIMER_INTERVAL;
     }
     this.initCentralTimer(); // Moved outside the if (isDevelopment) block
 
@@ -808,21 +810,25 @@ class MemoryManager {
    * Initialize centralized timer for periodic cleanup and monitoring
    */
   initCentralTimer() {
-    if (!shouldEnableDebugging()) return;
+    // Essential cleanup should work in both development and production
     if (this.centralTimer) return;
 
     this.centralTimer = setInterval(() => {
       this.performCentralCleanup();
     }, this.centralTimerInterval);
 
-    logger.debug(`Centralized cleanup timer initialized (${this.centralTimerInterval}ms interval)`);
+    if (shouldEnableDebugging()) {
+      const minutes = Math.floor(this.centralTimerInterval / 60000);
+      const seconds = Math.round((this.centralTimerInterval % 60000) / 1000);
+      const formattedSeconds = seconds.toString().padStart(2, '0');
+      logger.debug(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
+    }
   }
 
   /**
    * Perform centralized cleanup for all registered caches and monitors
    */
   performCentralCleanup() {
-    if (!shouldEnableDebugging()) return;
     try {
       // Check if there's an active translation before cleaning up translation-related resources
       const isTranslationActive = typeof window !== 'undefined' && Boolean(window.isTranslationInProgress);
@@ -857,10 +863,11 @@ class MemoryManager {
    * @param {Object} cache - Cache instance with cleanup method
    */
   registerCache(cache) {
-    if (!shouldEnableDebugging()) return;
     if (cache && typeof cache.cleanup === 'function') {
       this.registeredCaches.add(cache);
-      logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
+      if (shouldEnableDebugging()) {
+        logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
+      }
     }
   }
 
@@ -869,9 +876,10 @@ class MemoryManager {
    * @param {Object} cache - Cache instance
    */
   unregisterCache(cache) {
-    if (!shouldEnableDebugging()) return;
     this.registeredCaches.delete(cache);
-    logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
+    if (shouldEnableDebugging()) {
+      logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
+    }
   }
 
   /**
@@ -879,10 +887,11 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance with performMonitoring method
    */
   registerMonitor(monitor) {
-    if (!shouldEnableDebugging()) return;
     if (monitor && typeof monitor.performMonitoring === 'function') {
       this.registeredMonitors.add(monitor);
-      logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
+      if (shouldEnableDebugging()) {
+        logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
+      }
     }
   }
 
@@ -891,20 +900,22 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance
    */
   unregisterMonitor(monitor) {
-    if (!shouldEnableDebugging()) return;
     this.registeredMonitors.delete(monitor);
-    logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
+    if (shouldEnableDebugging()) {
+      logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
+    }
   }
 
   /**
    * Stop centralized timer
    */
   stopCentralTimer() {
-    if (!shouldEnableDebugging()) return;
     if (this.centralTimer) {
       clearInterval(this.centralTimer);
       this.centralTimer = null;
-      logger.debug('Centralized cleanup timer stopped');
+      if (shouldEnableDebugging()) {
+        logger.debug('Centralized cleanup timer stopped');
+      }
     }
   }
 

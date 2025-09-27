@@ -4,8 +4,7 @@
 import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js'
-import { setI18nLocale } from '@/utils/i18n/plugin.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -76,13 +75,14 @@ export function useUnifiedI18n() {
    */
   const tAsync = async (key, langCode) => {
     try {
+      const { getTranslationString } = await utilsFactory.getI18nUtils()
       const translation = await getTranslationString(key, langCode)
       return translation || key
     } catch (error) {
       logger.debug('Async translation failed for key:', key, error)
       return key
     }
-  }
+  };
 
   /**
    * Change language across the entire extension
@@ -91,14 +91,17 @@ export function useUnifiedI18n() {
   const changeLanguage = async (langCode) => {
     try {
       logger.debug('Changing unified language to:', langCode)
-      
+
       // Normalize the locale code
       const normalizedLocale = normalizeLocale(langCode)
       logger.debug('Normalized locale:', normalizedLocale)
 
+      // Get utils from factory
+      const { clearTranslationCache, setI18nLocale } = await utilsFactory.getI18nUtils()
+
       // 1. Clear legacy translations cache to ensure fresh translations
-      clearTranslationsCache()
-      
+      await clearTranslationCache()
+
       // 2. Update vue-i18n locale and load messages if needed
       await setI18nLocale(normalizedLocale)
 
@@ -107,7 +110,7 @@ export function useUnifiedI18n() {
 
       // 4. Send message to background to refresh context menus with new locale
       try {
-        await browser.runtime.sendMessage({ 
+        await browser.runtime.sendMessage({
           action: MessageActions.REFRESH_CONTEXT_MENUS,
           locale: normalizedLocale
         })
@@ -144,11 +147,12 @@ export function useUnifiedI18n() {
   // Watch for settings store changes to sync with vue-i18n
   watch(
     () => settingsStore.settings?.APPLICATION_LOCALIZE,
-    (newLang) => {
+    async (newLang) => {
       if (newLang) {
         const normalizedLang = normalizeLocale(newLang)
         if (normalizedLang !== locale.value) {
-          setI18nLocale(normalizedLang).catch(err => 
+          const { setI18nLocale } = await utilsFactory.getI18nUtils()
+          setI18nLocale(normalizedLang).catch(err =>
             logger.warn('Failed to sync locale from settings:', err)
           )
         }

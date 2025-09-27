@@ -27,32 +27,17 @@
           {{ t('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}
         </p>
       </div>
-      
-      <GeminiApiSettings v-else-if="selectedProvider === 'gemini'" />
-      <YandexApiSettings v-else-if="selectedProvider === 'yandex'" />
-      <BrowserApiSettings v-else-if="selectedProvider === 'browser'" />
-      <WebAIApiSettings v-else-if="selectedProvider === 'webai'" />
-      <OpenAIApiSettings v-else-if="selectedProvider === 'openai'" />
-      <OpenRouterApiSettings v-else-if="selectedProvider === 'openrouter'" />
-      <DeepseekApiSettings v-else-if="selectedProvider === 'deepseek'" />
-      <CustomApiSettings v-else-if="selectedProvider === 'custom'" />
+
+      <component :is="providerSettingsComponent" />
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed, defineAsyncComponent } from 'vue'
   import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
-import GeminiApiSettings from '@/components/feature/api-settings/GeminiApiSettings.vue'
-import YandexApiSettings from '@/components/feature/api-settings/YandexApiSettings.vue'
-import BrowserApiSettings from '@/components/feature/api-settings/BrowserApiSettings.vue'
-import WebAIApiSettings from '@/components/feature/api-settings/WebAIApiSettings.vue'
-import OpenAIApiSettings from '@/components/feature/api-settings/OpenAIApiSettings.vue'
-import OpenRouterApiSettings from '@/components/feature/api-settings/OpenRouterApiSettings.vue'
-import DeepseekApiSettings from '@/components/feature/api-settings/DeepseekApiSettings.vue'
-import CustomApiSettings from '@/components/feature/api-settings/CustomApiSettings.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -63,6 +48,31 @@ const settingsStore = useSettingsStore()
 
 // Selected provider
 const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+
+// Dynamically load the settings component based on the selected provider
+const providerSettingsComponent = computed(() => {
+  const provider = selectedProvider.value;
+  switch (provider) {
+    case 'gemini':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/GeminiApiSettings.vue'));
+    case 'yandex':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/YandexApiSettings.vue'));
+    case 'browser':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/BrowserApiSettings.vue'));
+    case 'webai':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/WebAIApiSettings.vue'));
+    case 'openai':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenAIApiSettings.vue'));
+    case 'openrouter':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenRouterApiSettings.vue'));
+    case 'deepseek':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepseekApiSettings.vue'));
+    case 'custom':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/CustomApiSettings.vue'));
+    default:
+      return null;
+  }
+});
 
 // Watch for changes in selectedProvider and update the store locally
 watch(selectedProvider, (newValue, oldValue) => {

@@ -16,7 +16,35 @@ import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 // Shared reactive state for select element mode (module-level so all callers share it)
 const sharedIsSelectModeActive = ref(false);
@@ -41,7 +69,7 @@ const _registerSelectStateListener = async () => {
       _currentTabId = response.tabId;
     }
   } catch (err) {
-    logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
+    getLogger().warn('[useSelectElementTranslation] Failed to query background for select state:', err);
   }
 
   // Register handler with central MessageHandler for background broadcasts
@@ -62,7 +90,7 @@ const _registerSelectStateListener = async () => {
           }
         }
       } catch (e) {
-        logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
+        getLogger().warn('[useSelectElementTranslation] broadcast handler error:', e);
       }
       return { success: true, handled: true };
     }
@@ -81,11 +109,11 @@ const _registerSelectStateListener = async () => {
 
       if (!_uiMessageHandler.isListenerActive) {
         _uiMessageHandler.listen();
-        logger.debug('[useTranslationModes] UI MessageHandler activated');
+        getLogger().debug('[useTranslationModes] UI MessageHandler activated');
       }
     }
   } catch (e) {
-    logger.warn('[useSelectElementTranslation] Could not register with MessageHandler:', e);
+    getLogger().warn('[useSelectElementTranslation] Could not register with MessageHandler:', e);
   }
 };
 
@@ -128,7 +156,7 @@ export function useSidepanelTranslation() {
         languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
       const targetLangCode = languages.getLanguagePromptName(targetLang);
 
-      logger.debug('Starting translation:', {
+      getLogger().debug('Starting translation:', {
         text: text.substring(0, 50) + "...",
         sourceLangCode,
         targetLangCode,
@@ -163,18 +191,18 @@ export function useSidepanelTranslation() {
 
       if (response?.success) {
         result.value = response;
-        logger.init('Translation successful');
+        getLogger().init('Translation successful');
         return response;
       } else {
         const errorMsg = response?.error || "Translation failed";
         error.value = errorMsg;
-        logger.error('Translation failed:', errorMsg);
+        getLogger().error('Translation failed:', errorMsg);
         return null;
       }
     } catch (err) {
       const errorMsg = err.message || "Translation error occurred";
       error.value = errorMsg;
-      logger.error('Translation error:', err);
+      getLogger().error('Translation error:', err);
       return null;
     } finally {
       isLoading.value = false;
@@ -221,10 +249,10 @@ export function useSelectElementTranslation() {
             });
             if (response && response.success) {
               sharedIsSelectModeActive.value = !!response.active;
-              logger.debug('Select element state refreshed on tab change:', response.active);
+              getLogger().debug('Select element state refreshed on tab change:', response.active);
             }
           } catch (err) {
-            logger.debug('Failed to refresh select element state on tab change:', err);
+            getLogger().debug('Failed to refresh select element state on tab change:', err);
           }
         };
         browser.tabs.onActivated.addListener(_tabsActivatedHandler);
@@ -258,7 +286,7 @@ export function useSelectElementTranslation() {
     error.value = null;
 
     try {
-      logger.debug('Activating select element mode');
+      getLogger().debug('Activating select element mode');
       const result = await sendMessage({
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
@@ -272,11 +300,11 @@ export function useSelectElementTranslation() {
         // The background script now provides a user-friendly message.
         const errorMsg = (result && result.message) || "Failed to activate select element mode";
         error.value = errorMsg;
-        logger.debug('Select mode activation failed:', { errorMsg, result });
+        getLogger().debug('Select mode activation failed:', { errorMsg, result });
         return false;
       }
       
-      logger.debug('Select element mode activated');
+      getLogger().debug('Select element mode activated');
       return true;
     } catch (err) {
       const errorMsg = err.message || "Failed to activate select element mode";
@@ -291,9 +319,9 @@ export function useSelectElementTranslation() {
           errorType === ErrorTypes.TAB_LOCAL_FILE ||
           errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
           errorType === ErrorTypes.TAB_RESTRICTED) {
-        logger.debug('Select mode activation blocked (restricted page):', { errorType, message: err.message });
+        getLogger().debug('Select mode activation blocked (restricted page):', { errorType, message: err.message });
       } else {
-        logger.error('Error activating select mode:', err);
+        getLogger().error('Error activating select mode:', err);
       }
       return false;
     } finally {
@@ -303,20 +331,20 @@ export function useSelectElementTranslation() {
 
   const deactivateSelectMode = async () => {
     try {
-      logger.debug('Deactivating select element mode');
+      getLogger().debug('Deactivating select element mode');
       await sendMessage({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
         data: { active: false }
       });
-      logger.debug('Select element mode deactivated');
+      getLogger().debug('Select element mode deactivated');
       return true;
     } catch (err) {
       const errorMsg =
         err.message || "Failed to deactivate select element mode";
       error.value = errorMsg;
-      logger.error('Error deactivating select mode:', err,
+      getLogger().error('Error deactivating select mode:', err,
       );
       return false;
     }
@@ -340,7 +368,7 @@ export function useSelectElementTranslation() {
       // If the action failed, revert the optimistic update
       if (!success) {
         sharedIsSelectModeActive.value = originalState;
-        logger.debug('Select element toggle failed, reverting UI state.');
+        getLogger().debug('Select element toggle failed, reverting UI state.');
         return false;
       }
       
@@ -348,7 +376,7 @@ export function useSelectElementTranslation() {
     } catch (err) {
       // Revert on any unexpected errors as well
       sharedIsSelectModeActive.value = originalState;
-      logger.error('An unexpected error occurred during toggleSelectElement:', err);
+      getLogger().error('An unexpected error occurred during toggleSelectElement:', err);
       return false;
     }
   };
@@ -375,7 +403,7 @@ export function useSidepanelActions() {
     error.value = null;
 
     try {
-      logger.debug('[SidepanelActions] Executing revert action');
+      getLogger().debug('[SidepanelActions] Executing revert action');
 
       // Use sendMessage (goes through background script) for proper error handling - same as Popup
       const response = await sendMessageViaMessaging({
@@ -386,11 +414,11 @@ export function useSidepanelActions() {
       });
 
       if (response?.success) {
-        logger.debug(`[SidepanelActions] Revert successful: ${response.revertedCount || 0} translations reverted`);
+        getLogger().debug(`[SidepanelActions] Revert successful: ${response.revertedCount || 0} translations reverted`);
         return true;
       } else if (response?.isRestrictedPage) {
         // Tab is restricted - log as debug and exit gracefully
-        logger.debug('Revert action blocked (restricted page):', {
+        getLogger().debug('Revert action blocked (restricted page):', {
           message: response.message,
           tabUrl: response.tabUrl
         });
@@ -398,13 +426,13 @@ export function useSidepanelActions() {
       } else {
         const errorMsg = response?.error || response?.message || 'Unknown error';
         error.value = `Revert failed: ${errorMsg}`;
-        logger.error('Revert failed:', errorMsg);
+        getLogger().error('Revert failed:', errorMsg);
         return false;
       }
     } catch (err) {
       // Check if this is a restricted page error with response data
       if (err.isRestrictedPage) {
-        logger.debug('Revert action blocked (restricted page):', {
+        getLogger().debug('Revert action blocked (restricted page):', {
           message: err.message,
           tabUrl: err.tabUrl
         });
@@ -413,7 +441,7 @@ export function useSidepanelActions() {
 
       const errorMsg = err.message || "Failed to revert translation";
       error.value = errorMsg;
-      logger.error('Error reverting translation:', err);
+      getLogger().error('Error reverting translation:', err);
       return false;
     } finally {
       isProcessing.value = false;
@@ -422,14 +450,14 @@ export function useSidepanelActions() {
 
   const stopTTS = async () => {
     try {
-      logger.debug('Stopping TTS');
+      getLogger().debug('Stopping TTS');
       await sendMessage({
         action: MessageActions.TTS_STOP,
         context: 'sidepanel',
         timestamp: Date.now()
       });
     } catch (err) {
-      logger.error('TTS stop failed (might not be active):', err,
+      getLogger().error('TTS stop failed (might not be active):', err,
       );
     }
   };

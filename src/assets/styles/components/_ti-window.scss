@@ -53,7 +53,7 @@
   unicode-bidi: plaintext !important;
 
   // CRITICAL: Ensure proper positioning and z-index override external styles
-  position: absolute !important;
+  position: fixed !important;
   z-index: 2147483646 !important;
   pointer-events: all !important;
 

@@ -164,11 +164,18 @@ export class FeatureLoader {
     }
 
     try {
+      logger.debug("🔧 [FeatureLoader] Loading ContextMenuManager...");
       const { ContextMenuManager } = await import(
         "../managers/context-menu.js"
       );
       const manager = new ContextMenuManager();
+
+      // Initialize the manager immediately
+      logger.debug("🚀 [FeatureLoader] Initializing ContextMenuManager...");
+      await manager.initialize();
+
       this.loadedFeatures.set(cacheKey, manager);
+      logger.debug("✅ [FeatureLoader] ContextMenuManager loaded and initialized successfully");
       return manager;
     } catch (error) {
       logger.error("Failed to load context menu manager:", error);

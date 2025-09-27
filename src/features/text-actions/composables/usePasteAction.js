@@ -5,7 +5,35 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'usePasteAction')
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    try {
+      logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'usePasteAction');
+      // Ensure logger is not null
+      if (!logger) {
+        logger = {
+          debug: () => {},
+          warn: () => {},
+          error: () => {},
+          info: () => {},
+          init: () => {}
+        };
+      }
+    } catch (error) {
+      // Fallback to noop logger
+      logger = {
+        debug: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        init: () => {}
+      };
+    }
+  }
+  return logger;
+}
 
 export function usePasteAction() {
   // State
@@ -23,7 +51,7 @@ export function usePasteAction() {
    */
   const pasteText = async () => {
     if (isPasting.value) {
-      logger.warn('[usePasteAction] Paste operation already in progress')
+      getLogger().warn('[usePasteAction] Paste operation already in progress')
       return ''
     }
 
@@ -36,11 +64,11 @@ export function usePasteAction() {
       // Primary method: Clipboard API
       if (navigator.clipboard && navigator.clipboard.readText) {
         text = await navigator.clipboard.readText()
-        logger.debug('[usePasteAction] Text pasted via Clipboard API')
+        getLogger().debug('[usePasteAction] Text pasted via Clipboard API')
       } else {
         // Fallback: try to get from selection or prompt user
         text = await pasteTextFallback()
-        logger.debug('[usePasteAction] Text pasted via fallback method')
+        getLogger().debug('[usePasteAction] Text pasted via fallback method')
       }
 
       if (text && text.trim()) {
@@ -52,7 +80,7 @@ export function usePasteAction() {
       return ''
 
     } catch (error) {
-      logger.error('[usePasteAction] Paste failed:', error)
+      getLogger().error('[usePasteAction] Paste failed:', error)
       pasteError.value = error
       return ''
     } finally {
@@ -67,7 +95,7 @@ export function usePasteAction() {
   const pasteTextFallback = async () => {
     // Note: For security reasons, there's no reliable fallback for reading clipboard
     // This method exists for API consistency but will return empty string
-    logger.warn('[usePasteAction] Fallback paste method called - limited functionality')
+    getLogger().warn('[usePasteAction] Fallback paste method called - limited functionality')
     return ''
   }
 
@@ -84,7 +112,7 @@ export function usePasteAction() {
       }
     } catch (error) {
       // This is expected in many contexts due to security restrictions
-      logger.debug('[usePasteAction] Clipboard check failed (expected):', error.message)
+      getLogger().debug('[usePasteAction] Clipboard check failed (expected):', error.message)
     }
     
     hasClipboardContent.value = false
@@ -150,7 +178,7 @@ export function usePasteAction() {
       }
     }, 3000) // Check every 3 seconds when focused
 
-    logger.debug('[usePasteAction] Clipboard monitoring started')
+    getLogger().debug('[usePasteAction] Clipboard monitoring started')
   }
 
   /**
@@ -160,7 +188,7 @@ export function usePasteAction() {
     if (clipboardMonitorInterval) {
       clearInterval(clipboardMonitorInterval)
       clipboardMonitorInterval = null
-      logger.debug('[usePasteAction] Clipboard monitoring stopped')
+      getLogger().debug('[usePasteAction] Clipboard monitoring stopped')
     }
   }
 

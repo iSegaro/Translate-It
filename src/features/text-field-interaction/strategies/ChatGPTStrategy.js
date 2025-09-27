@@ -1,7 +1,7 @@
 // src/features/text-field-interaction/strategies/ChatGPTStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { setCursorToEnd } from "@/utils/browser/events.js";
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { CONFIG } from "@/shared/config/config.js";
 import { filterXSS } from "xss";
 
@@ -76,6 +76,9 @@ export default class ChatGPTStrategy extends PlatformStrategy {
         // shortcutsModal.dispatchEvent(escapeEvent);
         return false;
       }
+
+      // Get browser utils from factory
+      const { setCursorToEnd } = await utilsFactory.getBrowserUtils();
 
       const htmlWithBreaks = translated.replace(/\n/g, "<br>");
       const sanitized = filterXSS(htmlWithBreaks, {

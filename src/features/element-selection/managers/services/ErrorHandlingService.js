@@ -2,7 +2,7 @@
 
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+// ErrorHandler will be imported dynamically when needed
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { errorMessages as ErrorMessages } from "@/shared/error-management/ErrorMessages.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -11,7 +11,30 @@ export class ErrorHandlingService extends ResourceTracker {
   constructor() {
     super('error-handling-service')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ErrorHandlingService');
-    this.errorHandler = ErrorHandler.getInstance();
+    // Initialize error handler lazily when needed
+    this._errorHandler = null;
+
+    // Add getter for errorHandler
+    Object.defineProperty(this, 'errorHandler', {
+      get: async function() {
+        if (!this._errorHandler) {
+          try {
+            const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+            this._errorHandler = ErrorHandler.getInstance();
+          } catch (error) {
+            // Fallback: create a simple error handler
+            this._errorHandler = {
+              handle: (err, context) => {
+                console.error('Error:', err, context);
+                return err;
+              }
+            };
+          }
+        }
+        return this._errorHandler;
+      },
+      configurable: true
+    });
   }
 
   /**
@@ -74,7 +97,8 @@ export class ErrorHandlingService extends ResourceTracker {
     const userMessage = ErrorMessages.NETWORK_ERROR;
     
     // Report to global error handler
-    await this.errorHandler.handle(error, {
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
       context: context,
       userMessage: userMessage,
@@ -100,7 +124,8 @@ export class ErrorHandlingService extends ResourceTracker {
     }
 
     // Report to global error handler
-    await this.errorHandler.handle(error, {
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,
       context: context,
       userMessage: userMessage,
@@ -118,8 +143,9 @@ export class ErrorHandlingService extends ResourceTracker {
    */
   async handleUIError(error, context, showNotification) {
     const userMessage = ErrorMessages.UI_ERROR;
-    
-    await this.errorHandler.handle(error, {
+
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.UI,
       context: context,
       userMessage: userMessage,
@@ -136,8 +162,9 @@ export class ErrorHandlingService extends ResourceTracker {
    */
   async handleIntegrationError(error, context, showNotification) {
     const userMessage = ErrorMessages.INTEGRATION_ERROR;
-    
-    await this.errorHandler.handle(error, {
+
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.INTEGRATION,
       context: context,
       userMessage: userMessage,
@@ -154,8 +181,9 @@ export class ErrorHandlingService extends ResourceTracker {
    */
   async handleConfigError(error, context, showNotification) {
     const userMessage = ErrorMessages.CONFIGURATION_ERROR;
-    
-    await this.errorHandler.handle(error, {
+
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.CONFIG,
       context: context,
       userMessage: userMessage,
@@ -172,8 +200,9 @@ export class ErrorHandlingService extends ResourceTracker {
    */
   async handleUnknownError(error, context, showNotification) {
     const userMessage = ErrorMessages.UNEXPECTED_ERROR;
-    
-    await this.errorHandler.handle(error, {
+
+    const errorHandler = await this.errorHandler;
+    await errorHandler.handle(error, {
       type: ErrorTypes.UNKNOWN,
       context: context,
       userMessage: userMessage,
@@ -236,8 +265,8 @@ export class ErrorHandlingService extends ResourceTracker {
    * Get the global error handler instance
    * @returns {ErrorHandler} The error handler instance
    */
-  getErrorHandler() {
-    return this.errorHandler;
+  async getErrorHandler() {
+    return await this.errorHandler;
   }
 
   /**
