@@ -42,6 +42,7 @@
           :rows="inputRows"
           :tabindex="1"
           class="ti-translation-textarea ti-enhanced"
+          autofocus
           @input="handleSourceInput"
           @keydown="handleKeydown"
         />

@@ -26,6 +26,7 @@
       :tabindex="tabindex"
       :class="textareaClass"
       class="ti-translation-textarea"
+      autofocus
       @input="handleInput"
       @keydown="handleKeydown"
     />
