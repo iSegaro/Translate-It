@@ -1,40 +1,64 @@
-// Content script entry point - Optimized for lazy loading
-// Minimal initial load with on-demand feature loading
+// Content script entry point - Ultra-optimized with smart loading
+// Minimal footprint with intelligent, interaction-based loading
 
 let contentScriptCore = null;
+let featureLoadPromises = new Map();
+let interactionDetected = false;
 
-// Initialize the content script with minimal footprint
+// Smart loading configuration
+const LOAD_STRATEGIES = {
+  CRITICAL: {
+    delay: 0,          // Load immediately
+    priority: 'high'
+  },
+  ESSENTIAL: {
+    delay: 500,        // Load after 500ms
+    priority: 'medium'
+  },
+  ON_DEMAND: {
+    delay: 2000,       // Load after 2 seconds or on interaction
+    priority: 'low'
+  },
+  INTERACTIVE: {
+    delay: 0,          // Load on specific user interaction
+    priority: 'medium'
+  }
+};
+
+// Feature categorization
+const FEATURE_CATEGORIES = {
+  CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
+  ESSENTIAL: ['textSelection', 'windowsManager', 'contentMessageHandler'], // Core translation features
+  INTERACTIVE: ['selectElement'], // UI interaction features
+  ON_DEMAND: ['shortcut', 'textFieldIcon', 'vue'] // Optional features
+};
+
+// Initialize the content script with ultra-minimal footprint
 (async () => {
   try {
-    // Dynamically import ContentScriptCore to enable better code splitting
+    // Dynamically import ContentScriptCore for code splitting
     const { contentScriptCore: core } = await import('./ContentScriptCore.js');
     contentScriptCore = core;
 
-    // Expose ContentScriptCore globally for other modules to access
+    // Expose globally for other modules
     window.translateItContentCore = contentScriptCore;
 
-    // Initialize only critical infrastructure
-    const initialized = await contentScriptCore.initialize();
+    // Initialize with minimal dependencies
+    const initialized = await contentScriptCore.initializeCritical();
 
     if (initialized) {
-      // Listen for extension popup open
-      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.action === 'popupOpened') {
-          // Load Vue app when user opens extension
-          contentScriptCore.loadVueApp();
-        }
-      });
+      // Setup smart event listeners
+      setupSmartListeners();
 
-      // Listen for user interactions that require features
-      document.addEventListener('click', handleUserInteraction, { once: true });
-      document.addEventListener('keydown', handleUserInteraction, { once: true });
+      // Start intelligent loading sequence
+      startIntelligentLoading();
 
       // Debug info
       if (process.env.NODE_ENV === 'development') {
-        console.log('Translate It: Content script initialized (lazy mode)', {
-          core: true,
-          vue: contentScriptCore.isVueLoaded(),
-          features: contentScriptCore.areFeaturesLoaded()
+        console.log('Translate It: Ultra-optimized content script initialized', {
+          mode: 'smart-loading',
+          critical: true,
+          memory: 'minimal'
         });
       }
     }
@@ -43,17 +67,146 @@ let contentScriptCore = null;
   }
 })();
 
-// Handle first user interaction to preload features
-function handleUserInteraction() {
-  // Preload features after first interaction
-  setTimeout(() => {
-    contentScriptCore.loadFeatures();
-  }, 1000);
+function setupSmartListeners() {
+  // Extension popup interaction
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'popupOpened') {
+      loadFeature('vue', 'INTERACTIVE');
+    }
+  });
 
-  // Remove listeners after first interaction
-  document.removeEventListener('click', handleUserInteraction);
-  document.removeEventListener('keydown', handleUserInteraction);
+  // Text selection interaction
+  document.addEventListener('mouseup', handleTextSelection, { passive: true });
+
+  // Right-click (context menu)
+  document.addEventListener('contextmenu', () => {
+    loadFeature('selectElement', 'INTERACTIVE');
+  }, { once: true });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeyboardInteraction, { passive: true });
+
+  // Focus on text fields
+  document.addEventListener('focusin', handleTextFieldFocus, { passive: true });
+
+  // Scroll detection (for preload)
+  let scrollTimer;
+  document.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      if (!interactionDetected) {
+        preloadEssentialFeatures();
+      }
+    }, 1000);
+  }, { passive: true });
 }
+
+function handleTextSelection(event) {
+  const selection = window.getSelection();
+  if (selection && selection.toString().trim().length > 0) {
+    loadFeature('textSelection', 'ESSENTIAL');
+  }
+}
+
+function handleKeyboardInteraction(event) {
+  // Ctrl+/ for translation
+  if (event.ctrlKey && event.key === '/') {
+    event.preventDefault();
+    loadFeature('shortcut', 'INTERACTIVE');
+    loadFeature('windowsManager', 'INTERACTIVE');
+  }
+}
+
+function handleTextFieldFocus(event) {
+  if (isEditableElement(event.target)) {
+    loadFeature('textFieldIcon', 'INTERACTIVE');
+  }
+}
+
+function isEditableElement(element) {
+  return element && (
+    element.isContentEditable ||
+    element.tagName === 'TEXTAREA' ||
+    (element.tagName === 'INPUT' &&
+     ['text', 'search', 'email', 'url', 'tel'].includes(element.type))
+  );
+}
+
+async function startIntelligentLoading() {
+  // Phase 1: Load critical features immediately
+  await Promise.all(
+    FEATURE_CATEGORIES.CRITICAL.map(feature =>
+      loadFeature(feature, 'CRITICAL')
+    )
+  );
+
+  // Phase 2: Load essential features after short delay
+  setTimeout(() => {
+    Promise.all(
+      FEATURE_CATEGORIES.ESSENTIAL.map(feature =>
+        loadFeature(feature, 'ESSENTIAL')
+      )
+    );
+  }, LOAD_STRATEGIES.ESSENTIAL.delay);
+
+  // Phase 3: Preload remaining features if user is active
+  setTimeout(() => {
+    if (interactionDetected) {
+      preloadRemainingFeatures();
+    }
+  }, LOAD_STRATEGIES.ON_DEMAND.delay);
+}
+
+async function loadFeature(featureName, category) {
+  if (featureLoadPromises.has(featureName)) {
+    return featureLoadPromises.get(featureName);
+  }
+
+  const strategy = LOAD_STRATEGIES[category];
+  const loadPromise = (async () => {
+    try {
+      if (strategy.delay > 0 && category !== 'INTERACTIVE') {
+        await new Promise(resolve => setTimeout(resolve, strategy.delay));
+      }
+
+      if (contentScriptCore && contentScriptCore.loadFeature) {
+        await contentScriptCore.loadFeature(featureName);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📦 Loaded feature: ${featureName} (${category})`);
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to load feature ${featureName}:`, error);
+    }
+  })();
+
+  featureLoadPromises.set(featureName, loadPromise);
+  return loadPromise;
+}
+
+function preloadEssentialFeatures() {
+  interactionDetected = true;
+  FEATURE_CATEGORIES.ESSENTIAL.forEach(feature =>
+    loadFeature(feature, 'ESSENTIAL')
+  );
+}
+
+function preloadRemainingFeatures() {
+  interactionDetected = true;
+  [...FEATURE_CATEGORIES.INTERACTIVE, ...FEATURE_CATEGORIES.ON_DEMAND].forEach(feature =>
+    loadFeature(feature, 'ON_DEMAND')
+  );
+}
+
+// Export for debugging
+window.translateItContentScriptCore = contentScriptCore;
+window.translateItDebug = {
+  loadFeature,
+  featureLoadPromises,
+  interactionDetected,
+  FEATURE_CATEGORIES
+};
 
 // Export for debugging
 window.translateItContentScriptCore = contentScriptCore;

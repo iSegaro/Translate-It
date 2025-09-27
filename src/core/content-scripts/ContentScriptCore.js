@@ -120,6 +120,90 @@ export class ContentScriptCore extends EventTarget {
     }
   }
 
+  async initializeCritical() {
+    // Ultra-minimal initialization for critical features only
+    if (this.initialized) {
+      return true;
+    }
+
+    try {
+      // Load only critical dependencies
+      await this.loadCriticalDependencies();
+
+      // Check access
+      this.access = checkContentScriptAccess();
+      this.accessChecked = true;
+
+      if (!this.access.isAccessible) {
+        return false;
+      }
+
+      // Prevent duplicate execution
+      if (window.translateItContentScriptLoaded) {
+        return false;
+      }
+      window.translateItContentScriptLoaded = true;
+
+      // Initialize only essential messaging
+      await this.initializeCriticalMessaging();
+
+      this.initialized = true;
+
+      if (logger) {
+        logger.debug('ContentScriptCore critical initialization complete');
+      }
+
+      return true;
+
+    } catch (error) {
+      console.error('Failed to initialize ContentScriptCore critically:', error);
+      return false;
+    }
+  }
+
+  async loadCriticalDependencies() {
+    // Load only essential dependencies for critical features
+    const [
+      loggerModule,
+      logConstantsModule,
+      tabPermissionsModule,
+      extensionContextModule
+    ] = await Promise.all([
+      import("@/shared/logging/logger.js"),
+      import("@/shared/logging/logConstants.js"),
+      import("@/core/tabPermissions.js"),
+      import('@/core/extensionContext.js')
+    ]);
+
+    getScopedLogger = loggerModule.getScopedLogger;
+    LOG_COMPONENTS = logConstantsModule.LOG_COMPONENTS;
+    checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
+    ExtensionContextManager = extensionContextModule.default;
+
+    logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
+  }
+
+  async initializeCriticalMessaging() {
+    // Set up minimal messaging for critical features
+    try {
+      const { createMessageHandler } = await import('@/shared/messaging/core/MessageHandler.js');
+      this.messageHandler = createMessageHandler();
+
+      // Register only essential handlers
+      this.messageHandler.registerHandler('contentScriptReady', async () => {
+        return { ready: true, vueLoaded: this.vueLoaded, featuresLoaded: this.featuresLoaded };
+      });
+
+      if (!this.messageHandler.isListenerActive) {
+        this.messageHandler.listen();
+      }
+    } catch (error) {
+      if (logger) {
+        logger.warn('Failed to initialize critical messaging:', error);
+      }
+    }
+  }
+
   async initializeCore() {
     // Validate extension context
     if (!this.validateExtensionContext('core-initialization')) {

@@ -407,15 +407,81 @@ async function initializeAndActivateFeatures() {
   }
 }
 
-// Load features on demand
+// Feature mapping for smart loading
+const FEATURE_MAPPING = {
+  // Messaging infrastructure
+  messaging: async () => {
+    // Already initialized in ContentScriptCore
+    return null;
+  },
+
+  // Extension context
+  extensionContext: async () => {
+    // Already initialized in ContentScriptCore
+    return null;
+  },
+
+  // Core features
+  textSelection: async () => await loadFeature('textSelection'),
+  contentMessageHandler: async () => await loadFeature('contentMessageHandler'),
+
+  // Interactive features
+  windowsManager: async () => await loadFeature('windowsManager'),
+  selectElement: async () => await loadFeature('selectElement'),
+
+  // On-demand features
+  shortcut: async () => await loadFeature('shortcut'),
+  textFieldIcon: async () => await loadFeature('textFieldIcon'),
+  vue: async () => {
+    // Vue is handled separately by ContentScriptCore
+    return null;
+  }
+};
+
+// Load features on demand with smart mapping
 export async function loadFeatureOnDemand(featureName) {
   const logger = getLogger();
-  if (!ON_DEMAND_FEATURES.has(featureName) && !CORE_FEATURES.has(featureName)) {
+
+  // Check if feature exists in mapping
+  if (!FEATURE_MAPPING[featureName]) {
     logger.warn(`Attempted to load unknown feature: ${featureName}`);
     return null;
   }
 
-  return await loadFeature(featureName);
+  try {
+    return await FEATURE_MAPPING[featureName]();
+  } catch (error) {
+    logger.error(`Failed to load feature ${featureName}:`, error);
+    return null;
+  }
+}
+
+// Feature categories (should match index.js)
+const FEATURE_CATEGORIES = {
+  CRITICAL: ['messaging', 'extensionContext'],
+  ESSENTIAL: ['textSelection', 'contentMessageHandler'],
+  INTERACTIVE: ['windowsManager', 'selectElement'],
+  ON_DEMAND: ['shortcut', 'textFieldIcon', 'vue']
+};
+
+// Load multiple features by category
+export async function loadFeaturesByCategory(category) {
+  const logger = getLogger();
+  const features = FEATURE_CATEGORIES[category] || [];
+
+  try {
+    const loadPromises = features.map(feature =>
+      loadFeatureOnDemand(feature).catch(error => {
+        logger.warn(`Failed to load ${feature}:`, error);
+        return null;
+      })
+    );
+
+    return await Promise.all(loadPromises);
+  } catch (error) {
+    logger.error(`Failed to load ${category} features:`, error);
+    return [];
+  }
 }
 
 // Get loaded feature

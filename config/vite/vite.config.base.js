@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import babel from '@rollup/plugin-babel'
+// import enhancedTreeShaking from './plugins/enhanced-tree-shaking.js'
 
 // Base configuration shared across all builds
 export const createBaseConfig = (browser, options = {}) => {
@@ -31,6 +32,10 @@ export const createBaseConfig = (browser, options = {}) => {
           ['@babel/plugin-proposal-decorators', { legacy: true }]
         ]
       }),
+      // enhancedTreeShaking({
+      //   include: ['src/**/*.{js,vue}'],
+      //   exclude: ['node_modules/**']
+      // }),
       ...(options.extraPlugins || [])
     ],
 
@@ -255,25 +260,50 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'store/store'
             }
 
-            // Content script chunks - new lazy loading architecture
+            // Content script chunks - ultra-aggressive splitting
             if (id.includes('src/core/content-scripts/index')) {
-              // Main entry point - minimal
+              // Main entry point - ultra minimal (<5KB)
               return 'content/content-entry';
             }
 
             if (id.includes('src/core/content-scripts/ContentScriptCore')) {
-              // Core infrastructure only
+              // Core infrastructure only - split from features
               return 'content/content-core';
             }
 
+            // Ultra-aggressive feature splitting - each major system in its own chunk
+            if (id.includes('src/features/windows/managers/WindowsManager')) {
+              return 'content/features/windows-manager';
+            }
+
+            if (id.includes('src/features/text-selection/core/SelectionManager')) {
+              return 'content/features/selection-manager';
+            }
+
+            if (id.includes('src/features/element-selection/SelectElementManager')) {
+              return 'content/features/element-selection-manager';
+            }
+
+            if (id.includes('src/features/text-field-interaction')) {
+              return 'content/features/text-field-interaction';
+            }
+
+            if (id.includes('src/handlers/content/ContentMessageHandler')) {
+              return 'content/features/message-handler';
+            }
+
+            if (id.includes('src/core/managers/content/FeatureManager')) {
+              return 'content/features/feature-manager';
+            }
+
             if (id.includes('src/core/content-scripts/chunks/lazy-vue-app')) {
-              // Vue app and all UI components
+              // Vue app - keep separate but optimize
               return 'content/content-vue';
             }
 
             if (id.includes('src/core/content-scripts/chunks/lazy-features')) {
-              // FeatureManager and all features
-              return 'content/content-features';
+              // Lazy loading utilities only
+              return 'content/content-lazy-utils';
             }
 
             if (id.includes('src/core/content-scripts/legacy-handlers')) {
@@ -281,22 +311,43 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'content/content-legacy';
             }
 
-            // Additional content script chunking - force separation of large modules
+            // Additional content script chunking - force separation of all large modules
+            if (id.includes('src/apps/content/ContentApp')) {
+              return 'content/apps/content-app-main';
+            }
+
             if (id.includes('src/apps/content/')) {
-              return 'content/content-apps';
+              return 'content/apps/content-apps';
+            }
+
+            if (id.includes('src/components/content/TranslationWindow')) {
+              return 'content/components/translation-window';
             }
 
             if (id.includes('src/components/content/')) {
-              return 'content/content-components';
+              return 'content/components/content-components';
             }
 
             if (id.includes('@/apps/content/') || id.includes('@/components/content/')) {
               return 'content/content-ui';
             }
 
-            // Vue apps and components (for content script)
-            if (id.includes('src/apps/') || id.includes('src/components/shared/')) {
-              return 'content/vue-components';
+            // Vue apps and components - more granular splitting
+            if (id.includes('src/components/shared/') || id.includes('src/apps/popup/')) {
+              return 'content/vue-shared';
+            }
+
+            if (id.includes('src/apps/options/')) {
+              return 'content/vue-options';
+            }
+
+            // Specific feature components
+            if (id.includes('src/features/shortcuts/')) {
+              return 'content/features/shortcuts';
+            }
+
+            if (id.includes('src/features/tts/')) {
+              return 'content/features/tts';
             }
           },
           
