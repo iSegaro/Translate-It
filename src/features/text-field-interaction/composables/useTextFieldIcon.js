@@ -13,7 +13,7 @@ export function useTextFieldIcon() {
   // Use the new Vue composable for automatic cleanup
   const tracker = useResourceTracker('text-field-icon-composable')
   const store = useTextFieldInteractionStore();
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useTextFieldIcon');  // Local reactive state
+  const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'useTextFieldIcon');  // Local reactive state
   const isInitialized = ref(false);
   const pageEventBus = ref(null);
   

@@ -40,21 +40,21 @@ const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
 
 backgroundService.initialize().then(() => {
-  logger.debug("✅ [Background] Background service initialization completed!");
+  logger.info("[Background] Background service initialization completed!");
 
   // Initialize UnifiedTranslationService with dependencies
   unifiedTranslationService.initialize({
     translationEngine: backgroundService.translationEngine,
     backgroundService: backgroundService
   });
-  logger.debug("✅ [Background] UnifiedTranslationService initialized!");
+  logger.info("[Background] UnifiedTranslationService initialized!");
 
   // Initialize Memory Garbage Collector
   initializeGlobalCleanup();
   if (isDevelopmentMode()) {
     startMemoryMonitoring();
   }
-  logger.debug("✅ [Background] Memory Garbage Collector initialized!");
+  logger.info("[Background] Memory Garbage Collector initialized!");
   
 }).catch((error) => {
   logger.error("❌ [Background] Background service initialization failed:", error);
@@ -67,20 +67,23 @@ import browser from 'webextension-polyfill'
 import ExtensionContextManager from '@/core/extensionContext.js'
 browser.runtime.onConnect.addListener((port) => {
   try {
-    logger.debug('[Background] Port connected:', port.name);
-    
+    logger.info('[Background] Port connected:', port.name);
+
     // Handle popup lifecycle port separately
     if (port.name === 'popup-lifecycle') {
-      logger.debug('[Background] Popup lifecycle port connected');
+      // Popup lifecycle port connected - logged at TRACE level for detailed debugging
+      // logger.trace('[Background] Popup lifecycle port connected');
       
       port.onMessage.addListener((msg) => {
         if (msg.action === 'POPUP_OPENED') {
-          logger.debug('[Background] Popup opened at:', new Date(msg.data.timestamp));
+          // Popup opened - logged at TRACE level for detailed debugging
+          // logger.trace('[Background] Popup opened at:', new Date(msg.data.timestamp));
         }
       });
       
       port.onDisconnect.addListener(async () => {
-        logger.debug('[Background] Popup port disconnected - popup closed, stopping TTS');
+        // Popup port disconnected - logged at TRACE level for detailed debugging
+        // logger.trace('[Background] Popup port disconnected - popup closed, stopping TTS');
         // Stop all TTS when popup closes
         try {
           if (!ExtensionContextManager.isValidSync()) {
@@ -94,12 +97,15 @@ browser.runtime.onConnect.addListener((port) => {
                 action: 'TTS_STOP', 
                 data: { source: 'popup-port-disconnect' } 
               });
-              logger.debug('[Background] TTS stopped successfully on popup close');
+              // TTS stopped successfully - logged at TRACE level for detailed debugging
+              // logger.trace('[Background] TTS stopped successfully on popup close');
             } else {
-              logger.warn('[Background] No handler found for TTS_STOP');
+              // No handler found - logged at TRACE level for detailed debugging
+              // logger.trace('[Background] No handler found for TTS_STOP');
             }
           } else {
-            logger.debug('[Background] Background service not initialized, skipping TTS stop on popup close');
+            // Background service not initialized - logged at TRACE level for detailed debugging
+            // logger.trace('[Background] Background service not initialized, skipping TTS stop on popup close');
           }
         } catch (error) {
           await errorHandler.handle(error, {
@@ -114,16 +120,19 @@ browser.runtime.onConnect.addListener((port) => {
 
     // Handle sidepanel lifecycle port separately
     if (port.name === 'sidepanel-lifecycle') {
-      logger.debug('[Background] Sidepanel lifecycle port connected');
+      // Sidepanel lifecycle port connected - logged at TRACE level for detailed debugging
+      // logger.trace('[Background] Sidepanel lifecycle port connected');
       
       port.onMessage.addListener((msg) => {
         if (msg.action === 'SIDEPANEL_OPENED') {
-          logger.debug('[Background] Sidepanel opened at:', new Date(msg.data.timestamp));
+          // Sidepanel opened - logged at TRACE level for detailed debugging
+          // logger.trace('[Background] Sidepanel opened at:', new Date(msg.data.timestamp));
         }
       });
       
       port.onDisconnect.addListener(async () => {
-        logger.debug('[Background] Sidepanel port disconnected - sidepanel closed, stopping TTS');
+        // Sidepanel port disconnected - logged at TRACE level for detailed debugging
+        // logger.trace('[Background] Sidepanel port disconnected - sidepanel closed, stopping TTS');
         // Stop all TTS when sidepanel closes
         try {
           if (!ExtensionContextManager.isValidSync()) {
@@ -137,12 +146,15 @@ browser.runtime.onConnect.addListener((port) => {
                 action: 'TTS_STOP', 
                 data: { source: 'sidepanel-port-disconnect' } 
               });
-              logger.debug('[Background] TTS stopped successfully on sidepanel close');
+              // TTS stopped successfully - logged at TRACE level for detailed debugging
+              // logger.trace('[Background] TTS stopped successfully on sidepanel close');
             } else {
-              logger.warn('[Background] No handler found for TTS_STOP');
+              // No handler found - logged at TRACE level for detailed debugging
+              // logger.trace('[Background] No handler found for TTS_STOP');
             }
           } else {
-            logger.debug('[Background] Background service not initialized, skipping TTS stop on sidepanel close');
+            // Background service not initialized - logged at TRACE level for detailed debugging
+            // logger.trace('[Background] Background service not initialized, skipping TTS stop on sidepanel close');
           }
         } catch (error) {
           await errorHandler.handle(error, {
@@ -157,7 +169,8 @@ browser.runtime.onConnect.addListener((port) => {
     
     // Only handle lifecycle ports now (popup, sidepanel)
     // All messaging is now handled via direct runtime.sendMessage through UnifiedMessaging
-    logger.debug('[Background] Unrecognized port connection:', port.name, '- ignoring as UnifiedMessaging handles all messaging');
+    // Unrecognized port - logged at TRACE level for detailed debugging
+    // logger.trace('[Background] Unrecognized port connection:', port.name, '- ignoring as UnifiedMessaging handles all messaging');
     } catch (err) {
       logger.error('[Background] Error in onConnect handler:', err);
     }

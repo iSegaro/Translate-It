@@ -34,6 +34,10 @@ export class BaseProxyStrategy {
     if (this.config.auth?.username) {
       const auth = btoa(`${this.config.auth.username}:${this.config.auth.password || ''}`);
       newHeaders['Proxy-Authorization'] = `Basic ${auth}`;
+      this.logger.debug('Added proxy authentication headers', {
+        hasUsername: true,
+        strategy: this.constructor.name
+      });
     }
 
     return newHeaders;
@@ -53,17 +57,27 @@ export class BaseProxyStrategy {
     const { type, host, port } = this.config;
 
     if (!type || !['http', 'https', 'socks'].includes(type)) {
-      this.logger.debug('Invalid proxy type:', type);
+      this.logger.debug('Invalid proxy type', {
+        type,
+        strategy: this.constructor.name,
+        expected: ['http', 'https', 'socks']
+      });
       return false;
     }
 
     if (!host || typeof host !== 'string' || host.trim() === '') {
-      this.logger.debug('Invalid proxy host:', host);
+      this.logger.debug('Invalid proxy host', {
+        host,
+        strategy: this.constructor.name
+      });
       return false;
     }
 
     if (!port || isNaN(port) || port < 1 || port > 65535) {
-      this.logger.debug('Invalid proxy port:', port);
+      this.logger.debug('Invalid proxy port', {
+        port,
+        strategy: this.constructor.name
+      });
       return false;
     }
 

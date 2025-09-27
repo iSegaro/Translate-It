@@ -84,7 +84,7 @@ class MemoryMonitor {
     this.eventCheckCount++
 
     if (this.eventCheckCount % 10 === 0) {
-      logger.debug(`Event listener summary: ${eventReport.totalElements} elements, ${eventReport.totalEvents} events, ${eventReport.totalListeners} listeners`)
+      // logger.trace(`Event listener summary: ${eventReport.totalElements} elements, ${eventReport.totalEvents} events, ${eventReport.totalListeners} listeners`);
     }
 
     // Check for potential leaks
@@ -122,7 +122,7 @@ class MemoryMonitor {
 
     this.memoryManager.cleanupGroup('memory-monitor')
     this.isMonitoring = false
-    logger.debug('Memory monitoring stopped')
+    // logger.trace('Memory monitoring stopped');
   }
 
   /**
@@ -132,7 +132,7 @@ class MemoryMonitor {
   measureMemory() {
     if (!import.meta.env.DEV) return null;
     if (!performance.memory) {
-      logger.debug('Performance.memory API not available')
+      // logger.trace('Performance.memory API not available');
       return null
     }
 
@@ -150,7 +150,7 @@ class MemoryMonitor {
       this.measurements.shift()
     }
 
-    logger.debug(`Memory measurement: ${(measurement.used / 1024 / 1024).toFixed(2)}MB used`)
+    // logger.trace(`Memory measurement: ${(measurement.used / 1024 / 1024).toFixed(2)}MB used`);
     return measurement
   }
 
@@ -252,7 +252,7 @@ class MemoryMonitor {
       return;
     }
 
-    logger.debug('High memory usage detected, performing cleanup');
+    // logger.trace('High memory usage detected, performing cleanup');
 
     // Perform garbage collection
     this.memoryManager.performGarbageCollection()
@@ -367,7 +367,7 @@ class MemoryMonitor {
   setThresholds(thresholds) {
     if (!import.meta.env.DEV) return;
     this.thresholds = { ...this.thresholds, ...thresholds }
-    logger.debug('Memory thresholds updated', this.thresholds)
+    // logger.trace('Memory thresholds updated');
   }
 
   /**
@@ -423,7 +423,7 @@ class MemoryMonitor {
     if (!import.meta.env.DEV) return;
     this.stopMonitoring()
     this.measurements = []
-    logger.debug('Memory monitor destroyed')
+    // logger.trace('Memory monitor destroyed');
   }
 }
 

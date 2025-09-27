@@ -58,7 +58,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'VueUtils');
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'VueUtils');
 
 // Track if Trusted Types compatibility has been set up
 let trustedTypesSetupComplete = false;

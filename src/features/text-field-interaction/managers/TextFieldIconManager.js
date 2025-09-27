@@ -24,7 +24,7 @@ export class TextFieldIconManager extends ResourceTracker {
     super('text-field-icon-manager')
 
     // Initialize logger first
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldIconManager');
 
     // Enforce singleton pattern
     if (textFieldIconManagerInstance) {
@@ -173,11 +173,12 @@ export class TextFieldIconManager extends ResourceTracker {
       const { textFieldDetector } = await import('../utils/TextFieldDetector.js');
 
       const detection = await textFieldDetector.detect(element);
-      this.logger.debug('TextFieldDetector result:', {
-        tagName: element.tagName,
-        fieldType: detection.fieldType,
-        shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
-      });
+      // TextFieldDetector result - logged at TRACE level for detailed debugging
+      // this.logger.trace('TextFieldDetector result:', {
+      //   tagName: element.tagName,
+      //   fieldType: detection.fieldType,
+      //   shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+      // });
       return detection.shouldShowTextFieldIcon;
     } catch (error) {
       this.logger.debug('Error in field detection, using fallback:', error);
@@ -259,7 +260,8 @@ export class TextFieldIconManager extends ResourceTracker {
   async shouldProcessTextField(element) {
     // Context validation: Ensure the extension context is valid BEFORE any settings calls
     if (!ExtensionContextManager.isValidSync()) {
-      this.logger.debug('Skipping icon creation: Extension context is invalid.');
+      // Skipping icon creation - Extension context is invalid (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Extension context is invalid.');
       return null;
     }
 
@@ -269,19 +271,22 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Basic validation
     if (!isExtensionEnabled) {
-      this.logger.debug('Skipping icon creation: Extension is disabled.');
+      // Skipping icon creation - Extension is disabled (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Extension is disabled.');
       return null;
     }
 
     // Protocol check
     if (typeof window === 'undefined' || !["http:", "https:"].includes(window.location.protocol)) {
-      this.logger.debug('Skipping icon creation: Invalid protocol or no window.');
+      // Skipping icon creation - Invalid protocol or no window (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Invalid protocol or no window.');
       return null;
     }
 
     // Feature flag check
     if (!isTextFieldFeatureEnabled) {
-      this.logger.debug('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
+      // Skipping icon creation - TRANSLATE_ON_TEXT_FIELDS feature is disabled (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
       return false;
     }
 
@@ -292,19 +297,22 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
-      this.logger.debug('Skipping icon creation: Another icon is already active.');
+      // Skipping icon creation - Another icon is already active (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Another icon is already active.');
       return false;
     }
 
     // Element validation
     if (!await this.isEditableElement(element)) {
-      this.logger.debug('Skipping icon creation: Element is not editable.');
+      // Skipping icon creation - Element is not editable (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Element is not editable.');
       return false;
     }
 
     // Platform-specific filtering
     if (!this.applyPlatformFiltering(element)) {
-      this.logger.debug('Skipping icon creation: Platform filtering rules applied.');
+      // Skipping icon creation - Platform filtering rules applied (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Platform filtering rules applied.');
       return false;
     }
 
@@ -369,11 +377,12 @@ export class TextFieldIconManager extends ResourceTracker {
       { checkCollisions: true }
     );
 
-    this.logger.debug('Calculated optimal position:', {
-      placement: optimalPosition.placement,
-      position: { top: optimalPosition.top, left: optimalPosition.left },
-      isFallback: optimalPosition.isFallback
-    });
+    // Position calculation details - logged at TRACE level for detailed debugging
+    // this.logger.trace('Calculated optimal position:', {
+    //   placement: optimalPosition.placement,
+    //   position: { top: optimalPosition.top, left: optimalPosition.left },
+    //   isFallback: optimalPosition.isFallback
+    // });
 
     // Emit event to UI Host to add the icon with enhanced data
     pageEventBus.emit('add-field-icon', { 
@@ -394,7 +403,8 @@ export class TextFieldIconManager extends ResourceTracker {
     // Create attachment for position management
     this.createIconAttachment(iconId, element);
 
-    this.logger.debug('Smart icon created and tracked successfully');
+    // Add info log for successful icon creation - this is useful to track actual usage
+    this.logger.info(`[TextField] Icon created for ${element.tagName}${element.type ? `(${element.type})` : ''}`);
     return { id: iconId, element, position: optimalPosition };
   }
 
@@ -413,7 +423,8 @@ export class TextFieldIconManager extends ResourceTracker {
       return null;
     }
 
-    this.logger.debug('Handling editable focus for:', element.tagName);
+    // Handling editable focus - logged at TRACE level for detailed debugging
+    // this.logger.trace('Handling editable focus for:', element.tagName);
     return this.processEditableElement(element);
   }
 
@@ -422,7 +433,8 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Blurred element
    */
   handleEditableBlur(element) {
-    this.logger.debug('Handling editable blur for:', element.tagName);
+    // Handling editable blur - logged at TRACE level for detailed debugging
+  // this.logger.trace('Handling editable blur for:', element.tagName);
 
     // Delay cleanup to allow user to interact with icon (using ResourceTracker)
     const cleanupTimeout = this.trackTimeout(() => {

@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ExclusionChecker');
+const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'ExclusionChecker');
 
 // Singleton instance for ExclusionChecker
 let exclusionCheckerInstance = null;
@@ -14,7 +14,8 @@ export class ExclusionChecker {
   constructor() {
     // Enforce singleton pattern
     if (exclusionCheckerInstance) {
-      logger.debug('ExclusionChecker singleton already exists, returning existing instance');
+      // Singleton exists - logged at TRACE level for detailed debugging
+      // logger.debug('ExclusionChecker singleton already exists, returning existing instance');
       return exclusionCheckerInstance;
     }
 
@@ -26,7 +27,7 @@ export class ExclusionChecker {
 
     // Store singleton instance
     exclusionCheckerInstance = this;
-    logger.debug('ExclusionChecker singleton created');
+    logger.info('ExclusionChecker initialized');
   }
 
   // Static method to get singleton instance
@@ -47,7 +48,8 @@ export class ExclusionChecker {
 
   async initialize() {
     try {
-      logger.debug('Initializing ExclusionChecker for URL:', this.currentUrl);
+      // Initializing for URL - logged at TRACE level for detailed debugging
+      // logger.debug('Initializing ExclusionChecker for URL:', this.currentUrl);
 
       // Initialize settings from SettingsManager
       await settingsManager.initialize();
@@ -59,7 +61,8 @@ export class ExclusionChecker {
       }
 
       this.initialized = true;
-      logger.debug('ExclusionChecker initialized');
+      // ExclusionChecker initialized - logged at TRACE level for detailed debugging
+      // logger.debug('ExclusionChecker initialized');
 
     } catch (error) {
       const handler = ErrorHandler.getInstance();
@@ -78,7 +81,8 @@ export class ExclusionChecker {
     try {
       // Just refresh settings without full reinitialization
       await settingsManager.initialize();
-      logger.debug('ExclusionChecker settings refreshed');
+      // Settings refreshed - logged at TRACE level for detailed debugging
+      // logger.debug('ExclusionChecker settings refreshed');
     } catch (error) {
       logger.error('Error refreshing ExclusionChecker settings:', error);
     }
@@ -86,7 +90,8 @@ export class ExclusionChecker {
 
   updateUrl(newUrl) {
     if (this.currentUrl !== newUrl) {
-      logger.debug('URL changed from', this.currentUrl, 'to', newUrl);
+      // URL changed - logged at TRACE level for detailed debugging
+      // logger.debug('URL changed from', this.currentUrl, 'to', newUrl);
       this.currentUrl = newUrl;
     }
   }
@@ -110,7 +115,8 @@ export class ExclusionChecker {
       featureSettings.forEach(setting => {
         this.settingsListeners.push(
           settingsManager.onChange(setting, (newValue) => {
-            logger.debug(`${setting} changed, refreshing features:`, newValue);
+            // Setting changed - logged at TRACE level for detailed debugging
+            // logger.debug(`${setting} changed, refreshing features:`, newValue);
             this.refreshFeaturesOnSettingsChange();
           }, 'exclusion-checker')
         );
@@ -119,7 +125,8 @@ export class ExclusionChecker {
       // Listen for EXCLUDED_SITES changes
       this.settingsListeners.push(
         settingsManager.onChange('EXCLUDED_SITES', (newValue) => {
-          logger.debug('EXCLUDED_SITES changed, refreshing features:', newValue);
+          // EXCLUDED_SITES changed - logged at TRACE level for detailed debugging
+          // logger.debug('EXCLUDED_SITES changed, refreshing features:', newValue);
           this.refreshFeaturesOnSettingsChange();
         }, 'exclusion-checker')
       );
@@ -135,7 +142,8 @@ export class ExclusionChecker {
    */
   refreshFeaturesOnSettingsChange() {
     // Just refresh internal settings cache - FeatureManager will handle re-evaluation
-    logger.debug('Settings changed, refreshing exclusion cache');
+    // Settings changed - logged at TRACE level for detailed debugging
+    // logger.debug('Settings changed, refreshing exclusion cache');
     // No need to trigger FeatureManager - it has its own debounced evaluation system
   }
 
@@ -148,23 +156,27 @@ export class ExclusionChecker {
       // Global extension check
       const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
       if (!isExtensionEnabled) {
-        logger.debug(`Feature ${featureName} blocked: extension disabled globally`);
+        // Feature blocked - logged at TRACE level for detailed debugging
+        // logger.debug(`Feature ${featureName} blocked: extension disabled globally`);
         return false;
       }
 
       // Feature-specific setting check
       if (!this.isFeatureEnabled(featureName)) {
-        logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
+        // Feature blocked - logged at TRACE level for detailed debugging
+        // logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
         return false;
       }
 
       // URL exclusion check
       if (await this.isUrlExcludedForFeature(featureName)) {
-        logger.debug(`Feature ${featureName} blocked: URL excluded`);
+        // Feature blocked - logged at TRACE level for detailed debugging
+        // logger.debug(`Feature ${featureName} blocked: URL excluded`);
         return false;
       }
 
-      logger.debug(`Feature ${featureName} allowed`);
+      // Feature allowed - logged at TRACE level for detailed debugging
+      // logger.debug(`Feature ${featureName} allowed`);
       return true;
 
     } catch (error) {
@@ -204,7 +216,8 @@ export class ExclusionChecker {
 
     const settingKey = featureSettingsMap[featureName];
     if (!settingKey) {
-      logger.warn(`Unknown feature name: ${featureName}`);
+      // Unknown feature - logged at TRACE level for detailed debugging
+      // logger.warn(`Unknown feature name: ${featureName}`);
       return false;
     }
 
@@ -270,7 +283,8 @@ export class ExclusionChecker {
     this.settingsListeners = [];
     this.listenersSetup = false;
 
-    logger.debug('ExclusionChecker cleaned up');
+    // Cleanup completed - logged at TRACE level for detailed debugging
+    // logger.debug('ExclusionChecker cleaned up');
   }
 
   // Static method to check if feature should be considered for a URL

@@ -7,7 +7,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldHandler');
 
 /**
  * Unified Text Field Handler
@@ -153,7 +153,8 @@ export class TextFieldHandler extends ResourceTracker {
 
         const element = event.target;
         if (this.isEditableElement(element)) {
-          logger.debug('Text field focused:', element.tagName, element.type || 'contenteditable');
+          // Text field focused - logged at TRACE level for detailed debugging
+          // logger.trace('Text field focused:', element.tagName, element.type || 'contenteditable');
 
           // Add icon with a small delay
           setTimeout(async () => {
@@ -181,7 +182,8 @@ export class TextFieldHandler extends ResourceTracker {
 
         const element = event.target;
         if (this.isEditableElement(element)) {
-          logger.debug('Text field blurred:', element.tagName);
+          // Text field blurred - logged at TRACE level for detailed debugging
+          // logger.trace('Text field blurred:', element.tagName);
 
           setTimeout(() => {
             // Check if focus moved to a translation-related element before cleanup

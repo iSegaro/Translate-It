@@ -50,7 +50,7 @@ class LifecycleManager {
     await this.refreshContextMenus();
 
     this.initialized = true;
-    logger.debug("✅ [LifecycleManager] Background service initialized successfully");
+    logger.info("[LifecycleManager] Background service initialized successfully");
   }
 
   /**
@@ -59,9 +59,9 @@ class LifecycleManager {
    */
   async preloadFeatures() {
     try {
-      logger.debug("🚀 Preloading essential features...");
+      logger.info("Preloading essential features...");
       const features = await this.featureLoader.preloadEssentialFeatures();
-      logger.debug("✅ Essential features preloaded:", Object.keys(features));
+      logger.info("Essential features preloaded:", Object.keys(features));
     } catch (error) {
       logger.error("❌ Failed to preload essential features:", error);
       // Continue initialization even if preloading fails
@@ -76,11 +76,11 @@ class LifecycleManager {
 
   async initializeTranslationEngine() {
     try {
-      logger.debug('🔧 [LifecycleManager] Creating TranslationEngine...');
+      logger.info('[LifecycleManager] Creating TranslationEngine...');
       this.translationEngine = new TranslationEngine();
-      logger.debug('🔧 [LifecycleManager] Initializing TranslationEngine...');
+      logger.info('[LifecycleManager] Initializing TranslationEngine...');
       await this.translationEngine.initialize();
-      logger.debug('✅ [LifecycleManager] TranslationEngine initialized successfully');
+      logger.info('[LifecycleManager] TranslationEngine initialized successfully');
     } catch (error) {
       logger.error('❌ [LifecycleManager] Failed to initialize TranslationEngine:', error);
       throw error;
@@ -88,15 +88,16 @@ class LifecycleManager {
   }
 
   async initializeDynamicIconManager() {
-    logger.debug('Initializing ActionbarIconManager...');
+    logger.info('Initializing ActionbarIconManager...');
     const { getActionbarIconManager } = await utilsFactory.getBrowserUtils();
     this.dynamicIconManager = await getActionbarIconManager();
-    logger.debug('ActionbarIconManager initialized');
+    logger.info('ActionbarIconManager initialized');
   }
 
   registerMessageHandlers() {
-    logger.debug('🎯 Registering message handlers...');
-    logger.debug('Available handlers:', Object.keys(Handlers));
+    logger.info('Registering message handlers...');
+    // Available handlers - logged at TRACE level for detailed debugging
+    // logger.trace('Available handlers:', Object.keys(Handlers));
     
     // Hybrid approach: explicit mapping with validation
     const handlerMappings = {
@@ -184,7 +185,7 @@ class LifecycleManager {
     // Register all handlers with proper action names
     const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
     
-    logger.debug(`📊 Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
+    logger.info(`Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
   }
 
   /**
@@ -198,14 +199,14 @@ class LifecycleManager {
     const unmappedHandlers = availableHandlers.filter(handler => !mappedHandlers.has(handler));
     
     if (unmappedHandlers.length > 0) {
-      logger.warn('⚠️ Unmapped handlers detected (consider adding to handlerMappings):', 
+      logger.warn('Unmapped handlers detected (consider adding to handlerMappings):',
                    unmappedHandlers.map(h => h.name || 'anonymous'));
     } else {
       logger.debug('✅ All available handlers are properly mapped');
     }
     
-    // Log mapping statistics
-    logger.debug(`📊 Handler mapping validation: ${Object.keys(handlerMappings).length} mapped, ${unmappedHandlers.length} unmapped`);
+    // Mapping statistics - logged at TRACE level for detailed debugging
+    // logger.trace(`Handler mapping validation: ${Object.keys(handlerMappings).length} mapped, ${unmappedHandlers.length} unmapped`);
   }
 
   /**
@@ -222,13 +223,15 @@ class LifecycleManager {
       if (handlerFunction) {
         try {
           this.messageHandler.registerHandler(actionName, handlerFunction);
-          logger.debug(`✅ Registered handler: ${actionName}`);
-          
+          // Handler registered - logged at TRACE level for detailed debugging
+          // logger.trace(`Registered handler: ${actionName}`);
+
           if (actionName === MessageActions.SET_SELECT_ELEMENT_STATE) {
-            logger.debug('setSelectElementState handler registered', {
-              actionName,
-              handlerName: handlerFunction?.name,
-            });
+            // Special handler registered - logged at TRACE level for detailed debugging
+            // logger.trace('setSelectElementState handler registered', {
+            //   actionName,
+            //   handlerName: handlerFunction?.name,
+            // });
           }
           
           registeredCount++;
@@ -250,7 +253,7 @@ class LifecycleManager {
    * @private
    */
   async initializeErrorHandlers() {
-    logger.debug("🛡️ Initializing error handlers...");
+    logger.info("Initializing error handlers...");
 
     try {
       const { ErrorHandler } = await import(
@@ -260,36 +263,40 @@ class LifecycleManager {
 
       // TTS error handling now integrated into handleGoogleTTS directly
 
-      logger.debug("✅ Error handlers initialization completed");
+      logger.info("Error handlers initialization completed");
     } catch (error) {
       logger.error("❌ Failed to initialize error handlers:", error);
     }
   }
 
   async refreshContextMenus(locale) {
-    logger.debug("🔄 [LifecycleManager] Starting context menu refresh...");
+    logger.info("[LifecycleManager] Starting context menu refresh...");
 
     try {
-      logger.debug("📋 [LifecycleManager] Loading context menu manager via featureLoader...");
-      const contextMenuManager = await this.featureLoader.loadContextMenuManager();
-      logger.debug("✅ [LifecycleManager] Context menu manager loaded successfully");
+      logger.info("[LifecycleManager] Loading context menu manager via featureLoader...");
+      this.contextMenuManager = await this.featureLoader.loadContextMenuManager();
+      logger.info("[LifecycleManager] Context menu manager loaded successfully");
 
-      logger.debug("🔄 [LifecycleManager] Refreshing context menus...");
-      await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
-      logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via featureLoader");
+      logger.info("[LifecycleManager] Refreshing context menus...");
+      await this.contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+      logger.info("[LifecycleManager] Context menus refreshed successfully via featureLoader");
 
     } catch (error) {
       logger.error("❌ [LifecycleManager] Failed to refresh context menus via featureLoader:", error);
-      logger.debug("🔄 [LifecycleManager] Attempting fallback initialization...");
+      logger.info("[LifecycleManager] Attempting fallback initialization...");
 
       try {
         // Fallback to direct import of new context menu manager
         const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
-        const contextMenuManager = new ContextMenuManager();
 
-        logger.debug("🔧 [LifecycleManager] Initializing context menus via fallback...");
-        await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
-        logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via fallback");
+        // Check if we already have an instance to reuse
+        if (!this.contextMenuManager) {
+          this.contextMenuManager = new ContextMenuManager();
+        }
+
+        logger.info("[LifecycleManager] Initializing context menus via fallback...");
+        await this.contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+        logger.info("[LifecycleManager] Context menus refreshed successfully via fallback");
 
       } catch (fallbackError) {
         logger.error("❌ [LifecycleManager] Fallback context menu initialization also failed:", fallbackError);
@@ -304,7 +311,7 @@ class LifecycleManager {
    */
   async createContextMenuDirectly(locale) {
     try {
-      logger.debug("🚨 [LifecycleManager] Attempting direct context menu creation...");
+      logger.info("[LifecycleManager] Attempting direct context menu creation...");
 
       const browser = await import("webextension-polyfill");
       const { getTranslationString } = await import('@/utils/i18n/i18n.js');
@@ -326,7 +333,7 @@ class LifecycleManager {
         contexts: ["action"]
       });
 
-      logger.debug("✅ [LifecycleManager] Direct context menu creation completed");
+      logger.info("[LifecycleManager] Direct context menu creation completed");
 
     } catch (directError) {
       logger.error("❌ [LifecycleManager] Direct context menu creation failed:", directError);

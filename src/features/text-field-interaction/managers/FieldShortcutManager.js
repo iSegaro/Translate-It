@@ -21,7 +21,7 @@ export class FieldShortcutManager {
     this.initialized = false;
 
     // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FieldShortcutManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'FieldShortcutManager');
     this.logger.init('FieldShortcutManager initialized');
   }
 

@@ -38,13 +38,7 @@ export class UnifiedTranslationCoordinator {
   async coordinateTranslation(message, options = {}) {
     const { messageId, action, data, context } = message;
 
-    getLogger().debug(`Coordinating translation request:`, {
-      messageId,
-      action,
-      context,
-      textLength: data?.text?.length,
-      mode: data?.mode
-    });
+    getLogger().info(`🔄 Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
     // Determine if this should be a streaming operation
     const shouldStream = this._shouldUseStreaming(message);

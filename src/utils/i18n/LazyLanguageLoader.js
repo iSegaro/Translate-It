@@ -3,19 +3,16 @@
 
 import {
   loadTranslationLanguagePack,
-  getAvailableTranslationLanguageCodes,
   clearTranslationLanguageCache
 } from './TranslationLanguageLoader.js';
 
 import {
   loadInterfaceLanguagePack,
-  getAvailableInterfaceLanguageCodes,
   clearInterfaceLanguageCache
 } from './InterfaceLanguageLoader.js';
 
 import {
   loadTtsLanguagePack,
-  getAvailableTtsLanguageCodes,
   clearTtsLanguageCache
 } from './TtsLanguageLoader.js';
 
@@ -24,6 +21,11 @@ import {
   detectLanguageFromText,
   clearDetectionCache
 } from './LanguageDetector.js';
+
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LazyLanguageLoader');
 
 // Cache for lazy-loaded language data
 const lazyLoadCache = new Map();
@@ -96,7 +98,7 @@ async function loadTranslationLanguageData(langCode, cacheKey) {
 
     return null;
   } catch (error) {
-    console.error(`Failed to lazy load translation language ${langCode}:`, error);
+    logger.error(`Failed to lazy load translation language ${langCode}:`, error);
     return null;
   }
 }
@@ -156,7 +158,7 @@ async function loadInterfaceLanguageData(langCode, cacheKey) {
 
     return null;
   } catch (error) {
-    console.error(`Failed to lazy load interface language ${langCode}:`, error);
+    logger.error(`Failed to lazy load interface language ${langCode}:`, error);
     return null;
   }
 }
@@ -216,7 +218,7 @@ async function loadTtsLanguageData(langCode, cacheKey) {
 
     return null;
   } catch (error) {
-    console.error(`Failed to lazy load TTS language ${langCode}:`, error);
+    logger.error(`Failed to lazy load TTS language ${langCode}:`, error);
     return null;
   }
 }
@@ -285,7 +287,7 @@ export async function getLanguageDataLazy(langCode, type = 'translation', force 
     case 'tts':
       return lazyLoadTtsLanguage(langCode, force);
     default:
-      console.warn(`Unknown language type: ${type}`);
+      logger.warn(`Unknown language type: ${type}`);
       return lazyLoadTranslationLanguage(langCode, force);
   }
 }

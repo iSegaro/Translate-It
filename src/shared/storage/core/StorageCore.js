@@ -29,7 +29,8 @@ class StorageCore extends ResourceTracker {
     this._readyPromise = null;
     this._changeListener = null;
     this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
-    this.logger.init('StorageCore initialized');
+    // StorageCore initialized - logged at TRACE level for detailed debugging
+    // this.logger.init('StorageCore initialized');
     this._initializeAsync();
   }
 
@@ -59,7 +60,7 @@ class StorageCore extends ResourceTracker {
       this._setupChangeListener();
 
       this._isReady = true;
-      this.logger.init('Storage core initialized successfully');
+      this.logger.info('Storage core initialized successfully');
     } catch (error) {
       this.logger.error('Initialization failed', error);
       throw error;
@@ -108,7 +109,8 @@ class StorageCore extends ResourceTracker {
   _invalidateCache(keys) {
     if (!keys || !Array.isArray(keys)) return;
 
-    this.logger.debug(`Force invalidating cache for keys: ${keys.join(', ')}`);
+    // Cache invalidation - logged at TRACE level for detailed debugging
+    // this.logger.debug(`Force invalidating cache for keys: ${keys.join(', ')}`);
     for (const key of keys) {
       this.cache.delete(key);
     }
@@ -294,7 +296,8 @@ class StorageCore extends ResourceTracker {
         this._emit(`set:${key}`, { value: plainData[key] });
       }
 
-      this.logger.debug(`Set ${Object.keys(plainData).length} key(s)`);
+      // Set operation completed - logged at TRACE level for detailed debugging
+      // this.logger.debug(`Set ${Object.keys(plainData).length} key(s)`);
     } catch (error) {
       this.logger.error('Set operation failed', error);
       throw error;
@@ -328,7 +331,8 @@ class StorageCore extends ResourceTracker {
         this._emit(`remove:${key}`, {});
       }
 
-      this.logger.debug(`Removed ${keyList.length} key(s)`);
+      // Remove operation completed - logged at TRACE level for detailed debugging
+      // this.logger.debug(`Removed ${keyList.length} key(s)`);
     } catch (error) {
       this.logger.error('Remove operation failed', error);
       throw error;
@@ -351,7 +355,8 @@ class StorageCore extends ResourceTracker {
       }
 
       this._emit("clear", {});
-      this.logger.debug('Storage cleared');
+      // Storage cleared - logged at TRACE level for detailed debugging
+      // this.logger.debug('Storage cleared');
     } catch (error) {
       this.logger.error('Clear operation failed', error);
       throw error;
@@ -388,7 +393,8 @@ class StorageCore extends ResourceTracker {
    */
   _ensureCache() {
     if (this.cache.isDestroyed) {
-      this.logger.debug('Cache was destroyed, recreating with enhanced settings...');
+      // Cache recreation - logged at TRACE level for detailed debugging
+      // this.logger.debug('Cache was destroyed, recreating with enhanced settings...');
       
       // Create new cache with same settings
       this.cache = new SmartCache({ 
@@ -400,7 +406,8 @@ class StorageCore extends ResourceTracker {
       // Re-register with memory manager for proper tracking
       this.trackCache(this.cache, { isCritical: true });
       
-      this.logger.debug('Cache successfully recreated and re-registered');
+      // Cache recreated - logged at TRACE level for detailed debugging
+      // this.logger.debug('Cache successfully recreated and re-registered');
     }
   }
 
@@ -415,7 +422,8 @@ class StorageCore extends ResourceTracker {
       this.cache.delete(key);
     }
 
-    this.logger.debug(`Invalidated cache for ${keyList.length} key(s)`);
+    // Cache invalidated - logged at TRACE level for detailed debugging
+    // this.logger.debug(`Invalidated cache for ${keyList.length} key(s)`);
   }
 
   /**
@@ -423,7 +431,8 @@ class StorageCore extends ResourceTracker {
    */
   clearCache() {
     this.cache.clear();
-    this.logger.debug('Cache cleared');
+    // Cache cleared - logged at TRACE level for detailed debugging
+    // this.logger.debug('Cache cleared');
   }
 
   /**

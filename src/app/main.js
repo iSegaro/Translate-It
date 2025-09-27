@@ -40,7 +40,7 @@ function extractVueComponentStyles() {
  * This includes both global styles and Vue component styles.
  */
 export function getAppCss() {
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'getAppCss');
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'getAppCss');
   let allStyles = combinedGlobalStyles;
   
   // Extract Vue component styles
@@ -75,7 +75,7 @@ export async function mountContentApp(rootElement) {
   }
 
   app.mount(rootElement);
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'mountContentApp');
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'mountContentApp');
   logger.info('Vue app mounted into shadow DOM.');
   return app;
 }

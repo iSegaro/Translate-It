@@ -29,6 +29,11 @@ import {
   getTtsLanguageCacheInfo
 } from './TtsLanguageLoader.js';
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LanguagePackLoader');
+
 /**
  * Load a language pack dynamically (legacy function - uses translation loader)
  * @param {string} langCode - Language code to load
@@ -104,7 +109,7 @@ export async function loadLanguagePackByType(langCode, type = 'translation') {
     case 'tts':
       return loadTtsLanguagePack(langCode);
     default:
-      console.warn(`Unknown language pack type: ${type}`);
+      logger.warn(`Unknown language pack type: ${type}`);
       return loadTranslationLanguagePack(langCode);
   }
 }
@@ -123,7 +128,7 @@ export function getAvailableLanguagesByType(type = 'translation') {
     case 'tts':
       return getAvailableTtsLanguageCodes();
     default:
-      console.warn(`Unknown language pack type: ${type}`);
+      logger.warn(`Unknown language pack type: ${type}`);
       return getAvailableTranslationLanguageCodes();
   }
 }
@@ -143,7 +148,7 @@ export function isLanguagePackAvailableByType(langCode, type = 'translation') {
     case 'tts':
       return isTtsLanguagePackAvailable(langCode);
     default:
-      console.warn(`Unknown language pack type: ${type}`);
+      logger.warn(`Unknown language pack type: ${type}`);
       return isTranslationLanguagePackAvailable(langCode);
   }
 }

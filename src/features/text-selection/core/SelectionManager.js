@@ -15,7 +15,7 @@ export class SelectionManager extends ResourceTracker {
   constructor(options = {}) {
     super('selection-manager');
 
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectionManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SelectionManager');
 
     // Mark this instance as critical to prevent cleanup during memory management
     this.trackResource('selection-manager-critical', () => {
@@ -50,7 +50,9 @@ export class SelectionManager extends ResourceTracker {
       this.isExcluded = isUrlExcluded(window.location.href);
       this.exclusionChecked = true;
       if (this.isExcluded) {
-        this.logger.debug('URL is excluded, functionality will be limited');
+        this.logger.info('Text selection disabled on excluded URL', {
+          url: window.location.hostname
+        });
       }
     }
     return this.isExcluded;
@@ -206,14 +208,28 @@ export class SelectionManager extends ResourceTracker {
         hasShowMethod: typeof windowsManager.show === 'function'
       });
 
-      await windowsManager.show(selectedText, position);
-      this.logger.debug('WindowsManager.show() completed');
+    // Show translation UI
+    this.logger.info('Translation UI requested', {
+      textLength: selectedText.length,
+      position: {
+        x: Math.round(position.x),
+        y: Math.round(position.y)
+      },
+      context: windowsManager ? 'main-frame' : 'iframe'
+    });
+
+    await windowsManager.show(selectedText, position);
+    this.logger.debug('WindowsManager.show() completed');
 
     } else if (window !== window.top) {
       // Iframe - request window creation in main frame
-      this.logger.debug('Requesting window creation in main frame', {
-        text: selectedText.substring(0, 30) + '...',
-        position
+      this.logger.info('Requesting translation window from iframe', {
+        frameId: this.frameId,
+        textLength: selectedText.length,
+        position: {
+          x: Math.round(position.x),
+          y: Math.round(position.y)
+        }
       });
 
       this.requestWindowCreationInMainFrame(selectedText, position);
@@ -252,6 +268,7 @@ export class SelectionManager extends ResourceTracker {
   dismissWindow() {
     const windowsManager = this.getWindowsManager();
     if (windowsManager) {
+      this.logger.debug('Translation window dismissed');
       windowsManager.dismiss();
     }
 

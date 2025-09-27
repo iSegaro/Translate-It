@@ -82,16 +82,14 @@ export class TranslationEngine {
       
       const abortController = new AbortController();
       this.activeTranslations.set(messageId, abortController);
-      logger.debug(`[TranslationEngine] Tracking translation: ${messageId}`);
+      // Tracking translation
     }
 
     // Handle different input formats
     if (!context || !data) {
       // Legacy format: request contains translation data directly
       if (request.text && request.provider) {
-        logger.debug(
-          "[TranslationEngine] Legacy format detected, normalizing...",
-        );
+        // Legacy format detected, normalizing
         context = request.context || "unknown";
         data = {
           text: request.text,
@@ -140,7 +138,7 @@ export class TranslationEngine {
       const lastRequest = this.recentRequests.get(requestKey);
       
       if (lastRequest && (now - lastRequest) < 5000) {
-        logger.debug(`[TranslationEngine] Duplicate request detected for ${messageId}, ignoring`);
+        // Duplicate request detected, ignoring
         return { success: true, streaming: true, messageId: messageId, duplicate: true };
       }
       
@@ -160,7 +158,7 @@ export class TranslationEngine {
       const cacheKey = this.generateCacheKey(data);
       if (this.cache.has(cacheKey)) {
         const cached = this.cache.get(cacheKey);
-        logger.debug(`[TranslationEngine] Cache hit for ${cacheKey}`);
+        // Cache hit
         result = {
           ...cached,
           fromCache: true,
@@ -203,7 +201,7 @@ export class TranslationEngine {
       if (messageId) {
         this.activeTranslations.delete(messageId);
         this.cancelledRequests.delete(messageId);
-        logger.debug(`[TranslationEngine] Stopped tracking translation: ${messageId}`);
+        // Stopped tracking translation
       }
 
       return result;
@@ -212,10 +210,10 @@ export class TranslationEngine {
       if (messageId) {
         this.activeTranslations.delete(messageId);
         this.cancelledRequests.delete(messageId);
-        logger.debug(`[TranslationEngine] Stopped tracking translation on error: ${messageId}`);
+        // Stopped tracking translation on error
       }
       // Don't log here - error already logged by provider
-      logger.debug("[TranslationEngine] Translation failed, formatting error response");
+      // Translation failed, formatting error response
       return this.formatError(error, context);
     }
   }
@@ -337,11 +335,7 @@ export class TranslationEngine {
       // Get abort controller for this translation
       const abortController = messageId ? this.activeTranslations.get(messageId) : null;
       
-      logger.debug(`[TranslationEngine] Standard translation call:`, {
-        provider,
-        messageId,
-        hasAbortController: !!abortController
-      });
+      // Standard translation call
       
       result = await providerInstance.translate(
         text,

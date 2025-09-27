@@ -1,6 +1,11 @@
 // src/utils/i18n/TranslationLanguageLoader.js
 // Dynamic translation language pack loading system for code splitting
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'TranslationLanguageLoader');
+
 // Cache for loaded translation language packs
 const translationLanguageCache = new Map();
 
@@ -89,7 +94,7 @@ export async function loadTranslationLanguagePack(langCode) {
     // Determine the chunk path
     const chunkPath = TRANSLATION_LANGUAGE_CHUNKS[normalizedCode];
     if (!chunkPath) {
-      console.warn(`No translation language chunk found for: ${normalizedCode}`);
+      logger.warn(`No translation language chunk found for: ${normalizedCode}`);
       return null;
     }
 
@@ -107,7 +112,7 @@ export async function loadTranslationLanguagePack(langCode) {
 
     return langData;
   } catch (error) {
-    console.error(`Failed to load translation language pack for ${normalizedCode}:`, error);
+    logger.error(`Failed to load translation language pack for ${normalizedCode}:`, error);
 
     // Fallback to English if available
     if (normalizedCode !== 'en') {
@@ -118,7 +123,7 @@ export async function loadTranslationLanguagePack(langCode) {
           return fallback;
         }
       } catch (fallbackError) {
-        console.error('Failed to load fallback translation language pack:', fallbackError);
+        logger.error('Failed to load fallback translation language pack:', fallbackError);
       }
     }
 

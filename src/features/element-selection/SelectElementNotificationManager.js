@@ -15,7 +15,7 @@ class SelectElementNotificationManager extends ResourceTracker {
     this.currentNotification = null;
     this.isInitialized = false;
     
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElementNotificationManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementNotificationManager');
     
     this.logger.debug('SelectElementNotificationManager created');
   }

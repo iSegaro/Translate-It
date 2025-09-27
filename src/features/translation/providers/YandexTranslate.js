@@ -68,6 +68,9 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     const lang = sourceLang === "auto" ? targetLang : `${sourceLang}-${targetLang}`;
     logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sourceLang}' target='${targetLang}'`);
 
+    // Add key info log for translation start
+    logger.info(`[Yandex] Starting translation: ${chunkTexts.join('').length} chars`);
+
     const uuid = this._generateUuid();
     const formData = new URLSearchParams();
     formData.append('lang', lang);
@@ -98,7 +101,14 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       abortController,
     });
 
-    return result || chunkTexts.map(() => '');
+    const finalResult = result || chunkTexts.map(() => '');
+
+    // Add completion log for successful translation
+    if (finalResult.length > 0) {
+      logger.info(`[Yandex] Translation completed successfully`);
+    }
+
+    return finalResult;
   }
 
   async detect_with_yandex(text, hintLangs = []) {

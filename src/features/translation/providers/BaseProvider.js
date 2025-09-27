@@ -203,8 +203,7 @@ export class BaseProvider {
    */
   async _executeApiCall({ url, fetchOptions, extractResponse, context, abortController }) {
     logger.debug(`_executeApiCall starting for context: ${context}`);
-    logger.debug(`_executeApiCall URL: ${url}`);
-    logger.debug('_executeApiCall fetchOptions:', fetchOptions);
+    // URL and fetchOptions logged at TRACE level to avoid exposing sensitive data
 
     try {
       const finalFetchOptions = { ...fetchOptions };

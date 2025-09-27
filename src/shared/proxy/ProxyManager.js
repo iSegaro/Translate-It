@@ -60,13 +60,9 @@ export class ProxyManager {
     });
 
     if (config?.enabled) {
-      this.logger.init('Proxy enabled', {
-        type: config.type,
-        host: config.host,
-        port: config.port
-      });
+      this.logger.info(`[Proxy] Enabled: ${config.type}://${config.host}:${config.port}`);
     } else {
-      this.logger.init('Proxy disabled');
+      this.logger.info('[Proxy] Disabled');
     }
   }
 
@@ -109,7 +105,11 @@ export class ProxyManager {
     // may require using chrome.proxy API or similar browser-specific APIs
     // For now, we'll prepare the configuration for potential integration
 
-    this.logger.debug('Proxy fetch options prepared for:', url);
+    this.logger.debug('Proxy fetch options prepared', {
+      url: this._sanitizeUrl(url),
+      hasAuth: !!(this.config.auth?.username),
+      proxyType: this.config.type
+    });
     return options;
   }
 
@@ -134,19 +134,23 @@ export class ProxyManager {
     const startTime = Date.now();
 
     try {
-      this.logger.debug('Proxy fetch request', {
+      this.logger.debug('Initiating proxy fetch', {
         url: this._sanitizeUrl(url),
-        proxyType: this.config.type
+        proxyType: this.config.type,
+        proxyHost: this.config.host,
+        proxyPort: this.config.port
       });
 
       const strategy = await this._getStrategy(url);
       const result = await strategy.execute(url, options);
 
       const duration = Date.now() - startTime;
-      this.logger.info('Proxy request successful', {
+      this.logger.info(`[Proxy] Request successful: ${this._sanitizeUrl(url)} (${duration}ms via ${this.config.type})`);
+      this.logger.debug('Proxy request details', {
         url: this._sanitizeUrl(url),
-        duration: `${duration}ms`,
-        proxyType: this.config.type
+        duration,
+        proxyType: this.config.type,
+        proxyHost: this.config.host
       });
 
       return result;
@@ -164,10 +168,13 @@ export class ProxyManager {
         }
       });
 
-      this.logger.error('Proxy request failed', {
+      this.logger.error(`[Proxy] Request failed: ${this._sanitizeUrl(url)} - ${error.message} (${duration}ms)`);
+      this.logger.debug('Proxy failure details', {
         url: this._sanitizeUrl(url),
         error: error.message,
-        duration: `${duration}ms`
+        duration,
+        proxyType: this.config.type,
+        proxyHost: this.config.host
       });
 
       // Do NOT fall back to direct connection - rethrow the error
@@ -236,10 +243,12 @@ export class ProxyManager {
 
     // Test proxy connection
     try {
-      this.logger.debug('Testing proxy connection', {
+      this.logger.info(`[Proxy] Testing connection: ${this.config.type}://${this.config.host}:${this.config.port}`);
+      this.logger.debug('Connection test details', {
         testUrl,
         proxyType: this.config.type,
-        proxyHost: this.config.host
+        proxyHost: this.config.host,
+        proxyPort: this.config.port
       });
 
       // Validate proxy configuration
@@ -263,32 +272,39 @@ export class ProxyManager {
       if (response.ok) {
         try {
           const data = await response.json();
-          this.logger.operation('Proxy connection test successful', {
+          this.logger.info(`[Proxy] Connection test successful (${duration}ms) - IP: ${data.ip}`);
+          this.logger.debug('Test success details', {
             ip: data.ip,
-            duration: `${duration}ms`,
+            duration,
             proxyType: this.config.type
           });
         } catch {
-          this.logger.operation('Proxy connection test successful', {
+          this.logger.info(`[Proxy] Connection test successful (${duration}ms) - Status: ${response.status}`);
+          this.logger.debug('Test success details', {
             status: response.status,
-            duration: `${duration}ms`,
+            duration,
             proxyType: this.config.type
           });
         }
         return true;
       } else {
-        this.logger.warn('Proxy connection test failed', {
+        this.logger.warn(`[Proxy] Connection test failed: HTTP ${response.status} (${duration}ms)`);
+        this.logger.debug('Test failure details', {
           status: response.status,
-          duration: `${duration}ms`
+          duration,
+          proxyType: this.config.type
         });
         return false;
       }
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.logger.warn('Proxy connection test failed', {
+      this.logger.warn(`[Proxy] Connection test failed: ${error.message} (${duration}ms)`);
+      this.logger.debug('Test error details', {
         error: error.message,
-        duration: `${duration}ms`
+        duration,
+        proxyType: this.config.type,
+        proxyHost: this.config.host
       });
       return false;
     }

@@ -82,7 +82,7 @@ export class RequestHealthMonitor {
     };
     
     this.providerHealth.set(providerName, health);
-    logger.debug(`[RequestHealthMonitor] Initialized health tracking for: ${providerName}`);
+    // Health tracking initialized
     return health;
   }
   
@@ -124,7 +124,7 @@ export class RequestHealthMonitor {
     // Update health metrics
     this._updateHealthMetrics(providerName, health);
     
-    logger.debug(`[RequestHealthMonitor] Recorded success for ${providerName}: ${responseTimeMs}ms`);
+    // Success recorded
   }
   
   /**
@@ -239,7 +239,7 @@ export class RequestHealthMonitor {
     
     health.lastHealthCheck = now;
     
-    logger.debug(`[RequestHealthMonitor] Health updated for ${providerName}: score=${health.healthScore.toFixed(2)}, healthy=${health.isHealthy}`);
+    // Health updated
   }
   
   /**

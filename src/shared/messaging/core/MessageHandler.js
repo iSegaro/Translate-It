@@ -39,6 +39,8 @@ class MessageHandler {
     this.handlers = new Map();
     this.isListenerActive = false;
     this.pendingResponses = new Map();
+    this._pendingRegistrations = [];
+    this._registrationTimeout = null;
   }
 
   registerHandler(action, handler) {
@@ -46,7 +48,23 @@ class MessageHandler {
       getLogger().warn(`Handler for action '${action}' is already registered. Overwriting.`);
     }
     this.handlers.set(action, handler);
-    getLogger().debug(`Handler registered for action: ${action}`);
+
+    // Collect registrations for batched logging
+    this._pendingRegistrations.push(action);
+
+    // Schedule batched logging
+    if (!this._registrationTimeout) {
+      this._registrationTimeout = setTimeout(() => {
+        const count = this._pendingRegistrations.length;
+        if (count > 1) {
+          getLogger().debug(`🔧 ${count} handlers registered: ${this._pendingRegistrations.join(', ')}`);
+        } else {
+          getLogger().debug(`Handler registered for action: ${this._pendingRegistrations[0]}`);
+        }
+        this._pendingRegistrations = [];
+        this._registrationTimeout = null;
+      }, 50); // Batch within 50ms
+    }
   }
 
   unregisterHandler(action) {

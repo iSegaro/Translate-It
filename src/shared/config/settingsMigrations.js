@@ -122,7 +122,7 @@ function runMainMigration(currentSettings) {
   });
 
   if (migrationLog.length > 0) {
-    logger.info('Auto-migration completed', {
+    logger.debug('Auto-migration completed', {
       addedCount: Object.keys(updates).length,
       migrations: migrationLog
     });
@@ -146,7 +146,7 @@ export async function runSettingsMigrations(currentSettings) {
   Object.assign(allUpdates, updates);
   allLogs.push(...migrationLog);
 
-  logger.info('Settings migrations completed', {
+  logger.debug('Settings migrations completed', {
     updatesCount: Object.keys(allUpdates).length,
     logs: allLogs
   });

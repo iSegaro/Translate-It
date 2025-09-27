@@ -73,7 +73,6 @@ export {
   getLanguageByName,
   findLanguageCode,
   clearLanguageCache,
-  getAvailableLanguagesByType,
   preloadLanguages,
   getLanguageByType,
   basicLanguageList

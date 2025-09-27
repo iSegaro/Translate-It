@@ -1,6 +1,11 @@
 // src/utils/i18n/InterfaceLanguageLoader.js
 // Dynamic interface language pack loading system for code splitting
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'InterfaceLanguageLoader');
+
 // Cache for loaded interface language packs
 const interfaceLanguageCache = new Map();
 
@@ -31,7 +36,7 @@ export async function loadInterfaceLanguagePack(langCode) {
     // Determine the chunk path
     const chunkPath = INTERFACE_LANGUAGE_CHUNKS[normalizedCode];
     if (!chunkPath) {
-      console.warn(`No interface language chunk found for: ${normalizedCode}`);
+      logger.warn(`No interface language chunk found for: ${normalizedCode}`);
       return null;
     }
 
@@ -49,7 +54,7 @@ export async function loadInterfaceLanguagePack(langCode) {
 
     return langData;
   } catch (error) {
-    console.error(`Failed to load interface language pack for ${normalizedCode}:`, error);
+    logger.error(`Failed to load interface language pack for ${normalizedCode}:`, error);
 
     // Fallback to English if available
     if (normalizedCode !== 'en') {
@@ -60,7 +65,7 @@ export async function loadInterfaceLanguagePack(langCode) {
           return fallback;
         }
       } catch (fallbackError) {
-        console.error('Failed to load fallback interface language pack:', fallbackError);
+        logger.error('Failed to load fallback interface language pack:', fallbackError);
       }
     }
 

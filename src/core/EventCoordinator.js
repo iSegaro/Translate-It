@@ -37,7 +37,7 @@ export default class EventCoordinator {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'EventCoordinator');
 
     // Bind coordinator methods
     this.handleEvent = this.handleEvent.bind(this);
@@ -51,10 +51,7 @@ export default class EventCoordinator {
     // All managers are now handled by FeatureManager
     // EventCoordinator just routes events to active handlers
 
-    this.logger.init('EventCoordinator initialized (Smart Handler Registration mode)', {
-      hasFeatureManager: !!this.featureManager,
-      featureManagerType: this.featureManager?.constructor?.name
-    });
+    this.logger.info('EventCoordinator initialized (Smart Handler Registration mode)');
   }
 
   /**
@@ -72,7 +69,8 @@ export default class EventCoordinator {
   async handleEvent(event) {
     // If no FeatureManager available, skip all handling
     if (!this.featureManager) {
-      this.logger.debug('No FeatureManager available, skipping event handling');
+      // No FeatureManager available - logged at TRACE level for detailed debugging
+      // this.logger.trace('No FeatureManager available, skipping event handling');
       return;
     }
 
@@ -84,7 +82,8 @@ export default class EventCoordinator {
 
       // Check if select element is active (priority handling)
       if (selectElementManager?.isSelectElementActive?.()) {
-        this.logger.debug('Select element mode is active - skipping other event handling');
+        // Select element mode active - logged at TRACE level for detailed debugging
+        // this.logger.trace('Select element mode is active - skipping other event handling');
         return; // Let SelectElementManager manage its own events
       }
 
@@ -117,7 +116,8 @@ export default class EventCoordinator {
       const textFieldManager = textFieldIconHandler.getTextFieldIconManager();
       
       if (!textFieldManager) {
-        this.logger.debug('No TextFieldIconManager available in handler');
+        // No TextFieldIconManager available - logged at TRACE level for detailed debugging
+        // this.logger.trace('No TextFieldIconManager available in handler');
         return;
       }
 
@@ -146,7 +146,8 @@ export default class EventCoordinator {
       const textSelectionManager = textSelectionHandler.getSelectionManager();
       
       if (!textSelectionManager) {
-        this.logger.debug('No TextSelectionManager available in handler');
+        // No TextSelectionManager available - logged at TRACE level for detailed debugging
+        // this.logger.trace('No TextSelectionManager available in handler');
         return;
       }
 

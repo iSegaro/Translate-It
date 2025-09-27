@@ -1,5 +1,10 @@
 // Vue component async loader for optimized loading
 import { defineAsyncComponent } from 'vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'async-components')
 
 // Component categories for different loading strategies
 const COMPONENT_CATEGORIES = {
@@ -67,7 +72,17 @@ export function preloadComponents(category) {
         components.forEach(name => {
           if (componentImporters[name]) {
             componentImporters[name]()
-              .catch(error => console.warn(`Failed to preload ${name}:`, error))
+              .catch(error => {
+                // Use ErrorHandler for component preload errors
+                const errorHandler = ErrorHandler.getInstance();
+                errorHandler.handle(error, {
+                  context: `component-preload-${name}`,
+                  isSilent: true, // Preload failures are not critical
+                  showToast: false
+                });
+
+                logger.warn(`Failed to preload ${name}:`, error);
+              })
           }
         })
       }, 1000)
@@ -79,7 +94,17 @@ export function preloadComponents(category) {
         components.forEach(name => {
           if (componentImporters[name]) {
             componentImporters[name]()
-              .catch(error => console.warn(`Failed to preload ${name}:`, error))
+              .catch(error => {
+                // Use ErrorHandler for component preload errors
+                const errorHandler = ErrorHandler.getInstance();
+                errorHandler.handle(error, {
+                  context: `component-preload-${name}`,
+                  isSilent: true, // Preload failures are not critical
+                  showToast: false
+                });
+
+                logger.warn(`Failed to preload ${name}:`, error);
+              })
           }
         })
       }, 3000)
@@ -112,7 +137,15 @@ export class ComponentPreloader {
       await componentImporters[name]()
       this.preloadedComponents.add(name)
     } catch (error) {
-      console.warn(`Failed to preload component ${name}:`, error)
+      // Use ErrorHandler for component preload errors
+      const errorHandler = ErrorHandler.getInstance();
+      errorHandler.handle(error, {
+        context: `component-preload-${name}`,
+        isSilent: true, // Component preload failures are not critical
+        showToast: false
+      });
+
+      logger.warn(`Failed to preload component ${name}:`, error)
     }
   }
 

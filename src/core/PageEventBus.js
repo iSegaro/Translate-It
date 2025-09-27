@@ -35,7 +35,7 @@ export const pageEventBus = new EventBus();
 
 // Attach to window for global access (fix for cross-context event delivery)
 if (typeof window !== 'undefined') {
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'PageEventBus');
+  const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'PageEventBus');
   window.pageEventBus = pageEventBus;
   
   // For iframe contexts, also ensure event bus is available in parent context

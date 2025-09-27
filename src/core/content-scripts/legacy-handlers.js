@@ -5,7 +5,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LegacyHandlers');
+const logger = getScopedLogger(LOG_COMPONENTS.LEGACY, 'LegacyHandlers');
 
 export async function initializeLegacyHandlers(contentCore) {
   logger.warn('Initializing legacy handlers as fallback...');

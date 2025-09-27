@@ -48,7 +48,7 @@ class TTSGlobalManager {
     this.setupPeriodicCleanup()
 
     this.isInitialized = true
-    getLogger().debug('[TTSGlobalManager] Global TTS manager initialized')
+    getLogger().info('[TTSGlobalManager] Global TTS manager initialized')
   }
 
   /**
@@ -61,7 +61,8 @@ class TTSGlobalManager {
       this.cleanupStaleInstances()
     }, 2 * 60 * 1000)
     
-    getLogger().debug('[TTSGlobalManager] Periodic cleanup initialized')
+    // Periodic cleanup initialized - logged at TRACE level for detailed debugging
+    // getLogger().debug('[TTSGlobalManager] Periodic cleanup initialized')
   }
 
   /**
@@ -71,8 +72,9 @@ class TTSGlobalManager {
    * @param {Object} componentInfo - Information about the component
    */
   registerInstance(instanceId, stopCallback, componentInfo = {}) {
-    getLogger().debug('[TTSGlobalManager] Registering TTS instance:', instanceId, componentInfo)
-    
+    // Registering TTS instance - logged at TRACE level for detailed debugging
+    // getLogger().debug('[TTSGlobalManager] Registering TTS instance:', instanceId, componentInfo)
+
     this.activeTTSInstances.set(instanceId, {
       stopCallback,
       componentInfo: {
@@ -84,7 +86,8 @@ class TTSGlobalManager {
       lastActivityAt: Date.now()
     })
 
-    getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
+    // Active instances count - logged at TRACE level for detailed debugging
+    // getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
   }
 
   /**
@@ -94,17 +97,19 @@ class TTSGlobalManager {
   unregisterInstance(instanceId) {
     if (!instanceId) return
 
-    getLogger().debug('[TTSGlobalManager] Unregistering TTS instance:', instanceId)
-    
+    // Unregistering TTS instance - logged at TRACE level for detailed debugging
+    // getLogger().debug('[TTSGlobalManager] Unregistering TTS instance:', instanceId)
+
     const wasActive = this.currentActiveId === instanceId
-    
+
     this.activeTTSInstances.delete(instanceId)
-    
+
     if (wasActive) {
       this.currentActiveId = null
     }
 
-    getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
+    // Active instances count - logged at TRACE level for detailed debugging
+    // getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
   }
 
   /**
@@ -132,7 +137,7 @@ class TTSGlobalManager {
     // Update instance timestamp
     instance.lastActivityAt = Date.now()
 
-    getLogger().debug(`[TTSGlobalManager] TTS started for instance: ${instanceId} (previous: ${previousActiveId})`)
+    getLogger().info(`[TTSGlobalManager] TTS started for ${instance.componentInfo.type || 'instance'}`)
     return true
   }
 
@@ -140,7 +145,7 @@ class TTSGlobalManager {
    * Stop all TTS instances
    */
   async stopAll() {
-    getLogger().debug(`[TTSGlobalManager] Stopping all TTS instances (${this.activeTTSInstances.size} active)`)
+    getLogger().info(`[TTSGlobalManager] Stopped all TTS instances (${this.activeTTSInstances.size} active)`)
 
     const stopPromises = []
 
@@ -170,7 +175,8 @@ class TTSGlobalManager {
     // Clear active instance
     this.currentActiveId = null
 
-    getLogger().debug('[TTSGlobalManager] All TTS instances stopped')
+    // All TTS instances stopped - logged at TRACE level for detailed debugging
+    // getLogger().debug('[TTSGlobalManager] All TTS instances stopped')
     return true
   }
 
@@ -475,7 +481,8 @@ function getGlobalTTSManager() {
  */
 export function useTTSGlobal(componentInfo = {}) {
   const manager = getGlobalTTSManager();
-  getLogger().debug('[useTTSGlobal] Creating TTS global composable for:', componentInfo)
+    // useTTSGlobal composable created - logged at TRACE level for detailed debugging
+    // getLogger().debug('[useTTSGlobal] Creating TTS global composable for:', componentInfo)
 
   // Generate unique instance ID
   const instanceId = `${componentInfo.type || 'component'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`

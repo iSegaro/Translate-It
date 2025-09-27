@@ -6,7 +6,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
  * Handles both Vue and Legacy translation systems

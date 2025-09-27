@@ -7,6 +7,8 @@ class ProviderRegistry {
     this.providers = new Map();
     this.providerImports = new Map();
     this.loadingPromises = new Map();
+    this._pendingRegistrations = [];
+    this._registrationTimeout = null;
   }
 
   register(id, providerClass) {
@@ -21,7 +23,23 @@ class ProviderRegistry {
       logger.warn(`Lazy provider with ID '${id}' already registered. Overwriting.`);
     }
     this.providerImports.set(id, { importFunction, metadata });
-    logger.debug(`Lazy provider '${id}' registered`);
+
+    // Collect registrations for batched logging
+    this._pendingRegistrations.push(id);
+
+    // Schedule batched logging
+    if (!this._registrationTimeout) {
+      this._registrationTimeout = setTimeout(() => {
+        const count = this._pendingRegistrations.length;
+        if (count > 1) {
+          logger.debug(`🔧 Registered ${count} lazy providers: ${this._pendingRegistrations.join(', ')}`);
+        } else {
+          logger.debug(`Lazy provider '${this._pendingRegistrations[0]}' registered`);
+        }
+        this._pendingRegistrations = [];
+        this._registrationTimeout = null;
+      }, 50); // Batch within 50ms
+    }
   }
 
   async get(id) {

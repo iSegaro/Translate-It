@@ -12,13 +12,13 @@ function getLogger() {
     try {
       logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
     } catch (error) {
-      // Fallback logger
+      // Fallback logger with proper formatting
       logger = {
-        debug: () => {},
-        warn: console.warn,
-        error: console.error,
-        info: console.log,
-        init: console.log
+        debug: (...args) => console.debug('[LazyFeatures]', ...args),
+        warn: (...args) => console.warn('[LazyFeatures]', ...args),
+        error: (...args) => console.error('[LazyFeatures]', ...args),
+        info: (...args) => console.log('[LazyFeatures]', ...args),
+        operation: (...args) => console.log('[LazyFeatures]', ...args)
       };
     }
   }
@@ -396,7 +396,6 @@ export async function loadCoreFeatures() {
     );
 
     await Promise.all(loadPromises);
-    logger.info('Core features loaded');
 
     // Initialize and activate FeatureManager after features are loaded
     logger.debug('About to call initializeAndActivateFeatures()');
@@ -413,7 +412,6 @@ export async function loadCoreFeatures() {
     );
 
     await Promise.all(loadPromises);
-    logger.info('Core features loaded (with fallback error handling)');
 
     // Initialize and activate FeatureManager after features are loaded
     logger.debug('About to call initializeAndActivateFeatures() (fallback path)');
@@ -434,25 +432,30 @@ async function initializeAndActivateFeatures() {
       featureManager = FeatureManager.getInstance();
       // Expose globally for RevertShortcut and other components
       window.featureManager = featureManager;
-      logger.debug('✅ FeatureManager initialized and set to window.featureManager');
-      logger.debug('FeatureManager is now available globally:', window.featureManager);
+      logger.debug('FeatureManager initialized and set to window.featureManager');
     } else {
       logger.debug('FeatureManager already exists');
-      logger.debug('FeatureManager already initialized');
     }
 
-    // Activate core features
-    for (const featureName of CORE_FEATURES) {
-      try {
-        await featureManager.activateFeature(featureName);
-        logger.debug(`Activated feature: ${featureName}`);
-      } catch (error) {
-        logger.warn(`Failed to activate feature ${featureName}:`, error);
+    // Only activate features if not already initialized
+    if (!featuresInitialized) {
+      // Activate core features
+      const activatedFeatures = [];
+      for (const featureName of CORE_FEATURES) {
+        try {
+          await featureManager.activateFeature(featureName);
+          activatedFeatures.push(featureName);
+        } catch (error) {
+          logger.warn(`Failed to activate feature ${featureName}:`, error);
+        }
       }
-    }
 
-    featuresInitialized = true;
-    logger.info('All core features activated successfully');
+      featuresInitialized = true;
+      const totalFeatures = CORE_FEATURES.size;
+      logger.operation(`Core features loaded: ${activatedFeatures.length}/${totalFeatures} [${activatedFeatures.join(', ')}]`);
+    } else {
+      logger.debug('Features already initialized, skipping activation');
+    }
 
     // Setup event listeners for smart feature loading
     logger.debug('Setting up smart feature loading listeners...');
@@ -571,7 +574,7 @@ export function isFeatureLoaded(featureName) {
 export async function loadFeatures(contentCore) {
   const logger = getLogger();
   try {
-    logger.init('Loading all features (legacy mode)...');
+    logger.debug('Loading all features (legacy mode)...');
 
     // Load core features first
     await loadCoreFeatures();

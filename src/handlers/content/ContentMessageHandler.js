@@ -20,15 +20,15 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // Enforce singleton pattern
     if (contentMessageHandlerInstance) {
-      const tempLogger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentMessageHandler');
-      tempLogger.debug('ContentMessageHandler singleton already exists, returning existing instance');
+      const tempLogger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ContentMessageHandler');
+      // logger.trace('ContentMessageHandler singleton already exists, returning existing instance');
       return contentMessageHandlerInstance;
     }
 
     this.handlers = new Map();
     this.initialized = false;
     this.context = MessagingContexts.CONTENT;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageHandler');
+    this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
     this.iFrameManager = null;
 
@@ -62,11 +62,11 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // Store singleton instance
     contentMessageHandlerInstance = this;
-    this.logger.debug('ContentMessageHandler singleton created');
+    this.logger.info('ContentMessageHandler singleton created');
 
     // CRITICAL: Protect ContentMessageHandler itself from Memory Garbage Collector
     this.trackResource('content-message-handler-core', () => {
-      this.logger.debug('ContentMessageHandler core cleanup called - PROTECTED (critical resource)');
+      // logger.trace('ContentMessageHandler core cleanup called - PROTECTED (critical resource)');
       // This callback is invoked but actual cleanup is skipped due to critical protection.
       // This is the expected behavior to preserve essential messaging functionality.
     }, { isCritical: true });
@@ -103,7 +103,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async activate() {
     if (this.initialized) {
-      this.logger.debug('ContentMessageHandler already active');
+      // logger.trace('ContentMessageHandler already active');
       return true;
     }
 
@@ -150,14 +150,11 @@ export class ContentMessageHandler extends ResourceTracker {
         // Store reference to message handler
         this.messageHandler = messageHandler;
 
-        this.logger.info('🔧 ContentMessageHandler registered handlers:', {
-          registeredActions: Array.from(this.handlers.keys()),
-          totalHandlers: this.handlers.size,
-          hasRevertHandler: this.handlers.has('revertTranslation'),
-          revertActionValue: MessageActions.REVERT_SELECT_ELEMENT_MODE,
-          allHandlerKeys: Array.from(this.handlers.keys()).join(', '),
-          usingContentScriptCore: !!contentScriptCore
-        });
+        this.logger.info(`✅ ContentMessageHandler registered ${this.handlers.size} handlers`);
+        // logger.trace('Handler details:', {
+        //   hasRevertHandler: this.handlers.has('revertTranslation'),
+        //   usingContentScriptCore: !!contentScriptCore
+        // });
       } else {
         throw new Error('No valid message handler available');
       }
@@ -170,12 +167,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // If using ContentScriptCore's message handler, it should already be listening
       if (contentScriptCore) {
-        this.logger.debug('Using ContentScriptCore message listener');
+        // logger.trace('Using ContentScriptCore message listener');
       }
 
       // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
       this.trackResource('messageHandler', () => {
-        this.logger.debug('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
+        // logger.trace('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
         // This callback is called but the actual cleanup is skipped by MemoryManager
         // because this resource is marked as critical. This is the expected behavior.
         this.logger.debug('Message handler is protected from cleanup and remains active');
@@ -192,7 +189,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async deactivate() {
     if (!this.initialized) {
-      this.logger.debug('ContentMessageHandler not active');
+      // logger.trace('ContentMessageHandler not active');
       return true;
     }
 
@@ -240,13 +237,13 @@ export class ContentMessageHandler extends ResourceTracker {
   unregisterHandler(action) {
     if (this.handlers.has(action)) {
       this.handlers.delete(action);
-      this.logger.debug(`Handler unregistered for action: ${action}`);
+      // logger.trace(`Handler unregistered for action: ${action}`);
     }
   }
 
   unregisterAllHandlers() {
     this.handlers.clear();
-    this.logger.debug('All handlers unregistered');
+    // logger.trace('All handlers unregistered');
   }
 
   async handleMessage(message, sender, sendResponse) {
@@ -274,30 +271,20 @@ export class ContentMessageHandler extends ResourceTracker {
         return true; // Error was handled
       }
     }
-    this.logger.debug(`No handler for action: ${message.action}`);
+    // logger.trace(`No handler for action: ${message.action}`);
     return false; // Message not handled
   }
 
   async handleActivateSelectElementMode(message) {
-    this.logger.debug(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
-    this.logger.operation("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!", {
-      hasSelectElementManager: !!this.selectElementManager,
-      messageData: message.data,
-      isInIframe: window !== window.top,
-      frameLocation: window.location.href,
-      messageAction: message.action,
-      messageSource: message.source,
-      isActive: this.isActive,
-      hasMessageHandler: !!this.messageHandler,
-      initialized: this.initialized
-    });
+    // logger.trace(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
+    this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
     try {
       if (!this.selectElementManager) {
         throw new Error('SelectElementManager not available - FeatureManager dependency injection may have failed');
       }
 
-      this.logger.debug("ContentMessageHandler: Activating SelectElementManager directly");
+      // logger.trace("ContentMessageHandler: Activating SelectElementManager directly");
 
       // Initialize if not already initialized
       if (!this.selectElementManager.isInitialized) {
@@ -306,7 +293,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Activate Select Element mode
       const result = await this.selectElementManager.activateSelectElementMode();
-      this.logger.debug("ContentMessageHandler: SelectElementManager.activateSelectElementMode() completed");
+      this.logger.info("SelectElementManager activated successfully");
 
       // Return success result
       return { success: true, activated: result.isActive, managerId: result.instanceId };
@@ -361,19 +348,14 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Only process deactivation if it's explicit or from non-background sources
       if (fromBackground && !isExplicitDeactivation) {
-        this.logger.debug('Ignoring implicit deactivation from background', {
-          fromBackground,
-          isExplicitDeactivation
-        });
+        // logger.trace('Ignoring implicit deactivation from background', {
+        //   fromBackground,
+        //   isExplicitDeactivation
+        // });
         return { success: true, activated: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false };
       }
 
-      this.logger.debug('DEACTIVATE_SELECT_ELEMENT_MODE received', {
-        fromBackground: fromBackground,
-        excludeFrameId: excludeFrameId,
-        isActive: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false,
-        isInIframe: window !== window.top,
-      });
+      this.logger.info('DEACTIVATE_SELECT_ELEMENT_MODE received');
 
       try {
         // Deactivate the manager directly
@@ -385,19 +367,19 @@ export class ContentMessageHandler extends ResourceTracker {
         return { success: false, error: error.message };
       }
     } else {
-      this.logger.debug("ContentMessageHandler: Deactivate request received but selectElementManager is null - this is normal if not activated");
+      // logger.trace("ContentMessageHandler: Deactivate request received but selectElementManager is null - this is normal if not activated");
       return { success: true, activated: false };
     }
   }
 
   async handleStreamUpdate(message) {
-    this.logger.debug('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', {
-      messageId: message.messageId,
-      success: message.data?.success,
-      batchIndex: message.data?.batchIndex,
-      hasSelectElementManager: !!this.selectElementManager,
-      isActive: this.selectElementManager?.isSelectElementActive()
-    });
+    // logger.trace('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', {
+    //   messageId: message.messageId,
+    //   success: message.data?.success,
+    //   batchIndex: message.data?.batchIndex,
+    //   hasSelectElementManager: !!this.selectElementManager,
+    //   isActive: this.selectElementManager?.isSelectElementActive()
+    // });
 
     if (this.selectElementManager && this.selectElementManager.translationOrchestrator) {
       return this.selectElementManager.translationOrchestrator.handleStreamUpdate(message);
@@ -415,31 +397,30 @@ export class ContentMessageHandler extends ResourceTracker {
   async handleTranslationResult(message) {
     const { translationMode, translatedText, originalText, options, success, error } = message.data;
     const toastId = options?.toastId;
-    this.logger.debug(`Handling translation result for mode: ${translationMode}`, {
+    this.logger.info(`Handling translation result for mode: ${translationMode}`, {
       success,
       translatedTextLength: translatedText?.length,
       originalTextLength: originalText?.length,
       hasToastId: !!toastId,
-      hasError: !!error,
-      errorType: typeof error
+      hasError: !!error
     });
 
     switch (translationMode) {
       case TranslationMode.Select_Element:
       case 'SelectElement': // Handle both enum and hardcoded string for robustness
         if (this.selectElementManager) {
-          this.logger.debug('Forwarding to SelectElementHandler');
+          this.logger.info('Forwarding to SelectElementHandler');
           return this.selectElementManager.handleTranslationResult(message);
         }
         break;
 
       case TranslationMode.Field:
       case 'field': // Handle both enum and string for robustness
-        this.logger.debug('Processing Text Field translation result');
+        this.logger.info('Processing Text Field translation result');
         
         // Check if translation failed at background level
         if (success === false && error) {
-          this.logger.debug('Text Field translation failed in background, handling error');
+          // logger.trace('Text Field translation failed in background, handling error');
           
           // Dismiss status notification if exists
           if (toastId) {
@@ -484,7 +465,7 @@ export class ContentMessageHandler extends ResourceTracker {
         }
         
         // If success or no explicit error, proceed with normal flow
-        this.logger.debug('Forwarding result to applyTranslationToTextField');
+        this.logger.info('Forwarding result to applyTranslationToTextField');
         try {
           return await applyTranslationToTextField(translatedText, originalText, translationMode, toastId, message.messageId);
         } catch (error) {
@@ -510,7 +491,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
-        this.logger.debug(`Displaying result for ${translationMode} mode in notification.`);
+        this.logger.info(`Displaying result for ${translationMode} mode in notification.`);
         return true;
 
       default:
@@ -524,12 +505,12 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleRevertTranslation() {
-    this.logger.debug('Handling revert translation request');
+    this.logger.info('Handling revert translation request');
 
     try {
       // Use the existing revertHandler to execute revert
       const result = await revertHandler.executeRevert();
-      this.logger.debug('Revert completed successfully:', result);
+      this.logger.info('Revert completed successfully');
       return result;
     } catch (error) {
       this.logger.error('Revert failed:', error);
@@ -539,7 +520,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
   // IFrame support handlers
   async handleIFrameActivateSelectElement(data) {
-    this.logger.debug('IFrame activate select element request', data);
+    this.logger.info('IFrame activate select element request');
     if (this.selectElementManager) {
       // Initialize if not already initialized
       if (!this.selectElementManager.isInitialized) {
@@ -553,14 +534,14 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleIFrameTranslateSelection(data) {
-    this.logger.debug('IFrame translate selection request', data);
+    this.logger.info('IFrame translate selection request');
     // Delegate to WindowsManager through page event bus
     pageEventBus.emit('iframe-translate-selection', data);
     return { success: true };
   }
 
   async handleIFrameGetFrameInfo(data) {
-    this.logger.debug('IFrame get frame info request', data);
+    this.logger.info('IFrame get frame info request');
     if (this.iFrameManager) {
       return { 
         success: true, 
@@ -571,7 +552,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleIFrameCoordinateOperation(data) {
-    this.logger.debug('IFrame coordinate operation request', data);
+    this.logger.info('IFrame coordinate operation request');
     // Delegate to appropriate manager based on operation type
     if (data.operation === 'select-element' && this.selectElementManager) {
       return await this.handleIFrameActivateSelectElement(data);
@@ -580,7 +561,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleIFrameDetectTextFields(data) {
-    this.logger.debug('IFrame detect text fields request', data);
+    this.logger.info('IFrame detect text fields request');
     // Basic text field detection
     const textFields = document.querySelectorAll('input[type="text"], textarea, input[type="email"], input[type="url"], input[type="search"]');
     const fieldInfo = Array.from(textFields).map(field => ({
@@ -594,7 +575,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleIFrameInsertText(data) {
-    this.logger.debug('IFrame insert text request', data);
+    this.logger.info('IFrame insert text request');
     const { targetSelector, text } = data;
     try {
       const element = document.querySelector(targetSelector);
@@ -609,8 +590,8 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
-  async handleIFrameSyncRequest(data) {
-    this.logger.debug('IFrame sync request', data);
+  async handleIFrameSyncRequest(/* data */) {
+    this.logger.info('IFrame sync request');
     if (this.iFrameManager) {
       // Handle synchronization requests
       return { success: true, response: 'sync-acknowledged' };
@@ -619,7 +600,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleIFrameSyncResponse(data) {
-    this.logger.debug('IFrame sync response', data);
+    this.logger.info('IFrame sync response');
     // Handle sync response - could be used for coordination
     return { success: true };
   }
@@ -632,7 +613,7 @@ export class ContentMessageHandler extends ResourceTracker {
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
 
-    this.logger.debug('ContentMessageHandler cleanup completed');
+    // logger.trace('ContentMessageHandler cleanup completed');
   }
 
   // Static method to get singleton instance

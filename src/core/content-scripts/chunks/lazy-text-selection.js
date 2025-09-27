@@ -5,7 +5,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyTextSelection');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'LazyTextSelection');
 
 let textSelectionManager = null;
 let textSelectionInitialized = false;

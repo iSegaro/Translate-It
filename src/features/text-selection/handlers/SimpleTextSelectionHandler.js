@@ -7,7 +7,7 @@ import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
 // Singleton instance for SimpleTextSelectionHandler
 let simpleTextSelectionHandlerInstance = null;
@@ -369,6 +369,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Process the selection
       if (this.selectionManager) {
+        this.logger.debug('Processing valid text selection', {
+          textLength: selectedText.length,
+          sourceElement: selection?.anchorNode?.nodeName || 'unknown'
+        });
         await this.selectionManager.processSelection(selectedText, selection);
       } else {
         logger.warn('SelectionManager is null - this should not happen with critical protection');

@@ -23,13 +23,11 @@ export function useWindowsManager() {
    * Event handlers
    */
   const handleShowWindow = (detail) => {
-    logger.debug('Show window event received', detail);
-    logger.debug('Show window ALL detail properties:', Object.keys(detail));
-    logger.debug('Show window detail text properties:', {
-      initialTranslatedText: detail.initialTranslatedText,
-      translatedText: detail.translatedText,
-      hasInitial: !!detail.initialTranslatedText,
-      hasTranslated: !!detail.translatedText
+    logger.debug('Show window event received', {
+      id: detail.id,
+      hasText: !!detail.selectedText,
+      position: detail.position,
+      hasTranslation: !!(detail.initialTranslatedText || detail.translatedText)
     });
     
     // Check if we're updating an existing window
@@ -61,11 +59,11 @@ export function useWindowsManager() {
   };
 
   const handleShowIcon = (detail) => {
-    logger.debug('Show icon event received', detail);
-    
+    logger.debug('Show icon event received', { id: detail.id, textLength: detail.text?.length });
+
     // Remove existing icons first (single icon at a time)
     translationIcons.value = [];
-    
+
     // Add new icon
     translationIcons.value.push({
       id: detail.id,
@@ -75,13 +73,13 @@ export function useWindowsManager() {
   };
 
   const handleDismissWindow = (detail) => {
-    logger.debug('Dismiss window event received', detail);
+    logger.debug('Dismiss window event', { id: detail.id });
     translationWindows.value = translationWindows.value.filter(w => w.id !== detail.id);
   };
 
   const handleUpdateWindow = (detail) => {
-    logger.debug('Update window event received', detail);
-    
+    logger.debug('Update window event', { id: detail.id });
+
     const existingWindowIndex = translationWindows.value.findIndex(w => w.id === detail.id);
     if (existingWindowIndex >= 0) {
       const existingWindow = translationWindows.value[existingWindowIndex];
@@ -92,25 +90,24 @@ export function useWindowsManager() {
         translatedText: detail.initialTranslatedText || detail.translatedText || existingWindow.translatedText,
         initialSize: detail.initialSize || existingWindow.initialSize
       };
-      logger.debug('Updated window with new data', detail.id);
+      logger.debug('Window updated', detail.id);
     } else {
       // Window was closed before translation completed - this is normal behavior
-      logger.debug('Window was closed before translation completed:', detail.id);
+      logger.debug('Window was closed before translation completed', detail.id);
     }
   };
 
   const handleDismissIcon = (detail) => {
-    logger.debug('Dismiss icon event received', detail);
+    logger.debug('Dismiss icon event', { id: detail.id });
     // Find the icon to get its ID
     const iconToRemove = translationIcons.value.find(icon => icon.id === detail.id);
-    
+
     if (iconToRemove) {
       // Emit specific dismiss event for the icon component
       const eventName = `dismiss-icon-${iconToRemove.id}`;
       pageEventBus.emit(eventName, { id: iconToRemove.id });
-      logger.debug('Emitted dismiss event for icon:', iconToRemove.id);
     }
-    
+
     translationIcons.value = translationIcons.value.filter(icon => icon.id !== detail.id);
   };
 
@@ -118,28 +115,27 @@ export function useWindowsManager() {
    * Component event handlers
    */
   const onTranslationIconClick = (detail) => {
-    logger.debug('onTranslationIconClick called with:', detail);
-    logger.info('Translation icon clicked', detail);
+    logger.debug('Translation icon clicked', { id: detail.id });
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail);
   };
 
   const onTranslationWindowClose = (id) => {
-    logger.debug('Translation window closed', id);
+    logger.debug('Translation window closed', { id });
     translationWindows.value = translationWindows.value.filter(w => w.id !== id);
-    
+
     // Emit dismiss event to WindowsManager
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id });
   };
 
   const onTranslationWindowSpeak = (detail) => {
-    logger.info('Translation window speak request', detail);
+    logger.debug('Translation window speak request', { textLength: detail.text?.length });
     pageEventBus.emit('translation-window-speak', detail);
   };
 
   const onTranslationIconClose = (id) => {
-    logger.debug('Translation icon closed', id);
+    logger.debug('Translation icon closed', { id });
     translationIcons.value = translationIcons.value.filter(icon => icon.id !== id);
-    
+
     // Emit dismiss event to WindowsManager
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, { id });
   };

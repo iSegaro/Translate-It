@@ -165,10 +165,8 @@ export const useSettingsStore = defineStore('settings', () => {
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
-  if (settings.value.DEBUG_MODE) logger.debugLazy(() => [`[settingsStore] updateSettingAndPersist: ${key} = ${value}`])
       settings.value[key] = value // Update local state
-  await storageManager.set({ [key]: value }) // Persist immediately
-  if (settings.value.DEBUG_MODE) logger.debug('[settingsStore] Saved key to storage');
+      await storageManager.set({ [key]: value }) // Persist immediately
       return true
     } catch (error) {
       logger.error(`Failed to update and persist setting ${key}:`, error)
@@ -308,7 +306,6 @@ export const useSettingsStore = defineStore('settings', () => {
           // Update the reactive settings ref
           if (settings.value[key] !== newValue) {
             settings.value[key] = newValue
-            if (settings.value.DEBUG_MODE) logger.debugLazy(() => [`[SettingsStore] Setting '${key}' updated from storage`, { key, newValue }])
           }
         }
       }

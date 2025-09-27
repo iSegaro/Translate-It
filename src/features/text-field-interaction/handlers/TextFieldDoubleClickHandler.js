@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldDoubleClickHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDoubleClickHandler');
 
 /**
  * Text Field Double Click Handler

@@ -1,6 +1,11 @@
 // src/utils/i18n/LanguageDetector.js
 // Language detection utilities for code splitting
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LanguageDetector');
+
 // Cache for detected languages with LRU eviction
 const detectionCache = new Map();
 
@@ -51,7 +56,7 @@ export function detectBrowserLanguage() {
 
     return primaryLang;
   } catch (error) {
-    console.warn('Failed to detect browser language:', error);
+    logger.warn('Failed to detect browser language:', error);
     return 'en';
   }
 }
@@ -90,7 +95,7 @@ export async function detectLanguageFromText(text) {
 
     return detection;
   } catch (error) {
-    console.warn('Failed to detect language from text:', error);
+    logger.warn('Failed to detect language from text:', error);
     return { lang: 'en', confidence: 0.0 };
   }
 }

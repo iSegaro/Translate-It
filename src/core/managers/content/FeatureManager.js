@@ -6,7 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // ErrorHandler will be imported lazily when needed
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FeatureManager');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'FeatureManager');
 
 // Singleton instance
 let featureManagerInstance = null;
@@ -172,7 +172,7 @@ export class FeatureManager extends ResourceTracker {
 
   async activateFeature(featureName) {
     if (this.activeFeatures.has(featureName)) {
-      logger.debug(`Feature ${featureName} already active`);
+      // logger.trace(`Feature ${featureName} already active`);
       return;
     }
 
@@ -233,7 +233,7 @@ export class FeatureManager extends ResourceTracker {
             }
           }
 
-          logger.info(`Feature ${featureName} activated successfully`);
+          logger.debug(`Feature ${featureName} activated successfully`);
         } else {
           logger.warn(`Feature ${featureName} activation returned false - not registering`);
         }

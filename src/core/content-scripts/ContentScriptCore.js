@@ -8,6 +8,7 @@ let LOG_COMPONENTS = null;
 let checkContentScriptAccess = null;
 let ExtensionContextManager = null;
 let createMessageHandler = null;
+let ErrorHandler = null;
 let mainDomCss = '';
 
 // Async initialization function to load dependencies
@@ -19,13 +20,15 @@ async function loadDependencies() {
     logConstantsModule,
     tabPermissionsModule,
     extensionContextModule,
-    messageHandlerModule
+    messageHandlerModule,
+    errorHandlerModule
   ] = await Promise.all([
     import("@/shared/logging/logger.js"),
     import("@/shared/logging/logConstants.js"),
     import("@/core/tabPermissions.js"),
     import('@/core/extensionContext.js'),
-    import('@/shared/messaging/core/MessageHandler.js')
+    import('@/shared/messaging/core/MessageHandler.js'),
+    import('@/shared/error-management/ErrorHandler.js')
   ]);
 
   getScopedLogger = loggerModule.getScopedLogger;
@@ -33,6 +36,7 @@ async function loadDependencies() {
   checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
   ExtensionContextManager = extensionContextModule.default;
   createMessageHandler = messageHandlerModule.createMessageHandler;
+  ErrorHandler = errorHandlerModule.ErrorHandler;
 
   // Define CSS directly as a string to avoid import issues
   mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}html[data-translate-it-select-mode="true"] *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]){pointer-events:none!important;color:inherit!important;text-decoration:none!important}:root{--translate-highlight-color:#ff8800;--translate-highlight-width:3px;--translate-highlight-offset:2px;--translate-highlight-z-index:1040}html body [data-translate-highlighted="true"][data-translate-highlighted="true"],html body .translate-it-element-highlighted.translate-it-element-highlighted{outline:var(--translate-highlight-width) solid var(--translate-highlight-color)!important;outline-offset:var(--translate-highlight-offset)!important;z-index:var(--translate-highlight-z-index)!important;position:relative!important;box-shadow:0 0 0 var(--translate-highlight-width) var(--translate-highlight-color)!important}html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,html body .translate-it-element-highlighted.translate-it-element-highlighted *{outline:none!important}`;
@@ -53,7 +57,7 @@ export class ContentScriptCore extends EventTarget {
 
   async initialize() {
     if (this.initialized) {
-      if (logger) logger.debug('ContentScriptCore already initialized');
+      // logger.trace('ContentScriptCore already initialized');
       return;
     }
 
@@ -61,18 +65,18 @@ export class ContentScriptCore extends EventTarget {
       // Load dependencies first
       await loadDependencies();
 
-      logger.init('Initializing ContentScriptCore...');
+      // logger.trace('Initializing ContentScriptCore...');
 
       // Check access first
       this.access = checkContentScriptAccess();
       this.accessChecked = true;
 
-      logger.debug('Content script access check result:', {
-        isAccessible: this.access.isAccessible,
-        errorMessage: this.access.errorMessage,
-        url: window.location.href,
-        isInIframe: window !== window.top
-      });
+      // logger.trace('Content script access check result:', {
+      //   isAccessible: this.access.isAccessible,
+      //   errorMessage: this.access.errorMessage,
+      //   url: window.location.href,
+      //   isInIframe: window !== window.top
+      // });
 
       if (!this.access.isAccessible) {
         logger.warn(`Content script execution stopped: ${this.access.errorMessage}`);
@@ -81,7 +85,7 @@ export class ContentScriptCore extends EventTarget {
 
       // Prevent duplicate execution
       if (window.translateItContentScriptLoaded) {
-        logger.debug('Content script already loaded, stopping duplicate execution');
+        // logger.trace('Content script already loaded, stopping duplicate execution');
         return false;
       }
       window.translateItContentScriptLoaded = true;
@@ -111,10 +115,30 @@ export class ContentScriptCore extends EventTarget {
       return true;
 
     } catch (error) {
+      // Use ErrorHandler for critical initialization errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'content-script-initialization',
+          isSilent: false,
+          showToast: true
+        });
+      }
+
       if (logger) {
-        logger.error('Failed to initialize ContentScriptCore:', error);
+        logger.error('Failed to initialize ContentScriptCore', {
+          error: error.message || error,
+          stack: error.stack,
+          url: window.location.href,
+          isInIframe: window !== window.top
+        });
       } else {
-        console.error('Failed to initialize ContentScriptCore:', error);
+        // Fallback: create a temporary logger instance
+        console.error('[ContentScriptCore] Failed to initialize:', {
+          error: error.message || error,
+          url: window.location.href,
+          isInIframe: window !== window.top
+        });
       }
       return false;
     }
@@ -155,11 +179,21 @@ export class ContentScriptCore extends EventTarget {
       // Pre-initialize FeatureManager for RevertShortcut and other features
       // This ensures FeatureManager is available globally before any features need it
       try {
-        logger.debug('Pre-initializing FeatureManager...');
+        // logger.trace('Pre-initializing FeatureManager...');
         const { loadCoreFeatures } = await import('./chunks/lazy-features.js');
         await loadCoreFeatures();
-        logger.debug('FeatureManager pre-initialized successfully');
+        // logger.trace('FeatureManager pre-initialized successfully');
       } catch (error) {
+        // Use ErrorHandler for FeatureManager pre-initialization errors
+        if (ErrorHandler) {
+          const errorHandler = ErrorHandler.getInstance();
+          await errorHandler.handle(error, {
+            context: 'feature-manager-pre-initialization',
+            isSilent: true, // FeatureManager pre-init is not critical
+            showToast: false
+          });
+        }
+
         logger.warn('Failed to pre-initialize FeatureManager:', error);
         // Don't fail critical initialization if FeatureManager fails
       }
@@ -167,13 +201,36 @@ export class ContentScriptCore extends EventTarget {
       this.initialized = true;
 
       if (logger) {
-        logger.debug('ContentScriptCore critical initialization complete');
+        logger.info('ContentScriptCore critical initialization complete');
       }
 
       return true;
 
     } catch (error) {
-      console.error('Failed to initialize ContentScriptCore critically:', error);
+      // Use ErrorHandler for critical initialization errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'content-script-critical-initialization',
+          isSilent: false,
+          showToast: true
+        });
+      }
+
+      // Use a structured error object even when logger is not available
+      const errorContext = {
+        operation: 'critical-initialization',
+        error: error.message || error,
+        stack: error.stack,
+        url: window.location.href,
+        isInIframe: window !== window.top
+      };
+
+      if (logger) {
+        logger.error('Failed to initialize ContentScriptCore critically', errorContext);
+      } else {
+        console.error('[ContentScriptCore] Failed to initialize critically:', errorContext);
+      }
       return false;
     }
   }
@@ -185,13 +242,15 @@ export class ContentScriptCore extends EventTarget {
       logConstantsModule,
       tabPermissionsModule,
       extensionContextModule,
-      messageHandlerModule
+      messageHandlerModule,
+      errorHandlerModule
     ] = await Promise.all([
       import("@/shared/logging/logger.js"),
       import("@/shared/logging/logConstants.js"),
       import("@/core/tabPermissions.js"),
       import('@/core/extensionContext.js'),
-      import('@/shared/messaging/core/MessageHandler.js')
+      import('@/shared/messaging/core/MessageHandler.js'),
+      import('@/shared/error-management/ErrorHandler.js')
     ]);
 
     getScopedLogger = loggerModule.getScopedLogger;
@@ -199,6 +258,7 @@ export class ContentScriptCore extends EventTarget {
     checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
     ExtensionContextManager = extensionContextModule.default;
     createMessageHandler = messageHandlerModule.createMessageHandler;
+    ErrorHandler = errorHandlerModule.ErrorHandler;
 
     // Define CSS directly as a string to avoid import issues
     mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}html[data-translate-it-select-mode="true"] *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]){pointer-events:none!important;color:inherit!important;text-decoration:none!important}:root{--translate-highlight-color:#ff8800;--translate-highlight-width:3px;--translate-highlight-offset:2px;--translate-highlight-z-index:1040}html body [data-translate-highlighted="true"][data-translate-highlighted="true"],html body .translate-it-element-highlighted.translate-it-element-highlighted{outline:var(--translate-highlight-width) solid var(--translate-highlight-color)!important;outline-offset:var(--translate-highlight-offset)!important;z-index:var(--translate-highlight-z-index)!important;position:relative!important;box-shadow:0 0 0 var(--translate-highlight-width) var(--translate-highlight-color)!important}html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,html body .translate-it-element-highlighted.translate-it-element-highlighted *{outline:none!important}`;
@@ -221,6 +281,16 @@ export class ContentScriptCore extends EventTarget {
         this.messageHandler.listen();
       }
     } catch (error) {
+      // Use ErrorHandler for messaging initialization errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'critical-messaging-initialization',
+          isSilent: true, // Messaging failures are not critical for basic functionality
+          showToast: false
+        });
+      }
+
       if (logger) {
         logger.warn('Failed to initialize critical messaging:', error);
       }
@@ -236,7 +306,7 @@ export class ContentScriptCore extends EventTarget {
     // Setup basic infrastructure
     // Note: Heavy imports like Vue, FeatureManager are loaded lazily
 
-    if (logger) logger.debug('Core infrastructure initialized');
+    // logger.trace('Core infrastructure initialized');
   }
 
   async initializeMessaging() {
@@ -254,14 +324,31 @@ export class ContentScriptCore extends EventTarget {
       // Activate the message listener
       if (!this.messageHandler.isListenerActive) {
         this.messageHandler.listen();
-        if (logger) logger.debug('Core message handler activated');
+        // logger.trace('Core message handler activated');
       }
 
     } catch (error) {
+      // Use ErrorHandler for messaging errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'messaging-initialization',
+          isSilent: true, // Messaging failures are not critical
+          showToast: false
+        });
+      }
+
+      const errorContext = {
+        operation: 'messaging-initialization',
+        error: error.message || error,
+        stack: error.stack,
+        messageHandlerInitialized: !!this.messageHandler
+      };
+
       if (logger) {
-        logger.error('Failed to initialize messaging:', error);
+        logger.error('Failed to initialize messaging', errorContext);
       } else {
-        console.error('Failed to initialize messaging:', error);
+        console.error('[ContentScriptCore] Failed to initialize messaging:', errorContext);
       }
     }
   }
@@ -290,12 +377,12 @@ export class ContentScriptCore extends EventTarget {
 
   async loadVueApp() {
     if (this.vueLoaded) {
-      logger.debug('Vue app already loaded');
+      // logger.trace('Vue app already loaded');
       return;
     }
 
     try {
-      logger.debug('Loading Vue app lazily...');
+      logger.info('Loading Vue app lazily...');
 
       // Load Vue app and all its dependencies
       const { loadVueApp } = await import('./chunks/lazy-vue-app.js');
@@ -306,6 +393,16 @@ export class ContentScriptCore extends EventTarget {
       logger.info('Vue app loaded successfully');
 
     } catch (error) {
+      // Use ErrorHandler for Vue loading errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'vue-app-loading',
+          isSilent: true, // Vue loading failures should not interrupt user
+          showToast: false
+        });
+      }
+
       logger.error('Failed to load Vue app:', error);
       // Fallback: try to load legacy style
       await this.fallbackVueLoad();
@@ -314,12 +411,12 @@ export class ContentScriptCore extends EventTarget {
 
   async loadFeatures() {
     if (this.featuresLoaded) {
-      logger.debug('Features already loaded');
+      // logger.trace('Features already loaded');
       return;
     }
 
     try {
-      logger.debug('Loading features lazily...');
+      logger.info('Loading features lazily...');
 
       // Load only core features initially
       const { loadCoreFeatures } = await import('./chunks/lazy-features.js');
@@ -330,6 +427,16 @@ export class ContentScriptCore extends EventTarget {
       logger.info('Core features loaded successfully');
 
     } catch (error) {
+      // Use ErrorHandler for features loading errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'features-loading',
+          isSilent: true, // Features loading failures should not interrupt user
+          showToast: false
+        });
+      }
+
       logger.error('Failed to load core features:', error);
       await this.fallbackFeaturesLoad();
     }
@@ -340,6 +447,16 @@ export class ContentScriptCore extends EventTarget {
       const { loadFeatureOnDemand } = await import('./chunks/lazy-features.js');
       return await loadFeatureOnDemand(featureName);
     } catch (error) {
+      // Use ErrorHandler for individual feature loading errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: `feature-loading-${featureName}`,
+          isSilent: true, // Individual feature failures should not interrupt user
+          showToast: false
+        });
+      }
+
       logger.error(`Failed to load feature ${featureName}:`, error);
       return null;
     }
@@ -355,14 +472,14 @@ export class ContentScriptCore extends EventTarget {
   }
 
   async fallbackVueLoad() {
-    logger.warn('Attempting fallback Vue load...');
+    logger.info('Attempting fallback Vue load...');
     // Import and initialize Vue the old way
     const { initializeLegacyHandlers } = await import('./legacy-handlers.js');
     await initializeLegacyHandlers(this);
   }
 
   async fallbackFeaturesLoad() {
-    logger.warn('Attempting fallback features load...');
+    logger.info('Attempting fallback features load...');
     // Initialize features the old way
     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
     const featureManager = FeatureManager.getInstance();
@@ -371,7 +488,7 @@ export class ContentScriptCore extends EventTarget {
 
   async injectMainDOMStyles() {
     if (!this.validateExtensionContext('main-dom-css-injection')) {
-      logger.debug('Extension context validation failed for CSS injection');
+      // logger.trace('Extension context validation failed for CSS injection');
       return;
     }
 
@@ -393,23 +510,33 @@ export class ContentScriptCore extends EventTarget {
 
     try {
       // Use style element with inline CSS
-      logger.debug('Main DOM CSS content check:', {
-        hasCss: !!mainDomCss,
-        cssLength: mainDomCss ? mainDomCss.length : 0,
-        cssPreview: mainDomCss ? mainDomCss.substring(0, 200) + '...' : 'null',
-        hasHighlightRule: mainDomCss ? mainDomCss.includes('translate-it-element-highlighted') : false
-      });
+      // logger.trace('Main DOM CSS content check:', {
+      //   hasCss: !!mainDomCss,
+      //   cssLength: mainDomCss ? mainDomCss.length : 0,
+      //   cssPreview: mainDomCss ? mainDomCss.substring(0, 200) + '...' : 'null',
+      //   hasHighlightRule: mainDomCss ? mainDomCss.includes('translate-it-element-highlighted') : false
+      // });
 
       if (mainDomCss && mainDomCss.includes('translate-it-element-highlighted')) {
         const styleElement = document.createElement('style');
         styleElement.id = 'translate-it-main-dom-styles';
         styleElement.textContent = mainDomCss;
         document.head.appendChild(styleElement);
-        logger.debug('Main DOM styles injected via inline style element');
+        // logger.trace('Main DOM styles injected via inline style element');
       } else {
         logger.error('Main DOM CSS does not contain highlight rules');
       }
     } catch (error) {
+      // Use ErrorHandler for CSS injection errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: 'main-dom-css-injection',
+          isSilent: true, // CSS injection failures are not critical
+          showToast: false
+        });
+      }
+
       logger.error('Failed to inject Main DOM CSS:', error);
     }
   }
@@ -417,7 +544,7 @@ export class ContentScriptCore extends EventTarget {
   validateExtensionContext(operation = 'unknown') {
     if (!ExtensionContextManager || !ExtensionContextManager.isValidSync()) {
       if (logger) {
-        logger.debug(`Extension context invalid - ${operation} skipped`);
+        // logger.trace(`Extension context invalid - ${operation} skipped`);
       }
       return false;
     }
@@ -447,7 +574,7 @@ export class ContentScriptCore extends EventTarget {
   // Cleanup method
   cleanup() {
     if (logger) {
-      logger.debug('Cleaning up ContentScriptCore...');
+      // logger.trace('Cleaning up ContentScriptCore...');
     }
 
     if (this.messageHandler) {
@@ -459,7 +586,7 @@ export class ContentScriptCore extends EventTarget {
     this.initialized = false;
 
     if (logger) {
-      logger.debug('ContentScriptCore cleaned up');
+      logger.info('ContentScriptCore cleaned up');
     }
   }
 }

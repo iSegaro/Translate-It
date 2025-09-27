@@ -167,7 +167,7 @@ class ResourceTracker {
 
       // Log removal in development
       if (shouldEnableDebugging()) {
-        this.logger.debug('Event listener removed:', { event, element: element?.constructor?.name });
+        // this.logger.trace('Event listener removed:', { event, element: element?.constructor?.name });
       }
     } catch (error) {
       this.logger.error('Error removing event listener:', error);

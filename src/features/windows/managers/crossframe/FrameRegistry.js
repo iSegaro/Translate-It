@@ -32,7 +32,7 @@ export class FrameRegistry {
       // Reinitialize if corrupted
       window.translateItFrameRegistry = new Set();
       window.translateItFrameRegistry.add(this.frameId);
-      this.logger.debug('Frame registry was corrupted, reinitialized');
+      this.logger.warn('[FrameRegistry] Registry corrupted, reinitialized');
     }
 
     // Register with parent/top frames if in iframe
@@ -60,9 +60,18 @@ export class FrameRegistry {
         window.top.postMessage(msg, '*');
       }
       
-      this._logXF('Sent translateit-register-frame');
+      this.logger.info(`[FrameRegistry] Registered with parent (frame: ${this.frameId})`);
+      this._logXF('Registration details', {
+        frameId: this.frameId,
+        hasParent: !!window.parent,
+        hasTop: !!(window.top && window.top !== window.parent)
+      });
     } catch (error) {
-      this.logger.warn('Failed to register with parent frames', error);
+      this.logger.warn('[FrameRegistry] Failed to register with parent', {
+        error: error.message,
+        frameId: this.frameId
+      });
+      this._logXF('Parent registration failed', { error: error?.message });
     }
   }
 
@@ -83,12 +92,20 @@ export class FrameRegistry {
       for (const frame of frames) {
         if (frame.contentWindow === event.source) {
           window.translateItFrameMap.set(event.data.frameId, frame);
-          this._logXF('Registered frameId → iframe element', { frameId: event.data.frameId });
+          this.logger.info(`[FrameRegistry] Mapped frame: ${event.data.frameId}`);
+          this._logXF('Frame mapping details', {
+            frameId: event.data.frameId,
+            iframeSrc: frame.src?.substring(0, 100) || 'no src'
+          });
           break;
         }
       }
     } catch (error) {
-      this._logXF('Failed to register frame', { error: error?.message });
+      this.logger.warn('[FrameRegistry] Failed to register frame', {
+        error: error.message,
+        frameId: event.data?.frameId
+      });
+      this._logXF('Frame registration failed', { error: error?.message });
     }
   }
 
@@ -114,20 +131,33 @@ export class FrameRegistry {
    */
   cleanup() {
     try {
+      const totalFrames = window.translateItFrameRegistry?.size || 0;
       if (window.translateItFrameRegistry) {
         window.translateItFrameRegistry.delete(this.frameId);
       }
 
+      let cleanedCount = 0;
       if (!this.isInIframe && window.translateItFrameMap) {
         // Clean up mapping entries that reference this frame
         for (const [id, element] of window.translateItFrameMap.entries()) {
           if (!element.isConnected) {
             window.translateItFrameMap.delete(id);
+            cleanedCount++;
           }
         }
       }
+
+      this.logger.info(`[FrameRegistry] Cleanup completed (removed: ${cleanedCount}, remaining: ${totalFrames - 1})`);
+      this._logXF('Cleanup details', {
+        frameId: this.frameId,
+        totalFramesBefore: totalFrames,
+        disconnectedCleaned: cleanedCount
+      });
     } catch (error) {
-      this.logger.warn('Error cleaning up frame registry', error);
+      this.logger.warn('[FrameRegistry] Error during cleanup', {
+        error: error.message,
+        frameId: this.frameId
+      });
     }
   }
 

@@ -3,6 +3,12 @@
  * Common language detection and text direction functions used across multiple features
  */
 
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'languageUtils')
+
 /**
  * Detect language of text using browser i18n API
  * @param {string} text - Text to detect language for
@@ -15,7 +21,15 @@ export async function detectTextLanguage(text) {
       return result.languages[0].language;
     }
   } catch (error) {
-    console.error("Language detection failed:", error);
+    // Use ErrorHandler for language detection errors
+    const errorHandler = ErrorHandler.getInstance();
+    errorHandler.handle(error, {
+      context: 'language-detection',
+      isSilent: true, // Language detection failures are not critical
+      showToast: false
+    });
+
+    logger.error("Language detection failed:", error);
   }
   return null;
 }

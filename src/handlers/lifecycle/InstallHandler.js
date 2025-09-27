@@ -155,12 +155,12 @@ async function runIncrementalSettingsMigrations() {
     // Apply updates if any
     if (Object.keys(updates).length > 0) {
       await storageManager.set(updates);
-      logger.info('Applied settings migration updates', {
+      logger.debug('Applied settings migration updates', {
         updateCount: Object.keys(updates).length,
         logs
       });
     } else {
-      logger.info('No settings updates needed');
+      logger.debug('No settings updates needed');
     }
 
   } catch (error) {

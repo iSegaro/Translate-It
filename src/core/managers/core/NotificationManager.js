@@ -2,6 +2,8 @@
 
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 /**
  * NotificationManager (v2)
@@ -11,7 +13,8 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
  */
 export default class NotificationManager extends ResourceTracker {
   constructor() {
-    super('notification-manager')
+    super('notification-manager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.NOTIFICATIONS, 'NotificationManager');
   }
   /**
    * Shows a notification.
@@ -26,7 +29,7 @@ export default class NotificationManager extends ResourceTracker {
    */
   show(message, type = 'info', duration = 4000, options = {}) {
     const toastId = `${type}-${Date.now()}`;
-    
+
     const detail = {
       id: toastId,
       message,
@@ -35,6 +38,15 @@ export default class NotificationManager extends ResourceTracker {
       persistent: options.persistent || false,
       actions: options.actions || []
     };
+
+    this.logger.info(`[Notification] Showing ${type} notification: ${message}`);
+    this.logger.debug('Notification details', {
+      id: toastId,
+      type,
+      duration,
+      persistent: options.persistent,
+      hasActions: options.actions?.length > 0
+    });
 
     pageEventBus.emit('show-notification', detail);
 
@@ -46,6 +58,7 @@ export default class NotificationManager extends ResourceTracker {
    * @param {string} toastId The ID of the notification to dismiss.
    */
   dismiss(toastId) {
+    this.logger.info(`[Notification] Dismissing notification: ${toastId}`);
     pageEventBus.emit('dismiss_notification', { id: toastId });
   }
 
@@ -53,6 +66,7 @@ export default class NotificationManager extends ResourceTracker {
    * Dismisses all currently visible notifications.
    */
   dismissAll() {
+    this.logger.info('[Notification] Dismissing all notifications');
     pageEventBus.emit('dismiss_all_notifications');
   }
 

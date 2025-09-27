@@ -3,7 +3,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Note: Direct access to SelectElementManager is no longer available
 // We need to get it via FeatureManager or use alternative approaches
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
+const logger = getScopedLogger(LOG_COMPONENTS.SHORTCUTS, 'RevertShortcut');
 
 /**
  * Get active SelectElementManager via FeatureManager

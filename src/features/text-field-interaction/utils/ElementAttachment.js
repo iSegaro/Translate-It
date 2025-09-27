@@ -33,7 +33,7 @@ export class ElementAttachment extends ResourceTracker {
     // Configuration from config file
     this.updateThrottle = textFieldIconConfig.attachment.updateThrottle;
     
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementAttachment');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'ElementAttachment');
     
     this.logger.debug('ElementAttachment created for icon:', iconId);
   }

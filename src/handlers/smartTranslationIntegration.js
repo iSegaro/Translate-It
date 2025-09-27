@@ -508,7 +508,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
  * @returns {Promise<Object>} Application result
  */
 async function processTranslationToTextField(translatedText, originalText, translationMode, toastId, messageId) {
-  logger.info('Applying translation to text field', {
+  logger.debug('Processing translation to text field', {
     translatedLength: translatedText?.length,
     originalLength: originalText?.length,
     translationMode,

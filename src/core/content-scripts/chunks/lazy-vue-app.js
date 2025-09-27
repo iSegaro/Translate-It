@@ -31,7 +31,7 @@ export async function loadVueApp(contentCore) {
   }
 
   try {
-    logger.init('Loading Vue application...');
+    logger.debug('Loading Vue application...');
 
     // Validate extension context
     if (!ExtensionContextManager.isValidSync()) {

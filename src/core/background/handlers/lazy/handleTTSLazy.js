@@ -20,16 +20,18 @@ async function loadTTSHandlers() {
   const cacheKey = 'tts_handlers';
 
   if (handlerCache.has(cacheKey)) {
-    logger.debug('[TTSLazyHandler] Using cached TTS handlers');
+    // Using cached TTS handlers - logged at TRACE level for detailed debugging
+    // logger.trace('[TTSLazyHandler] Using cached TTS handlers');
     return handlerCache.get(cacheKey);
   }
 
   if (loadingPromises.has(cacheKey)) {
-    logger.debug('[TTSLazyHandler] TTS handlers already loading, waiting...');
+    // TTS handlers already loading - logged at TRACE level for detailed debugging
+    // logger.trace('[TTSLazyHandler] TTS handlers already loading, waiting...');
     return loadingPromises.get(cacheKey);
   }
 
-  logger.debug('[TTSLazyHandler] Loading TTS handlers dynamically...');
+  logger.info('[TTSLazyHandler] Loading TTS handlers dynamically...');
 
   const loadingPromise = Promise.all([
     import('@/features/tts/handlers/handleGoogleTTS.js'),
@@ -43,7 +45,7 @@ async function loadTTSHandlers() {
 
     handlerCache.set(cacheKey, handlers);
     loadingPromises.delete(cacheKey);
-    logger.debug('[TTSLazyHandler] TTS handlers loaded and cached successfully');
+    logger.info('[TTSLazyHandler] TTS handlers loaded and cached successfully');
 
     return handlers;
   }).catch(error => {
@@ -61,11 +63,12 @@ async function loadTTSHandlers() {
  */
 export const handleTTSSpeakLazy = async (message, sender) => {
   try {
-    logger.debug('[TTSLazyHandler] TTS_SPEAK requested, loading handlers...');
+    logger.info('[TTSLazyHandler] TTS_SPEAK requested');
 
     const { handleGoogleTTSSpeak } = await loadTTSHandlers();
 
-    logger.debug('[TTSLazyHandler] Delegating to handleGoogleTTSSpeak');
+    // Delegating to handleGoogleTTSSpeak - logged at TRACE level for detailed debugging
+    // logger.trace('[TTSLazyHandler] Delegating to handleGoogleTTSSpeak');
     return await handleGoogleTTSSpeak(message, sender);
   } catch (error) {
     logger.error('[TTSLazyHandler] Failed to handle TTS_SPEAK:', error);
@@ -84,11 +87,12 @@ export const handleTTSSpeakLazy = async (message, sender) => {
  */
 export const handleOffscreenReadyLazy = async (message, sender) => {
   try {
-    logger.debug('[TTSLazyHandler] OFFSCREEN_READY requested, loading handlers...');
+    logger.info('[TTSLazyHandler] OFFSCREEN_READY requested');
 
     const { handleOffscreenReady } = await loadTTSHandlers();
 
-    logger.debug('[TTSLazyHandler] Delegating to handleOffscreenReady');
+    // Delegating to handleOffscreenReady - logged at TRACE level for detailed debugging
+    // logger.trace('[TTSLazyHandler] Delegating to handleOffscreenReady');
     return await handleOffscreenReady(message, sender);
   } catch (error) {
     logger.error('[TTSLazyHandler] Failed to handle OFFSCREEN_READY:', error);
@@ -107,15 +111,17 @@ export const handleOffscreenReadyLazy = async (message, sender) => {
  */
 export const handleTTSStopLazy = async (message, sender) => {
   try {
-    logger.debug('[TTSLazyHandler] TTS_STOP requested');
+    logger.info('[TTSLazyHandler] TTS_STOP requested');
 
     // For stop actions, use the dedicated stop handler
     if (handlerCache.has('tts_handlers')) {
-      logger.debug('[TTSLazyHandler] Using cached handlers for TTS_STOP');
+      // Using cached handlers for TTS_STOP - logged at TRACE level for detailed debugging
+      // logger.trace('[TTSLazyHandler] Using cached handlers for TTS_STOP');
       const { handleGoogleTTSStopAll } = handlerCache.get('tts_handlers');
       return await handleGoogleTTSStopAll(message, sender);
     } else {
-      logger.debug('[TTSLazyHandler] TTS handlers not loaded, loading for stop...');
+      // TTS handlers not loaded - logged at TRACE level for detailed debugging
+      // logger.trace('[TTSLazyHandler] TTS handlers not loaded, loading for stop...');
       const { handleGoogleTTSStopAll } = await loadTTSHandlers();
       return await handleGoogleTTSStopAll(message, sender);
     }
@@ -146,7 +152,7 @@ export const getTTSHandlerStats = () => {
  * Clear TTS handler cache (for testing/memory management)
  */
 export const clearTTSHandlerCache = () => {
-  logger.debug('[TTSLazyHandler] Clearing TTS handler cache');
+  logger.info('[TTSLazyHandler] Clearing TTS handler cache');
   handlerCache.clear();
   loadingPromises.clear();
 };

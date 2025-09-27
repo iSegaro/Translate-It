@@ -6,7 +6,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'CaptureContent');
 class CaptureContent extends ResourceTracker {
   constructor() {
     super('capture-content')
-    logger.debug("CaptureContent initialized");
+    logger.info("CaptureContent initialized");
   }
 
   async captureScreen() {
@@ -19,7 +19,7 @@ class CaptureContent extends ResourceTracker {
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
     
-    logger.debug('CaptureContent cleanup completed');
+    logger.info('CaptureContent cleanup completed');
   }
 }
 

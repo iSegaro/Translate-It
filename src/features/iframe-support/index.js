@@ -105,7 +105,7 @@ export async function initializeIFrameSupport(options = {}) {
     enableLogging = true
   } = options;
   
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'IFrameSupport');
+  const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'IFrameSupport');
   
   try {
     if (enableLogging) {

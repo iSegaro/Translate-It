@@ -140,12 +140,7 @@ export async function sendRegularMessage(message, options = {}) {
   const { timeout: customTimeout } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action);
 
-  getLogger().debug('Sending regular message to background:', {
-    action: message.action,
-    messageId: message.messageId,
-    context: message.context,
-    timeout: actionTimeout,
-  });
+  getLogger().debug(`📤 Sending ${message.action} to background (${actionTimeout}ms timeout)`);
 
   try {
     if (!ExtensionContextManager.isValidSync()) {
@@ -196,11 +191,7 @@ export async function sendRegularMessage(message, options = {}) {
       throw error;
     }
 
-    getLogger().debug('Regular message response received:', {
-      action: message.action,
-      messageId: message.messageId,
-      success: true,
-    });
+    getLogger().debug(`✅ Regular message response received: ${message.action}`);
 
     return response;
   } catch (error) {

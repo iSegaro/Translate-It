@@ -66,7 +66,8 @@ class MemoryManager {
   initDOMCleanupObserver() {
     // Skip DOM observer initialization in service worker context
     if (isServiceWorker() || !isDOMAvailable() || typeof MutationObserver === 'undefined') {
-      logger.debug('Skipping DOM observer initialization (service worker or DOM not available)')
+      // Skipping DOM observer - logged at TRACE level for detailed debugging
+      // logger.trace('Skipping DOM observer initialization (service worker or DOM not available)')
       return
     }
 
@@ -112,11 +113,12 @@ class MemoryManager {
         subtree: true
       })
     } else {
-      logger.debug('Document not available (running in service worker), skipping DOM observer')
+      // Document not available - logged at TRACE level for detailed debugging
+      // logger.trace('Document not available (running in service worker), skipping DOM observer')
       return
     }
 
-    logger.debug('Shared DOM cleanup observer initialized')
+    logger.info('Shared DOM cleanup observer initialized')
   }
 
   /**
@@ -200,7 +202,8 @@ class MemoryManager {
     // Add element to monitoring set
     if (this.monitoredElements) {
       this.monitoredElements.add(element)
-      logger.debug(`Added element to shared observer monitoring: ${this.getElementDescription(element)}`)
+      // Element added to monitoring - logged at TRACE level for detailed debugging
+      // logger.trace(`Added element to shared observer monitoring: ${this.getElementDescription(element)}`)
     }
   }
 
@@ -215,7 +218,7 @@ class MemoryManager {
     const events = Array.from(elementListeners.keys())
     let totalHandlers = 0
 
-    logger.debug(`Cleaning up ${events.length} event types for removed element: ${this.getElementDescription(element)}`)
+    logger.info(`Cleaning up ${events.length} event types for removed element: ${this.getElementDescription(element)}`)
 
     events.forEach(event => {
       const handlers = elementListeners.get(event)
@@ -237,10 +240,10 @@ class MemoryManager {
         }
       }
       
-      logger.debug(`Cleaned up ${handlerCount} ${event} listeners for element: ${this.getElementDescription(element)}`)
+      // logger.trace(`Cleaned up ${handlerCount} ${event} listeners for element: ${this.getElementDescription(element)}`)
     })
 
-    logger.debug(`Total handlers cleaned for element: ${totalHandlers}`)
+    // logger.trace(`Total handlers cleaned for element: ${totalHandlers}`)
 
     // Remove the element from tracking
     this.eventListeners.delete(element)
@@ -262,7 +265,7 @@ class MemoryManager {
    */
   trackResource(resourceId, cleanupFn, groupId = 'default', options = {}) {
     if (this.resources.has(resourceId)) {
-      logger.debug(`Resource ${resourceId} already tracked`)
+      // logger.trace(`Resource ${resourceId} already tracked`)
       return
     }
 
@@ -319,7 +322,7 @@ class MemoryManager {
       if (elementListeners.has(event)) {
         const eventHandlers = elementListeners.get(event);
         if (this.isHandlerTracked(eventHandlers, handler)) {
-          logger.debug(`Handler already tracked for ${event} on ${this.getElementDescription(element)}`);
+          // logger.trace(`Handler already tracked for ${event} on ${this.getElementDescription(element)}`)
           return;
         }
       }
@@ -337,18 +340,18 @@ class MemoryManager {
 
     // Debug log for critical events
     if (isDevelopment && handlerInfo.isCritical) {
-      logger.debug(`Tracking CRITICAL event listener: ${event} on ${this.getElementDescription(element)}`);
+      logger.info(`Tracking CRITICAL event listener: ${event} on ${this.getElementDescription(element)}`);
     }
 
     // Create cleanup function
     const cleanupFn = () => {
       try {
         // Debug log for all cleanup attempts (FORCE DEBUG FOR TESTING)
-        logger.debug(`Attempting to cleanup event listener: ${event} on ${this.getElementDescription(element)}, isCritical: ${handlerInfo.isCritical}`);
+        // logger.trace(`Attempting to cleanup event listener: ${event} on ${this.getElementDescription(element)}, isCritical: ${handlerInfo.isCritical}`);
 
         // Skip critical event listeners during cleanup
         if (handlerInfo.isCritical) {
-          logger.debug(`Skipping critical event listener: ${event} on ${this.getElementDescription(element)}`);
+          logger.info(`Skipping critical event listener: ${event} on ${this.getElementDescription(element)}`);
           return;
         }
 
@@ -380,7 +383,7 @@ class MemoryManager {
         }
 
         if (isDevelopment) {
-          logger.debug(`Removed event listener: ${event} from ${this.getElementDescription(element)}`);
+          logger.info(`Removed event listener: ${event} from ${this.getElementDescription(element)}`);
           // Update cleanup statistics
           this.eventStats.totalCleaned++;
           if (this.eventStats.byType.has(event)) {
@@ -420,7 +423,7 @@ class MemoryManager {
         this.eventStats.byType.set(event, 0);
       }
       this.eventStats.byType.set(event, this.eventStats.byType.get(event) + 1);
-      logger.debug(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`);
+      logger.info(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`);
     }
   }
 
@@ -453,7 +456,7 @@ class MemoryManager {
       const isCritical = typeof resourceInfo === 'object' ? resourceInfo.isCritical : false;
       
       if (isCritical) {
-        logger.debug(`Skipping critical resource: ${resourceId}`);
+        logger.info(`Skipping critical resource: ${resourceId}`);
         return;
       }
       
@@ -520,7 +523,7 @@ class MemoryManager {
     this.caches.forEach(cache => {
       if (cache.isCritical) {
         if (isDevelopment) {
-          logger.debug('Skipping critical cache during cleanup');
+          // logger.trace('Skipping critical cache during cleanup');
         }
         return;
       }
@@ -650,7 +653,7 @@ class MemoryManager {
     const hasActiveTranslation = translationGroup && translationGroup.size > 0;
     
     if (hasActiveTranslation && isDevelopment) {
-      logger.debug('Translation active, deferring cleanup operations');
+      logger.info('Translation active, deferring cleanup operations');
     }
     
     return hasActiveTranslation;
@@ -664,7 +667,7 @@ class MemoryManager {
 
     // Skip GC during active translation
     if (TRANSLATION_MEMORY.SKIP_CLEANUP_DURING_TRANSLATION && this.isTranslationActive()) {
-      logger.debug('Skipping garbage collection during active translation');
+      logger.info('Skipping garbage collection during active translation');
       return;
     }
 
@@ -821,7 +824,7 @@ class MemoryManager {
       const minutes = Math.floor(this.centralTimerInterval / 60000);
       const seconds = Math.round((this.centralTimerInterval % 60000) / 1000);
       const formattedSeconds = seconds.toString().padStart(2, '0');
-      logger.debug(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
+      logger.info(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
     }
   }
 
@@ -845,14 +848,14 @@ class MemoryManager {
         if (monitor && typeof monitor.performMonitoring === 'function') {
           // Skip cleanup of translation-related managers during active translation
           if (isTranslationActive && monitor.constructor.name === 'SelectElementManager') {
-            logger.debug('Skipping SelectElementManager cleanup during active translation');
+            logger.info('Skipping SelectElementManager cleanup during active translation');
             return;
           }
           monitor.performMonitoring();
         }
       });
 
-      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors (translation active: ${isTranslationActive})`);
+      logger.info(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors (translation active: ${isTranslationActive})`);
     } catch (error) {
       logger.warn('Error during central cleanup:', error);
     }
@@ -866,7 +869,7 @@ class MemoryManager {
     if (cache && typeof cache.cleanup === 'function') {
       this.registeredCaches.add(cache);
       if (shouldEnableDebugging()) {
-        logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
+        // logger.trace(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
       }
     }
   }
@@ -878,7 +881,7 @@ class MemoryManager {
   unregisterCache(cache) {
     this.registeredCaches.delete(cache);
     if (shouldEnableDebugging()) {
-      logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
+      // logger.trace(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
     }
   }
 
@@ -890,7 +893,7 @@ class MemoryManager {
     if (monitor && typeof monitor.performMonitoring === 'function') {
       this.registeredMonitors.add(monitor);
       if (shouldEnableDebugging()) {
-        logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
+        // logger.trace(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
       }
     }
   }
@@ -902,7 +905,7 @@ class MemoryManager {
   unregisterMonitor(monitor) {
     this.registeredMonitors.delete(monitor);
     if (shouldEnableDebugging()) {
-      logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
+      // logger.trace(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
     }
   }
 
@@ -914,7 +917,7 @@ class MemoryManager {
       clearInterval(this.centralTimer);
       this.centralTimer = null;
       if (shouldEnableDebugging()) {
-        logger.debug('Centralized cleanup timer stopped');
+        // logger.trace('Centralized cleanup timer stopped');
       }
     }
   }
@@ -978,7 +981,7 @@ class MemoryManager {
   setThresholds(thresholds) {
     if (!isDevelopment) return;
     this.thresholds = { ...this.thresholds, ...thresholds };
-    logger.debug('Memory thresholds updated', this.thresholds);
+    logger.info('Memory thresholds updated', this.thresholds);
   }
 
   /**
@@ -1034,7 +1037,7 @@ class MemoryManager {
     if (!isDevelopment) return;
     this.stopMonitoring();
     this.measurements = [];
-    logger.debug('Memory monitor destroyed');
+    // logger.trace('Memory monitor destroyed');
   }
 }
 

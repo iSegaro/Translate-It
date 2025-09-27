@@ -46,6 +46,9 @@ export class OpenAIProvider extends BaseAIProvider {
       getOpenAIModelAsync(),
     ]);
 
+    logger.info(`[OpenAI] Using model: ${model || 'gpt-3.5-turbo'}`);
+    logger.info(`[OpenAI] Starting translation: ${text.length} chars`);
+
     // Validate configuration
     this._validateConfig(
       { apiKey, apiUrl },
@@ -76,13 +79,16 @@ export class OpenAIProvider extends BaseAIProvider {
       }),
     };
 
-    return this._executeApiCall({
+    const result = await this._executeApiCall({
       url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
     });
+
+    logger.info(`[OpenAI] Translation completed successfully`);
+    return result;
   }
 
   /**
@@ -109,7 +115,7 @@ export class OpenAIProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    logger.debug('translateImage called with mode:', translateMode);
+    logger.info(`[OpenAI] Starting image translation`);
 
     // Build prompt for screen capture translation
     const basePrompt = await getPromptBASEScreenCaptureAsync();
@@ -162,7 +168,7 @@ export class OpenAIProvider extends BaseAIProvider {
         context: context,
       });
 
-      logger.info('image translation completed with result:', result);
+      logger.info(`[OpenAI] Image translation completed successfully`);
       return result;
     } catch (error) {
       logger.error('image translation failed with error:', error);

@@ -26,7 +26,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const activeHighlights = ref([]);
 const showTooltip = ref(false);
 const tooltipText = ref('Click to translate');
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementHighlightOverlay');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ElementHighlightOverlay');
 
 // Generate unique IDs for highlights
 let highlightCounter = 0;

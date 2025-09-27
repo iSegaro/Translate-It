@@ -4,7 +4,7 @@ import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 import { TranslationHandler as WindowsTranslationHandler } from '@/features/windows/managers/translation/TranslationHandler.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManagerHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsManagerHandler');
 
 /**
  * Handler for managing WindowsManager lifecycle through FeatureManager

@@ -24,11 +24,20 @@ export const LOG_COMPONENTS = {
   TTS: 'TTS',                     // src/features/tts/
   SCREEN_CAPTURE: 'ScreenCapture', // src/features/screen-capture/
   ELEMENT_SELECTION: 'ElementSelection', // src/features/element-selection/
+  TEXT_SELECTION: 'TextSelection', // src/features/text-selection/
   TEXT_ACTIONS: 'TextActions',    // src/features/text-actions/
+  TEXT_FIELD_INTERACTION: 'TextFieldInteraction', // src/features/text-field-interaction/
+  NOTIFICATIONS: 'Notifications', // src/features/notifications/
+  IFRAME: 'IFrame',               // src/features/iframe-support/
+  SHORTCUTS: 'Shortcuts',         // src/features/shortcuts/
+  EXCLUSION: 'Exclusion',         // src/features/exclusion/
   SUBTITLE: 'Subtitle',           // src/features/subtitle/
   HISTORY: 'History',             // src/features/history/
   SETTINGS: 'Settings',           // src/features/settings/
   WINDOWS: 'Windows',             // src/features/windows/
+
+  // Content Applications
+  CONTENT_APP: 'ContentApp',       // src/apps/content/
   
   // سیستم‌های مشترک
   PROXY: 'Proxy',                 // src/shared/proxy/
@@ -43,6 +52,7 @@ export const LOG_COMPONENTS = {
   BROWSER: 'Browser',             // src/utils/browser/
   TEXT: 'Text',                   // src/utils/text/
   FRAMEWORK: 'Framework',         // src/utils/framework/
+  LEGACY: 'Legacy',               // Legacy compatibility code
 
   // Providers (زیرمجموعه Translation)
   PROVIDERS: 'Providers',         // src/features/translation/providers/

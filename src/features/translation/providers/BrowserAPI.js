@@ -231,6 +231,7 @@ export class browserTranslateProvider extends BaseProvider {
   }
 
   async translate(text, sourceLang, targetLang, _translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+    logger.info(`[BrowserAPI] Starting translation: ${text.length} chars`);
     logger.debug(`[BrowserAPI] translate called (ENTRY): ${text?.slice(0, 30)}... | ${sourceLang} → ${targetLang}`);
     // Check API availability first
     if (!this._isAPIAvailable()) {
@@ -344,7 +345,9 @@ export class browserTranslateProvider extends BaseProvider {
             return parts.join("");
           }
         }
-        return translatedResults[0];
+        const finalResult = translatedResults[0];
+        logger.info(`[BrowserAPI] Translation completed successfully`);
+        return finalResult;
       }
     } catch (error) {
       // Enhanced error handling with specific context

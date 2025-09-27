@@ -10,7 +10,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { textFieldIconConfig } from '../config/positioning.js';
 
 export class PositionCalculator {
-  static logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'PositionCalculator');
+  static logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'PositionCalculator');
   
   // Default icon size - from config
   static get DEFAULT_ICON_SIZE() {

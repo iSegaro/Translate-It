@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { settingsManager } from '@/shared/managers/SettingsManager.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SettingsUpdateHandler')
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'SettingsUpdateHandler')
 
 export class SettingsUpdateHandler {
   constructor() {

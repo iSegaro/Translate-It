@@ -28,13 +28,14 @@ class TTSFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[TTSFactory] Loading useTTSSmart...');
+    // Loading useTTSSmart - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSFactory] Loading useTTSSmart...');
 
     const loadingPromise = import('./composables/useTTSSmart.js').then(module => {
       const composable = module.useTTSSmart;
       this.cache.set(cacheKey, composable);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[TTSFactory] useTTSSmart loaded and cached');
+      logger.info('[TTSFactory] useTTSSmart loaded successfully');
       return composable;
     }).catch(error => {
       logger.error('[TTSFactory] Failed to load useTTSSmart:', error);
@@ -60,7 +61,8 @@ class TTSFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[TTSFactory] Loading TTSGlobalManager...');
+    // Loading TTSGlobalManager - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSFactory] Loading TTSGlobalManager...');
 
     const loadingPromise = import('./core/TTSGlobalManager.js').then(module => {
       const result = {
@@ -69,7 +71,7 @@ class TTSFactory {
       };
       this.cache.set(cacheKey, result);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[TTSFactory] TTSGlobalManager loaded and cached');
+      logger.info('[TTSFactory] TTSGlobalManager loaded successfully');
       return result;
     }).catch(error => {
       logger.error('[TTSFactory] Failed to load TTSGlobalManager:', error);
@@ -95,7 +97,8 @@ class TTSFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[TTSFactory] Loading TTS handlers...');
+    // Loading TTS handlers - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSFactory] Loading TTS handlers...');
 
     const loadingPromise = Promise.all([
       import('./handlers/handleGoogleTTS.js'),
@@ -107,7 +110,7 @@ class TTSFactory {
       };
       this.cache.set(cacheKey, result);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[TTSFactory] TTS handlers loaded and cached');
+      logger.info('[TTSFactory] TTS handlers loaded successfully');
       return result;
     }).catch(error => {
       logger.error('[TTSFactory] Failed to load TTS handlers:', error);
@@ -133,13 +136,14 @@ class TTSFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[TTSFactory] Loading Browser API...');
+    // Loading Browser API - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSFactory] Loading Browser API...');
 
     const loadingPromise = import('./core/useBrowserAPI.js').then(module => {
       const result = module.useBrowserAPI;
       this.cache.set(cacheKey, result);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[TTSFactory] Browser API loaded and cached');
+      logger.info('[TTSFactory] Browser API loaded successfully');
       return result;
     }).catch(error => {
       logger.error('[TTSFactory] Failed to load Browser API:', error);
@@ -155,7 +159,8 @@ class TTSFactory {
    * Clear cache for testing or memory management
    */
   clearCache() {
-    logger.debug('[TTSFactory] Clearing TTS cache');
+    // Clearing TTS cache - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSFactory] Clearing TTS cache');
     this.cache.clear();
     this.loadingPromises.clear();
   }

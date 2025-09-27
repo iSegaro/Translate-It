@@ -7,10 +7,10 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-// import { getScopedLogger } from '@/shared/logging/logger.js';
-// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
 export class DeepSeekProvider extends BaseAIProvider {
   static type = "ai";
@@ -44,6 +44,9 @@ export class DeepSeekProvider extends BaseAIProvider {
       getDeepSeekApiModelAsync(),
     ]);
 
+    logger.info(`[DeepSeek] Using model: ${model || 'deepseek-chat'}`);
+    logger.info(`[DeepSeek] Starting translation: ${text.length} chars`);
+
     // Validate configuration
     this._validateConfig(
       { apiKey },
@@ -72,12 +75,15 @@ export class DeepSeekProvider extends BaseAIProvider {
       }),
     };
 
-    return this._executeApiCall({
+    const result = await this._executeApiCall({
       url: CONFIG.DEEPSEEK_API_URL,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
     });
+
+    logger.info(`[DeepSeek] Translation completed successfully`);
+    return result;
   }
 }

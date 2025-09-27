@@ -220,7 +220,7 @@ export class BaseTranslateProvider extends BaseProvider {
         );
 
         processedCount += chunk.texts.length;
-        logger.debug(`[${this.providerName}] Streamed chunk ${chunkIndex + 1}/${chunks.length}, total processed: ${processedCount}/${texts.length}`);
+        // Streamed chunk progress
 
       } catch (error) {
         logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
@@ -239,7 +239,7 @@ export class BaseTranslateProvider extends BaseProvider {
     // Send streaming end notification
     await this._sendStreamEnd(messageId);
     
-    logger.info(`[${this.providerName}] Streaming translation completed: ${allResults.length} texts`);
+    // Streaming translation completed
     return allResults;
   }
 

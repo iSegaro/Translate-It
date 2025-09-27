@@ -151,10 +151,12 @@ export class TranslationOrchestrator extends ResourceTracker {
 
     try {
       const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
-      this.logger.info("Cache separation result:", {
-        textsToTranslate: textsToTranslate,
-        cachedTranslations: Array.from(cachedTranslations.entries()),
-        originalTextsMap: Array.from(originalTextsMap.entries())
+      this.logger.debug("Cache separation result:", {
+        textsToTranslateCount: textsToTranslate.length,
+        cachedTranslationsCount: cachedTranslations.size,
+        totalUniqueTexts: originalTextsMap.size,
+        sampleTextsToTranslate: textsToTranslate.slice(0, 3).map(text => text.substring(0, 50) + (text.length > 50 ? '...' : '')),
+        cachedRatio: cachedTranslations.size / originalTextsMap.size
       });
 
       if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
@@ -640,12 +642,14 @@ this.translationRequests.delete(messageId);
         }
 
         this.logger.debug("Looking for nodes to update:", {
-            originalText: originalText,
-            translatedText: translatedText,
-            textNodesContents: textNodes.map(n => n.textContent.trim()),
+            originalTextLength: originalText.length,
+            translatedTextLength: translatedText.length,
+            textNodesCount: textNodes.length,
             foundNodes: nodesToUpdate.length,
             usedPartialMatch: nodesToUpdate.length > 0 && textNodes.filter(node => node.textContent.trim() === originalText.trim()).length === 0,
-            isMultiSegment
+            isMultiSegment,
+            originalTextPreview: originalText.substring(0, 50) + (originalText.length > 50 ? '...' : ''),
+            translatedTextPreview: translatedText.substring(0, 50) + (translatedText.length > 50 ? '...' : '')
         });
 
         if (nodesToUpdate.length > 0) {
@@ -688,10 +692,12 @@ this.translationRequests.delete(messageId);
                 });
 
                 this.logger.debug("Built translation map for multi-segment wrapper approach:", {
-                    originalText: originalTextKey,
-                    combinedTranslation,
+                    originalTextLength: originalTextKey.length,
+                    combinedTranslationLength: combinedTranslation.length,
                     segments: allSegments.length,
-                    nodeCount: nodesToUpdate.length
+                    nodeCount: nodesToUpdate.length,
+                    originalTextPreview: originalTextKey.substring(0, 50) + (originalTextKey.length > 50 ? '...' : ''),
+                    combinedTranslationPreview: combinedTranslation.substring(0, 50) + (combinedTranslation.length > 50 ? '...' : '')
                 });
 
                 this.applyTranslationsToNodes(nodesToUpdate, translationMap);
@@ -719,10 +725,11 @@ this.translationRequests.delete(messageId);
                 });
 
                 this.logger.debug("Built translation map for wrapper approach:", {
-                    originalText,
-                    translatedText,
+                    originalTextLength: originalText.length,
+                    translatedTextLength: translatedText.length,
                     nodeCount: nodesToUpdate.length,
-                    mapEntries: Array.from(translationMap.entries()).slice(0, 3)
+                    originalTextPreview: originalText.substring(0, 50) + (originalText.length > 50 ? '...' : ''),
+                    translatedTextPreview: translatedText.substring(0, 50) + (translatedText.length > 50 ? '...' : '')
                 });
 
                 this.applyTranslationsToNodes(nodesToUpdate, translationMap);
@@ -991,7 +998,7 @@ this.translationRequests.delete(messageId);
     this.logger.debug("Applying translations directly to DOM nodes", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
-      translations: Array.from(translations.entries())
+      sampleTranslations: Array.from(translations.entries()).slice(0, 3).map(([key, value]) => [key.substring(0, 50) + (key.length > 50 ? '...' : ''), value.substring(0, 50) + (value.length > 50 ? '...' : '')])
     });
 
     // Get target language for better RTL detection

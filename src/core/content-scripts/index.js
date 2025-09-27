@@ -33,9 +33,45 @@ const FEATURE_CATEGORIES = {
   ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 
+// Import logging utilities
+let logger = null;
+let getScopedLogger = null;
+let LOG_COMPONENTS = null;
+let ErrorHandler = null;
+
+// Lazy load logging and error handling dependencies
+async function initializeLogger() {
+  if (logger) return logger;
+
+  try {
+    const [{ getScopedLogger: scopedLogger }, { LOG_COMPONENTS: logComponents }, { ErrorHandler: errorHandler }] = await Promise.all([
+      import('@/shared/logging/logger.js'),
+      import('@/shared/logging/logConstants.js'),
+      import('@/shared/error-management/ErrorHandler.js')
+    ]);
+
+    getScopedLogger = scopedLogger;
+    LOG_COMPONENTS = logComponents;
+    ErrorHandler = errorHandler;
+    logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
+    return logger;
+  } catch (error) {
+    // Fallback logger - direct console calls will be filtered through logging system later
+    return {
+      debug: () => {},
+      info: (...args) => console.log('[ContentScriptIndex]', ...args),
+      warn: (...args) => console.warn('[ContentScriptIndex]', ...args),
+      error: (...args) => console.error('[ContentScriptIndex]', ...args)
+    };
+  }
+}
+
 // Initialize the content script with ultra-minimal footprint
 (async () => {
   try {
+    // Initialize logger first
+    const scriptLogger = await initializeLogger();
+
     // Dynamically import ContentScriptCore for code splitting
     const { contentScriptCore: core } = await import('./ContentScriptCore.js');
     contentScriptCore = core;
@@ -55,7 +91,7 @@ const FEATURE_CATEGORIES = {
 
       // Debug info
       if (process.env.NODE_ENV === 'development') {
-        console.log('Translate It: Ultra-optimized content script initialized', {
+        scriptLogger.info('Ultra-optimized content script initialized', {
           mode: 'smart-loading',
           critical: true,
           memory: 'minimal'
@@ -63,7 +99,23 @@ const FEATURE_CATEGORIES = {
       }
     }
   } catch (error) {
-    console.error('Failed to initialize content script:', error);
+    // Use ErrorHandler for critical initialization errors
+    if (ErrorHandler) {
+      const errorHandler = ErrorHandler.getInstance();
+      await errorHandler.handle(error, {
+        context: 'content-script-index-initialization',
+        isSilent: false,
+        showToast: true
+      });
+    }
+
+    // Try to get logger for proper error handling, fallback to console if not available
+    const errorLogger = await initializeLogger();
+    errorLogger.error('Failed to initialize content script', {
+      error: error.message || error,
+      stack: error.stack,
+      url: window.location.href
+    });
   }
 })();
 
@@ -169,11 +221,28 @@ async function loadFeature(featureName, category) {
         await contentScriptCore.loadFeature(featureName);
 
         if (process.env.NODE_ENV === 'development') {
-          console.log(`📦 Loaded feature: ${featureName} (${category})`);
+          const featureLogger = await initializeLogger();
+          featureLogger.debug(`Loaded feature: ${featureName} (${category})`);
         }
       }
     } catch (error) {
-      console.warn(`Failed to load feature ${featureName}:`, error);
+      // Use ErrorHandler for feature loading errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: `feature-loading-${featureName}`,
+          isSilent: true, // Feature loading failures should not interrupt user
+          showToast: false
+        });
+      }
+
+      const errorLogger = await initializeLogger();
+      errorLogger.warn(`Failed to load feature ${featureName}`, {
+        error: error.message || error,
+        category,
+        featureName,
+        stack: error.stack
+      });
     }
   })();
 

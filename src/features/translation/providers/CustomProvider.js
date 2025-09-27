@@ -7,10 +7,10 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-// import { getScopedLogger } from '@/shared/logging/logger.js';
-// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'CustomProvider');
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'CustomProvider');
 
 export class CustomProvider extends BaseAIProvider {
   static type = "ai";
@@ -45,6 +45,9 @@ export class CustomProvider extends BaseAIProvider {
       getCustomApiModelAsync(),
     ]);
 
+    logger.info(`[Custom] Using model: ${model}`);
+    logger.info(`[Custom] Starting translation: ${text.length} chars`);
+
     // Validate configuration
     this._validateConfig(
       { apiUrl, apiKey },
@@ -72,12 +75,15 @@ export class CustomProvider extends BaseAIProvider {
       }),
     };
 
-    return this._executeApiCall({
+    const result = await this._executeApiCall({
       url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
     });
+
+    logger.info(`[Custom] Translation completed successfully`);
+    return result;
   }
 }

@@ -81,7 +81,7 @@ import { getSelectElementNotificationManager } from '@/features/element-selectio
 
 const pageEventBus = window.pageEventBus;
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentApp');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
 // Use WindowsManager composable
 const {
@@ -143,17 +143,13 @@ const setupOutsideClickHandler = () => {
   // translation windows to close when clicked inside them.
 };
 
-logger.info('ContentApp script setup executed.');
+logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
-  
-  logger.info(`ContentApp component has been mounted into the Shadow DOM (${executionMode})`, {
-    isInIframe,
-    frameLocation: window.location.href,
-    hasPageEventBus: !!window.pageEventBus
-  });
+
+  logger.info(`ContentApp mounted in ${executionMode} mode`);
   
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
@@ -193,7 +189,7 @@ onMounted(async () => {
         }, 1000); // 1 second debounce
       }
     });
-    logger.debug('ToastIntegration initialized successfully');
+    // ToastIntegration initialized successfully
   } catch (error) {
     logger.warn('ToastIntegration initialization failed:', error);
     // Continue without toast integration if it fails
@@ -203,7 +199,7 @@ onMounted(async () => {
   try {
     const notificationManager = new NotificationManager();
     selectElementNotificationManager = await getSelectElementNotificationManager(notificationManager);
-    logger.debug('SelectElementNotificationManager initialized successfully');
+    // SelectElementNotificationManager initialized successfully
   } catch (error) {
     logger.warn('Failed to initialize SelectElementNotificationManager:', error);
   }
@@ -350,7 +346,6 @@ onMounted(async () => {
   // Listen for TextFieldIcon events
   tracker.addEventListener(pageEventBus, 'add-field-icon', (detail) => {
     logger.info('Event: add-field-icon', detail);
-    console.log('ContentApp: Adding field icon', detail);
     // Ensure no duplicate icons for the same ID
     if (!activeIcons.value.some(icon => icon.id === detail.id)) {
       activeIcons.value.push({
@@ -360,7 +355,7 @@ onMounted(async () => {
         targetElement: detail.targetElement,
         attachmentMode: detail.attachmentMode || 'smart'
       });
-      console.log('ContentApp: Active icons after adding:', activeIcons.value);
+      logger.debug('Active icons after adding:', activeIcons.value);
     }
   });
 
