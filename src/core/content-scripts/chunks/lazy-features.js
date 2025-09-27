@@ -433,7 +433,11 @@ const FEATURE_MAPPING = {
   shortcut: async () => await loadFeature('shortcut'),
   textFieldIcon: async () => await loadFeature('textFieldIcon'),
   vue: async () => {
-    // Vue is handled separately by ContentScriptCore
+    // Load Vue app through ContentScriptCore
+    if (window.translateItContentCore && window.translateItContentCore.loadVueApp) {
+      await window.translateItContentCore.loadVueApp();
+      return window.translateItContentCore.vueLoaded;
+    }
     return null;
   }
 };
@@ -459,9 +463,9 @@ export async function loadFeatureOnDemand(featureName) {
 // Feature categories (should match index.js)
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'],
-  ESSENTIAL: ['textSelection', 'contentMessageHandler'],
-  INTERACTIVE: ['windowsManager', 'selectElement'],
-  ON_DEMAND: ['shortcut', 'textFieldIcon', 'vue']
+  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler'],
+  INTERACTIVE: ['selectElement'],
+  ON_DEMAND: ['shortcut', 'textFieldIcon']
 };
 
 // Load multiple features by category

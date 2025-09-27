@@ -28,9 +28,9 @@ const LOAD_STRATEGIES = {
 // Feature categorization
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
-  ESSENTIAL: ['textSelection', 'windowsManager', 'contentMessageHandler'], // Core translation features
-  INTERACTIVE: ['selectElement'], // UI interaction features
-  ON_DEMAND: ['shortcut', 'textFieldIcon', 'vue'] // Optional features
+  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core translation features
+  INTERACTIVE: [], // UI interaction features
+  ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 
 // Initialize the content script with ultra-minimal footprint
@@ -78,11 +78,7 @@ function setupSmartListeners() {
   // Text selection interaction
   document.addEventListener('mouseup', handleTextSelection, { passive: true });
 
-  // Right-click (context menu)
-  document.addEventListener('contextmenu', () => {
-    loadFeature('selectElement', 'INTERACTIVE');
-  }, { once: true });
-
+  
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardInteraction, { passive: true });
 

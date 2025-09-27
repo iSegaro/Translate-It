@@ -96,7 +96,7 @@ export class ContentScriptCore extends EventTarget {
       if (!this.isInIframe()) {
         await this.injectMainDOMStyles();
       }
-
+      
       this.initialized = true;
       logger.info('ContentScriptCore initialized successfully');
 
@@ -146,6 +146,11 @@ export class ContentScriptCore extends EventTarget {
 
       // Initialize only essential messaging
       await this.initializeCriticalMessaging();
+
+      // Inject critical CSS for all features that need it if in main frame
+      if (!this.isInIframe()) {
+        await this.injectMainDOMStyles();
+      }
 
       this.initialized = true;
 
@@ -348,22 +353,37 @@ export class ContentScriptCore extends EventTarget {
 
   async injectMainDOMStyles() {
     if (!this.validateExtensionContext('main-dom-css-injection')) {
+      logger.debug('Extension context validation failed for CSS injection');
       return;
     }
 
-    // Check if already injected
-    if (document.getElementById('translate-it-main-dom-styles')) {
-      return;
+    // Check if already injected and working
+    const existingStyle = document.getElementById('translate-it-main-dom-styles');
+
+    if (existingStyle) {
+      // Verify the CSS is actually working by checking if variables are defined
+      const rootStyles = getComputedStyle(document.documentElement);
+      const highlightColor = rootStyles.getPropertyValue('--translate-highlight-color');
+
+      if (highlightColor && highlightColor.trim() !== '') {
+        return; // CSS is already working
+      }
+
+      // CSS exists but variables are not defined, remove and re-inject
+      existingStyle.remove();
     }
 
     try {
-      const styleElement = document.createElement('style');
-      styleElement.id = 'translate-it-main-dom-styles';
-      styleElement.textContent = mainDomCss;
-
-      document.head.appendChild(styleElement);
-      logger.debug('Main DOM styles injected');
-
+      // Use style element with inline CSS
+      if (mainDomCss && mainDomCss.includes('translate-it-element-highlighted')) {
+        const styleElement = document.createElement('style');
+        styleElement.id = 'translate-it-main-dom-styles';
+        styleElement.textContent = mainDomCss;
+        document.head.appendChild(styleElement);
+        logger.debug('Main DOM styles injected via inline style element');
+      } else {
+        logger.error('Main DOM CSS does not contain highlight rules');
+      }
     } catch (error) {
       logger.error('Failed to inject Main DOM CSS:', error);
     }
