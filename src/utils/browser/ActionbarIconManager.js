@@ -56,8 +56,9 @@ class ActionbarIconManager {
 
       // Listen for provider changes using tracked event listener
       this.resourceTracker.addEventListener(storageManager, 'change', async (changes) => {
-        if (changes.TRANSLATION_API && changes.TRANSLATION_API.newValue !== this.currentProvider) {
-          this.currentProvider = changes.TRANSLATION_API.newValue;
+        // StorageCore emits change events as { key, newValue, oldValue }
+        if (changes.key === 'TRANSLATION_API' && changes.newValue !== this.currentProvider) {
+          this.currentProvider = changes.newValue;
           await this.updateIcon(this.currentProvider);
         }
       });
