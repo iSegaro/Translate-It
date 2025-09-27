@@ -349,7 +349,23 @@ export class WindowsManager extends ResourceTracker {
     
     // Outside click handling is now managed by ClickManager
     // this._addDismissListener(); // Removed - duplicate handling
-    
+
+    // Add outside click listener with delay for iframe support
+    setTimeout(() => {
+      if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
+        this.clickManager.addOutsideClickListener();
+
+        // Notify iframes to activate their click listeners
+        if (this.crossFrameManager && !this.crossFrameManager.isInIframe) {
+          this.crossFrameManager.messageRouter._broadcastToAllIframes({
+            type: 'translateit-activate-click-listeners',
+            frameId: this.crossFrameManager.frameId,
+            timestamp: Date.now()
+          });
+        }
+      }
+    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+
     this.logger.info('Translation icon created successfully', { iconId });
   }
 
@@ -654,7 +670,23 @@ export class WindowsManager extends ResourceTracker {
     this.state.setTranslationCancelled(false);
     this.state.setIconMode(false);
     this.state.setVisible(true);
-    
+
+    // Add outside click listener with delay for iframe support
+    setTimeout(() => {
+      if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
+        this.clickManager.addOutsideClickListener();
+
+        // Notify iframes to activate their click listeners
+        if (this.crossFrameManager && !this.crossFrameManager.isInIframe) {
+          this.crossFrameManager.messageRouter._broadcastToAllIframes({
+            type: 'translateit-activate-click-listeners',
+            frameId: this.crossFrameManager.frameId,
+            timestamp: Date.now()
+          });
+        }
+      }
+    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+
     this.logger.info('Translation window created successfully', { windowId });
 
     // PHASE 2: Perform translation and update window
@@ -815,17 +847,7 @@ export class WindowsManager extends ResourceTracker {
     // Additional interaction setup can be added here
   }
 
-  /**
-   * Add outside click listener with delay
-   */
-  _addOutsideClickListenerDelayed() {
-    setTimeout(() => {
-      if (this.state.isVisible && !this.state.pendingTranslationWindow) {
-        this.clickManager.addOutsideClickListener();
-      }
-    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
-  }
-
+  
   /**
    * Handle cross-frame outside click
    */
