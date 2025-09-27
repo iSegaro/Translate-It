@@ -8,6 +8,8 @@
         :disabled="isActivating"
         :class="{ 'ti-active': isSelectModeActive }"
         @click="handleSelectElement"
+        @keydown.enter.prevent="handleSelectElement"
+        @keydown.space.prevent="handleSelectElement"
       >
         <img
           :src="selectIcon"
@@ -20,6 +22,8 @@
         class="toolbar-button"
         :title="t('SIDEPANEL_REVERT_TOOLTIP')"
         @click="handleRevertAction"
+        @keydown.enter.prevent="handleRevertAction"
+        @keydown.space.prevent="handleRevertAction"
       >
         <img
           :src="revertIcon"
@@ -32,6 +36,8 @@
         class="toolbar-button"
         :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON')"
         @click="handleClearFields"
+        @keydown.enter.prevent="handleClearFields"
+        @keydown.space.prevent="handleClearFields"
       >
         <img
           :src="clearIcon"
@@ -52,6 +58,8 @@
         :title="t('SIDEPANEL_HISTORY_TOOLTIP')"
         :class="{ 'ti-active': isHistoryVisible }"
         @click="handleHistoryClick"
+        @keydown.enter.prevent="handleHistoryClick"
+        @keydown.space.prevent="handleHistoryClick"
       >
         <img
           src="@/icons/ui/history.svg"
@@ -66,6 +74,8 @@
         class="toolbar-button"
         :title="t('SIDEPANEL_SETTINGS_TITLE_ICON')"
         @click="handleSettingsClick"
+        @keydown.enter.prevent="handleSettingsClick"
+        @keydown.space.prevent="handleSettingsClick"
       >
         <img
           :src="settingsIcon"
@@ -195,7 +205,6 @@ const handleProviderChange = (provider) => {
 }
 
 const handleHistoryClick = () => {
-  getLogger().debug('📜 History button clicked! Current visibility:', props.isHistoryVisible, '→', !props.isHistoryVisible)
   emit('historyToggle', !props.isHistoryVisible)
   showVisualFeedback(document.getElementById('historyBtn'), 'success', 300)
 }
@@ -263,16 +272,20 @@ const handleSettingsClick = async () => {
     background-color: var(--color-background);
   }
 
-  &.ti-active {
-    background-color: var(--color-primary);
+  &.ti-active,
+  &.ti-active:focus,
+  &.ti-active:focus:not(:active) {
+    background-color: var(--color-primary) !important;
+  }
 
-    /* Removed nested .toolbar-icon - now handled by global sidepanel styles with higher specificity */
+  &:not(.ti-active):focus:not(:active) {
+    background-color: transparent;
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    
+
     &:hover {
       background-color: transparent;
     }

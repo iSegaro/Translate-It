@@ -10,6 +10,8 @@
         id="closeHistoryBtn"
         class="close-btn"
         @click="handleClose"
+        @keydown.enter.prevent="handleClose"
+        @keydown.space.prevent="handleClose"
       >
         ✕
       </button>
@@ -211,11 +213,12 @@ const formattedHistoryItems = computed(() => {
 // Handle close button click
 const handleClose = () => {
   isClosing.value = true
-  
-  // Emit update:isVisible to sync with parent (SidepanelLayout)
+
+  // Emit both events to ensure proper closing
   emit('update:isVisible', false)
-  logger.debug('[SidepanelHistory] handleClose: Emitting update:isVisible(false)')
-  
+  emit('close')
+
+  // Set isClosing back to false after animation
   setTimeout(() => {
     isClosing.value = false
   }, 300)
@@ -346,12 +349,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
-  transition: transform $transition-slow;
+  transition: transform $transition-slow, visibility $transition-slow, opacity $transition-slow;
   z-index: 100;
+  visibility: hidden;
+  opacity: 0;
 }
 
 .history-panel.ti-active {
   transform: translateX(0);
+  visibility: visible;
+  opacity: 1;
 }
 
 .history-header {
