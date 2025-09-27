@@ -269,7 +269,8 @@ const loadingGifUrl = computed(() => {
 const windowStyle = computed(() => {
   return {
     ...positionStyle.value
-    // All width, height, minWidth, minHeight, borderRadius now handled by CSS classes
+    // All positioning, display, and visibility handled by global CSS
+    // All width, height, minWidth, minHeight, borderRadius handled by CSS classes
   };
 });
 
