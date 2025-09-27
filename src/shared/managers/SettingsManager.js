@@ -179,7 +179,7 @@ class SettingsManager {
    */
   getSettings() {
     if (!this._initialized) {
-      getLogger().warn('SettingsManager not initialized, returning empty object')
+      getLogger().debug('SettingsManager not initialized, returning empty object')
       return ref({})
     }
 
@@ -191,7 +191,7 @@ class SettingsManager {
    */
   get(key, defaultValue = undefined) {
     if (!this._initialized) {
-      getLogger().warn(`SettingsManager not initialized, returning default for ${key}`)
+      getLogger().debug(`SettingsManager not initialized, returning default for ${key}`)
       return defaultValue
     }
 
@@ -362,7 +362,7 @@ class SettingsManager {
    */
   computed(key, defaultValue = undefined) {
     if (!this._initialized) {
-      getLogger().warn('SettingsManager not initialized for computed property')
+      getLogger().debug('SettingsManager not initialized for computed property')
       return computed(() => defaultValue)
     }
 
