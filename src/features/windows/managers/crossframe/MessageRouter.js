@@ -144,10 +144,17 @@ export class MessageRouter {
    */
   _handleOutsideClick(event) {
     // Don't process our own messages
-    if (event.data.frameId === this.frameRegistry.frameId || 
+    if (event.data.frameId === this.frameRegistry.frameId ||
         event.data.forwardedFrom === this.frameRegistry.frameId) {
       return;
     }
+
+    this.logger.debug('[MessageRouter] Received outside click message', {
+      sourceFrameId: event.data.frameId,
+      isInIframe: event.data.isInIframe,
+      targetFrame: event.data.targetFrame,
+      forwardedFrom: event.data.forwardedFrom
+    });
 
     // Forward from main document to other iframes
     if (!this.frameRegistry.isInIframe && event.data.isInIframe && !event.data.forwardedFrom) {

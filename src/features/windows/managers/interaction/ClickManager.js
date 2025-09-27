@@ -49,13 +49,14 @@ export class ClickManager extends ResourceTracker {
     this.addEventListener(document, "click", this._handleOutsideClick, { capture: true });
 
     // Enable cross-frame broadcasting
+    this.logger.debug('Enabling cross-frame click broadcasting');
     this.crossFrameManager.enableGlobalClickBroadcast();
     this.crossFrameManager.requestGlobalClickRelay(true);
 
     // Store removal function for cross-frame cleanup
     this.removeMouseDownListener = () => {
       // ResourceTracker will handle event listener cleanup automatically
-      
+
       // Disable cross-frame broadcasting if no active elements
       if (!this.state.hasActiveElements) {
         this.crossFrameManager.disableGlobalClickBroadcast();
@@ -63,7 +64,11 @@ export class ClickManager extends ResourceTracker {
       }
     };
 
-    this.logger.debug('Outside click listener added');
+    this.logger.debug('Outside click listener added', {
+      isInIframe: this.crossFrameManager.isInIframe,
+      frameId: this.crossFrameManager.frameId,
+      hasActiveElements: this.state.hasActiveElements
+    });
   }
 
   /**
