@@ -9,6 +9,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
@@ -80,7 +81,7 @@ class LifecycleManager {
 
   async initializeDynamicIconManager() {
     logger.debug('Initializing ActionbarIconManager...');
-    const { getActionbarIconManager } = await import('@/utils/browser/ActionbarIconManager.js');
+    const { getActionbarIconManager } = await utilsFactory.getBrowserUtils();
     this.dynamicIconManager = await getActionbarIconManager();
     logger.debug('ActionbarIconManager initialized');
   }

@@ -1,8 +1,8 @@
 // s../error-management/ErrorMessages.js
 
-import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 
 export const errorMessages = {
   // Validation errors
@@ -80,20 +80,23 @@ export async function getErrorMessage(type, skipI18n = false) {
   if (skipI18n || ExtensionContextManager.isContextError({ message: type })) {
     return ExtensionContextManager.getContextErrorMessage(type, errorMessages);
   }
-  
+
   try {
     // Use ExtensionContextManager for safe i18n operations
     const translationKey = type?.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
-    
+
+    // Get i18n utils from factory
+    const { getTranslationString } = await utilsFactory.getI18nUtils();
+
     const msg = await ExtensionContextManager.safeI18nOperation(
       () => getTranslationString(translationKey),
       `getErrorMessage-${type}`,
       errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]
     );
-    
+
     // Return the result (either translated string or fallback)
     return msg && msg.trim() ? msg : (errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]);
-    
+
   } catch {
     // If i18n fails (e.g., extension context invalidated), fall back to English
     return errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];

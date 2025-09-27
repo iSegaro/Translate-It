@@ -262,7 +262,8 @@ class UtilsFactory {
       ...platformUtils,
       ...eventsUtils,
       ...compatibilityUtils,
-      ActionbarIconManager: iconManagerModule.default || iconManagerModule.ActionbarIconManager
+      ActionbarIconManager: iconManagerModule.default || iconManagerModule.ActionbarIconManager,
+      getActionbarIconManager: iconManagerModule.getActionbarIconManager
     };
   }
 
