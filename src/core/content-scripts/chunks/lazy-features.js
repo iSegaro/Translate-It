@@ -348,6 +348,17 @@ export async function loadCoreFeatures() {
   // Ensure global reference exists
   console.log('[FeatureManager] 📍 Current window.featureManager before loading:', window.featureManager);
 
+  // Initialize SettingsManager before loading features to avoid "not initialized" warnings
+  try {
+    console.log('[FeatureManager] 📋 Initializing SettingsManager...');
+    const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
+    await SettingsManager.initialize();
+    console.log('[FeatureManager] ✅ SettingsManager initialized successfully');
+  } catch (error) {
+    console.warn('[FeatureManager] ⚠️ Failed to initialize SettingsManager:', error);
+    // Don't fail feature loading if SettingsManager fails
+  }
+
   try {
     // Try to get ErrorHandler for better error handling
     const handler = await getErrorHandler();
