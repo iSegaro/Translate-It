@@ -75,8 +75,16 @@ class LifecycleManager {
   }
 
   async initializeTranslationEngine() {
-    this.translationEngine = new TranslationEngine();
-    await this.translationEngine.initialize();
+    try {
+      logger.debug('🔧 [LifecycleManager] Creating TranslationEngine...');
+      this.translationEngine = new TranslationEngine();
+      logger.debug('🔧 [LifecycleManager] Initializing TranslationEngine...');
+      await this.translationEngine.initialize();
+      logger.debug('✅ [LifecycleManager] TranslationEngine initialized successfully');
+    } catch (error) {
+      logger.error('❌ [LifecycleManager] Failed to initialize TranslationEngine:', error);
+      throw error;
+    }
   }
 
   async initializeDynamicIconManager() {

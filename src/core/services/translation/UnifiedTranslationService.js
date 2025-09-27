@@ -54,6 +54,29 @@ export class UnifiedTranslationService {
     const { messageId, data } = message;
 
     logger.info(`[UnifiedService] Processing translation request: ${messageId}`);
+    logger.debug(`[UnifiedService] Translation engine available: ${!!this.translationEngine}`);
+    logger.debug(`[UnifiedService] Background service available: ${!!this.backgroundService}`);
+
+    // Check if service is initialized
+    if (!this.translationEngine || !this.backgroundService) {
+      logger.warn(`[UnifiedService] Service not fully initialized. Engine: ${!!this.translationEngine}, Background: ${!!this.backgroundService}`);
+
+      // Try to get dependencies from global scope
+      if (!this.translationEngine && globalThis.backgroundService?.translationEngine) {
+        logger.debug(`[UnifiedService] Getting translation engine from global backgroundService`);
+        this.translationEngine = globalThis.backgroundService.translationEngine;
+      }
+
+      if (!this.backgroundService && globalThis.backgroundService) {
+        logger.debug(`[UnifiedService] Getting background service from global scope`);
+        this.backgroundService = globalThis.backgroundService;
+      }
+
+      // If still not available, throw error
+      if (!this.translationEngine || !this.backgroundService) {
+        throw new Error('Translation service not initialized. Please try again.');
+      }
+    }
 
     try {
       // Validate message
