@@ -76,6 +76,8 @@ import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 
 const pageEventBus = window.pageEventBus;
 
@@ -97,6 +99,9 @@ useResourceTracker('content-app')
 
 // Toast integration
 let toastIntegration = null;
+
+// SelectElement Notification Manager
+let selectElementNotificationManager = null;
 
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
@@ -140,7 +145,7 @@ const setupOutsideClickHandler = () => {
 
 logger.info('ContentApp script setup executed.');
 
-onMounted(() => {
+onMounted(async () => {
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
   
@@ -192,6 +197,15 @@ onMounted(() => {
   } catch (error) {
     logger.warn('ToastIntegration initialization failed:', error);
     // Continue without toast integration if it fails
+  }
+
+  // Initialize SelectElement Notification Manager
+  try {
+    const notificationManager = new NotificationManager();
+    selectElementNotificationManager = await getSelectElementNotificationManager(notificationManager);
+    logger.debug('SelectElementNotificationManager initialized successfully');
+  } catch (error) {
+    logger.warn('Failed to initialize SelectElementNotificationManager:', error);
   }
 
   const toastMap = {
@@ -435,7 +449,7 @@ onMounted(() => {
   });
 });
 
-onUnmounted(() => {
+onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
   
   // Clear cancel timeout if exists
@@ -451,6 +465,18 @@ onUnmounted(() => {
     }
   } catch (error) {
     logger.warn('Error shutting down ToastIntegration:', error);
+  }
+
+  // Cleanup SelectElement Notification Manager
+  try {
+    if (selectElementNotificationManager) {
+      await selectElementNotificationManager.cleanup();
+      // Clear the singleton instance
+      const { SelectElementNotificationManager } = await import('@/features/element-selection/SelectElementNotificationManager.js');
+      SelectElementNotificationManager.clearInstance();
+    }
+  } catch (error) {
+    logger.warn('Error cleaning up SelectElementNotificationManager:', error);
   }
   
     
