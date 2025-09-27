@@ -214,17 +214,36 @@ export class ContentScriptCore extends EventTarget {
     try {
       logger.debug('Loading features lazily...');
 
-      // Load FeatureManager and all features
-      const { loadFeatures } = await import('./chunks/lazy-features.js');
-      await loadFeatures(this);
+      // Load only core features initially
+      const { loadCoreFeatures } = await import('./chunks/lazy-features.js');
+      await loadCoreFeatures();
 
       this.featuresLoaded = true;
       this.dispatchEvent(new CustomEvent('features-loaded'));
-      logger.info('Features loaded successfully');
+      logger.info('Core features loaded successfully');
 
     } catch (error) {
-      logger.error('Failed to load features:', error);
+      logger.error('Failed to load core features:', error);
       await this.fallbackFeaturesLoad();
+    }
+  }
+
+  async loadFeature(featureName) {
+    try {
+      const { loadFeatureOnDemand } = await import('./chunks/lazy-features.js');
+      return await loadFeatureOnDemand(featureName);
+    } catch (error) {
+      logger.error(`Failed to load feature ${featureName}:`, error);
+      return null;
+    }
+  }
+
+  getFeature(featureName) {
+    try {
+      const { getFeature } = require('./chunks/lazy-features.js');
+      return getFeature(featureName);
+    } catch {
+      return null;
     }
   }
 

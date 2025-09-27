@@ -5,11 +5,11 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+// ErrorHandler will be imported dynamically when needed
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
+// createMessageHandler will be imported dynamically when needed
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -31,7 +31,31 @@ export class ContentMessageHandler extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageHandler');
     this.selectElementManager = null;
     this.iFrameManager = null;
-    this.errorHandler = ErrorHandler.getInstance();
+
+    // Initialize error handler lazily when needed
+    this._errorHandler = null;
+
+    // Add getter for errorHandler
+    Object.defineProperty(this, 'errorHandler', {
+      get: async function() {
+        if (!this._errorHandler) {
+          try {
+            const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+            this._errorHandler = ErrorHandler.getInstance();
+          } catch (error) {
+            // Fallback: create a simple error handler
+            this._errorHandler = {
+              handle: (err, context) => {
+                console.error('Error:', err, context);
+                return err;
+              }
+            };
+          }
+        }
+        return this._errorHandler;
+      },
+      configurable: true
+    });
 
     // Track processed message IDs to prevent duplicates
     this.processedMessageIds = new Set();
@@ -86,37 +110,67 @@ export class ContentMessageHandler extends ResourceTracker {
     try {
       this.initialize();
 
-      // Connect to message handler for smart feature management
-      this.messageHandler = createMessageHandler();
+      // Get the existing message handler from ContentScriptCore
+      // ContentScriptCore should be available globally or through window
+      let contentScriptCore = null;
 
-      // Register all handlers with the central message handler
-      for (const [action, handler] of this.handlers.entries()) {
-        this.messageHandler.registerHandler(action, (message, sender, sendResponse) => {
-          try {
-            // Call handler and return result directly (preserve Promise nature)
-            const result = handler.call(this, message, sender, sendResponse);
-            return result;
-          } catch (error) {
-            this.logger.error(`Error in content handler for ${action}:`, error);
-            throw error;
-          }
-        });
+      // Try to get ContentScriptCore instance
+      if (window.translateItContentCore) {
+        contentScriptCore = window.translateItContentCore;
+      } else {
+        // Fallback: create our own message handler if ContentScriptCore is not available
+        this.logger.warn('ContentScriptCore not available, creating own message handler');
+        try {
+          const { createMessageHandler } = await import('@/shared/messaging/core/MessageHandler.js');
+          this.messageHandler = createMessageHandler();
+        } catch (error) {
+          this.logger.error('Failed to create message handler:', error);
+          throw new Error('MessageHandler creation failed');
+        }
       }
 
-      this.logger.info('🔧 ContentMessageHandler registered handlers:', {
-        registeredActions: Array.from(this.handlers.keys()),
-        totalHandlers: this.handlers.size,
-        hasRevertHandler: this.handlers.has('revertTranslation'),
-        revertActionValue: MessageActions.REVERT_SELECT_ELEMENT_MODE,
-        allHandlerKeys: Array.from(this.handlers.keys()).join(', ')
-      });
+      // Use ContentScriptCore's message handler if available
+      const messageHandler = contentScriptCore ? contentScriptCore.messageHandler : this.messageHandler;
 
-      // Activate the message listener
-      if (!this.messageHandler.isListenerActive) {
+      // Register all handlers with the message handler
+      if (messageHandler && typeof messageHandler.registerHandler === 'function') {
+        for (const [action, handler] of this.handlers.entries()) {
+          messageHandler.registerHandler(action, (message, sender, sendResponse) => {
+            try {
+              // Call handler and return result directly (preserve Promise nature)
+              const result = handler.call(this, message, sender, sendResponse);
+              return result;
+            } catch (error) {
+              this.logger.error(`Error in content handler for ${action}:`, error);
+              throw error;
+            }
+          });
+        }
+
+        // Store reference to message handler
+        this.messageHandler = messageHandler;
+
+        this.logger.info('🔧 ContentMessageHandler registered handlers:', {
+          registeredActions: Array.from(this.handlers.keys()),
+          totalHandlers: this.handlers.size,
+          hasRevertHandler: this.handlers.has('revertTranslation'),
+          revertActionValue: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+          allHandlerKeys: Array.from(this.handlers.keys()).join(', '),
+          usingContentScriptCore: !!contentScriptCore
+        });
+      } else {
+        throw new Error('No valid message handler available');
+      }
+
+      // Activate the message listener if we created our own
+      if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
         this.messageHandler.listen();
         this.logger.info('✅ ContentMessageHandler message listener activated');
-      } else {
-        this.logger.warn('⚠️ ContentMessageHandler message listener was already active');
+      }
+
+      // If using ContentScriptCore's message handler, it should already be listening
+      if (contentScriptCore) {
+        this.logger.debug('Using ContentScriptCore message listener');
       }
 
       // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
@@ -261,9 +315,7 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
       
       // Use centralized error handling for better error classification
-      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
-      const errorHandler = ErrorHandler.getInstance();
+      const errorHandler = await this.errorHandler;
       
       // Determine error type and provide meaningful response
       let errorType = ErrorTypes.UNKNOWN;
@@ -420,7 +472,8 @@ export class ContentMessageHandler extends ResourceTracker {
           translationError.originalError = error;
           
           // Use centralized error handling
-          await this.errorHandler.handle(translationError, {
+          const errorHandler = await this.errorHandler;
+          await errorHandler.handle(translationError, {
             context: 'text-field-translation',
             type: ErrorTypes.TRANSLATION_FAILED,
             showToast: true
@@ -444,7 +497,8 @@ export class ContentMessageHandler extends ResourceTracker {
           this.logger.error('Field translation failed during application:', error);
           
           // Use centralized error handling
-          await this.errorHandler.handle(error, {
+          const errorHandler = await this.errorHandler;
+          await errorHandler.handle(error, {
             context: 'text-field-application',
             type: ErrorTypes.TRANSLATION_FAILED,
             showToast: true
@@ -604,13 +658,15 @@ export class ContentMessageHandler extends ResourceTracker {
 }
 
 // Export default instance for backward compatibility
-// Note: This creates the singleton instance when first accessed
-let _contentMessageHandlerInstance = null;
+// Note: This uses the same singleton instance as getInstance()
 export const contentMessageHandler = new Proxy({}, {
   get: function(target, prop) {
-    if (!_contentMessageHandlerInstance) {
-      _contentMessageHandlerInstance = ContentMessageHandler.getInstance();
-    }
-    return _contentMessageHandlerInstance[prop];
+    const instance = ContentMessageHandler.getInstance();
+    return instance[prop];
+  },
+  set: function(target, prop, value) {
+    const instance = ContentMessageHandler.getInstance();
+    instance[prop] = value;
+    return true;
   }
 });

@@ -139,12 +139,17 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       return true;
 
     } catch (error) {
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: 'SimpleTextSelectionHandler-activate',
-        showToast: false
-      });
+      try {
+        const handler = ErrorHandler.getInstance();
+        handler.handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: 'SimpleTextSelectionHandler-activate',
+          showToast: false
+        });
+      } catch (handlerError) {
+        logger.error('Error activating SimpleTextSelectionHandler:', error);
+        logger.error('ErrorHandler not available:', handlerError);
+      }
       return false;
     }
   }
@@ -371,12 +376,16 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     } catch (error) {
       logger.error('Error processing selection:', error);
-      const handler = ErrorHandler.getInstance();
-      await handler.handle(error, {
-        type: ErrorTypes.UI,
-        context: 'simple-text-selection-process',
-        showToast: false
-      });
+      try {
+        const handler = ErrorHandler.getInstance();
+        await handler.handle(error, {
+          type: ErrorTypes.UI,
+          context: 'simple-text-selection-process',
+          showToast: false
+        });
+      } catch (handlerError) {
+        logger.error('ErrorHandler not available when processing selection:', handlerError);
+      }
     }
   }
 

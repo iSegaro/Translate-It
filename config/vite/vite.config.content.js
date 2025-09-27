@@ -71,7 +71,16 @@ export const createContentConfig = (browser) => {
               return 'content/content-vue';
             }
             if (id.includes('src/core/content-scripts/chunks/lazy-features')) {
-              return 'content/content-features';
+              return 'content/content-features-core';
+            }
+            if (id.includes('src/core/content-scripts/chunks/lazy-text-selection')) {
+              return 'content/content-text-selection';
+            }
+            if (id.includes('src/core/content-scripts/chunks/lazy-windows-manager')) {
+              return 'content/content-windows-manager';
+            }
+            if (id.includes('src/core/content-scripts/chunks/lazy-text-field-icon')) {
+              return 'content/content-text-field-icon';
             }
 
             // Vendor chunks for content scripts

@@ -10,6 +10,9 @@ let contentScriptCore = null;
     const { contentScriptCore: core } = await import('./ContentScriptCore.js');
     contentScriptCore = core;
 
+    // Expose ContentScriptCore globally for other modules to access
+    window.translateItContentCore = contentScriptCore;
+
     // Initialize only critical infrastructure
     const initialized = await contentScriptCore.initialize();
 
