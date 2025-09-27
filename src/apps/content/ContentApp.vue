@@ -95,7 +95,7 @@ const {
 } = useWindowsManager();
 
 // Resource tracker for automatic cleanup
-useResourceTracker('content-app')
+const tracker = useResourceTracker('content-app')
 
 // Toast integration
 let toastIntegration = null;
@@ -230,7 +230,7 @@ onMounted(async () => {
   
     
   
-  pageEventBus.on('show-notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'show-notification', (detail) => {
     // Create a unique key for this notification
     const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
     
@@ -291,7 +291,7 @@ onMounted(async () => {
     toastFn(message, toastOptions);
   });
 
-  pageEventBus.on('dismiss_notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'dismiss_notification', (detail) => {
     logger.info('Received dismiss_notification event:', detail);
 
     // Skip select-element notifications - they are managed by SelectElementNotificationManager
@@ -317,7 +317,7 @@ onMounted(async () => {
     }, 2000);
   });
 
-  pageEventBus.on('dismiss_all_notifications', () => {
+  tracker.addEventListener(pageEventBus, 'dismiss_all_notifications', () => {
     logger.info('Received dismiss_all_notifications event');
     // Dismiss all notifications except select-element ones
     toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
@@ -325,30 +325,30 @@ onMounted(async () => {
 
   // Select element notifications should NOT be auto-dismissed
   // They are controlled by SelectElementNotificationManager only
-  pageEventBus.on('dismiss-select-element-notification', () => {
+  tracker.addEventListener(pageEventBus, 'dismiss-select-element-notification', () => {
     logger.debug('Received dismiss-select-element-notification event - ignoring (controlled by SelectElementNotificationManager)');
     // Do nothing - select element notifications are managed by their own manager
   });
 
   // Test event to confirm communication
-  pageEventBus.on('ui-host-mounted', () => {
+  tracker.addEventListener(pageEventBus, 'ui-host-mounted', () => {
     logger.info('Successfully received the ui-host-mounted test event!');
   });
 
 
   // Listen for Select Element Mode changes
-  pageEventBus.on('select-mode-activated', () => {
+  tracker.addEventListener(pageEventBus, 'select-mode-activated', () => {
     logger.info('Event: select-mode-activated');
     isSelectModeActive.value = true;
   });
 
-  pageEventBus.on('select-mode-deactivated', () => {
+  tracker.addEventListener(pageEventBus, 'select-mode-deactivated', () => {
     logger.info('Event: select-mode-deactivated');
     isSelectModeActive.value = false;
   });
 
   // Listen for TextFieldIcon events
-  pageEventBus.on('add-field-icon', (detail) => {
+  tracker.addEventListener(pageEventBus, 'add-field-icon', (detail) => {
     logger.info('Event: add-field-icon', detail);
     console.log('ContentApp: Adding field icon', detail);
     // Ensure no duplicate icons for the same ID
@@ -364,7 +364,7 @@ onMounted(async () => {
     }
   });
 
-  pageEventBus.on('remove-field-icon', (detail) => {
+  tracker.addEventListener(pageEventBus, 'remove-field-icon', (detail) => {
     logger.info('Event: remove-field-icon', detail);
     const iconIndex = activeIcons.value.findIndex(icon => icon.id === detail.id);
     if (iconIndex !== -1) {
@@ -375,7 +375,7 @@ onMounted(async () => {
     }
   });
 
-  pageEventBus.on('remove-all-field-icons', () => {
+  tracker.addEventListener(pageEventBus, 'remove-all-field-icons', () => {
     logger.info('Event: remove-all-field-icons');
     // Clear all component references
     iconRefs.value.clear();
@@ -384,7 +384,7 @@ onMounted(async () => {
   });
 
   // Listen for enhanced TextFieldIcon events
-  pageEventBus.on('update-field-icon-position', (detail) => {
+  tracker.addEventListener(pageEventBus, 'update-field-icon-position', (detail) => {
     logger.debug('Event: update-field-icon-position', detail);
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
@@ -399,7 +399,7 @@ onMounted(async () => {
     }
   });
 
-  pageEventBus.on('update-field-icon-visibility', (detail) => {
+  tracker.addEventListener(pageEventBus, 'update-field-icon-visibility', (detail) => {
     logger.debug('Event: update-field-icon-visibility', detail);
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
@@ -421,7 +421,7 @@ onMounted(async () => {
   setupEventListeners();
   
   // Listen for navigation events to clean up UI state
-  pageEventBus.on('navigation-detected', (detail) => {
+  tracker.addEventListener(pageEventBus, 'navigation-detected', (detail) => {
     logger.info('Navigation detected, cleaning up UI state:', detail);
     
     // Close all translation windows
