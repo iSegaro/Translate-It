@@ -138,7 +138,7 @@
 
 ---
 
-### **فاز 6: Background Script Optimization** (اولویت بالا - تاثیر محسوس)
+### **فاز 6: Background Script Optimization** (اولویت پایین - تاثیر غیر محسوس)
 **هدف**: کاهش 579KB background script به ~300KB با service splitting
 
 **چرا این مهم است؟**
