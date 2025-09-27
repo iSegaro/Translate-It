@@ -25,13 +25,26 @@ export async function loadTextFieldIcon() {
       return null;
     }
 
-    // Load TextFieldIconManager
-    const { default: TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
+    // Note: TextFieldIconManager is now created by TextFieldIconHandler through FeatureManager
+    // This function is kept for backward compatibility but should not create its own instance
 
-    // Initialize text field icon manager
-    textFieldIconManager = new TextFieldIconManager();
-    await textFieldIconManager.initialize();
+    // Get the TextFieldIconManager from the TextFieldIconHandler if available
+    let manager = null;
+    try {
+      const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+      const featureManager = FeatureManager.getInstance();
+      const handler = featureManager.getFeatureHandler('textFieldIcon');
+      manager = handler ? handler.getManager() : null;
+    } catch (error) {
+      logger.debug('TextFieldIconHandler not available, creating standalone TextFieldIconManager');
 
+      // Fallback: create standalone TextFieldIconManager
+      const { default: TextFieldIconManager } = await import('@/features/text-field-interaction/managers/TextFieldIconManager.js');
+      manager = new TextFieldIconManager();
+      await manager.initialize();
+    }
+
+    textFieldIconManager = manager;
     textFieldIconInitialized = true;
     logger.info('Text field icon feature loaded successfully');
 

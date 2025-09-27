@@ -215,8 +215,18 @@ async function loadWindowsManagerFeature() {
 async function loadTextFieldIconFeature() {
   const logger = getLogger();
   try {
-    const { loadTextFieldIcon } = await import('./lazy-text-field-icon.js');
-    return await loadTextFieldIcon();
+    // Use FeatureManager to load TextFieldIcon to ensure proper integration
+    if (!featureManager) {
+      const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+      featureManager = FeatureManager.getInstance();
+    }
+
+    // Load and activate TextFieldIcon through FeatureManager
+    await featureManager.activateFeature('textFieldIcon');
+
+    // Return the TextFieldIconManager instance
+    const handler = featureManager.getFeatureHandler('textFieldIcon');
+    return handler ? handler.getManager() : null;
   } catch (error) {
     // Try to get ErrorHandler for proper error handling
     try {
@@ -293,9 +303,17 @@ async function loadSelectElementFeature() {
 async function loadShortcutFeature() {
   const logger = getLogger();
   try {
-    const { default: ShortcutHandler } = await import('@/features/shortcuts/handlers/ShortcutHandler.js');
-    const handler = new ShortcutHandler();
-    await handler.initialize();
+    // Use FeatureManager to load ShortcutHandler to ensure proper integration
+    if (!featureManager) {
+      const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+      featureManager = FeatureManager.getInstance();
+    }
+
+    // Load and activate ShortcutHandler through FeatureManager
+    await featureManager.activateFeature('shortcut');
+
+    // Return the ShortcutHandler instance
+    const handler = featureManager.getFeatureHandler('shortcut');
     return handler;
   } catch (error) {
     // Try to get ErrorHandler for proper error handling
