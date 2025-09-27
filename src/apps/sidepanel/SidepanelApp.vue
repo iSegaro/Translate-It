@@ -51,6 +51,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 // Static import is now used for SidepanelLayout
 
+// Language preloading utility
+const usePreloadLanguages = async () => {
+  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
+  const { loadLanguages } = useLanguages()
+  // Preload languages in parallel with other initialization tasks
+  return loadLanguages()
+}
+
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -115,13 +123,17 @@ const initialize = async () => {
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
     logger.debug('✅ Loading text set')
 
-    // Step 2: Load settings store
-    logger.debug('⚙️ Loading settings store...')
+    // Step 2: Load settings store and preload essential data
+    logger.debug('⚙️ Loading settings store and preloading data...')
     await Promise.race([
-      settingsStore.loadSettings(),
+      Promise.all([
+        settingsStore.loadSettings(),
+        // Preload languages to ensure LanguageSelector has cached values
+        usePreloadLanguages()
+      ]),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Settings loading timeout')), 10000))
     ])
-    logger.debug('✅ Settings store loaded')
+    logger.debug('✅ Settings store loaded and languages preloaded')
 
     // Step 3: Apply theme
     const settings = settingsStore.settings
@@ -130,7 +142,7 @@ const initialize = async () => {
 
     // Step 4: Add message listener with automatic cleanup
     tracker.addEventListener(browser.runtime.onMessage, 'addListener', handleMessage)
-    
+
     // Step 5: Add system theme change listener with automatic cleanup
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     tracker.addEventListener(mediaQuery, 'change', handleSystemThemeChange)

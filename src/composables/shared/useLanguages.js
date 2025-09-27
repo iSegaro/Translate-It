@@ -15,6 +15,12 @@ function getLogger() {
   return logger;
 }
 
+// Shared state for cache optimization
+let sharedState = {
+  loadingPromise: null,
+  isLoaded: false
+};
+
 
 /**
  * Composable for managing different types of languages in the extension
@@ -29,19 +35,50 @@ export function useLanguages() {
    * @returns {Promise<void>}
    */
   const loadLanguages = async () => {
-    if (isLoaded.value) return; // Prevent multiple loads
-
-    try {
-      const { getFullLanguageList } = await utilsFactory.getI18nUtils();
-      languages.value = await getFullLanguageList() || [];
-      isLoaded.value = true;
-      getLogger().init('Languages loaded successfully:', languages.value.length);
-    } catch (error) {
-      getLogger().error('Failed to load languages:', error);
-      // In case of error, use an empty list but mark as loaded
-      languages.value = [];
-      isLoaded.value = true;
+    // Return immediately if languages are already loaded globally
+    if (sharedState.isLoaded) {
+      // Update local state from shared state if needed
+      if (!isLoaded.value && sharedState.languageList) {
+        languages.value = sharedState.languageList;
+        isLoaded.value = true;
+      }
+      return;
     }
+
+    // Return existing loading promise to prevent duplicate requests
+    if (sharedState.loadingPromise) {
+      await sharedState.loadingPromise;
+      return;
+    }
+
+    // Create new loading promise
+    sharedState.loadingPromise = (async () => {
+      try {
+        const { getFullLanguageList } = await utilsFactory.getI18nUtils();
+        const languageList = await getFullLanguageList() || [];
+
+        // Update shared state
+        sharedState.languageList = languageList;
+        sharedState.isLoaded = true;
+
+        // Update component state
+        languages.value = languageList;
+        isLoaded.value = true;
+
+        getLogger().init('Languages loaded successfully:', languages.value.length);
+      } catch (error) {
+        getLogger().error('Failed to load languages:', error);
+        // In case of error, use an empty list but mark as loaded
+        languages.value = [];
+        isLoaded.value = true;
+        sharedState.isLoaded = true;
+      } finally {
+        // Clear loading promise
+        sharedState.loadingPromise = null;
+      }
+    })();
+
+    await sharedState.loadingPromise;
   };
 
   /**

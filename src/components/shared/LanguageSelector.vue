@@ -126,11 +126,14 @@ const targetLanguage = computed({
   set: (value) => emit('update:targetLanguage', value)
 })
 
-const availableLanguages = computed(() => languages.allLanguages.value || [])
+const availableLanguages = computed(() => {
+  // Return cached languages if available, otherwise show loading indicator
+  return languages.allLanguages.value || []
+})
 
 const targetLanguages = computed(() => {
   // Filter out Auto-Detect from target languages
-  return (languages.allLanguages.value || []).filter(lang => lang.code !== AUTO_DETECT_VALUE)
+  return availableLanguages.value.filter(lang => lang.code !== AUTO_DETECT_VALUE)
 })
 
 const swapIcon = computed(() => {
@@ -195,11 +198,14 @@ const handleDropdownClick = () => {
 }
 
 // Initialize languages
-onMounted(() => {
-  // Load languages asynchronously (non-blocking)
-  languages.loadLanguages().catch(error => {
-    handleError(error, 'language-selector-languages')
-  });
+onMounted(async () => {
+  // Languages should already be preloaded by SidepanelApp
+  // If not, load them asynchronously
+  if (!languages.isLoaded.value) {
+    await languages.loadLanguages().catch(error => {
+      handleError(error, 'language-selector-languages')
+    })
+  }
 });
 </script>
 

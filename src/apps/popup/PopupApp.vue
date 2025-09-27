@@ -122,6 +122,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('popup-app')
 
+// Language preloading utility
+const usePreloadLanguages = async () => {
+  const { useLanguages } = await import('@/composables/shared/useLanguages.js')
+  const { loadLanguages } = useLanguages()
+  // Preload languages in parallel with other initialization tasks
+  return loadLanguages()
+}
+
 // Stores & Composables
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')
@@ -189,36 +197,40 @@ const initialize = async () => {
   try {
     // Step 1: Set loading text
     loadingText.value = t('popup_loading') || 'Loading Popup...'
-    
-    // Step 2: Load settings store
+
+    // Step 2: Load settings store and preload essential data
     await Promise.race([
-      settingsStore.loadSettings(),
-      new Promise((_, reject) => 
+      Promise.all([
+        settingsStore.loadSettings(),
+        // Preload languages to ensure LanguageSelector has cached values
+        usePreloadLanguages()
+      ]),
+      new Promise((_, reject) =>
         tracker.trackTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-    
+
     // Step 3: Apply theme
     const settings = settingsStore.settings
     await applyThemeLazy(settings.THEME)
-    
+
     // Step 4: Check for saved version preference
     const savedVersion = localStorage.getItem('popup-enhanced-version')
     if (savedVersion !== null) {
       useEnhancedVersion.value = savedVersion === 'true'
     }
-    
+
     // Add clear-storage event listener to reset languages using ResourceTracker
     tracker.addEventListener(document, 'clear-storage', async () => {
       logger.debug("🔄 Clear storage event - resetting languages via composable");
       await clearTranslation();
     })
-    
+
     logger.debug('[PopupApp] Popup initialized successfully', {
       useEnhancedVersion: useEnhancedVersion.value,
       isDevelopment: isDevelopment.value
     })
-    
+
   } catch (error) {
     const isSilent = await handleError(error, 'popup-initialization')
     if (!isSilent) {
