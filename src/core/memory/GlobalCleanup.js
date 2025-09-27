@@ -80,14 +80,20 @@ class GlobalCleanup {
       this.memoryManager.trackEventListener(browser.runtime.onConnect, 'connect', connectHandler, 'global-cleanup')
     }
 
-    // Periodic garbage collection using centralized timing
-    this.gcInterval = setInterval(() => {
-      logger.debug('Periodic garbage collection triggered')
-      this.memoryManager.performGarbageCollection()
-    }, MEMORY_TIMING.GC_INTERVAL)
+    // Use centralized timer for periodic garbage collection
+    if (this.memoryManager && typeof this.memoryManager.initCentralTimer === 'function') {
+      // Centralized timer is already initialized in MemoryManager constructor
+      logger.debug('Using centralized timer for periodic garbage collection')
+    } else {
+      // Fallback to local timer if centralized system not available
+      this.gcInterval = setInterval(() => {
+        logger.debug('Periodic garbage collection triggered (fallback timer)')
+        this.memoryManager.performGarbageCollection()
+      }, MEMORY_TIMING.GC_INTERVAL)
 
-    // Track the GC interval
-    this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
+      // Track the GC interval
+      this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
+    }
   }
 
   /**
