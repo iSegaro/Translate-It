@@ -201,10 +201,13 @@ export class SelectionManager extends ResourceTracker {
       // Main frame - use WindowsManager directly
       this.logger.debug('Showing translation UI via WindowsManager', {
         text: selectedText.substring(0, 30) + '...',
-        position
+        position,
+        windowsManagerType: typeof windowsManager,
+        hasShowMethod: typeof windowsManager.show === 'function'
       });
 
       await windowsManager.show(selectedText, position);
+      this.logger.debug('WindowsManager.show() completed');
 
     } else if (window !== window.top) {
       // Iframe - request window creation in main frame
