@@ -818,7 +818,10 @@ class MemoryManager {
     }, this.centralTimerInterval);
 
     if (shouldEnableDebugging()) {
-      logger.debug(`Centralized cleanup timer initialized (${this.centralTimerInterval}ms interval)`);
+      const minutes = Math.floor(this.centralTimerInterval / 60000);
+      const seconds = Math.round((this.centralTimerInterval % 60000) / 1000);
+      const formattedSeconds = seconds.toString().padStart(2, '0');
+      logger.debug(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
     }
   }
 
