@@ -19,15 +19,13 @@ async function loadDependencies() {
     logConstantsModule,
     tabPermissionsModule,
     extensionContextModule,
-    messageHandlerModule,
-    cssModule
+    messageHandlerModule
   ] = await Promise.all([
     import("@/shared/logging/logger.js"),
     import("@/shared/logging/logConstants.js"),
     import("@/core/tabPermissions.js"),
     import('@/core/extensionContext.js'),
-    import('@/shared/messaging/core/MessageHandler.js'),
-    import('@/assets/styles/content-main-dom.scss?inline')
+    import('@/shared/messaging/core/MessageHandler.js')
   ]);
 
   getScopedLogger = loggerModule.getScopedLogger;
@@ -35,7 +33,9 @@ async function loadDependencies() {
   checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
   ExtensionContextManager = extensionContextModule.default;
   createMessageHandler = messageHandlerModule.createMessageHandler;
-  mainDomCss = cssModule.default;
+
+  // Define CSS directly as a string to avoid import issues
+  mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}html[data-translate-it-select-mode="true"] *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]){pointer-events:none!important;color:inherit!important;text-decoration:none!important}:root{--translate-highlight-color:#ff8800;--translate-highlight-width:3px;--translate-highlight-offset:2px;--translate-highlight-z-index:1040}html body [data-translate-highlighted="true"][data-translate-highlighted="true"],html body .translate-it-element-highlighted.translate-it-element-highlighted{outline:var(--translate-highlight-width) solid var(--translate-highlight-color)!important;outline-offset:var(--translate-highlight-offset)!important;z-index:var(--translate-highlight-z-index)!important;position:relative!important;box-shadow:0 0 0 var(--translate-highlight-width) var(--translate-highlight-color)!important}html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,html body .translate-it-element-highlighted.translate-it-element-highlighted *{outline:none!important}`;
 
   logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
 }
@@ -172,18 +172,24 @@ export class ContentScriptCore extends EventTarget {
       loggerModule,
       logConstantsModule,
       tabPermissionsModule,
-      extensionContextModule
+      extensionContextModule,
+      messageHandlerModule
     ] = await Promise.all([
       import("@/shared/logging/logger.js"),
       import("@/shared/logging/logConstants.js"),
       import("@/core/tabPermissions.js"),
-      import('@/core/extensionContext.js')
+      import('@/core/extensionContext.js'),
+      import('@/shared/messaging/core/MessageHandler.js')
     ]);
 
     getScopedLogger = loggerModule.getScopedLogger;
     LOG_COMPONENTS = logConstantsModule.LOG_COMPONENTS;
     checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
     ExtensionContextManager = extensionContextModule.default;
+    createMessageHandler = messageHandlerModule.createMessageHandler;
+
+    // Define CSS directly as a string to avoid import issues
+    mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}html[data-translate-it-select-mode="true"] *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]){pointer-events:none!important;color:inherit!important;text-decoration:none!important}:root{--translate-highlight-color:#ff8800;--translate-highlight-width:3px;--translate-highlight-offset:2px;--translate-highlight-z-index:1040}html body [data-translate-highlighted="true"][data-translate-highlighted="true"],html body .translate-it-element-highlighted.translate-it-element-highlighted{outline:var(--translate-highlight-width) solid var(--translate-highlight-color)!important;outline-offset:var(--translate-highlight-offset)!important;z-index:var(--translate-highlight-z-index)!important;position:relative!important;box-shadow:0 0 0 var(--translate-highlight-width) var(--translate-highlight-color)!important}html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,html body .translate-it-element-highlighted.translate-it-element-highlighted *{outline:none!important}`;
 
     logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
   }
@@ -375,6 +381,13 @@ export class ContentScriptCore extends EventTarget {
 
     try {
       // Use style element with inline CSS
+      logger.debug('Main DOM CSS content check:', {
+        hasCss: !!mainDomCss,
+        cssLength: mainDomCss ? mainDomCss.length : 0,
+        cssPreview: mainDomCss ? mainDomCss.substring(0, 200) + '...' : 'null',
+        hasHighlightRule: mainDomCss ? mainDomCss.includes('translate-it-element-highlighted') : false
+      });
+
       if (mainDomCss && mainDomCss.includes('translate-it-element-highlighted')) {
         const styleElement = document.createElement('style');
         styleElement.id = 'translate-it-main-dom-styles';
