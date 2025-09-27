@@ -3,8 +3,8 @@
 ## 📋 خلاصه وضعیت فعلی
 
 **تاریخ گزارش**: 27 سپتامبر 2025
-**مرحله فعلی**: Phase 7 (Utils Factory Integration) تکمیل شده
-**وضعیت کلی**: ✅ موفقیت‌آمیز - بهینه‌سازی‌های محسوس اعمال شده
+**مرحله فعلی**: Phase 7 (Utils Factory Integration) تکمیل شده + Select Element CSS Fix
+**وضعیت کلی**: ✅ موفقیت‌آمیز - بهینه‌سازی‌های محسوس اعمال شده + باگ رفع شده
 
 ---
 
@@ -207,6 +207,40 @@
 
 ---
 
+### **Select Element CSS Fix** (تکمیل شده ✅)
+**هدف**: رفع باگ نمایش هایلایت در حالت Select Element
+
+**مشکل**:
+- هایلایت عناصر در حالت Select Element نمایش داده نمی‌شد
+- این مشکل پس از تغییرات در Essential features loading strategy بوجود آمده بود
+- CSS فقط در full initialization load می‌شد، نه در critical initialization
+
+**ریشه‌یابی**:
+- Content script از `initializeCritical()` استفاده می‌کند
+- `selectElement` در دسته ESSENTIAL قرار دارد
+- CSS فقط در `loadDependencies()` تعریف شده بود، نه در `loadCriticalDependencies()`
+
+**راه‌حل**:
+- اضافه کردن CSS string definition به `loadCriticalDependencies()`
+- تضمین می‌کند که CSS همیشه در دسترس است regardless of initialization path
+
+**تغییرات اعمال شده**:
+```javascript
+// در ContentScriptCore.js
+async loadCriticalDependencies() {
+  // ... existing code ...
+
+  // Define CSS directly as a string to avoid import issues
+  mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}...`;
+
+  // ... rest of the code ...
+}
+```
+
+**نتیجه**: ✅ هایلایت Select Element دوباره به درستی کار می‌کند
+
+---
+
 ### **فاز 8: Smart Component Loading** (اولویت متوسط)
 **هدف**: Lazy loading برای non-critical UI components
 
@@ -365,6 +399,13 @@ async function loadFeature(featureName) {
 - [ ] ایجاد backup از current state
 - [ ] setup performance monitoring tools
 - [ ] create test suite برای functionality validation
+
+### **Select Element CSS Fix** ✅ **COMPLETED**
+- [x] مشکل را در console logs تشخیص ده (cssLength: 0)
+- [x] ریشه‌یابی کن که CSS فقط در loadDependencies() تعریف شده
+- [x] CSS را به loadCriticalDependencies() اضافه کن
+- [x] تست کن که هایلایت دوباره کار می‌کند
+- [x] کدهای اضافی را پاک کن (guard clauses)
 
 ### **فاز 5: Content Script Optimization** ✅ **COMPLETED**
 - [x] Analyze content script dependencies
