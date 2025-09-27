@@ -339,23 +339,41 @@ async function loadShortcutFeature() {
   }
 }
 
+// Smart feature loading handlers
+function handleTextSelection() {
+  // Load text selection feature on demand when user selects text
+  const logger = getLogger();
+  logger.debug('Text selection detected, loading textSelection feature...');
+  loadFeature('textSelection', 'ESSENTIAL');
+}
+
+function handleKeyboardInteraction(event) {
+  // Load shortcut feature on demand when user presses relevant keys
+  // Check for common shortcut combinations
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    const logger = getLogger();
+    logger.debug('Shortcut key detected, loading shortcut feature...');
+    loadFeature('shortcut', 'ON_DEMAND');
+  }
+}
+
 // Load core features immediately
 export async function loadCoreFeatures() {
   const logger = getLogger();
   logger.debug('Loading core features...');
-  console.log('[FeatureManager] 🚀 Starting loadCoreFeatures()');
+  logger.debug('Starting loadCoreFeatures()');
 
   // Ensure global reference exists
-  console.log('[FeatureManager] 📍 Current window.featureManager before loading:', window.featureManager);
+  logger.debug('Current window.featureManager before loading:', window.featureManager);
 
   // Initialize SettingsManager before loading features to avoid "not initialized" warnings
   try {
-    console.log('[FeatureManager] 📋 Initializing SettingsManager...');
+    logger.debug('Initializing SettingsManager...');
     const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
     await SettingsManager.initialize();
-    console.log('[FeatureManager] ✅ SettingsManager initialized successfully');
+    logger.debug('SettingsManager initialized successfully');
   } catch (error) {
-    console.warn('[FeatureManager] ⚠️ Failed to initialize SettingsManager:', error);
+    logger.warn('[FeatureManager] ⚠️ Failed to initialize SettingsManager:', error);
     // Don't fail feature loading if SettingsManager fails
   }
 
@@ -381,9 +399,9 @@ export async function loadCoreFeatures() {
     logger.info('Core features loaded');
 
     // Initialize and activate FeatureManager after features are loaded
-    console.log('[FeatureManager] 🔄 About to call initializeAndActivateFeatures()');
+    logger.debug('About to call initializeAndActivateFeatures()');
     await initializeAndActivateFeatures();
-    console.log('[FeatureManager] ✅ initializeAndActivateFeatures() completed');
+    logger.debug('initializeAndActivateFeatures() completed');
   } catch (error) {
     // Fallback if ErrorHandler is not available
     logger.warn('ErrorHandler not available in loadCoreFeatures, using simple error handling');
@@ -398,9 +416,9 @@ export async function loadCoreFeatures() {
     logger.info('Core features loaded (with fallback error handling)');
 
     // Initialize and activate FeatureManager after features are loaded
-    console.log('[FeatureManager] 🔄 About to call initializeAndActivateFeatures() (fallback path)');
+    logger.debug('About to call initializeAndActivateFeatures() (fallback path)');
     await initializeAndActivateFeatures();
-    console.log('[FeatureManager] ✅ initializeAndActivateFeatures() completed (fallback path)');
+    logger.debug('initializeAndActivateFeatures() completed (fallback path)');
   }
 }
 
@@ -417,10 +435,10 @@ async function initializeAndActivateFeatures() {
       // Expose globally for RevertShortcut and other components
       window.featureManager = featureManager;
       logger.debug('✅ FeatureManager initialized and set to window.featureManager');
-      console.log('[FeatureManager] ✅ FeatureManager is now available globally:', window.featureManager);
+      logger.debug('FeatureManager is now available globally:', window.featureManager);
     } else {
       logger.debug('FeatureManager already exists');
-      console.log('[FeatureManager] 📝 FeatureManager already initialized');
+      logger.debug('FeatureManager already initialized');
     }
 
     // Activate core features
@@ -435,6 +453,24 @@ async function initializeAndActivateFeatures() {
 
     featuresInitialized = true;
     logger.info('All core features activated successfully');
+
+    // Setup event listeners for smart feature loading
+    logger.debug('Setting up smart feature loading listeners...');
+
+    // Text selection interaction
+    document.addEventListener('mouseup', handleTextSelection, { passive: true });
+
+    // Right-click (context menu) - load select element feature on demand
+    document.addEventListener('contextmenu', () => {
+      logger.debug('Context menu detected, pre-loading selectElement feature...');
+      loadFeature('selectElement', 'INTERACTIVE');
+    }, { once: true });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyboardInteraction, { passive: true });
+
+    logger.debug('Smart feature loading listeners setup complete');
+
   } catch (error) {
     logger.error('Failed to initialize and activate features:', error);
   }

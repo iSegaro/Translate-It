@@ -27,9 +27,13 @@ const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 async function getApiProviders() {
   try {
     const { providerRegistry } = await import('@/features/translation/providers/ProviderRegistry.js');
-    return Array.from(providerRegistry.providers.entries()).map(([id, ProviderClass]) => ({
-      id,
-      defaultTitle: ProviderClass.displayName || id
+
+    // Get all available providers (both loaded and lazy registered)
+    const availableProviders = providerRegistry.getAllAvailable();
+
+    return availableProviders.map(provider => ({
+      id: provider.id || provider,
+      defaultTitle: provider.name || provider.displayName || provider
     }));
   } catch (error) {
     logger.error("Failed to get providers dynamically, using fallback:", error);
@@ -136,6 +140,8 @@ export class ContextMenuManager extends ResourceTracker {
   // Prevent concurrent menu setup
   _menuSetupLock = false;
   async setupDefaultMenus(locale = null) {
+    logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
+
     if (this._menuSetupLock) {
       logger.warn("setupDefaultMenus called concurrently, skipping.");
       return;
@@ -143,17 +149,24 @@ export class ContextMenuManager extends ResourceTracker {
     this._menuSetupLock = true;
     try {
       // Get i18n utility from factory
+      logger.debug("🔧 [ContextMenuManager] Getting i18n utilities...");
       const { getTranslationString } = await utilsFactory.getI18nUtils();
 
       // Clear existing menus first and wait for completion
+      logger.debug("🧹 [ContextMenuManager] Clearing existing menus...");
       await browser.contextMenus.removeAll();
       this.createdMenus.clear();
+      logger.debug("✅ [ContextMenuManager] Existing menus cleared");
 
       // Get the currently active API to set the 'checked' state
+      logger.debug("🔍 [ContextMenuManager] Getting current API...");
       const currentApi = await getTranslationApiAsync();
-      
+      logger.debug(`📊 [ContextMenuManager] Current API: ${currentApi}`);
+
       // Get commands for keyboard shortcuts
+      logger.debug("⌨️ [ContextMenuManager] Getting keyboard commands...");
       const commands = await browser.commands.getAll();
+      logger.debug(`📊 [ContextMenuManager] Found ${commands.length} commands`);
 
       // --- 1. Create Page Context Menu ---
       try {
@@ -178,7 +191,10 @@ export class ContextMenuManager extends ResourceTracker {
 
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
+        logger.debug("🎯 [ContextMenuManager] Creating Action (Browser Action) menus...");
+
         // --- Translate Element Menu (First option) ---
+        logger.debug("📝 [ContextMenuManager] Creating Translate Element action menu...");
         let actionPageMenuTitle =
           (await getTranslationString("context_menu_translate_with_selection", locale)) ||
           "Translate Element";
@@ -191,8 +207,10 @@ export class ContextMenuManager extends ResourceTracker {
           title: actionPageMenuTitle,
           contexts: ["action"],
         });
+        logger.debug(`✅ [ContextMenuManager] Translate Element menu created: "${actionPageMenuTitle}"`);
 
         // --- API Provider Parent Menu ---
+        logger.debug("🔗 [ContextMenuManager] Creating API Provider parent menu...");
         await this.createMenu({
           id: API_PROVIDER_PARENT_ID,
           title:
@@ -200,9 +218,13 @@ export class ContextMenuManager extends ResourceTracker {
             "API Provider",
           contexts: ["action"],
         });
+        logger.debug("✅ [ContextMenuManager] API Provider parent menu created");
 
         // --- API Provider Sub-Menus (Radio Buttons) ---
+        logger.debug("📋 [ContextMenuManager] Creating API Provider sub-menus...");
         const apiProviders = await getApiProviders();
+        logger.debug(`📊 [ContextMenuManager] Found ${apiProviders.length} providers`);
+
         for (const provider of apiProviders) {
           await this.createMenu({
             id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
@@ -214,7 +236,7 @@ export class ContextMenuManager extends ResourceTracker {
           });
         }
         logger.debug(
-          `API Provider sub-menus created. Current API: ${currentApi}`
+          `✅ [ContextMenuManager] API Provider sub-menus created. Current API: ${currentApi}`
         );
 
         // --- Options Menu ---

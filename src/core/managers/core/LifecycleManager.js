@@ -259,15 +259,69 @@ class LifecycleManager {
   }
 
   async refreshContextMenus(locale) {
+    logger.debug("🔄 [LifecycleManager] Starting context menu refresh...");
+
     try {
+      logger.debug("📋 [LifecycleManager] Loading context menu manager via featureLoader...");
       const contextMenuManager = await this.featureLoader.loadContextMenuManager();
+      logger.debug("✅ [LifecycleManager] Context menu manager loaded successfully");
+
+      logger.debug("🔄 [LifecycleManager] Refreshing context menus...");
       await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+      logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via featureLoader");
+
     } catch (error) {
-      logger.error("❌ Failed to refresh context menus via featureLoader:", error);
-      // Fallback to direct import of new context menu manager
-      const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
-      const contextMenuManager = new ContextMenuManager();
-      await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+      logger.error("❌ [LifecycleManager] Failed to refresh context menus via featureLoader:", error);
+      logger.debug("🔄 [LifecycleManager] Attempting fallback initialization...");
+
+      try {
+        // Fallback to direct import of new context menu manager
+        const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
+        const contextMenuManager = new ContextMenuManager();
+
+        logger.debug("🔧 [LifecycleManager] Initializing context menus via fallback...");
+        await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
+        logger.debug("✅ [LifecycleManager] Context menus refreshed successfully via fallback");
+
+      } catch (fallbackError) {
+        logger.error("❌ [LifecycleManager] Fallback context menu initialization also failed:", fallbackError);
+        // Try one more direct approach
+        await this.createContextMenuDirectly(locale);
+      }
+    }
+  }
+
+  /**
+   * Direct context menu creation as ultimate fallback
+   */
+  async createContextMenuDirectly(locale) {
+    try {
+      logger.debug("🚨 [LifecycleManager] Attempting direct context menu creation...");
+
+      const browser = await import("webextension-polyfill");
+      const { getTranslationString } = await import('@/utils/i18n/i18n.js');
+
+      // Clear existing menus
+      await browser.contextMenus.removeAll();
+
+      // Create basic action menu
+      await browser.contextMenus.create({
+        id: "action-translate-element-direct",
+        title: "Translate Element (Direct)",
+        contexts: ["action"]
+      });
+
+      // Create options menu
+      await browser.contextMenus.create({
+        id: "open-options-page-direct",
+        title: "Options (Direct)",
+        contexts: ["action"]
+      });
+
+      logger.debug("✅ [LifecycleManager] Direct context menu creation completed");
+
+    } catch (directError) {
+      logger.error("❌ [LifecycleManager] Direct context menu creation failed:", directError);
     }
   }
 

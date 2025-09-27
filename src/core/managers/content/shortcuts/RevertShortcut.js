@@ -16,7 +16,6 @@ async function getActiveSelectElementManager() {
   if (!featureManager) {
     // FeatureManager might not be initialized yet, this can happen during startup
     logger.warn('FeatureManager not available - attempting to initialize it');
-    console.log('[RevertShortcut] ⚠️ FeatureManager not available, trying to initialize...');
 
     try {
       // Try to initialize FeatureManager dynamically
@@ -25,15 +24,12 @@ async function getActiveSelectElementManager() {
 
       featureManager = window.featureManager;
       if (featureManager) {
-        console.log('[RevertShortcut] ✅ FeatureManager initialized successfully');
         logger.info('FeatureManager initialized successfully');
       } else {
-        console.log('[RevertShortcut] ❌ Failed to initialize FeatureManager');
         logger.warn('Failed to initialize FeatureManager after attempt');
         return null;
       }
     } catch (error) {
-      console.error('[RevertShortcut] ❌ Error initializing FeatureManager:', error);
       logger.error('Error initializing FeatureManager:', error);
       return null;
     }
