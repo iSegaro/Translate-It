@@ -231,14 +231,25 @@ export class ShortcutHandler extends ResourceTracker {
 
         // Check for Ctrl+/ or Cmd+/ combination
         if (event[this.modifierKey] && event.key === '/') {
-          getLogger().info('Translation shortcut triggered');
+          // Check settings first before logging
+          (async () => {
+            const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+            const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+            const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
 
-          // Prevent default behavior
-          event.preventDefault();
-          event.stopPropagation();
+            if (!isExtensionEnabled || !isShortcutEnabled) {
+              return; // Silently ignore when disabled
+            }
 
-          // Handle the shortcut
-          this.handleTranslationShortcut(event);
+            getLogger().info('Translation shortcut triggered');
+
+            // Prevent default behavior
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Handle the shortcut
+            await this.handleTranslationShortcut(event);
+          })();
         }
       };
 
@@ -252,10 +263,22 @@ export class ShortcutHandler extends ResourceTracker {
     }
   }
 
-  handleTranslationShortcut() {
+  async handleTranslationShortcut() {
     try {
+      // Import settings dynamically to avoid circular dependencies
+      const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+
+      // Check settings before processing
+      const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+      const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
+
+      if (!isExtensionEnabled || !isShortcutEnabled) {
+        // Shortcut is disabled due to settings
+        return;
+      }
+
       const activeElement = document.activeElement;
-      
+
       // Check if active element is a text field
       if (this.isEditableElement(activeElement)) {
         // Shortcut triggered on text field - logged at TRACE level for detailed debugging
