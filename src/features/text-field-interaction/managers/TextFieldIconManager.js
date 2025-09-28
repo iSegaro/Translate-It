@@ -146,10 +146,10 @@ export class TextFieldIconManager extends ResourceTracker {
       // Note: EXTENSION_ENABLED listener is handled by FeatureManager
       // We don't need to duplicate it here as FeatureManager will handle activation/deactivation
 
-      settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', (newValue) => {
-        this.logger.debug('TRANSLATE_ON_TEXT_FIELDS changed:', newValue);
+      settingsManager.onChange('TRANSLATE_ON_TEXT_SELECTION', (newValue) => {
+        this.logger.debug('TRANSLATE_ON_TEXT_SELECTION changed:', newValue);
         if (!newValue) {
-          // Clean up all icons when text field feature is disabled
+          // Clean up all icons when text selection feature is disabled
           this.cleanup();
         }
       }, 'text-field-icon-manager')

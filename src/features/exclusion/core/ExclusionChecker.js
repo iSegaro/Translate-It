@@ -196,7 +196,7 @@ export class ExclusionChecker {
     const featureSettingsMap = {
       'selectElement': 'TRANSLATE_WITH_SELECT_ELEMENT',
       'textSelection': 'TRANSLATE_ON_TEXT_SELECTION',
-      'textFieldIcon': 'TRANSLATE_ON_TEXT_FIELDS',
+      'textFieldIcon': 'TRANSLATE_ON_TEXT_SELECTION', // Changed from TRANSLATE_ON_TEXT_FIELDS since it's under On-Page Selection
       'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
       'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION'
     };
