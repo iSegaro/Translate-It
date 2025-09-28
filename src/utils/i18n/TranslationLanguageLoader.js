@@ -4,7 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'TranslationLanguageLoader');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'TranslationLanguageLoader');
 
 // Cache for loaded translation language packs
 const translationLanguageCache = new Map();

@@ -4,7 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LanguageDetector');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'LanguageDetector');
 
 // Cache for detected languages with LRU eviction
 const detectionCache = new Map();

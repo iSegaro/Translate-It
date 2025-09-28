@@ -10,85 +10,36 @@
  */
 
 import { LOG_LEVELS } from './logConstants.js';
+import {
+  getGlobalDebugState,
+  setGlobalDebugOverride,
+  getGlobalLogLevel,
+  setGlobalLogLevel,
+  getComponentLogLevel,
+  setComponentLogLevel,
+  getSharedLogLevelCache,
+  incrementShouldLogCalls,
+  incrementCacheHits,
+  incrementCacheMisses,
+  clearSharedLogLevelCache,
+  getPerformanceStats,
+  resetPerformanceStats
+} from './GlobalDebugState.js';
 
-// Development environment detection
-const isDevelopment = process.env.NODE_ENV === "development";
+// Development environment detection - extension compatible
+const isDevelopment = (() => {
+  try {
+    return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
+  } catch (e) {
+    // Fallback for extension environments
+    return false;
+  }
+})();
 
-// (Instrumentation removed after stabilization)
+// (Component log levels moved to GlobalDebugState.js)
 
-// Global log level - can be overridden per component
-let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
-
-// Runtime global debug override (when true, all debug logs are enabled regardless of per-component level)
-let __runtimeDebugOverride = false;
-
-export function enableGlobalDebug() { __runtimeDebugOverride = true; }
-export function disableGlobalDebug() { __runtimeDebugOverride = false; }
-export function isGlobalDebugEnabled() { return __runtimeDebugOverride; }
-
-// Component-specific log levels (production defaults)
-// ERROR = 0 | WARN = 1 | INFO = 2 | DEBUG = 3
-// Keep noise low in UI & content paths while retaining Info for core/background workflows.
-const componentLogLevels = {
-  // لایه‌های اصلی (Core layers)
-  Background: LOG_LEVELS.INFO,  // background handlers
-  Core: LOG_LEVELS.INFO,        // core handlers
-  Content: LOG_LEVELS.INFO,     // Windows Manager and content scripts
-
-  // اپلیکیشن‌ها و UI (Apps and UI)
-  UI: LOG_LEVELS.INFO,           // UI composables
-  Popup: LOG_LEVELS.INFO,        // Popup app
-  Sidepanel: LOG_LEVELS.INFO,    // Sidepanel app
-  Options: LOG_LEVELS.INFO,      // Options app
-
-  // Features
-  Translation: LOG_LEVELS.INFO,
-  TTS: LOG_LEVELS.INFO,          // TTS feature
-  ScreenCapture: LOG_LEVELS.INFO, // Screen capture feature
-  ElementSelection: LOG_LEVELS.INFO, // Element selection feature
-  TextSelection: LOG_LEVELS.INFO, // Text selection feature
-  TextActions: LOG_LEVELS.INFO,  // Text actions feature
-  TextFieldInteraction: LOG_LEVELS.INFO, // Text field interaction feature
-  Notifications: LOG_LEVELS.INFO, // Notifications feature
-  IFrame: LOG_LEVELS.INFO,       // IFrame support feature
-  Shortcuts: LOG_LEVELS.INFO,    // Shortcuts feature
-  Exclusion: LOG_LEVELS.INFO,    // Exclusion feature
-  Subtitle: LOG_LEVELS.INFO,     // Subtitle feature
-  History: LOG_LEVELS.INFO,      // History feature
-  Settings: LOG_LEVELS.INFO,     // Settings feature
-  Windows: LOG_LEVELS.INFO,      // Windows feature
-
-  // Content Applications
-  ContentApp: LOG_LEVELS.INFO,   // Content app components
-
-  // سیستم‌های مشترک (Shared systems)
-  Messaging: LOG_LEVELS.INFO,
-  Storage: LOG_LEVELS.WARN,
-  Error: LOG_LEVELS.INFO,
-  Config: LOG_LEVELS.INFO,       // Config system
-  Memory: LOG_LEVELS.INFO,       // Memory management system
-  Proxy: LOG_LEVELS.INFO,      // Memory management system
-
-  // ابزارها و utilities (Tools and utilities)
-  Utils: LOG_LEVELS.INFO,       // Utilities
-  Browser: LOG_LEVELS.INFO,     // Browser utils
-  Text: LOG_LEVELS.INFO,        // Text utils
-  Framework: LOG_LEVELS.INFO,   // Framework utils
-  Legacy: LOG_LEVELS.WARN,       // Legacy compatibility code
-
-  // Providers (زیرمجموعه Translation)
-  Providers: LOG_LEVELS.INFO,
-
-  // Legacy aliases (برای backward compatibility)
-  Capture: LOG_LEVELS.INFO,      // Legacy alias for SCREEN_CAPTURE
-};
-
-// Freeze the initial shape to avoid accidental structural mutation; values still updated via setter.
-Object.seal(componentLogLevels);
-
-// Memoization cache with LRU eviction
-const logLevelCache = new Map();
-const MAX_CACHE_SIZE = 200;
+// Cache size for LRU eviction
+const MAX_CACHE_SIZE = 100;
 
 // Logger cache stored on globalThis to avoid circular dependencies
 function __getLoggerCache() {
@@ -102,7 +53,40 @@ function __getLoggerCache() {
   return g.__TRANSLATE_IT__.__LOGGER_CACHE;
 }
 // (Devtools helper removed for production cleanliness)
-const __initialComponentLevels = { ...componentLogLevels };
+const __initialComponentLevels = (() => {
+  try {
+    return { ...getGlobalDebugState().componentLogLevels };
+  } catch (e) {
+    // Fallback for initialization order issues
+    return {};
+  }
+})();
+
+/**
+ * Helper function for lazy logging to reduce code duplication
+ */
+function createLazyLogMethod(component, loggerName, level, consoleMethod) {
+  return (factory) => {
+    if (!shouldLog(component, level)) return;
+    try {
+      const produced = factory();
+      if (!produced) return;
+      if (Array.isArray(produced)) {
+        const [message, data] = produced;
+        const formatted = formatMessage(loggerName, level, message, data);
+        consoleMethod(...formatted);
+      } else if (typeof produced === 'object' && produced.message) {
+        const formatted = formatMessage(loggerName, level, produced.message, produced.data);
+        consoleMethod(...formatted);
+      } else {
+        const formatted = formatMessage(loggerName, level, produced, undefined);
+        consoleMethod(...formatted);
+      }
+    } catch {
+      // Swallow to avoid breaking app due to logging
+    }
+  };
+}
 
 /**
  * Get (cached) scoped logger. Use this instead of ad-hoc singleton patterns.
@@ -119,7 +103,11 @@ export function getScopedLogger(component, subComponent = null) {
 
 // Introspection helper (mainly for debugging / devtools)
 export function listLoggerLevels() {
-  return { global: globalLogLevel, components: { ...componentLogLevels } };
+  const globalState = getGlobalDebugState();
+  return {
+    global: getGlobalLogLevel(),
+    components: { ...globalState.componentLogLevels }
+  };
 }
 
 /**
@@ -135,8 +123,6 @@ function formatMessage(component, level, message, data) {
 
   const prefix = `[${timestamp}] ${component}:`;
 
-  // TODO: احتمال داره که اینجا مشکل داشته باشه و نیازی به این شرط نباشه، بدون بررسی های دقیق این شرط رو بعدا اضافه کرده ام
-  // TODO: اگه مشکل در لاگ ها وجود داشته باشه ، باید این شرط رو بررسی کرد
   // If data is an Error, log it directly to preserve stack trace
   if (data instanceof Error) {
     return [prefix, message, data];
@@ -153,25 +139,32 @@ function formatMessage(component, level, message, data) {
  * - Memoized per component to avoid repeated lookups
  */
 function shouldLog(component, level) {
-  // Check cache first
+  incrementShouldLogCalls();
+
   const cacheKey = `${component}:${level}`;
-  if (logLevelCache.has(cacheKey)) {
-    return logLevelCache.get(cacheKey);
+  const cache = getSharedLogLevelCache();
+
+  if (cache.has(cacheKey)) {
+    incrementCacheHits();
+    return cache.get(cacheKey);
   }
 
-  const componentLevel = componentLogLevels[component] ?? globalLogLevel;
-  const shouldLogValue = __runtimeDebugOverride
+  incrementCacheMisses();
+
+  const globalState = getGlobalDebugState();
+  const componentLevel = getComponentLogLevel(component);
+  const shouldLogValue = globalState.debugOverride
     ? level <= LOG_LEVELS.DEBUG
     : level <= componentLevel;
 
-  // Cache the result with LRU eviction
-  if (logLevelCache.size >= MAX_CACHE_SIZE) {
-    // Remove oldest entry
-    const firstKey = logLevelCache.keys().next().value;
-    logLevelCache.delete(firstKey);
-  }
+  // Cache the result
+  cache.set(cacheKey, shouldLogValue);
 
-  logLevelCache.set(cacheKey, shouldLogValue);
+  // LRU eviction (simplified)
+  if (cache.size > MAX_CACHE_SIZE) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+  }
 
   return shouldLogValue;
 }
@@ -180,7 +173,7 @@ function shouldLog(component, level) {
  * Clear log level cache (call when log levels change)
  */
 export function clearLogLevelCache() {
-  logLevelCache.clear();
+  clearSharedLogLevelCache();
 }
 
 // Fast helper specifically for debug gating (avoid recomputing numbers in callers if needed)
@@ -336,78 +329,19 @@ export function createLogger(component, subComponent = null) {
 
     // Check if debug logging is enabled for this logger
     isDebugEnabled: () => {
-      const componentLevel = componentLogLevels[component] ?? globalLogLevel;
-      return __runtimeDebugOverride || componentLevel >= LOG_LEVELS.DEBUG;
+      const globalState = getGlobalDebugState();
+      const componentLevel = getComponentLogLevel(component);
+      return globalState.debugOverride || componentLevel >= LOG_LEVELS.DEBUG;
     },
 
     // Lazy debug: accept function returning (message, data?) tuple or array of args
-    debugLazy: (factory) => {
-      const DEBUG_LEVEL = 3;
-      if (!shouldLog(component, DEBUG_LEVEL)) return;
-      try {
-        const produced = factory();
-        if (!produced) return;
-        if (Array.isArray(produced)) {
-          const [message, data] = produced;
-          const formatted = formatMessage(loggerName, DEBUG_LEVEL, message, data);
-          console.log(...formatted);
-        } else if (typeof produced === 'object' && produced.message) {
-          const formatted = formatMessage(loggerName, DEBUG_LEVEL, produced.message, produced.data);
-          console.log(...formatted);
-        } else {
-          const formatted = formatMessage(loggerName, DEBUG_LEVEL, produced, undefined);
-          console.log(...formatted);
-        }
-      } catch {
-        // Swallow to avoid breaking app due to logging
-      }
-    },
+    debugLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.DEBUG, console.log),
 
     // Lazy info: similar to debugLazy but for info level
-    infoLazy: (factory) => {
-      const INFO_LEVEL = 2;
-      if (!shouldLog(component, INFO_LEVEL)) return;
-      try {
-        const produced = factory();
-        if (!produced) return;
-        if (Array.isArray(produced)) {
-          const [message, data] = produced;
-          const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
-          console.info(...formatted);
-        } else if (typeof produced === 'object' && produced.message) {
-          const formatted = formatMessage(loggerName, INFO_LEVEL, produced.message, produced.data);
-          console.info(...formatted);
-        } else {
-          const formatted = formatMessage(loggerName, INFO_LEVEL, produced, undefined);
-          console.info(...formatted);
-        }
-      } catch {
-        // Ignore console logging errors
-      }
-    },
+    infoLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.INFO, console.info),
 
     // Lazy warn: similar to debugLazy but for warn level
-    warnLazy: (factory) => {
-      const WARN_LEVEL = 1;
-      if (!shouldLog(component, WARN_LEVEL)) return;
-      try {
-        const produced = factory();
-        if (!produced) return;
-        if (Array.isArray(produced)) {
-          const [message, data] = produced;
-          const formatted = formatMessage(loggerName, WARN_LEVEL, message, data);
-          console.warn(...formatted);
-        } else if (typeof produced === 'object' && produced.message) {
-          const formatted = formatMessage(loggerName, WARN_LEVEL, produced.message, produced.data);
-          console.warn(...formatted);
-        } else {
-          const formatted = formatMessage(loggerName, WARN_LEVEL, produced, undefined);
-          console.warn(...formatted);
-        }
-      } catch {
-        // Ignore console logging errors
-      }
-    },
+    warnLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.WARN, console.warn),
 
     // Special method for initialization logs (always important)
     init: (message, data) => {
@@ -435,27 +369,16 @@ export function createLogger(component, subComponent = null) {
   return Object.freeze(loggerApi);
 }
 
-// --- Legacy Compatibility Layer (to be removed after refactor) -----------------
-// Some existing modules still call getLogger() or logger.debug(). Provide shims so we
-// can migrate incrementally without breaking lint/build.
-export function getLogger(component, subComponent) {
-  return getScopedLogger(component, subComponent);
-}
-try {
-  if (!globalThis.getLogger) globalThis.getLogger = getLogger;
-  if (!globalThis.logME) globalThis.logME = (...a) => { if (isDevelopment) console.log('[logME]', ...a); };
-} catch { /* ignore global assignment issues */ }
 
 /**
  * Update log level for a component or globally
  */
 export function setLogLevel(component, level) {
   if (component === "global") {
-    globalLogLevel = level;
+    setGlobalLogLevel(level);
   } else {
-    componentLogLevels[component] = level;
+    setComponentLogLevel(component, level);
   }
-  // Clear cache when levels change
   clearLogLevelCache();
 }
 
@@ -463,7 +386,7 @@ export function setLogLevel(component, level) {
  * Get current log level for a component
  */
 export function getLogLevel(component) {
-  return componentLogLevels[component] ?? globalLogLevel;
+  return getComponentLogLevel(component);
 }
 
 /**
@@ -604,11 +527,22 @@ export function getRuntimeFilterConfig() {
  */
 export function __resetLoggingSystemForTests() {
   __getLoggerCache().clear(); // global cache
-  logLevelCache.clear(); // memoization cache
-  // Reset component-specific levels to their original values
-  Object.keys(componentLogLevels).forEach((k) => delete componentLogLevels[k]);
-  Object.assign(componentLogLevels, { ...__initialComponentLevels });
-  globalLogLevel = isDevelopment ? 3 : 1;
+  getSharedLogLevelCache().clear(); // shared memoization cache
+  resetPerformanceStats();
   // Reset runtime filter
   configureRuntimeFilter({ enabled: false });
+}
+
+/**
+ * Get logging performance statistics
+ */
+export function getLoggingPerformanceStats() {
+  const globalStats = getPerformanceStats();
+  const cache = getSharedLogLevelCache();
+
+  return {
+    ...globalStats,
+    cacheSize: cache.size,
+    cacheHitRate: globalStats.cacheHits / (globalStats.cacheHits + globalStats.cacheMisses) || 0
+  };
 }

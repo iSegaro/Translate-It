@@ -51,6 +51,7 @@ export const LOG_COMPONENTS = {
   UTILS: 'Utils',                 // src/utils/
   BROWSER: 'Browser',             // src/utils/browser/
   TEXT: 'Text',                   // src/utils/text/
+  I18N: 'I18n',                   // src/utils/i18n/
   FRAMEWORK: 'Framework',         // src/utils/framework/
   LEGACY: 'Legacy',               // Legacy compatibility code
 

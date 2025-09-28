@@ -32,7 +32,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LanguagePackLoader');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'LanguagePackLoader');
 
 /**
  * Load a language pack dynamically (legacy function - uses translation loader)

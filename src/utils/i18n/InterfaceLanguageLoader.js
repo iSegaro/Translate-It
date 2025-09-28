@@ -4,7 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'InterfaceLanguageLoader');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'InterfaceLanguageLoader');
 
 // Cache for loaded interface language packs
 const interfaceLanguageCache = new Map();
