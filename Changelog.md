@@ -1,12 +1,16 @@
-#### v1.X.X – Released X on X, 2025
+#### v1.4.0 – Released September on 28, 2025
 
 #### Added
 
-- Added support for triple-click
+- Support for [Triple-Click](#/activation)
 
 #### Fixed
 
-- Fixed issue with dynamic display of provider icons in Chrome
+- Dynamic display issue of provider icons in Chrome
+
+#### Changed
+
+- Optimized core architecture
 
 ---
 
@@ -36,7 +40,7 @@
 
 ##### Added
 
-- **Proxy Support**: Added proxy configuration support in [`Settings > Advanced Tab > Proxy Settings`](#/advance) to enable access to translation services with geographic restrictions
+- **Proxy Support**: Added proxy configuration support in [Settings > Advanced Tab > Proxy Settings](#/advance) to enable access to translation services with geographic restrictions
 
 ##### Fixed
 
@@ -64,7 +68,7 @@
 ##### Added
 
 - **Dynamic Extension Icon**: The extension icon now changes to match the selected translation provider
-- **Custom Fonts for Translations**: Users can now choose the font used to display translations.
+- **Custom Fonts for Translations**: Users can now choose the font used to display translations. ([Appearance](#/appearance))
 
 #### Changed
 
