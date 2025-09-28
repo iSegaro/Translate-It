@@ -58,7 +58,7 @@ export class FieldShortcutManager {
       return false;
     }
 
-    // Check if extension and feature are enabled
+    // Check if extension and shortcut are enabled
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
     const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
 
