@@ -132,7 +132,7 @@ function setupSmartListeners() {
 
   
   // Keyboard shortcuts
-  document.addEventListener('keydown', handleKeyboardInteraction, { passive: true });
+  document.addEventListener('keydown', handleKeyboardInteraction);
 
   // Focus on text fields
   document.addEventListener('focusin', handleTextFieldFocus, { passive: true });
