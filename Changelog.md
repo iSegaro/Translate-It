@@ -1,15 +1,15 @@
 #### v1.4.0 – Released October on 04, 2025
 
-#### Added
+##### Added
 
 - Support for [Triple-Click](#/activation)
 
-#### Fixed
+##### Fixed
 
 - Dynamic display issue of provider icons in Chrome
 - Improved icon display in text fields
 
-#### Changed
+##### Changed
 
 - Optimized core architecture
 
@@ -17,7 +17,7 @@
 
 #### v1.3.2 – Released September on 25, 2025
 
-#### Fixed
+##### Fixed
 
 - Fixed issue where the floating window was not displayed
 - Fixed issue with dictionary mode in the floating window
@@ -71,14 +71,14 @@
 - **Dynamic Extension Icon**: The extension icon now changes to match the selected translation provider
 - **Custom Fonts for Translations**: Users can now choose the font used to display translations. ([Appearance](#/appearance))
 
-#### Changed
+##### Changed
 
 - **Enhanced Notifications**: Added cancel functionality to Select Element Mode translations
 - **Universal Translation History**: History now tracks all translation modes and is searchable in Side Panel
 - **Removed YouTube Subtitles**: Experimental feature was removed due to low usage
 - **Optimized Field Icons**: Translation icon now only appears in relevant fields (like editors), not all input fields. Keyboard shortcuts still work everywhere.
 
-#### Fixed
+##### Fixed
 
 - **CSP Issues**: Resolved Content Security Policy conflicts across all websites
 - **Core Optimization**: Extension core rewritten for optimal resource usage with minimal overhead
