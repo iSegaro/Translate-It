@@ -114,7 +114,7 @@ export class ExclusionChecker {
 
       featureSettings.forEach(setting => {
         this.settingsListeners.push(
-          settingsManager.onChange(setting, (newValue) => {
+          settingsManager.onChange(setting, () => {
             // Setting changed - logged at TRACE level for detailed debugging
             // logger.debug(`${setting} changed, refreshing features:`, newValue);
             this.refreshFeaturesOnSettingsChange();
@@ -124,7 +124,7 @@ export class ExclusionChecker {
 
       // Listen for EXCLUDED_SITES changes
       this.settingsListeners.push(
-        settingsManager.onChange('EXCLUDED_SITES', (newValue) => {
+        settingsManager.onChange('EXCLUDED_SITES', () => {
           // EXCLUDED_SITES changed - logged at TRACE level for detailed debugging
           // logger.debug('EXCLUDED_SITES changed, refreshing features:', newValue);
           this.refreshFeaturesOnSettingsChange();

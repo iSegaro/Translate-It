@@ -35,7 +35,7 @@ export async function loadTextFieldIcon() {
       const featureManager = FeatureManager.getInstance();
       const handler = featureManager.getFeatureHandler('textFieldIcon');
       manager = handler ? handler.getManager() : null;
-    } catch (error) {
+    } catch {
       logger.debug('TextFieldIconHandler not available, creating standalone TextFieldIconManager');
 
       // Fallback: create standalone TextFieldIconManager

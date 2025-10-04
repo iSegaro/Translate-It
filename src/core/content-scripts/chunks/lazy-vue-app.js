@@ -3,7 +3,6 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Import Vue and dependencies (these will be chunked separately by Vite)

@@ -250,7 +250,7 @@ export function ContentScriptCore() {
     }
   };
 
-  eventTarget.validateExtensionContext = function(operation = 'unknown') {
+  eventTarget.validateExtensionContext = function() {
     if (!ExtensionContextManager || !ExtensionContextManager.isValidSync()) {
       return false;
     }

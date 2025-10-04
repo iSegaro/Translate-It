@@ -36,7 +36,7 @@ export class UnifiedTranslationCoordinator {
    * @returns {Promise} - Translation result
    */
   async coordinateTranslation(message, options = {}) {
-    const { messageId, action, data, context } = message;
+    const { action, data } = message;
 
     getLogger().info(`🔄 Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 

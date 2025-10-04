@@ -88,8 +88,7 @@ export class BaseAIProvider extends BaseProvider {
     // Create optimal batches based on provider strategy
     const batches = this._createOptimalBatches(texts);
     const allResults = [];
-    let processedCount = 0;
-
+    
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       // Check for cancellation
       if (abortController && abortController.signal.aborted) {
@@ -129,8 +128,7 @@ export class BaseAIProvider extends BaseProvider {
           engine
         );
 
-        processedCount += batch.length;
-        // Streamed batch progress
+                // Streamed batch progress
 
       } catch (error) {
         logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);

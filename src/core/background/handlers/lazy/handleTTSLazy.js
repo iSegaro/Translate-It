@@ -5,7 +5,6 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLazyHandler');
 

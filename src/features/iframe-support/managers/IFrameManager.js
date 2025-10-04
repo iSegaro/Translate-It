@@ -454,7 +454,7 @@ export class IFrameManager extends ResourceTracker {
 
       this.logger.info(`[IFrame] Script injected successfully to iframe: ${frameId}`);
       
-    } catch (error) {
+    } catch {
       // Content script injection failed details logged at DEBUG level
 
       // Don't re-throw - script injection failure is not critical for iframe functionality

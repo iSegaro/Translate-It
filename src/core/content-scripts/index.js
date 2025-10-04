@@ -1,6 +1,10 @@
 // Content script entry point - Ultra-optimized with smart loading
 // Minimal footprint with intelligent, interaction-based loading
 
+// Early Trusted Types setup - must run BEFORE any Vue code
+import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
+setupTrustedTypesCompatibility();
+
 let contentScriptCore = null;
 let featureLoadPromises = new Map();
 let interactionDetected = false;
@@ -58,7 +62,7 @@ async function initializeLogger() {
     ErrorHandler = errorHandler;
     logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
     return logger;
-  } catch (error) {
+  } catch {
     // Fallback logger - direct console calls will be filtered through logging system later
     return {
       debug: () => {},
@@ -148,7 +152,7 @@ async function initializeLogger() {
 
 function setupSmartListeners() {
   // Extension popup interaction
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'popupOpened') {
       loadFeature('vue', 'INTERACTIVE');
     }
@@ -176,7 +180,7 @@ function setupSmartListeners() {
   }, { passive: true });
 }
 
-function handleTextSelection(event) {
+function handleTextSelection() {
   const selection = window.getSelection();
   if (selection && selection.toString().trim().length > 0) {
     loadFeature('textSelection', 'ESSENTIAL');

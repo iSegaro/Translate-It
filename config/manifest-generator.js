@@ -143,7 +143,7 @@ function generateChromeManifest(baseManifest) {
     
     // Content Security Policy for Chrome MV3 (with Vue 3 compatibility)
     content_security_policy: {
-      extension_pages: 'script-src \'self\' \'wasm-unsafe-eval\'; object-src \'self\';'
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
     }
   };
 }
@@ -174,7 +174,7 @@ function generateFirefoxManifest(baseManifest) {
 
     // Content Security Policy for Firefox with DOMPurify support
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self';"
+      extension_pages: "script-src 'self'; object-src 'self'; trusted-types default vue dompurify;"
     },
     
     // Firefox uses sidebar_action instead of side_panel

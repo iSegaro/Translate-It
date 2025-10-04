@@ -100,7 +100,7 @@ export class FeatureManager extends ResourceTracker {
           context: 'FeatureManager-initialize',
           showToast: false
         });
-      } catch (handlerError) {
+      } catch {
         logger.error('Error initializing FeatureManager:', error);
       }
       throw error;
@@ -250,7 +250,7 @@ export class FeatureManager extends ResourceTracker {
           context: `FeatureManager-activateFeature-${featureName}`,
           showToast: false
         });
-      } catch (handlerError) {
+      } catch {
         // Fallback - error already logged
       }
     }
@@ -313,7 +313,7 @@ export class FeatureManager extends ResourceTracker {
           context: `FeatureManager-deactivateFeature-${featureName}`,
           showToast: false
         });
-      } catch (handlerError) {
+      } catch {
         // Fallback - error already logged
       }
     }

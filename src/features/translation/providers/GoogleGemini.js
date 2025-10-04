@@ -333,7 +333,7 @@ export class GeminiProvider extends BaseAIProvider {
    * @param {string} translateMode - Translation mode
    * @returns {Promise<string>} - Translated text
    */
-  async translateImage(imageData, sourceLang, targetLang, translateMode) {
+  async translateImage(imageData, sourceLang, targetLang) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const { apiKey, geminiModel } = await this._getConfig();

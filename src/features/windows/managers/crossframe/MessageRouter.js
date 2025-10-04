@@ -75,13 +75,14 @@ export class MessageRouter {
   _handleBroadcastRequest(event) {
     if (this.frameRegistry.isInIframe) return;
 
+    // Extract enable outside try block so it's accessible in catch
+    const enable = !!event.data.enabled;
+
     try {
       // Initialize ref counter on top window
       if (typeof window.translateItBroadcastCount !== 'number') {
         window.translateItBroadcastCount = 0;
       }
-
-      const enable = !!event.data.enabled;
       
       // Update counter
       if (enable) {
@@ -116,7 +117,7 @@ export class MessageRouter {
     } catch (error) {
       this.logger.error('[MessageRouter] Failed broadcast request handling', {
         error: error.message,
-        enable: enable
+        enable
       });
     }
   }

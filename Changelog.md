@@ -1,4 +1,4 @@
-#### v1.4.0 – Released September on 28, 2025
+#### v1.4.0 – Released October on 04, 2025
 
 #### Added
 
@@ -7,6 +7,7 @@
 #### Fixed
 
 - Dynamic display issue of provider icons in Chrome
+- Improved icon display in text fields
 
 #### Changed
 

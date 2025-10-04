@@ -131,7 +131,6 @@ class TTSGlobalManager {
     await this.stopAllExcept(instanceId)
 
     // Mark this instance as active
-    const previousActiveId = this.currentActiveId
     this.currentActiveId = instanceId
 
     // Update instance timestamp

@@ -171,7 +171,7 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Handle renderer toggle event
    */
-  _handleToggleRenderer(event) {
+  _handleToggleRenderer() {
     // logger.trace('Renderer toggle requested', event.detail);
     const newRendererType = this.toggleEnhancedRenderer();
     

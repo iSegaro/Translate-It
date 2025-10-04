@@ -1,6 +1,6 @@
 // src/utils/i18n/languages.js - Dynamically loaded language packs with lazy loading
 
-import { loadLanguagePack, preloadCoreLanguagePacks, getAvailableLanguageCodes, loadLanguagePackByType } from './LanguagePackLoader.js';
+import { getAvailableLanguageCodes } from './LanguagePackLoader.js';
 import { lazyLoadTranslationLanguage, preloadUserLanguages, getLanguageDataLazy } from './LazyLanguageLoader.js';
 
 // A minimal list of languages for UI elements to avoid loading all language data.
@@ -39,7 +39,7 @@ export async function getLanguageData(code) {
       languageCache.set(code, langData);
     }
     return langData;
-  } catch (error) {
+  } catch {
     // console.error(`Failed to load language data for ${code}:`, error);
     return null;
   }
@@ -145,7 +145,7 @@ export function clearLanguageCache() {
  * @param {string} [type='translation'] - Language type ('translation', 'interface', 'tts')
  * @returns {Array<string>} List of available language codes
  */
-export function getAvailableLanguagesByType(type = 'translation') {
+export function getAvailableLanguagesByType() {
   return getAvailableLanguageCodes();
 }
 

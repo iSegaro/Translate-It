@@ -277,7 +277,7 @@ class ContentScriptVueBridge extends ResourceTracker {
     }
   }
 
-  showTranslationResult = async (translationData) => {
+  showTranslationResult = async (/*translationData*/) => {
     // TranslationTooltip removed - translation results now handled elsewhere
     // logger.trace("[Vue Bridge] Translation result received:", translationData);
     return null;

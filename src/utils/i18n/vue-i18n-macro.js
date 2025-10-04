@@ -7,7 +7,7 @@ import { loadI18nPlugin } from './plugin-async-loader.js';
  * Create Vue app with async i18n plugin loading
  * This prevents TDZ errors in main app files
  */
-export async function createAppWithI18n(rootComponent, options = {}) {
+export async function createAppWithI18n(rootComponent) {
   const { createApp } = await import('vue');
   const { createPinia } = await import('pinia');
 

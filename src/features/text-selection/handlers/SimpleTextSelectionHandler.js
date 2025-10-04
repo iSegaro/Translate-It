@@ -643,7 +643,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   /**
    * Handle mouse move - simple drag detection
    */
-  handleMouseMove(event) {
+  handleMouseMove() {
     // Not needed for simplified triple-click + drag
     // We only care about mouse up to end the drag
   }
