@@ -3,7 +3,14 @@ import { getSupportedProviders } from "../core/provider-registry.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'providerHtmlGenerator');
+
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'providerHtmlGenerator');
+  }
+  return logger;
+};
 
 
 // Helper function to get provider by ID
@@ -23,7 +30,7 @@ export class ProviderHtmlGenerator {
    */
   static generateOptionsHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-  logger.debug(`Generating options HTML for ${availableProviders.length} providers`);
+  getLogger().debug(`Generating options HTML for ${availableProviders.length} providers`);
 
     return availableProviders
       .map((provider) => {
@@ -45,7 +52,7 @@ export class ProviderHtmlGenerator {
    */
   static generateDropdownHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-  logger.debug(`Generating dropdown HTML for ${availableProviders.length} providers`);
+  getLogger().debug(`Generating dropdown HTML for ${availableProviders.length} providers`);
 
     return availableProviders
       .map((provider) => {

@@ -78,7 +78,7 @@ export class GeminiProvider extends BaseAIProvider {
       
       // Validate results
       if (parsedResults.length === batch.length) {
-        logger.debug(`[${this.providerName}] Batch translation successful: ${batch.length} segments`);
+        // Batch translation successful
         return parsedResults;
       } else {
         logger.warn(`[${this.providerName}] Batch result mismatch, falling back to individual requests`);
@@ -90,7 +90,8 @@ export class GeminiProvider extends BaseAIProvider {
       // Try fallback, but if that fails too, throw the original error
       try {
         const fallbackResults = await this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
-        logger.info(`[${this.providerName}] Fallback successful for ${batch.length} segments`);
+        // Fallback successful
+        logger.info(`[Gemini] Fallback completed for ${batch.length} segments`);
         return fallbackResults;
       } catch (fallbackError) {
         logger.error(`[${this.providerName}] Fallback also failed:`, fallbackError);
@@ -172,12 +173,8 @@ export class GeminiProvider extends BaseAIProvider {
         getGeminiThinkingEnabledAsync(),
       ]);
       
-      logger.debug(`[Gemini] Configuration loaded:`, {
-        apiKeyPresent: !!apiKey,
-        apiKeyLength: apiKey ? apiKey.length : 0,
-        geminiModel,
-        thinkingEnabled
-      });
+      // Configuration loaded successfully
+      logger.info(`[Gemini] Using model: ${geminiModel}${thinkingEnabled ? ' with thinking' : ''}`);
       
       return { apiKey, geminiModel, thinkingEnabled };
     } catch (error) {
@@ -192,14 +189,8 @@ export class GeminiProvider extends BaseAIProvider {
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const { apiKey, geminiModel, thinkingEnabled } = await this._getConfig();
 
-    // Detailed logging for debugging
-    logger.debug(`[Gemini] Using configuration for translation:`, {
-      apiKeyPresent: !!apiKey,
-      apiKeyLength: apiKey ? apiKey.length : 0,
-      geminiModel,
-      thinkingEnabled,
-      text: text.substring(0, 50) + (text.length > 50 ? '...' : '')
-    });
+    // Configuration applied for translation
+    logger.info(`[Gemini] Starting translation: ${text.length} chars`);
 
     // Build API URL based on selected model
     let apiUrl;
@@ -265,10 +256,7 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-translation`;
-    logger.debug('about to call _executeApiCall with:', {
-      url: url.replace(/key=[^&]+/, "key=***"),
-      context: context,
-    });
+    // About to call API (logged at TRACE level)
 
     try {
       const result = await this._executeApiCall({
@@ -280,7 +268,8 @@ export class GeminiProvider extends BaseAIProvider {
         abortController: abortController
       });
 
-      logger.info('_executeApiCall completed with result:', result);
+      // API call completed successfully
+      logger.info(`[Gemini] Translation completed successfully`);
       return result;
     } catch (error) {
       
@@ -309,7 +298,7 @@ export class GeminiProvider extends BaseAIProvider {
             context: `${context}-fallback`,
           });
 
-          logger.info('[Gemini] Fallback without thinking config successful:', fallbackResult);
+          // Fallback without thinking config successful
           return fallbackResult;
         } catch (fallbackError) {
           // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
@@ -367,7 +356,8 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    logger.debug('translateImage called with mode:', translateMode);
+    // translateImage called
+    logger.info(`[Gemini] Starting image translation`);
 
     // Build prompt for screen capture translation
     const basePrompt = await getPromptBASEScreenCaptureAsync();
@@ -375,7 +365,7 @@ export class GeminiProvider extends BaseAIProvider {
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    logger.debug('translateImage built prompt:', prompt);
+    // Prompt built for image translation
 
     // Extract image format and data
     const imageMatch = imageData.match(/^data:image\/([^;]+);base64,(.+)/);
@@ -413,7 +403,7 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    logger.debug('about to call _executeApiCall for image translation');
+    // About to call API for image translation
 
     try {
       const result = await this._executeApiCall({
@@ -425,7 +415,8 @@ export class GeminiProvider extends BaseAIProvider {
         // abortController: abortController
       });
 
-      logger.info('image translation completed with result:', result);
+      // Image translation completed successfully
+      logger.info(`[Gemini] Image translation completed successfully`);
       return result;
     } catch (error) {
       logger.error('image translation failed with error:', error);

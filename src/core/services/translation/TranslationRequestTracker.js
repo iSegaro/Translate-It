@@ -63,7 +63,7 @@ export class TranslationRequestTracker {
     this.cleanupInterval = null;
     this.startCleanup();
 
-    logger.info('TranslationRequestTracker initialized');
+    logger.debug('TranslationRequestTracker initialized');
   }
 
   /**
@@ -115,11 +115,6 @@ export class TranslationRequestTracker {
     // Update statistics
     this.stats.totalCreated++;
 
-    logger.debug(`[RequestTracker] Created request: ${messageId}`, {
-      mode: request.mode,
-      priority: request.priority
-    });
-
     return request;
   }
 
@@ -160,11 +155,6 @@ export class TranslationRequestTracker {
 
     // Apply updates
     Object.assign(request, updates, { updatedAt: Date.now() });
-
-    logger.debug(`[RequestTracker] Updated request: ${messageId}`, {
-      status: request.status,
-      changes: Object.keys(updates)
-    });
 
     return true;
   }
@@ -217,11 +207,6 @@ export class TranslationRequestTracker {
     } else {
       this.stats.totalFailed++;
     }
-
-    logger.debug(`[RequestTracker] Completed and removed request: ${messageId}`, {
-      status,
-      success: result?.success
-    });
 
     return true;
   }

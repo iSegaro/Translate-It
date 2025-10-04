@@ -2,9 +2,6 @@
 // Modern CSS Architecture (2025) - Zero !important Policy
 // برخلاف content-app-global.scss که در Shadow DOM است
 
-@use './base/variables' as *;
-@use './components/toast-integration';
-
 /* ==========================================================================
    Select Element Mode Styles - Main DOM Injection (Critical Only)
    ========================================================================== */
@@ -85,6 +82,7 @@ html[data-translate-it-select-mode="true"] {
   --translate-highlight-color: #ff8800;
   --translate-highlight-width: 3px;
   --translate-highlight-offset: 2px;
+  --translate-highlight-z-index: 1040;
 }
 
 // High specificity highlighting without !important
@@ -92,7 +90,7 @@ html body [data-translate-highlighted="true"][data-translate-highlighted="true"]
 html body .translate-it-element-highlighted.translate-it-element-highlighted {
   outline: var(--translate-highlight-width) solid var(--translate-highlight-color);
   outline-offset: var(--translate-highlight-offset);
-  z-index: $z-overlay;
+  z-index: var(--translate-highlight-z-index);
   position: relative;
   box-shadow: 0 0 0 var(--translate-highlight-width) var(--translate-highlight-color);
 

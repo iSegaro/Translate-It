@@ -6,7 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 export class ToastEventHandler {
   constructor(eventBus = null) {
     this.eventBus = eventBus;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ToastEventHandler');
+    this.logger = getScopedLogger(LOG_COMPONENTS.NOTIFICATIONS, 'ToastEventHandler');
     this.isEnabled = false;
     this.clickHandler = null;
     this.isProcessingClick = false;
@@ -20,7 +20,7 @@ export class ToastEventHandler {
    */
   enable(options = {}) {
     if (this.isEnabled) {
-      this.logger.debug('ToastEventHandler already enabled');
+      this.logger.debug('[ToastHandler] Already enabled');
       return;
     }
     
@@ -33,7 +33,11 @@ export class ToastEventHandler {
     document.addEventListener('click', this.clickHandler, { capture: true });
     
     this.isEnabled = true;
-    this.logger.debug('ToastEventHandler enabled');
+    this.logger.info('[ToastHandler] Event handler enabled');
+    this.logger.debug('Handler configuration', {
+      hasCancelCallback: !!options.onCancelClick,
+      hasToastCallback: !!options.onToastClick
+    });
   }
   
   /**
@@ -50,7 +54,7 @@ export class ToastEventHandler {
     }
     
     this.isEnabled = false;
-    this.logger.debug('ToastEventHandler disabled');
+    this.logger.info('[ToastHandler] Event handler disabled');
   }
   
   /**
@@ -76,18 +80,12 @@ export class ToastEventHandler {
     
     this.isProcessingClick = true;
     
-    this.logger.debug('Toast click detected:', {
+    this.logger.debug('[ToastHandler] Click detected:', {
       targetTag: target.tagName,
       targetClass: target.className,
       targetText: target.textContent?.slice(0, 20),
       hasHighlightClass: target.classList?.contains('translate-it-element-highlighted'),
-      pathLength: path.length,
-      pathElements: path.slice(0, 5).map(el => ({
-        tagName: el.tagName || 'unknown',
-        className: el.className || 'none',
-        hasButtonData: el.hasAttribute?.('data-button'),
-        hasActionData: el.hasAttribute?.('data-action')
-      }))
+      pathLength: path.length
     });
     
     // Prevent the click from reaching other handlers
@@ -99,7 +97,7 @@ export class ToastEventHandler {
     const isCancelButton = this.isCancelButtonClickDirect(event);
     
     if (isCancelButton) {
-      this.logger.info('Cancel button clicked in toast');
+      this.logger.info('[ToastHandler] Cancel button clicked');
       
       if (this.onCancelClick) {
         this.onCancelClick(event);
@@ -108,7 +106,7 @@ export class ToastEventHandler {
       // Note: Don't emit cancel-select-element-mode event here to avoid duplicates
       // The event will be emitted by the onCancelClick callback in ContentApp
     } else {
-      this.logger.debug('General toast click (non-cancel)');
+      this.logger.debug('[ToastHandler] General toast click (non-cancel)');
       
       if (this.onToastClick) {
         this.onToastClick(event);
@@ -140,7 +138,7 @@ export class ToastEventHandler {
   isCancelButtonClickDirect(event) {
     const path = event.composedPath ? event.composedPath() : [event.target];
     
-    this.logger.debug('Checking for cancel button in path:', {
+    this.logger.debug('[ToastHandler] Checking for cancel button:', {
       pathLength: path.length,
       firstElement: path[0] ? {
         tagName: path[0].tagName,
@@ -159,7 +157,7 @@ export class ToastEventHandler {
       if (element.hasAttribute('data-button') && 
           element.hasAttribute('data-action')) {
         
-        this.logger.debug('Found action button:', {
+        this.logger.debug('[ToastHandler] Found action button:', {
           tagName: element.tagName,
           textContent: element.textContent?.trim(),
           isFirstChild: element.parentElement?.children[0] === element
@@ -170,7 +168,7 @@ export class ToastEventHandler {
         if (toastContainer) {
           const actionButtons = toastContainer.querySelectorAll('[data-button][data-action]');
           if (actionButtons.length > 0 && actionButtons[0] === element) {
-            this.logger.debug('Cancel button detected via first action button heuristic');
+            this.logger.debug('[ToastHandler] Cancel button detected via first action');
             return true;
           }
         }
@@ -181,7 +179,7 @@ export class ToastEventHandler {
           if (element.getAttribute('role') === 'button' || 
               element.textContent?.trim().toLowerCase().includes('cancel') ||
               element.textContent?.trim().includes('کنسل')) {
-            this.logger.debug('Cancel button detected via button characteristics');
+            this.logger.debug('[ToastHandler] Cancel button via characteristics');
             return true;
           }
         }
@@ -190,7 +188,7 @@ export class ToastEventHandler {
         if (element.textContent) {
           const text = element.textContent.trim();
           if (text.includes('Cancel') || text.includes('کنسل')) {
-            this.logger.debug('Cancel button detected via text fallback');
+            this.logger.debug('[ToastHandler] Cancel button via text fallback');
             return true;
           }
         }
@@ -203,7 +201,7 @@ export class ToastEventHandler {
           // Verify this button is within a toast context
           const parentToast = element.closest('[data-sonner-toast], .sonner-toast, [data-testid="toaster"]');
           if (parentToast) {
-            this.logger.debug('Cancel button detected via button tag and text within toast');
+            this.logger.debug('[ToastHandler] Cancel button via tag and text');
             return true;
           }
         }

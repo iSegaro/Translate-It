@@ -7,7 +7,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
-logger.init('config.js module initialized');
+logger.info('Config module initialized');
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -30,8 +30,8 @@ export const CONFIG = {
   USE_MOCK: false,
   DEBUG_MODE: false,
   APPLICATION_LOCALIZE: "English",
-  SOURCE_LANGUAGE: "auto",
-  TARGET_LANGUAGE: "en",
+  SOURCE_LANGUAGE: "en",
+  TARGET_LANGUAGE: "fa",
   THEME: "auto",
   TIMEOUT: 30000,
   selectionTranslationMode: "onClick", // "immediate",
@@ -366,25 +366,28 @@ export const getSettingsAsync = async () => {
 };
 
 export const initializeSettingsListener = async () => {
-  logger.debug('[config.js] initializeSettingsListener called - using StorageManager events');
+  // initializeSettingsListener called - logged at TRACE level for detailed debugging
+  // logger.debug('[config.js] initializeSettingsListener called - using StorageManager events');
   
   try {
     // Check if storageManager is available and initialized
     if (!storageManager || typeof storageManager.on !== 'function') {
-      logger.warn('[config.js] StorageManager not available or not initialized yet');
+      // StorageManager not available - logged at TRACE level for detailed debugging
+      // logger.warn('[config.js] StorageManager not available or not initialized yet');
       return null;
     }
 
     // Setup listener through StorageManager event system
     // Note: StorageManager automatically handles caching, no manual cache management needed
     const listener = (data) => {
-      logger.debug(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
+      // Storage change detected - logged at TRACE level for detailed debugging
+      // logger.debug(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
       // StorageManager handles cache updates automatically
       // Any additional processing can be added here if needed
     };
 
     storageManager.on('change', listener);
-    logger.debug('[config.js] ✅ Storage listener successfully set up via StorageManager');
+    logger.info('[config.js] Storage listener set up successfully');
     
     return listener; // Return listener for cleanup if needed
   } catch (error) {
@@ -400,7 +403,8 @@ const getSettingValueAsync = async (key, defaultValue) => {
   try {
     // Let StorageManager handle caching internally
     const result = await storageManager.get({ [key]: defaultValue });
-    logger.debug(`[config] Retrieved value for ${key}:`, result[key] ? 'present' : 'not present');
+    // Value retrieved - logged at TRACE level for detailed debugging
+    // logger.debug(`[config] Retrieved value for ${key}:`, result[key] ? 'present' : 'not present');
     return result[key];
   } catch (error) {
     const handler = ErrorHandler.getInstance();
@@ -525,7 +529,8 @@ export const getPromptBASEScreenCaptureAsync = async () => {
 
 export const getTranslationApiAsync = async () => {
   const result = await getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
-  logger.debug(`[config.js] getTranslationApiAsync - Returning: ${result}`);
+  // Translation API retrieved - logged at TRACE level for detailed debugging
+  // logger.debug(`[config.js] getTranslationApiAsync - Returning: ${result}`);
   return result;
 };
 

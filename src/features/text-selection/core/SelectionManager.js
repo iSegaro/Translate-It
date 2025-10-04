@@ -1,9 +1,9 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { isUrlExcluded } from "@/utils/ui/exclusion.js";
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 
 /**
  * SelectionManager - Simplified text selection management
@@ -15,7 +15,7 @@ export class SelectionManager extends ResourceTracker {
   constructor(options = {}) {
     super('selection-manager');
 
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectionManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SelectionManager');
 
     // Mark this instance as critical to prevent cleanup during memory management
     this.trackResource('selection-manager-critical', () => {
@@ -23,11 +23,9 @@ export class SelectionManager extends ResourceTracker {
       this.logger.debug('Critical SelectionManager cleanup skipped');
     }, { isCritical: true });
 
-    // Check if current URL is excluded
-    this.isExcluded = isUrlExcluded(window.location.href);
-    if (this.isExcluded) {
-      this.logger.debug('URL is excluded, functionality will be limited');
-    }
+    // Initialize exclusion state - will be checked asynchronously
+    this.isExcluded = false;
+    this.exclusionChecked = false;
 
     // FeatureManager reference for accessing WindowsManager
     this.featureManager = options.featureManager;
@@ -41,6 +39,23 @@ export class SelectionManager extends ResourceTracker {
     this.frameId = Math.random().toString(36).substring(7);
 
     this.logger.init('SelectionManager initialized');
+  }
+
+  /**
+   * Check if URL is excluded using UtilsFactory
+   */
+  async checkExclusion() {
+    if (!this.exclusionChecked) {
+      const { isUrlExcluded } = await utilsFactory.getUIUtils();
+      this.isExcluded = isUrlExcluded(window.location.href);
+      this.exclusionChecked = true;
+      if (this.isExcluded) {
+        this.logger.info('Text selection disabled on excluded URL', {
+          url: window.location.hostname
+        });
+      }
+    }
+    return this.isExcluded;
   }
 
   /**
@@ -75,7 +90,7 @@ export class SelectionManager extends ResourceTracker {
       return;
     }
 
-    if (this.isExcluded) {
+    if (await this.checkExclusion()) {
       this.logger.debug('URL excluded, skipping selection processing');
       return;
     }
@@ -188,16 +203,33 @@ export class SelectionManager extends ResourceTracker {
       // Main frame - use WindowsManager directly
       this.logger.debug('Showing translation UI via WindowsManager', {
         text: selectedText.substring(0, 30) + '...',
-        position
+        position,
+        windowsManagerType: typeof windowsManager,
+        hasShowMethod: typeof windowsManager.show === 'function'
       });
 
-      await windowsManager.show(selectedText, position);
+    // Show translation UI
+    this.logger.info('Translation UI requested', {
+      textLength: selectedText.length,
+      position: {
+        x: Math.round(position.x),
+        y: Math.round(position.y)
+      },
+      context: windowsManager ? 'main-frame' : 'iframe'
+    });
+
+    await windowsManager.show(selectedText, position);
+    this.logger.debug('WindowsManager.show() completed');
 
     } else if (window !== window.top) {
       // Iframe - request window creation in main frame
-      this.logger.debug('Requesting window creation in main frame', {
-        text: selectedText.substring(0, 30) + '...',
-        position
+      this.logger.info('Requesting translation window from iframe', {
+        frameId: this.frameId,
+        textLength: selectedText.length,
+        position: {
+          x: Math.round(position.x),
+          y: Math.round(position.y)
+        }
       });
 
       this.requestWindowCreationInMainFrame(selectedText, position);
@@ -236,6 +268,7 @@ export class SelectionManager extends ResourceTracker {
   dismissWindow() {
     const windowsManager = this.getWindowsManager();
     if (windowsManager) {
+      this.logger.debug('Translation window dismissed');
       windowsManager.dismiss();
     }
 

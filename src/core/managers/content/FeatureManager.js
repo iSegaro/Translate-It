@@ -3,10 +3,10 @@ import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+// ErrorHandler will be imported lazily when needed
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FeatureManager');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'FeatureManager');
 
 // Singleton instance
 let featureManagerInstance = null;
@@ -52,8 +52,8 @@ export class FeatureManager extends ResourceTracker {
     ExclusionChecker.resetInstance();
     // Reset ContentMessageHandler singleton
     try {
-      import('@/handlers/content/ContentMessageHandler.js').then(({ ContentMessageHandler }) => {
-        ContentMessageHandler.resetInstance();
+      import('@/handlers/content/ContentMessageHandler.js').then((module) => {
+        module.default.resetInstance();
       });
     } catch {
       // Import might not be available
@@ -91,12 +91,18 @@ export class FeatureManager extends ResourceTracker {
       });
 
     } catch (error) {
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: 'FeatureManager-initialize',
-        showToast: false
-      });
+      // Try to get ErrorHandler for better error handling
+      try {
+        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+        const handler = ErrorHandler.getInstance();
+        handler.handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: 'FeatureManager-initialize',
+          showToast: false
+        });
+      } catch (handlerError) {
+        logger.error('Error initializing FeatureManager:', error);
+      }
       throw error;
     }
   }
@@ -166,7 +172,7 @@ export class FeatureManager extends ResourceTracker {
 
   async activateFeature(featureName) {
     if (this.activeFeatures.has(featureName)) {
-      logger.debug(`Feature ${featureName} already active`);
+      // logger.trace(`Feature ${featureName} already active`);
       return;
     }
 
@@ -191,8 +197,8 @@ export class FeatureManager extends ResourceTracker {
         handler = SimpleTextSelectionHandler.getInstance({ featureManager: this });
       } else if (featureName === 'contentMessageHandler') {
         // Use singleton pattern for ContentMessageHandler
-        const { ContentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
-        handler = ContentMessageHandler.getInstance({ featureManager: this });
+        const { contentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
+        handler = contentMessageHandler;
       } else {
         handler = await this.loadFeatureHandler(featureName);
       }
@@ -202,7 +208,32 @@ export class FeatureManager extends ResourceTracker {
         if (success !== false) { // Consider true or undefined as success
           this.featureHandlers.set(featureName, handler);
           this.activeFeatures.add(featureName);
-          logger.info(`Feature ${featureName} activated successfully`);
+
+          // Special integration: Connect SelectElementManager to ContentMessageHandler
+          if (featureName === 'selectElement') {
+            try {
+              const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+              if (contentMessageHandler && typeof contentMessageHandler.setSelectElementManager === 'function') {
+                contentMessageHandler.setSelectElementManager(handler);
+                logger.debug('SelectElementManager integrated with ContentMessageHandler');
+              }
+            } catch (integrationError) {
+              logger.warn('Failed to integrate SelectElementManager with ContentMessageHandler:', integrationError);
+            }
+          } else if (featureName === 'contentMessageHandler') {
+            // If ContentMessageHandler is activated after SelectElementManager, connect them
+            try {
+              const selectElementManager = this.featureHandlers.get('selectElement');
+              if (selectElementManager && typeof handler.setSelectElementManager === 'function') {
+                handler.setSelectElementManager(selectElementManager);
+                logger.debug('ContentMessageHandler integrated with existing SelectElementManager');
+              }
+            } catch (integrationError) {
+              logger.warn('Failed to integrate ContentMessageHandler with SelectElementManager:', integrationError);
+            }
+          }
+
+          logger.debug(`Feature ${featureName} activated successfully`);
         } else {
           logger.warn(`Feature ${featureName} activation returned false - not registering`);
         }
@@ -210,12 +241,18 @@ export class FeatureManager extends ResourceTracker {
       
     } catch (error) {
       logger.error(`Failed to activate feature ${featureName}:`, error);
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, { 
-        type: ErrorTypes.SERVICE, 
-        context: `FeatureManager-activateFeature-${featureName}`,
-        showToast: false 
-      });
+      // Try to get ErrorHandler for better error handling
+      try {
+        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+        const handler = ErrorHandler.getInstance();
+        handler.handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: `FeatureManager-activateFeature-${featureName}`,
+          showToast: false
+        });
+      } catch (handlerError) {
+        // Fallback - error already logged
+      }
     }
   }
 
@@ -267,12 +304,18 @@ export class FeatureManager extends ResourceTracker {
 
     } catch (error) {
       logger.error(`Failed to deactivate feature ${featureName}:`, error);
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: `FeatureManager-deactivateFeature-${featureName}`,
-        showToast: false
-      });
+      // Try to get ErrorHandler for better error handling
+      try {
+        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+        const handler = ErrorHandler.getInstance();
+        handler.handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: `FeatureManager-deactivateFeature-${featureName}`,
+          showToast: false
+        });
+      } catch (handlerError) {
+        // Fallback - error already logged
+      }
     }
   }
 

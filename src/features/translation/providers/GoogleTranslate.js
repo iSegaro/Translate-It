@@ -51,6 +51,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
     const isDictionaryEnabled = await getEnableDictionaryAsync();
+
+    // Add key info log for translation start
+    logger.info(`[Google] Starting translation: ${chunkTexts.join(RELIABLE_DELIMITER).length} chars`);
     // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
     const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
 
@@ -118,7 +121,14 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       return [`${result.translatedSegments[0]}\n\n${formattedDictionary}`];
     }
 
-    return result?.translatedSegments || chunkTexts;
+    const finalResult = result?.translatedSegments || chunkTexts;
+
+    // Add completion log for successful translation
+    if (finalResult.length > 0) {
+      logger.info(`[Google] Translation completed successfully`);
+    }
+
+    return finalResult;
   }
 
   _formatDictionaryAsMarkdown(candidateText) {

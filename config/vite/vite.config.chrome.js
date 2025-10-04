@@ -6,6 +6,12 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
+// Import production config for production builds
+let productionConfig = null;
+if (process.env.NODE_ENV === 'production') {
+  productionConfig = (await import('./vite.config.production.js')).default;
+}
+
 // Plugin to copy static files and fix HTML paths for extension structure
 function fixExtensionPaths() {
   const copyStaticFiles = async (outDir) => {
@@ -165,11 +171,40 @@ function fixExtensionPaths() {
 
 const baseConfig = createBaseConfig('chrome')
 
+// Use production config if in production, otherwise use base config
+const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
+  ? {
+      ...baseConfig,
+      ...productionConfig,
+      build: {
+        ...baseConfig.build,
+        ...productionConfig.build,
+        rollupOptions: {
+          ...baseConfig.build?.rollupOptions,
+          ...productionConfig.build?.rollupOptions,
+          output: {
+            ...baseConfig.build?.rollupOptions?.output,
+            ...productionConfig.build?.rollupOptions?.output
+          }
+        }
+      }
+    }
+  : baseConfig;
+
 export default defineConfig({
-  ...baseConfig,
+  ...finalConfig,
   build: {
-    ...baseConfig.build,
+    ...(finalConfig.build || {}),
     outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+    rollupOptions: {
+      ...(finalConfig.build?.rollupOptions || {}),
+      // Override entry points to remove them from production config
+      input: undefined,
+      output: {
+        ...(finalConfig.build?.rollupOptions?.output || {}),
+        format: 'es'
+      }
+    }
   },
   plugins: [
     ...(baseConfig.plugins || []),

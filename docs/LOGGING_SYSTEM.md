@@ -2,17 +2,11 @@
 
 The extension uses a **unified, modern logging system** for structured, environment-aware logging across all components.
 
-**✅ Migration Status:** **COMPLETED** (September 2025)  
-**🚀 API Status:** 100% Modern - Zero Legacy Code - TDZ Safe  
-**🔧 Build Status:** Chrome + Firefox Extensions Verified - All TDZ Issues Resolved  
+**✅ Migration Status:** **COMPLETED** (September 2025)
+**🚀 API Status:** 100% Modern - Zero Legacy Code - TDZ Safe
+**🔧 Build Status:** Chrome + Firefox Extensions Verified - All TDZ Issues Resolved
 
-> **Note:** All legacy `getLogger()` and### Migration Benefits Achieved ✅
-- **100% API Consistency:** Single logging interface across all components
-- **Zero Legacy Code:** No more dual-API confusion
-- **Performance Optimized:** Lazy evaluation and level checking prevent unnecessary work
-- **Build Verified:** Chrome + Firefox extensions build successfully
-- **TDZ Safe:** All utility modules use lazy initialization to prevent temporal dead zone errors
-- **Memory Efficient:** Cached logger instances prevent duplicationE()` patterns have been fully migrated to the modern `getScopedLogger()` API. This guide reflects the current production-ready system.
+> **Note:** All legacy `getLogger()` and `logME()` patterns have been fully migrated to the modern `getScopedLogger()` API. This guide reflects the current production-ready system.
 
 ## Quick Start
 
@@ -43,7 +37,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 
 // ❌ REMOVED - These no longer exist
 getLogger()                    // Fully removed
-logME()                       // Fully removed  
+logME()                       // Fully removed
 console.log('[Component]')    // Avoid - use logger instead
 createLogger()                // Internal use only
 ```
@@ -117,19 +111,64 @@ Use immediate initialization when:
 
 ## Components
 
-Available component categories:
-
+### Core Layers
 ```javascript
-LOG_COMPONENTS.BACKGROUND  // Background service worker
-LOG_COMPONENTS.CORE        // Core system components
-LOG_COMPONENTS.CONTENT     // Content script components  
-LOG_COMPONENTS.MESSAGING   // Messaging system
-LOG_COMPONENTS.TRANSLATION // Translation-related
-LOG_COMPONENTS.UI          // User interface components
-LOG_COMPONENTS.STORAGE     // Storage operations
-LOG_COMPONENTS.CAPTURE     // Screen capture components
-LOG_COMPONENTS.PROVIDERS   // Translation provider implementations
-LOG_COMPONENTS.ERROR       // Error handling and management
+LOG_COMPONENTS.BACKGROUND  // Background service worker (src/core/background/)
+LOG_COMPONENTS.CONTENT     // Content script components (src/core/content-scripts/)
+LOG_COMPONENTS.CORE        // Core system components (src/core/ except background & content)
+```
+
+### Applications & UI
+```javascript
+LOG_COMPONENTS.UI          // UI components and composables (src/apps/ & src/components/)
+LOG_COMPONENTS.POPUP       // Popup application (src/apps/popup/)
+LOG_COMPONENTS.SIDEPANEL   // Sidepanel application (src/apps/sidepanel/)
+LOG_COMPONENTS.OPTIONS     // Options application (src/apps/options/)
+LOG_COMPONENTS.CONTENT_APP // Content application (src/apps/content/)
+```
+
+### Feature Modules
+```javascript
+LOG_COMPONENTS.TRANSLATION          // Translation engine and services
+LOG_COMPONENTS.TTS                  // Text-to-Speech system
+LOG_COMPONENTS.SCREEN_CAPTURE        // Screen capture and OCR
+LOG_COMPONENTS.ELEMENT_SELECTION     // Element selection functionality
+LOG_COMPONENTS.TEXT_SELECTION       // Text selection handling
+LOG_COMPONENTS.TEXT_ACTIONS         // Copy/paste/TTS operations
+LOG_COMPONENTS.TEXT_FIELD_INTERACTION // Text field icon interactions
+LOG_COMPONENTS.NOTIFICATIONS        // Notification system
+LOG_COMPONENTS.IFRAME              // IFrame support
+LOG_COMPONENTS.SHORTCUTS           // Keyboard shortcuts
+LOG_COMPONENTS.EXCLUSION           // URL exclusion system
+LOG_COMPONENTS.SUBTITLE            // Subtitle display
+LOG_COMPONENTS.HISTORY             // Translation history
+LOG_COMPONENTS.SETTINGS           // Settings management
+LOG_COMPONENTS.WINDOWS             // Windows management
+```
+
+### Shared Systems
+```javascript
+LOG_COMPONENTS.PROXY      // Proxy system for geographically restricted services
+LOG_COMPONENTS.MESSAGING  // Unified messaging system
+LOG_COMPONENTS.STORAGE    // Storage management with caching
+LOG_COMPONENTS.ERROR      // Error handling and management
+LOG_COMPONENTS.CONFIG     // Configuration system
+LOG_COMPONENTS.MEMORY     // Memory management and garbage collection
+```
+
+### Utilities & Tools
+```javascript
+LOG_COMPONENTS.UTILS      // General utilities
+LOG_COMPONENTS.BROWSER    // Browser compatibility utilities
+LOG_COMPONENTS.TEXT       // Text processing utilities
+LOG_COMPONENTS.FRAMEWORK  // Framework compatibility
+LOG_COMPONENTS.LEGACY     // Legacy compatibility code
+```
+
+### Provider Systems
+```javascript
+LOG_COMPONENTS.PROVIDERS  // Translation provider implementations
+LOG_COMPONENTS.CAPTURE    // Legacy alias for SCREEN_CAPTURE
 ```
 
 ## Environment Behavior
@@ -154,7 +193,7 @@ Always creates a new instance. Reserved for internal or exceptional meta use-cas
 
 ```javascript
 logger.error(message, data?)     // Critical errors (always visible)
-logger.warn(message, data?)      // Warnings  
+logger.warn(message, data?)      // Warnings
 logger.info(message, data?)      // General information
 logger.debug(message, data?)     // Debug information (development only)
 logger.init(message, data?)      // Initialization logs (always shown in dev)
@@ -213,18 +252,18 @@ class TranslationService {
   constructor() {
   this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TranslationService')
   }
-  
+
   async translateText(text, options) {
-    this.logger.debug('Translation request', { 
-      length: text.length, 
-      provider: options.provider 
+    this.logger.debug('Translation request', {
+      length: text.length,
+      provider: options.provider
     })
-    
+
     try {
       const result = await this.callAPI(text, options)
-      this.logger.info('Translation completed', { 
+      this.logger.info('Translation completed', {
         provider: options.provider,
-        duration: result.duration 
+        duration: result.duration
       })
       return result
     } catch (error) {
@@ -247,7 +286,7 @@ class SelectElementManager {
   constructor() {
   this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
   }
-  
+
   initialize() {
     try {
       this.setupEventListeners()
@@ -256,13 +295,13 @@ class SelectElementManager {
       this.logger.error('Initialization failed', error)
     }
   }
-  
+
   handleElementClick(element) {
-    this.logger.debug('Element clicked', { 
-      tagName: element.tagName, 
-      id: element.id 
+    this.logger.debug('Element clicked', {
+      tagName: element.tagName,
+      id: element.id
     })
-    
+
     this.logger.operation('Element processed successfully')
   }
 }
@@ -303,7 +342,7 @@ Choose appropriate log levels:
 // ERROR: For actual errors
 logger.error('API request failed', error)
 
-// WARN: For deprecations or recoverable issues  
+// WARN: For deprecations or recoverable issues
 logger.warn('Using deprecated method, please migrate')
 
 // INFO: For important status updates
@@ -345,9 +384,9 @@ Use `init()` for component initialization:
 
 ```javascript
 // Good: Clear initialization
-logger.init('Component initialized', { 
+logger.init('Component initialized', {
   handlers: this.handlers.length,
-  features: this.enabledFeatures 
+  features: this.enabledFeatures
 })
 
 // Avoid: Generic info
@@ -359,16 +398,55 @@ logger.info('Ready')
 ### Default Component Levels (Production Optimized)
 ```javascript
 const componentLogLevels = {
-  Background: LOG_LEVELS.INFO,
-  Core: LOG_LEVELS.INFO,
-  Content: LOG_LEVELS.WARN,      // Reduced noise in content scripts
+  // Core layers (main background and content workflows)
+  Background: LOG_LEVELS.INFO,  // Background service worker and handlers
+  Core: LOG_LEVELS.INFO,        // Core system components
+  Content: LOG_LEVELS.INFO,     // Windows Manager and content scripts
+
+  // Applications and UI
+  UI: LOG_LEVELS.INFO,          // UI composables and components
+  Popup: LOG_LEVELS.INFO,       // Popup application
+  Sidepanel: LOG_LEVELS.INFO,   // Sidepanel application
+  Options: LOG_LEVELS.INFO,     // Options application
+  ContentApp: LOG_LEVELS.INFO,  // Content application
+
+  // Features (all set to INFO for production visibility)
   Translation: LOG_LEVELS.INFO,
-  Messaging: LOG_LEVELS.WARN,    // Reduced noise in messaging
-  Providers: LOG_LEVELS.INFO,
-  UI: LOG_LEVELS.WARN,           // Reduced noise in UI components
-  Storage: LOG_LEVELS.WARN,
-  Capture: LOG_LEVELS.INFO,
-  Error: LOG_LEVELS.INFO,
+  TTS: LOG_LEVELS.INFO,
+  ScreenCapture: LOG_LEVELS.INFO,
+  ElementSelection: LOG_LEVELS.INFO,
+  TextSelection: LOG_LEVELS.INFO,
+  TextActions: LOG_LEVELS.INFO,
+  TextFieldInteraction: LOG_LEVELS.INFO,
+  Notifications: LOG_LEVELS.INFO,
+  IFrame: LOG_LEVELS.INFO,
+  Shortcuts: LOG_LEVELS.INFO,
+  Exclusion: LOG_LEVELS.INFO,
+  Subtitle: LOG_LEVELS.INFO,
+  History: LOG_LEVELS.INFO,
+  Settings: LOG_LEVELS.INFO,
+  Windows: LOG_LEVELS.INFO,
+
+  // Shared systems
+  Messaging: LOG_LEVELS.INFO,    // Important for debugging communication
+  Storage: LOG_LEVELS.WARN,      // Reduce noise in storage operations
+  Error: LOG_LEVELS.INFO,        // Error tracking is important
+  Config: LOG_LEVELS.INFO,       // Configuration changes
+  Memory: LOG_LEVELS.INFO,       // Memory management operations
+  Proxy: LOG_LEVELS.INFO,      // Proxy system for restricted services
+
+  // Utilities and tools
+  Utils: LOG_LEVELS.INFO,       // General utilities
+  Browser: LOG_LEVELS.INFO,     // Browser utilities
+  Text: LOG_LEVELS.INFO,        // Text processing
+  Framework: LOG_LEVELS.INFO,   // Framework compatibility
+  Legacy: LOG_LEVELS.WARN,       // Legacy compatibility (reduced noise)
+
+  // Providers (subset of Translation)
+  Providers: LOG_LEVELS.INFO,   // Translation provider implementations
+
+  // Legacy aliases
+  Capture: LOG_LEVELS.INFO,     // Maps to ScreenCapture
 }
 ```
 
@@ -385,50 +463,27 @@ enableGlobalDebug()  // Enable all debug logs
 disableGlobalDebug() // Restore component-specific levels
 ```
 
-## ✅ Migration Status (August 2025)
+## Advanced Features
 
-### Migration Completed ✅
-The extension has been **fully migrated** from legacy logging patterns:
+### Performance Optimizations
 
-| Legacy Pattern | Status | Replacement |
-|----------------|--------|-------------|
-| `getLogger()` | ✅ **REMOVED** | `getScopedLogger()` |
-| `logME()` | ✅ **REMOVED** | `logger.debug()` |
-| `console.log('[Component]')` | ✅ **REMOVED** | `logger.debug()` |
-| Global singletons | ✅ **REMOVED** | Cached scoped loggers |
+1. **Log Batching**: Production environment batches logs within 100ms windows to reduce console I/O
+2. **Level Memoization**: Caches level checks to avoid repeated computations
+3. **Lazy Evaluation**: Expensive operations only executed when log level is enabled
+4. **Memory Management**: Cached logger instances with LRU eviction
 
-### Migration Benefits Achieved ✅
-- **100% API Consistency:** Single logging interface across all components
-- **Zero Legacy Code:** No more dual-API confusion
-- **Performance Optimized:** Lazy evaluation and level checking
-- **Build Verified:** Chrome + Firefox extensions build successfully
-- **Memory Efficient:** Cached logger instances prevent duplication
+### Runtime Filtering
 
-### Common Migration Patterns
-
-| Old Pattern | New Pattern |
-|-------------|-------------|
-| `console.log('[Component] ✅ Success')` | `logger.init('Success')` or `logger.operation('Success')` |
-| `console.log('[Component] Processing...')` | `logger.debug('Processing')` |
-| `console.error('[Component] Error:', err)` | `logger.error('Error description', err)` |
-| `console.warn('[Component] Warning')` | `logger.warn('Warning description')` |
-| `logME('Debug info')` | `logger.debug('Debug info')` |
-| `getLogger().debug('message')` | `logger.debug('message')` |
-
-### New Developer Workflow ✅
 ```javascript
-// Step 1: Import (once per file)
-import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
-
-// Step 2: Create scoped logger (cached automatically)
-const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'MyComponent')
-
-// Step 3: Use throughout component
-logger.init('Component started')
-logger.debug('Processing...')
-logger.error('Something failed', error)
+// Configure dynamic filtering
+configureRuntimeFilter({
+  enabled: true,
+  minLevel: LOG_LEVELS.INFO,
+  allowedComponents: ['Translation', 'Core'],
+  allowedPatterns: [/error/i, /warning/i],
+  blockedPatterns: [/debug.*test/i]
+})
 ```
-5. Use init() for initialization logs
 
 ## Troubleshooting
 
@@ -494,14 +549,46 @@ listLoggerLevels()
 ## File Structure
 
 ```
-src/utils/core/
+src/shared/logging/
 ├── logger.js          # Main logging system (getScopedLogger, performance optimized)
 ├── logConstants.js    # LOG_LEVELS and LOG_COMPONENTS definitions
 ```
 
-**Key Files**:
-- `src/utils/core/logger.js` - Main logging implementation (**always use getScopedLogger**)
-- `src/utils/core/logConstants.js` - Constants and component definitions
+**Key Files:**
+- `src/shared/logging/logger.js` - Main logging implementation (**always use getScopedLogger**)
+- `src/shared/logging/logConstants.js` - Constants and component definitions
+
+## Best Practices by Component Type
+
+### Core Components (Background, Core, Content)
+- Use `INFO` for important lifecycle events
+- Use `DEBUG` for detailed operational flow
+- Use `ERROR` for critical failures
+- Example: Background service startup, content script initialization
+
+### Feature Components (Translation, TTS, ScreenCapture, etc.)
+- Use `INFO` for feature state changes
+- Use `DEBUG` for feature-specific operations
+- Use `WARN` for recoverable issues
+- Example: Translation completed, TTS started, screen capture processed
+
+### UI Components (UI, Popup, Sidepanel, Options)
+- Use `INFO` for user interactions
+- Use `DEBUG` for UI state changes
+- Use `WARN` for UI-related issues
+- Example: Button clicked, panel opened, settings saved
+
+### Shared Systems (Messaging, Storage, Error, Config)
+- Use `INFO` for system-level events
+- Use `WARN` for non-critical system issues
+- Use `ERROR` for system failures
+- Example: Message sent, storage error, config updated
+
+### Utility Components (Utils, Browser, Text, Framework)
+- Use `DEBUG` for utility operations
+- Use `WARN` for utility deprecations
+- Generally reduce noise in utilities
+- Example: Text processed, browser API called
 
 ## Summary
 
@@ -600,12 +687,12 @@ class MyManager {
     // Listen for commands from main world (Console)
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
-      
+
       const { type, ...params } = event.data;
-      
+
       if (type === 'MY_DEBUG_COMMAND') {
         this.handleDebugCommand(params);
-        
+
         // Send response back to main world
         window.postMessage({
           type: 'MY_DEBUG_RESPONSE',
@@ -613,11 +700,11 @@ class MyManager {
         }, '*');
       }
     });
-    
+
     // Display available commands in Console
     this.displayConsoleHelp();
   }
-  
+
   displayConsoleHelp() {
     console.log('\n🚀 Debug Commands Available:');
     console.log('===============================================');
@@ -646,7 +733,7 @@ window.addEventListener('message', (event) => {
    ```javascript
    // Good: Namespace your messages
    window.postMessage({type:'TRANSLATE_IT_SET_MODE', mode:'simple'}, '*')
-   
+
    // Avoid: Generic types
    window.postMessage({type:'SET_MODE', mode:'simple'}, '*')
    ```
@@ -657,7 +744,7 @@ window.addEventListener('message', (event) => {
      console.log('\n🚀 MyExtension Debug Mode');
      console.log('===============================================');
      console.log('Available commands:');
-     console.log('window.postMessage({type:"MY_COMMAND",value:"test"},"*")');
+     console.log('window.postMessage({type:"MY_COMMAND",value:"test"},'*')');
      console.log('===============================================\n');
    };
    ```
@@ -677,12 +764,12 @@ window.addEventListener('message', (event) => {
    ```javascript
    window.addEventListener('message', (event) => {
      if (event.source !== window) return;
-     
+
      const { type, ...params } = event.data;
-     
+
      // Validate expected message types
      if (!type || !type.startsWith('MY_EXTENSION_')) return;
-     
+
      this.handleCommand(type, params);
    });
    ```
@@ -703,7 +790,7 @@ window.addEventListener('message', (event) => {
      'MY_EXTENSION_COMMAND_1',
      'MY_EXTENSION_COMMAND_2'
    ];
-   
+
    if (!ALLOWED_TYPES.includes(type)) return;
    ```
 
@@ -721,9 +808,9 @@ window.addEventListener('message', (event) => {
 setupPostMessageInterface() {
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
-    
+
     const { type, mode } = event.data;
-    
+
     if (type === 'TRANSLATE_IT_SET_MODE' && mode) {
       this.setMode(mode);
     } else if (type === 'TRANSLATE_IT_GET_MODE') {
@@ -734,13 +821,13 @@ setupPostMessageInterface() {
       }, '*');
     }
   });
-  
+
   // Display help in Console
   console.log('\n🚀 TranslateIt Select Manager - Debug Mode');
   console.log('===============================================');
   console.log('Commands:');
-  console.log('window.postMessage({type:"TRANSLATE_IT_SET_MODE",mode:"smart"},"*")');
-  console.log('window.postMessage({type:"TRANSLATE_IT_GET_MODE"},"*")');
+  console.log('window.postMessage({type:"TRANSLATE_IT_SET_MODE",mode:"smart"},'*')');
+  console.log('window.postMessage({type:"TRANSLATE_IT_GET_MODE"},'*')');
   console.log('===============================================\n');
 }
 ```
@@ -762,7 +849,7 @@ window.addEventListener('message', (event) => {
 
 1. **PostMessage is the ONLY reliable solution** for Manifest V3 cross-world communication
 2. **Always provide Console help** showing available commands
-3. **Use unique message types** to avoid conflicts with other extensions/scripts  
+3. **Use unique message types** to avoid conflicts with other extensions/scripts
 4. **Validate all incoming messages** for security
 5. **Handle responses** to provide feedback to Console users
 6. **Keep it simple** - complex debug interfaces become maintenance burdens
@@ -771,5 +858,5 @@ This pattern enables powerful debugging capabilities while respecting Manifest V
 
 ---
 
-**📅 Last Updated:** September 3, 2025 - TDZ Issues Resolved & Lazy Initialization Implemented  
+**📅 Last Updated:** September 27, 2025 - Updated with new architecture, component levels, and optimizations
 **📊 Status:** ✅ Production Ready - 100% Modern Logging API with Full TDZ Safety

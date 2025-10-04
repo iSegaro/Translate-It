@@ -1,412 +1,301 @@
-// Content script entry point for Vue build
-// Modern modular architecture with smart feature management
+// Content script entry point - Ultra-optimized with smart loading
+// Minimal footprint with intelligent, interaction-based loading
 
-import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { checkContentScriptAccess } from "@/core/tabPermissions.js";
-// import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-// import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { isDevelopmentMode } from '@/shared/utils/environment.js';
-import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js';
-// Import Main DOM CSS as raw string for injection
-import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
+let contentScriptCore = null;
+let featureLoadPromises = new Map();
+let interactionDetected = false;
 
-// Import Memory Garbage Collector
-import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
-import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
-
-// Import Feature Manager for smart handler registration
-import { FeatureManager } from '@/core/managers/content/FeatureManager.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
-
-// Import Field Detection System for global availability
-// import { fieldDetector } from '@/utils/text/FieldDetector.js';
-// import { selectionDetector } from '@/utils/text/SelectionDetector.js';
-
-// Import Notification System
-import NotificationManager from '@/core/managers/core/NotificationManager.js';
-
-// Import Settings Update Handler
-import '@/shared/messaging/handlers/SettingsUpdateHandler.js';
-
-// Setup Trusted Types compatibility early
-import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
-setupTrustedTypesCompatibility();
-
-
-// Create logger for content script
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
-
-// Global extension context validation helper
-function validateExtensionContext(operation = 'unknown') {
-  if (!ExtensionContextManager.isValidSync()) {
-    logger.debug(`Extension context invalid - ${operation} skipped`);
-    return false;
+// Smart loading configuration
+const LOAD_STRATEGIES = {
+  CRITICAL: {
+    delay: 0,          // Load immediately
+    priority: 'high'
+  },
+  ESSENTIAL: {
+    delay: 500,        // Load after 500ms
+    priority: 'medium'
+  },
+  ON_DEMAND: {
+    delay: 2000,       // Load after 2 seconds or on interaction
+    priority: 'low'
+  },
+  INTERACTIVE: {
+    delay: 0,          // Load on specific user interaction
+    priority: 'medium'
   }
-  return true;
-}
+};
 
+// Feature categorization
+const FEATURE_CATEGORIES = {
+  CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
+  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core translation features
+  INTERACTIVE: [], // UI interaction features
+  ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
+};
 
-/**
- * Legacy initialization fallback
- * Used when FeatureManager fails to initialize
- */
-async function initializeLegacyHandlers() {
-  // Validate extension context before legacy initialization
-  if (!validateExtensionContext('legacy-initialization')) {
-    return;
-  }
+// Import logging utilities
+let logger = null;
+let getScopedLogger = null;
+let LOG_COMPONENTS = null;
+let ErrorHandler = null;
 
-  logger.warn('Initializing legacy handlers as fallback...');
+// Static import ContentScriptCore to fix Firefox class compilation issues
+import { ContentScriptCore } from './ContentScriptCore.js';
+
+// Lazy load logging and error handling dependencies
+async function initializeLogger() {
+  if (logger) return logger;
 
   try {
-    // Legacy initialization is now handled by FeatureManager
-    // Import only what's needed for backward compatibility
-    const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
-    const { contentMessageHandler } = await import("@/handlers/content/index.js");
+    const [{ getScopedLogger: scopedLogger }, { LOG_COMPONENTS: logComponents }, { ErrorHandler: errorHandler }] = await Promise.all([
+      import('@/shared/logging/logger.js'),
+      import('@/shared/logging/logConstants.js'),
+      import('@/shared/error-management/ErrorHandler.js')
+    ]);
 
-    // Initialize core systems
-    const translationHandler = getTranslationHandlerInstance();
-
-    // Store instances globally (for legacy compatibility)
-    window.translationHandlerInstance = translationHandler;
-    window.contentMessageHandler = contentMessageHandler;
-    // Note: selectElementManagerInstance is no longer available - use FeatureManager instead
-
-    // Get message handler
-    const messageHandler = createMessageHandler();
-
-    // Register all ContentMessageHandler handlers with the central message handler
-    if (contentMessageHandler.handlers) {
-      for (const [action, handler] of contentMessageHandler.handlers.entries()) {
-        messageHandler.registerHandler(action, async (message, sender) => {
-          try {
-            // Call the handler directly and return the result
-            const result = await handler.call(contentMessageHandler, message, sender);
-            return result;
-          } catch (error) {
-            logger.error(`Error in legacy content handler for ${action}:`, error);
-            throw error;
-          }
-        });
-      }
-      logger.debug('Registered legacy content message handlers:', Array.from(contentMessageHandler.handlers.keys()));
-    }
-    
-    // Activate the message listener
-    if (!messageHandler.isListenerActive) {
-      messageHandler.listen();
-      logger.debug('Legacy message handler activated');
-    }
-    
-    // Store message handler globally for cleanup
-    window.legacyMessageHandler = messageHandler;
-    
-    logger.info('Legacy handlers initialized successfully with proper message handling');
-    
+    getScopedLogger = scopedLogger;
+    LOG_COMPONENTS = logComponents;
+    ErrorHandler = errorHandler;
+    logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
+    return logger;
   } catch (error) {
-    // Handle context errors silently
-    if (ExtensionContextManager.isContextError(error)) {
-      ExtensionContextManager.handleContextError(error, 'legacy-initialization');
-    } else {
-      logger.error('Legacy initialization also failed:', error);
-    }
-  }
-}
-
-/**
- * Inject CSS for Main DOM (outside Shadow DOM)
- * This ensures styles for Select Element Mode work on main page elements
- */
-async function injectMainDOMStyles() {
-  // Check if already injected
-  if (document.getElementById('translate-it-main-dom-styles')) {
-    return;
-  }
-
-  // Validate extension context before DOM operations
-  if (!validateExtensionContext('main-dom-css-injection')) {
-    return;
-  }
-
-  try {
-    // Create style element with pre-compiled CSS
-    const styleElement = document.createElement('style');
-    styleElement.id = 'translate-it-main-dom-styles';
-    styleElement.textContent = mainDomCss;
-    
-    // Inject to main document head
-    document.head.appendChild(styleElement);
-    
-  } catch (error) {
-    logger.error('Failed to inject Main DOM CSS:', error);
-  }
-}
-
-// --- Early exit for restricted pages ---
-const access = checkContentScriptAccess();
-
-logger.debug('Content script access check result:', {
-  isAccessible: access.isAccessible,
-  errorMessage: access.errorMessage,
-  url: window.location.href,
-  isInIframe: window !== window.top
-});
-
-// NOTE: Revert handling is now managed by MessageHandler in useTranslationModes.js
-// This ensures proper integration with existing messaging infrastructure
-
-if (!access.isAccessible) {
-  logger.warn(`Content script execution stopped: ${access.errorMessage}`);
-  // Stop further execution by not initializing anything.
-  // This prevents errors on pages like chrome://extensions or about:addons.
-} else {
-  // Use async IIFE to handle initialization
-  (async () => {
-    // Validate extension context before any operations
-    if (!validateExtensionContext('content-script-initialization')) {
-      return;
-    }
-    // Initialize IFrameManager for enhanced iframe support
-    const { iFrameManager } = await import('@/features/iframe-support/managers/IFrameManager.js');
-    
-    // Determine execution mode based on frame context
-    const isInIframe = window !== window.top;
-    const executionMode = isInIframe ? 'iframe' : 'main-frame';
-  
-  if (window.translateItContentScriptLoaded) {
-    logger.debug('Content script already loaded, stopping duplicate execution');
-    // Stop further execution
-  } else {
-    window.translateItContentScriptLoaded = true;
-    
-    (async () => {
-      logger.init(`Content script loading in ${executionMode}...`);
-
-    // --- Inject Main DOM CSS (main frame only) ---
-    if (!isInIframe) {
-      await injectMainDOMStyles();
-    }
-
-    // --- Mount the Vue UI Host (required for both main frame and iframe) ---
-    try {
-      // Check if UI Host already exists in current frame
-      const hostId = `translate-it-host-${isInIframe ? 'iframe' : 'main'}`;
-      if (document.getElementById(hostId)) {
-        // UI Host already exists
-      } else {
-        const { mountContentApp, getAppCss } = await import("@/app/main.js");
-        const { pageEventBus } = await import("@/core/PageEventBus.js");
-        
-        // 2. Create the host element and shadow DOM with iframe awareness
-        const hostElement = document.createElement('div');
-        hostElement.id = hostId;
-        hostElement.setAttribute('data-frame-type', executionMode);
-        hostElement.style.all = 'initial';
-        
-        // Enhanced z-index and positioning for iframe contexts
-        if (isInIframe) {
-          hostElement.style.position = 'fixed';
-          hostElement.style.top = '0';
-          hostElement.style.left = '0';
-          hostElement.style.width = '100vw';
-          hostElement.style.height = '100vh';
-          hostElement.style.pointerEvents = 'none';
-          hostElement.style.zIndex = '2147483647';
-        } else {
-          hostElement.style.position = 'relative';
-        }
-        
-        document.body.appendChild(hostElement);
-        const shadowRoot = hostElement.attachShadow({ mode: 'open' });
-
-        // 3. Inject the entire app's CSS into the shadow DOM with iframe awareness
-        const appStyles = getAppCss();
-        const appStyleEl = document.createElement('style');
-        appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
-        appStyleEl.setAttribute('data-frame-context', executionMode);
-        
-        // Include all app styles with critical reset first
-        appStyleEl.textContent = `
-          /* Minimal Shadow DOM Reset - Only essential properties */
-          :host {
-            display: block !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 2147483647 !important;
-            pointer-events: none !important;
-          }
-
-          /* App styles with Shadow DOM reset included */
-          ${appStyles}
-
-          /* IFrame-specific adjustments */
-          ${isInIframe ? `
-          :host {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            pointer-events: none !important;
-            z-index: 2147483647 !important;
-          }
-          
-          .translation-icon {
-            position: absolute !important;
-            z-index: 2147483647 !important;
-            pointer-events: all !important;
-          }
-          
-          .translation-window {
-            position: absolute !important;
-            z-index: 2147483646 !important;
-            pointer-events: all !important;
-          }
-          
-          /* Ensure all interactive elements have pointer-events */
-          .translation-icon *,
-          .translation-window *,
-          [data-vue-component] {
-            pointer-events: all !important;
-          }
-          ` : ''}
-        `;
-        shadowRoot.appendChild(appStyleEl);
-        
-
-        // 4. Create the root element for the Vue app and mount it.
-        const appRoot = document.createElement('div');
-        shadowRoot.appendChild(appRoot);
-        mountContentApp(appRoot);
-
-        logger.info(`Vue UI Host mounted into Shadow DOM with all styles (${executionMode})`, {
-          hostId,
-          isInIframe,
-          shadowRootMode: shadowRoot.mode,
-          hostElementPosition: hostElement.style.position,
-          hostElementZIndex: hostElement.style.zIndex
-        });
-
-        // Initialize Notification System for Select Element
-        setTimeout(async () => {
-          try {
-            const notificationManager = new NotificationManager();
-            
-            // Initialize SelectElementNotificationManager for unified notification handling
-            const { getSelectElementNotificationManager } = await import('@/features/element-selection/SelectElementNotificationManager.js');
-            await getSelectElementNotificationManager(notificationManager);
-            
-            logger.debug('Notification System initialized for Select Element');
-          } catch (error) {
-            logger.error('Failed to initialize Notification System:', error);
-          }
-        }, 100);
-
-        // Emit a test event to confirm communication
-        setTimeout(() => {
-          pageEventBus.emit('ui-host-mounted');
-        }, 500);
-      }
-
-    } catch (error) {
-      logger.error('Failed to mount the Vue UI Host:', error);
-    }
-
-    // NOTE: Revert handling is now properly integrated with MessageHandler in useTranslationModes.js
-
-    // Initialize Smart Feature Management System
-    let featureManager = null;
-    try {
-      logger.info('🚀 [Content Script] Starting Smart Feature Management System initialization...');
-      
-      // Create and initialize FeatureManager singleton
-      featureManager = FeatureManager.getInstance();
-
-      // FeatureManager manages handlers - individual handlers handle their own Critical Protection
-      featureManager.trackResource('feature-manager-core', () => {
-        logger.debug('FeatureManager core cleanup called');
-        // Smart cleanup: only deactivate non-critical features during memory pressure
-        featureManager.performSmartCleanup();
-      });
-
-      await featureManager.initialize();
-
-      // Store for global access (mainly for debugging and memory protection)
-      if (isDevelopmentMode()) {
-        window.featureManagerInstance = featureManager;
-      }
-      // Also store globally for memory protection
-      window.featureManager = featureManager;
-      
-      logger.info('Smart Feature Management System initialized successfully', {
-        activeFeatures: featureManager.getActiveFeatures(),
-        frameType: executionMode,
-        debugMode: isDevelopmentMode()
-      });
-
-      // FeatureManager handles all message handler registration through smart feature management
-      // ContentMessageHandler and other features are activated based on settings and exclusions
-      logger.debug('Smart feature management system will handle message handler registration');
-
-    } catch (error) {
-      logger.error('❌ [Content Script] Smart Feature Management System failed:', error);
-      logger.error('❌ [Content Script] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        url: window.location.href
-      });
-      
-      // Fallback to legacy initialization on error
-      logger.warn('⚠️ [Content Script] Falling back to legacy initialization...');
-      await initializeLegacyHandlers();
-    }
-    
-    logger.debug('Content script initialization complete', {
-      featureManagement: featureManager ? 'smart' : 'legacy',
-      activeFeatures: featureManager ? featureManager.getActiveFeatures() : []
-    });
-    
-    // Cleanup legacy message handler if smart initialization succeeded
-    if (featureManager && window?.legacyMessageHandler) {
-      logger.debug('Cleaning up legacy message handler - smart initialization succeeded');
-      window.legacyMessageHandler.stopListening();
-      window.legacyMessageHandler = null;
-    }
-
-    // Final initialization summary with feature management context
-    const initializationSummary = {
-      frameId: iFrameManager.frameId,
-      isInIframe: isInIframe,
-      executionMode: executionMode,
-      featureManagement: featureManager ? 'smart' : 'legacy',
-      activeFeatures: featureManager ? featureManager.getActiveFeatures() : [],
-      featureStatus: featureManager ? featureManager.getStatus() : null,
-      iFrameSupport: true,
-      registeredFrames: iFrameManager.getAllFrames().length
+    // Fallback logger - direct console calls will be filtered through logging system later
+    return {
+      debug: () => {},
+      info: (...args) => console.log('[ContentScriptIndex]', ...args),
+      warn: (...args) => console.warn('[ContentScriptIndex]', ...args),
+      error: (...args) => console.error('[ContentScriptIndex]', ...args)
     };
-
-    logger.init(`Content script initialized with Smart Feature Management (${executionMode})`, initializationSummary);
-
-    // Initialize Memory Garbage Collector with frame context
-    initializeGlobalCleanup();
-    startMemoryMonitoring();
-    logger.debug(`✅ [Content Script] Memory Garbage Collector initialized! (${executionMode})`);
-    
-    // Final iframe manager setup
-    logger.info(`🎯 [Content Script] IFrame support enabled - Frame ID: ${iFrameManager.frameId}`);
-    
-    // EventCoordinator disabled - modern FeatureManager system handles all events
-    // The EventCoordinator was causing duplicate event processing with the new selection event strategy system
-    // All event handling is now properly managed through TextSelectionHandler and other feature handlers
-    logger.debug('EventCoordinator disabled - using modern FeatureManager event handling');
-
-
-    })();
   }
-  })(); // Close first async IIFE
 }
+
+// Initialize the content script with ultra-minimal footprint
+(async () => {
+  try {
+    // Initialize logger first
+    const scriptLogger = await initializeLogger();
+
+    // Create ContentScriptCore instance using static import (fixes Firefox class compilation)
+    try {
+      contentScriptCore = new ContentScriptCore();
+
+      if (process.env.NODE_ENV === 'development') {
+        scriptLogger.debug('ContentScriptCore instance created successfully');
+      }
+    } catch (error) {
+      scriptLogger.error('Failed to create ContentScriptCore instance:', {
+        error: error.message,
+        stack: error.stack,
+        userAgent: navigator.userAgent
+      });
+      throw new Error(`Failed to create ContentScriptCore: ${error.message}`);
+    }
+
+    // Verify that contentScriptCore was loaded correctly
+    if (!contentScriptCore) {
+      throw new Error('Failed to load ContentScriptCore: instance not found');
+    }
+
+    // Initialize ContentScriptCore
+    let initialized = false;
+    if (typeof contentScriptCore.initializeCritical === 'function') {
+      initialized = await contentScriptCore.initializeCritical();
+    } else if (typeof contentScriptCore.initialize === 'function') {
+      initialized = await contentScriptCore.initialize();
+    } else {
+      throw new Error('ContentScriptCore instance missing initialization method');
+    }
+
+    // Expose globally for other modules (after potentially replacing instance)
+    window.translateItContentCore = contentScriptCore;
+
+    if (initialized) {
+      // Setup smart event listeners
+      setupSmartListeners();
+
+      // Start intelligent loading sequence
+      startIntelligentLoading();
+
+      // Debug info
+      if (process.env.NODE_ENV === 'development') {
+        scriptLogger.info('Ultra-optimized content script initialized', {
+          mode: 'smart-loading',
+          critical: true,
+          memory: 'minimal'
+        });
+      }
+    }
+  } catch (error) {
+    // Use ErrorHandler for critical initialization errors
+    if (ErrorHandler) {
+      const errorHandler = ErrorHandler.getInstance();
+      await errorHandler.handle(error, {
+        context: 'content-script-index-initialization',
+        isSilent: false,
+        showToast: true
+      });
+    }
+
+    // Try to get logger for proper error handling, fallback to console if not available
+    const errorLogger = await initializeLogger();
+    errorLogger.error('Failed to initialize content script', {
+      error: error.message || error,
+      stack: error.stack,
+      url: window.location.href
+    });
+  }
+})();
+
+function setupSmartListeners() {
+  // Extension popup interaction
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'popupOpened') {
+      loadFeature('vue', 'INTERACTIVE');
+    }
+  });
+
+  // Text selection interaction
+  document.addEventListener('mouseup', handleTextSelection, { passive: true });
+
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeyboardInteraction);
+
+  // Focus on text fields
+  document.addEventListener('focusin', handleTextFieldFocus, { passive: true });
+
+  // Scroll detection (for preload)
+  let scrollTimer;
+  document.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      if (!interactionDetected) {
+        preloadEssentialFeatures();
+      }
+    }, 1000);
+  }, { passive: true });
+}
+
+function handleTextSelection(event) {
+  const selection = window.getSelection();
+  if (selection && selection.toString().trim().length > 0) {
+    loadFeature('textSelection', 'ESSENTIAL');
+  }
+}
+
+function handleKeyboardInteraction(event) {
+  // Ctrl+/ for translation
+  if (event.ctrlKey && event.key === '/') {
+    event.preventDefault();
+    loadFeature('shortcut', 'INTERACTIVE');
+    loadFeature('windowsManager', 'INTERACTIVE');
+  }
+}
+
+function handleTextFieldFocus(event) {
+  if (isEditableElement(event.target)) {
+    loadFeature('textFieldIcon', 'INTERACTIVE');
+  }
+}
+
+function isEditableElement(element) {
+  return element && (
+    element.isContentEditable ||
+    element.tagName === 'TEXTAREA' ||
+    (element.tagName === 'INPUT' &&
+     ['text', 'search', 'email', 'url', 'tel'].includes(element.type))
+  );
+}
+
+async function startIntelligentLoading() {
+  // Phase 1: Load critical features immediately
+  await Promise.all(
+    FEATURE_CATEGORIES.CRITICAL.map(feature =>
+      loadFeature(feature, 'CRITICAL')
+    )
+  );
+
+  // Phase 2: Load essential features after short delay
+  setTimeout(() => {
+    Promise.all(
+      FEATURE_CATEGORIES.ESSENTIAL.map(feature =>
+        loadFeature(feature, 'ESSENTIAL')
+      )
+    );
+  }, LOAD_STRATEGIES.ESSENTIAL.delay);
+
+  // Phase 3: Preload remaining features if user is active
+  setTimeout(() => {
+    if (interactionDetected) {
+      preloadRemainingFeatures();
+    }
+  }, LOAD_STRATEGIES.ON_DEMAND.delay);
+}
+
+async function loadFeature(featureName, category) {
+  if (featureLoadPromises.has(featureName)) {
+    return featureLoadPromises.get(featureName);
+  }
+
+  const strategy = LOAD_STRATEGIES[category];
+  const loadPromise = (async () => {
+    try {
+      if (strategy.delay > 0 && category !== 'INTERACTIVE') {
+        await new Promise(resolve => setTimeout(resolve, strategy.delay));
+      }
+
+      if (contentScriptCore && contentScriptCore.loadFeature) {
+        await contentScriptCore.loadFeature(featureName);
+
+        if (process.env.NODE_ENV === 'development') {
+          const featureLogger = await initializeLogger();
+          featureLogger.debug(`Loaded feature: ${featureName} (${category})`);
+        }
+      }
+    } catch (error) {
+      // Use ErrorHandler for feature loading errors
+      if (ErrorHandler) {
+        const errorHandler = ErrorHandler.getInstance();
+        await errorHandler.handle(error, {
+          context: `feature-loading-${featureName}`,
+          isSilent: true, // Feature loading failures should not interrupt user
+          showToast: false
+        });
+      }
+
+      const errorLogger = await initializeLogger();
+      errorLogger.warn(`Failed to load feature ${featureName}`, {
+        error: error.message || error,
+        category,
+        featureName,
+        stack: error.stack
+      });
+    }
+  })();
+
+  featureLoadPromises.set(featureName, loadPromise);
+  return loadPromise;
+}
+
+function preloadEssentialFeatures() {
+  interactionDetected = true;
+  FEATURE_CATEGORIES.ESSENTIAL.forEach(feature =>
+    loadFeature(feature, 'ESSENTIAL')
+  );
+}
+
+function preloadRemainingFeatures() {
+  interactionDetected = true;
+  [...FEATURE_CATEGORIES.INTERACTIVE, ...FEATURE_CATEGORIES.ON_DEMAND].forEach(feature =>
+    loadFeature(feature, 'ON_DEMAND')
+  );
+}
+
+// Export for debugging
+window.translateItContentScriptCore = contentScriptCore;
+window.translateItDebug = {
+  loadFeature,
+  featureLoadPromises,
+  interactionDetected,
+  FEATURE_CATEGORIES
+};

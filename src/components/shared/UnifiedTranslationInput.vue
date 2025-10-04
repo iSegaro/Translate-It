@@ -42,6 +42,7 @@
           :rows="inputRows"
           :tabindex="1"
           class="ti-translation-textarea ti-enhanced"
+          autofocus
           @input="handleSourceInput"
           @keydown="handleKeydown"
         />
@@ -107,14 +108,22 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch, defineAsyncComponent } from 'vue'
 import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 
-// Components
-import LanguageSelector from '@/components/shared/LanguageSelector.vue'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
-import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+// Components - Lazy loaded for performance
+const LanguageSelector = defineAsyncComponent(() =>
+  import('@/components/shared/LanguageSelector.vue')
+)
+const ProviderSelector = defineAsyncComponent(() =>
+  import('@/components/shared/ProviderSelector.vue')
+)
+const ActionToolbar = defineAsyncComponent(() =>
+  import('@/features/text-actions/components/ActionToolbar.vue')
+)
+const TranslationDisplay = defineAsyncComponent(() =>
+  import('@/components/shared/TranslationDisplay.vue')
+)
 
 // Logger
 import { getScopedLogger } from '@/shared/logging/logger.js'

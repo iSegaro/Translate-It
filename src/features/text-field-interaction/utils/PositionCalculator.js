@@ -10,7 +10,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { textFieldIconConfig } from '../config/positioning.js';
 
 export class PositionCalculator {
-  static logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'PositionCalculator');
+  static logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'PositionCalculator');
   
   // Default icon size - from config
   static get DEFAULT_ICON_SIZE() {
@@ -54,32 +54,54 @@ export class PositionCalculator {
     const rect = element.getBoundingClientRect();
     const viewport = this.getViewportInfo();
     const isMultiline = this.isMultilineElement(element);
-    
+    const positioningMode = options.positioningMode || textFieldIconConfig.positioning.defaultPositioningMode;
+
     this.logger.debug('Calculating position for element:', {
       tag: element.tagName,
       isMultiline,
+      positioningMode,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       viewport: { width: viewport.width, height: viewport.height }
     });
 
     // Generate all possible positions (now with element context)
     const candidates = this.generatePositionCandidates(rect, iconSize, viewport, element);
-    
+
     // Filter valid positions (within viewport, no collisions)
-    const validPositions = candidates.filter(pos => 
+    const validPositions = candidates.filter(pos =>
       this.isWithinViewport(pos, iconSize, viewport) &&
       (!options.checkCollisions || !this.hasCollision(pos, iconSize, element))
     );
 
     if (validPositions.length === 0) {
       this.logger.debug('No valid positions found, using fallback');
-      return this.getFallbackPosition(rect, iconSize);
+      return this.getFallbackPosition(rect, iconSize, positioningMode);
     }
 
     // Select best position based on priority
     const bestPosition = this.selectBestPosition(validPositions);
-    
-    this.logger.debug('Selected optimal position:', bestPosition);
+
+    // Convert to absolute positioning if needed
+    if (positioningMode === 'absolute') {
+      this.logger.debug('Converting to absolute position before:', {
+        top: bestPosition.top,
+        left: bestPosition.left,
+        scrollY: viewport.scrollY,
+        scrollX: viewport.scrollX
+      });
+      this.convertToAbsolutePosition(bestPosition, viewport);
+      this.logger.debug('Converting to absolute position after:', {
+        top: bestPosition.top,
+        left: bestPosition.left
+      });
+    }
+
+    this.logger.debug('Selected optimal position:', {
+      positioningMode,
+      top: bestPosition.top,
+      left: bestPosition.left,
+      placement: bestPosition.placement
+    });
     return bestPosition;
   }
 
@@ -340,34 +362,64 @@ export class PositionCalculator {
    * Get fallback position when no optimal position is found
    * @param {DOMRect} rect - Element rectangle
    * @param {Object} iconSize - Icon dimensions
+   * @param {string} positioningMode - Positioning mode ('fixed' or 'absolute')
    * @returns {Object} Fallback position
    */
-  static getFallbackPosition(rect = null, iconSize = null) {
+  static getFallbackPosition(rect = null, iconSize = null, positioningMode = null) {
     iconSize = iconSize || this.DEFAULT_ICON_SIZE;
-    
+    positioningMode = positioningMode || textFieldIconConfig.positioning.defaultPositioningMode;
+
     if (!rect) {
       // Absolute fallback - center of viewport
-      return {
-        top: window.innerHeight / 2 - iconSize.height / 2,
-        left: window.innerWidth / 2 - iconSize.width / 2,
+      const viewport = this.getViewportInfo();
+      const fallbackPosition = {
+        top: viewport.height / 2 - iconSize.height / 2,
+        left: viewport.width / 2 - iconSize.width / 2,
         placement: 'center',
         priority: 999,
         isFallback: true
       };
+
+      // Convert to absolute if needed
+      if (positioningMode === 'absolute') {
+        this.convertToAbsolutePosition(fallbackPosition, viewport);
+      }
+
+      return fallbackPosition;
     }
 
     // Element-relative fallback - simple top-right with viewport constraint
     const viewport = this.getViewportInfo();
     const top = Math.min(rect.top - iconSize.height - this.ELEMENT_MARGIN, viewport.height - iconSize.height - this.VIEWPORT_MARGIN);
     const left = Math.min(rect.right - iconSize.width, viewport.width - iconSize.width - this.VIEWPORT_MARGIN);
-    
-    return {
+
+    const fallbackPosition = {
       top: Math.max(this.VIEWPORT_MARGIN, top),
       left: Math.max(this.VIEWPORT_MARGIN, left),
       placement: 'fallback',
       priority: 999,
       isFallback: true
     };
+
+    // Convert to absolute if needed
+    if (positioningMode === 'absolute') {
+      this.convertToAbsolutePosition(fallbackPosition, viewport);
+    }
+
+    return fallbackPosition;
+  }
+
+  /**
+   * Convert position from viewport-relative (fixed) to document-relative (absolute)
+   * @param {Object} position - Position object to convert
+   * @param {Object} viewport - Viewport information
+   */
+  static convertToAbsolutePosition(position, viewport) {
+    if (!position || !viewport) return;
+
+    // Add scroll offsets to convert from fixed to absolute positioning
+    position.top += viewport.scrollY;
+    position.left += viewport.scrollX;
   }
 
   /**

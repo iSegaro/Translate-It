@@ -294,7 +294,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { computed } from 'vue'
-import { getTranslationString } from '@/utils/i18n/i18n.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js'
 
 const { handleError } = useErrorHandler()
 
@@ -343,6 +343,7 @@ const translateText = ref('Translate')
 
 // Initialize localized messages
 onMounted(async () => {
+  const { getTranslationString } = await utilsFactory.getI18nUtils()
   translatingText.value = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...'
   translateText.value = await getTranslationString('TRANSLATE') || 'Translate'
 })

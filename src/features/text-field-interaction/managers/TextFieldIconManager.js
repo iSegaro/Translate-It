@@ -5,7 +5,7 @@
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { detectPlatform, Platform } from "@/utils/browser/platform.js";
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
@@ -13,6 +13,35 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { PositionCalculator } from '../utils/PositionCalculator.js';
 import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
+import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
+
+/**
+ * Visibility management utility class
+ * Centralizes visibility logic for different update reasons
+ */
+class VisibilityManager {
+  /**
+   * Determine if icon should be visible based on update reason
+   * @param {string} reason - Update reason (e.g., 'smooth-scroll-follow', 'viewport-exit')
+   * @param {boolean} visible - Current visibility state
+   * @returns {boolean} Effective visibility state
+   */
+  static shouldKeepVisible(reason, visible) {
+    // Smooth follow always keeps icon visible
+    if (reason === 'smooth-scroll-follow') {
+      return true;
+    }
+
+    // Respect viewport visibility changes
+    if (reason?.startsWith('viewport-')) {
+      return visible;
+    }
+
+    // Default behavior for all other cases
+    return visible;
+  }
+}
+
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
@@ -24,7 +53,7 @@ export class TextFieldIconManager extends ResourceTracker {
     super('text-field-icon-manager')
 
     // Initialize logger first
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldIconManager');
 
     // Enforce singleton pattern
     if (textFieldIconManagerInstance) {
@@ -146,10 +175,10 @@ export class TextFieldIconManager extends ResourceTracker {
       // Note: EXTENSION_ENABLED listener is handled by FeatureManager
       // We don't need to duplicate it here as FeatureManager will handle activation/deactivation
 
-      settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', (newValue) => {
-        this.logger.debug('TRANSLATE_ON_TEXT_FIELDS changed:', newValue);
+      settingsManager.onChange('TRANSLATE_ON_TEXT_SELECTION', (newValue) => {
+        this.logger.debug('TRANSLATE_ON_TEXT_SELECTION changed:', newValue);
         if (!newValue) {
-          // Clean up all icons when text field feature is disabled
+          // Clean up all icons when text selection feature is disabled
           this.cleanup();
         }
       }, 'text-field-icon-manager')
@@ -173,11 +202,12 @@ export class TextFieldIconManager extends ResourceTracker {
       const { textFieldDetector } = await import('../utils/TextFieldDetector.js');
 
       const detection = await textFieldDetector.detect(element);
-      this.logger.debug('TextFieldDetector result:', {
-        tagName: element.tagName,
-        fieldType: detection.fieldType,
-        shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
-      });
+      // TextFieldDetector result - logged at TRACE level for detailed debugging
+      // this.logger.trace('TextFieldDetector result:', {
+      //   tagName: element.tagName,
+      //   fieldType: detection.fieldType,
+      //   shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+      // });
       return detection.shouldShowTextFieldIcon;
     } catch (error) {
       this.logger.debug('Error in field detection, using fallback:', error);
@@ -259,7 +289,8 @@ export class TextFieldIconManager extends ResourceTracker {
   async shouldProcessTextField(element) {
     // Context validation: Ensure the extension context is valid BEFORE any settings calls
     if (!ExtensionContextManager.isValidSync()) {
-      this.logger.debug('Skipping icon creation: Extension context is invalid.');
+      // Skipping icon creation - Extension context is invalid (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Extension context is invalid.');
       return null;
     }
 
@@ -269,19 +300,31 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Basic validation
     if (!isExtensionEnabled) {
-      this.logger.debug('Skipping icon creation: Extension is disabled.');
+      // Skipping icon creation - Extension is disabled (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Extension is disabled.');
       return null;
     }
 
     // Protocol check
     if (typeof window === 'undefined' || !["http:", "https:"].includes(window.location.protocol)) {
-      this.logger.debug('Skipping icon creation: Invalid protocol or no window.');
+      // Skipping icon creation - Invalid protocol or no window (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Invalid protocol or no window.');
       return null;
+    }
+
+    // Exclusion check for text field icons
+    const exclusionChecker = ExclusionChecker.getInstance();
+    const isFeatureAllowed = await exclusionChecker.isFeatureAllowed('textFieldIcon');
+    if (!isFeatureAllowed) {
+      // Skipping icon creation - Site excluded for text field icons (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Site excluded for text field icons.');
+      return false;
     }
 
     // Feature flag check
     if (!isTextFieldFeatureEnabled) {
-      this.logger.debug('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
+      // Skipping icon creation - TRANSLATE_ON_TEXT_FIELDS feature is disabled (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: TRANSLATE_ON_TEXT_FIELDS feature is disabled.');
       return false;
     }
 
@@ -292,19 +335,22 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
-      this.logger.debug('Skipping icon creation: Another icon is already active.');
+      // Skipping icon creation - Another icon is already active (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Another icon is already active.');
       return false;
     }
 
     // Element validation
     if (!await this.isEditableElement(element)) {
-      this.logger.debug('Skipping icon creation: Element is not editable.');
+      // Skipping icon creation - Element is not editable (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Element is not editable.');
       return false;
     }
 
     // Platform-specific filtering
     if (!this.applyPlatformFiltering(element)) {
-      this.logger.debug('Skipping icon creation: Platform filtering rules applied.');
+      // Skipping icon creation - Platform filtering rules applied (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Platform filtering rules applied.');
       return false;
     }
 
@@ -314,11 +360,14 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Target element
    * @returns {boolean} Whether element should be processed (false = skip)
    */
-  applyPlatformFiltering(element) {
+  async applyPlatformFiltering(element) {
+    // Get browser utils from factory
+    const { detectPlatform, Platform } = await utilsFactory.getBrowserUtils();
+
     // YouTube platform-specific handling
     if (detectPlatform() === Platform.Youtube) {
       const youtubeStrategy = this.strategies?.["youtube"];
-      
+
       // Skip processing for recognized special fields on YouTube (search query, etc.)
       // This is a temporary implementation - may need more robust handling in the future
       if (youtubeStrategy?.isYoutube_ExtraField?.(element)) {
@@ -360,24 +409,30 @@ export class TextFieldIconManager extends ResourceTracker {
     const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Calculate optimal position using the new positioning system
+    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
     const optimalPosition = PositionCalculator.calculateOptimalPosition(
       element,
       null, // Use default icon size
-      { checkCollisions: true }
+      {
+        checkCollisions: true,
+        positioningMode: positioningMode
+      }
     );
 
-    this.logger.debug('Calculated optimal position:', {
-      placement: optimalPosition.placement,
-      position: { top: optimalPosition.top, left: optimalPosition.left },
-      isFallback: optimalPosition.isFallback
-    });
+    // Position calculation details - logged at TRACE level for detailed debugging
+    // this.logger.trace('Calculated optimal position:', {
+    //   placement: optimalPosition.placement,
+    //   position: { top: optimalPosition.top, left: optimalPosition.left },
+    //   isFallback: optimalPosition.isFallback
+    // });
 
     // Emit event to UI Host to add the icon with enhanced data
-    pageEventBus.emit('add-field-icon', { 
-      id: iconId, 
+    pageEventBus.emit('add-field-icon', {
+      id: iconId,
       position: optimalPosition,
       targetElement: element,
-      attachmentMode: 'smart'
+      attachmentMode: 'smart',
+      positioningMode: positioningMode
     });
 
     // Track the created icon with enhanced data
@@ -391,7 +446,8 @@ export class TextFieldIconManager extends ResourceTracker {
     // Create attachment for position management
     this.createIconAttachment(iconId, element);
 
-    this.logger.debug('Smart icon created and tracked successfully');
+    // Add info log for successful icon creation - this is useful to track actual usage
+    this.logger.info(`[TextField] Icon created for ${element.tagName}${element.type ? `(${element.type})` : ''}`);
     return { id: iconId, element, position: optimalPosition };
   }
 
@@ -410,7 +466,8 @@ export class TextFieldIconManager extends ResourceTracker {
       return null;
     }
 
-    this.logger.debug('Handling editable focus for:', element.tagName);
+    // Handling editable focus - logged at TRACE level for detailed debugging
+    // this.logger.trace('Handling editable focus for:', element.tagName);
     return this.processEditableElement(element);
   }
 
@@ -419,7 +476,8 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Blurred element
    */
   handleEditableBlur(element) {
-    this.logger.debug('Handling editable blur for:', element.tagName);
+    // Handling editable blur - logged at TRACE level for detailed debugging
+  // this.logger.trace('Handling editable blur for:', element.tagName);
 
     // Delay cleanup to allow user to interact with icon (using ResourceTracker)
     const cleanupTimeout = this.trackTimeout(() => {
@@ -472,15 +530,18 @@ export class TextFieldIconManager extends ResourceTracker {
       this.handleIconUpdate(updateData);
     };
 
-    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback);
-    
+    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
+    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback, positioningMode);
+
     // Attach the icon to the element
     attachment.attach();
-    
+
     // Store the attachment for later cleanup
     this.iconAttachments.set(iconId, attachment);
-    
-    this.logger.debug('Created attachment for icon:', iconId);
+
+    this.logger.debug('Created attachment for icon:', iconId, {
+      positioningMode: positioningMode
+    });
   }
 
   /**
@@ -489,7 +550,7 @@ export class TextFieldIconManager extends ResourceTracker {
    */
   handleIconUpdate(updateData) {
     const { iconId, position, visible, reason } = updateData;
-    
+
     this.logger.debug('Received icon update:', {
       iconId,
       reason,
@@ -497,17 +558,21 @@ export class TextFieldIconManager extends ResourceTracker {
       placement: position?.placement
     });
 
+    // Use VisibilityManager to determine effective visibility
+    const effectiveVisible = VisibilityManager.shouldKeepVisible(reason, visible);
+
     // Emit update event to UI Host
     if (position) {
       pageEventBus.emit('update-field-icon-position', {
         id: iconId,
         position,
-        visible: visible !== false
+        visible: effectiveVisible !== false
       });
-    } else if (visible !== undefined) {
+    } else if (visible !== undefined && reason !== 'smooth-scroll-follow') {
+      // Emit visibility changes for viewport events and other non-follow events
       pageEventBus.emit('update-field-icon-visibility', {
         id: iconId,
-        visible
+        visible: effectiveVisible
       });
     }
   }

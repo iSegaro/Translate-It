@@ -106,8 +106,18 @@ export class MessageRouter {
         enabled: shouldEnable,
         timestamp: Date.now()
       });
+
+      this.logger.info(`[MessageRouter] Broadcast state changed: ${shouldEnable ? 'enabled' : 'disabled'} (count: ${window.translateItBroadcastCount})`);
+      this.logger.debug('Broadcast request details', {
+        requestedEnable: enable,
+        actualEnable: shouldEnable,
+        broadcastCount: window.translateItBroadcastCount
+      });
     } catch (error) {
-      this.logger.error('Failed broadcast request handling', error);
+      this.logger.error('[MessageRouter] Failed broadcast request handling', {
+        error: error.message,
+        enable: enable
+      });
     }
   }
 
@@ -134,10 +144,17 @@ export class MessageRouter {
    */
   _handleOutsideClick(event) {
     // Don't process our own messages
-    if (event.data.frameId === this.frameRegistry.frameId || 
+    if (event.data.frameId === this.frameRegistry.frameId ||
         event.data.forwardedFrom === this.frameRegistry.frameId) {
       return;
     }
+
+    this.logger.debug('[MessageRouter] Received outside click message', {
+      sourceFrameId: event.data.frameId,
+      isInIframe: event.data.isInIframe,
+      targetFrame: event.data.targetFrame,
+      forwardedFrom: event.data.forwardedFrom
+    });
 
     // Forward from main document to other iframes
     if (!this.frameRegistry.isInIframe && event.data.isInIframe && !event.data.forwardedFrom) {
@@ -192,9 +209,16 @@ export class MessageRouter {
     // Call handler if set
     if (this.onTextSelectionWindowRequest) {
       this.onTextSelectionWindowRequest(data, event.source);
+      this.logger.info('[MessageRouter] Text selection window request processed');
     } else {
-      this.logger.warn('No onTextSelectionWindowRequest handler set');
+      this.logger.warn('[MessageRouter] No handler for text selection window request');
     }
+
+    this.logger.debug('Text selection request details', {
+      sourceFrameId: data.frameId,
+      textLength: data.selectedText?.length || 0,
+      position: data.position
+    });
   }
 
   /**
@@ -222,7 +246,11 @@ export class MessageRouter {
 
       // Broadcast to all child frames
       this._broadcastToAllIframes(message);
-    } catch {
+    } catch (error) {
+      this.logger.debug('[MessageRouter] Cross-frame communication error', {
+        error: error.message,
+        operation: 'broadcastOutsideClick'
+      });
       // Silently ignore errors in cross-frame communication
     }
   }
@@ -335,11 +363,13 @@ export class MessageRouter {
    * Clean up message router
    */
   cleanup() {
+    this.logger.info('[MessageRouter] Cleaning up message router');
     window.removeEventListener('message', this._boundHandleMessage);
     this.onOutsideClick = null;
     this.onWindowCreationRequest = null;
     this.onWindowCreatedResponse = null;
     this.onBroadcastStateChange = null;
     this.onTextSelectionWindowRequest = null;
+    this.logger.info('[MessageRouter] Cleanup completed');
   }
 }

@@ -6,7 +6,18 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
+// Import production config for production builds
+let productionConfig = null;
+if (process.env.NODE_ENV === 'production') {
+  productionConfig = (await import('./vite.config.production.js')).default;
+}
+
 const baseConfig = createBaseConfig('firefox')
+
+// Use production config if in production, otherwise use base config
+const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
+  ? { ...productionConfig, ...baseConfig }
+  : baseConfig;
 
 // Plugin to copy CSS files for Firefox
 function copyFirefoxAssets() {
@@ -31,17 +42,17 @@ function copyFirefoxAssets() {
 }
 
 export default defineConfig({
-  ...baseConfig,
-  
+  ...finalConfig,
+
   // Firefox-specific build definitions
   define: {
-    ...baseConfig.define,
+    ...(finalConfig.define || {}),
     __BROWSER__: JSON.stringify('firefox'),
     __MANIFEST_VERSION__: 3
   },
-  
+
   build: {
-    ...baseConfig.build,
+    ...(finalConfig.build || {}),
     outDir: `dist/firefox/Translate-It-v${pkg.version}`,
   },
   

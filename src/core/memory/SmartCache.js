@@ -233,7 +233,7 @@ class SmartCache extends Map {
 
     // Skip destruction if this is a critical cache
     if (this.isCritical) {
-      logger.debug('Skipping destruction of critical cache')
+      // logger.trace('Skipping destruction of critical cache');
       return
     }
 

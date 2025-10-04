@@ -177,10 +177,16 @@ const response = await sendMessage({
 - **Proper Event Emission**: Fixed `select-mode-deactivated` event emission for cross-frame coordination
 - **Enhanced Cleanup**: Improved post-translation cleanup with full deactivation process
 
-### Logging Improvements  
+### Logging Improvements
 - **Reduced Console Noise**: Changed multi-frame "unknown message" warnings to debug level with explanatory text
 - **Context-Aware Messages**: Added "(normal in multi-frame context)" indicators for expected behavior
 - **Fallback Translation Cleanup**: Enhanced cleanup triggers even for unknown message IDs in multi-frame environments
+
+### Translation Icon Click Detection (2025-09-27)
+- **Cross-Frame Click Detection**: Fixed issue where translation icons remained open when clicking inside iframes
+- **Iframe ClickManager**: Created dedicated ClickManager instances for iframes to handle outside click detection
+- **Message-Based Activation**: Main document now sends activation messages to iframes when translation UI is shown
+- **Automatic Cleanup**: ClickManager instances in iframes are automatically cleaned up when no longer needed
 
 ## 🔮 Future Enhancements
 

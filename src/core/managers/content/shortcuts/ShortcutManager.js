@@ -17,7 +17,7 @@ export class ShortcutManager extends ResourceTracker {
     this.globalListener = null;
     this.keyboardStateManager = null;
     this.ctrlSlashShortcut = null;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ShortcutManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.SHORTCUTS, 'ShortcutManager');
   }
 
   /**

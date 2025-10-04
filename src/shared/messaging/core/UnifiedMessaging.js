@@ -5,7 +5,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
+  }
+  return logger;
+}
 
 // Operation timeout mapping remains the same
 const OPERATION_TIMEOUTS = {
@@ -95,7 +102,7 @@ export async function sendMessage(message, options = {}) {
 
   // Check if this should be handled as a streaming operation
   if (!forceRegular && isTranslationAction(message.action)) {
-    logger.debug('Routing translation message through coordinator:', {
+    getLogger().debug('Routing translation message through coordinator:', {
       action: message.action,
       messageId: message.messageId,
       context: message.context
@@ -105,7 +112,7 @@ export async function sendMessage(message, options = {}) {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
       // If coordination fails, fall back to regular messaging
-      logger.warn('Translation coordination failed, falling back to regular messaging:', error);
+      getLogger().warn('Translation coordination failed, falling back to regular messaging:', error);
 
       // Create a new message with a fresh messageId to avoid duplicate detection
       const fallbackMessage = {
@@ -113,7 +120,7 @@ export async function sendMessage(message, options = {}) {
         messageId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
 
-      logger.info('Using fallback message with new ID:', {
+      getLogger().info('Using fallback message with new ID:', {
         originalId: message.messageId,
         fallbackId: fallbackMessage.messageId
       });
@@ -133,12 +140,7 @@ export async function sendRegularMessage(message, options = {}) {
   const { timeout: customTimeout } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action);
 
-  logger.debug('Sending regular message to background:', {
-    action: message.action,
-    messageId: message.messageId,
-    context: message.context,
-    timeout: actionTimeout,
-  });
+  getLogger().debug(`📤 Sending ${message.action} to background (${actionTimeout}ms timeout)`);
 
   try {
     if (!ExtensionContextManager.isValidSync()) {
@@ -160,7 +162,7 @@ export async function sendRegularMessage(message, options = {}) {
 
     if (response.success === false) {
       // Debug logging to understand response structure
-      logger.debug('Response with success=false received:', {
+      getLogger().debug('Response with success=false received:', {
         response,
         responseKeys: Object.keys(response),
         hasError: !!response.error,
@@ -174,7 +176,7 @@ export async function sendRegularMessage(message, options = {}) {
 
       // Check if this is a restricted page error - if so, return the response instead of throwing
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
-        logger.debug('Restricted page detected, returning response without throwing error');
+        getLogger().debug('Restricted page detected, returning response without throwing error');
         return response;
       }
 
@@ -189,11 +191,7 @@ export async function sendRegularMessage(message, options = {}) {
       throw error;
     }
 
-    logger.debug('Regular message response received:', {
-      action: message.action,
-      messageId: message.messageId,
-      success: true,
-    });
+    getLogger().debug(`✅ Regular message response received: ${message.action}`);
 
     return response;
   } catch (error) {
@@ -204,7 +202,7 @@ export async function sendRegularMessage(message, options = {}) {
     const errorType = matchErrorToType(error);
 
     // Debug log to see what error type is detected
-    logger.debug(`Error type detected: ${errorType} for message: ${message.action}`, {
+    getLogger().debug(`Error type detected: ${errorType} for message: ${message.action}`, {
       errorMessage: error.message,
       errorObject: error
     });
@@ -216,17 +214,17 @@ export async function sendRegularMessage(message, options = {}) {
          errorType === ErrorTypes.CONTEXT ||
          errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED)) {
       // TTS stop errors are expected when offscreen document is closed
-      logger.debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
+      getLogger().debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
     } else if (errorType === ErrorTypes.TAB_BROWSER_INTERNAL ||
                errorType === ErrorTypes.TAB_EXTENSION_PAGE ||
                errorType === ErrorTypes.TAB_LOCAL_FILE ||
                errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
                errorType === ErrorTypes.TAB_RESTRICTED) {
       // Tab accessibility errors should be debug level
-      logger.debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
+      getLogger().debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
     } else {
       // All other errors are logged as error level
-      logger.error(`Message failed for ${message.action}:`, {
+      getLogger().error(`Message failed for ${message.action}:`, {
         message: error.message || error,
         errorType: errorType,
         fullError: error

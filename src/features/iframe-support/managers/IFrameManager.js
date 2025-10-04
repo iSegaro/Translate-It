@@ -23,7 +23,7 @@ export class IFrameManager extends ResourceTracker {
   constructor() {
     super('iframe-manager');
     
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'IFrameManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'IFrameManager');
     this.errorHandler = ErrorHandler.getInstance();
     
     // Frame detection and registry
@@ -279,9 +279,11 @@ export class IFrameManager extends ResourceTracker {
       ...frameData
     });
     
-    this.logger.debug('Frame registered', {
+    this.logger.info(`[IFrame] New frame registered: ${frameData.frameId} (total: ${this.frameCache.size})`);
+    this.logger.debug('Frame registration details', {
       frameId: frameData.frameId,
       isInIframe: frameData.isInIframe,
+      url: frameData.url,
       totalFrames: this.frameCache.size
     });
     
@@ -373,12 +375,18 @@ export class IFrameManager extends ResourceTracker {
         if (contentWindow && !contentWindow.translateItContentScriptLoaded) {
           await this._injectContentScriptToIframe(iframe);
         } else {
-          this.logger.debug('Content script already loaded or window not accessible');
+          this.logger.debug('Content script already loaded or window not accessible', {
+            src: iframe.src,
+            hasWindow: !!contentWindow,
+            scriptLoaded: contentWindow?.translateItContentScriptLoaded
+          });
         }
       } catch (injectionError) {
         this.logger.debug('Content script injection failed', {
           error: injectionError.message,
-          src: iframe.src
+          name: injectionError.name,
+          src: iframe.src,
+          isSecurityError: injectionError.name === 'SecurityError'
         });
         // Don't throw - injection failure is not critical
       }
@@ -432,7 +440,8 @@ export class IFrameManager extends ResourceTracker {
 
       this.logger.debug('Attempting to inject content script to iframe', {
         src: iframe.src,
-        frameId: frameId
+        frameId: frameId,
+        hasScriptingAPI: !!(browser.scripting && browser.scripting.executeScript)
       });
 
       // Use browser.scripting.executeScript for MV3 compliance
@@ -443,22 +452,10 @@ export class IFrameManager extends ResourceTracker {
         files: ['src/core/content-scripts/index.js']
       });
 
-      this.logger.debug('Content script injection completed successfully', {
-        src: iframe.src,
-        frameId: frameId
-      });
+      this.logger.info(`[IFrame] Script injected successfully to iframe: ${frameId}`);
       
     } catch (error) {
-      // More detailed error logging
-      this.logger.debug('Content script injection failed', {
-        error: error.message,
-        name: error.name,
-        src: iframe?.src || 'unknown',
-        code: error.code || 'no code',
-        // Don't include full stack trace to avoid noise
-        isSecurityError: error.name === 'SecurityError',
-        isDOMException: error instanceof DOMException
-      });
+      // Content script injection failed details logged at DEBUG level
 
       // Don't re-throw - script injection failure is not critical for iframe functionality
     }
@@ -614,9 +611,10 @@ export class IFrameManager extends ResourceTracker {
         }
       }
       
-      this.logger.debug('Performed maintenance', {
+      this.logger.debug('Frame maintenance performed', {
         cachedFrames: this.frameCache.size,
-        registeredFrames: window.translateItFrameRegistry?.size || 0
+        registeredFrames: window.translateItFrameRegistry?.size || 0,
+        cleanupTime: Date.now()
       });
       
     } catch (error) {
@@ -704,7 +702,7 @@ export class IFrameManager extends ResourceTracker {
    */
   async cleanup() {
     try {
-      this.logger.debug('Starting IFrameManager cleanup');
+      this.logger.info('[IFrame] Starting cleanup process');
       
       // Notify other frames about cleanup
       this._broadcastToAllFrames({
@@ -720,7 +718,7 @@ export class IFrameManager extends ResourceTracker {
       // Call parent cleanup (ResourceTracker)
       await super.cleanup();
       
-      this.logger.debug('IFrameManager cleanup completed');
+      this.logger.info('[IFrame] Cleanup completed successfully');
       
     } catch (error) {
       this.logger.error('Error during cleanup', error);

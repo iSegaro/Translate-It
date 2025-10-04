@@ -7,8 +7,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/shared/config/config.js';
-import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
+// Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
@@ -27,13 +27,119 @@ const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 async function getApiProviders() {
   try {
     const { providerRegistry } = await import('@/features/translation/providers/ProviderRegistry.js');
-    return Array.from(providerRegistry.providers.entries()).map(([id, ProviderClass]) => ({
-      id,
-      defaultTitle: ProviderClass.displayName || id
-    }));
+
+    // Get all available providers (both loaded and lazy registered)
+    const availableProviders = providerRegistry.getAllAvailable();
+
+    // Log provider structure for debugging
+    logger.info("Processing available providers for context menu", {
+      totalProviders: availableProviders.length,
+      lazyProviders: availableProviders.filter(p => p.isLazy).length,
+      loadedProviders: availableProviders.filter(p => !p.isLazy).length
+    });
+
+    const validProviders = [];
+
+    for (const provider of availableProviders) {
+      // Handle both lazy providers and loaded provider classes
+      let id, name;
+
+      if (provider.isLazy) {
+        // This is a lazy provider with metadata
+        id = provider.id;
+        name = provider.name;
+      } else {
+        // This is a loaded provider class - should have been filtered out at registry level
+        // But we handle it defensively
+        logger.warn("Unexpected loaded provider class found in context menu:", provider.constructor?.name);
+        continue;
+      }
+
+      // Validate required fields
+      if (!id || !name) {
+        logger.warn("Provider missing required id or name:", { id, name, provider });
+        continue;
+      }
+
+      // Validate field types
+      if (typeof id !== 'string' || typeof name !== 'string') {
+        logger.warn("Provider id or name is not a string:", { id, name, provider });
+        continue;
+      }
+
+      // Validate field content
+      if (id.includes('undefined') || name.includes('undefined')) {
+        logger.warn("Provider id or name contains undefined:", { id, name });
+        continue;
+      }
+
+      // Validate ID format - should match registered provider IDs
+      if (!/^[a-z][a-z0-9_-]*$/i.test(id)) {
+        logger.warn("Provider ID doesn't match expected format:", { id, name });
+        continue;
+      }
+
+      // Validate name content
+      if (name.length < 2 || name.length > 50) {
+        logger.warn("Provider name length seems invalid:", { id, name });
+        continue;
+      }
+
+      // Check against known provider IDs for extra validation
+      const knownProviderIds = [
+        'google', 'yandex', 'gemini', 'openai', 'openrouter',
+        'deepseek', 'webai', 'bing', 'browser', 'custom'
+      ];
+
+      if (!knownProviderIds.includes(id.toLowerCase())) {
+        logger.warn("Unknown provider ID detected:", { id, name });
+        // Don't filter out unknown providers, just warn - they might be newly added
+      }
+
+      validProviders.push({
+        id: id.toLowerCase(), // Normalize ID to lowercase
+        defaultTitle: name
+      });
+    }
+
+    // Remove duplicates based on id (case-insensitive)
+    const uniqueProviders = [];
+    const seenIds = new Set();
+
+    for (const provider of validProviders) {
+      const normalizedId = provider.id.toLowerCase();
+      if (!seenIds.has(normalizedId)) {
+        seenIds.add(normalizedId);
+        uniqueProviders.push({
+          ...provider,
+          id: normalizedId // Ensure consistent case
+        });
+      } else {
+        logger.warn(`Removing duplicate provider with id: ${provider.id}`);
+      }
+    }
+
+    logger.debug("Final provider list created", {
+      providerCount: uniqueProviders.length,
+      providers: uniqueProviders.map(p => p.id)
+    });
+    return uniqueProviders;
   } catch (error) {
     logger.error("Failed to get providers dynamically, using fallback:", error);
-    return [];
+
+    // Fallback to basic provider list if dynamic loading fails
+    return [
+      { id: "google", defaultTitle: "Google Translate" },
+      { id: "yandex", defaultTitle: "Yandex Translate" },
+      { id: "gemini", defaultTitle: "Google Gemini" },
+      { id: "openai", defaultTitle: "OpenAI" },
+      { id: "openrouter", defaultTitle: "OpenRouter" },
+      { id: "deepseek", defaultTitle: "DeepSeek" },
+      { id: "webai", defaultTitle: "WebAI" },
+      { id: "bing", defaultTitle: "Bing Translate" },
+      { id: "browser", defaultTitle: "Browser API" },
+      { id: "custom", defaultTitle: "Custom Provider" }
+    ];
   }
 }
 
@@ -59,8 +165,9 @@ async function deactivateSelectElementModeInAllTabs() {
           });
       }
     }
-    logger.debug(
-      "Sent deactivation signal for Select Element mode to all tabs."
+    logger.info(
+      "Sent deactivation signal for Select Element mode to all tabs",
+      { tabsProcessed: tabs.length }
     );
   } catch (e) {
     logger.error("Error trying to deactivate select element mode in all tabs:", e);
@@ -110,7 +217,7 @@ export class ContextMenuManager extends ResourceTracker {
     try {
       this.browser = browser;
 
-      logger.debug("📋 Initializing context menu manager", force ? '(forced)' : '');
+      logger.info("📋 Initializing context menu manager", force ? '(forced)' : '');
 
       // Set up default context menus (this clears existing ones)
       await this.setupDefaultMenus(locale);
@@ -121,7 +228,7 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       this.initialized = true;
-      logger.debug("✅ Context menu manager initialized");
+      logger.info("✅ Context menu manager initialized");
     } catch (error) {
       logger.error("❌ Failed to initialize context menu manager:", error);
       throw error;
@@ -136,19 +243,25 @@ export class ContextMenuManager extends ResourceTracker {
   // Prevent concurrent menu setup
   _menuSetupLock = false;
   async setupDefaultMenus(locale = null) {
+    logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
+
     if (this._menuSetupLock) {
       logger.warn("setupDefaultMenus called concurrently, skipping.");
       return;
     }
     this._menuSetupLock = true;
     try {
+      // Get i18n utility from factory
+      const { getTranslationString } = await utilsFactory.getI18nUtils();
+
       // Clear existing menus first and wait for completion
       await browser.contextMenus.removeAll();
       this.createdMenus.clear();
+      logger.debug("🧹 [ContextMenuManager] Cleared existing menus");
 
       // Get the currently active API to set the 'checked' state
       const currentApi = await getTranslationApiAsync();
-      
+
       // Get commands for keyboard shortcuts
       const commands = await browser.commands.getAll();
 
@@ -166,15 +279,15 @@ export class ContextMenuManager extends ResourceTracker {
           title: pageMenuTitle,
           contexts: ["page", "selection", "link", "image", "video", "audio"],
         });
-        logger.debug(
-          `Page context menu created with title: "${pageMenuTitle}"`
-        );
+        logger.debug(`Created page context menu: "${pageMenuTitle}"`);
       } catch (e) {
         logger.error("Error creating page context menu:", e);
       }
 
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
+        logger.debug("🎯 [ContextMenuManager] Creating Action (Browser Action) menus...");
+
         // --- Translate Element Menu (First option) ---
         let actionPageMenuTitle =
           (await getTranslationString("context_menu_translate_with_selection", locale)) ||
@@ -188,6 +301,7 @@ export class ContextMenuManager extends ResourceTracker {
           title: actionPageMenuTitle,
           contexts: ["action"],
         });
+        logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
 
         // --- API Provider Parent Menu ---
         await this.createMenu({
@@ -197,9 +311,12 @@ export class ContextMenuManager extends ResourceTracker {
             "API Provider",
           contexts: ["action"],
         });
+        logger.debug("Created API Provider parent menu");
 
         // --- API Provider Sub-Menus (Radio Buttons) ---
         const apiProviders = await getApiProviders();
+        logger.debug(`📊 [ContextMenuManager] Found ${apiProviders.length} providers`);
+
         for (const provider of apiProviders) {
           await this.createMenu({
             id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
@@ -211,7 +328,7 @@ export class ContextMenuManager extends ResourceTracker {
           });
         }
         logger.debug(
-          `API Provider sub-menus created. Current API: ${currentApi}`
+          `Created ${apiProviders.length} API Provider sub-menus. Current API: ${currentApi}`
         );
 
         // --- Options Menu ---
@@ -248,7 +365,7 @@ export class ContextMenuManager extends ResourceTracker {
         logger.error("Error creating action context menus:", e);
       }
 
-      logger.debug("✅ Default context menus created");
+      logger.info("✅ Default context menus created");
     } catch (error) {
       logger.error("❌ Failed to setup default menus:", error);
       throw error;
@@ -336,7 +453,7 @@ export class ContextMenuManager extends ResourceTracker {
       await this.browser.contextMenus.removeAll();
       this.createdMenus.clear();
 
-      logger.debug("📋 Cleared all context menus");
+      logger.info("Cleared all context menus");
     } catch (error) {
       logger.error("❌ Failed to clear context menus:", error);
       throw error;
@@ -351,14 +468,17 @@ export class ContextMenuManager extends ResourceTracker {
     if (!tab || !tab.id) return;
 
     try {
-      logger.debug(`Activating select mode for tab ${tab.id} via central handler`);
+      logger.info(`Activating select mode for tab ${tab.id} via central handler`);
       const message = {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'context-menu',
         data: { active: true, tabId: tab.id }
       };
       const sender = { tab };
-      await handleActivateSelectElementMode(message, sender);
+
+      // Load Element Selection handler lazily
+      const { handleActivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
+      await handleActivateSelectElementModeLazy(message, sender);
     } catch (error) {
       logger.error(`Could not activate select element mode for tab ${tab.id}:`, error);
     }
@@ -371,7 +491,7 @@ export class ContextMenuManager extends ResourceTracker {
    */
   async handleMenuClick(info, tab) {
     try {
-      logger.debug(`📋 Context menu clicked: ${info.menuItemId}`);
+      logger.info(`📋 Context menu clicked: ${info.menuItemId}`);
 
       // --- Handle browser action menu clicks ---
       const isApiProviderClick = info.menuItemId.startsWith(
@@ -393,7 +513,7 @@ export class ContextMenuManager extends ResourceTracker {
         const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
         try {
           await storageManager.set({ TRANSLATION_API: newApiId });
-          logger.debug(`API Provider changed to: ${newApiId}`);
+          logger.info(`API Provider changed to: ${newApiId}`);
           // Refresh context menus to update radio button states
           await this.setupDefaultMenus();
         } catch (e) {
@@ -456,14 +576,14 @@ export class ContextMenuManager extends ResourceTracker {
     if (browser?.storage?.onChanged) {
       this.storageListener = (changes, areaName) => {
         if (areaName === "local" && changes.TRANSLATION_API) {
-          logger.debug(
+          logger.info(
             "TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
           );
           this.setupDefaultMenus();
         }
       };
       browser.storage.onChanged.addListener(this.storageListener);
-      logger.debug("📋 Storage change listener registered");
+      logger.info("📋 Storage change listener registered");
     }
   }
 
@@ -500,7 +620,7 @@ export class ContextMenuManager extends ResourceTracker {
    * Cleanup resources
    */
   async cleanup() {
-    logger.debug("🧹 Cleaning up context menu manager");
+    logger.info("🧹 Cleaning up context menu manager");
 
     try {
       await this.clearAllMenus();

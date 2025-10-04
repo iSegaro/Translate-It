@@ -15,7 +15,7 @@ export class KeyboardStateManager extends ResourceTracker {
     this.initialized = false;
 
     // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'KeyboardStateManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'KeyboardStateManager');
 
     // Commonly tracked keys
     this.TRACKED_KEYS = {
@@ -37,7 +37,7 @@ export class KeyboardStateManager extends ResourceTracker {
    */
   initialize() {
     if (this.initialized) {
-      this.logger.debug('Already initialized, skipping');
+      // logger.trace('Already initialized, skipping');
       return;
     }
 
@@ -49,7 +49,7 @@ export class KeyboardStateManager extends ResourceTracker {
     this.resetAllStates();
     
     this.initialized = true;
-    this.logger.debug('Initialized successfully');
+    // logger.trace('Initialized successfully');
   }
 
   /**
@@ -199,7 +199,7 @@ export class KeyboardStateManager extends ResourceTracker {
    */
   setKeyState(key, state) {
     this.keyStates.set(key, state);
-    this.logger.debug(`Manual key state update: ${key} = ${state}`);
+    // logger.trace(`Manual key state update: ${key} = ${state}`);
   }
 
   /**
@@ -217,8 +217,7 @@ export class KeyboardStateManager extends ResourceTracker {
     this.keyStates.set('shiftPressed', false);
     this.keyStates.set('ctrlKeyPressed', false);
     
-    // Remove verbose log - this is called frequently
-    this.logger.debug('All key states reset');
+    // logger.trace('All key states reset');
   }
 
   /**
@@ -310,6 +309,6 @@ export class KeyboardStateManager extends ResourceTracker {
     // Use ResourceTracker cleanup for automatic resource management (includes event listeners)
     super.cleanup();
 
-    this.logger.debug('Cleaned up');
+    // logger.trace('Cleaned up');
   }
 }

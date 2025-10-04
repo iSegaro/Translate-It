@@ -4,6 +4,11 @@
  * Simplified for element-selection independence
  */
 
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'timeoutCalculator')
+
 /**
  * Default timeout configuration
  */
@@ -26,7 +31,7 @@ export const DEFAULT_TIMEOUT_CONFIG = {
 export function calculateDynamicTimeout(segmentCount, config = DEFAULT_TIMEOUT_CONFIG) {
   // Validate input
   if (!segmentCount || segmentCount <= 0 || !Number.isInteger(segmentCount)) {
-    console.debug(`[TimeoutCalculator] Invalid segment count (${segmentCount}), using fallback timeout`);
+    logger.debug(`[TimeoutCalculator] Invalid segment count (${segmentCount}), using fallback timeout`);
     return config.FALLBACK_TIMEOUT || DEFAULT_TIMEOUT_CONFIG.FALLBACK_TIMEOUT;
   }
 
@@ -47,7 +52,7 @@ export function calculateDynamicTimeout(segmentCount, config = DEFAULT_TIMEOUT_C
     Math.min(calculatedTimeout, safeConfig.MAX_TIMEOUT)
   );
 
-  console.debug(`[TimeoutCalculator] Dynamic timeout calculated: ${segmentCount} segments → ${finalTimeout}ms (${finalTimeout / 1000}s)`, {
+  logger.debug(`[TimeoutCalculator] Dynamic timeout calculated: ${segmentCount} segments → ${finalTimeout}ms (${finalTimeout / 1000}s)`, {
     segmentCount,
     calculatedTimeout,
     finalTimeout,

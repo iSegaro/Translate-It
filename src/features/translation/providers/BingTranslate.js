@@ -68,6 +68,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
     const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
     const providerConfig = getProviderConfiguration(this.providerName);
 
+    // Add key info log for translation start
+    if (retryAttempt === 0) {
+      logger.info(`[Bing] Starting translation: ${chunkTexts.join(' ').length} chars`);
+    }
+
     try {
       // Validate chunk size before processing
       if (chunkTexts.length > this.constructor.maxChunksPerBatch) {
@@ -243,8 +248,15 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         abortController,
       });
 
-      return result || chunkTexts.map(() => "");
-      
+      const finalResult = result || chunkTexts.map(() => "");
+
+      // Add completion log for successful translation
+      if (retryAttempt === 0 && finalResult.length > 0) {
+        logger.info(`[Bing] Translation completed successfully`);
+      }
+
+      return finalResult;
+
     } catch (error) {
       // Handle HTML response and JSON parsing errors with retry
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
@@ -263,7 +275,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             minChunkSize
           );
 
-          logger.info(`[Bing] Retrying with smaller chunks: ${chunkTexts.length} → ${newChunkSize} texts per chunk`);
+          // Retrying with smaller chunks
 
           try {
             // Split into smaller chunks and retry while preserving order
@@ -295,7 +307,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
               }
             }
 
-            logger.info(`[Bing] Retry successful: translated ${results.length} texts from original ${chunkTexts.length}`);
+            // Retry successful
             return results;
 
           } catch (retryError) {

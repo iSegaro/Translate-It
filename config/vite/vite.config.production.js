@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
-import { analyzer } from 'rollup-plugin-analyzer'
+import analyzerPkg from 'rollup-plugin-analyzer'
+const analyzer = analyzerPkg.default || analyzerPkg
 
 export default defineConfig({
   plugins: [
@@ -25,14 +26,14 @@ export default defineConfig({
   
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@components': resolve(__dirname, 'src/components'),
-      '@views': resolve(__dirname, 'src/views'),
-      '@store': resolve(__dirname, 'src/store'),
-      '@composables': resolve(__dirname, 'src/composables'),
-      '@utils': resolve(__dirname, 'src/utils'),
-      '@providers': resolve(__dirname, 'src/providers'),
-      '@assets': resolve(__dirname, 'src/assets')
+      '@': resolve(__dirname, '../../src'),
+      '@components': resolve(__dirname, '../../src/components'),
+      '@views': resolve(__dirname, '../../src/views'),
+      '@store': resolve(__dirname, '../../src/store'),
+      '@composables': resolve(__dirname, '../../src/composables'),
+      '@utils': resolve(__dirname, '../../src/utils'),
+      '@providers': resolve(__dirname, '../../src/providers'),
+      '@assets': resolve(__dirname, '../../src/assets')
     }
   },
 
@@ -40,9 +41,9 @@ export default defineConfig({
     outDir: 'dist-vue',
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'popup.html'),
-        sidepanel: resolve(__dirname, 'sidepanel.html'),
-        options: resolve(__dirname, 'options.html')
+        popup: resolve(__dirname, '../../popup.html'),
+        sidepanel: resolve(__dirname, '../../sidepanel.html'),
+        options: resolve(__dirname, '../../options.html')
       },
       
       external: [
@@ -82,22 +83,36 @@ export default defineConfig({
           if (id.includes('src/providers')) {
             return 'providers-core'
           }
-          
+
+          // Provider chunks - lazy loaded (highest priority)
+          if (id.includes('src/features/translation/providers/') && !id.includes('ProviderFactory') && !id.includes('ProviderRegistry') && !id.includes('register-providers')) {
+            const providerMatch = id.match(/providers\/(.+?)\.js/)
+            if (providerMatch) {
+              const providerName = providerMatch[1].toLowerCase()
+              return `provider-${providerName}`
+            }
+            return 'providers'
+          }
+
           // Feature-based chunks
-          if (id.includes('src/capture') || id.includes('ScreenCapture') || id.includes('screen-capture')) {
+          if (id.includes('src/features/screen-capture') || id.includes('ScreenCapture')) {
             return 'feature-capture'
           }
-          
-          if (id.includes('src/subtitle') || id.includes('Subtitle')) {
-            return 'feature-subtitle'
+
+          if (id.includes('src/features/element-selection') || id.includes('SelectElement')) {
+            return 'feature-element-selection'
           }
-          
-          if (id.includes('src/utils/tts') || id.includes('TTS') || id.includes('speech')) {
+
+          if (id.includes('src/features/iframe-support') || id.includes('IFrame')) {
+            return 'feature-iframe'
+          }
+
+          if (id.includes('src/features/text-actions') || id.includes('TextActions')) {
+            return 'feature-text-actions'
+          }
+
+          if (id.includes('src/features/tts') || id.includes('TTS') || id.includes('speech')) {
             return 'feature-tts'
-          }
-          
-          if (id.includes('src/utils/ocr') || id.includes('OCR')) {
-            return 'feature-ocr'
           }
           
           // Component chunks
@@ -113,9 +128,86 @@ export default defineConfig({
             return 'components-content'
           }
           
-          // Utility chunks
+          // Utils splitting - organized by functionality with more granular chunks
           if (id.includes('src/utils')) {
-            return 'utils'
+            // Messaging utilities (small, critical)
+            if (id.includes('utils/messaging')) {
+              return 'utils-messaging'
+            }
+
+            // Text processing utilities
+            if (id.includes('utils/rendering')) {
+              return 'utils-rendering'
+            }
+
+            if (id.includes('utils/text')) {
+              return 'utils-text'
+            }
+
+            // i18n utilities - split further for better code splitting
+            if (id.includes('utils/i18n/i18n')) {
+              return 'utils-i18n-main'
+            }
+
+            if (id.includes('utils/i18n/languages')) {
+              return 'utils-i18n-languages'
+            }
+
+            if (id.includes('utils/i18n/plugin')) {
+              return 'utils-i18n-plugin'
+            }
+
+            if (id.includes('utils/i18n/wrapper')) {
+              return 'utils-i18n-wrapper'
+            }
+
+            // Browser-specific utilities - split by size
+            if (id.includes('utils/browser/compatibility')) {
+              return 'utils-browser-compat'
+            }
+
+            if (id.includes('utils/browser/platform')) {
+              return 'utils-browser-platform'
+            }
+
+            if (id.includes('utils/browser/events')) {
+              return 'utils-browser-events'
+            }
+
+            if (id.includes('utils/browser/ActionbarIconManager')) {
+              return 'utils-browser-actionbar'
+            }
+
+            // UI utilities
+            if (id.includes('utils/ui/theme')) {
+              return 'utils-ui-theme'
+            }
+
+            if (id.includes('utils/ui/exclusion')) {
+              return 'utils-ui-exclusion'
+            }
+
+            if (id.includes('utils/ui/html-sanitizer')) {
+              return 'utils-ui-sanitizer'
+            }
+
+            // Security and storage utilities
+            if (id.includes('utils/secureStorage')) {
+              return 'utils-security'
+            }
+
+            // Provider utilities
+            if (id.includes('utils/providerHtmlGenerator')) {
+              return 'utils-provider-html'
+            }
+
+            // UtilsFactory itself
+            if (id.includes('utils/UtilsFactory')) {
+              return 'utils-factory'
+            }
+
+            // Small core utilities that didn't match above
+            return 'utils-core'
           }
           
           // Store chunks
@@ -133,7 +225,7 @@ export default defineConfig({
           if (name.startsWith('vue-') || name === 'vendor') {
             return `js/vendor/${name}.${hash}.js`
           }
-          
+
           if (name.startsWith('provider-')) {
             return `js/providers/${name}.${hash}.js`
           }
@@ -145,7 +237,11 @@ export default defineConfig({
           if (name.startsWith('components-')) {
             return `js/components/${name}.${hash}.js`
           }
-          
+
+          if (name.startsWith('utils-')) {
+            return `js/utils/${name}.${hash}.js`
+          }
+
           return `js/${name}.${hash}.js`
         },
         
@@ -201,11 +297,7 @@ export default defineConfig({
         drop_console: true,
         drop_debugger: true,
         pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn'],
-        passes: 2,
-        unsafe_arrows: true,
-        unsafe_comps: true,
-        unsafe_math: true,
-        unsafe_methods: true
+        passes: 2
       },
       mangle: {
         safari10: true,
@@ -259,10 +351,34 @@ export default defineConfig({
     ],
     exclude: [
       // Exclude provider implementations for lazy loading
-      'src/providers/implementations',
+      'src/features/translation/providers/GoogleTranslate.js',
+      'src/features/translation/providers/OpenAI.js',
+      'src/features/translation/providers/Gemini.js',
+      'src/features/translation/providers/DeepSeek.js',
+      'src/features/translation/providers/YandexTranslate.js',
+      'src/features/translation/providers/BingTranslate.js',
+      'src/features/translation/providers/OpenRouter.js',
+      'src/features/translation/providers/WebAI.js',
+      'src/features/translation/providers/CustomProvider.js',
+      'src/features/translation/providers/BrowserAPI.js',
       // Exclude large features for code splitting
-      'src/capture',
-      'src/subtitle'
+      'src/features/screen-capture',
+      'src/features/element-selection',
+      'src/features/iframe-support',
+      // Exclude utils modules for lazy loading and code splitting
+      'src/utils/i18n/i18n.js',
+      'src/utils/i18n/languages.js',
+      'src/utils/i18n/plugin.js',
+      'src/utils/browser/compatibility.js',
+      'src/utils/browser/platform.js',
+      'src/utils/browser/events.js',
+      'src/utils/browser/ActionbarIconManager.js',
+      'src/utils/rendering/TranslationRenderer.js',
+      'src/utils/ui/theme.js',
+      'src/utils/ui/exclusion.js',
+      'src/utils/ui/html-sanitizer.js',
+      'src/utils/secureStorage.js',
+      'src/utils/providerHtmlGenerator.js'
     ]
   },
   

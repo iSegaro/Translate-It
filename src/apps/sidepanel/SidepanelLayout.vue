@@ -1,7 +1,7 @@
 <template>
   <div
     class="sidepanel-container"
-    @click="handleSidepanelClick"
+    @keydown="handleKeydown"
   >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
@@ -53,7 +53,6 @@
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import { useHistory } from '@/features/history/composables/useHistory.js';
-import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
@@ -68,7 +67,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelLayout');
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
-const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 const translationStore = useTranslationStore()
 const { handleError } = useErrorHandler()
 
@@ -77,6 +75,12 @@ const mainContentRef = ref(null);
 
 // Shared state between components
 const isHistoryVisible = ref(false)
+
+// Ensure history panel is closed on mount
+onMounted(() => {
+  isHistoryVisible.value = false
+  setHistoryPanelOpen(false)
+})
 
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
@@ -94,39 +98,42 @@ const toggleEnhancedVersion = () => {
 
 // Handle history panel toggle
 const handleHistoryToggle = (visible) => {
-  isHistoryVisible.value = visible
-  if (visible) {
-    openHistoryPanel()
-  } else {
-    closeHistoryPanel()
+  // Only toggle if the value is actually changing
+  if (isHistoryVisible.value !== visible) {
+    isHistoryVisible.value = visible
+    setHistoryPanelOpen(visible)
+
+    if (visible) {
+      openHistoryPanel()
+    } else {
+      closeHistoryPanel()
+    }
   }
 }
 
 // Handle history panel close
 const handleHistoryClose = () => {
   isHistoryVisible.value = false
-  closeHistoryPanel() // Sync with composable state
+  setHistoryPanelOpen(false) // Sync with composable state
+  closeHistoryPanel()
 }
 
 // Watch for changes in isHistoryVisible and sync with composable
-watch(isHistoryVisible, (newVal) => {
-  setHistoryPanelOpen(newVal)
+watch(isHistoryVisible, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    setHistoryPanelOpen(newVal)
+  }
 })
 
 // Handle clear fields event from toolbar
 const handleClearFields = () => {
-  logger.debug('Layout received clear-fields event, calling child component');
   if (mainContentRef.value && typeof mainContentRef.value.clearFields === 'function') {
     mainContentRef.value.clearFields();
-  } else {
-    logger.warn('Could not find clearFields method on main content component');
   }
 }
 
 // Handle history item selection
 const handleHistoryItemSelect = (historyData) => {
-  logger.debug('[SidepanelLayout] History item selected:', historyData)
-  
   // Update translation store with the selected history item
   translationStore.currentTranslation = {
     sourceText: historyData.sourceText,
@@ -135,26 +142,14 @@ const handleHistoryItemSelect = (historyData) => {
     targetLanguage: historyData.targetLanguage,
     timestamp: Date.now()
   }
-  
+
   // Close history panel after selection
   isHistoryVisible.value = false
   closeHistoryPanel()
 }
 
-// Handle sidepanel click to deactivate select element mode
-const handleSidepanelClick = async () => {
-  // Only deactivate if select mode is active
-  if (isSelectModeActive.value) {
-    try {
-      await deactivateSelectMode()
-    } catch (error) {
-      await handleError(error, 'sidepanel-select-deactivate')
-    }
-  }
-}
 
-// Note: ESC key handling is now managed by ShortcutManager for consistency
-// No need for separate ESC listener in sidepanel - ShortcutManager handles all ESC events
+
 
 // Lifecycle management
 onMounted(() => {
@@ -163,6 +158,7 @@ onMounted(() => {
   if (savedVersion !== null) {
     useEnhancedVersion.value = savedVersion === 'true'
   }
+
   
   logger.debug('[SidepanelLayout] Component initialized', {
     useEnhancedVersion: useEnhancedVersion.value,

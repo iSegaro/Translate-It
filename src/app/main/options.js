@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import i18n, { setI18nLocale } from '@/utils/i18n/plugin.js'
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
 import OptionsApp from '@/apps/options/OptionsApp.vue'
@@ -44,6 +44,9 @@ async function initializeApp() {
 
     // Setup browser API globals
     setupBrowserAPIGlobals()
+
+    // Get i18n plugin and locale setter from factory
+    const { i18nPlugin, setI18nLocale } = await utilsFactory.getI18nUtils();
 
     // مقداردهی اولیه locale بر اساس تنظیمات کاربر
     let userLocale = 'en';
@@ -100,7 +103,7 @@ async function initializeApp() {
     logger.debug('✅ Pinia installed')
     
     logger.debug('🔌 Installing i18n...')
-    app.use(i18n)
+    app.use(i18nPlugin)
     logger.debug('✅ i18n installed')
     
     logger.debug('🔌 Installing Router...')

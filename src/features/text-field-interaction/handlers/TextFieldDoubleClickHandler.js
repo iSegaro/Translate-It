@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldDoubleClickHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDoubleClickHandler');
 
 /**
  * Text Field Double Click Handler
@@ -474,8 +474,18 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    */
   async isTextFieldIconsEnabled() {
     try {
-      const { getActiveSelectionIconOnTextfieldsAsync } = await import('@/shared/config/config.js');
-      return await getActiveSelectionIconOnTextfieldsAsync();
+      const {
+        getActiveSelectionIconOnTextfieldsAsync,
+        getExtensionEnabledAsync,
+        getTranslateOnTextSelectionAsync
+      } = await import('@/shared/config/config.js');
+
+      const activeSelectionIconEnabled = await getActiveSelectionIconOnTextfieldsAsync();
+      const extensionEnabled = await getExtensionEnabledAsync();
+      const translateOnTextSelection = await getTranslateOnTextSelectionAsync();
+
+      // Only enable if all parent settings are also enabled
+      return activeSelectionIconEnabled && extensionEnabled && translateOnTextSelection;
     } catch (error) {
       logger.warn('Error checking text field icons setting:', error);
       return false; // Default to disabled if can't check

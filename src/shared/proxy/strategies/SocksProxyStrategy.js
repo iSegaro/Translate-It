@@ -23,7 +23,8 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
 
     this.logger.debug('Executing SOCKS proxy request', {
       ...this._getStrategyInfo(),
-      url: this._sanitizeUrl(url)
+      url: this._sanitizeUrl(url),
+      method: options.method || 'GET'
     });
 
     // SOCKS proxy implementation is complex in browser environment
@@ -31,10 +32,12 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     try {
       return await this._socksProxy(url, options);
     } catch (error) {
-      this.logger.error('SOCKS proxy failed', {
+      this.logger.error(`[SocksProxy] Request failed: ${this._sanitizeUrl(url)} - ${error.message}`);
+      this.logger.debug('SOCKS proxy failure details', {
         ...this._getStrategyInfo(),
         url: this._sanitizeUrl(url),
-        error: error.message
+        error: error.message,
+        method: options.method || 'GET'
       });
 
       // Do NOT fall back to direct connection - rethrow the error
@@ -56,7 +59,8 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     this.logger.debug('Attempting SOCKS proxy connection', {
       proxyHost: this.config.host,
       proxyPort: this.config.port,
-      targetUrl: this._sanitizeUrl(url)
+      targetUrl: this._sanitizeUrl(url),
+      method: options.method || 'GET'
     });
 
     // First, validate that we can reach the proxy server itself
@@ -95,7 +99,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     };
 
     try {
-      this.logger.debug('Attempting HTTP-over-SOCKS request');
+      this.logger.debug('[SocksProxy] Attempting HTTP-over-SOCKS request');
 
       // For HTTP URLs, we can try to proxy directly
       if (url.startsWith('http://')) {
@@ -125,8 +129,9 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
 
       throw new Error('Unsupported URL scheme for SOCKS proxy');
     } catch (error) {
-      this.logger.debug('HTTP-over-SOCKS failed', {
-        error: error.message
+      this.logger.debug('[SocksProxy] HTTP-over-SOCKS failed', {
+        error: error.message,
+        url: this._sanitizeUrl(url)
       });
       throw new Error(`SOCKS proxy request failed: ${error.message}`);
     }
@@ -143,7 +148,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     const targetUrl = new URL(url);
     const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
-    this.logger.debug('Attempting HTTPS through SOCKS proxy', {
+    this.logger.debug('[SocksProxy] Attempting HTTPS through SOCKS proxy', {
       proxyUrl,
       targetHost: targetUrl.hostname,
       targetPort: targetUrl.port || 443
@@ -182,8 +187,9 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
         throw new Error(`Proxy returned error status: ${response.status}`);
       }
     } catch (error) {
-      this.logger.debug('HTTPS through SOCKS failed', {
-        error: error.message
+      this.logger.debug('[SocksProxy] HTTPS through SOCKS failed', {
+        error: error.message,
+        targetHost: targetUrl.hostname
       });
       throw new Error(`Cannot establish HTTPS connection through SOCKS proxy: ${error.message}`);
     }

@@ -3,7 +3,7 @@ import { ExclusionChecker } from '../core/ExclusionChecker.js';
 // import { getScopedLogger } from '@/shared/logging/logger.js';
 // import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useExclusionChecker');
+// const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'useExclusionChecker');
 
 let checkerInstance = null;
 const isInitialized = ref(false);
@@ -56,8 +56,8 @@ export function useExclusionChecker() {
   };
 
   // Static helper for quick checks
-  const shouldConsiderFeature = (featureName, url = window.location.href) => {
-    return ExclusionChecker.shouldConsiderFeature(featureName, url);
+  const shouldConsiderFeature = async (featureName, url = window.location.href) => {
+    return await ExclusionChecker.shouldConsiderFeature(featureName, url);
   };
 
   return {

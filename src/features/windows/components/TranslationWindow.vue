@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
@@ -233,11 +233,25 @@ watch(() => props.position, (newPos) => {
 
 watch(() => props.initialSize, (newSize) => {
   currentSize.value = newSize;
-  // Recalculate position with new dimensions to ensure it stays within viewport
-  updatePosition(currentPosition.value, {
-    width: currentWidth.value || 240,
-    height: currentHeight.value || 180
-  });
+
+  if (newSize === 'normal') {
+    // Wait for the DOM to update to the normal window
+    nextTick(() => {
+      if (windowElement.value) {
+        const { offsetWidth, offsetHeight } = windowElement.value;
+        updatePosition(currentPosition.value, {
+          width: offsetWidth,
+          height: offsetHeight
+        });
+      }
+    });
+  } else {
+    // For 'small' size, we know the dimensions
+    updatePosition(currentPosition.value, {
+      width: currentWidth.value,
+      height: currentHeight.value
+    });
+  }
 });
 
 
@@ -255,7 +269,8 @@ const loadingGifUrl = computed(() => {
 const windowStyle = computed(() => {
   return {
     ...positionStyle.value
-    // All width, height, minWidth, minHeight, borderRadius now handled by CSS classes
+    // All positioning, display, and visibility handled by global CSS
+    // All width, height, minWidth, minHeight, borderRadius handled by CSS classes
   };
 });
 

@@ -22,7 +22,8 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
 
     this.logger.debug('Executing HTTP proxy request', {
       ...this._getStrategyInfo(),
-      url: this._sanitizeUrl(url)
+      url: this._sanitizeUrl(url),
+      method: options.method || 'GET'
     });
 
     try {
@@ -44,10 +45,12 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
       throw new Error('Unsupported URL scheme for HTTP proxy');
 
     } catch (error) {
-      this.logger.error('HTTP proxy request failed', {
+      this.logger.error(`[HttpProxy] Request failed: ${this._sanitizeUrl(url)} - ${error.message}`);
+      this.logger.debug('HTTP proxy failure details', {
         ...this._getStrategyInfo(),
         url: this._sanitizeUrl(url),
-        error: error.message
+        error: error.message,
+        method: options.method || 'GET'
       });
       throw error;
     }
@@ -74,9 +77,10 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
       }
     };
 
-    this.logger.debug('Sending HTTP request through proxy', {
+    this.logger.debug('Routing HTTP request through proxy', {
       proxyUrl,
-      targetUrl: this._sanitizeUrl(url)
+      targetUrl: this._sanitizeUrl(url),
+      targetHost: new URL(url).host
     });
 
     // Send request to proxy with target URL as path
@@ -90,7 +94,7 @@ export class HttpProxyStrategy extends BaseProxyStrategy {
    * @returns {Promise<Response>}
    */
   async _proxyHttpsRequest() {
-    this.logger.debug('HTTPS through HTTP proxy not supported in browser extension environment');
+    this.logger.debug('[HttpProxy] HTTPS through HTTP proxy not supported in browser extension');
 
     // In browser extensions, we cannot properly implement CONNECT tunnel for HTTPS through HTTP proxy
     // Instead of falling back to direct connection, we should fail to properly test the proxy

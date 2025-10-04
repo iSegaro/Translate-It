@@ -60,7 +60,7 @@ export class FeatureLoader {
       ? "side_panel"
       : "sidebar_action"; // Simplified panel system selection
 
-    logger.debug(`📋 Loading panel manager with system: ${panelSystem}`);
+    logger.info(`Loading panel manager with system: ${panelSystem}`);
 
     try {
       if (panelSystem === "side_panel" && capabilities.sidePanel) {
@@ -128,7 +128,7 @@ export class FeatureLoader {
       ? "chrome"
       : "firefox"; // Simplified browser detection
 
-    logger.debug(`📸 Loading screen capture manager for ${browserName}`);
+    logger.info(`Loading screen capture manager for ${browserName}`);
 
     try {
       if (capabilities.offscreen && browser === "chrome") {
@@ -164,11 +164,18 @@ export class FeatureLoader {
     }
 
     try {
+      logger.info("[FeatureLoader] Loading ContextMenuManager...");
       const { ContextMenuManager } = await import(
         "../managers/context-menu.js"
       );
       const manager = new ContextMenuManager();
+
+      // Initialize the manager immediately
+      logger.info("[FeatureLoader] Initializing ContextMenuManager...");
+      await manager.initialize();
+
       this.loadedFeatures.set(cacheKey, manager);
+      logger.info("[FeatureLoader] ContextMenuManager loaded and initialized successfully");
       return manager;
     } catch (error) {
       logger.error("Failed to load context menu manager:", error);
@@ -181,7 +188,7 @@ export class FeatureLoader {
    * @returns {Promise<Object>} Object containing all loaded features
    */
   async preloadEssentialFeatures() {
-    logger.debug("🚀 Pre-loading essential features...");
+    logger.info("Pre-loading essential features...");
 
     const results = await Promise.allSettled([
       // TTS preloading removed - using unified GOOGLE_TTS_SPEAK system
@@ -204,12 +211,9 @@ export class FeatureLoader {
 
       if (result.status === "fulfilled") {
         features[featureName] = result.value;
-        logger.debug(`✅ ${featureName} feature loaded successfully`);
+        logger.info(`${featureName} feature loaded successfully`);
       } else {
-        logger.error(
-          `❌ Failed to load ${featureName} feature:`,
-          result.reason,
-        );
+        logger.error(`Failed to load ${featureName} feature:`, result.reason);
       }
     });
 

@@ -20,6 +20,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 export class ContentCaptureHandler extends ResourceTracker {
   constructor() {
     super('content-capture-handler')
+    // logger.trace('ContentCaptureHandler constructor initialized');
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
@@ -32,12 +33,14 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   startScreenAreaSelection(captureOptions) {
     try {
+      // logger.trace('Starting screen area selection with options:', captureOptions);
       if (this.screenSelector) this.screenSelector.cleanup();
       this.screenSelector = new ScreenSelector({
         onSelectionComplete: (selectionData) => this.handleAreaSelectionComplete(selectionData, captureOptions),
         onCancel: () => this.cleanup(),
       });
       this.screenSelector.start();
+      logger.info('Screen area selection started');
     } catch (error) {
       this.handleCaptureError(error, "area-selection");
     }
@@ -45,29 +48,33 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   async handleAreaSelectionComplete(selectionData, captureOptions) {
     try {
+      // logger.trace('Area selection completed:', selectionData);
       const fullCaptureMessage = MessageFormat.create(
         MessageActions.CAPTURE_SCREEN,
         { mode: 'full' },
         MessagingContexts.CONTENT
       );
-      
+
       const fullCaptureResponse = await sendMessage(fullCaptureMessage);
       if (!fullCaptureResponse || fullCaptureResponse.error) throw new Error(fullCaptureResponse.error || "Failed to capture full screen");
-      
+
+      // logger.trace('Full screen captured, cropping to selection');
       const croppedImageData = await cropImageData(fullCaptureResponse.imageData, selectionData);
-      
+
       const ocrMessage = MessageFormat.create(
         MessageActions.PROCESS_IMAGE_OCR,
-        { 
+        {
           imageData: croppedImageData,
           ...captureOptions,
-          selectionData 
+          selectionData
         },
         MessagingContexts.CONTENT
       );
-      
+
+      // logger.trace('Sending OCR processing request');
       await sendMessage(ocrMessage);
       if (this.screenSelector) this.screenSelector.cleanup();
+      logger.info('Screen area selection and OCR processing completed');
     } catch (error) {
       this.handleCaptureError(error, "area-completion");
     }
@@ -75,6 +82,7 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   async showCapturePreview(previewData) {
     try {
+      // logger.trace('Showing capture preview with data:', previewData);
       if (this.capturePreview) this.capturePreview.cleanup();
       this.capturePreview = new CapturePreview({
         ...previewData,
@@ -83,6 +91,7 @@ export class ContentCaptureHandler extends ResourceTracker {
         onRetry: this.handlePreviewRetry,
       });
       await this.capturePreview.show();
+      logger.info('Capture preview displayed successfully');
     } catch (error) {
       this.handleCaptureError(error, "preview");
     }
@@ -90,9 +99,11 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   async showCaptureResult(resultData) {
     try {
+      // logger.trace('Showing capture result with data:', resultData);
       if (this.captureResult) this.captureResult.cleanup();
       this.captureResult = new CaptureResult({ ...resultData, onClose: this.handleResultClose });
       await this.captureResult.show();
+      logger.info('Capture result displayed successfully');
     } catch (error) {
       this.handleCaptureError(error, "result");
     }
@@ -100,7 +111,9 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   async handlePreviewConfirm(captureData, translationOptions) {
     try {
+      // logger.trace('Preview confirmed with data:', { captureData, translationOptions });
       if (this.capturePreview) this.capturePreview.cleanup();
+      logger.info('Capture preview confirmed by user');
       await this.messenger.sendMessage({ action: "previewConfirmed", data: { captureData, translationOptions } });
     } catch (error) {
       this.handleCaptureError(error, "preview-confirm");
@@ -109,20 +122,24 @@ export class ContentCaptureHandler extends ResourceTracker {
 
   handlePreviewCancel() {
     if (this.capturePreview) this.capturePreview.cleanup();
+    logger.info('Capture preview cancelled by user');
   this.messenger.sendMessage({ action: "previewCancelled" }).catch(err => logger.error('Error sending preview cancel', err));
   }
 
   handlePreviewRetry(captureType) {
     if (this.capturePreview) this.capturePreview.cleanup();
+    logger.info(`Capture preview retry requested for type: ${captureType}`);
   this.messenger.sendMessage({ action: "previewRetry", data: { captureType } }).catch(err => logger.error('Error sending preview retry', err));
   }
 
   handleResultClose() {
     if (this.captureResult) this.captureResult.cleanup();
+    logger.info('Capture result closed by user');
   this.messenger.sendMessage({ action: "resultClosed" }).catch(err => logger.error('Error sending result close', err));
   }
 
   handleCaptureError(error, context) {
+    logger.error(`Capture error in context: ${context}`, error);
     this.cleanup();
     this.messenger.sendMessage({
       action: "captureError",
@@ -132,6 +149,7 @@ export class ContentCaptureHandler extends ResourceTracker {
   }
 
   _showErrorNotification(message, error) {
+    // logger.trace('Showing error notification:', { message, error: error.message });
     this.messenger.sendMessage({
       action: MessageActions.SHOW_ERROR_NOTIFICATION,
       data: { message, error: error.message, type: error.type || ErrorTypes.SCREEN_CAPTURE },
@@ -147,6 +165,7 @@ export class ContentCaptureHandler extends ResourceTracker {
   }
 
   cleanup() {
+    // logger.trace('ContentCaptureHandler cleanup initiated');
     if (this.screenSelector) {
       this.screenSelector.cleanup();
       this.screenSelector = null;
@@ -159,10 +178,10 @@ export class ContentCaptureHandler extends ResourceTracker {
       this.captureResult.cleanup();
       this.captureResult = null;
     }
-    
+
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
-    logger.debug('ContentCaptureHandler cleanup completed');
+
+    logger.info('ContentCaptureHandler cleanup completed');
   }
 }

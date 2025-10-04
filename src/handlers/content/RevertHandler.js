@@ -1,12 +1,12 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
  * Handles both Vue and Legacy translation systems
@@ -84,10 +84,12 @@ export class RevertHandler extends ResourceTracker {
 
       // Show a single, unified notification
       if (totalRevertedCount > 0) {
+        const { getTranslationString } = await utilsFactory.getI18nUtils();
         const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
         pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
         logger.info('[RevertHandler] 📢 Success notification sent');
       } else {
+        const { getTranslationString } = await utilsFactory.getI18nUtils();
         const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
         pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
         logger.info('[RevertHandler] 📢 Warning notification sent - no translations found');

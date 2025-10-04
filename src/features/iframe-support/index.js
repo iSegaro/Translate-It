@@ -1,17 +1,65 @@
-// IFrame Support System - Simplified Entry Point
+// IFrame Support System - Lazy Loading Entry Point
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 
-// Export core managers that are actually used
-export { IFrameManager, iFrameManager } from './managers/IFrameManager.js';
-export { FrameRegistry } from '../windows/managers/crossframe/FrameRegistry.js';
+// Export lazy loading factory
+export { IFrameSupportFactory } from './IFrameSupportFactory.js';
+export { useIFrameSupportLazy } from './composables/useIFrameSupportLazy.js';
 
-// Export Vue composables
-export { 
-  useIFrameSupport, 
-  useIFrameDetection, 
-  useIFramePositioning 
-} from './composables/useIFrameSupport.js';
+// Lazy loading functions for dynamic imports
+export const loadIFrameCore = async () => {
+  const [manager, registry] = await Promise.all([
+    import('./managers/IFrameManager.js'),
+    import('../windows/managers/crossframe/FrameRegistry.js')
+  ]);
+
+  return {
+    IFrameManager: manager.IFrameManager,
+    iFrameManager: manager.iFrameManager,
+    FrameRegistry: registry.FrameRegistry
+  };
+};
+
+export const loadIFrameComposables = async () => {
+  const composables = await import('./composables/useIFrameSupport.js');
+
+  return {
+    useIFrameSupport: composables.useIFrameSupport,
+    useIFrameDetection: composables.useIFrameDetection,
+    useIFramePositioning: composables.useIFramePositioning
+  };
+};
+
+// Backward compatibility - lazy loaded when accessed
+export const IFrameManager = async () => {
+  const { IFrameManager: Manager } = await loadIFrameCore();
+  return Manager;
+};
+
+export const iFrameManager = async () => {
+  const { iFrameManager: manager } = await loadIFrameCore();
+  return manager;
+};
+
+export const FrameRegistry = async () => {
+  const { FrameRegistry: Registry } = await loadIFrameCore();
+  return Registry;
+};
+
+export const useIFrameSupport = async () => {
+  const { useIFrameSupport: composable } = await loadIFrameComposables();
+  return composable;
+};
+
+export const useIFrameDetection = async () => {
+  const { useIFrameDetection: composable } = await loadIFrameComposables();
+  return composable;
+};
+
+export const useIFramePositioning = async () => {
+  const { useIFramePositioning: composable } = await loadIFrameComposables();
+  return composable;
+};
 
 /**
  * Check if iframe support is available
@@ -57,7 +105,7 @@ export async function initializeIFrameSupport(options = {}) {
     enableLogging = true
   } = options;
   
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'IFrameSupport');
+  const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'IFrameSupport');
   
   try {
     if (enableLogging) {

@@ -7,15 +7,21 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationRenderer')
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationRenderer');
+  }
+  return logger;
+};
 
 /**
  * Universal Translation Content Renderer
  * Used by both Vue components and vanilla JS (like SelectionWindows)
  */
-export class TranslationRenderer extends ResourceTracker {
+export class TranslationRenderer {
   constructor(options = {}) {
-    super(); // Initialize ResourceTracker first
+    this.resourceTracker = new ResourceTracker();
     this.options = {
       enableMarkdown: true,
       enableLabelFormatting: true,
@@ -138,8 +144,7 @@ export class TranslationRenderer extends ResourceTracker {
       const markdownElement = SimpleMarkdown.render(content)
       return markdownElement ? markdownElement.outerHTML : this._escapeHtml(content).replace(/\n/g, '<br>')
     } catch (error) {
-      logger.warn('[TranslationRenderer] Markdown rendering failed:', error)
-      return this._escapeHtml(content).replace(/\n/g, '<br>')
+      getLogger().warn('[TranslationRenderer] Markdown rendering failed:', error)
     }
   }
 
@@ -167,7 +172,7 @@ export class TranslationRenderer extends ResourceTracker {
     img.className = 'toolbar-icon'
     button.appendChild(img)
 
-    this.addEventListener(button, 'click', handler)
+    this.resourceTracker.addEventListener(button, 'click', handler)
     return button
   }
 
@@ -239,7 +244,7 @@ export class TranslationRenderer extends ResourceTracker {
           })
         }
       } catch (error) {
-        logger.warn('[TranslationRenderer] Markdown rendering failed:', error)
+        getLogger().warn('[TranslationRenderer] Markdown rendering failed:', error)
         // Fallback to escaped text
         const lines = params.content.split('\n')
         lines.forEach((line, index) => {

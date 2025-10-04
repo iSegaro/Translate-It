@@ -22,7 +22,8 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
 
     this.logger.debug('Executing HTTPS proxy request', {
       ...this._getStrategyInfo(),
-      url: this._sanitizeUrl(url)
+      url: this._sanitizeUrl(url),
+      method: options.method || 'GET'
     });
 
     try {
@@ -36,10 +37,12 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
       return await this._proxyThroughHttps(url, proxyOptions);
 
     } catch (error) {
-      this.logger.error('HTTPS proxy request failed', {
+      this.logger.error(`[HttpsProxy] Request failed: ${this._sanitizeUrl(url)} - ${error.message}`);
+      this.logger.debug('HTTPS proxy failure details', {
         ...this._getStrategyInfo(),
         url: this._sanitizeUrl(url),
-        error: error.message
+        error: error.message,
+        method: options.method || 'GET'
       });
 
       // Do NOT fall back to direct connection - rethrow the error
@@ -70,9 +73,11 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
       }
     };
 
-    this.logger.debug('Sending request through HTTPS proxy', {
+    this.logger.debug('Routing request through HTTPS proxy', {
       proxyUrl,
-      targetUrl: this._sanitizeUrl(url)
+      targetUrl: this._sanitizeUrl(url),
+      targetHost: new URL(url).host,
+      method: options.method || 'GET'
     });
 
     // Simple approach: send request to proxy with target info
@@ -87,7 +92,7 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
 
       return response;
     } catch (error) {
-      this.logger.error('HTTPS proxy connection failed', {
+      this.logger.debug('HTTPS proxy connection failed', {
         proxyUrl,
         targetUrl: this._sanitizeUrl(url),
         error: error.message

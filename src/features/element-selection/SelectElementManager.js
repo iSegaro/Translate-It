@@ -99,7 +99,7 @@ class SelectElementManager extends ResourceTracker {
     // Notification management
     this.currentNotification = null;
     
-    this.logger.init("New SelectElementManager instance created", {
+    this.logger.debug("New SelectElementManager instance created", {
       instanceId: this.instanceId,
       isInIframe: this.isInIframe,
       frameLocation: this.frameLocation,
@@ -404,11 +404,11 @@ class SelectElementManager extends ResourceTracker {
       // Extract text from the highlighted element
       const text = await this.textExtractionService.extractTextFromElement(elementToTranslate);
 
-      this.logger.info("Text extraction result:", {
-        text: text,
+      this.logger.debug("Text extraction result:", {
         textLength: text?.length || 0,
         elementType: elementToTranslate.tagName,
-        hasText: !!(text && text.trim())
+        hasText: !!(text && text.trim()),
+        textPreview: text ? text.substring(0, 100) + (text.length > 100 ? '...' : '') : null
       });
 
       if (text && text.trim()) {
@@ -616,15 +616,13 @@ class SelectElementManager extends ResourceTracker {
         }
       }
       
-      this.logger.info("Prepared translation data:", {
-        targetElement: targetElement,
+      this.logger.debug("Prepared translation data:", {
         targetElementTag: targetElement.tagName,
         targetElementClass: targetElement.className,
-        targetInnerHTML: targetElement.innerHTML.substring(0, 500),
+        targetInnerHTMLLength: targetElement.innerHTML.length,
         textNodesCount: textNodes.length,
-        foundTexts: textNodes.map(node => node.textContent.trim()),
-        originalTextsMap: Array.from(originalTextsMap.entries()),
-        nodeToTextMap: Array.from(nodeToTextMap.entries())
+        uniqueTextsCount: originalTextsMap.size,
+        sampleTexts: Array.from(originalTextsMap.keys()).slice(0, 3).map(text => text.substring(0, 50) + (text.length > 50 ? '...' : ''))
       });
 
       // Check if all texts are cached before showing notification
@@ -648,7 +646,8 @@ class SelectElementManager extends ResourceTracker {
           resultKeys: Object.keys(result),
           hasTranslatedText: !!result.translatedText,
           hasData: !!result.data,
-          fullResult: result
+          streaming: result.streaming,
+          fromCache: result.fromCache
         });
 
         // For non-streaming translations or cached translations, we need to apply the result here
@@ -692,9 +691,9 @@ class SelectElementManager extends ResourceTracker {
             this.logger.debug("Creating translation map from translatedData:", {
               translatedDataType: typeof translatedData,
               translatedDataLength: Array.isArray(translatedData) ? translatedData.length : 'not array',
-              translatedData: translatedData,
               workingOriginalTextsMapSize: workingOriginalTextsMap.size,
-              fromCache: result.fromCache
+              fromCache: result.fromCache,
+              sampleTranslatedData: Array.isArray(translatedData) ? translatedData.slice(0, 2).map(item => item?.text?.substring(0, 50) + (item?.text?.length > 50 ? '...' : '') || 'no text') : 'not array'
             });
 
             if (Array.isArray(translatedData) && result.expandedTexts && result.originMapping) {
@@ -768,7 +767,7 @@ class SelectElementManager extends ResourceTracker {
 
             this.logger.debug("Translation map created:", {
               size: translationMap.size,
-              entries: Array.from(translationMap.entries())
+              sampleEntries: Array.from(translationMap.entries()).slice(0, 3).map(([key, value]) => [key.substring(0, 50) + (key.length > 50 ? '...' : ''), value.substring(0, 50) + (value.length > 50 ? '...' : '')])
             });
 
             // Apply translations to DOM

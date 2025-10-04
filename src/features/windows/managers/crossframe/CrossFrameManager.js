@@ -83,15 +83,18 @@ export class CrossFrameManager {
    * Handle text selection window request from iframe
    */
   _handleTextSelectionWindowRequest(data, sourceWindow) {
-    this._logXF('Text selection window request received in CrossFrameManager', {
+    this.logger.info(`[CrossFrame] Text selection window request from ${data.sourceFrameId || 'unknown'}`);
+    this._logXF('Text selection request details', {
       hasHandler: !!this.onTextSelectionWindowRequest,
-      data: data
+      sourceFrameId: data.sourceFrameId,
+      position: data.position,
+      textLength: data.selectedText?.length || 0
     });
-    
+
     if (this.onTextSelectionWindowRequest) {
       this.onTextSelectionWindowRequest(data, sourceWindow);
     } else {
-      this._logXF('No handler set for text selection window request!');
+      this.logger.warn('[CrossFrame] No handler for text selection window request!');
     }
   }
 
@@ -100,12 +103,16 @@ export class CrossFrameManager {
    */
   enableGlobalClickBroadcast() {
     if (this._broadcastEnabled) return;
-    
+
     this._globalClickHandler = (e) => this._broadcastOutsideClick(e);
     document.addEventListener('click', this._globalClickHandler, { capture: true });
     this._broadcastEnabled = true;
-    
-    this._logXF('Global click broadcast enabled');
+
+    this.logger.info('[CrossFrame] Global click broadcast enabled');
+    this._logXF('Broadcast enabled details', {
+      frameId: this.frameId,
+      isInIframe: this.isInIframe
+    });
   }
 
   /**
@@ -113,14 +120,18 @@ export class CrossFrameManager {
    */
   disableGlobalClickBroadcast() {
     if (!this._broadcastEnabled) return;
-    
+
     if (this._globalClickHandler) {
       document.removeEventListener('click', this._globalClickHandler, { capture: true });
       this._globalClickHandler = null;
     }
     this._broadcastEnabled = false;
-    
-    this._logXF('Global click broadcast disabled');
+
+    this.logger.info('[CrossFrame] Global click broadcast disabled');
+    this._logXF('Broadcast disabled details', {
+      frameId: this.frameId,
+      isInIframe: this.isInIframe
+    });
   }
 
   /**
@@ -149,16 +160,23 @@ export class CrossFrameManager {
         
         document.addEventListener('click', this._relayClickHandler, { capture: true });
         this._relayEnabled = true;
-        this._logXF('Relay click enabled');
+        this.logger.info('[CrossFrame] Relay click enabled');
+        this._logXF('Relay enabled details', {
+          frameId: this.frameId,
+          broadcastActive: this._broadcastEnabled
+        });
       } else {
         if (!this._relayEnabled) return;
-        
+
         if (this._relayClickHandler) {
           document.removeEventListener('click', this._relayClickHandler, { capture: true });
           this._relayClickHandler = null;
         }
         this._relayEnabled = false;
-        this._logXF('Relay click disabled');
+        this.logger.info('[CrossFrame] Relay click disabled');
+        this._logXF('Relay disabled details', {
+          frameId: this.frameId
+        });
       }
     } catch (error) {
       this._logXF('Failed to apply relay state', { error: error?.message });
@@ -189,9 +207,11 @@ export class CrossFrameManager {
       return;
     }
     
-    this.logger.debug('Requesting window creation in main document', {
+    this.logger.info(`[CrossFrame] Window creation requested from iframe: ${this.frameRegistry.frameId}`);
+    this._logXF('Window creation request details', {
       originalPosition: position,
-      frameId: this.frameRegistry.frameId
+      frameId: this.frameRegistry.frameId,
+      textLength: selectedText?.length || 0
     });
     
     this.messageRouter.requestWindowCreation(selectedText, position);
@@ -252,16 +272,19 @@ export class CrossFrameManager {
    * Clean up cross-frame manager
    */
   cleanup() {
+    this.logger.info('[CrossFrame] Cleaning up cross-frame manager');
     this.disableGlobalClickBroadcast();
     this._applyGlobalClickRelay(false);
     this.messageRouter.cleanup();
     this.frameRegistry.cleanup();
-    
+
     // Clear handlers
     this.onOutsideClick = null;
     this.onWindowCreationRequest = null;
     this.onWindowCreatedResponse = null;
     this.onTextSelectionWindowRequest = null;
+
+    this.logger.info('[CrossFrame] Cleanup completed');
   }
 
   // Getters for compatibility

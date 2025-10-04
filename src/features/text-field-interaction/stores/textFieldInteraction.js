@@ -83,7 +83,7 @@ export const useTextFieldInteractionStore = defineStore('textFieldInteraction', 
      * Initialize the store
      */
     initialize() {
-      this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldInteractionStore');
+      this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldInteractionStore');
       this.initialized = true;
       this.updateActivity('initialize');
       

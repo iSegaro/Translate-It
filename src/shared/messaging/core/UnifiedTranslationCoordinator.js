@@ -13,7 +13,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
+// Lazy logger initialization to avoid TDZ issues
+let logger = null;
+function getLogger() {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
+  }
+  return logger;
+}
 
 export class UnifiedTranslationCoordinator {
   constructor() {
@@ -31,13 +38,7 @@ export class UnifiedTranslationCoordinator {
   async coordinateTranslation(message, options = {}) {
     const { messageId, action, data, context } = message;
 
-    logger.debug(`Coordinating translation request:`, {
-      messageId,
-      action,
-      context,
-      textLength: data?.text?.length,
-      mode: data?.mode
-    });
+    getLogger().info(`🔄 Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
     // Determine if this should be a streaming operation
     const shouldStream = this._shouldUseStreaming(message);
@@ -67,11 +68,11 @@ export class UnifiedTranslationCoordinator {
       // Use regular messaging (bypass coordinator to avoid recursion)
       const result = await sendRegularMessage(message, options);
 
-      logger.debug(`Regular translation completed: ${messageId}`);
+      getLogger().debug(`Regular translation completed: ${messageId}`);
       return result;
 
     } catch (error) {
-      logger.error(`Regular translation failed: ${messageId}`, error);
+      getLogger().error(`Regular translation failed: ${messageId}`, error);
       throw error;
     } finally {
       this.activeTranslations.delete(messageId);
@@ -99,7 +100,7 @@ export class UnifiedTranslationCoordinator {
       // Calculate appropriate timeouts for streaming
       const streamingTimeouts = this._calculateStreamingTimeouts(data, customTimeout);
 
-      logger.debug(`Starting streaming translation coordination: ${messageId}`, streamingTimeouts);
+      getLogger().debug(`Starting streaming translation coordination: ${messageId}`, streamingTimeouts);
 
       // Register with StreamingTimeoutManager
       const streamingPromise = streamingTimeoutManager.registerStreamingOperation(
@@ -107,17 +108,17 @@ export class UnifiedTranslationCoordinator {
         streamingTimeouts.initialTimeout,
         {
           onProgress: (progressData) => {
-            logger.debug(`Streaming progress: ${messageId}`, progressData);
+            getLogger().debug(`Streaming progress: ${messageId}`, progressData);
           },
           onComplete: (result) => {
-            logger.debug(`Streaming completed: ${messageId}`, result);
+            getLogger().debug(`Streaming completed: ${messageId}`, result);
           },
           onTimeout: () => {
-            logger.warn(`Streaming timeout: ${messageId}`);
+            getLogger().warn(`Streaming timeout: ${messageId}`);
             this._handleStreamingTimeout(messageId);
           },
           onError: (error) => {
-            logger.error(`Streaming error: ${messageId}`, error);
+            getLogger().error(`Streaming error: ${messageId}`, error);
           },
           maxProgressTimeout: streamingTimeouts.progressTimeout,
           gracePeriod: streamingTimeouts.gracePeriod
@@ -131,7 +132,7 @@ export class UnifiedTranslationCoordinator {
 
       // If initial response indicates streaming started, wait for streaming completion
       if (initialResponse.streaming) {
-        logger.debug(`Streaming initiated successfully: ${messageId}`);
+        getLogger().debug(`Streaming initiated successfully: ${messageId}`);
         return await streamingPromise;
       } else {
         // Not streaming, return regular response
@@ -140,7 +141,7 @@ export class UnifiedTranslationCoordinator {
       }
 
     } catch (error) {
-      logger.error(`Streaming translation coordination failed: ${messageId}`, error);
+      getLogger().error(`Streaming translation coordination failed: ${messageId}`, error);
 
       // Cancel streaming if it was registered
       if (this.streamingOperations.has(messageId)) {
@@ -198,7 +199,7 @@ export class UnifiedTranslationCoordinator {
       return false;
     }
 
-    logger.debug(`Cancelling translation: ${messageId} (${translation.type})`);
+    getLogger().debug(`Cancelling translation: ${messageId} (${translation.type})`);
 
     if (translation.type === 'streaming') {
       streamingTimeoutManager.cancelStreaming(messageId, reason);
@@ -285,13 +286,13 @@ export class UnifiedTranslationCoordinator {
    * @private
    */
   _handleStreamingTimeout(messageId) {
-    logger.warn(`Handling streaming timeout for: ${messageId}`);
+    getLogger().warn(`Handling streaming timeout for: ${messageId}`);
 
     const translation = this.activeTranslations.get(messageId);
     if (translation) {
       // Streaming timeout occurred, but background might still be processing
       // We keep the operation active but notify user about timeout
-      logger.debug(`Streaming timeout handled, background processing may continue`);
+      getLogger().debug(`Streaming timeout handled, background processing may continue`);
     }
   }
 
@@ -320,7 +321,7 @@ export class UnifiedTranslationCoordinator {
    * Cleanup all operations
    */
   cleanup() {
-    logger.debug('Cleaning up UnifiedTranslationCoordinator');
+    getLogger().debug('Cleaning up UnifiedTranslationCoordinator');
 
     // Cancel all active translations
     for (const messageId of this.activeTranslations.keys()) {

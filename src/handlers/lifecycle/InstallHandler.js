@@ -5,7 +5,7 @@
 
 import browser from "webextension-polyfill";
 
-import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { CONFIG } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -155,12 +155,12 @@ async function runIncrementalSettingsMigrations() {
     // Apply updates if any
     if (Object.keys(updates).length > 0) {
       await storageManager.set(updates);
-      logger.info('Applied settings migration updates', {
+      logger.debug('Applied settings migration updates', {
         updateCount: Object.keys(updates).length,
         logs
       });
     } else {
-      logger.info('No settings updates needed');
+      logger.debug('No settings updates needed');
     }
 
   } catch (error) {
@@ -200,6 +200,7 @@ async function handleExtensionUpdate() {
     const manifest = browser.runtime.getManifest();
     const version = manifest.version;
 
+    const { getTranslationString } = await utilsFactory.getI18nUtils();
     const appName = (await getTranslationString("name")) || "Translate It!";
     const title =
       (await getTranslationString("notification_update_title")) ||

@@ -130,7 +130,7 @@ export class BaseAIProvider extends BaseProvider {
         );
 
         processedCount += batch.length;
-        logger.debug(`[${this.providerName}] Streamed batch ${batchIndex + 1}/${batches.length}, total processed: ${processedCount}/${texts.length}`);
+        // Streamed batch progress
 
       } catch (error) {
         logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);
@@ -149,7 +149,7 @@ export class BaseAIProvider extends BaseProvider {
     // Send streaming end notification
     await this._sendStreamEnd(messageId, engine);
     
-    logger.info(`[${this.providerName}] Streaming translation completed: ${allResults.length} segments`);
+    // Streaming translation completed
     return allResults;
   }
 

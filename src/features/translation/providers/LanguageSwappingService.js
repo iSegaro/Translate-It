@@ -1,6 +1,5 @@
 import browser from 'webextension-polyfill';
 import { isPersianText } from "@/shared/utils/text/textAnalysis.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -51,19 +50,8 @@ export class LanguageSwappingService {
         
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
-        logger.debug(`${providerName}: Language detection details:`, {
-          text: text.slice(0, 50),
-          detectedLang: mainDetection.language,
-          detectedLangCode,
-          sourceLang,
-          targetLang,
-          sourceNorm,
-          targetNorm,
-          targetLangCode,
-          originalSourceLang,
-          originalTargetLang
-        });
+        const targetLangCode = targetNorm.split("-")[0];
+        // Language detection details logged at TRACE level
 
         if (detectedLangCode === targetLangCode) {
           let newTargetLang;
@@ -77,11 +65,11 @@ export class LanguageSwappingService {
             newTargetLang = targetLang;
           }
           
-          logger.debug(`${providerName}: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+          // Languages swapped
           return [targetNorm, newTargetLang];
         }
         
-        logger.debug(`${providerName}: No language swapping: detected=${detectedLangCode}, source=${sourceNorm}, target=${targetLangCode}`);
+        // No language swapping needed
       } else if (useRegexFallback) {
         return this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
       }
@@ -92,14 +80,14 @@ export class LanguageSwappingService {
       }
     }
 
-    logger.debug(`${providerName}: No language swapping applied: source=${sourceLang}, target=${targetLang}`);
+    // No language swapping applied
     return [sourceLang, targetLang];
   }
 
   static _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
-    const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+    const targetLangCode = targetNorm.split("-")[0];
 
     if (
       isPersianText(text) &&

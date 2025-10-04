@@ -150,22 +150,19 @@ const dynamicStyle = computed(() => {
 // Event handlers
 const handleClick = (event) => {
   if (props.disabled) return;
-  
+
   event.preventDefault();
   event.stopPropagation();
-  
+
   isActive.value = true;
   setTimeout(() => {
     isActive.value = false;
   }, 150);
-  
+
   const clickData = { id: props.id, text: props.text, position: props.position };
-  
+
+  // Only emit Vue event - remove duplicate PageEventBus emission
   emit('click', clickData);
-  
-  if (pageEventBus) {
-    pageEventBus.emit('windows-manager-icon-clicked', clickData);
-  }
 };
 
 const onMouseEnter = (event) => {

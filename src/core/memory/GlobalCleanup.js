@@ -30,7 +30,7 @@ class GlobalCleanup {
     if (this.gcInterval) return
 
     this.gcInterval = setInterval(() => {
-      logger.debug('Periodic garbage collection triggered')
+      // logger.trace('Periodic garbage collection triggered');
       this.memoryManager.performGarbageCollection()
     }, MEMORY_TIMING.GC_INTERVAL)
 
@@ -59,12 +59,12 @@ class GlobalCleanup {
     // Before unload cleanup (only available in window environments)
     if (typeof window !== 'undefined') {
       this.addEventListener(window, 'beforeunload', () => {
-        logger.debug('Before unload cleanup triggered')
+        // logger.trace('Before unload cleanup triggered');
         this.memoryManager.cleanupAll()
       })
     } else {
       // In service worker, listen for service worker termination
-      logger.debug('Service worker environment detected, skipping beforeunload listener')
+      // logger.trace('Service worker environment detected, skipping beforeunload listener');
     }
 
     // Extension context invalidation cleanup
@@ -72,7 +72,7 @@ class GlobalCleanup {
       const connectHandler = () => {
         // Check if context is still valid
         if (this.isContextInvalid()) {
-          logger.debug('Extension context invalidated, cleaning up (skipping critical caches)')
+          // logger.trace('Extension context invalidated, cleaning up (skipping critical caches)');
           this.memoryManager.cleanupAll()
         }
       }
@@ -80,14 +80,20 @@ class GlobalCleanup {
       this.memoryManager.trackEventListener(browser.runtime.onConnect, 'connect', connectHandler, 'global-cleanup')
     }
 
-    // Periodic garbage collection using centralized timing
-    this.gcInterval = setInterval(() => {
-      logger.debug('Periodic garbage collection triggered')
-      this.memoryManager.performGarbageCollection()
-    }, MEMORY_TIMING.GC_INTERVAL)
+    // Use centralized timer for periodic garbage collection
+    if (this.memoryManager && typeof this.memoryManager.initCentralTimer === 'function') {
+      // Centralized timer is already initialized in MemoryManager constructor
+      // logger.trace('Using centralized timer for periodic garbage collection');
+    } else {
+      // Fallback to local timer if centralized system not available
+      this.gcInterval = setInterval(() => {
+        // logger.trace('Periodic garbage collection triggered (fallback timer)');
+        this.memoryManager.performGarbageCollection()
+      }, MEMORY_TIMING.GC_INTERVAL)
 
-    // Track the GC interval
-    this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
+      // Track the GC interval
+      this.memoryManager.trackTimer(this.gcInterval, 'global-cleanup')
+    }
   }
 
   /**
@@ -125,7 +131,7 @@ class GlobalCleanup {
       }
       return true
     } catch (error) {
-      logger.debug('Extension context check failed:', error)
+      // logger.trace('Extension context check failed:', error);
       return true
     }
   }
@@ -134,7 +140,7 @@ class GlobalCleanup {
    * Force cleanup all resources
    */
   forceCleanup() {
-    logger.debug('Force cleanup triggered')
+    // logger.trace('Force cleanup triggered');
     this.memoryManager.cleanupAll()
   }
 
@@ -165,7 +171,7 @@ class GlobalCleanup {
 
     this.memoryManager.cleanupGroup('global-cleanup')
     this.isInitialized = false
-    logger.debug('Global cleanup destroyed')
+    // logger.trace('Global cleanup destroyed');
   }
 }
 

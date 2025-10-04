@@ -172,9 +172,10 @@ const clearFields = async () => {
   await clearTranslation();
 };
 
-// Expose the clearFields method to the parent component
+// Expose methods and refs to the parent component
 defineExpose({
-  clearFields
+  clearFields,
+  sourceInputRef
 });
 
 

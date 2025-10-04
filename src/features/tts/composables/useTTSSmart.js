@@ -1,15 +1,17 @@
 import { ref, computed } from "vue";
-import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
-const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+// Logger will be initialized inside the function to avoid TDZ
 
 export function useTTSSmart() {
-  
+  // Initialize logger to avoid TDZ
+  const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
+
   // Simplified state management
   const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
   const currentTTSId = ref(null);
@@ -73,7 +75,8 @@ export function useTTSSmart() {
       progress.value = 0;
       currentTTSId.value = generateTTSId();
       
-      let language = getLanguageCodeForTTS(lang) || "en";
+      const { getLanguageCodeForTTS } = await utilsFactory.getI18nUtils();
+      let language = await getLanguageCodeForTTS(lang) || "en";
       
       // Fallback mapping for languages with limited Google TTS support
       const ttsLanguageFallbacks = {
@@ -93,11 +96,12 @@ export function useTTSSmart() {
       };
       
       if (ttsLanguageFallbacks[language]) {
-        logger.debug(`[useTTSSmart] Using fallback language: ${language} → ${ttsLanguageFallbacks[language]}`);
+        // Language fallback - logged at TRACE level for detailed debugging
+      // logger.debug(`[useTTSSmart] Using fallback language: ${language} → ${ttsLanguageFallbacks[language]}`);
         language = ttsLanguageFallbacks[language];
       }
       
-      logger.debug("[useTTSSmart] Speaking via GOOGLE_TTS_SPEAK:", text.substring(0, 50) + "...");
+      logger.info(`[useTTSSmart] Starting TTS: ${text.length} chars in ${language}`);
 
       // Use smart messaging for TTS (port-based for slow actions)
       const message = {
@@ -124,7 +128,8 @@ export function useTTSSmart() {
 
       ttsState.value = 'playing';
       progress.value = 0; // Reset progress, real progress will come from audio events
-      logger.debug("[useTTSSmart] TTS started successfully");
+      // TTS started successfully - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] TTS started successfully");
 
       // Start safety timeout for completion (event-driven system with fallback)
       startCompletionTimeout();
@@ -157,7 +162,8 @@ export function useTTSSmart() {
     }
 
     try {
-      logger.debug("[useTTSSmart] Pausing TTS");
+      // Pausing TTS - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Pausing TTS");
       const message = {
         action: MessageActions.GOOGLE_TTS_PAUSE,
         data: { ttsId: currentTTSId.value },
@@ -172,7 +178,8 @@ export function useTTSSmart() {
       }
 
       ttsState.value = 'paused';
-      logger.debug("[useTTSSmart] TTS paused successfully");
+      // TTS paused successfully - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] TTS paused successfully");
       return true;
     } catch (error) {
       logger.error("[useTTSSmart] Failed to pause TTS:", error);
@@ -188,7 +195,8 @@ export function useTTSSmart() {
     }
 
     try {
-      logger.debug("[useTTSSmart] Resuming TTS");
+      // Resuming TTS - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Resuming TTS");
       const message = {
         action: MessageActions.GOOGLE_TTS_RESUME,
         data: { ttsId: currentTTSId.value },
@@ -203,7 +211,8 @@ export function useTTSSmart() {
       }
 
       ttsState.value = 'playing';
-      logger.debug("[useTTSSmart] TTS resumed successfully");
+      // TTS resumed successfully - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] TTS resumed successfully");
       return true;
     } catch (error) {
       logger.error("[useTTSSmart] Failed to resume TTS:", error);
@@ -219,7 +228,8 @@ export function useTTSSmart() {
     }
 
     try {
-      logger.debug("[useTTSSmart] Stopping TTS");
+      // Stopping TTS - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Stopping TTS");
       
       const message = {
         action: MessageActions.TTS_STOP,
@@ -243,7 +253,8 @@ export function useTTSSmart() {
       errorMessage.value = '';
       errorType.value = '';
 
-      logger.debug("[useTTSSmart] TTS stopped successfully");
+      // TTS stopped successfully - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] TTS stopped successfully");
       
       return true;
     } catch (error) {
@@ -271,7 +282,8 @@ export function useTTSSmart() {
 
   const stopAll = async () => {
     try {
-      logger.debug("[useTTSSmart] Stopping all TTS instances");
+      // Stopping all TTS instances - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Stopping all TTS instances");
       const message = {
         action: MessageActions.TTS_STOP,
         data: {},
@@ -294,7 +306,8 @@ export function useTTSSmart() {
       errorMessage.value = '';
       isProcessing.value = false; // Reset processing flag when stopping
 
-      logger.debug("[useTTSSmart] All TTS instances stopped");
+      // All TTS instances stopped - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] All TTS instances stopped");
       return true;
     } catch (error) {
       // Use proper error management system
@@ -326,7 +339,8 @@ export function useTTSSmart() {
 
   const retry = async () => {
     if (ttsState.value === 'error' && lastText.value) {
-      logger.debug("[useTTSSmart] Manual retry initiated");
+      // Manual retry initiated - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Manual retry initiated");
       
       // Clear error state
       ttsState.value = 'idle';
@@ -334,7 +348,7 @@ export function useTTSSmart() {
       errorType.value = '';
       
       // Try speaking the stored text again
-      logger.debug("[useTTSSmart] Retrying with stored text:", lastText.value.substring(0, 50) + '...');
+      logger.info(`[useTTSSmart] Retrying TTS: ${lastText.value.length} chars`);
       return await speak(lastText.value, lastLanguage.value);
     }
     return false;
@@ -350,7 +364,8 @@ export function useTTSSmart() {
       errorType.value = '';
       lastText.value = '';
       lastLanguage.value = 'auto';
-      logger.debug("[useTTSSmart] Error state manually cleared");
+      // Error state manually cleared - logged at TRACE level for detailed debugging
+      // logger.debug("[useTTSSmart] Error state manually cleared");
       return true;
     }
     return false;
@@ -371,7 +386,8 @@ export function useTTSSmart() {
       
       // Sync local state with server state if different
       if (serverStatus !== ttsState.value && serverStatus !== 'error') {
-        logger.debug("[useTTSSmart] Syncing state:", ttsState.value, "→", serverStatus);
+        // State sync - logged at TRACE level for detailed debugging
+        // logger.debug("[useTTSSmart] Syncing state:", ttsState.value, "→", serverStatus);
         ttsState.value = serverStatus;
       }
 
@@ -414,7 +430,8 @@ export function useTTSSmart() {
       clearTimeout(completionTimeout);
     }
 
-    logger.debug("[useTTSSmart] Starting completion safety timeout (30s)");
+    // Safety timeout started - logged at TRACE level for detailed debugging
+    // logger.debug("[useTTSSmart] Starting completion safety timeout (30s)");
 
     // Safety net: if no GOOGLE_TTS_ENDED event received within 30 seconds, assume completion
     completionTimeout = setTimeout(() => {
@@ -427,7 +444,8 @@ export function useTTSSmart() {
   };
   
   const handleTTSCompletion = () => {
-    logger.debug("[useTTSSmart] Handling TTS completion");
+    // Handling TTS completion - logged at TRACE level for detailed debugging
+    // logger.debug("[useTTSSmart] Handling TTS completion");
     
     if (ttsState.value === 'playing') {
       ttsState.value = 'idle';
@@ -449,7 +467,7 @@ export function useTTSSmart() {
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message) => {
       if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
-        logger.debug("[useTTSSmart] TTS ended notification received - audio playback completed");
+        logger.info("[useTTSSmart] TTS completed successfully");
 
         // Clear safety timeout since we received the completion event
         if (completionTimeout) {

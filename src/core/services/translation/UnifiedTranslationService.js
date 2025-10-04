@@ -15,7 +15,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { TranslationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
+import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -26,7 +26,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationSe
 export class UnifiedTranslationService {
   constructor() {
     // Initialize components
-    this.requestTracker = new TranslationRequestTracker();
+    this.requestTracker = translationRequestTracker; // Use singleton instance
     this.resultDispatcher = new TranslationResultDispatcher();
     this.modeCoordinator = new TranslationModeCoordinator();
 
@@ -53,7 +53,29 @@ export class UnifiedTranslationService {
   async handleTranslationRequest(message, sender) {
     const { messageId, data } = message;
 
-    logger.info(`[UnifiedService] Processing translation request: ${messageId}`);
+    logger.info(`[UnifiedService] Processing translation request: ${messageId} (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
+    // Service availability checked silently
+
+    // Check if service is initialized
+    if (!this.translationEngine || !this.backgroundService) {
+      logger.warn(`[UnifiedService] Service not fully initialized. Engine: ${!!this.translationEngine}, Background: ${!!this.backgroundService}`);
+
+      // Try to get dependencies from global scope
+      if (!this.translationEngine && globalThis.backgroundService?.translationEngine) {
+        // Getting translation engine from global backgroundService
+        this.translationEngine = globalThis.backgroundService.translationEngine;
+      }
+
+      if (!this.backgroundService && globalThis.backgroundService) {
+        // Getting background service from global scope
+        this.backgroundService = globalThis.backgroundService;
+      }
+
+      // If still not available, throw error
+      if (!this.translationEngine || !this.backgroundService) {
+        throw new Error('Translation service not initialized. Please try again.');
+      }
+    }
 
     try {
       // Validate message
@@ -64,13 +86,13 @@ export class UnifiedTranslationService {
       // Check for duplicate active request
       const existingRequest = this.requestTracker.getRequest(messageId);
       if (existingRequest && this.requestTracker.isRequestActive(messageId)) {
-        logger.debug(`[UnifiedService] Duplicate active request detected: ${messageId}`);
+        // Duplicate active request detected
         return { success: false, error: 'Request already processing' };
       }
 
       // If request exists but is not active (completed/failed), we can proceed with new request
       if (existingRequest && !this.requestTracker.isRequestActive(messageId)) {
-        logger.debug(`[UnifiedService] Found inactive request, proceeding with new request: ${messageId}`);
+        // Found inactive request, proceeding with new request
       }
 
       // Create new request record
@@ -96,7 +118,7 @@ export class UnifiedTranslationService {
       // For field mode, return result directly without dispatching
       // For other modes, dispatch result
       if (request.mode === TranslationMode.Field) {
-        logger.debug(`[UnifiedService] Field mode - returning result directly`);
+        // Field mode - returning result directly
         return result;
       }
 
@@ -129,7 +151,7 @@ export class UnifiedTranslationService {
   async handleStreamingUpdate(message) {
     const { messageId, data } = message;
 
-    logger.debug(`[UnifiedService] Streaming update: ${messageId}`);
+    // Streaming update handled
 
     // Forward to result dispatcher for streaming handling
     await this.resultDispatcher.dispatchStreamingUpdate({
@@ -197,7 +219,6 @@ class TranslationResultDispatcher {
   async dispatchResult({ messageId, result, request, originalMessage }) {
     // Check for duplicate result processing
     if (this.processedResults.has(messageId)) {
-      logger.debug(`[ResultDispatcher] Result already processed: ${messageId}`);
       return;
     }
 
@@ -217,7 +238,6 @@ class TranslationResultDispatcher {
       await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
     } else {
       // For other modes, return directly
-      logger.debug(`[ResultDispatcher] Direct return for mode: ${request.mode}`);
     }
   }
 
@@ -225,7 +245,6 @@ class TranslationResultDispatcher {
    * Dispatch field mode translation result
    */
   async dispatchFieldResult({ messageId, result, request }) {
-    logger.debug(`[ResultDispatcher] Dispatching field result: ${messageId}`);
 
     // Send back to original tab
     try {
@@ -241,9 +260,7 @@ class TranslationResultDispatcher {
         }
       });
 
-      if (response?.handled) {
-        logger.debug(`[ResultDispatcher] Field result handled: ${messageId}`);
-      }
+      // Field result handled silently
     } catch (error) {
       logger.warn(`[ResultDispatcher] Failed to dispatch field result:`, error);
     }
@@ -253,7 +270,6 @@ class TranslationResultDispatcher {
    * Dispatch select-element translation result
    */
   async dispatchSelectElementResult({ messageId, result, request }) {
-    logger.debug(`[ResultDispatcher] Dispatching select-element result: ${messageId}`);
 
     // For select-element, we might need broadcast
     if (result.streaming || (result.translatedText && result.translatedText.length > 2000)) {
@@ -265,7 +281,6 @@ class TranslationResultDispatcher {
    * Broadcast result to all tabs (for streaming/large content)
    */
   async broadcastResult({ messageId, result, request }) {
-    logger.debug(`[ResultDispatcher] Broadcasting result: ${messageId}`);
 
     const tabs = await browser.tabs.query({});
 
@@ -330,8 +345,6 @@ class TranslationModeCoordinator {
   async processRequest(request, { translationEngine }) {
     const { messageId, mode } = request;
 
-    logger.debug(`[ModeCoordinator] Processing ${mode} request: ${messageId}`);
-
     // Update request status
     request.status = RequestStatus.PROCESSING;
 
@@ -352,8 +365,6 @@ class TranslationModeCoordinator {
    * Process field mode translation
    */
   async processFieldTranslation(request, { translationEngine }) {
-    logger.debug(`[ModeCoordinator] Processing field translation: ${request.messageId}`);
-
     // Use translation engine directly
     if (!translationEngine) {
       throw new Error('Translation engine not available');
@@ -376,8 +387,6 @@ class TranslationModeCoordinator {
    * Process select-element translation
    */
   async processSelectElementTranslation(request, { translationEngine }) {
-    logger.debug(`[ModeCoordinator] Processing select-element translation: ${request.messageId}`);
-
     // For select-element, always use streaming for better UX
     const enhancedData = {
       ...request.data,
@@ -401,8 +410,6 @@ class TranslationModeCoordinator {
    * Process standard translation
    */
   async processStandardTranslation(request, { translationEngine }) {
-    logger.debug(`[ModeCoordinator] Processing standard translation: ${request.messageId}`);
-
     const result = await translationEngine.handleTranslateMessage({
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,

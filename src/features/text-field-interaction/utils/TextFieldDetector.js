@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldDetector');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDetector');
 
 // Field type constants
 export const FieldTypes = {
@@ -89,11 +89,12 @@ export class TextFieldDetector {
         isRichEditor: this._isRichTextEditor(element)
       };
 
-      logger.debug('Field detected:', {
-        tagName: element.tagName,
-        fieldType,
-        shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
-      });
+      // Field detection details - logged at TRACE level for detailed debugging
+      // logger.trace('Field detected:', {
+      //   tagName: element.tagName,
+      //   fieldType,
+      //   shouldShowTextFieldIcon: detection.shouldShowTextFieldIcon
+      // });
 
       return detection;
 

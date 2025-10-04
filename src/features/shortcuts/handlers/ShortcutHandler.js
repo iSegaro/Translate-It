@@ -3,8 +3,15 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { detectPlatform, Platform } from '@/utils/browser/platform.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
+
+const Platform = {
+  MAC: 'MAC',
+  WINDOWS: 'WINDOWS',
+  LINUX: 'LINUX',
+  UNKNOWN: 'UNKNOWN'
+};
 
 // Global tracking for debugging multiple instances and singleton enforcement
 if (!window.__shortcutHandlerInstances) {
@@ -23,7 +30,7 @@ let shortcutHandlerInstance = null;
 let logger = null;
 const getLogger = () => {
   if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ShortcutHandler');
+    logger = getScopedLogger(LOG_COMPONENTS.SHORTCUTS, 'ShortcutHandler');
   }
   return logger;
 };
@@ -37,13 +44,14 @@ export class ShortcutHandler extends ResourceTracker {
     this.translationHandler = null;
     this.featureManager = options.featureManager;
 
-    // Detect platform for proper key combination
-    this.platform = detectPlatform();
-    this.modifierKey = this.platform === Platform.MAC ? 'metaKey' : 'ctrlKey';
+    // Platform will be detected asynchronously in activate()
+    this.platform = null;
+    this.modifierKey = 'ctrlKey'; // Default value, will be updated in activate()
 
     // Track this instance for debugging
     window.__shortcutHandlerInstances.add(this);
-    getLogger().debug(`🔍 ShortcutHandler instance created. Total instances: ${window.__shortcutHandlerInstances.size}`);
+    // Instance created - logged at TRACE level for detailed debugging
+    // getLogger().debug(`🔍 ShortcutHandler instance created. Total instances: ${window.__shortcutHandlerInstances.size}`);
   }
 
   // Static method to get or create singleton instance
@@ -51,18 +59,20 @@ export class ShortcutHandler extends ResourceTracker {
     if (!shortcutHandlerInstance) {
       // Check global disable flag before creating instance
       if (window.__shortcutHandlerDisabled) {
-        getLogger().debug('🚫 ShortcutHandler creation blocked - feature is globally disabled');
+        // Creation blocked - logged at TRACE level for detailed debugging
+        // getLogger().debug('🚫 ShortcutHandler creation blocked - feature is globally disabled');
         return null;
       }
 
       shortcutHandlerInstance = new ShortcutHandler(options);
-      getLogger().debug('✅ ShortcutHandler singleton instance created');
+      getLogger().info('ShortcutHandler singleton created');
     } else {
       // Update options if provided
       if (options.featureManager) {
         shortcutHandlerInstance.featureManager = options.featureManager;
       }
-      getLogger().debug('🔄 ShortcutHandler singleton instance reused');
+      // Singleton reused - logged at TRACE level for detailed debugging
+      // getLogger().debug('🔄 ShortcutHandler singleton instance reused');
     }
 
     return shortcutHandlerInstance;
@@ -73,28 +83,47 @@ export class ShortcutHandler extends ResourceTracker {
     if (shortcutHandlerInstance) {
       if (shortcutHandlerInstance.isActive) {
         shortcutHandlerInstance.deactivate().catch(error => {
-          getLogger().error('Error deactivating singleton instance:', error);
+          // Error deactivating - logged at TRACE level for detailed debugging
+          // getLogger().error('Error deactivating singleton instance:', error);
         });
       }
       shortcutHandlerInstance = null;
-      getLogger().debug('🗑️ ShortcutHandler singleton instance destroyed');
+      getLogger().info('ShortcutHandler singleton destroyed');
     }
   }
 
   async activate() {
+    // Detect platform if not already done
+    if (!this.platform) {
+      try {
+        const { detectPlatform } = await utilsFactory.getBrowserUtils();
+        this.platform = detectPlatform();
+        this.modifierKey = this.platform === Platform.MAC ? 'metaKey' : 'ctrlKey';
+        // Platform detected - logged at TRACE level for detailed debugging
+        // getLogger().debug(`Platform detected: ${this.platform}`);
+      } catch (error) {
+        getLogger().error('Failed to detect platform:', error);
+        // Keep default modifierKey if detection fails
+        this.platform = Platform.UNKNOWN;
+      }
+    }
+
     // Check global disable flag - don't activate if disabled
     if (window.__shortcutHandlerDisabled) {
-      getLogger().debug('🚫 ShortcutHandler activation blocked - feature is globally disabled');
+      // Activation blocked - logged at TRACE level for detailed debugging
+      // getLogger().debug('🚫 ShortcutHandler activation blocked - feature is globally disabled');
       return false;
     }
 
     if (this.isActive) {
-      getLogger().debug('ShortcutHandler already active');
+      // Already active - logged at TRACE level for detailed debugging
+      // getLogger().debug('ShortcutHandler already active');
       return true;
     }
 
     try {
-      getLogger().debug('Activating ShortcutHandler');
+      // Activating - logged at TRACE level for detailed debugging
+      // getLogger().debug('Activating ShortcutHandler');
 
       // Initialize ShortcutManager with dependencies
       await shortcutManager.initialize({
@@ -121,18 +150,21 @@ export class ShortcutHandler extends ResourceTracker {
 
   async deactivate() {
     if (!this.isActive) {
-      getLogger().debug('ShortcutHandler not active');
+      // Not active - logged at TRACE level for detailed debugging
+      // getLogger().debug('ShortcutHandler not active');
       return true;
     }
 
     try {
-      getLogger().debug('Deactivating ShortcutHandler');
+      // Deactivating - logged at TRACE level for detailed debugging
+      // getLogger().debug('Deactivating ShortcutHandler');
 
       // Manually remove event listeners to ensure they're properly cleaned up
       if (this.keydownHandler) {
         this.removeEventListener(document, 'keydown', this.keydownHandler, { capture: true });
         this.keydownHandler = null;
-        getLogger().debug('Manually removed keydown event listener');
+        // Event listener removed - logged at TRACE level for detailed debugging
+        // getLogger().debug('Manually removed keydown event listener');
       }
 
       // Cleanup ShortcutManager
@@ -145,7 +177,8 @@ export class ShortcutHandler extends ResourceTracker {
 
       // Remove this instance from tracking
       window.__shortcutHandlerInstances.delete(this);
-      getLogger().debug(`🔍 ShortcutHandler instance removed. Remaining instances: ${window.__shortcutHandlerInstances.size}`);
+      // Instance removed - logged at TRACE level for detailed debugging
+      // getLogger().debug(`🔍 ShortcutHandler instance removed. Remaining instances: ${window.__shortcutHandlerInstances.size}`);
 
       this.isActive = false;
       getLogger().info('ShortcutHandler deactivated successfully');
@@ -169,7 +202,8 @@ export class ShortcutHandler extends ResourceTracker {
 
         // Remove this instance from tracking
         window.__shortcutHandlerInstances.delete(this);
-        getLogger().debug(`🔍 ShortcutHandler instance removed (error path). Remaining instances: ${window.__shortcutHandlerInstances.size}`);
+        // Instance removed (error path) - logged at TRACE level for detailed debugging
+      // getLogger().debug(`🔍 ShortcutHandler instance removed (error path). Remaining instances: ${window.__shortcutHandlerInstances.size}`);
 
         this.isActive = false;
         return true;
@@ -197,40 +231,65 @@ export class ShortcutHandler extends ResourceTracker {
 
         // Check for Ctrl+/ or Cmd+/ combination
         if (event[this.modifierKey] && event.key === '/') {
-          getLogger().debug('Translation shortcut detected:', this.modifierKey + ' + /');
+          // Check settings first before logging
+          (async () => {
+            const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+            const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+            const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
 
-          // Prevent default behavior
-          event.preventDefault();
-          event.stopPropagation();
+            if (!isExtensionEnabled || !isShortcutEnabled) {
+              return; // Silently ignore when disabled
+            }
 
-          // Handle the shortcut
-          this.handleTranslationShortcut(event);
+            getLogger().info('Translation shortcut triggered');
+
+            // Prevent default behavior
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Handle the shortcut
+            await this.handleTranslationShortcut(event);
+          })();
         }
       };
 
       // Register the keydown listener
       this.addEventListener(document, 'keydown', this.keydownHandler, { capture: true });
 
-      getLogger().debug(`Shortcut listener setup complete (${this.modifierKey} + /)`);
+      getLogger().info(`Shortcut listener setup: ${this.modifierKey} + /`);
       
     } catch (error) {
       getLogger().error('Failed to setup shortcut listeners:', error);
     }
   }
 
-  handleTranslationShortcut() {
+  async handleTranslationShortcut() {
     try {
+      // Import settings dynamically to avoid circular dependencies
+      const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+
+      // Check settings before processing
+      const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
+      const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
+
+      if (!isExtensionEnabled || !isShortcutEnabled) {
+        // Shortcut is disabled due to settings
+        return;
+      }
+
       const activeElement = document.activeElement;
-      
+
       // Check if active element is a text field
       if (this.isEditableElement(activeElement)) {
-        getLogger().debug('Shortcut triggered on text field:', activeElement.tagName);
+        // Shortcut triggered on text field - logged at TRACE level for detailed debugging
+        // getLogger().debug('Shortcut triggered on text field:', activeElement.tagName);
         
         // Get text content
         const text = this.getElementText(activeElement);
         
         if (!text || text.trim().length === 0) {
-          getLogger().debug('No text found in active element for translation');
+          // No text found - logged at TRACE level for detailed debugging
+          // getLogger().debug('No text found in active element for translation');
           return;
         }
 
@@ -243,13 +302,14 @@ export class ShortcutHandler extends ResourceTracker {
         const selectedText = selection.toString().trim();
         
         if (selectedText) {
-          getLogger().debug('Shortcut triggered with selected text:', selectedText.substring(0, 50));
+          getLogger().info(`Shortcut triggered with selection: ${selectedText.length} chars`);
           
           // Trigger translation for selected text
           this.triggerSelectionTranslation(selectedText, selection);
           
         } else {
-          getLogger().debug('No text field or selection found for shortcut');
+          // No context found - logged at TRACE level for detailed debugging
+          // getLogger().debug('No text field or selection found for shortcut');
           
           // Show a brief notification
           this.showShortcutHint();
@@ -313,14 +373,17 @@ export class ShortcutHandler extends ResourceTracker {
             target: element
           });
         } else {
-          getLogger().error('Translation handler not available or missing method');
+          // Translation handler unavailable - logged at TRACE level for detailed debugging
+          // getLogger().error('Translation handler not available or missing method');
         }
       }).catch(error => {
-        getLogger().error('Failed to load translation handler:', error);
+        // Failed to load translation handler - logged at TRACE level for detailed debugging
+        // getLogger().error('Failed to load translation handler:', error);
       });
       
     } catch (error) {
-      getLogger().error('Error triggering text field translation:', error);
+      // Error triggering translation - logged at TRACE level for detailed debugging
+      // getLogger().error('Error triggering text field translation:', error);
     }
   }
 
@@ -349,7 +412,8 @@ export class ShortcutHandler extends ResourceTracker {
               windowsManager.show(selectedText, position);
             }
           }).catch(error => {
-            getLogger().error('Failed to activate WindowsManager:', error);
+            // Failed to activate WindowsManager - logged at TRACE level for detailed debugging
+            // getLogger().error('Failed to activate WindowsManager:', error);
           });
         } else {
           // WindowsManager is already active
@@ -371,11 +435,13 @@ export class ShortcutHandler extends ResourceTracker {
           }
         }
       } else {
-        getLogger().warn('FeatureManager not available');
+        // FeatureManager unavailable - logged at TRACE level for detailed debugging
+        // getLogger().warn('FeatureManager not available');
       }
 
     } catch (error) {
-      getLogger().error('Error triggering selection translation:', error);
+      // Error triggering selection translation - logged at TRACE level for detailed debugging
+      // getLogger().error('Error triggering selection translation:', error);
     }
   }
 
@@ -389,11 +455,13 @@ export class ShortcutHandler extends ResourceTracker {
           duration: 3000
         });
       }).catch(error => {
-        getLogger().debug('Could not show shortcut hint:', error);
+        // Could not show hint - logged at TRACE level for detailed debugging
+        // getLogger().debug('Could not show shortcut hint:', error);
       });
       
     } catch (error) {
-      getLogger().debug('Error showing shortcut hint:', error);
+      // Error showing hint - logged at TRACE level for detailed debugging
+      // getLogger().debug('Error showing shortcut hint:', error);
     }
   }
 
@@ -410,14 +478,16 @@ export class ShortcutHandler extends ResourceTracker {
   // Method to set translation handler after initialization
   setTranslationHandler(handler) {
     this.translationHandler = handler;
-    getLogger().debug('Translation handler set for shortcuts');
+    // Translation handler set - logged at TRACE level for detailed debugging
+    // getLogger().debug('Translation handler set for shortcuts');
   }
 
   // Static method to deactivate ALL instances (used when feature should be globally disabled)
   static async deactivateAllInstances() {
     // Set global disable flag to prevent new instances
     window.__shortcutHandlerDisabled = true;
-    getLogger().debug('🚫 Setting global ShortcutHandler disable flag');
+    // Setting global disable flag - logged at TRACE level for detailed debugging
+    // getLogger().debug('🚫 Setting global ShortcutHandler disable flag');
 
     // Destroy singleton instance first
     this.destroyInstance();
@@ -425,23 +495,27 @@ export class ShortcutHandler extends ResourceTracker {
     // Then handle any legacy instances that might exist
     if (window.__shortcutHandlerInstances && window.__shortcutHandlerInstances.size > 0) {
       const instances = Array.from(window.__shortcutHandlerInstances);
-      getLogger().debug(`🔍 Deactivating ${instances.length} legacy ShortcutHandler instances`);
+      // Deactivating legacy instances - logged at TRACE level for detailed debugging
+      // getLogger().debug(`🔍 Deactivating ${instances.length} legacy ShortcutHandler instances`);
 
       const results = [];
       for (const instance of instances) {
         try {
           const result = await instance.deactivate();
           results.push(result);
-          getLogger().debug('✅ Legacy instance deactivated successfully');
+          // Legacy instance deactivated - logged at TRACE level for detailed debugging
+          // getLogger().debug('✅ Legacy instance deactivated successfully');
         } catch (error) {
-          getLogger().error('❌ Failed to deactivate legacy instance:', error);
+          // Failed to deactivate legacy instance - logged at TRACE level for detailed debugging
+          // getLogger().error('❌ Failed to deactivate legacy instance:', error);
           results.push(false);
         }
       }
 
       // Force clear the global tracking set
       window.__shortcutHandlerInstances.clear();
-      getLogger().debug(`🔍 Legacy instances cleaned up. Success rate: ${results.filter(r => r).length}/${results.length}`);
+      // Legacy instances cleaned up - logged at TRACE level for detailed debugging
+      // getLogger().debug(`🔍 Legacy instances cleaned up. Success rate: ${results.filter(r => r).length}/${results.length}`);
     }
 
     return true;
@@ -450,7 +524,7 @@ export class ShortcutHandler extends ResourceTracker {
   // Static method to enable ShortcutHandler creation (called when feature is enabled)
   static enableGlobally() {
     window.__shortcutHandlerDisabled = false;
-    getLogger().debug('✅ Cleared global ShortcutHandler disable flag - new instances can be created');
+    getLogger().info('ShortcutHandler globally enabled');
   }
 
   getStatus() {

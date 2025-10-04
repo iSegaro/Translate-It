@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import babel from '@rollup/plugin-babel'
+// import enhancedTreeShaking from './plugins/enhanced-tree-shaking.js'
 
 // Base configuration shared across all builds
 export const createBaseConfig = (browser, options = {}) => {
@@ -31,6 +32,10 @@ export const createBaseConfig = (browser, options = {}) => {
           ['@babel/plugin-proposal-decorators', { legacy: true }]
         ]
       }),
+      // enhancedTreeShaking({
+      //   include: ['src/**/*.{js,vue}'],
+      //   exclude: ['node_modules/**']
+      // }),
       ...(options.extraPlugins || [])
     ],
 
@@ -116,6 +121,10 @@ export const createBaseConfig = (browser, options = {}) => {
             }
             
             if (id.includes('src/components/feature')) {
+              // Split FontSelector and font detector into separate chunk
+              if (id.includes('FontSelector') || id.includes('SystemFontDetector')) {
+                return 'components/components-fonts'
+              }
               return 'components/components-feature'
             }
             
@@ -127,23 +136,218 @@ export const createBaseConfig = (browser, options = {}) => {
             if (id.includes('src/capture') || id.includes('ScreenCapture')) {
               return 'features/feature-capture'
             }
-            
+
             if (id.includes('src/subtitle') || id.includes('Subtitle')) {
               return 'features/feature-subtitle'
             }
-            
+
             if (id.includes('src/utils/tts') || id.includes('TTS')) {
               return 'features/feature-tts'
             }
+
+            // API settings - split into separate chunk
+            if (id.includes('src/apps/options/tabs/ApiTab') ||
+                id.includes('OpenAIOptions') ||
+                id.includes('GoogleOptions') ||
+                id.includes('GeminiOptions') ||
+                id.includes('ClaudeOptions') ||
+                id.includes('GroqOptions') ||
+                id.includes('DeepSeekOptions') ||
+                id.includes('MistralOptions') ||
+                id.includes('PerplexityOptions') ||
+                id.includes('LLaMAOptions')) {
+              return 'features/api-settings'
+            }
             
-            // Utility chunks
+            // Utility chunks - more granular splitting
             if (id.includes('src/utils')) {
-              return 'utils/utils'
+              // Special handling for locale files - create separate chunks
+              if (id.includes('src/utils/i18n/locales')) {
+                const localeMatch = id.match(/locales\/([a-z]{2,3})\.json$/);
+                if (localeMatch) {
+                  return `locales/${localeMatch[1]}`;
+                }
+                return 'utils/locales-other';
+              }
+
+              // I18n utilities - more granular splitting
+              if (id.includes('src/utils/i18n')) {
+                // Language loaders - separate chunks for different language types
+                if (id.includes('LanguagePackLoader')) {
+                  return 'languages/loader-main';
+                }
+                if (id.includes('TranslationLanguageLoader')) {
+                  return 'languages/loader-translation';
+                }
+                if (id.includes('InterfaceLanguageLoader')) {
+                  return 'languages/loader-interface';
+                }
+                if (id.includes('TtsLanguageLoader')) {
+                  return 'languages/loader-tts';
+                }
+                // Main i18n functionality
+                if (id.includes('i18n.js')) {
+                  return 'utils/i18n-main';
+                }
+                // Translation languages (65+ languages)
+                if (id.includes('languages.js') && id.includes('translation')) {
+                  return 'languages/translation-data';
+                }
+                // TTS languages (~80 languages)
+                if (id.includes('languages.js') && id.includes('tts')) {
+                  return 'languages/tts-data';
+                }
+                // Interface languages (currently 2 languages)
+                if (id.includes('languages.js') && id.includes('interface')) {
+                  return 'languages/interface-data';
+                }
+                // Language detection utilities
+                if (id.includes('LanguageDetector')) {
+                  return 'languages/detection';
+                }
+                // Helper functions
+                if (id.includes('helper.js')) {
+                  return 'utils/i18n-helper';
+                }
+                // Plugin and utilities
+                if (id.includes('plugin.js') || id.includes('localization.js') ||
+                    id.includes('langUtils.js') || id.includes('vue-i18n-macro.js')) {
+                  return 'utils/i18n-utils';
+                }
+                return 'utils/i18n-core';
+              }
+
+              // Browser utilities
+              if (id.includes('src/utils/browser')) {
+                return 'utils/browser';
+              }
+
+              // UI utilities
+              if (id.includes('src/utils/ui')) {
+                return 'utils/ui';
+              }
+
+              // Rendering utilities
+              if (id.includes('src/utils/rendering')) {
+                return 'utils/rendering';
+              }
+
+              // Security utilities
+              if (id.includes('src/utils/secureStorage')) {
+                return 'utils/security';
+              }
+
+              // Messaging utilities
+              if (id.includes('src/utils/messaging')) {
+                return 'utils/messaging';
+              }
+
+              // Provider utilities
+              if (id.includes('src/utils/providerHtmlGenerator')) {
+                return 'utils/provider';
+              }
+
+              // Utils factory itself (keep separate as it's the entry point)
+              if (id.includes('src/utils/UtilsFactory')) {
+                return 'utils/factory';
+              }
+
+              return 'utils/core';
             }
             
             // Store chunks
             if (id.includes('src/store')) {
               return 'store/store'
+            }
+
+            // Content script chunks - ultra-aggressive splitting
+            if (id.includes('src/core/content-scripts/index')) {
+              // Main entry point - ultra minimal (<5KB)
+              return 'content/content-entry';
+            }
+
+            if (id.includes('src/core/content-scripts/ContentScriptCore')) {
+              // Core infrastructure only - split from features
+              return 'content/content-core';
+            }
+
+            // Ultra-aggressive feature splitting - each major system in its own chunk
+            if (id.includes('src/features/windows/managers/WindowsManager')) {
+              return 'content/features/windows-manager';
+            }
+
+            if (id.includes('src/features/text-selection/core/SelectionManager')) {
+              return 'content/features/selection-manager';
+            }
+
+            if (id.includes('src/features/element-selection/SelectElementManager')) {
+              return 'content/features/element-selection-manager';
+            }
+
+            if (id.includes('src/features/text-field-interaction')) {
+              return 'content/features/text-field-interaction';
+            }
+
+            if (id.includes('src/handlers/content/ContentMessageHandler')) {
+              return 'content/features/message-handler';
+            }
+
+            if (id.includes('src/core/managers/content/FeatureManager')) {
+              return 'content/features/feature-manager';
+            }
+
+            if (id.includes('src/core/content-scripts/chunks/lazy-vue-app')) {
+              // Vue app - keep separate but optimize
+              return 'content/content-vue';
+            }
+
+            if (id.includes('src/core/content-scripts/chunks/lazy-features')) {
+              // Lazy loading utilities only
+              return 'content/content-lazy-utils';
+            }
+
+            if (id.includes('src/core/content-scripts/legacy-handlers')) {
+              // Legacy fallback handlers
+              return 'content/content-legacy';
+            }
+
+            // Additional content script chunking - force separation of all large modules
+            if (id.includes('src/apps/content/ContentApp')) {
+              return 'content/apps/content-app-main';
+            }
+
+            if (id.includes('src/apps/content/')) {
+              return 'content/apps/content-apps';
+            }
+
+            if (id.includes('src/components/content/TranslationWindow')) {
+              return 'content/components/translation-window';
+            }
+
+            if (id.includes('src/components/content/')) {
+              return 'content/components/content-components';
+            }
+
+            if (id.includes('@/apps/content/') || id.includes('@/components/content/')) {
+              return 'content/content-ui';
+            }
+
+            // Vue apps and components - more granular splitting
+            if (id.includes('src/components/shared/') || id.includes('src/apps/popup/')) {
+              return 'content/vue-shared';
+            }
+
+            if (id.includes('src/apps/options/')) {
+              return 'content/vue-options';
+            }
+
+            // Specific feature components
+            if (id.includes('src/features/shortcuts/')) {
+              return 'content/features/shortcuts';
+            }
+
+            if (id.includes('src/features/tts/')) {
+              return 'content/features/tts';
             }
           },
           

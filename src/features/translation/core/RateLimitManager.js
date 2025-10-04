@@ -70,7 +70,7 @@ export class RateLimitManager {
     let config;
     try {
       config = getProviderRateLimit(providerName);
-      logger.debug(`Using provider configuration for ${providerName}:`, config);
+      // Using provider configuration for ${providerName}
     } catch (error) {
       logger.debug(`Failed to load configuration for ${providerName}, using default:`, error.message);
       config = DEFAULT_RATE_LIMIT_CONFIG;
@@ -96,7 +96,7 @@ export class RateLimitManager {
     };
     
     this.providerStates.set(providerName, state);
-    logger.debug(`Initialized rate limiting for provider: ${providerName}`, config);
+    // Rate limiting initialized for provider: ${providerName}
     return state;
   }
   

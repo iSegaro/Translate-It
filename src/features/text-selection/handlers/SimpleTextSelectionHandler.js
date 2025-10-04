@@ -7,7 +7,7 @@ import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SimpleTextSelectionHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
 // Singleton instance for SimpleTextSelectionHandler
 let simpleTextSelectionHandlerInstance = null;
@@ -139,12 +139,17 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       return true;
 
     } catch (error) {
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: 'SimpleTextSelectionHandler-activate',
-        showToast: false
-      });
+      try {
+        const handler = ErrorHandler.getInstance();
+        handler.handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: 'SimpleTextSelectionHandler-activate',
+          showToast: false
+        });
+      } catch (handlerError) {
+        logger.error('Error activating SimpleTextSelectionHandler:', error);
+        logger.error('ErrorHandler not available:', handlerError);
+      }
       return false;
     }
   }
@@ -364,6 +369,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Process the selection
       if (this.selectionManager) {
+        this.logger.debug('Processing valid text selection', {
+          textLength: selectedText.length,
+          sourceElement: selection?.anchorNode?.nodeName || 'unknown'
+        });
         await this.selectionManager.processSelection(selectedText, selection);
       } else {
         logger.warn('SelectionManager is null - this should not happen with critical protection');
@@ -371,12 +380,16 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     } catch (error) {
       logger.error('Error processing selection:', error);
-      const handler = ErrorHandler.getInstance();
-      await handler.handle(error, {
-        type: ErrorTypes.UI,
-        context: 'simple-text-selection-process',
-        showToast: false
-      });
+      try {
+        const handler = ErrorHandler.getInstance();
+        await handler.handle(error, {
+          type: ErrorTypes.UI,
+          context: 'simple-text-selection-process',
+          showToast: false
+        });
+      } catch (handlerError) {
+        logger.error('ErrorHandler not available when processing selection:', handlerError);
+      }
     }
   }
 

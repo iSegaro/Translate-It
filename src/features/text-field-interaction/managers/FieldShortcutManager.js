@@ -21,7 +21,7 @@ export class FieldShortcutManager {
     this.initialized = false;
 
     // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FieldShortcutManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'FieldShortcutManager');
     this.logger.init('FieldShortcutManager initialized');
   }
 
@@ -58,7 +58,7 @@ export class FieldShortcutManager {
       return false;
     }
 
-    // Check if extension and feature are enabled
+    // Check if extension and shortcut are enabled
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
     const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
 

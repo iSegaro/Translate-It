@@ -13,7 +13,7 @@ export function useFieldShortcuts() {
   // Use the new Vue composable for automatic cleanup
   const tracker = useResourceTracker('field-shortcuts-composable')
   const store = useTextFieldInteractionStore();
-  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useFieldShortcuts');  // Local reactive state
+  const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'useFieldShortcuts');  // Local reactive state
   const isInitialized = ref(false);
   const isProcessing = ref(false);
   const lastShortcutTime = ref(0);

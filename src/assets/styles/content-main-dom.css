@@ -1,0 +1,100 @@
+/* Main DOM CSS - Critical styles only for Main DOM injection */
+/* Modern CSS Architecture (2025) - Zero !important Policy */
+
+/* ==========================================================================
+   Select Element Mode Styles - Main DOM Injection (Critical Only)
+   ========================================================================== */
+
+/* Scoped cursor change when in select element mode using high specificity */
+html[data-translate-it-select-mode="true"] {
+  cursor: crosshair;
+
+  /* Apply to all elements when in select mode */
+  & * {
+    cursor: crosshair;
+  }
+
+  /* More specific for body elements */
+  body {
+    cursor: crosshair;
+
+    & * {
+      cursor: crosshair;
+    }
+  }
+}
+
+/* Disable interactions on clickable elements during select mode
+Scoped to select-element mode only with high specificity */
+html[data-translate-it-select-mode="true"] {
+  /* Interactive elements that should be disabled */
+  a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+  [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]) {
+    pointer-events: none;
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+/* Disable default hover effects during select mode */
+/* Let JavaScript handle highlighting instead */
+html[data-translate-it-select-mode="true"] {
+  /* Common content elements that might have hover effects */
+  *:hover,
+  body:hover,
+  p:hover,
+  div:hover,
+  span:hover,
+  h1:hover,
+  h2:hover,
+  h3:hover,
+  h4:hover,
+  h5:hover,
+  h6:hover,
+  li:hover,
+  td:hover,
+  th:hover,
+  article:hover,
+  section:hover {
+    outline: none;
+  }
+}
+
+/* Visual feedback for input elements during select mode */
+html[data-translate-it-select-mode="true"] {
+  input:hover,
+  textarea:hover {
+    outline: 2px solid #4a90e2;
+    outline-offset: 1px;
+  }
+}
+
+/* JS-controlled highlighting for selected elements */
+/* Using CSS custom properties for consistency */
+:root {
+  --translate-highlight-color: #ff8800;
+  --translate-highlight-width: 3px;
+  --translate-highlight-offset: 2px;
+  --translate-highlight-z-index: 1040;
+}
+
+/* High specificity highlighting without !important */
+html body [data-translate-highlighted="true"][data-translate-highlighted="true"],
+html body .translate-it-element-highlighted.translate-it-element-highlighted {
+  outline: var(--translate-highlight-width) solid var(--translate-highlight-color);
+  outline-offset: var(--translate-highlight-offset);
+  z-index: var(--translate-highlight-z-index);
+  position: relative;
+  box-shadow: 0 0 0 var(--translate-highlight-width) var(--translate-highlight-color);
+
+  /* Prevent child elements from showing their own outlines */
+  * {
+    outline: none;
+  }
+}

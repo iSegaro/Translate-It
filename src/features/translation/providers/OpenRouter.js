@@ -8,10 +8,10 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-// import { getScopedLogger } from '@/shared/logging/logger.js';
-// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenRouter');
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenRouter');
 
 export class OpenRouterProvider extends BaseAIProvider {
   static type = "ai";
@@ -45,6 +45,9 @@ export class OpenRouterProvider extends BaseAIProvider {
       getOpenRouterApiModelAsync(),
     ]);
 
+    logger.info(`[OpenRouter] Using model: ${model || 'openai/gpt-3.5-turbo'}`);
+    logger.info(`[OpenRouter] Starting translation: ${text.length} chars`);
+
     // Validate configuration
     this._validateConfig(
       { apiKey },
@@ -74,12 +77,15 @@ export class OpenRouterProvider extends BaseAIProvider {
       }),
     };
 
-    return this._executeApiCall({
+    const result = await this._executeApiCall({
       url: CONFIG.OPENROUTER_API_URL,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
     });
+
+    logger.info(`[OpenRouter] Translation completed successfully`);
+    return result;
   }
 }

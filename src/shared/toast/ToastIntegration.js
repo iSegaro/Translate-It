@@ -9,7 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 export class ToastIntegration {
   constructor(eventBus = null) {
     this.eventBus = eventBus;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ToastIntegration');
+    this.logger = getScopedLogger(LOG_COMPONENTS.NOTIFICATIONS, 'ToastIntegration');
     this.eventHandler = new ToastEventHandler(eventBus);
     this.isInitialized = false;
   }
@@ -26,7 +26,11 @@ export class ToastIntegration {
       return;
     }
     
-    this.logger.debug('Initializing ToastIntegration system');
+    this.logger.info('[Toast] Initializing toast integration system');
+    this.logger.debug('Initialization options', {
+      hasCancelCallback: !!options.onCancelClick,
+      hasToastCallback: !!options.onToastClick
+    });
     
     try {
       // Initialize event handler with callbacks
@@ -36,9 +40,9 @@ export class ToastIntegration {
       });
       
       this.isInitialized = true;
-      this.logger.info('ToastIntegration system initialized successfully');
+      this.logger.info('[Toast] Integration system initialized successfully');
     } catch (error) {
-      this.logger.error('Error initializing ToastIntegration:', error);
+      this.logger.error('[Toast] Initialization failed:', error);
       throw error;
     }
   }
@@ -51,12 +55,12 @@ export class ToastIntegration {
       return;
     }
     
-    this.logger.debug('Shutting down ToastIntegration system');
+    this.logger.info('[Toast] Shutting down toast integration system');
     
     this.eventHandler.disable();
     this.isInitialized = false;
     
-    this.logger.info('ToastIntegration system shut down successfully');
+    this.logger.info('[Toast] Integration system shut down successfully');
   }
   
   /**
@@ -64,7 +68,7 @@ export class ToastIntegration {
    * @param {Event} event - Click event
    */
   defaultCancelHandler() {
-    this.logger.info('Default cancel handler triggered');
+    this.logger.info('[Toast] Cancel button clicked - triggering default handler');
 
     if (this.eventBus) {
       this.eventBus.emit('cancel-select-element-mode');
@@ -76,7 +80,7 @@ export class ToastIntegration {
    * @param {Event} event - Click event
    */
   defaultToastHandler() {
-    this.logger.debug('Default toast click handler triggered');
+    this.logger.debug('[Toast] Default toast click handler triggered');
     // By default, just prevent the click from propagating
   }
   

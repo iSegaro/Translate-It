@@ -17,7 +17,7 @@ let translationIdCounter = 0;
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('translation-overlay')
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationOverlay')
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'TranslationOverlay')
 
 // Generate unique IDs for translations
 const generateUniqueTranslationId = () => {

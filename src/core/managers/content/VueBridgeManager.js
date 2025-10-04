@@ -9,7 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'VueBridgeManager');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'VueBridgeManager');
 
 class ContentScriptVueBridge extends ResourceTracker {
   constructor() {
@@ -55,7 +55,7 @@ class ContentScriptVueBridge extends ResourceTracker {
     return (message, sender, sendResponse) => {
       // Simple validation - just check for action
       if (!message || !message.action) {
-        logger.warn("[Vue Bridge] Received message without action:", message);
+        // logger.trace("[Vue Bridge] Received message without action:", message);
         return false;
       }
 
@@ -279,7 +279,7 @@ class ContentScriptVueBridge extends ResourceTracker {
 
   showTranslationResult = async (translationData) => {
     // TranslationTooltip removed - translation results now handled elsewhere
-    logger.debug("[Vue Bridge] Translation result received:", translationData);
+    // logger.trace("[Vue Bridge] Translation result received:", translationData);
     return null;
   }
 
@@ -312,7 +312,7 @@ class ContentScriptVueBridge extends ResourceTracker {
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
     
-    logger.debug('VueBridgeManager cleanup completed');
+    // logger.trace('VueBridgeManager cleanup completed');
   }
 }
 

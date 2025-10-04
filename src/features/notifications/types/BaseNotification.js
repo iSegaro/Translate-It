@@ -11,7 +11,7 @@ export class BaseNotification {
     this.persistent = options.persistent || false;
     this.actions = options.actions || [];
     this.isActive = false;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, `${type}Notification`);
+    this.logger = getScopedLogger(LOG_COMPONENTS.NOTIFICATIONS, `${type}Notification`);
   }
   
   /**
@@ -43,7 +43,7 @@ export class BaseNotification {
    */
   updateMessage(message) {
     this.message = message;
-    this.logger.debug(`Notification message updated: ${message}`);
+    this.logger.debug(`[Notification] Message updated for ${this.id}: ${message}`);
   }
   
   /**
@@ -52,7 +52,7 @@ export class BaseNotification {
    */
   addAction(action) {
     this.actions.push(action);
-    this.logger.debug(`Action added to notification: ${action.label}`);
+    this.logger.debug(`[Notification] Action added to ${this.id}: ${action.label}`);
   }
   
   /**
@@ -60,7 +60,13 @@ export class BaseNotification {
    */
   setActive() {
     this.isActive = true;
-    this.logger.debug(`Notification ${this.id} set as active`);
+    this.logger.info(`[Notification] Activated: ${this.id} (${this.type})`);
+    this.logger.debug('Activation details', {
+      id: this.id,
+      type: this.type,
+      message: this.message,
+      duration: this.duration
+    });
   }
   
   /**
@@ -68,7 +74,12 @@ export class BaseNotification {
    */
   setInactive() {
     this.isActive = false;
-    this.logger.debug(`Notification ${this.id} set as inactive`);
+    this.logger.info(`[Notification] Deactivated: ${this.id}`);
+    this.logger.debug('Deactivation details', {
+      id: this.id,
+      type: this.type,
+      wasActive: this.isActive
+    });
   }
   
   /**

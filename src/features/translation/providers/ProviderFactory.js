@@ -3,25 +3,52 @@ import { providerRegistry } from "./ProviderRegistry.js";
 export class ProviderFactory {
   constructor() {
     this.providerInstances = new Map();
+    this.loadingInstances = new Map();
   }
 
-  getProvider(providerId) {
+  async getProvider(providerId) {
     if (this.providerInstances.has(providerId)) {
       return this.providerInstances.get(providerId);
     }
 
-    const ProviderClass = providerRegistry.get(providerId);
-    const provider = new ProviderClass();
-    this.providerInstances.set(providerId, provider);
-    return provider;
+    if (this.loadingInstances.has(providerId)) {
+      return await this.loadingInstances.get(providerId);
+    }
+
+    const loadingPromise = this._createProviderInstance(providerId);
+    this.loadingInstances.set(providerId, loadingPromise);
+
+    try {
+      const provider = await loadingPromise;
+      this.loadingInstances.delete(providerId);
+      return provider;
+    } catch (error) {
+      this.loadingInstances.delete(providerId);
+      throw error;
+    }
+  }
+
+  async _createProviderInstance(providerId) {
+    try {
+      const ProviderClass = await providerRegistry.get(providerId);
+      const provider = new ProviderClass();
+      this.providerInstances.set(providerId, provider);
+      return provider;
+    } catch (error) {
+      throw new Error(`Failed to create provider instance for '${providerId}': ${error.message}`);
+    }
   }
 
   getSupportedProviders() {
-    return providerRegistry.getAll().map(p => ({ id: p.id, name: p.name }));
+    return providerRegistry.getAllAvailable().map(p => ({
+      id: p.id,
+      name: p.name,
+      isLazy: p.isLazy || false
+    }));
   }
 
   isProviderSupported(providerId) {
-    return providerRegistry.getAll().some(p => p.id === providerId);
+    return providerRegistry.isProviderAvailable(providerId);
   }
 
   resetProviders(providerId = null) {

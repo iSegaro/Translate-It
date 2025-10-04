@@ -8,7 +8,7 @@
 
 ## ویژگی‌های کلیدی
 - **Vue.js Apps**: سه اپلیکیشن جداگانه (Popup، Sidepanel، Options)
-- **Pinia Stores**: مدیریت state راکتیو 
+- **Pinia Stores**: مدیریت state راکتیو
 - **Composables**: منطق business قابل استفاده مجدد
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با fallback زبان خودکار و هماهنگی کراس-کانتکست
 - **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
@@ -23,6 +23,9 @@
 - **Memory Garbage Collector**: سیستم مدیریت حافظه پیشرفته با Critical Protection System برای جلوگیری از memory leaks و حفظ منابع حیاتی
 - **Element Detection Service (2025)**: سیستم متمرکز تشخیص المنت‌ها با حذف سلکتورهای هاردکد شده و بهینه‌سازی DOM queries
 - **Smart Handler Registration**: سیستم ثبت handler های هوشمند با فعال‌سازی و غیرفعال‌سازی پویا بر اساس تنظیمات و URL exclusion
+- **Content Script Smart Loading**: سیستم لودینگ هوشمند با دسته‌بندی ویژگی‌ها (CRITICAL, ESSENTIAL, ON_DEMAND, INTERACTIVE) و بهبود 20-30 درصدی مصرف حافظه
+- **Advanced Code Splitting**: جداسازی هوشمندانه باندل با لودینگ روی‌محتور برای ویژگی‌ها، زبان‌ها و یوتیلیتی‌ها
+- **Bundle Size Optimization**: کاهش اندازه باندل به ~2.98MB (40% کوچکتر از وب‌پک قبلی)
 
 ## روش‌های ترجمه
 1. **انتخاب متن**: ترجمه متن انتخاب شده با نمایش آیکون یا کادر مستقیم
@@ -88,7 +91,10 @@
 ### 🏗️ Core Infrastructure
 - **`src/core/`**: زیرساخت اصلی
   - `background/` - service worker، handlers، lifecycle
-  - `content-scripts/` - اسکریپت‌های محتوا
+  - `content-scripts/` - اسکریپت‌های محتوا با سیستم لودینگ هوشمند
+    - `index.js` - ورودی اصلی با footprint مینیمال (~5KB)
+    - `ContentScriptCore.js` - منطق مدیریت لودینگ
+    - `chunks/` - ماژول‌های ویژگی لودشده روی‌محتور
   - `memory/` - سیستم Memory Garbage Collector پیشرفته با Critical Protection (MemoryManager, ResourceTracker, SmartCache, GlobalCleanup, MemoryMonitor)
   - `managers/` - **FeatureManager** برای مدیریت چرخه حیات handler ها و TextSelectionManager
   - `services/translation/` - **خدمات ترجمه اصلی (2025)** - UnifiedTranslationService، TranslationRequestTracker، TranslationResultDispatcher
@@ -162,6 +168,16 @@
 - **مدیریت پویا**: فعال‌سازی و غیرفعال‌سازی خودکار بر اساس URL و تنظیمات
 - **جداسازی خطا**: اگر یک feature خراب شود، سایرین کار می‌کنند
 
+### 🚀 Content Script Smart Loading
+- **Ultra-Minimal Entry**: ورودی محتوا با footprint ~5KB
+- **Feature Categorization**: دسته‌بندی هوشمند ویژگی‌ها بر اساس اولویت
+  - CRITICAL: [messaging, extensionContext] - لود فوری
+  - ESSENTIAL: [textSelection, windowsManager, vue] - لود بعد از 500ms
+  - ON_DEMAND: [shortcut, textFieldIcon] - لود بعد از 2 ثانیه یا روی‌محتور
+- **Interaction Detection**: پیش‌لود بر اساس تعامل کاربر
+- **Memory Optimization**: بهبود 20-30 درصدی مصرف حافظه از طریق لودینگ انتخابی
+- **Dynamic Imports**: ماژول‌های ویژگی لودشده روی‌محتور
+
 ### 🎉 Toast Integration System (2025)
 - **Actionable Notifications**: Toast notifications با دکمه‌های تعاملی برای cancel و action
 - **Cross-Context Support**: کاربری یکپارچه در تمام contexts و iframe ها
@@ -195,7 +211,7 @@
 - **Vue.js 3**: فریمورک راکتیو frontend
 - **Pinia**: مدیریت state مدرن
 - **Cross-Browser**: کروم و فایرفاکس
-- **Build Tools**: Webpack، pnpm
+- **Build Tools**: Vite، pnpm
 - **Polyfill**: webextension-polyfill برای سازگاری
 - **Modern Architecture**: Feature-based با Smart Handler Registration System
 - **Dynamic Feature Management**: سیستم FeatureManager برای مدیریت چرخه حیات handlers
@@ -203,3 +219,5 @@
 - **Unified TTS System (2025)**: سیستم TTS کاملاً یکپارچه با حذف 600+ خط کد تکراری، fallback زبان خودکار (فارسی→عربی)، و هماهنگی کامل بین تمام contexts
 - **Element Detection Service (2025)**: سیستم تشخیص متمرکز المنت‌ها با حذف سلکتورهای هاردکد و بهینه‌سازی DOM queries
 - **Unified Translation Service (2025)**: سیستم ترجمه متمرکز با جلوگیری از پردازش تکراری، مدیریت چرخه حیات درخواست‌ها، و ارسال هوشمندانه نتایج بر اساس حالت ترجمه
+- **Content Script Smart Loading**: سیستم لودینگ هوشمند با بهینه‌سازی 20-30 درصدی مصرف حافظه
+- **Bundle Optimization**: اندازه باندل ~2.98MB (40% کوچکتر از وب‌پک قبلی)

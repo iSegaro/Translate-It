@@ -3,9 +3,27 @@
  * Provides a convenient interface for tracking resources in classes
  */
 import { getMemoryManager } from './MemoryManager.js';
-import { getScopedLogger } from '../../shared/logging/logger.js';
-import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 import { isDevelopmentMode } from '../../shared/utils/environment.js';
+
+// Lazy logger initialization to avoid TDZ
+let loggerPromise = null;
+const getLogger = (groupId) => {
+  if (!loggerPromise) {
+    loggerPromise = Promise.all([
+      import('../../shared/logging/logger.js'),
+      import('../../shared/logging/logConstants.js')
+    ]).then(([loggerModule, logConstantsModule]) => {
+      return loggerModule.getScopedLogger(logConstantsModule.LOG_COMPONENTS.MEMORY, `ResourceTracker:${groupId}`);
+    });
+  }
+  // Return a temporary logger that buffers calls until the real logger is loaded
+  return {
+    debug: (...args) => loggerPromise.then(l => l.debug(...args)),
+    info: (...args) => loggerPromise.then(l => l.info(...args)),
+    warn: (...args) => loggerPromise.then(l => l.warn(...args)),
+    error: (...args) => loggerPromise.then(l => l.error(...args))
+  };
+};
 
 const isDevelopment = isDevelopmentMode();
 
@@ -23,10 +41,21 @@ class ResourceTracker {
   constructor(groupId) {
     this.groupId = groupId;
     this.memoryManager = getMemoryManager();
-    this.logger = getScopedLogger(LOG_COMPONENTS.MEMORY, `ResourceTracker:${groupId}`);
+    this._logger = null;
     if (shouldEnableDebugging()) {
       this.resources = new Set();
     }
+  }
+
+  get logger() {
+    if (!this._logger) {
+      this._logger = getLogger(this.groupId);
+    }
+    return this._logger;
+  }
+
+  set logger(value) {
+    this._logger = value;
   }
 
   /**
@@ -138,7 +167,7 @@ class ResourceTracker {
 
       // Log removal in development
       if (shouldEnableDebugging()) {
-        this.logger.debug('Event listener removed:', { event, element: element?.constructor?.name });
+        // this.logger.trace('Event listener removed:', { event, element: element?.constructor?.name });
       }
     } catch (error) {
       this.logger.error('Error removing event listener:', error);

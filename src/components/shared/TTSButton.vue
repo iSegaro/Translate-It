@@ -184,7 +184,8 @@ const handleClick = async () => {
     return
   }
 
-  logger.debug('[TTSButton] Button clicked, current state:', tts.ttsState.value)
+  // Button clicked - logged at TRACE level for detailed debugging
+  // logger.debug('[TTSButton] Button clicked, current state:', tts.ttsState.value)
 
   try {
     let result = false
@@ -216,7 +217,8 @@ const handleClick = async () => {
         if (result) emit('tts-stopped')
     }
 
-    logger.debug('[TTSButton] Action completed:', result)
+    // Action completed - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSButton] Action completed:', result)
   } catch (error) {
     logger.error('[TTSButton] Action failed:', error)
     emit('tts-error', { error: error.message || 'TTS action failed' })
@@ -226,7 +228,8 @@ const handleClick = async () => {
 // Watch for state changes and emit events
 watch(() => tts.ttsState.value, (newState, oldState) => {
   if (oldState !== undefined) {
-    logger.debug('[TTSButton] State changed:', oldState, '→', newState)
+    // State changed - logged at TRACE level for detailed debugging
+    // logger.debug('[TTSButton] State changed:', oldState, '→', newState)
     emit('state-changed', { 
       from: oldState, 
       to: newState,

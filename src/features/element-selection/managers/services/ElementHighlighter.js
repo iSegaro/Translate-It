@@ -12,7 +12,7 @@ export class ElementHighlighter extends ResourceTracker {
   constructor() {
     super('element-highlighter')
     
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementHighlighter');
+    this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ElementHighlighter');
     this.currentHighlighted = null;
     this.overlayElements = new Set();
   }

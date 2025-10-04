@@ -4,7 +4,7 @@
     appear
   >
     <button
-      v-show="internalVisible"
+      v-if="internalVisible"
       class="ti-field-icon"
       :data-id="id"
       :data-translate-ui="true"
@@ -84,7 +84,8 @@ const props = defineProps({
   visible: { type: Boolean, default: true },
   size: { type: String, default: 'medium', validator: (value) => ['small', 'medium', 'large'].includes(value) },
   targetElement: { type: Object, default: null }, // Reference to target element
-  attachmentMode: { type: String, default: 'smart' }
+  attachmentMode: { type: String, default: 'smart' },
+  positioningMode: { type: String, default: 'absolute', validator: (value) => ['fixed', 'absolute'].includes(value) }
 });
 
 const emit = defineEmits(['click', 'hover', 'focus', 'position-updated']);
@@ -97,6 +98,7 @@ const isFocused = ref(false);
 // Internal position state for smooth updates
 const internalPosition = ref({ ...props.position });
 const internalVisible = ref(props.visible);
+const isSmoothFollowing = ref(false);
 
 
 // Watch for position prop changes and animate to new position
@@ -124,10 +126,17 @@ const computedClasses = computed(() => ({
 
 const computedStyle = computed(() => {
   const baseStyle = {
-    position: 'fixed',
+    position: props.positioningMode,
     top: `${internalPosition.value.top}px`,
     left: `${internalPosition.value.left}px`
   };
+
+  // Performance optimizations for smooth following
+  if (isSmoothFollowing.value) {
+    baseStyle.transition = 'none'; // No transitions for immediate updates during scroll
+    baseStyle.willChange = 'transform'; // Hint for GPU acceleration
+    baseStyle.transform = 'translateZ(0)'; // Force GPU layer
+  }
 
   // Set width and height based on size
   if (props.size === 'small') {
@@ -251,14 +260,31 @@ const forceUpdate = () => {
   internalPosition.value = { ...internalPosition.value };
 };
 
+const enableSmoothFollowing = () => {
+  isSmoothFollowing.value = true;
+};
+
+const disableSmoothFollowing = () => {
+  isSmoothFollowing.value = false;
+};
+
+const updatePositionImmediate = (newPosition) => {
+  // For smooth following - update immediately without reactivity delays
+  internalPosition.value = { ...newPosition };
+};
+
 // Expose methods for parent components
 defineExpose({
   updatePosition,
+  updatePositionImmediate,
   show,
   hide,
   forceUpdate,
+  enableSmoothFollowing,
+  disableSmoothFollowing,
   getPosition: () => internalPosition.value,
-  isVisible: () => internalVisible.value
+  isVisible: () => internalVisible.value,
+  isSmoothFollowing: () => isSmoothFollowing.value
 });
 
 onMounted(() => {
