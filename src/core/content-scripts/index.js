@@ -39,6 +39,9 @@ let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 let ErrorHandler = null;
 
+// Static import ContentScriptCore to fix Firefox class compilation issues
+import { ContentScriptCore } from './ContentScriptCore.js';
+
 // Lazy load logging and error handling dependencies
 async function initializeLogger() {
   if (logger) return logger;
@@ -72,15 +75,39 @@ async function initializeLogger() {
     // Initialize logger first
     const scriptLogger = await initializeLogger();
 
-    // Dynamically import ContentScriptCore for code splitting
-    const { contentScriptCore: core } = await import('./ContentScriptCore.js');
-    contentScriptCore = core;
+    // Create ContentScriptCore instance using static import (fixes Firefox class compilation)
+    try {
+      contentScriptCore = new ContentScriptCore();
 
-    // Expose globally for other modules
+      if (process.env.NODE_ENV === 'development') {
+        scriptLogger.debug('ContentScriptCore instance created successfully');
+      }
+    } catch (error) {
+      scriptLogger.error('Failed to create ContentScriptCore instance:', {
+        error: error.message,
+        stack: error.stack,
+        userAgent: navigator.userAgent
+      });
+      throw new Error(`Failed to create ContentScriptCore: ${error.message}`);
+    }
+
+    // Verify that contentScriptCore was loaded correctly
+    if (!contentScriptCore) {
+      throw new Error('Failed to load ContentScriptCore: instance not found');
+    }
+
+    // Initialize ContentScriptCore
+    let initialized = false;
+    if (typeof contentScriptCore.initializeCritical === 'function') {
+      initialized = await contentScriptCore.initializeCritical();
+    } else if (typeof contentScriptCore.initialize === 'function') {
+      initialized = await contentScriptCore.initialize();
+    } else {
+      throw new Error('ContentScriptCore instance missing initialization method');
+    }
+
+    // Expose globally for other modules (after potentially replacing instance)
     window.translateItContentCore = contentScriptCore;
-
-    // Initialize with minimal dependencies
-    const initialized = await contentScriptCore.initializeCritical();
 
     if (initialized) {
       // Setup smart event listeners
@@ -130,7 +157,7 @@ function setupSmartListeners() {
   // Text selection interaction
   document.addEventListener('mouseup', handleTextSelection, { passive: true });
 
-  
+
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardInteraction);
 
@@ -272,6 +299,3 @@ window.translateItDebug = {
   interactionDetected,
   FEATURE_CATEGORIES
 };
-
-// Export for debugging
-window.translateItContentScriptCore = contentScriptCore;
