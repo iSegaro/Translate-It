@@ -12,30 +12,29 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { textFieldIconConfig } from '../config/positioning.js';
 
 export class ElementAttachment extends ResourceTracker {
-  constructor(iconId, targetElement, iconUpdateCallback) {
+  constructor(iconId, targetElement, iconUpdateCallback, positioningMode = null) {
     super(`element-attachment-${iconId}`);
-    
+
     this.iconId = iconId;
     this.targetElement = targetElement;
     this.iconUpdateCallback = iconUpdateCallback; // Function to update icon position
+    this.positioningMode = positioningMode || textFieldIconConfig.positioning.defaultPositioningMode;
     this.isAttached = false;
-    
+
     // Cache last known positions to detect changes
     this.lastElementRect = null;
     this.lastIconPosition = null;
     this.lastViewport = null;
-    
+
     // Observers and listeners
     this.resizeObserver = null;
     this.intersectionObserver = null;
-    this.scrollThrottleId = null;
-    
-    // Configuration from config file
-    this.updateThrottle = textFieldIconConfig.attachment.updateThrottle;
-    
+
     this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'ElementAttachment');
-    
-    this.logger.debug('ElementAttachment created for icon:', iconId);
+
+    this.logger.debug('ElementAttachment created for icon:', iconId, {
+      positioningMode: this.positioningMode
+    });
   }
 
   /**
@@ -64,7 +63,7 @@ export class ElementAttachment extends ResourceTracker {
     // Setup observers and listeners
     this.setupResizeObserver();
     this.setupIntersectionObserver();
-    this.setupScrollDismissListener();
+    this.setupSmoothScrollFollowing();
     
     this.isAttached = true;
     this.logger.debug('ElementAttachment attached successfully');
@@ -138,25 +137,40 @@ export class ElementAttachment extends ResourceTracker {
     });
 
     this.intersectionObserver.observe(this.targetElement);
-    
+
     // Track with ResourceTracker for automatic cleanup
     this.trackResource('intersectionObserver', () => this.intersectionObserver?.disconnect());
   }
 
   /**
-   * Setup scroll listener to dismiss icon on scroll
+   * Setup smooth scroll following listener with RequestAnimationFrame
    */
-  setupScrollDismissListener() {
+  setupSmoothScrollFollowing() {
+    let rafId = null;
+
     const scrollHandler = () => {
-      this.logger.debug('Page scrolled, dismissing icon:', this.iconId);
-      this.notifyIconUpdate({
-        visible: false,
-        reason: 'scroll-dismiss'
-      });
+      // Use RAF for smooth 60fps updates without multiple concurrent calls
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          this.smoothUpdatePosition();
+          rafId = null;
+        });
+      }
     };
 
     // Use passive listener for better performance
     this.addEventListener(window, 'scroll', scrollHandler, { passive: true });
+
+    // Also listen to document scroll for better coverage
+    this.addEventListener(document, 'scroll', scrollHandler, { passive: true });
+
+    // Track RAF for cleanup
+    this.trackResource('scroll-raf', () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    });
   }
 
 
@@ -171,23 +185,23 @@ export class ElementAttachment extends ResourceTracker {
     });
 
     if (!isVisible) {
-      // Hide icon when element is not visible
+      // Hide icon when element is not visible in viewport
       this.notifyIconUpdate({
         visible: false,
-        reason: 'element-hidden'
+        reason: 'viewport-exit'
       });
     } else {
-      // Show and update icon position when element becomes visible
+      // Show and update icon position when element becomes visible again
       this.updatePosition();
       this.notifyIconUpdate({
         visible: true,
-        reason: 'element-visible'
+        reason: 'viewport-enter'
       });
     }
   }
 
   /**
-   * Update icon position with throttling
+   * Update icon position with throttling (for resize events)
    */
   throttledUpdatePosition() {
     if (this.scrollThrottleId) {
@@ -201,6 +215,63 @@ export class ElementAttachment extends ResourceTracker {
   }
 
   /**
+   * Smooth position update for scroll following
+   */
+  smoothUpdatePosition() {
+    if (!this.isAttached || !this.targetElement || !this.targetElement.isConnected) {
+      return;
+    }
+
+    try {
+      // Calculate new optimal position with high precision
+      const newPosition = PositionCalculator.calculateOptimalPosition(
+        this.targetElement,
+        null, // Use default icon size
+        {
+          checkCollisions: false, // Skip collision detection for performance during scroll
+          positioningMode: this.positioningMode
+        }
+      );
+
+      // Always update during scroll for smooth following (lower threshold)
+      if (this.hasPositionChanged(newPosition, 1)) {
+        this.lastIconPosition = newPosition;
+        this.updateElementRect();
+        this.updateViewportInfo();
+
+        
+        // Notify the icon component to update immediately
+        this.notifyIconUpdate({
+          position: newPosition,
+          positioningMode: this.positioningMode,
+          reason: 'smooth-scroll-follow',
+          immediate: true
+        });
+      }
+    } catch (error) {
+      this.logger.error('Error in smooth position update:', error);
+    }
+  }
+
+  /**
+   * Check if position has changed significantly
+   * @param {Object} newPosition - New position to compare
+   * @param {number} threshold - Change threshold in pixels (default: 2)
+   * @returns {boolean} Whether position changed
+   */
+  hasPositionChanged(newPosition, threshold = 2) {
+    if (!this.lastIconPosition) {
+      return true;
+    }
+
+    return (
+      Math.abs(newPosition.top - this.lastIconPosition.top) > threshold ||
+      Math.abs(newPosition.left - this.lastIconPosition.left) > threshold ||
+      newPosition.placement !== this.lastIconPosition.placement
+    );
+  }
+
+  /**
    * Update icon position
    */
   updatePosition() {
@@ -209,11 +280,14 @@ export class ElementAttachment extends ResourceTracker {
     }
 
     try {
-      // Calculate new optimal position
+      // Calculate new optimal position with positioning mode
       const newPosition = PositionCalculator.calculateOptimalPosition(
         this.targetElement,
         null, // Use default icon size
-        { checkCollisions: true }
+        {
+          checkCollisions: true,
+          positioningMode: this.positioningMode
+        }
       );
 
       // Check if position actually changed
@@ -221,9 +295,10 @@ export class ElementAttachment extends ResourceTracker {
         this.lastIconPosition = newPosition;
         this.updateElementRect();
         this.updateViewportInfo();
-        
+
         this.logger.debug('Updating icon position:', {
           iconId: this.iconId,
+          positioningMode: this.positioningMode,
           placement: newPosition.placement,
           position: { top: newPosition.top, left: newPosition.left }
         });
@@ -231,31 +306,13 @@ export class ElementAttachment extends ResourceTracker {
         // Notify the icon component to update
         this.notifyIconUpdate({
           position: newPosition,
+          positioningMode: this.positioningMode,
           reason: 'position-update'
         });
       }
     } catch (error) {
       this.logger.error('Error updating icon position:', error);
     }
-  }
-
-
-  /**
-   * Check if position has changed significantly
-   * @param {Object} newPosition - New position to compare
-   * @returns {boolean} Whether position changed
-   */
-  hasPositionChanged(newPosition) {
-    if (!this.lastIconPosition) {
-      return true;
-    }
-
-    const threshold = 2; // pixels
-    return (
-      Math.abs(newPosition.top - this.lastIconPosition.top) > threshold ||
-      Math.abs(newPosition.left - this.lastIconPosition.left) > threshold ||
-      newPosition.placement !== this.lastIconPosition.placement
-    );
   }
 
 

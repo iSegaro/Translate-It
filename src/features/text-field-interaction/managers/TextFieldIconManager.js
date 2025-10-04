@@ -13,6 +13,35 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { PositionCalculator } from '../utils/PositionCalculator.js';
 import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
+import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
+
+/**
+ * Visibility management utility class
+ * Centralizes visibility logic for different update reasons
+ */
+class VisibilityManager {
+  /**
+   * Determine if icon should be visible based on update reason
+   * @param {string} reason - Update reason (e.g., 'smooth-scroll-follow', 'viewport-exit')
+   * @param {boolean} visible - Current visibility state
+   * @returns {boolean} Effective visibility state
+   */
+  static shouldKeepVisible(reason, visible) {
+    // Smooth follow always keeps icon visible
+    if (reason === 'smooth-scroll-follow') {
+      return true;
+    }
+
+    // Respect viewport visibility changes
+    if (reason?.startsWith('viewport-')) {
+      return visible;
+    }
+
+    // Default behavior for all other cases
+    return visible;
+  }
+}
+
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
@@ -283,6 +312,15 @@ export class TextFieldIconManager extends ResourceTracker {
       return null;
     }
 
+    // Exclusion check for text field icons
+    const exclusionChecker = ExclusionChecker.getInstance();
+    const isFeatureAllowed = await exclusionChecker.isFeatureAllowed('textFieldIcon');
+    if (!isFeatureAllowed) {
+      // Skipping icon creation - Site excluded for text field icons (logged at TRACE level)
+      // this.logger.trace('Skipping icon creation: Site excluded for text field icons.');
+      return false;
+    }
+
     // Feature flag check
     if (!isTextFieldFeatureEnabled) {
       // Skipping icon creation - TRANSLATE_ON_TEXT_FIELDS feature is disabled (logged at TRACE level)
@@ -371,10 +409,14 @@ export class TextFieldIconManager extends ResourceTracker {
     const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Calculate optimal position using the new positioning system
+    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
     const optimalPosition = PositionCalculator.calculateOptimalPosition(
       element,
       null, // Use default icon size
-      { checkCollisions: true }
+      {
+        checkCollisions: true,
+        positioningMode: positioningMode
+      }
     );
 
     // Position calculation details - logged at TRACE level for detailed debugging
@@ -385,11 +427,12 @@ export class TextFieldIconManager extends ResourceTracker {
     // });
 
     // Emit event to UI Host to add the icon with enhanced data
-    pageEventBus.emit('add-field-icon', { 
-      id: iconId, 
+    pageEventBus.emit('add-field-icon', {
+      id: iconId,
       position: optimalPosition,
       targetElement: element,
-      attachmentMode: 'smart'
+      attachmentMode: 'smart',
+      positioningMode: positioningMode
     });
 
     // Track the created icon with enhanced data
@@ -487,15 +530,18 @@ export class TextFieldIconManager extends ResourceTracker {
       this.handleIconUpdate(updateData);
     };
 
-    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback);
-    
+    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
+    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback, positioningMode);
+
     // Attach the icon to the element
     attachment.attach();
-    
+
     // Store the attachment for later cleanup
     this.iconAttachments.set(iconId, attachment);
-    
-    this.logger.debug('Created attachment for icon:', iconId);
+
+    this.logger.debug('Created attachment for icon:', iconId, {
+      positioningMode: positioningMode
+    });
   }
 
   /**
@@ -504,7 +550,7 @@ export class TextFieldIconManager extends ResourceTracker {
    */
   handleIconUpdate(updateData) {
     const { iconId, position, visible, reason } = updateData;
-    
+
     this.logger.debug('Received icon update:', {
       iconId,
       reason,
@@ -512,17 +558,21 @@ export class TextFieldIconManager extends ResourceTracker {
       placement: position?.placement
     });
 
+    // Use VisibilityManager to determine effective visibility
+    const effectiveVisible = VisibilityManager.shouldKeepVisible(reason, visible);
+
     // Emit update event to UI Host
     if (position) {
       pageEventBus.emit('update-field-icon-position', {
         id: iconId,
         position,
-        visible: visible !== false
+        visible: effectiveVisible !== false
       });
-    } else if (visible !== undefined) {
+    } else if (visible !== undefined && reason !== 'smooth-scroll-follow') {
+      // Emit visibility changes for viewport events and other non-follow events
       pageEventBus.emit('update-field-icon-visibility', {
         id: iconId,
-        visible
+        visible: effectiveVisible
       });
     }
   }

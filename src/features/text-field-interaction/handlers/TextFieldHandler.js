@@ -231,24 +231,21 @@ export class TextFieldHandler extends ResourceTracker {
         }
       }, { critical: true });
 
-      this.addEventListener(document, 'scroll', () => {
-        if (this.textFieldIconManager) {
-          clearTimeout(this.scrollUpdateTimeout);
-          this.scrollUpdateTimeout = setTimeout(() => {
-            if (this.textFieldIconManager) {
-              this.textFieldIconManager.forceUpdateAllPositions();
-            }
-          }, 100);
-        }
-      }, { passive: true, critical: true });
+      // Disabled scroll handler to keep icon fixed during scroll
+      // this.addEventListener(document, 'scroll', () => {
+      //   if (this.textFieldIconManager) {
+      //     clearTimeout(this.scrollUpdateTimeout);
+      //     this.scrollUpdateTimeout = setTimeout(() => {
+      //       if (this.textFieldIconManager) {
+      //         this.textFieldIconManager.forceUpdateAllPositions();
+      //       }
+      //     }, 100);
+      //   }
+      // }, { passive: true, critical: true });
 
-      // Track timeouts for cleanup
+      // Track timeout for cleanup
       this.trackResource('position-update-timeout', () => {
         clearTimeout(this.positionUpdateTimeout);
-      });
-
-      this.trackResource('scroll-update-timeout', () => {
-        clearTimeout(this.scrollUpdateTimeout);
       });
 
       logger.debug('Text field listeners setup complete');

@@ -5,18 +5,22 @@
 
 export const textFieldIconConfig = {
   positioning: {
+    // Positioning mode: 'fixed' (relative to viewport) or 'absolute' (relative to document)
+    // Note: 'absolute' doesn't work well in Shadow DOM, keeping 'fixed' for now
+    defaultPositioningMode: 'fixed',
+
     // Preferred placement order for single-line elements
     singleLinePlacements: ['top-right', 'bottom-right', 'top-left', 'bottom-left', 'inside-right', 'inside-left'],
-    
+
     // Preferred placement order for multiline elements (textarea, WYSIWYG)
     multiLinePlacements: ['inside-bottom-right', 'inside-bottom-left', 'inside-top-right', 'bottom-right', 'top-right', 'bottom-left'],
-    
+
     // Distance from target element (pixels)
     elementMargin: 4,
-    
-    // Minimum distance from viewport edges (pixels) 
+
+    // Minimum distance from viewport edges (pixels)
     viewportMargin: 8,
-    
+
     // Collision detection settings
     collision: {
       enabled: true,

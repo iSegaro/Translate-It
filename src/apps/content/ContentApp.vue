@@ -28,6 +28,7 @@
       :visible="icon.visible !== false"
       :target-element="icon.targetElement"
       :attachment-mode="icon.attachmentMode || 'smart'"
+      :positioning-mode="icon.positioningMode || 'absolute'"
       @click="onIconClick"
       @position-updated="onIconPositionUpdated"
     />
@@ -353,7 +354,8 @@ onMounted(async () => {
         position: detail.position,
         visible: detail.visible !== false,
         targetElement: detail.targetElement,
-        attachmentMode: detail.attachmentMode || 'smart'
+        attachmentMode: detail.attachmentMode || 'smart',
+        positioningMode: detail.positioningMode || 'absolute'
       });
       logger.debug('Active icons after adding:', activeIcons.value);
     }
@@ -388,8 +390,19 @@ onMounted(async () => {
       
       // Update the component directly
       const iconComponent = getIconRef(detail.id);
-      if (iconComponent && iconComponent.updatePosition) {
-        iconComponent.updatePosition(detail.position);
+      if (iconComponent) {
+        // Use immediate update for smooth following
+        if (iconComponent.updatePositionImmediate) {
+          iconComponent.updatePositionImmediate(detail.position);
+        } else if (iconComponent.updatePosition) {
+          iconComponent.updatePosition(detail.position);
+        }
+
+        // Enable smooth following if this is a smooth-scroll-follow event
+        // (We can detect this by checking if position updates are coming rapidly)
+        if (!iconComponent.isSmoothFollowing?.()) {
+          iconComponent.enableSmoothFollowing?.();
+        }
       }
     }
   });
@@ -399,14 +412,18 @@ onMounted(async () => {
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
       icon.visible = detail.visible;
-      
+
       // Update the component directly
       const iconComponent = getIconRef(detail.id);
       if (iconComponent) {
         if (detail.visible && iconComponent.show) {
           iconComponent.show();
+          // Re-enable smooth following when icon becomes visible again
+          iconComponent.enableSmoothFollowing?.();
         } else if (!detail.visible && iconComponent.hide) {
           iconComponent.hide();
+          // Disable smooth following when icon is hidden to save resources
+          iconComponent.disableSmoothFollowing?.();
         }
       }
     }
