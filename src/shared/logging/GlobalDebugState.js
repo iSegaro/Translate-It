@@ -22,19 +22,54 @@ const globalState = {
   debugOverride: false,
 
   // Component-specific log levels (copied from logger.js)
+  // Organized into logical categories and sorted alphabetically within each category.
   componentLogLevels: {
-    Background: 2, Core: 2, Content: 2,
-    UI: 2, Popup: 2, Sidepanel: 2, Options: 2,
-    Translation: 2, TTS: 2, ScreenCapture: 2,
-    ElementSelection: 3, TextSelection: 2, TextActions: 2,
-    TextFieldInteraction: 2, Notifications: 2, IFrame: 3,
-    Shortcuts: 2, Exclusion: 2, Subtitle: 2,
-    History: 2, Settings: 2, Windows: 2,
-    ContentApp: 3, Messaging: 2, Storage: 1,
-    Error: 2, Config: 2, Memory: 2,
-    Proxy: 2, Utils: 2, Browser: 2,
-    Text: 2, I18n: 2, Framework: 2, Legacy: 1,
-    Providers: 2, Capture: 2
+    // Core
+    Background: 2,
+    Content: 2,
+    Core: 2,
+
+    // UI
+    UI: 2,
+    Popup: 2,
+    Options: 2,
+    Sidepanel: 2,
+    ContentApp: 2,
+    
+    // Features
+    Windows: 2,
+    ElementSelection: 2,
+    TextFieldInteraction: 2,
+    TextActions: 2,
+    TextSelection: 2,
+    Translation: 2,
+    Shortcuts: 2,
+    Exclusion: 2,
+    Capture: 2,
+    ScreenCapture: 2,
+    Subtitle: 2,
+    TTS: 2,
+
+    // Services/Utilities
+    Browser: 2,
+    Config: 2,
+    Error: 2,
+    Framework: 2,
+    I18n: 2,
+    IFrame: 3,
+    Memory: 2,
+    Messaging: 2,
+    Notifications: 2,
+    Proxy: 2,
+    Providers: 2,
+    Text: 2,
+    Utils: 2,
+    
+    // Data/Configuration
+    History: 2,
+    Legacy: 1,
+    Settings: 2,
+    Storage: 1,
   },
 
   // Shared LRU cache for all loggers
