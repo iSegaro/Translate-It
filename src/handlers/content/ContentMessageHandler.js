@@ -20,8 +20,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // Enforce singleton pattern
     if (contentMessageHandlerInstance) {
-      const tempLogger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ContentMessageHandler');
-      // logger.trace('ContentMessageHandler singleton already exists, returning existing instance');
+            // logger.trace('ContentMessageHandler singleton already exists, returning existing instance');
       return contentMessageHandlerInstance;
     }
 
@@ -42,7 +41,7 @@ export class ContentMessageHandler extends ResourceTracker {
           try {
             const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
             this._errorHandler = ErrorHandler.getInstance();
-          } catch (error) {
+          } catch {
             // Fallback: create a simple error handler
             this._errorHandler = {
               handle: (err, context) => {
@@ -275,7 +274,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return false; // Message not handled
   }
 
-  async handleActivateSelectElementMode(message) {
+  async handleActivateSelectElementMode(/* message */) {
     // logger.trace(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
@@ -341,8 +340,7 @@ export class ContentMessageHandler extends ResourceTracker {
     if (this.selectElementManager) {
       // Check if this is from background (to avoid circular messaging)
       const fromBackground = message?.data?.fromBackground;
-      const excludeFrameId = message?.data?.excludeFrameId;
-      
+            
       // Check if this is an explicit deactivation request
       const isExplicitDeactivation = message?.data?.isExplicitDeactivation;
 
@@ -519,7 +517,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   // IFrame support handlers
-  async handleIFrameActivateSelectElement(data) {
+  async handleIFrameActivateSelectElement(/* data */) {
     this.logger.info('IFrame activate select element request');
     if (this.selectElementManager) {
       // Initialize if not already initialized
@@ -540,7 +538,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: true };
   }
 
-  async handleIFrameGetFrameInfo(data) {
+  async handleIFrameGetFrameInfo(/* data */) {
     this.logger.info('IFrame get frame info request');
     if (this.iFrameManager) {
       return { 
@@ -560,7 +558,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: false, error: 'Unsupported operation or manager not available' };
   }
 
-  async handleIFrameDetectTextFields(data) {
+  async handleIFrameDetectTextFields(/* data */) {
     this.logger.info('IFrame detect text fields request');
     // Basic text field detection
     const textFields = document.querySelectorAll('input[type="text"], textarea, input[type="email"], input[type="url"], input[type="search"]');
@@ -599,7 +597,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: false, error: 'IFrameManager not available' };
   }
 
-  async handleIFrameSyncResponse(data) {
+  async handleIFrameSyncResponse(/* data */) {
     this.logger.info('IFrame sync response');
     // Handle sync response - could be used for coordination
     return { success: true };

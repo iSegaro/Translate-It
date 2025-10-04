@@ -4,7 +4,6 @@
  */
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
-import { providerRegistry } from "@/features/translation/providers/ProviderRegistry.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -332,9 +331,7 @@ export class TranslationEngine {
     // Standard translation for non-streaming providers
     let result;
     try {
-      // Get abort controller for this translation
-      const abortController = messageId ? this.activeTranslations.get(messageId) : null;
-      
+            
       // Standard translation call
       
       result = await providerInstance.translate(

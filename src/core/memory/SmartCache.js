@@ -4,10 +4,10 @@
  */
 import { getMemoryManager } from './MemoryManager.js'
 import { MEMORY_TIMING } from './constants.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+// import { getScopedLogger } from '@/shared/logging/logger.js'
+// import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SmartCache')
+// const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SmartCache')
 
 class SmartCache extends Map {
   constructor(options = {}) {

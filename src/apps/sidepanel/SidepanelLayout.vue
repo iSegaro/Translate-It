@@ -68,7 +68,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelLayout');
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const translationStore = useTranslationStore()
-const { handleError } = useErrorHandler()
+useErrorHandler()
 
 // Template refs
 const mainContentRef = ref(null);

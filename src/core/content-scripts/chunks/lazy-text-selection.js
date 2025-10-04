@@ -29,7 +29,7 @@ export async function loadTextSelection() {
     // This function is kept for backward compatibility but should not create its own instance
 
     // Load WindowsConfig for text selection functionality
-    const { WindowsConfig } = await import('@/features/windows/managers/core/WindowsConfig.js');
+    await import('@/features/windows/managers/core/WindowsConfig.js');
 
     // Get the SelectionManager from the SimpleTextSelectionHandler if available
     let selectionManager = null;
@@ -37,7 +37,7 @@ export async function loadTextSelection() {
       const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
       const handler = SimpleTextSelectionHandler.getInstance();
       selectionManager = handler ? handler.selectionManager : null;
-    } catch (error) {
+    } catch {
       logger.debug('SimpleTextSelectionHandler not available, creating standalone SelectionManager');
 
       // Fallback: create standalone SelectionManager (without FeatureManager integration)

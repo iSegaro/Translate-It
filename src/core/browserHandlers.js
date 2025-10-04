@@ -42,7 +42,7 @@ export const isFirefox = () => {
  * @param {Object} handlerMappings - Handler mappings object to modify
  * @param {Object} Handlers - Available handlers object
  */
-export const addChromiumSpecificHandlers = (handlerMappings, Handlers) => {
+export const addChromiumSpecificHandlers = () => {
   if (isChromium()) {
     // OFFSCREEN_READY is needed in all Chromium-based browsers (Chrome, Edge, Opera, etc.)
     // Note: Already mapped in LifecycleManager, no need to add again
@@ -69,11 +69,11 @@ export const addFirefoxSpecificHandlers = () => {
  * @param {Object} handlerMappings - Handler mappings object to modify
  * @param {Object} Handlers - Available handlers object
  */
-export const addBrowserSpecificHandlers = (handlerMappings, Handlers) => {
+export const addBrowserSpecificHandlers = () => {
   logger.debug('🌐 Adding browser-specific handlers...');
 
-  addChromiumSpecificHandlers(handlerMappings, Handlers);
-  addFirefoxSpecificHandlers(handlerMappings, Handlers);
+  addChromiumSpecificHandlers();
+  addFirefoxSpecificHandlers();
 
   logger.debug('✅ Browser-specific handlers added');
 };

@@ -82,7 +82,7 @@ export class ShortcutHandler extends ResourceTracker {
   static destroyInstance() {
     if (shortcutHandlerInstance) {
       if (shortcutHandlerInstance.isActive) {
-        shortcutHandlerInstance.deactivate().catch(error => {
+        shortcutHandlerInstance.deactivate().catch(() => {
           // Error deactivating - logged at TRACE level for detailed debugging
           // getLogger().error('Error deactivating singleton instance:', error);
         });
@@ -376,12 +376,12 @@ export class ShortcutHandler extends ResourceTracker {
           // Translation handler unavailable - logged at TRACE level for detailed debugging
           // getLogger().error('Translation handler not available or missing method');
         }
-      }).catch(error => {
+      }).catch(() => {
         // Failed to load translation handler - logged at TRACE level for detailed debugging
         // getLogger().error('Failed to load translation handler:', error);
       });
       
-    } catch (error) {
+    } catch {
       // Error triggering translation - logged at TRACE level for detailed debugging
       // getLogger().error('Error triggering text field translation:', error);
     }
@@ -411,7 +411,7 @@ export class ShortcutHandler extends ResourceTracker {
               // Show translation window
               windowsManager.show(selectedText, position);
             }
-          }).catch(error => {
+          }).catch(() => {
             // Failed to activate WindowsManager - logged at TRACE level for detailed debugging
             // getLogger().error('Failed to activate WindowsManager:', error);
           });
@@ -439,7 +439,7 @@ export class ShortcutHandler extends ResourceTracker {
         // getLogger().warn('FeatureManager not available');
       }
 
-    } catch (error) {
+    } catch {
       // Error triggering selection translation - logged at TRACE level for detailed debugging
       // getLogger().error('Error triggering selection translation:', error);
     }
@@ -454,12 +454,12 @@ export class ShortcutHandler extends ResourceTracker {
           type: 'info',
           duration: 3000
         });
-      }).catch(error => {
+      }).catch(() => {
         // Could not show hint - logged at TRACE level for detailed debugging
         // getLogger().debug('Could not show shortcut hint:', error);
       });
       
-    } catch (error) {
+    } catch {
       // Error showing hint - logged at TRACE level for detailed debugging
       // getLogger().debug('Error showing shortcut hint:', error);
     }
@@ -505,7 +505,7 @@ export class ShortcutHandler extends ResourceTracker {
           results.push(result);
           // Legacy instance deactivated - logged at TRACE level for detailed debugging
           // getLogger().debug('✅ Legacy instance deactivated successfully');
-        } catch (error) {
+        } catch {
           // Failed to deactivate legacy instance - logged at TRACE level for detailed debugging
           // getLogger().error('❌ Failed to deactivate legacy instance:', error);
           results.push(false);

@@ -7,7 +7,7 @@
 const isDevelopment = (() => {
   try {
     return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-  } catch (e) {
+  } catch {
     // Fallback for extension environments
     return false;
   }

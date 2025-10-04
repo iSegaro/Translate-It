@@ -2,7 +2,10 @@
   <section class="languages-tab">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
     
-    <div v-if="!isLoaded" class="loading-message">
+    <div
+      v-if="!isLoaded"
+      class="loading-message"
+    >
       Loading languages...
     </div>
     <template v-else>

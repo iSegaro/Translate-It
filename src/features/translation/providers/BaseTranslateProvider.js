@@ -182,8 +182,7 @@ export class BaseTranslateProvider extends BaseProvider {
     // Create chunks based on provider strategy
     const chunks = this._createChunks(texts);
     const allResults = [];
-    let processedCount = 0;
-
+    
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       // Check for cancellation
       if (abortController && abortController.signal.aborted) {
@@ -219,7 +218,6 @@ export class BaseTranslateProvider extends BaseProvider {
           messageId
         );
 
-        processedCount += chunk.texts.length;
         // Streamed chunk progress
 
       } catch (error) {

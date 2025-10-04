@@ -248,7 +248,7 @@ class TranslationResultDispatcher {
 
     // Send back to original tab
     try {
-      const response = await browser.tabs.sendMessage(request.sender.tab.id, {
+      await browser.tabs.sendMessage(request.sender.tab.id, {
         action: MessageActions.TRANSLATION_RESULT_UPDATE,
         messageId,
         data: {
@@ -343,7 +343,7 @@ class TranslationModeCoordinator {
    * Process request based on mode
    */
   async processRequest(request, { translationEngine }) {
-    const { messageId, mode } = request;
+    const { mode } = request;
 
     // Update request status
     request.status = RequestStatus.PROCESSING;

@@ -379,7 +379,7 @@ export const initializeSettingsListener = async () => {
 
     // Setup listener through StorageManager event system
     // Note: StorageManager automatically handles caching, no manual cache management needed
-    const listener = (data) => {
+    const listener = () => {
       // Storage change detected - logged at TRACE level for detailed debugging
       // logger.debug(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
       // StorageManager handles cache updates automatically

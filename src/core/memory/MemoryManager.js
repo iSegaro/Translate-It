@@ -216,14 +216,12 @@ class MemoryManager {
 
     const elementListeners = this.eventListeners.get(element)
     const events = Array.from(elementListeners.keys())
-    let totalHandlers = 0
 
     logger.info(`Cleaning up ${events.length} event types for removed element: ${this.getElementDescription(element)}`)
 
     events.forEach(event => {
       const handlers = elementListeners.get(event)
-      const handlerCount = this.getHandlerSetSize(handlers)
-      totalHandlers += handlerCount
+      this.getHandlerSetSize(handlers)
       
       // Clean up each handler
       for (const handlerInfo of handlers) {

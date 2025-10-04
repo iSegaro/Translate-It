@@ -11,7 +11,7 @@ function getLogger() {
   if (!logger) {
     try {
       logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
-    } catch (error) {
+    } catch {
       // Fallback logger with proper formatting
       logger = {
         debug: (...args) => console.debug('[LazyFeatures]', ...args),
@@ -134,12 +134,13 @@ export async function loadFeature(featureName) {
     try {
       const handler = await getErrorHandler();
       if (handler) {
-        error = handler.handle(error, {
+        const processedError = handler.handle(error, {
           type: 'FEATURE',
           context: `loadFeature-${featureName}`
         });
+        throw processedError;
       }
-    } catch (handlerError) {
+    } catch {
       // Fallback to simple error if ErrorHandler is not available
       logger.warn('ErrorHandler not available, using simple error handling');
     }
@@ -175,7 +176,7 @@ async function loadTextSelectionFeature() {
           context: 'loadTextSelectionFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       // Fallback
       logger.error('Failed to load text selection feature:', error);
     }
@@ -208,7 +209,7 @@ async function loadWindowsManagerFeature() {
           context: 'loadWindowsManagerFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       // Fallback
       logger.error('Failed to load windows manager feature:', error);
     }
@@ -241,7 +242,7 @@ async function loadTextFieldIconFeature() {
           context: 'loadTextFieldIconFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       // Fallback
       logger.error('Failed to load text field icon feature:', error);
     }
@@ -266,7 +267,7 @@ async function loadContentMessageHandlerFeature() {
           context: 'loadContentMessageHandlerFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       logger.error('Failed to load ContentMessageHandler:', error);
     }
     throw error;
@@ -297,7 +298,7 @@ async function loadSelectElementFeature() {
           context: 'loadSelectElementFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       logger.error('Failed to load SelectElementManager:', error);
     }
     throw error;
@@ -331,7 +332,7 @@ async function loadShortcutFeature() {
           context: 'loadShortcutFeature'
         });
       }
-    } catch (handlerError) {
+    } catch {
       // Fallback
       logger.error('Failed to load shortcut feature:', error);
     }
@@ -401,7 +402,7 @@ export async function loadCoreFeatures() {
     logger.debug('About to call initializeAndActivateFeatures()');
     await initializeAndActivateFeatures();
     logger.debug('initializeAndActivateFeatures() completed');
-  } catch (error) {
+  } catch {
     // Fallback if ErrorHandler is not available
     logger.warn('ErrorHandler not available in loadCoreFeatures, using simple error handling');
 
@@ -607,39 +608,30 @@ export async function loadFeatures(contentCore) {
   }
 }
 
-async function setupAdditionalSystems() {
-  const logger = getLogger();
-  try {
-    // Load memory management if needed
-    if (isDevelopmentMode()) {
-      const { startMemoryMonitoring } = await import('@/core/memory/MemoryMonitor.js');
-      startMemoryMonitoring();
-    }
+// async function setupAdditionalSystems() {
+  //   const logger = getLogger();
+//   try {
+//     // Load memory management if needed
+//     if (isDevelopmentMode()) {
+//       const { startMemoryMonitoring } = await import('@/core/memory/MemoryMonitor.js');
+//       startMemoryMonitoring();
+//     }
 
-    // Load notification system
-    const { default: NotificationManager } = await import('@/core/managers/core/NotificationManager.js');
-    // Initialize if needed
+//     // Load notification system
+//     await import('@/core/managers/core/NotificationManager.js');
 
-    // Load iframe support
-    const { IFrameSupportFactory } = await import('@/features/iframe-support/IFrameSupportFactory.js');
-    const iFrameCore = await IFrameSupportFactory.getIFrameManager();
-    // Store reference if needed
+//     // Load iframe support
+//     const { IFrameSupportFactory } = await import('@/features/iframe-support/IFrameSupportFactory.js');
+//     void IFrameSupportFactory.getIFrameManager();
 
-    logger.debug('Additional systems setup complete');
+//     logger.debug('Additional systems setup complete');
 
-  } catch (error) {
-    logger.warn('Failed to setup additional systems:', error);
-    // Non-critical, continue without these systems
-  }
-}
+//   } catch (error) {
+//     logger.warn('Failed to setup additional systems:', error);
+//     // Non-critical, continue without these systems
+//   }
+// }
 
-function isDevelopmentMode() {
-  try {
-    return process.env.NODE_ENV === 'development';
-  } catch {
-    return false;
-  }
-}
 
 // Get feature manager instance
 export function getFeatureManager() {

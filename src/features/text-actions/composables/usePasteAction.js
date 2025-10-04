@@ -21,7 +21,7 @@ function getLogger() {
           init: () => {}
         };
       }
-    } catch (error) {
+    } catch {
       // Fallback to noop logger
       logger = {
         debug: () => {},

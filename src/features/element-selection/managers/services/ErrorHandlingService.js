@@ -21,7 +21,7 @@ export class ErrorHandlingService extends ResourceTracker {
           try {
             const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
             this._errorHandler = ErrorHandler.getInstance();
-          } catch (error) {
+          } catch {
             // Fallback: create a simple error handler
             this._errorHandler = {
               handle: (err, context) => {

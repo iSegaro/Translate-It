@@ -130,7 +130,7 @@ class GlobalCleanup {
         return false
       }
       return true
-    } catch (error) {
+    } catch {
       // logger.trace('Extension context check failed:', error);
       return true
     }

@@ -12,8 +12,7 @@
 import { LOG_LEVELS } from './logConstants.js';
 import {
   getGlobalDebugState,
-  setGlobalDebugOverride,
-  getGlobalLogLevel,
+    getGlobalLogLevel,
   setGlobalLogLevel,
   getComponentLogLevel,
   setComponentLogLevel,
@@ -30,7 +29,7 @@ import {
 const isDevelopment = (() => {
   try {
     return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-  } catch (e) {
+  } catch {
     // Fallback for extension environments
     return false;
   }
@@ -53,10 +52,10 @@ function __getLoggerCache() {
   return g.__TRANSLATE_IT__.__LOGGER_CACHE;
 }
 // (Devtools helper removed for production cleanliness)
-const __initialComponentLevels = (() => {
+(() => {
   try {
     return { ...getGlobalDebugState().componentLogLevels };
-  } catch (e) {
+  } catch {
     // Fallback for initialization order issues
     return {};
   }

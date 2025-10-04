@@ -177,7 +177,7 @@ class LifecycleManager {
     };
     
     // Add browser-specific handlers
-    addBrowserSpecificHandlers(handlerMappings, Handlers);
+    addBrowserSpecificHandlers();
     
     // Validate handler mappings
     this.validateHandlerMappings(handlerMappings);
@@ -301,7 +301,7 @@ class LifecycleManager {
       } catch (fallbackError) {
         logger.error("❌ [LifecycleManager] Fallback context menu initialization also failed:", fallbackError);
         // Try one more direct approach
-        await this.createContextMenuDirectly(locale);
+        await this.createContextMenuDirectly();
       }
     }
   }
@@ -309,12 +309,11 @@ class LifecycleManager {
   /**
    * Direct context menu creation as ultimate fallback
    */
-  async createContextMenuDirectly(locale) {
+  async createContextMenuDirectly() {
     try {
       logger.info("[LifecycleManager] Attempting direct context menu creation...");
 
       const browser = await import("webextension-polyfill");
-      const { getTranslationString } = await import('@/utils/i18n/i18n.js');
 
       // Clear existing menus
       await browser.contextMenus.removeAll();

@@ -35,7 +35,7 @@ export async function loadWindowsManager() {
       const featureManager = FeatureManager.getInstance();
       const handler = featureManager.getFeatureHandler('windowsManager');
       manager = handler ? handler.getWindowsManager() : null;
-    } catch (error) {
+    } catch {
       logger.debug('WindowsManagerHandler not available, creating standalone WindowsManager');
 
       // Fallback: create standalone WindowsManager
