@@ -1,4 +1,4 @@
-#### v1.4.2 – Released X on X, 2025
+#### v1.4.2 – Released October on 06, 2025
 
 ##### Fixed
 
