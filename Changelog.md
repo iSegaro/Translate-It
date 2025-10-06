@@ -1,3 +1,12 @@
+#### v1.4.2 – Released X on X, 2025
+
+##### Fixed
+
+- Fixed console logs appearing in production environment
+- Fixed icon display position in text fields
+
+---
+
 #### v1.4.0 – Released October on 04, 2025
 
 ##### Added
