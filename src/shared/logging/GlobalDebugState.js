@@ -57,7 +57,7 @@ const globalState = {
     Error: 2,
     Framework: 2,
     I18n: 2,
-    IFrame: 3,
+    IFrame: 2,
     Memory: 2,
     Messaging: 2,
     Notifications: 2,
