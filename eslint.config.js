@@ -43,6 +43,9 @@ export default [
         ...globals.browser,
         ...globals.webextensions,
         defineExpose: "readonly",
+        __IS_DEVELOPMENT__: "readonly",
+        __IS_PRODUCTION__: "readonly",
+        __BROWSER__: "readonly",
       },
     },
     plugins: {
@@ -81,6 +84,9 @@ export default [
         ...globals.webextensions,
         ...globals.serviceworker,
         ...globals.node, // For process, etc.
+        __IS_DEVELOPMENT__: "readonly",
+        __IS_PRODUCTION__: "readonly",
+        __BROWSER__: "readonly",
       },
     },
     rules: {
