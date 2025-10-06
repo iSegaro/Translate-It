@@ -1,4 +1,13 @@
-#### v1.4.0 – Released October on 04, 2025
+#### v1.4.2 – Released on October 06, 2025
+
+##### Fixed
+
+- Fixed console logs appearing in production environment
+- Fixed icon display position in text fields
+
+---
+
+#### v1.4.0 – Released on October 04, 2025
 
 ##### Added
 
@@ -15,7 +24,7 @@
 
 ---
 
-#### v1.3.2 – Released September on 25, 2025
+#### v1.3.2 – Released on September 25, 2025
 
 ##### Fixed
 
@@ -24,7 +33,7 @@
 
 ---
 
-#### v1.3.0 – Released September on 25, 2025
+#### v1.3.0 – Released on September  25, 2025
 
 ##### Added
 
@@ -179,7 +188,7 @@
 ---
 
 
-#### v0.6.5 – Released on 2 July 2025
+#### v0.6.5 – Released on 02 July 2025
 
 
 ##### Added
@@ -198,7 +207,7 @@
 
 ---
 
-#### v0.6.0 – Released on 1 July 2025
+#### v0.6.0 – Released on 01 July 2025
 
 
 ##### Added
@@ -367,7 +376,7 @@
 
 ---
 
-#### v0.1.1 - Released 6 May 2025
+#### v0.1.1 - Released 06 May 2025
 
 
 - Updated the build process and added a lint check

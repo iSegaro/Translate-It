@@ -60,6 +60,7 @@ export class PositionCalculator {
       tag: element.tagName,
       isMultiline,
       positioningMode,
+      preferredPlacement: options.preferredPlacement,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       viewport: { width: viewport.width, height: viewport.height }
     });
@@ -78,8 +79,8 @@ export class PositionCalculator {
       return this.getFallbackPosition(rect, iconSize, positioningMode);
     }
 
-    // Select best position based on priority
-    const bestPosition = this.selectBestPosition(validPositions);
+    // Select best position based on priority and preferred placement
+    const bestPosition = this.selectBestPosition(validPositions, options.preferredPlacement);
 
     // Convert to absolute positioning if needed
     if (positioningMode === 'absolute') {
@@ -264,16 +265,26 @@ export class PositionCalculator {
   /**
    * Select the best position from valid candidates
    * @param {Array} validPositions - Array of valid positions
+   * @param {string} preferredPlacement - Preferred placement strategy
    * @returns {Object} Best position
    */
-  static selectBestPosition(validPositions) {
+  static selectBestPosition(validPositions, preferredPlacement = null) {
     if (validPositions.length === 1) {
       return validPositions[0];
     }
 
+    // If preferred placement is specified and valid, use it
+    if (preferredPlacement) {
+      const preferredPosition = validPositions.find(pos => pos.placement === preferredPlacement);
+      if (preferredPosition) {
+        this.logger.debug('Using preferred placement:', preferredPlacement);
+        return preferredPosition;
+      }
+    }
+
     // Sort by priority (lower number = higher priority)
     validPositions.sort((a, b) => a.priority - b.priority);
-    
+
     return validPositions[0];
   }
 
