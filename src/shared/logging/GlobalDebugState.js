@@ -4,14 +4,15 @@
  */
 
 // Development environment detection - extension compatible
-const isDevelopment = (() => {
-  try {
-    return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-  } catch {
-    // Fallback for extension environments
-    return false;
-  }
-})();
+const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPMENT__ :
+  (() => {
+    try {
+      return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
+    } catch {
+      // Fallback for extension environments
+      return false;
+    }
+  })();
 
 // Global state shared by all logger instances
 const globalState = {

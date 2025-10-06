@@ -25,15 +25,16 @@ import {
   resetPerformanceStats
 } from './GlobalDebugState.js';
 
-// Development environment detection - extension compatible
-const isDevelopment = (() => {
-  try {
-    return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-  } catch {
-    // Fallback for extension environments
-    return false;
-  }
-})();
+// Development environment detection - use Vite's build-time constant
+const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPMENT__ :
+  (() => {
+    try {
+      return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
+    } catch {
+      // Fallback for extension environments
+      return false;
+    }
+  })();
 
 // (Component log levels moved to GlobalDebugState.js)
 
@@ -191,9 +192,21 @@ const BATCH_DELAY = 100; // Batch logs within 100ms
 function processLogBatch() {
   if (logBatch.length === 0) return;
 
+  // Filter logs based on environment and level
+  const filteredLogs = logBatch.filter(log =>
+    isDevelopment || log.levelNum <= LOG_LEVELS.WARN
+  );
+
+  if (filteredLogs.length === 0) {
+    // Clear batch and return if no logs to show
+    logBatch.length = 0;
+    batchTimeout = null;
+    return;
+  }
+
   // Group by component and level for better readability
   const groupedLogs = {};
-  for (const log of logBatch) {
+  for (const log of filteredLogs) {
     const key = `${log.component}:${log.level}`;
     if (!groupedLogs[key]) {
       groupedLogs[key] = [];
@@ -245,6 +258,11 @@ function getConsoleMethod(level) {
  * Add log to batch
  */
 function batchLog(component, level, levelNum, message, data) {
+  // In production, only batch ERROR and WARN logs
+  if (!isDevelopment && levelNum > LOG_LEVELS.WARN) {
+    return; // Skip INFO and DEBUG logs in production
+  }
+
   logBatch.push({ component, level, levelNum, message, data, timestamp: Date.now() });
 
   if (!batchTimeout) {
@@ -278,7 +296,7 @@ export function createLogger(component, subComponent = null) {
       const ERROR_LEVEL = 0; // LOG_LEVELS.ERROR
       if (shouldLog(component, ERROR_LEVEL) && passesRuntimeFilter(loggerName, ERROR_LEVEL, message)) {
         // Use batching for non-error logs in production
-        if (process.env.NODE_ENV === 'production' && !data?.isImmediate) {
+        if (!isDevelopment && !data?.isImmediate) {
           batchLog(loggerName, 'error', ERROR_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, ERROR_LEVEL, message, data);
@@ -291,7 +309,7 @@ export function createLogger(component, subComponent = null) {
       const WARN_LEVEL = 1; // LOG_LEVELS.WARN
       if (shouldLog(component, WARN_LEVEL) && passesRuntimeFilter(loggerName, WARN_LEVEL, message)) {
         // Use batching in production for non-critical warns
-        if (process.env.NODE_ENV === 'production' && !data?.isImmediate) {
+        if (!isDevelopment && !data?.isImmediate) {
           batchLog(loggerName, 'warn', WARN_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, WARN_LEVEL, message, data);
@@ -304,7 +322,7 @@ export function createLogger(component, subComponent = null) {
       const INFO_LEVEL = 2; // LOG_LEVELS.INFO
       if (shouldLog(component, INFO_LEVEL) && passesRuntimeFilter(loggerName, INFO_LEVEL, message)) {
         // Use batching in production for non-critical info
-        if (process.env.NODE_ENV === 'production' && !data?.isImmediate) {
+        if (!isDevelopment && !data?.isImmediate) {
           batchLog(loggerName, 'info', INFO_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
@@ -317,7 +335,7 @@ export function createLogger(component, subComponent = null) {
       const DEBUG_LEVEL = 3; // LOG_LEVELS.DEBUG
       if (shouldLog(component, DEBUG_LEVEL) && passesRuntimeFilter(loggerName, DEBUG_LEVEL, message)) {
         // Always batch debug logs in production
-        if (process.env.NODE_ENV === 'production') {
+        if (!isDevelopment) {
           batchLog(loggerName, 'debug', DEBUG_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, DEBUG_LEVEL, message, data);
