@@ -56,17 +56,28 @@ export class ElementAttachment extends ResourceTracker {
       elementTag: this.targetElement.tagName
     });
 
-    // Store initial element position
+    // Store initial element position and calculate initial icon position
     this.updateElementRect();
     this.updateViewportInfo();
-    
+
+    // Calculate and store initial position to maintain consistency
+    const initialPosition = PositionCalculator.calculateOptimalPosition(
+      this.targetElement,
+      null,
+      {
+        checkCollisions: true,
+        positioningMode: this.positioningMode
+      }
+    );
+    this.lastIconPosition = initialPosition;
+
     // Setup observers and listeners
     this.setupResizeObserver();
     this.setupIntersectionObserver();
     this.setupSmoothScrollFollowing();
-    
+
     this.isAttached = true;
-    this.logger.debug('ElementAttachment attached successfully');
+    this.logger.debug('ElementAttachment attached successfully with initial placement:', initialPosition.placement);
   }
 
   /**
@@ -224,12 +235,14 @@ export class ElementAttachment extends ResourceTracker {
 
     try {
       // Calculate new optimal position with high precision
+      // IMPORTANT: Use checkCollisions: true to maintain consistent placement with initial position
       const newPosition = PositionCalculator.calculateOptimalPosition(
         this.targetElement,
         null, // Use default icon size
         {
-          checkCollisions: false, // Skip collision detection for performance during scroll
-          positioningMode: this.positioningMode
+          checkCollisions: true, // Keep collision detection to maintain consistent placement
+          positioningMode: this.positioningMode,
+          preferredPlacement: this.lastIconPosition?.placement // Prefer current placement
         }
       );
 
@@ -239,7 +252,7 @@ export class ElementAttachment extends ResourceTracker {
         this.updateElementRect();
         this.updateViewportInfo();
 
-        
+
         // Notify the icon component to update immediately
         this.notifyIconUpdate({
           position: newPosition,
