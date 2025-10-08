@@ -127,6 +127,8 @@ class LifecycleManager {
       'TTS_SPEAK': Handlers.handleTTSSpeakLazy,
       'TTS_STOP': Handlers.handleTTSStopLazy,
       'OFFSCREEN_READY': Handlers.handleOffscreenReadyLazy,
+      'clearTTSHandlerCache': Handlers.clearTTSHandlerCache,
+      'getTTSHandlerStats': Handlers.getTTSHandlerStats,
       
       // Element selection handlers - Lazy loaded for better performance
       'activateSelectElementMode': Handlers.handleActivateSelectElementModeLazy,
