@@ -173,6 +173,28 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.selectionTimeout = null;
       }
 
+      // Clean up Shift+Click event listeners and timeouts
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      // Clean up mouse up timers and animation frames
+      if (this._mouseUpTimeout) {
+        clearTimeout(this._mouseUpTimeout);
+        this._mouseUpTimeout = null;
+      }
+
+      if (this._mouseUpAnimationFrame) {
+        cancelAnimationFrame(this._mouseUpAnimationFrame);
+        this._mouseUpAnimationFrame = null;
+      }
+
       // Clean up settings listeners
       this._settingsListeners.forEach(unsubscribe => {
         if (unsubscribe) unsubscribe();
@@ -614,11 +636,59 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       // Set global flag for WindowsManager to check
       window.translateItShiftClickOperation = true;
 
-      // Auto-reset after 2 seconds
-      setTimeout(() => {
-        this.isInShiftClickOperation = false;
-        window.translateItShiftClickOperation = false;
-      }, 2000);
+      // Clean up previous shift key release handler if exists
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      // Clean up previous fallback timeout if exists
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      // Set up event-based Shift key release detection
+      this._shiftKeyReleaseHandler = (event) => {
+        if (event.key === 'Shift' && this.isInShiftClickOperation) {
+          this.isInShiftClickOperation = false;
+          this.shiftKeyPressed = false;
+          window.translateItShiftClickOperation = false;
+
+          // Clean up event listener
+          document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+          this._shiftKeyReleaseHandler = null;
+
+          // Clean up fallback timeout
+          if (this._shiftKeyTimeout) {
+            clearTimeout(this._shiftKeyTimeout);
+            this._shiftKeyTimeout = null;
+          }
+
+          logger.debug('Shift key released via event listener');
+        }
+      };
+
+      // Add event listener with capture for immediate response
+      document.addEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+
+      // Fallback timeout as backup (reduced from 2s to 1.5s)
+      this._shiftKeyTimeout = setTimeout(() => {
+        if (this.isInShiftClickOperation) {
+          this.isInShiftClickOperation = false;
+          this.shiftKeyPressed = false;
+          window.translateItShiftClickOperation = false;
+
+          // Clean up event listener if still exists
+          if (this._shiftKeyReleaseHandler) {
+            document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+            this._shiftKeyReleaseHandler = null;
+          }
+
+          this._shiftKeyTimeout = null;
+          logger.debug('Shift key state reset via fallback timeout');
+        }
+      }, 1500);
     }
   }
 
@@ -631,10 +701,24 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this.ctrlKeyPressed = false;
       logger.debug('Ctrl key released');
     }
-    if (!event.shiftKey) {
+    if (!event.shiftKey && this.isInShiftClickOperation) {
       this.shiftKeyPressed = false;
       this.isInShiftClickOperation = false;
       window.translateItShiftClickOperation = false;
+
+      // Clean up event listener if it exists (prevent duplicate cleanup)
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      // Clean up fallback timeout
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      logger.debug('Shift key released via keyup handler');
     }
   }
 
@@ -699,16 +783,35 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     // End drag detection
     this.isDragging = false;
 
-    // Process selection after drag ends with longer delay for Shift+Click
-    const delay = wasShiftClick ? 150 : 50; // Longer delay for Shift+Click to allow browser to complete selection
-    setTimeout(() => {
-       const selection = window.getSelection();
-       if (selection && selection.toString().trim()) {
-       logger.debug('Processing selection after drag end', { wasShiftClick });
-       this.processSelection();
-       }
-       }, delay);
+    // Clean up any previous mouse up timeout
+    if (this._mouseUpTimeout) {
+      clearTimeout(this._mouseUpTimeout);
+      this._mouseUpTimeout = null;
+    }
 
+    // Clean up any previous animation frame
+    if (this._mouseUpAnimationFrame) {
+      cancelAnimationFrame(this._mouseUpAnimationFrame);
+      this._mouseUpAnimationFrame = null;
+    }
+
+    // Use requestAnimationFrame for better performance and visual consistency
+    // Then use setTimeout as a fallback to ensure selection processing
+    const delay = wasShiftClick ? 150 : 50; // Longer delay for Shift+Click to allow browser to complete selection
+
+    this._mouseUpAnimationFrame = requestAnimationFrame(() => {
+      this._mouseUpTimeout = setTimeout(() => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          logger.debug('Processing selection after drag end', { wasShiftClick });
+          this.processSelection();
+        }
+
+        // Clean up references
+        this._mouseUpTimeout = null;
+        this._mouseUpAnimationFrame = null;
+      }, delay);
+    });
   }
 
   /**
