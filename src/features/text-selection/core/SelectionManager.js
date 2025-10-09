@@ -194,9 +194,40 @@ export class SelectionManager extends ResourceTracker {
   }
 
   /**
+   * Check if windowsManager should be allowed to operate
+   */
+  async shouldProcessWindowsManager() {
+    if (!this.featureManager) {
+      this.logger.debug('FeatureManager not available for WindowsManager check');
+      return false;
+    }
+
+    try {
+      const exclusionChecker = this.featureManager.exclusionChecker;
+      if (!exclusionChecker) {
+        this.logger.debug('ExclusionChecker not available');
+        return false;
+      }
+
+      const allowed = await exclusionChecker.isFeatureAllowed('windowsManager');
+      this.logger.debug(`WindowsManager check: ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
+      return allowed;
+    } catch (error) {
+      this.logger.error('Error checking WindowsManager permission:', error);
+      return false;
+    }
+  }
+
+  /**
    * Show translation UI (icon or window based on settings)
    */
   async showTranslationUI(selectedText, position) {
+    // Check if WindowsManager should be allowed
+    if (!(await this.shouldProcessWindowsManager())) {
+      this.logger.info('WindowsManager is blocked by exclusion, skipping translation UI');
+      return;
+    }
+
     const windowsManager = this.getWindowsManager();
 
     if (windowsManager) {
@@ -208,18 +239,18 @@ export class SelectionManager extends ResourceTracker {
         hasShowMethod: typeof windowsManager.show === 'function'
       });
 
-    // Show translation UI
-    this.logger.info('Translation UI requested', {
-      textLength: selectedText.length,
-      position: {
-        x: Math.round(position.x),
-        y: Math.round(position.y)
-      },
-      context: windowsManager ? 'main-frame' : 'iframe'
-    });
+      // Show translation UI
+      this.logger.info('Translation UI requested', {
+        textLength: selectedText.length,
+        position: {
+          x: Math.round(position.x),
+          y: Math.round(position.y)
+        },
+        context: windowsManager ? 'main-frame' : 'iframe'
+      });
 
-    await windowsManager.show(selectedText, position);
-    this.logger.debug('WindowsManager.show() completed');
+      await windowsManager.show(selectedText, position);
+      this.logger.debug('WindowsManager.show() completed');
 
     } else if (window !== window.top) {
       // Iframe - request window creation in main frame
