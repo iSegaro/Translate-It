@@ -95,7 +95,6 @@ export class WindowsManager extends ResourceTracker {
     this._isInShiftClickOperation = false;
 
     // Event handler references
-    this._inputHandler = null;
     this._iconClickHandler = null;
     
     // External dependencies
@@ -470,131 +469,9 @@ export class WindowsManager extends ResourceTracker {
     // Use passive event listener for better performance
     document.addEventListener('click', this._dismissHandler, { capture: false, passive: true });
 
-    // Add input event listener specifically for text field typing when in icon mode
-    if (this.state.isIconMode) {
-      this._inputHandler = (event) => {
-        // Only handle input events on text fields
-        const target = event.target;
-        if (this.isTextFieldElement(target)) {
-          // Only handle input events (actual text changes)
-          if (event.type !== 'input') {
-            return;
-          }
-
-          // Debounce rapid successive input events
-          const currentTime = Date.now();
-          if (currentTime - this._lastInputTime < this._inputDebounceDelay) {
-            return;
-          }
-          this._lastInputTime = currentTime;
-
-          this.logger.debug('Input detected in text field - dismissing icon', {
-            target: target?.tagName,
-            targetType: target?.type || 'contenteditable',
-            eventType: event.type
-          });
-
-          // Don't prevent default - let the key be processed normally
-          // We just need to dismiss the icon and ensure focus stays
-
-          // Store the active element before dismissing
-          const elementToRefocus = target;
-
-          // Remove listeners first to prevent multiple dismissals
-          this._removeDismissListener();
-
-          // Set flag to prevent multiple dismissals from other components
-          this._isDismissingDueToTyping = true;
-
-          // Use microtask for immediate response
-          Promise.resolve().then(() => {
-            // Store the element reference for focus restoration
-            const element = elementToRefocus;
-
-            // Set flag to preserve selection during dismissal
-            const wasPreservingSelection = this._preserveSelectionForTyping;
-            this._preserveSelectionForTyping = true;
-
-            // Dismiss the icon without clearing selection and without animation
-            this.dismiss(false, true);
-
-            // Use microtask again to ensure DOM is ready
-            Promise.resolve().then(() => {
-              // Restore focus to the text field after dismissal
-              if (element && element.isConnected && typeof element.focus === 'function') {
-                try {
-                  element.focus();
-                  this.logger.debug('Focus restored to text field after typing dismissal');
-                } catch (focusError) {
-                  this.logger.warn('Failed to restore focus to text field', focusError);
-                }
-              }
-
-              // Restore the flag after all operations
-              this._preserveSelectionForTyping = wasPreservingSelection;
-
-              // Clear the typing dismissal flag
-              this._isDismissingDueToTyping = false;
-            });
-          });
-        }
-      };
-
-      // Listen for input events with higher priority to catch typing early
-      // Use capture phase to intercept before other handlers
-      document.addEventListener('input', this._inputHandler, { capture: true, passive: false });
-
-      // Also listen for keydown events as backup
-      this._keydownHandler = (event) => {
-        const target = event.target;
-        if (this.isTextFieldElement(target) && this.state.isIconMode) {
-          // Only handle actual typing keys (letters, numbers, space, backspace, delete)
-          const isTypingKey = event.key.length === 1 ||
-                            ['Backspace', 'Delete', 'Enter', 'Tab'].includes(event.key) ||
-                            (event.key.length > 1 && event.key.startsWith('Arrow'));
-
-          if (isTypingKey) {
-            this.logger.debug('Typing key detected in text field', { key: event.key });
-
-            // Set typing flag immediately
-            this._isDismissingDueToTyping = true;
-            this._preserveSelectionForTyping = true;
-
-            // Store element for focus restoration
-            const elementToRefocus = target;
-
-            // Schedule dismiss with focus preservation
-            Promise.resolve().then(() => {
-              this.dismiss(false, true);
-
-              // Restore focus
-              Promise.resolve().then(() => {
-                if (elementToRefocus && elementToRefocus.isConnected && typeof elementToRefocus.focus === 'function') {
-                  try {
-                    elementToRefocus.focus();
-                    this.logger.debug('Focus restored after keydown dismiss');
-                  } catch (focusError) {
-                    this.logger.warn('Failed to restore focus after keydown dismiss', focusError);
-                  }
-                }
-
-                // Clear flags
-                this._isDismissingDueToTyping = false;
-                this._preserveSelectionForTyping = false;
-              });
-            });
-          }
-        }
-      };
-
-      document.addEventListener('keydown', this._keydownHandler, { capture: true, passive: false });
-
-      // Add debouncing for rapid successive input events
-      this._lastInputTime = 0;
-      this._inputDebounceDelay = 50; // Reduced delay for faster response
-
-      this.logger.debug('Added enhanced text field input listeners with focus preservation');
-    }
+    // Simplified approach: text field typing is now handled directly in dismiss logic
+    // This prevents icon dismissal interference with text field focus
+    this.logger.debug('Text field protection enabled via dismiss logic');
 
     // Also add Escape key listener for better UX
     this._escapeKeyHandler = (event) => {
@@ -620,16 +497,6 @@ export class WindowsManager extends ResourceTracker {
     if (this._dismissHandler) {
       document.removeEventListener('click', this._dismissHandler, { capture: false });
       this._dismissHandler = null;
-    }
-
-    if (this._inputHandler) {
-      document.removeEventListener('input', this._inputHandler, { capture: true });
-      this._inputHandler = null;
-    }
-
-    if (this._keydownHandler) {
-      document.removeEventListener('keydown', this._keydownHandler, { capture: true });
-      this._keydownHandler = null;
     }
 
     if (this._escapeKeyHandler) {
@@ -1271,9 +1138,9 @@ export class WindowsManager extends ResourceTracker {
    * @param {boolean} preserveSelection - Whether to preserve text selection (for icon->window transitions)
    */
   async dismiss(withFadeOut = true, preserveSelection = false) {
-    // Track dismissal attempts to prevent duplicates
+    // Track dismissal attempts to prevent duplicates (optimized for responsiveness)
     const now = Date.now();
-    if (this._lastDismissTime && (now - this._lastDismissTime) < 100) {
+    if (this._lastDismissTime && (now - this._lastDismissTime) < 25) {
       return;
     }
     this._lastDismissTime = now;
@@ -1356,7 +1223,7 @@ export class WindowsManager extends ResourceTracker {
 
     // Check if the dismiss is happening in a text field context
     const activeElement = document.activeElement;
-    const isInTextField = activeElement && this.isTextFieldElement(activeElement);
+    const isInTextField = activeElement && activeElement.isConnected && this.isTextFieldElement(activeElement);
 
     const shouldClearSelection = this.state.isIconMode &&
                                ExtensionContextManager.isValidSync() &&
@@ -1603,7 +1470,6 @@ export class WindowsManager extends ResourceTracker {
     this._isInShiftClickOperation = false;
 
     // Clean up event handler references
-    this._inputHandler = null;
     this._iconClickHandler = null;
     this._dismissHandler = null;
     this._escapeKeyHandler = null;
