@@ -15,32 +15,6 @@ import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
 import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 
-/**
- * Visibility management utility class
- * Centralizes visibility logic for different update reasons
- */
-class VisibilityManager {
-  /**
-   * Determine if icon should be visible based on update reason
-   * @param {string} reason - Update reason (e.g., 'smooth-scroll-follow', 'viewport-exit')
-   * @param {boolean} visible - Current visibility state
-   * @returns {boolean} Effective visibility state
-   */
-  static shouldKeepVisible(reason, visible) {
-    // Smooth follow always keeps icon visible
-    if (reason === 'smooth-scroll-follow') {
-      return true;
-    }
-
-    // Respect viewport visibility changes
-    if (reason?.startsWith('viewport-')) {
-      return visible;
-    }
-
-    // Default behavior for all other cases
-    return visible;
-  }
-}
 
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
@@ -551,28 +525,33 @@ export class TextFieldIconManager extends ResourceTracker {
   handleIconUpdate(updateData) {
     const { iconId, position, visible, reason } = updateData;
 
-    this.logger.debug('Received icon update:', {
-      iconId,
-      reason,
-      visible,
-      placement: position?.placement
-    });
+    // Handle scroll dismissal immediately
+    if (updateData.dismiss && reason === 'scroll-started') {
+      // Find and remove the icon
+      for (const [element, iconData] of this.activeIcons.entries()) {
+        if (iconData.id === iconId) {
+          this.cleanupElement(element);
+          break;
+        }
+      }
 
-    // Use VisibilityManager to determine effective visibility
-    const effectiveVisible = VisibilityManager.shouldKeepVisible(reason, visible);
+      return;
+    }
 
-    // Emit update event to UI Host
+    // Emit position update events
     if (position) {
       pageEventBus.emit('update-field-icon-position', {
         id: iconId,
         position,
-        visible: effectiveVisible !== false
+        visible: visible !== false
       });
-    } else if (visible !== undefined && reason !== 'smooth-scroll-follow') {
-      // Emit visibility changes for viewport events and other non-follow events
+    }
+
+    // Also emit visibility changes if explicitly provided
+    if (visible !== undefined) {
       pageEventBus.emit('update-field-icon-visibility', {
         id: iconId,
-        visible: effectiveVisible
+        visible: visible
       });
     }
   }
