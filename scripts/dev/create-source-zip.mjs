@@ -38,7 +38,7 @@ const sourceFilesAndDirs = [
   "package.json",
   "pnpm-lock.yaml",
   "Privacy.md",
-  "Prompt.md",
+  "CLAUDE.md",
   "README.md",
   "README_FARSI.md",
 ];
