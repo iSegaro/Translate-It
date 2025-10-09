@@ -194,7 +194,7 @@ export default class EventCoordinator {
     
     // Check for input elements
     if (tagName === 'input') {
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
+      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number'];
       return !type || textTypes.includes(type);
     }
     

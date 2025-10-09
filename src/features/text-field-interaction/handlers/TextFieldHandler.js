@@ -266,7 +266,7 @@ export class TextFieldHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
+      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number'];
       return textTypes.includes(type);
     }
 

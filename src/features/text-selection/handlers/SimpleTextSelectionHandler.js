@@ -389,7 +389,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Skip if selection is in a text field (handled by TextFieldDoubleClickHandler)
       if (this.isSelectionInTextField()) {
-        logger.debug('Selection in text field, skipping (handled by TextFieldDoubleClickHandler)');
+        logger.debug('Selection in text field, skipping (handled by TextFieldDoubleClickHandler)', {
+          activeElement: document.activeElement?.tagName,
+          activeElementType: document.activeElement?.type,
+          selectionText: selectedText.substring(0, 20)
+        });
         return;
       }
 
@@ -527,7 +531,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
+      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number'];
       return textTypes.includes(type);
     }
 
