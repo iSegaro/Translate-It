@@ -162,13 +162,12 @@ async function loadTextSelectionFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('textSelection');
-    logger.info(`🔍 TextSelection should activate: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate text selection through FeatureManager
       await featureManager.activateFeature('textSelection');
     } else {
-      logger.info('❌ TextSelection is blocked by exclusion, skipping activation');
+      logger.debug('TextSelection is blocked by exclusion, skipping activation');
       return null;
     }
 
@@ -204,13 +203,12 @@ async function loadWindowsManagerFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('windowsManager');
-    logger.info(`🔍 WindowsManager should activate: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate WindowsManager through FeatureManager
       await featureManager.activateFeature('windowsManager');
     } else {
-      logger.info('❌ WindowsManager is blocked by exclusion, skipping activation');
+      logger.debug('WindowsManager is blocked by exclusion, skipping activation');
       return null;
     }
 
@@ -246,13 +244,12 @@ async function loadTextFieldIconFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('textFieldIcon');
-    logger.info(`🔍 TextFieldIcon should activate: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate TextFieldIcon through FeatureManager
       await featureManager.activateFeature('textFieldIcon');
     } else {
-      logger.info('❌ TextFieldIcon is blocked by exclusion, skipping activation');
+      logger.debug('TextFieldIcon is blocked by exclusion, skipping activation');
       return null;
     }
 
@@ -312,13 +309,12 @@ async function loadSelectElementFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('selectElement');
-    logger.info(`🔍 SelectElement should activate: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate SelectElementManager through FeatureManager
       await featureManager.activateFeature('selectElement');
     } else {
-      logger.info('❌ SelectElement is blocked by exclusion, skipping activation');
+      logger.debug('SelectElement is blocked by exclusion, skipping activation');
       return null;
     }
 
@@ -354,13 +350,12 @@ async function loadShortcutFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('shortcut');
-    logger.info(`🔍 Shortcut should activate: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate ShortcutHandler through FeatureManager
       await featureManager.activateFeature('shortcut');
     } else {
-      logger.info('❌ Shortcut is blocked by exclusion, skipping activation');
+      logger.debug('Shortcut is blocked by exclusion, skipping activation');
       return null;
     }
 
@@ -491,16 +486,13 @@ async function initializeAndActivateFeatures() {
 
       for (const featureName of CORE_FEATURES) {
         try {
-          logger.info(`🔍 Checking if ${featureName} should activate in initializeAndActivateFeatures`);
           const shouldActivate = await featureManager.shouldActivateFeature(featureName);
 
           if (shouldActivate) {
             await featureManager.activateFeature(featureName);
             activatedFeatures.push(featureName);
-            logger.info(`✅ Activated feature: ${featureName}`);
           } else {
             skippedFeatures.push(featureName);
-            logger.info(`❌ Skipped feature: ${featureName} (blocked by exclusion)`);
           }
         } catch (error) {
           logger.warn(`Failed to activate feature ${featureName}:`, error);
@@ -512,7 +504,7 @@ async function initializeAndActivateFeatures() {
       logger.operation(`Core features loaded: ${activatedFeatures.length}/${totalFeatures} [${activatedFeatures.join(', ')}]`);
 
       if (skippedFeatures.length > 0) {
-        logger.warn(`Skipped features due to exclusion: [${skippedFeatures.join(', ')}]`);
+        logger.debug(`Skipped features due to exclusion: [${skippedFeatures.join(', ')}]`);
       }
     } else {
       logger.debug('Features already initialized, skipping activation');
