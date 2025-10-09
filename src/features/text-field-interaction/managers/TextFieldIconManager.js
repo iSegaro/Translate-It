@@ -15,32 +15,6 @@ import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
 import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 
-/**
- * Visibility management utility class
- * Centralizes visibility logic for different update reasons
- */
-class VisibilityManager {
-  /**
-   * Determine if icon should be visible based on update reason
-   * @param {string} reason - Update reason (e.g., 'smooth-scroll-follow', 'viewport-exit')
-   * @param {boolean} visible - Current visibility state
-   * @returns {boolean} Effective visibility state
-   */
-  static shouldKeepVisible(reason, visible) {
-    // Smooth follow always keeps icon visible
-    if (reason === 'smooth-scroll-follow') {
-      return true;
-    }
-
-    // Respect viewport visibility changes
-    if (reason?.startsWith('viewport-')) {
-      return visible;
-    }
-
-    // Default behavior for all other cases
-    return visible;
-  }
-}
 
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
@@ -159,6 +133,19 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Setup settings listeners (only once)
     this.setupSettingsListeners();
+
+    // Listen for WindowsManager icon events to prevent conflicts
+    this.addEventListener(pageEventBus, 'windows-manager-show-icon', (detail) => {
+      this.logger.debug('WindowsManager icon shown, preventing TextFieldIcon creation');
+      this._windowsManagerIconActive = true;
+      // Clean up any existing TextFieldIcon when WindowsManager shows an icon
+      this.cleanup();
+    });
+
+    this.addEventListener(pageEventBus, 'windows-manager-dismiss-icon', (detail) => {
+      this.logger.debug('WindowsManager icon dismissed, allowing TextFieldIcon creation');
+      this._windowsManagerIconActive = false;
+    });
   }
 
   /**
@@ -333,10 +320,29 @@ export class TextFieldIconManager extends ResourceTracker {
       return false;
     }
 
+    // Check if WindowsManager currently has an active icon
+    if (this._windowsManagerIconActive) {
+      this.logger.debug('Skipping icon creation: WindowsManager icon is currently active');
+      return false;
+    }
+
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
-      // Skipping icon creation - Another icon is already active (logged at TRACE level)
-      // this.logger.trace('Skipping icon creation: Another icon is already active.');
+      // Additional check: Verify if the active icon is a WindowsManager icon
+      // WindowsManager icons have IDs starting with 'translation-icon-'
+      const activeIcon = state.activeTranslateIcon;
+      const isWindowsManagerIcon = activeIcon && (
+        activeIcon.id?.startsWith('translation-icon-') ||
+        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.getAttribute?.('data-translate-icon')
+      );
+
+      if (isWindowsManagerIcon) {
+        this.logger.debug('Skipping icon creation: WindowsManager icon is active');
+        return false;
+      }
+
+      this.logger.debug('Another icon is active, skipping TextFieldIcon creation');
       return false;
     }
 
@@ -389,6 +395,11 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {Element|null} Created icon element or null
    */
   async processEditableElement(element) {
+    // Enhanced null reference checks
+    if (!element || !element.isConnected) {
+      return null;
+    }
+
     // Check if processing should continue
     const shouldProcess = await this.shouldProcessTextField(element);
     if (shouldProcess === null || shouldProcess === false) {
@@ -401,23 +412,35 @@ export class TextFieldIconManager extends ResourceTracker {
     this.cleanup();
 
     // Apply platform-specific filtering
-    if (!this.applyPlatformFiltering(element)) {
+    if (!await this.applyPlatformFiltering(element)) {
       return null;
     }
 
     // Generate a unique ID for the icon
     const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Calculate optimal position using the new positioning system
-    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
-    const optimalPosition = PositionCalculator.calculateOptimalPosition(
-      element,
-      null, // Use default icon size
-      {
-        checkCollisions: true,
-        positioningMode: positioningMode
-      }
-    );
+    // Calculate optimal position using the new positioning system (with error handling)
+    let optimalPosition;
+    try {
+      const positioningMode = textFieldIconConfig?.positioning?.defaultPositioningMode || 'smart';
+      optimalPosition = PositionCalculator.calculateOptimalPosition(
+        element,
+        null, // Use default icon size
+        {
+          checkCollisions: true,
+          positioningMode: positioningMode
+        }
+      );
+    } catch (error) {
+      this.logger.warn('Failed to calculate optimal position, using fallback:', error);
+      // Create a simple fallback position
+      optimalPosition = {
+        top: 0,
+        left: 0,
+        placement: 'top-right',
+        isFallback: true
+      };
+    }
 
     // Position calculation details - logged at TRACE level for detailed debugging
     // this.logger.trace('Calculated optimal position:', {
@@ -426,14 +449,20 @@ export class TextFieldIconManager extends ResourceTracker {
     //   isFallback: optimalPosition.isFallback
     // });
 
-    // Emit event to UI Host to add the icon with enhanced data
-    pageEventBus.emit('add-field-icon', {
-      id: iconId,
-      position: optimalPosition,
-      targetElement: element,
-      attachmentMode: 'smart',
-      positioningMode: positioningMode
-    });
+    // Emit event to UI Host to add the icon with enhanced data (with error handling)
+    try {
+      const positioningMode = textFieldIconConfig?.positioning?.defaultPositioningMode || 'smart';
+      pageEventBus.emit('add-field-icon', {
+        id: iconId,
+        position: optimalPosition,
+        targetElement: element,
+        attachmentMode: 'smart',
+        positioningMode: positioningMode
+      });
+    } catch (error) {
+      this.logger.error('Failed to emit add-field-icon event:', error);
+      return null;
+    }
 
     // Track the created icon with enhanced data
     this.trackIcon({ 
@@ -457,7 +486,31 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {Element|null} Created icon or null
    */
   handleEditableFocus(element) {
-    if (state.activeTranslateIcon) {
+    // Enhanced null reference checks
+    if (!element || !element.isConnected) {
+      return null;
+    }
+
+    // Check if WindowsManager currently has an active icon
+    if (this._windowsManagerIconActive) {
+      this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation on focus');
+      return null;
+    }
+
+    if (state?.activeTranslateIcon) {
+      // Check if the active icon is from WindowsManager
+      const activeIcon = state.activeTranslateIcon;
+      const isWindowsManagerIcon = activeIcon && (
+        activeIcon.id?.startsWith('translation-icon-') ||
+        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.getAttribute?.('data-translate-icon')
+      );
+
+      if (isWindowsManagerIcon) {
+        this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation');
+        return null;
+      }
+
       this.logger.debug('Icon already active, skipping focus handling');
       return null;
     }
@@ -476,47 +529,47 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Blurred element
    */
   handleEditableBlur(element) {
-    // Handling editable blur - logged at TRACE level for detailed debugging
-  // this.logger.trace('Handling editable blur for:', element.tagName);
+    // Enhanced null reference checks
+    if (!element || !element.isConnected) {
+      return;
+    }
 
-    // Delay cleanup to allow user to interact with icon (using ResourceTracker)
-    const cleanupTimeout = this.trackTimeout(() => {
+    // Handling editable blur - logged at TRACE level for detailed debugging
+    // this.logger.trace('Handling editable blur for:', element.tagName);
+
+    // Use microtask for immediate response while maintaining execution order
+    Promise.resolve().then(() => {
       const activeElement = document.activeElement;
 
-      // Don't cleanup if focus moved to the translate icon or its children
-      if (
-        activeElement?.isConnected &&
-        (activeElement === state.activeTranslateIcon ||
-         activeElement.closest(".AIWritingCompanion-translation-icon-extension"))
-      ) {
-        this.logger.debug('Focus moved to translate icon, keeping active');
-        return;
+      // Don't cleanup if focus moved to a translation-related element
+      if (activeElement?.isConnected) {
+        // Check if focus moved to translate icon or its children (with null safety)
+        const activeIcon = state?.activeTranslateIcon;
+        if (activeElement === activeIcon ||
+            activeElement.closest(".AIWritingCompanion-translation-icon-extension")) {
+          this.logger.debug('Focus moved to translate icon, keeping active');
+          return;
+        }
+
+        // Check if WindowsManager is processing a translation operation
+        if (state?.preventTextFieldIconCreation) {
+          this.logger.debug('WindowsManager is processing translation, keeping icons active');
+          return;
+        }
+
+        // Check if focus moved to any translation-related element
+        if (this.elementDetection?.isUIElement?.(activeElement)) {
+          this.logger.debug('Focus moved to translation element, keeping active');
+          return;
+        }
       }
 
-      // Don't cleanup if WindowsManager is processing a translation operation
-      if (this.state && this.state.preventTextFieldIconCreation) {
-        this.logger.debug('WindowsManager is processing translation, keeping icons active');
-        return;
-      }
-
-      // Don't cleanup if focus moved to any translation-related element
-      if (activeElement?.isConnected && this.elementDetection.isUIElement(activeElement)) {
-        this.logger.debug('Focus moved to translation element, keeping active');
-        return;
-      }
-
-      // Cleanup if no active element or focus moved away from icon/translation area
-      if (
-        !activeElement?.isConnected ||
-        !this.elementDetection.isUIElement(activeElement)
-      ) {
+      // Cleanup if focus moved away from translation elements
+      if (!activeElement?.isConnected || !this.elementDetection?.isUIElement?.(activeElement)) {
         this.logger.debug('Cleaning up after blur');
         this.cleanup();
       }
-    }, 150); // Increased delay to better coordinate with WindowsManager
-
-    // Track timeout for potential cancellation
-    this.cleanupTimeouts.set(element, cleanupTimeout);
+    });
   }
 
   /**
@@ -525,23 +578,33 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} targetElement - Target element
    */
   createIconAttachment(iconId, targetElement) {
-    // Callback function to handle icon position updates
-    const iconUpdateCallback = (updateData) => {
-      this.handleIconUpdate(updateData);
-    };
+    // Enhanced null reference checks
+    if (!iconId || !targetElement || !targetElement.isConnected) {
+      this.logger.warn('Cannot create attachment: invalid parameters', { iconId, targetElement });
+      return;
+    }
 
-    const positioningMode = textFieldIconConfig.positioning.defaultPositioningMode;
-    const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback, positioningMode);
+    try {
+      // Callback function to handle icon position updates
+      const iconUpdateCallback = (updateData) => {
+        this.handleIconUpdate(updateData);
+      };
 
-    // Attach the icon to the element
-    attachment.attach();
+      const positioningMode = textFieldIconConfig?.positioning?.defaultPositioningMode || 'smart';
+      const attachment = new ElementAttachment(iconId, targetElement, iconUpdateCallback, positioningMode);
 
-    // Store the attachment for later cleanup
-    this.iconAttachments.set(iconId, attachment);
+      // Attach the icon to the element
+      attachment.attach();
 
-    this.logger.debug('Created attachment for icon:', iconId, {
-      positioningMode: positioningMode
-    });
+      // Store the attachment for later cleanup
+      this.iconAttachments.set(iconId, attachment);
+
+      this.logger.debug('Created attachment for icon:', iconId, {
+        positioningMode: positioningMode
+      });
+    } catch (error) {
+      this.logger.error('Failed to create attachment for icon:', iconId, error);
+    }
   }
 
   /**
@@ -551,28 +614,33 @@ export class TextFieldIconManager extends ResourceTracker {
   handleIconUpdate(updateData) {
     const { iconId, position, visible, reason } = updateData;
 
-    this.logger.debug('Received icon update:', {
-      iconId,
-      reason,
-      visible,
-      placement: position?.placement
-    });
+    // Handle scroll dismissal immediately
+    if (updateData.dismiss && reason === 'scroll-started') {
+      // Find and remove the icon
+      for (const [element, iconData] of this.activeIcons.entries()) {
+        if (iconData.id === iconId) {
+          this.cleanupElement(element);
+          break;
+        }
+      }
 
-    // Use VisibilityManager to determine effective visibility
-    const effectiveVisible = VisibilityManager.shouldKeepVisible(reason, visible);
+      return;
+    }
 
-    // Emit update event to UI Host
+    // Emit position update events
     if (position) {
       pageEventBus.emit('update-field-icon-position', {
         id: iconId,
         position,
-        visible: effectiveVisible !== false
+        visible: visible !== false
       });
-    } else if (visible !== undefined && reason !== 'smooth-scroll-follow') {
-      // Emit visibility changes for viewport events and other non-follow events
+    }
+
+    // Also emit visibility changes if explicitly provided
+    if (visible !== undefined) {
       pageEventBus.emit('update-field-icon-visibility', {
         id: iconId,
-        visible: effectiveVisible
+        visible: visible
       });
     }
   }
@@ -655,6 +723,11 @@ export class TextFieldIconManager extends ResourceTracker {
    * @param {Element} element - Element to cleanup
    */
   cleanupElement(element) {
+    // Enhanced null reference checks
+    if (!element) {
+      return;
+    }
+
     // Clear any pending timeout for this element (ResourceTracker will handle this)
     this.cleanupTimeouts.delete(element);
 
@@ -665,12 +738,21 @@ export class TextFieldIconManager extends ResourceTracker {
       const attachment = this.iconAttachments.get(iconData.id);
       if (attachment) {
         this.logger.debug('Cleaning up attachment for element:', element.tagName);
-        attachment.detach();
+        try {
+          attachment.detach();
+        } catch (error) {
+          this.logger.warn('Failed to detach attachment:', error);
+        }
         this.iconAttachments.delete(iconData.id);
       }
 
-      // Emit event to UI Host to remove specific icon
-      pageEventBus.emit('remove-field-icon', { id: iconData.id });
+      // Emit event to UI Host to remove specific icon (with error handling)
+      try {
+        pageEventBus.emit('remove-field-icon', { id: iconData.id });
+      } catch (error) {
+        this.logger.warn('Failed to emit remove-field-icon event:', error);
+      }
+
       this.activeIcons.delete(element);
       this.logger.debug('Cleaned up element:', element.tagName);
     }

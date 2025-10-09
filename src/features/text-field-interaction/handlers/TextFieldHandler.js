@@ -6,6 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldHandler');
 
@@ -185,7 +186,9 @@ export class TextFieldHandler extends ResourceTracker {
           // Text field blurred - logged at TRACE level for detailed debugging
           // logger.trace('Text field blurred:', element.tagName);
 
-          setTimeout(() => {
+          // Reduced delay for faster response while still allowing proper focus tracking
+          // Use microtask for faster response while maintaining execution order
+          Promise.resolve().then(() => {
             // Check if focus moved to a translation-related element before cleanup
             const activeElement = document.activeElement;
             const isTranslationElement = activeElement && (
@@ -200,7 +203,7 @@ export class TextFieldHandler extends ResourceTracker {
             } else if (isTranslationElement) {
               logger.debug('Focus moved to translation element, skipping cleanup');
             }
-          }, 200); // Increased delay to match TextFieldIconManager timing
+          });
         }
       };
 
@@ -264,8 +267,8 @@ export class TextFieldHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
-      return textTypes.includes(type);
+      // Use all text field types that should be detected for icon management
+      return INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
 
     // Textarea

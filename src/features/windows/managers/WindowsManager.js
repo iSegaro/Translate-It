@@ -41,7 +41,6 @@ export class WindowsManager extends ResourceTracker {
 
     // Enforce singleton pattern
     if (windowsManagerInstance) {
-    // logger.trace('WindowsManager singleton already exists, returning existing instance');
       return windowsManagerInstance;
     }
     
@@ -92,8 +91,10 @@ export class WindowsManager extends ResourceTracker {
     // State flag for preventing duplicate dismiss calls
     this._isDismissing = false;
 
+    // State flag for preventing dismiss during Shift+Click operations
+    this._isInShiftClickOperation = false;
+
     // Event handler references
-    this._inputHandler = null;
     this._iconClickHandler = null;
     
     // External dependencies
@@ -149,11 +150,9 @@ export class WindowsManager extends ResourceTracker {
       onIconClick: this._handleIconClick.bind(this)
     });
     // Listen for events from the Vue UI Host
-    // logger.trace('WindowsManager: EventBus ICON_CLICKED listener registered');
     if (this.pageEventBus) {
       // Create bound handler to enable proper cleanup
       this._iconClickHandler = (payload) => {
-        // logger.trace('Icon click handler triggered from Vue UI Host', payload);
         this._handleIconClickFromVue(payload);
       };
       
@@ -172,7 +171,6 @@ export class WindowsManager extends ResourceTracker {
    * Handle renderer toggle event
    */
   _handleToggleRenderer() {
-    // logger.trace('Renderer toggle requested', event.detail);
     const newRendererType = this.toggleEnhancedRenderer();
     
     // If there's an active translation window, re-render with new renderer through Vue UI Host
@@ -252,7 +250,6 @@ export class WindowsManager extends ResourceTracker {
     }
 
     if (this.state.isProcessing) {
-      // logger.trace('WindowsManager is already processing, skipping show()');
       return;
     }
     
@@ -281,9 +278,6 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      // Reuse the selectionTranslationMode from above
-      // logger.trace('Selection translation mode', { mode: selectionTranslationMode });
-
       if (selectionTranslationMode === "onClick") {
         await this._showIcon(selectedText, position);
       } else {
@@ -298,10 +292,9 @@ export class WindowsManager extends ResourceTracker {
    * Check if we should skip showing (duplicate text)
    */
   _shouldSkipShow(selectedText) {
-    if (selectedText && 
-        this.state.isVisible && 
+    if (selectedText &&
+        this.state.isVisible &&
         this.state.originalText === selectedText) {
-      // logger.trace('Skipping show - same text already displayed');
       return true;
     }
     return false;
@@ -348,7 +341,6 @@ export class WindowsManager extends ResourceTracker {
     });
     
     // Outside click handling is now managed by ClickManager
-    // this._addDismissListener(); // Removed - duplicate handling
 
     // Add outside click listener with delay for iframe support
     setTimeout(() => {
@@ -381,6 +373,11 @@ export class WindowsManager extends ResourceTracker {
     this._dismissHandler = (event) => {
       // Handle both icon mode and visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
+
+      // Don't dismiss during Shift+Click operations
+      if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
+        return;
+      }
 
       // Don't dismiss on middle or right clicks
       if (event.button !== 0) {
@@ -472,90 +469,13 @@ export class WindowsManager extends ResourceTracker {
     // Use passive event listener for better performance
     document.addEventListener('click', this._dismissHandler, { capture: false, passive: true });
 
-    // Add input event listener specifically for text field typing when in icon mode
-    if (this.state.isIconMode) {
-      this._inputHandler = (event) => {
-        // Only handle input events on text fields
-        const target = event.target;
-        if (this.isTextFieldElement(target)) {
-          // Only handle input events (actual text changes)
-          if (event.type !== 'input') {
-            return;
-          }
-
-          // Debounce rapid successive input events
-          const currentTime = Date.now();
-          if (currentTime - this._lastInputTime < this._inputDebounceDelay) {
-            return;
-          }
-          this._lastInputTime = currentTime;
-
-          this.logger.debug('Input detected in text field - dismissing icon', {
-            target: target?.tagName,
-            targetType: target?.type || 'contenteditable',
-            eventType: event.type
-          });
-
-          // Don't prevent default - let the key be processed normally
-          // We just need to dismiss the icon and ensure focus stays
-
-          // Store the active element before dismissing
-          const elementToRefocus = target;
-
-          // Remove listeners first to prevent multiple dismissals
-          this._removeDismissListener();
-
-          // Set flag to prevent multiple dismissals from other components
-          this._isDismissingDueToTyping = true;
-
-          // Use requestAnimationFrame for better timing than setTimeout(..., 0)
-          requestAnimationFrame(() => {
-            // Store the element reference for focus restoration
-            const element = elementToRefocus;
-
-            // Set flag to preserve selection during dismissal
-            const wasPreservingSelection = this._preserveSelectionForTyping;
-            this._preserveSelectionForTyping = true;
-
-            // Dismiss the icon without clearing selection
-            this.dismiss(false, true);
-
-            // Use requestAnimationFrame again to ensure DOM is ready
-            requestAnimationFrame(() => {
-              // Restore focus to the text field after dismissal
-              if (element && element.isConnected && typeof element.focus === 'function') {
-                try {
-                  element.focus();
-                  this.logger.debug('Focus restored to text field after typing dismissal');
-                } catch (focusError) {
-                  this.logger.warn('Failed to restore focus to text field', focusError);
-                }
-              }
-
-              // Restore the flag after all operations
-              this._preserveSelectionForTyping = wasPreservingSelection;
-
-              // Clear the typing dismissal flag
-              this._isDismissingDueToTyping = false;
-            });
-          });
-        }
-      };
-
-      // Only listen for input events (after value has changed)
-      // This allows the key to be fully processed before we dismiss
-      // Use passive event listener for better performance
-      document.addEventListener('input', this._inputHandler, { capture: true, passive: true });
-
-      // Add debouncing for rapid successive input events
-      this._lastInputTime = 0;
-      this._inputDebounceDelay = 100; // ms
-
-      this.logger.debug('Added text field input listeners with passive event handling');
-    }
+    // Simplified approach: text field typing is now handled directly in dismiss logic
+    // This prevents icon dismissal interference with text field focus
+    this.logger.debug('Text field protection enabled via dismiss logic');
 
     // Also add Escape key listener for better UX
     this._escapeKeyHandler = (event) => {
+      // Only dismiss on Escape key, ignore other keys like Shift
       if (event.key === 'Escape' && (this.state.isIconMode || this.state.isVisible)) {
         this.logger.info('Escape key pressed - dismissing window');
         this.dismiss();
@@ -579,14 +499,14 @@ export class WindowsManager extends ResourceTracker {
       this._dismissHandler = null;
     }
 
-    if (this._inputHandler) {
-      document.removeEventListener('input', this._inputHandler, { capture: true });
-      this._inputHandler = null;
-    }
-
     if (this._escapeKeyHandler) {
       document.removeEventListener('keydown', this._escapeKeyHandler, { capture: false });
       this._escapeKeyHandler = null;
+    }
+
+    if (this._shiftKeyReleaseHandler) {
+      document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+      this._shiftKeyReleaseHandler = null;
     }
 
     this.logger.debug('Removed dismiss listeners');
@@ -639,12 +559,7 @@ export class WindowsManager extends ResourceTracker {
       context: this.crossFrameManager.isInIframe ? 'iframe' : 'main-frame'
     });
 
-    // logger.trace('Showing window', {
-    //   isInIframe: this.crossFrameManager.isInIframe,
-    //   frameId: this.crossFrameManager.frameId,
-    //   textLength: selectedText?.length
-    // });
-    
+      
     // NEW: Create window directly in iframe using Vue UI Host
     // The old cross-frame logic is no longer needed since each frame has its own Vue UI Host
     this.logger.info(`Creating window directly in current frame (${this.crossFrameManager.isInIframe ? 'iframe' : 'main-frame'})`);
@@ -799,7 +714,6 @@ export class WindowsManager extends ResourceTracker {
       });
       
       // Outside click handling is now managed by ClickManager
-      // this._addDismissListener(); // Removed - duplicate handling
       
       this.logger.debug('Loading window creation event emitted', { windowId });
 
@@ -1143,7 +1057,6 @@ export class WindowsManager extends ResourceTracker {
 
     // Prevent duplicate processing of the same icon click
     if (this.state.isProcessing) {
-      // logger.trace('Already processing icon click, ignoring duplicate');
       return;
     }
 
@@ -1165,11 +1078,9 @@ export class WindowsManager extends ResourceTracker {
       if (this._lastDismissedIcon &&
           this._lastDismissedIcon.id === detail.id &&
           (now - this._lastDismissedIcon.timestamp) < recentDismissWindow) {
-        // logger.trace('[DEBUG] Accepting recent click from dismissed icon:', detail.id);
         // Temporarily restore icon mode for processing
         this.state.setIconMode(true);
       } else {
-        // logger.trace('[DEBUG] Ignoring icon click - no longer in icon mode and not recent');
         return;
       }
     }
@@ -1227,23 +1138,25 @@ export class WindowsManager extends ResourceTracker {
    * @param {boolean} preserveSelection - Whether to preserve text selection (for icon->window transitions)
    */
   async dismiss(withFadeOut = true, preserveSelection = false) {
-    // Track dismissal attempts to prevent duplicates
+    // Track dismissal attempts to prevent duplicates (optimized for responsiveness)
     const now = Date.now();
-    if (this._lastDismissTime && (now - this._lastDismissTime) < 100) {
-      this.logger.debug('[DEBUG] Ignoring duplicate dismiss call within 100ms');
+    if (this._lastDismissTime && (now - this._lastDismissTime) < 25) {
       return;
     }
     this._lastDismissTime = now;
 
     // Check if we're already dismissing due to typing - prevent redundant dismissals
     if (this._isDismissingDueToTyping && withFadeOut) {
-      this.logger.debug('[LOG] Skipping redundant dismiss call during typing dismissal');
       return;
     }
 
     // Check if we're already in the process of dismissing
     if (this._isDismissing) {
-      this.logger.debug('[LOG] Already dismissing, ignoring duplicate call');
+      return;
+    }
+
+    // Check if we're in a Shift+Click operation
+    if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
       return;
     }
 
@@ -1264,8 +1177,10 @@ export class WindowsManager extends ResourceTracker {
     // Clear text selection only when dismissing icon mode AND extension context is valid
     // AND we're not preserving selection (e.g., for icon->window transitions)
     // AND we're not preventing dismissal due to drag operations
+    // AND user is not doing Shift+Click operations
     let textSelectionManager = null;
     let preventDismissDueToDrag = false;
+    let preventDismissDueToShiftClick = false;
 
     // Check for drag operations - get reference to textSelectionManager if available
     if (window.textSelectionManager) {
@@ -1283,15 +1198,49 @@ export class WindowsManager extends ResourceTracker {
       textSelectionManager.preventDismissOnNextClear = false;
     }
 
+    // Check if we should prevent dismissal due to Shift+Click operations
+    if (textSelectionManager && textSelectionManager.shiftKeyPressed) {
+      preventDismissDueToShiftClick = true;
+      this._isInShiftClickOperation = true;
+      this.logger.debug('Preventing dismissal due to Shift+Click operation');
+
+      // Reset flag when Shift key is released (event-based approach)
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+      }
+
+      this._shiftKeyReleaseHandler = (event) => {
+        if (event.key === 'Shift' && this._isInShiftClickOperation) {
+          this._isInShiftClickOperation = false;
+          document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+          this._shiftKeyReleaseHandler = null;
+          this.logger.debug('Shift+Click operation ended - Shift key released');
+        }
+      };
+
+      document.addEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+    }
+
+    // Check if the dismiss is happening in a text field context
+    const activeElement = document.activeElement;
+    const isInTextField = activeElement && activeElement.isConnected && this.isTextFieldElement(activeElement);
+
     const shouldClearSelection = this.state.isIconMode &&
                                ExtensionContextManager.isValidSync() &&
                                !preserveSelection &&
                                !preventDismissDueToDrag &&
-                               !this._preserveSelectionForTyping;
+                               !preventDismissDueToShiftClick &&
+                               !this._preserveSelectionForTyping &&
+                               !this._isDismissingDueToTyping &&
+                               !isInTextField; // NEVER clear selection if in text field
     this.logger.debug('Dismiss selection logic', {
       shouldClearSelection,
       preserveSelection,
-      preventDismissDueToDrag
+      preventDismissDueToDrag,
+      preventDismissDueToShiftClick,
+      isInTextField,
+      activeElementTag: activeElement?.tagName,
+      activeElementType: activeElement?.type || 'contenteditable'
     });
     
     if (shouldClearSelection) {
@@ -1337,8 +1286,6 @@ export class WindowsManager extends ResourceTracker {
       if (typeof this.translationHandler.cancelAllTranslations === 'function') {
         this.translationHandler.cancelAllTranslations();
         this.logger.info('All pending translations cancelled during dismiss');
-      } else {
-        // logger.trace('cancelAllTranslations not available on this TranslationHandler instance');
       }
     }
 
@@ -1416,6 +1363,7 @@ export class WindowsManager extends ResourceTracker {
     this._lastProcessedClick = null;
     this._lastDismissedIcon = null;
     this._isDismissingDueToTyping = false;
+    this._isInShiftClickOperation = false;
 
     if (state && typeof state === 'object') {
       state.preventTextFieldIconCreation = false;
@@ -1519,12 +1467,13 @@ export class WindowsManager extends ResourceTracker {
     this._isDismissingDueToTyping = false;
     this._preserveSelectionForTyping = false;
     this._isDismissing = false;
+    this._isInShiftClickOperation = false;
 
     // Clean up event handler references
-    this._inputHandler = null;
     this._iconClickHandler = null;
     this._dismissHandler = null;
     this._escapeKeyHandler = null;
+    this._shiftKeyReleaseHandler = null;
     
     // Destroy child managers if they have destroy methods
     if (this.crossFrameManager && typeof this.crossFrameManager.destroy === 'function') {

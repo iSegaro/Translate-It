@@ -1,3 +1,16 @@
+#### v1.4.3 – Released on October 09, 2025
+
+##### Fixed
+
+- Fixed Exclusion feature not working properly
+- Fixed translation icon display issue with double-click on text fields in iframe
+- Fixed text deselection issue when using `Shift+Click`
+- Fixed delay when clicking outside text fields to dismiss translation icon
+- Improved icon responsiveness for faster dismissal while keeping scroll behavior unchanged
+- **[#66](https://github.com/iSegaro/Translate-It/issues/66)**: Fixed text field deactivation issue
+
+---
+
 #### v1.4.2 – Released on October 06, 2025
 
 ##### Fixed

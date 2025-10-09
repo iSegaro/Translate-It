@@ -408,7 +408,6 @@ onMounted(async () => {
   });
 
   tracker.addEventListener(pageEventBus, 'update-field-icon-visibility', (detail) => {
-    logger.debug('Event: update-field-icon-visibility', detail);
     const icon = activeIcons.value.find(icon => icon.id === detail.id);
     if (icon) {
       icon.visible = detail.visible;
@@ -418,12 +417,8 @@ onMounted(async () => {
       if (iconComponent) {
         if (detail.visible && iconComponent.show) {
           iconComponent.show();
-          // Re-enable smooth following when icon becomes visible again
-          iconComponent.enableSmoothFollowing?.();
         } else if (!detail.visible && iconComponent.hide) {
           iconComponent.hide();
-          // Disable smooth following when icon is hidden to save resources
-          iconComponent.disableSmoothFollowing?.();
         }
       }
     }

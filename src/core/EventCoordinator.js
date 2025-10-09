@@ -27,6 +27,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { logMethod } from "../core/helpers.js";
 import { clearAllCaches } from "@/shared/utils/text/extraction.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
@@ -192,10 +193,9 @@ export default class EventCoordinator {
     const tagName = element.tagName?.toLowerCase();
     const type = element.type?.toLowerCase();
     
-    // Check for input elements
+    // Check for input elements - include all text field types or empty type (defaults to text)
     if (tagName === 'input') {
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
-      return !type || textTypes.includes(type);
+      return !type || INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
     
     // Check for textarea

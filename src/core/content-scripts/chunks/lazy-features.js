@@ -160,8 +160,16 @@ async function loadTextSelectionFeature() {
       featureManager = FeatureManager.getInstance();
     }
 
-    // Load and activate text selection through FeatureManager
-    await featureManager.activateFeature('textSelection');
+    // Check if feature should be activated first
+    const shouldActivate = await featureManager.shouldActivateFeature('textSelection');
+
+    if (shouldActivate) {
+      // Load and activate text selection through FeatureManager
+      await featureManager.activateFeature('textSelection');
+    } else {
+      logger.debug('TextSelection is blocked by exclusion, skipping activation');
+      return null;
+    }
 
     // Get the handler and return the selection manager from it
     const handler = featureManager.getFeatureHandler('textSelection');
@@ -193,8 +201,16 @@ async function loadWindowsManagerFeature() {
       featureManager = FeatureManager.getInstance();
     }
 
-    // Load and activate WindowsManager through FeatureManager
-    await featureManager.activateFeature('windowsManager');
+    // Check if feature should be activated first
+    const shouldActivate = await featureManager.shouldActivateFeature('windowsManager');
+
+    if (shouldActivate) {
+      // Load and activate WindowsManager through FeatureManager
+      await featureManager.activateFeature('windowsManager');
+    } else {
+      logger.debug('WindowsManager is blocked by exclusion, skipping activation');
+      return null;
+    }
 
     // Get the handler and return the WindowsManager from it
     const handler = featureManager.getFeatureHandler('windowsManager');
@@ -226,8 +242,16 @@ async function loadTextFieldIconFeature() {
       featureManager = FeatureManager.getInstance();
     }
 
-    // Load and activate TextFieldIcon through FeatureManager
-    await featureManager.activateFeature('textFieldIcon');
+    // Check if feature should be activated first
+    const shouldActivate = await featureManager.shouldActivateFeature('textFieldIcon');
+
+    if (shouldActivate) {
+      // Load and activate TextFieldIcon through FeatureManager
+      await featureManager.activateFeature('textFieldIcon');
+    } else {
+      logger.debug('TextFieldIcon is blocked by exclusion, skipping activation');
+      return null;
+    }
 
     // Return the TextFieldIconManager instance
     const handler = featureManager.getFeatureHandler('textFieldIcon');
@@ -283,8 +307,16 @@ async function loadSelectElementFeature() {
       featureManager = FeatureManager.getInstance();
     }
 
-    // Load and activate SelectElementManager through FeatureManager
-    await featureManager.activateFeature('selectElement');
+    // Check if feature should be activated first
+    const shouldActivate = await featureManager.shouldActivateFeature('selectElement');
+
+    if (shouldActivate) {
+      // Load and activate SelectElementManager through FeatureManager
+      await featureManager.activateFeature('selectElement');
+    } else {
+      logger.debug('SelectElement is blocked by exclusion, skipping activation');
+      return null;
+    }
 
     // Return the SelectElementManager instance
     const handler = featureManager.getFeatureHandler('selectElement');
@@ -316,8 +348,16 @@ async function loadShortcutFeature() {
       window.featureManager = featureManager;
     }
 
-    // Load and activate ShortcutHandler through FeatureManager
-    await featureManager.activateFeature('shortcut');
+    // Check if feature should be activated first
+    const shouldActivate = await featureManager.shouldActivateFeature('shortcut');
+
+    if (shouldActivate) {
+      // Load and activate ShortcutHandler through FeatureManager
+      await featureManager.activateFeature('shortcut');
+    } else {
+      logger.debug('Shortcut is blocked by exclusion, skipping activation');
+      return null;
+    }
 
     // Return the ShortcutHandler instance
     const handler = featureManager.getFeatureHandler('shortcut');
@@ -440,12 +480,20 @@ async function initializeAndActivateFeatures() {
 
     // Only activate features if not already initialized
     if (!featuresInitialized) {
-      // Activate core features
+      // Activate core features with exclusion check
       const activatedFeatures = [];
+      const skippedFeatures = [];
+
       for (const featureName of CORE_FEATURES) {
         try {
-          await featureManager.activateFeature(featureName);
-          activatedFeatures.push(featureName);
+          const shouldActivate = await featureManager.shouldActivateFeature(featureName);
+
+          if (shouldActivate) {
+            await featureManager.activateFeature(featureName);
+            activatedFeatures.push(featureName);
+          } else {
+            skippedFeatures.push(featureName);
+          }
         } catch (error) {
           logger.warn(`Failed to activate feature ${featureName}:`, error);
         }
@@ -454,6 +502,10 @@ async function initializeAndActivateFeatures() {
       featuresInitialized = true;
       const totalFeatures = CORE_FEATURES.size;
       logger.operation(`Core features loaded: ${activatedFeatures.length}/${totalFeatures} [${activatedFeatures.join(', ')}]`);
+
+      if (skippedFeatures.length > 0) {
+        logger.debug(`Skipped features due to exclusion: [${skippedFeatures.join(', ')}]`);
+      }
     } else {
       logger.debug('Features already initialized, skipping activation');
     }

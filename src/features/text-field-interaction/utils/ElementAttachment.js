@@ -26,6 +26,8 @@ export class ElementAttachment extends ResourceTracker {
     this.lastIconPosition = null;
     this.lastViewport = null;
 
+    
+
     // Observers and listeners
     this.resizeObserver = null;
     this.intersectionObserver = null;
@@ -157,31 +159,43 @@ export class ElementAttachment extends ResourceTracker {
    * Setup smooth scroll following listener with RequestAnimationFrame
    */
   setupSmoothScrollFollowing() {
-    let rafId = null;
+    let scrollDetected = false;
 
     const scrollHandler = () => {
-      // Use RAF for smooth 60fps updates without multiple concurrent calls
-      if (!rafId) {
-        rafId = requestAnimationFrame(() => {
-          this.smoothUpdatePosition();
-          rafId = null;
+      // Dismiss icon immediately when scroll starts (only once)
+      if (!scrollDetected) {
+        scrollDetected = true;
+
+        // Notify manager to dismiss the icon completely
+        this.notifyIconUpdate({
+          dismiss: true,
+          reason: 'scroll-started'
         });
+
+        // Remove scroll listeners after dismissal
+        this.removeScrollListeners();
       }
     };
+
+    // Store scroll handler reference for removal
+    this._scrollHandler = scrollHandler;
 
     // Use passive listener for better performance
     this.addEventListener(window, 'scroll', scrollHandler, { passive: true });
 
     // Also listen to document scroll for better coverage
     this.addEventListener(document, 'scroll', scrollHandler, { passive: true });
+  }
 
-    // Track RAF for cleanup
-    this.trackResource('scroll-raf', () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-    });
+  /**
+   * Remove scroll listeners after icon dismissal
+   */
+  removeScrollListeners() {
+    if (this._scrollHandler) {
+      window.removeEventListener('scroll', this._scrollHandler, { passive: true });
+      document.removeEventListener('scroll', this._scrollHandler, { passive: true });
+      this._scrollHandler = null;
+    }
   }
 
 
@@ -190,11 +204,6 @@ export class ElementAttachment extends ResourceTracker {
    * @param {boolean} isVisible - Whether element is visible
    */
   handleVisibilityChange(isVisible) {
-    this.logger.debug('Element visibility changed:', {
-      iconId: this.iconId,
-      isVisible
-    });
-
     if (!isVisible) {
       // Hide icon when element is not visible in viewport
       this.notifyIconUpdate({
@@ -225,47 +234,7 @@ export class ElementAttachment extends ResourceTracker {
     });
   }
 
-  /**
-   * Smooth position update for scroll following
-   */
-  smoothUpdatePosition() {
-    if (!this.isAttached || !this.targetElement || !this.targetElement.isConnected) {
-      return;
-    }
-
-    try {
-      // Calculate new optimal position with high precision
-      // IMPORTANT: Use checkCollisions: true to maintain consistent placement with initial position
-      const newPosition = PositionCalculator.calculateOptimalPosition(
-        this.targetElement,
-        null, // Use default icon size
-        {
-          checkCollisions: true, // Keep collision detection to maintain consistent placement
-          positioningMode: this.positioningMode,
-          preferredPlacement: this.lastIconPosition?.placement // Prefer current placement
-        }
-      );
-
-      // Always update during scroll for smooth following (lower threshold)
-      if (this.hasPositionChanged(newPosition, 1)) {
-        this.lastIconPosition = newPosition;
-        this.updateElementRect();
-        this.updateViewportInfo();
-
-
-        // Notify the icon component to update immediately
-        this.notifyIconUpdate({
-          position: newPosition,
-          positioningMode: this.positioningMode,
-          reason: 'smooth-scroll-follow',
-          immediate: true
-        });
-      }
-    } catch (error) {
-      this.logger.error('Error in smooth position update:', error);
-    }
-  }
-
+  
   /**
    * Check if position has changed significantly
    * @param {Object} newPosition - New position to compare
@@ -389,4 +358,5 @@ export class ElementAttachment extends ResourceTracker {
     this.lastIconPosition = null; // Force position change detection
     this.updatePosition();
   }
-}
+
+  }

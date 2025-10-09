@@ -6,6 +6,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
@@ -52,6 +53,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.ctrlKeyPressed = false;
     this.lastKeyEventTime = 0;
     this.lastMouseEventTime = 0;
+
+    // Track Shift key state for Shift+Click operations
+    this.shiftKeyPressed = false;
+    this.isInShiftClickOperation = false;
 
     // Simple drag detection to prevent selection during drag
     this.isDragging = false;
@@ -167,6 +172,28 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       if (this.selectionTimeout) {
         clearTimeout(this.selectionTimeout);
         this.selectionTimeout = null;
+      }
+
+      // Clean up Shift+Click event listeners and timeouts
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      // Clean up mouse up timers and animation frames
+      if (this._mouseUpTimeout) {
+        clearTimeout(this._mouseUpTimeout);
+        this._mouseUpTimeout = null;
+      }
+
+      if (this._mouseUpAnimationFrame) {
+        cancelAnimationFrame(this._mouseUpAnimationFrame);
+        this._mouseUpAnimationFrame = null;
       }
 
       // Clean up settings listeners
@@ -320,6 +347,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         hasText: !!selectedText,
         textLength: selectedText.length,
         ctrlPressed: this.ctrlKeyPressed,
+        shiftPressed: this.shiftKeyPressed,
         isDragging: this.isDragging
       });
 
@@ -333,6 +361,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         // Skip if currently dragging (prevents dismissal during drag operations)
         if (this.isDragging) {
           logger.debug('Currently dragging with no text selected, skipping dismissal');
+          return;
+        }
+
+        // Skip dismissal during Shift+Click operations
+        if (this.shiftKeyPressed) {
           return;
         }
 
@@ -357,7 +390,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Skip if selection is in a text field (handled by TextFieldDoubleClickHandler)
       if (this.isSelectionInTextField()) {
-        logger.debug('Selection in text field, skipping (handled by TextFieldDoubleClickHandler)');
+        logger.debug('Selection in text field, skipping (handled by TextFieldDoubleClickHandler)', {
+          activeElement: document.activeElement?.tagName,
+          activeElementType: document.activeElement?.type,
+          selectionText: selectedText.substring(0, 20)
+        });
         return;
       }
 
@@ -495,8 +532,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel'];
-      return textTypes.includes(type);
+      // Use all text field types for selection detection (to ignore text selections in these fields)
+      return INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
 
     // Textarea
@@ -589,7 +626,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   }
 
   /**
-   * Handle key down events for Ctrl tracking
+   * Handle key down events for Ctrl and Shift tracking
    */
   handleKeyDown(event) {
     this.lastKeyEventTime = Date.now();
@@ -597,16 +634,96 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this.ctrlKeyPressed = true;
       logger.debug('Ctrl key pressed down');
     }
+    if (event.shiftKey) {
+      this.shiftKeyPressed = true;
+      this.isInShiftClickOperation = true;
+
+      // Set global flag for WindowsManager to check
+      window.translateItShiftClickOperation = true;
+
+      // Clean up previous shift key release handler if exists
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      // Clean up previous fallback timeout if exists
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      // Set up event-based Shift key release detection
+      this._shiftKeyReleaseHandler = (event) => {
+        if (event.key === 'Shift' && this.isInShiftClickOperation) {
+          this.isInShiftClickOperation = false;
+          this.shiftKeyPressed = false;
+          window.translateItShiftClickOperation = false;
+
+          // Clean up event listener
+          document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+          this._shiftKeyReleaseHandler = null;
+
+          // Clean up fallback timeout
+          if (this._shiftKeyTimeout) {
+            clearTimeout(this._shiftKeyTimeout);
+            this._shiftKeyTimeout = null;
+          }
+
+          logger.debug('Shift key released via event listener');
+        }
+      };
+
+      // Add event listener with capture for immediate response
+      document.addEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+
+      // Fallback timeout as backup (reduced from 2s to 1.5s)
+      this._shiftKeyTimeout = setTimeout(() => {
+        if (this.isInShiftClickOperation) {
+          this.isInShiftClickOperation = false;
+          this.shiftKeyPressed = false;
+          window.translateItShiftClickOperation = false;
+
+          // Clean up event listener if still exists
+          if (this._shiftKeyReleaseHandler) {
+            document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+            this._shiftKeyReleaseHandler = null;
+          }
+
+          this._shiftKeyTimeout = null;
+          logger.debug('Shift key state reset via fallback timeout');
+        }
+      }, 1500);
+    }
   }
 
   /**
-   * Handle key up events for Ctrl tracking
+   * Handle key up events for Ctrl and Shift tracking
    */
   handleKeyUp(event) {
     this.lastKeyEventTime = Date.now();
     if (!event.ctrlKey && !event.metaKey) {
       this.ctrlKeyPressed = false;
       logger.debug('Ctrl key released');
+    }
+    if (!event.shiftKey && this.isInShiftClickOperation) {
+      this.shiftKeyPressed = false;
+      this.isInShiftClickOperation = false;
+      window.translateItShiftClickOperation = false;
+
+      // Clean up event listener if it exists (prevent duplicate cleanup)
+      if (this._shiftKeyReleaseHandler) {
+        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
+        this._shiftKeyReleaseHandler = null;
+      }
+
+      // Clean up fallback timeout
+      if (this._shiftKeyTimeout) {
+        clearTimeout(this._shiftKeyTimeout);
+        this._shiftKeyTimeout = null;
+      }
+
+      logger.debug('Shift key released via keyup handler');
     }
   }
 
@@ -653,24 +770,53 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    */
   handleMouseUp(event) {
     this.lastMouseEventTime = Date.now();
-    this.isDragging = false;
     this.lastMouseUpEvent = event; // Store for translation window detection
 
-    // Update Ctrl state from mouse event if available
+    // Update Ctrl and Shift state from mouse event if available
     if (event.ctrlKey || event.metaKey) {
       this.ctrlKeyPressed = true;
       this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
     }
+    if (event.shiftKey) {
+      this.shiftKeyPressed = true;
+      this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
+    }
 
-    // Process selection after drag ends
-    setTimeout(() => {
-       const selection = window.getSelection();
-       if (selection && selection.toString().trim()) {
-       logger.debug('Processing selection after drag end');
-       this.processSelection();
-       }
-       }, 50); // Small delay to ensure selection is finalized
+    // For Shift+Click operations, we need special handling to preserve selection
+    const wasShiftClick = this.shiftKeyPressed;
 
+    // End drag detection
+    this.isDragging = false;
+
+    // Clean up any previous mouse up timeout
+    if (this._mouseUpTimeout) {
+      clearTimeout(this._mouseUpTimeout);
+      this._mouseUpTimeout = null;
+    }
+
+    // Clean up any previous animation frame
+    if (this._mouseUpAnimationFrame) {
+      cancelAnimationFrame(this._mouseUpAnimationFrame);
+      this._mouseUpAnimationFrame = null;
+    }
+
+    // Use requestAnimationFrame for better performance and visual consistency
+    // Then use setTimeout as a fallback to ensure selection processing
+    const delay = wasShiftClick ? 150 : 50; // Longer delay for Shift+Click to allow browser to complete selection
+
+    this._mouseUpAnimationFrame = requestAnimationFrame(() => {
+      this._mouseUpTimeout = setTimeout(() => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          logger.debug('Processing selection after drag end', { wasShiftClick });
+          this.processSelection();
+        }
+
+        // Clean up references
+        this._mouseUpTimeout = null;
+        this._mouseUpAnimationFrame = null;
+      }, delay);
+    });
   }
 
   /**

@@ -44,9 +44,9 @@ export function useExclusionChecker() {
     }
   };
 
-  const updateFeatureStatus = () => {
+  const updateFeatureStatus = async () => {
     if (checkerInstance && isInitialized.value) {
-      const status = checkerInstance.getFeatureStatus();
+      const status = await checkerInstance.getFeatureStatus();
       Object.assign(featureStatus, status);
     }
   };

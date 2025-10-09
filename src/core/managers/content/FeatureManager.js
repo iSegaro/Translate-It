@@ -111,15 +111,17 @@ export class FeatureManager extends ResourceTracker {
     // Order matters: contentMessageHandler should be activated first
     // selectElement is managed directly by FeatureManager with its own Critical Protection
     const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
-    
+
     logger.debug('Evaluating features for registration:', features);
-    
+
     for (const feature of features) {
-      if (await this.shouldActivateFeature(feature)) {
+      const shouldActivate = await this.shouldActivateFeature(feature);
+
+      if (shouldActivate) {
         await this.activateFeature(feature);
       }
     }
-    
+
     logger.debug('Feature evaluation complete', {
       activeFeatures: Array.from(this.activeFeatures)
     });
@@ -559,12 +561,12 @@ export class FeatureManager extends ResourceTracker {
     await this.reevaluateFeatures('manual-refresh');
   }
 
-  getStatus() {
+  async getStatus() {
     return {
       initialized: this.initialized,
       activeFeatures: Array.from(this.activeFeatures),
       totalHandlers: this.featureHandlers.size,
-      exclusionStatus: this.exclusionChecker.getFeatureStatus()
+      exclusionStatus: await this.exclusionChecker.getFeatureStatus()
     };
   }
 

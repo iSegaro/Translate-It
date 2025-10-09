@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -46,6 +46,8 @@ import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { TTSGlobalManager } from '@/features/tts/core/TTSGlobalManager.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
@@ -146,6 +148,54 @@ const initialize = async () => {
     // Step 5: Add system theme change listener with automatic cleanup
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     tracker.addEventListener(mediaQuery, 'change', handleSystemThemeChange)
+
+    // Step 6: Add visibility change listener for TTS cleanup
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        logger.debug('[SidepanelApp] Sidepanel hidden - stopping TTS')
+
+        // Send direct TTS stop message to background to stop any playing TTS
+        browser.runtime.sendMessage({
+          action: MessageActions.TTS_STOP,
+          data: {}
+        }).catch(error => {
+          logger.debug('[SidepanelApp] Failed to send TTS stop message in visibility change:', error)
+        })
+      }
+    }
+
+    // Add visibility change listener
+    tracker.addEventListener(document, 'addEventListener', ['visibilitychange', handleVisibilityChange])
+
+    // Step 7: Also listen for pagehide as additional fallback
+    const handlePageHide = (event) => {
+      logger.debug('[SidepanelApp] pagehide event fired - stopping TTS', event.persisted)
+
+      // Send direct TTS stop message to background to stop any playing TTS
+      browser.runtime.sendMessage({
+        action: MessageActions.TTS_STOP,
+        data: {}
+      }).catch(error => {
+        logger.debug('[SidepanelApp] Failed to send TTS stop message in pagehide:', error)
+      })
+    }
+
+    // Add pagehide listener
+    tracker.addEventListener(window, 'addEventListener', ['pagehide', handlePageHide])
+
+    // Step 8: Create lifecycle port connection for background to detect sidepanel closure
+    try {
+      const lifecyclePort = browser.runtime.connect({ name: 'sidepanel-lifecycle' })
+      logger.debug('[SidepanelApp] Sidepanel lifecycle port connected')
+
+      // Port will automatically disconnect when sidepanel closes
+      // This triggers background's onDisconnect listener which stops TTS
+      lifecyclePort.onDisconnect.addListener(() => {
+        logger.debug('[SidepanelApp] Sidepanel lifecycle port disconnected')
+      })
+    } catch (error) {
+      logger.debug('[SidepanelApp] Failed to create lifecycle port:', error)
+    }
   } catch (error) {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
@@ -158,6 +208,34 @@ const initialize = async () => {
 
 // Lifecycle
 onMounted(initialize)
+
+onBeforeUnmount(() => {
+  // Stop all TTS instances when sidepanel is closing
+  try {
+    logger.debug('[SidepanelApp] Stopping TTS instances before sidepanel unmount')
+
+    // Send direct TTS stop message to background to stop any playing TTS
+    browser.runtime.sendMessage({
+      action: MessageActions.TTS_STOP,
+      data: {}
+    }).catch(error => {
+      logger.debug('[SidepanelApp] Failed to send TTS stop message:', error)
+    })
+
+    // Also try to use TTSGlobalManager if available for additional cleanup
+    try {
+      const ttsManager = TTSGlobalManager()
+      if (ttsManager && ttsManager.isInitialized) {
+        logger.debug('[SidepanelApp] Additional cleanup via TTSGlobalManager')
+        ttsManager.stopAll()
+      }
+    } catch (managerError) {
+      logger.debug('[SidepanelApp] TTSGlobalManager cleanup failed:', managerError)
+    }
+  } catch (error) {
+    logger.error('[SidepanelApp] Failed to stop TTS instances:', error)
+  }
+})
 
 onUnmounted(() => {
   // Event listeners cleanup is now handled automatically by useResourceTracker
