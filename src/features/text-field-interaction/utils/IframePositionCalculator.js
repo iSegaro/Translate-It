@@ -3,7 +3,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import {
   POSITION_CONFIG,
   IFRAME_CONFIG,
-  VALIDATION_CONFIG,
   FEATURE_CONFIG,
   ConfigUtils,
 } from '../config/TextFieldConfig.js';
@@ -218,7 +217,7 @@ export class IframePositionCalculator {
   /**
    * Strategy 3: Mouse tracking (most reliable for cross-origin)
    */
-  tryMouseTracking(position) {
+  tryMouseTracking() {
     try {
       if (!this.trackedMousePosition) {
         return null;

@@ -641,8 +641,8 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    */
   requestWindowCreationInMainFrame(selectedText, position) {
     try {
-      // Import WindowsConfig for message types
-      import('@/features/windows/managers/core/WindowsConfig.js').then(({ WindowsConfig }) => {
+      // Import module for side effects (ensure module is loaded)
+      import('@/features/windows/managers/core/WindowsConfig.js').then(() => {
         const message = {
           type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
           frameId: ConfigUtils.generateFrameId(),

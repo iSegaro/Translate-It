@@ -135,14 +135,14 @@ export class TextFieldIconManager extends ResourceTracker {
     this.setupSettingsListeners();
 
     // Listen for WindowsManager icon events to prevent conflicts
-    this.addEventListener(pageEventBus, 'windows-manager-show-icon', (detail) => {
+    this.addEventListener(pageEventBus, 'windows-manager-show-icon', () => {
       this.logger.debug('WindowsManager icon shown, preventing TextFieldIcon creation');
       this._windowsManagerIconActive = true;
       // Clean up any existing TextFieldIcon when WindowsManager shows an icon
       this.cleanup();
     });
 
-    this.addEventListener(pageEventBus, 'windows-manager-dismiss-icon', (detail) => {
+    this.addEventListener(pageEventBus, 'windows-manager-dismiss-icon', () => {
       this.logger.debug('WindowsManager icon dismissed, allowing TextFieldIcon creation');
       this._windowsManagerIconActive = false;
     });
