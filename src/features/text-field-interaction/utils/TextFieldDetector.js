@@ -48,7 +48,7 @@ const RichEditorPatterns = [
   '[data-slate-editor]', '.slate-editor',
   '.ql-editor', '.quill-editor',
   '.ProseMirror', '.pm-editor',
-  '.CodeMirror', '.cm-editor',
+  // '.CodeMirror', '.cm-editor', // Removed - CodeMirror should be treated as code editor, not rich text
   '.mce-content-body', '.tinymce',
   '.cke_editable', '.ck-editor__editable',
   '.DraftEditor-root', '.public-DraftEditor-content',
@@ -207,6 +207,11 @@ export class TextFieldDetector {
    */
   _shouldNeverShowIcon(element, fieldType) {
     if (!element) return false;
+
+    // Check if this is a CodeMirror editor (should be treated as code editor)
+    if (this._isCodeMirrorEditor(element)) {
+      return true;
+    }
 
     // Check input type first
     if (element.tagName === 'INPUT') {
@@ -590,10 +595,58 @@ export class TextFieldDetector {
     const classPatterns = [
       /notion-/i, /editor-/i, /rich-text/i, /wysiwyg/i,
       /draft-js/i, /slate-/i, /quill-/i, /tinymce/i,
-      /ckeditor/i, /prosemirror/i, /codemirror/i
+      /ckeditor/i, /prosemirror/i
+      // /codemirror/i // Removed - CodeMirror should not be treated as rich text editor
     ];
 
     return classPatterns.some(pattern => pattern.test(className));
+  }
+
+  /**
+   * Check if element is a CodeMirror editor
+   * @param {Element} element - Element to check
+   * @returns {boolean} Whether element is a CodeMirror editor
+   */
+  _isCodeMirrorEditor(element) {
+    if (!element) return false;
+
+    // Check direct CodeMirror patterns
+    const codeMirrorPatterns = [
+      '.CodeMirror',
+      '.cm-editor',
+      '[data-codemirror]'
+    ];
+
+    // Check if element matches any CodeMirror pattern
+    for (const pattern of codeMirrorPatterns) {
+      if (element.matches(pattern)) {
+        return true;
+      }
+    }
+
+    // Check class names for CodeMirror
+    const className = (element.className || '').toLowerCase();
+    const codeMirrorClassPatterns = [
+      /codemirror/i,
+      /cm-editor/i
+    ];
+
+    if (codeMirrorClassPatterns.some(pattern => pattern.test(className))) {
+      return true;
+    }
+
+    // Check if element is inside a CodeMirror container
+    const codeMirrorContainer = element.closest('.CodeMirror, .cm-editor, [data-codemirror]');
+    if (codeMirrorContainer) {
+      return true;
+    }
+
+    // Check for CodeMirror-specific attributes
+    if (element.getAttribute('data-codemirror') !== null) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
