@@ -133,6 +133,19 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Setup settings listeners (only once)
     this.setupSettingsListeners();
+
+    // Listen for WindowsManager icon events to prevent conflicts
+    this.addEventListener(pageEventBus, 'windows-manager-show-icon', (detail) => {
+      this.logger.debug('WindowsManager icon shown, preventing TextFieldIcon creation');
+      this._windowsManagerIconActive = true;
+      // Clean up any existing TextFieldIcon when WindowsManager shows an icon
+      this.cleanup();
+    });
+
+    this.addEventListener(pageEventBus, 'windows-manager-dismiss-icon', (detail) => {
+      this.logger.debug('WindowsManager icon dismissed, allowing TextFieldIcon creation');
+      this._windowsManagerIconActive = false;
+    });
   }
 
   /**
@@ -307,10 +320,29 @@ export class TextFieldIconManager extends ResourceTracker {
       return false;
     }
 
+    // Check if WindowsManager currently has an active icon
+    if (this._windowsManagerIconActive) {
+      this.logger.debug('Skipping icon creation: WindowsManager icon is currently active');
+      return false;
+    }
+
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
-      // Skipping icon creation - Another icon is already active (logged at TRACE level)
-      // this.logger.trace('Skipping icon creation: Another icon is already active.');
+      // Additional check: Verify if the active icon is a WindowsManager icon
+      // WindowsManager icons have IDs starting with 'translation-icon-'
+      const activeIcon = state.activeTranslateIcon;
+      const isWindowsManagerIcon = activeIcon && (
+        activeIcon.id?.startsWith('translation-icon-') ||
+        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.getAttribute?.('data-translate-icon')
+      );
+
+      if (isWindowsManagerIcon) {
+        this.logger.debug('Skipping icon creation: WindowsManager icon is active');
+        return false;
+      }
+
+      this.logger.debug('Another icon is active, skipping TextFieldIcon creation');
       return false;
     }
 
@@ -431,7 +463,26 @@ export class TextFieldIconManager extends ResourceTracker {
    * @returns {Element|null} Created icon or null
    */
   handleEditableFocus(element) {
+    // Check if WindowsManager currently has an active icon
+    if (this._windowsManagerIconActive) {
+      this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation on focus');
+      return null;
+    }
+
     if (state.activeTranslateIcon) {
+      // Check if the active icon is from WindowsManager
+      const activeIcon = state.activeTranslateIcon;
+      const isWindowsManagerIcon = activeIcon && (
+        activeIcon.id?.startsWith('translation-icon-') ||
+        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.getAttribute?.('data-translate-icon')
+      );
+
+      if (isWindowsManagerIcon) {
+        this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation');
+        return null;
+      }
+
       this.logger.debug('Icon already active, skipping focus handling');
       return null;
     }
