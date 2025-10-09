@@ -185,7 +185,9 @@ export class TextFieldHandler extends ResourceTracker {
           // Text field blurred - logged at TRACE level for detailed debugging
           // logger.trace('Text field blurred:', element.tagName);
 
-          setTimeout(() => {
+          // Reduced delay for faster response while still allowing proper focus tracking
+          // Use microtask for faster response while maintaining execution order
+          Promise.resolve().then(() => {
             // Check if focus moved to a translation-related element before cleanup
             const activeElement = document.activeElement;
             const isTranslationElement = activeElement && (
@@ -200,7 +202,7 @@ export class TextFieldHandler extends ResourceTracker {
             } else if (isTranslationElement) {
               logger.debug('Focus moved to translation element, skipping cleanup');
             }
-          }, 200); // Increased delay to match TextFieldIconManager timing
+          });
         }
       };
 

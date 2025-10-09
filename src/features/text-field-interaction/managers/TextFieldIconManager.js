@@ -453,41 +453,43 @@ export class TextFieldIconManager extends ResourceTracker {
     // Handling editable blur - logged at TRACE level for detailed debugging
   // this.logger.trace('Handling editable blur for:', element.tagName);
 
-    // Delay cleanup to allow user to interact with icon (using ResourceTracker)
+    // Use microtask for faster response while maintaining execution order
     const cleanupTimeout = this.trackTimeout(() => {
-      const activeElement = document.activeElement;
+      Promise.resolve().then(() => {
+        const activeElement = document.activeElement;
 
-      // Don't cleanup if focus moved to the translate icon or its children
-      if (
-        activeElement?.isConnected &&
-        (activeElement === state.activeTranslateIcon ||
-         activeElement.closest(".AIWritingCompanion-translation-icon-extension"))
-      ) {
-        this.logger.debug('Focus moved to translate icon, keeping active');
-        return;
-      }
+        // Don't cleanup if focus moved to the translate icon or its children
+        if (
+          activeElement?.isConnected &&
+          (activeElement === state.activeTranslateIcon ||
+           activeElement.closest(".AIWritingCompanion-translation-icon-extension"))
+        ) {
+          this.logger.debug('Focus moved to translate icon, keeping active');
+          return;
+        }
 
-      // Don't cleanup if WindowsManager is processing a translation operation
-      if (this.state && this.state.preventTextFieldIconCreation) {
-        this.logger.debug('WindowsManager is processing translation, keeping icons active');
-        return;
-      }
+        // Don't cleanup if WindowsManager is processing a translation operation
+        if (this.state && this.state.preventTextFieldIconCreation) {
+          this.logger.debug('WindowsManager is processing translation, keeping icons active');
+          return;
+        }
 
-      // Don't cleanup if focus moved to any translation-related element
-      if (activeElement?.isConnected && this.elementDetection.isUIElement(activeElement)) {
-        this.logger.debug('Focus moved to translation element, keeping active');
-        return;
-      }
+        // Don't cleanup if focus moved to any translation-related element
+        if (activeElement?.isConnected && this.elementDetection.isUIElement(activeElement)) {
+          this.logger.debug('Focus moved to translation element, keeping active');
+          return;
+        }
 
-      // Cleanup if no active element or focus moved away from icon/translation area
-      if (
-        !activeElement?.isConnected ||
-        !this.elementDetection.isUIElement(activeElement)
-      ) {
-        this.logger.debug('Cleaning up after blur');
-        this.cleanup();
-      }
-    }, 150); // Increased delay to better coordinate with WindowsManager
+        // Cleanup if no active element or focus moved away from icon/translation area
+        if (
+          !activeElement?.isConnected ||
+          !this.elementDetection.isUIElement(activeElement)
+        ) {
+          this.logger.debug('Cleaning up after blur');
+          this.cleanup();
+        }
+      });
+    }, 10); // Minimal delay to ensure microtask scheduling works properly
 
     // Track timeout for potential cancellation
     this.cleanupTimeouts.set(element, cleanupTimeout);
