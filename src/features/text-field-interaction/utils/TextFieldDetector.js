@@ -5,62 +5,16 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { FIELD_DETECTION } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDetector');
 
-// Field type constants
-export const FieldTypes = {
-  TEXT_INPUT: 'text-input',
-  TEXT_AREA: 'text-area',
-  CONTENT_EDITABLE: 'content-editable',
-  RICH_TEXT_EDITOR: 'rich-text-editor',
-  NON_EDITABLE: 'non-editable',
-  UNKNOWN: 'unknown'
-};
+// Export field types for backward compatibility
+export const FieldTypes = FIELD_DETECTION.TYPES;
 
-/**
- * Non-processable field keywords
- * These fields should be completely ignored
- */
-const NonProcessableKeywords = [
-  // Authentication fields
-  'password', 'pwd', 'pass', 'login', 'username', 'email', 'user',
-  'auth', 'signin', 'signup', 'register', 'captcha', 'otp', 'token',
-  'verification', 'confirm', 'security', 'pin', 'code',
-  // Phone and contact fields
-  'phone', 'mobile', 'tel', 'telephone', 'fax',
-  // Sensitive data
-  'ssn', 'social', 'credit', 'card', 'cvv', 'expiry',
-  // Numeric and data fields
-  'number', 'amount', 'quantity', 'price', 'cost', 'total', 'sum',
-  'count', 'age', 'year', 'month', 'day', 'date', 'time',
-  'percent', 'percentage', 'rate', 'ratio',
-  'zip', 'postal', 'code', 'id', 'identifier',
-  // Other non-processable fields
-  'zipcode', 'postal'
-];
-
-/**
- * Rich text editor detection patterns
- */
-const RichEditorPatterns = [
-  // Modern rich text editors
-  '[data-slate-editor]', '.slate-editor',
-  '.ql-editor', '.quill-editor',
-  '.ProseMirror', '.pm-editor',
-  // '.CodeMirror', '.cm-editor', // Removed - CodeMirror should be treated as code editor, not rich text
-  '.mce-content-body', '.tinymce',
-  '.cke_editable', '.ck-editor__editable',
-  '.DraftEditor-root', '.public-DraftEditor-content',
-  '.monaco-editor', '.view-lines',
-
-  // Generic rich text indicators
-  '[role="textbox"][aria-multiline="true"]',
-  '[contenteditable="true"].rich-editor',
-  '[contenteditable="true"].editor',
-  '.rich-text-editor', '.wysiwyg-editor',
-  '.text-editor', '.note-editor', '.editor-content'
-];
+// Import patterns from constants for cleaner code
+const NonProcessableKeywords = FIELD_DETECTION.NON_PROCESSABLE_KEYWORDS;
+const RichEditorPatterns = FIELD_DETECTION.RICH_EDITOR_PATTERNS;
 
 /**
  * Simplified field detector for text field interaction
@@ -217,15 +171,7 @@ export class TextFieldDetector {
     if (element.tagName === 'INPUT') {
       const inputType = (element.type || '').toLowerCase();
 
-      // Never show for these input types
-      const neverShowTypes = [
-        'password', 'hidden', 'file', 'image', 'button', 'submit',
-        'reset', 'checkbox', 'radio', 'color', 'date', 'datetime-local',
-        'email', 'month', 'number', 'range', 'search', 'tel', 'time',
-        'url', 'week', 'email'
-      ];
-
-      if (neverShowTypes.includes(inputType)) {
+      if (FIELD_DETECTION.EXCLUDED_INPUT_TYPES.includes(inputType)) {
         return true;
       }
     }
@@ -287,11 +233,7 @@ export class TextFieldDetector {
       element.getAttribute('role') || ''
     ].join(' ').toLowerCase();
 
-    const searchPatterns = [
-      'search', 'query', 'find', 'filter', 'lookup'
-    ];
-
-    return searchPatterns.some(pattern => attributes.includes(pattern));
+    return FIELD_DETECTION.SEARCH_PATTERNS.some(pattern => attributes.includes(pattern));
   }
 
   /**
@@ -313,27 +255,7 @@ export class TextFieldDetector {
       element.getAttribute('data-testid') || ''
     ].join(' ').toLowerCase();
 
-    // Extended auth and sensitive field patterns
-    const sensitivePatterns = [
-      // Authentication
-      'user', 'username', 'login', 'signin', 'email', 'password', 'pwd',
-      'pass', 'auth', 'verification', 'confirm', 'security', 'pin', 'code',
-      'token', 'captcha', 'otp', 'secret', 'credential',
-
-      // Personal information
-      'fname', 'lname', 'firstname', 'lastname', 'fullname', 'name',
-      'phone', 'mobile', 'telephone', 'zipcode', 'postal', 'address',
-      'ssn', 'social', 'birth', 'age', 'gender', 'id',
-
-      // Financial
-      'credit', 'card', 'cvv', 'expiry', 'bank', 'account', 'payment',
-      'billing', 'transaction', 'amount', 'price', 'cost',
-
-      // Other sensitive
-      'secret', 'private', 'confidential', 'secure'
-    ];
-
-    return sensitivePatterns.some(pattern => {
+    return FIELD_DETECTION.SENSITIVE_FIELD_PATTERNS.some(pattern => {
       // Check for whole word matches to avoid false positives
       const regex = new RegExp(`\\b${pattern}\\b`);
       return regex.test(attributes);
@@ -346,12 +268,6 @@ export class TextFieldDetector {
    * @returns {boolean} Whether element is likely single-line
    */
   _isLikelySingleLineContentEditable(element) {
-    // Check for single-line indicators
-    const singleLineIndicators = [
-      'input', 'chat', 'message', 'comment', 'search', 'query',
-      'prompt', 'command', 'terminal', 'console'
-    ];
-
     // Check element attributes and classes
     const id = (element.id || '').toLowerCase();
     const className = (element.className || '').toLowerCase();
@@ -361,7 +277,7 @@ export class TextFieldDetector {
     const combinedText = id + ' ' + className + ' ' + placeholder + ' ' + dataAttr;
 
     // Check for single-line keywords
-    const hasSingleLineKeyword = singleLineIndicators.some(keyword =>
+    const hasSingleLineKeyword = FIELD_DETECTION.SINGLE_LINE_INDICATORS.some(keyword =>
       combinedText.includes(keyword)
     );
 
@@ -376,14 +292,7 @@ export class TextFieldDetector {
     }
 
     // Check for common single-line contenteditable patterns
-    const singleLinePatterns = [
-      '[contenteditable="true"][data-single-line]',
-      '[contenteditable="true"].single-line',
-      '[contenteditable="true"].chat-input',
-      '[contenteditable="true"].message-input'
-    ];
-
-    return singleLinePatterns.some(pattern => element.matches(pattern));
+    return FIELD_DETECTION.SINGLE_LINE_PATTERNS.some(pattern => element.matches(pattern));
   }
 
   /**
@@ -436,17 +345,8 @@ export class TextFieldDetector {
       element.getAttribute('name') || ''
     ].join(' ').toLowerCase();
 
-    // Chat/comment keywords
-    const chatKeywords = [
-      'chat', 'message', 'comment', 'reply', 'conversation',
-      'discussion', 'thread', 'post', 'tweet', 'status',
-      'input-message', 'chat-input', 'comment-input',
-      'message-box', 'chat-box', 'reply-box',
-      'compose', 'new-message', 'send-message'
-    ];
-
-    // Check if any keyword matches
-    return chatKeywords.some(keyword => attributes.includes(keyword));
+    // Check if any chat keyword matches
+    return FIELD_DETECTION.CHAT_DETECTION.KEYWORDS.some(keyword => attributes.includes(keyword));
   }
 
   /**
@@ -460,25 +360,7 @@ export class TextFieldDetector {
     const className = (element.className || '').toLowerCase();
     const id = (element.id || '').toLowerCase();
 
-    // Common chat container patterns
-    const containerPatterns = [
-      // Class patterns
-      /chat-?container/i,
-      /chat-?list/i,
-      /message-?list/i,
-      /conversation-?list/i,
-      /comments?/i,
-      /replies?/i,
-      /thread/i,
-      /discussion/i,
-
-      // ID patterns
-      /chat-?container/i,
-      /message-?container/i,
-      /comment-?section/i
-    ];
-
-    return containerPatterns.some(pattern =>
+    return FIELD_DETECTION.CHAT_DETECTION.CONTAINER_PATTERNS.some(pattern =>
       pattern.test(className) || pattern.test(id)
     );
   }
@@ -522,15 +404,7 @@ export class TextFieldDetector {
     if (element.tagName === 'INPUT') {
       const inputType = (element.type || '').toLowerCase();
 
-      // Non-text input types
-      const nonTextTypes = [
-        'password', 'hidden', 'file', 'image', 'button', 'submit',
-        'reset', 'checkbox', 'radio', 'color', 'date', 'datetime-local',
-        'email', 'month', 'number', 'range', 'search', 'tel', 'time',
-        'url', 'week'
-      ];
-
-      if (nonTextTypes.includes(inputType)) {
+      if (FIELD_DETECTION.EXCLUDED_INPUT_TYPES.includes(inputType)) {
         return true;
       }
 
@@ -558,6 +432,7 @@ export class TextFieldDetector {
   _isAuthField(element) {
     if (!element) return false;
 
+    // Use a subset of sensitive patterns for basic auth detection
     const authKeywords = [
       'password', 'pwd', 'pass', 'login', 'username', 'email', 'user',
       'auth', 'signin', 'signup', 'register', 'captcha', 'otp', 'token'
@@ -611,14 +486,7 @@ export class TextFieldDetector {
     if (!element) return false;
 
     // Check direct CodeMirror patterns
-    const codeMirrorPatterns = [
-      '.CodeMirror',
-      '.cm-editor',
-      '[data-codemirror]'
-    ];
-
-    // Check if element matches any CodeMirror pattern
-    for (const pattern of codeMirrorPatterns) {
+    for (const pattern of FIELD_DETECTION.CODE_EDITOR_PATTERNS.CODEMIRROR) {
       if (element.matches(pattern)) {
         return true;
       }
@@ -626,12 +494,7 @@ export class TextFieldDetector {
 
     // Check class names for CodeMirror
     const className = (element.className || '').toLowerCase();
-    const codeMirrorClassPatterns = [
-      /codemirror/i,
-      /cm-editor/i
-    ];
-
-    if (codeMirrorClassPatterns.some(pattern => pattern.test(className))) {
+    if (FIELD_DETECTION.CODE_EDITOR_PATTERNS.CLASS_PATTERNS.some(pattern => pattern.test(className))) {
       return true;
     }
 
@@ -642,11 +505,7 @@ export class TextFieldDetector {
     }
 
     // Check for CodeMirror-specific attributes
-    if (element.getAttribute('data-codemirror') !== null) {
-      return true;
-    }
-
-    return false;
+    return element.getAttribute('data-codemirror') !== null;
   }
 
   /**
