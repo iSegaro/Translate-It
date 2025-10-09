@@ -497,16 +497,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   }
 
   /**
-   * Calculate position for text field translation UI using IframePositionCalculator
+   * Calculate position for text field translation UI
    *
-   * This method handles position calculation for both main frame and iframe contexts.
-   * It uses the centralized IframePositionCalculator which implements multiple strategies:
-   *
-   * 1. Direct iframe access (same-origin only)
-   * 2. Visual Viewport API
-   * 3. Mouse tracking (cross-origin reliable)
-   * 4. Enhanced estimation using element bounds
-   * 5. Conservative fallback
+   * This method provides document-relative positioning for WindowsManager.
+   * Based on the logs, WindowsManager expects document-relative coordinates
+   * even for fixed positioning elements.
    *
    * @param {Event} event - Double-click event containing client coordinates
    * @param {Element|null} actualTextField - The actual text field element (may differ from event.target)
@@ -516,42 +511,63 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     try {
       // Use actual text field element if provided, otherwise use event target
       const element = actualTextField || event.target;
-      const rect = element.getBoundingClientRect();
 
-      let clientX, clientY;
+      let baseX, baseY;
       let isFromMouseEvent = false;
 
       // Priority 1: Use double-click mouse position (most accurate for text fields)
       if (event.clientX && event.clientY) {
-        clientX = event.clientX;
-        clientY = event.clientY;
+        baseX = event.clientX;
+        baseY = event.clientY;
         isFromMouseEvent = true;
       } else {
-        // Priority 2: Fallback to element-based position (same as SelectionManager)
-        clientX = rect.left + rect.width / 2;
-        clientY = rect.bottom;
+        // Priority 2: Fallback to element-based position
+        const rect = element.getBoundingClientRect();
+        baseX = rect.left + rect.width / 2;
+        baseY = rect.bottom;
         isFromMouseEvent = false;
       }
 
-      // Delegate position calculation to IframePositionCalculator
-      // This handles iframe conversion automatically with multiple fallback strategies
-      const position = this.positionCalculator.calculatePosition(clientX, clientY, {
-        isFromMouseEvent,
-        actualElement: element,
-      });
+      // Convert viewport coordinates to document-relative coordinates
+      // WindowsManager appears to expect document coordinates even for fixed positioning
+      const documentX = baseX + window.scrollX;
+      const documentY = baseY + window.scrollY;
 
-      logger.debug('Calculated text field position', {
-        elementRect: {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height
-        },
-        clientCoords: { x: clientX, y: clientY },
-        calculatedPosition: position,
-        scrollOffset: { x: window.scrollX, y: window.scrollY },
+      // Calculate position with icon offset
+      const iconSize = 32; // Same as WindowsConfig
+      const iconOffset = 10; // Small offset below cursor/element
+
+      let finalX, finalY;
+
+      if (isFromMouseEvent) {
+        // Center icon horizontally on cursor, place slightly below cursor
+        finalX = documentX - (iconSize / 2);
+        finalY = documentY + iconOffset;
+      } else {
+        // Center icon on element bottom edge
+        finalX = documentX - (iconSize / 2);
+        finalY = documentY + iconOffset;
+      }
+
+      const position = {
+        x: finalX,
+        y: finalY,
+        isFromMouseEvent,
+        strategy: 'document-relative-with-scroll',
         isInIframe: window !== window.top,
-        strategy: position?.strategy || 'unknown'
+        isViewportRelative: false // Mark as document-relative for WindowsManager
+      };
+
+      logger.debug('Calculated text field position (document-relative)', {
+        element: element.tagName,
+        baseCoords: { x: baseX, y: baseY },
+        scrollOffset: { x: window.scrollX, y: window.scrollY },
+        calculatedPosition: position,
+        isInIframe: window !== window.top,
+        documentSize: {
+          width: document.documentElement.scrollWidth,
+          height: document.documentElement.scrollHeight
+        }
       });
 
       return position;

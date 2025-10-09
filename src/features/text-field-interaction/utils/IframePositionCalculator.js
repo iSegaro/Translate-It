@@ -60,7 +60,7 @@ export class IframePositionCalculator {
       isInIframe: window !== window.top,
     });
 
-    // If not in iframe, return coordinates as-is
+    // If not in iframe, return coordinates as-is (viewport-relative for WindowsManager)
     if (window === window.top) {
       return this.formatPosition(clientX, clientY, {
         isFromMouseEvent,
