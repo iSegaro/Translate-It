@@ -4,6 +4,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { IFRAME_CONFIG, POSITION_CONFIG, ConfigUtils } from '../config/TextFieldConfig.js';
+import IframePositionCalculator from '../utils/IframePositionCalculator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDoubleClickHandler');
 
@@ -11,13 +13,22 @@ const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextField
  * Text Field Double Click Handler
  *
  * Handles double-click events specifically for text fields and editable elements.
- * This is separate from page text selection to keep concerns separated.
+ * This handler is optimized for iframe support and provides accurate position calculation
+ * across different browsing contexts.
  *
  * Features:
- * - Double-click detection in text fields
- * - Professional editor support (Google Docs, etc.)
- * - Text selection and position calculation
- * - Integration with WindowsManager
+ * - Double-click detection in text fields with 500ms window
+ * - Professional editor support (Google Docs, Zoho Writer, etc.)
+ * - Cross-origin iframe position calculation with multiple fallback strategies
+ * - Integration with WindowsManager for UI display
+ * - Smart mouse tracking for accurate positioning
+ * - Configurable timeouts and offsets
+ *
+ * Architecture:
+ * - Uses IframePositionCalculator for all position calculations
+ * - Leverages centralized configuration from TextFieldConfig.js
+ * - Implements ResourceTracker for proper memory management
+ * - Supports both same-origin and cross-origin iframes
  */
 export class TextFieldDoubleClickHandler extends ResourceTracker {
   constructor(options = {}) {
@@ -35,23 +46,19 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     // Double-click state management
     this.doubleClickProcessing = false;
     this.lastDoubleClickTime = 0;
-    this.doubleClickWindow = 500; // 500ms window
+    this.doubleClickWindow = POSITION_CONFIG.DOUBLE_CLICK_WINDOW;
+
+    // Initialize iframe position calculator
+    this.positionCalculator = new IframePositionCalculator({
+      logger,
+      config: POSITION_CONFIG,
+    });
 
     // Bind methods
     this.handleDoubleClick = this.handleDoubleClick.bind(this);
 
     // Store last clicked element for position estimation
     this.lastClickedElement = null;
-
-    // Store last mouse event for position estimation
-    this.lastMouseEvent = null;
-
-    // Track mouse position continuously for accurate iframe conversion
-    this.trackedMousePosition = null;
-    this.mouseTrackingEnabled = false;
-
-    // Store pending position requests
-    this.pendingPositionRequests = new Map();
   }
 
   async activate() {
@@ -70,7 +77,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       this.setupPostMessageListener();
 
       // Setup mouse tracking for iframe position conversion
-      this.setupMouseTracking();
+      this.positionCalculator.setupMouseTracking();
 
       this.isActive = true;
       logger.info('TextFieldDoubleClickHandler activated successfully');
@@ -105,8 +112,8 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
         this.postMessageHandler = null;
       }
 
-      // Cleanup mouse tracking
-      this.disableMouseTracking();
+      // Cleanup position calculator
+      this.positionCalculator.cleanup();
 
       // ResourceTracker will handle event listener cleanup
       this.cleanup();
@@ -122,6 +129,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
           window.removeEventListener('message', this.postMessageHandler);
           this.postMessageHandler = null;
         }
+        this.positionCalculator.cleanup();
         this.cleanup();
         this.isActive = false;
         return true;
@@ -151,8 +159,10 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     try {
       // Listen for postMessage from iframes
       this.postMessageHandler = (event) => {
+        const messageType = event.data?.type;
+
         // Only handle messages from same origin or trusted origins
-        if (event.data && event.data.type === 'showTranslationIcon') {
+        if (messageType === IFRAME_CONFIG.MESSAGE_TYPES.SHOW_TRANSLATION_ICON) {
           logger.info('TextFieldDoubleClickHandler: Received showTranslationIcon message from iframe', {
             frameId: event.data.frameId,
             text: event.data.text?.substring(0, 30) + '...',
@@ -164,13 +174,13 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
         }
 
         // Handle iframe position calculation requests (only in main document)
-        if (event.data && event.data.type === 'calculateIframePosition' && window === window.top) {
-          this.handleIframePositionRequest(event);
+        if (messageType === IFRAME_CONFIG.MESSAGE_TYPES.CALCULATE_IFRAME_POSITION && window === window.top) {
+          this.positionCalculator.handleIframePositionRequest(event);
         }
 
         // Handle position calculation responses (only in iframes)
-        if (event.data && event.data.type === 'iframePositionCalculated' && window !== window.top) {
-          this.handlePositionCalculationResponse(event);
+        if (messageType === IFRAME_CONFIG.MESSAGE_TYPES.IFRAME_POSITION_CALCULATED && window !== window.top) {
+          this.positionCalculator.handlePositionCalculationResponse(event);
         }
       };
 
@@ -186,134 +196,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     }
   }
 
-  /**
-   * Handle position calculation responses from parent
-   */
-  handlePositionCalculationResponse(event) {
-    try {
-      const { frameId, calculatedPosition } = event.data;
-
-      logger.debug('Received position calculation response', {
-        frameId: frameId,
-        calculatedPosition: calculatedPosition
-      });
-
-      // Find pending request for this position
-      const requestId = `${frameId}_${calculatedPosition.timestamp}`;
-      const pendingRequest = this.pendingPositionRequests.get(requestId);
-
-      if (pendingRequest) {
-        // Execute the pending callback with the calculated position
-        pendingRequest(calculatedPosition);
-
-        // Remove from pending requests
-        this.pendingPositionRequests.delete(requestId);
-
-        logger.debug('Processed pending position request', { requestId: requestId });
-      }
-
-    } catch (error) {
-      logger.error('Error handling position calculation response:', error);
-    }
-  }
-
-  /**
-   * Handle position calculation requests from iframes
-   */
-  handleIframePositionRequest(event) {
-    try {
-      const { frameId, clientPosition, elementInfo } = event.data;
-
-      logger.debug('Received position calculation request from iframe', {
-        frameId: frameId,
-        clientPosition: clientPosition,
-        elementInfo: elementInfo
-      });
-
-      // Find the iframe element in the main document
-      const iframeElement = this.findIframeByFrameId(frameId);
-
-      if (iframeElement) {
-        try {
-          const rect = iframeElement.getBoundingClientRect();
-          const calculatedPosition = {
-            x: clientPosition.x + rect.left,
-            y: clientPosition.y + rect.top + 25 // Add offset for icon
-          };
-
-          // Send the calculated position back to the iframe
-          const response = {
-            type: 'iframePositionCalculated',
-            frameId: frameId,
-            calculatedPosition: calculatedPosition,
-            timestamp: Date.now()
-          };
-
-          event.source.postMessage(response, '*');
-
-          logger.debug('Sent calculated position back to iframe', {
-            frameId: frameId,
-            calculatedPosition: calculatedPosition
-          });
-
-        } catch (error) {
-          logger.debug('Could not calculate iframe position', {
-            frameId: frameId,
-            error: error.message
-          });
-        }
-      } else {
-        logger.debug('Could not find iframe element', { frameId: frameId });
-      }
-
-    } catch (error) {
-      logger.error('Error handling iframe position request:', error);
-    }
-  }
-
-  /**
-   * Find iframe element by frame ID
-   */
-  findIframeByFrameId(frameId) {
-    try {
-      // Method 1: Check IFrameManager registry first
-      if (window.translateItFrameRegistry) {
-        const frameData = window.translateItFrameRegistry.get(frameId);
-        if (frameData && frameData.element) {
-          return frameData.element;
-        }
-      }
-
-      // Method 2: Search all iframes in the document
-      const iframes = document.querySelectorAll('iframe');
-      for (const iframe of iframes) {
-        try {
-          // Try to access contentWindow properties to identify the iframe
-          if (iframe.contentWindow && iframe.contentWindow.frameId === frameId) {
-            return iframe;
-          }
-        } catch (error) {
-          // Cross-origin iframe - can't access contentWindow
-          // Skip and continue
-        }
-      }
-
-      // Method 3: Try to match by other attributes
-      for (const iframe of iframes) {
-        if (iframe.dataset.frameId === frameId) {
-          return iframe;
-        }
-      }
-
-      logger.debug('Could not find iframe with ID', { frameId: frameId });
-      return null;
-
-    } catch (error) {
-      logger.error('Error finding iframe by ID:', error);
-      return null;
-    }
-  }
-
+  
   /**
    * Handle double-click events on text fields
    */
@@ -614,7 +497,20 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   }
 
   /**
-   * Calculate position for text field translation UI using SelectionManager pattern
+   * Calculate position for text field translation UI using IframePositionCalculator
+   *
+   * This method handles position calculation for both main frame and iframe contexts.
+   * It uses the centralized IframePositionCalculator which implements multiple strategies:
+   *
+   * 1. Direct iframe access (same-origin only)
+   * 2. Visual Viewport API
+   * 3. Mouse tracking (cross-origin reliable)
+   * 4. Enhanced estimation using element bounds
+   * 5. Conservative fallback
+   *
+   * @param {Event} event - Double-click event containing client coordinates
+   * @param {Element|null} actualTextField - The actual text field element (may differ from event.target)
+   * @returns {Object|null} Position object with x, y coordinates or null if calculation fails
    */
   calculateTextFieldPosition(event, actualTextField = null) {
     try {
@@ -622,30 +518,27 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       const element = actualTextField || event.target;
       const rect = element.getBoundingClientRect();
 
-      let position;
+      let clientX, clientY;
+      let isFromMouseEvent = false;
 
-      // Use double-click position if available (more accurate for text fields)
+      // Priority 1: Use double-click mouse position (most accurate for text fields)
       if (event.clientX && event.clientY) {
-        // For double-click events, use the mouse position directly
-        // This is more accurate than the element rect for text fields
-        const iconSize = 32; // Same as WindowsConfig.POSITIONING.ICON_SIZE
-        position = {
-          x: event.clientX - (iconSize / 2) + window.scrollX,
-          y: event.clientY + 10 + window.scrollY, // Small offset below cursor
-          isFromMouseEvent: true,
-          clientX: event.clientX,
-          clientY: event.clientY
-        };
+        clientX = event.clientX;
+        clientY = event.clientY;
+        isFromMouseEvent = true;
       } else {
-        // Fallback to element-based position (same as SelectionManager)
-        const iconSize = 32;
-        const selectionCenter = rect.left + rect.width / 2;
-        position = {
-          x: selectionCenter - (iconSize / 2) + window.scrollX,
-          y: rect.bottom + 10 + window.scrollY,
-          isFromMouseEvent: false
-        };
+        // Priority 2: Fallback to element-based position (same as SelectionManager)
+        clientX = rect.left + rect.width / 2;
+        clientY = rect.bottom;
+        isFromMouseEvent = false;
       }
+
+      // Delegate position calculation to IframePositionCalculator
+      // This handles iframe conversion automatically with multiple fallback strategies
+      const position = this.positionCalculator.calculatePosition(clientX, clientY, {
+        isFromMouseEvent,
+        actualElement: element,
+      });
 
       logger.debug('Calculated text field position', {
         elementRect: {
@@ -654,9 +547,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
           width: rect.width,
           height: rect.height
         },
+        clientCoords: { x: clientX, y: clientY },
         calculatedPosition: position,
         scrollOffset: { x: window.scrollX, y: window.scrollY },
-        isInIframe: window !== window.top
+        isInIframe: window !== window.top,
+        strategy: position?.strategy || 'unknown'
       });
 
       return position;
@@ -667,531 +562,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     }
   }
 
-  /**
-   * Convert iframe coordinates to main document coordinates
-   */
-  convertIframePositionToMain(position) {
-    try {
-      logger.debug('Converting iframe position to main document', {
-        originalPosition: position,
-        isInIframe: window !== window.top,
-        clientX: position.clientX,
-        clientY: position.clientY
-      });
-
-      // If not in iframe, return original position
-      if (window === window.top) {
-        return position;
-      }
-
-      // Store the mouse event for later reference
-      if (position.isFromMouseEvent) {
-        this.lastMouseEvent = {
-          clientX: position.clientX,
-          clientY: position.clientY,
-          timestamp: Date.now()
-        };
-      }
-
-      // Method 1: Try to get iframe position and add to client coordinates
-      const iframePosition = this.getIframePositionInMainDocument();
-      if (iframePosition) {
-        const mainPosition = {
-          x: (position.clientX || position.x) + iframePosition.x,
-          y: (position.clientY || position.y) + iframePosition.y + 25,
-          isFromMouseEvent: true
-        };
-
-        logger.debug('Successfully converted iframe coordinates using direct iframe position', {
-          originalPosition: position,
-          iframePosition: iframePosition,
-          mainPosition: mainPosition
-        });
-
-        return mainPosition;
-      }
-
-      // Method 2: Use enhanced position estimation
-      const clientX = position.clientX || position.x;
-      const clientY = position.clientY || position.y;
-
-      // Check if these coordinates are likely iframe-relative
-      if (!this.areCoordinatesMainDocument(clientX, clientY)) {
-        // These are iframe-relative coordinates, need conversion
-        const enhancedPosition = this.estimateIframePositionEnhanced(clientX, clientY);
-        if (enhancedPosition) {
-          logger.debug('Successfully converted iframe coordinates using enhanced estimation', {
-            originalPosition: position,
-            clientCoords: { x: clientX, y: clientY },
-            enhancedPosition: enhancedPosition
-          });
-          return enhancedPosition;
-        }
-      } else {
-        // These appear to be main document coordinates already
-        const mainCoords = {
-          x: clientX,
-          y: clientY + 25,
-          isFromMouseEvent: true
-        };
-        logger.debug('Using coordinates as main document relative', {
-          originalPosition: position,
-          mainCoords: mainCoords
-        });
-        return mainCoords;
-      }
-
-      // Method 3: Send async request to parent for position calculation
-      this.requestPositionFromParent(position, (calculatedPosition) => {
-        logger.debug('Received async position calculation from parent', {
-          calculatedPosition: calculatedPosition
-        });
-
-        // Note: For now, we'll log the response but continue with the fallback
-        // The async response comes too late for the immediate display
-      });
-
-      logger.warn('Could not get iframe position immediately, using fallback with offsets');
-      // Fallback: Try basic coordinate transformation
-      return {
-        x: clientX,
-        y: clientY + 25,
-        isFromMouseEvent: true,
-        isFallback: true
-      };
-
-    } catch (error) {
-      logger.error('Error converting iframe position:', error);
-      return {
-        x: position.clientX || position.x,
-        y: (position.clientY || position.y) + 25,
-        isFromMouseEvent: true,
-        isFallback: true
-      };
-    }
-  }
-
-  /**
-   * Get iframe position in main document using multiple approaches
-   */
-  getIframePositionInMainDocument() {
-    // Approach 1: Try to access frame element directly (same-origin only)
-    if (window.frameElement) {
-      try {
-        const rect = window.frameElement.getBoundingClientRect();
-        const position = {
-          x: rect.left,
-          y: rect.top
-        };
-
-        logger.debug('Got iframe position from frameElement', {
-          position: position,
-          rect: {
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height
-          }
-        });
-
-        return position;
-      } catch (error) {
-        logger.debug('Could not access frameElement (cross-origin)', { error: error.message });
-      }
-    }
-
-    // Approach 2: Enhanced estimation using mouse coordinates
-    // For cross-origin iframes, we can estimate position using various techniques
-    // Return null since this method doesn't have the required parameters for enhanced estimation
-    return null;
-  }
-
-  /**
-   * Setup mouse tracking for accurate iframe position conversion
-   */
-  setupMouseTracking() {
-    try {
-      if (this.mouseTrackingEnabled) {
-        return;
-      }
-
-      this.mouseTrackingEnabled = true;
-
-      // Track mouse movement continuously
-      this.mouseMoveHandler = (event) => {
-        this.trackedMousePosition = {
-          x: event.clientX,
-          y: event.clientY,
-          timestamp: Date.now()
-        };
-      };
-
-      // Use capture to get events before they're prevented
-      document.addEventListener('mousemove', this.mouseMoveHandler, { capture: true });
-      this.trackResource('mouseMoveHandler', () => {
-        document.removeEventListener('mousemove', this.mouseMoveHandler, { capture: true });
-      });
-
-      logger.debug('Mouse tracking enabled for iframe position conversion');
-
-    } catch (error) {
-      logger.error('Failed to setup mouse tracking:', error);
-    }
-  }
-
-  /**
-   * Disable mouse tracking
-   */
-  disableMouseTracking() {
-    try {
-      this.mouseTrackingEnabled = false;
-      this.trackedMousePosition = null;
-
-      if (this.mouseMoveHandler) {
-        document.removeEventListener('mousemove', this.mouseMoveHandler, { capture: true });
-        this.mouseMoveHandler = null;
-      }
-
-      logger.debug('Mouse tracking disabled');
-
-    } catch (error) {
-      logger.error('Failed to disable mouse tracking:', error);
-    }
-  }
-
-  /**
-   * Enhanced iframe position estimation for cross-origin iframes
-   */
-  estimateIframePositionEnhanced(clientX, clientY) {
-    try {
-      logger.debug('Estimating iframe position with enhanced method', {
-        clientX: clientX,
-        clientY: clientY,
-        hasTrackedPosition: !!this.trackedMousePosition,
-        isInIframe: window !== window.top
-      });
-
-      // CRITICAL APPROACH: These coordinates are iframe-relative and need conversion
-      // to main document coordinates
-
-      // Method 1: Try Visual Viewport API first (most reliable)
-      if (window.visualViewport) {
-        const viewport = window.visualViewport;
-        // Note: offsetLeft/offsetTop might be 0 for cross-origin iframes
-        if (viewport.offsetLeft > 0 || viewport.offsetTop > 0) {
-          const mainCoords = {
-            x: clientX + viewport.offsetLeft,
-            y: clientY + viewport.offsetTop + 25
-          };
-          logger.debug('Using visual viewport offset', {
-            clientCoords: { x: clientX, y: clientY },
-            viewportOffset: { left: viewport.offsetLeft, top: viewport.offsetTop },
-            calculatedPosition: mainCoords
-          });
-          return mainCoords;
-        }
-      }
-
-      // Method 2: Use tracked mouse position (most reliable for cross-origin)
-      if (this.trackedMousePosition) {
-        const timeDiff = Date.now() - this.trackedMousePosition.timestamp;
-        if (timeDiff < 1000) { // Within 1 second
-          // The tracked position should be main document relative
-          const mainCoords = {
-            x: this.trackedMousePosition.x,
-            y: this.trackedMousePosition.y + 25
-          };
-          logger.debug('Using tracked mouse position (main document relative)', {
-            iframeCoords: { x: clientX, y: clientY },
-            trackedPosition: this.trackedMousePosition,
-            calculatedPosition: mainCoords,
-            timeDiff: timeDiff
-          });
-          return mainCoords;
-        }
-      }
-
-      // Method 3: Enhanced iframe position estimation using element bounds
-      if (this.lastClickedElement) {
-        const rect = this.lastClickedElement.getBoundingClientRect();
-
-        // Estimate iframe position based on element and mouse coordinates
-        // This is a fallback method
-        const estimatedMainCoords = {
-          x: Math.max(clientX + 100, 200), // Assume iframe is at least 100px from left
-          y: Math.max(clientY + 150, 300) // Assume iframe is at least 150px from top
-        };
-
-        logger.debug('Using enhanced element-based estimation', {
-          iframeCoords: { x: clientX, y: clientY },
-          elementRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-          estimatedMainCoords: estimatedMainCoords
-        });
-        return estimatedMainCoords;
-      }
-
-      // Method 4: Conservative estimation - add significant offset for iframe position
-      // Most iframes are not at (0,0) on the main page
-      const conservativeCoords = {
-        x: clientX + 200, // Assume iframe is around 200px from left
-        y: clientY + 250 // Assume iframe is around 250px from top
-      };
-
-      logger.debug('Using conservative iframe position estimation', {
-        iframeCoords: { x: clientX, y: clientY },
-        estimatedMainCoords: conservativeCoords
-      });
-      return conservativeCoords;
-
-    } catch (error) {
-      logger.error('Error in enhanced position estimation:', error);
-      // Return a reasonable fallback position
-      return {
-        x: clientX + 200,
-        y: clientY + 250
-      };
-    }
-  }
-
-  /**
-   * Check if coordinates are likely relative to main document
-   */
-  areCoordinatesMainDocument(x, y) {
-    try {
-      // CRITICAL FIX: Small coordinates (like 54, 150) are almost always iframe-relative
-      // Most main document coordinates for text fields would be larger
-
-      // If coordinates are very small, they're almost certainly iframe-relative
-      if (x < 100 && y < 200) {
-        return false; // These are iframe coordinates
-      }
-
-      // If coordinates are very large, they might be main document relative
-      if (x > 500 || y > 500) {
-        return true;
-      }
-
-      // Check if coordinates are a significant portion of viewport
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-
-      // For main document, text fields are usually not in the top-left corner
-      if (x > viewportWidth * 0.2 || y > viewportHeight * 0.2) {
-        return true;
-      }
-
-      // Default to false for small coordinates (assume iframe-relative)
-      return false;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Request position calculation from parent document
-   */
-  requestPositionFromParent(position, callback) {
-    try {
-      const timestamp = Date.now();
-      const frameId = window.frameId || 'unknown';
-
-      // Send a special message to parent requesting position calculation
-      const message = {
-        type: 'calculateIframePosition',
-        frameId: frameId,
-        clientPosition: {
-          x: position.clientX || position.x,
-          y: position.clientY || position.y
-        },
-        elementInfo: this.lastClickedElement ? {
-          tagName: this.lastClickedElement.tagName,
-          id: this.lastClickedElement.id,
-          className: this.lastClickedElement.className,
-          value: this.lastClickedElement.value || this.lastClickedElement.textContent
-        } : null,
-        timestamp: timestamp
-      };
-
-      // Store the callback for when we receive the response
-      const requestId = `${frameId}_${timestamp}`;
-      this.pendingPositionRequests.set(requestId, callback);
-
-      // Set a timeout to remove the pending request if no response
-      setTimeout(() => {
-        if (this.pendingPositionRequests.has(requestId)) {
-          this.pendingPositionRequests.delete(requestId);
-          logger.debug('Position request timed out', { requestId: requestId });
-        }
-      }, 1000); // 1 second timeout
-
-      window.parent.postMessage(message, '*');
-      logger.debug('Sent position calculation request to parent', message);
-
-    } catch (error) {
-      logger.debug('Could not send position request to parent', { error: error.message });
-    }
-  }
-
-  /**
-   * Send message to parent frame for position calculation
-   */
-  sendMessageToParent(messageData) {
-    try {
-      if (window.parent && window.parent !== window) {
-        const message = {
-          ...messageData,
-          frameId: window.frameId || 'unknown',
-          timestamp: Date.now()
-        };
-
-        window.parent.postMessage(message, '*');
-        logger.debug('Sent position calculation message to parent', message);
-      }
-    } catch (error) {
-      logger.debug('Failed to send message to parent', { error: error.message });
-    }
-  }
-
-  /**
-   * Approach 1: Direct iframe element access
-   */
-  getIframePositionApproach1(position) {
-    try {
-      const iframeElement = window.frameElement;
-      if (!iframeElement) {
-        return null;
-      }
-
-      const iframeRect = iframeElement.getBoundingClientRect();
-
-      return {
-        x: position.x + iframeRect.left,
-        y: position.y + iframeRect.top
-      };
-
-    } catch (accessError) {
-      logger.debug('Approach 1 failed - cannot access iframe rect', {
-        error: accessError.message
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Approach 2: Visual viewport and scroll estimation
-   */
-  getIframePositionApproach2(position) {
-    try {
-      // Use visual viewport API if available
-      if (window.visualViewport) {
-        const viewport = window.visualViewport;
-        const iframeOffsetLeft = viewport.offsetLeft || 0;
-        const iframeOffsetTop = viewport.offsetTop || 0;
-
-        return {
-          x: position.x + iframeOffsetLeft,
-          y: position.y + iframeOffsetTop
-        };
-      }
-
-      // Try to use iframe position from existing IFrameManager
-      return this.getIframePositionFromManager(position);
-
-    } catch (error) {
-      logger.debug('Approach 2 failed', { error: error.message });
-      return null;
-    }
-  }
-
-  /**
-   * Get iframe position from existing IFrameManager system
-   */
-  getIframePositionFromManager(position) {
-    try {
-      // Try to access IFrameManager from existing iframe-support system
-      if (window.translateItFrameRegistry) {
-        const frameId = window.frameId || this.generateFrameId();
-        const frameData = window.translateItFrameRegistry.get(frameId);
-
-        if (frameData && frameData.element) {
-          const frameRect = frameData.element.getBoundingClientRect();
-          return {
-            x: position.x + frameRect.left,
-            y: position.y + frameRect.top
-          };
-        }
-      }
-
-      // Fallback to mouse event estimation
-      return this.estimateIframePosition(position);
-
-    } catch (error) {
-      logger.debug('Could not get iframe position from manager', { error: error.message });
-      return this.estimateIframePosition(position);
-    }
-  }
-
-  /**
-   * Generate a simple frame ID if needed
-   */
-  generateFrameId() {
-    return `frame_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  }
-
-  /**
-   * Estimate iframe position using mouse coordinates
-   */
-  estimateIframePosition(position) {
-    try {
-      logger.debug('Estimating iframe position from mouse coordinates', {
-        hasClientX: !!position.clientX,
-        hasClientY: !!position.clientY,
-        isFromMouseEvent: position.isFromMouseEvent
-      });
-
-      // For mouse events, the clientX/Y are already relative to the viewport
-      // For iframe to main document conversion, we need to add iframe offset
-      if (position.isFromMouseEvent && position.clientX !== undefined && position.clientY !== undefined) {
-        // The clientX/clientY are viewport coordinates - these should be correct for the main document
-        // when the iframe is positioned normally in the flow
-        return {
-          x: position.clientX,
-          y: position.clientY + 25 // Add offset for icon placement
-        };
-      }
-
-      // For non-mouse based positions, try to use element-based estimation
-      if (this.lastClickedElement) {
-        const rect = this.lastClickedElement.getBoundingClientRect();
-        return {
-          x: rect.left + rect.width / 2,
-          y: rect.bottom + 10
-        };
-      }
-
-      return null;
-
-    } catch (error) {
-      logger.debug('Could not estimate iframe position', { error: error.message });
-      return null;
-    }
-  }
-
-  /**
-   * Check if position is valid (not negative or too large)
-   */
-  isPositionValid(position) {
-    if (!position) return false;
-
-    // Check for reasonable coordinate values
-    return (
-      position.x >= 0 &&
-      position.y >= 0 &&
-      position.x < window.screen.width + 1000 && // Allow some margin
-      position.y < window.screen.height + 1000
-    );
-  }
-
+  
   /**
    * Check if WindowsManager should be allowed to operate
    */
@@ -1257,8 +628,8 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       // Import WindowsConfig for message types
       import('@/features/windows/managers/core/WindowsConfig.js').then(({ WindowsConfig }) => {
         const message = {
-          type: 'TEXT_SELECTION_WINDOW_REQUEST', // Use same message type as text selection
-          frameId: this.generateFrameId(),
+          type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
+          frameId: ConfigUtils.generateFrameId(),
           selectedText: selectedText,
           position: position,
           timestamp: Date.now()
