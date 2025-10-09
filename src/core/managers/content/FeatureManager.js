@@ -71,22 +71,30 @@ export class FeatureManager extends ResourceTracker {
 
   async initialize() {
     try {
-      logger.init('Initializing FeatureManager');
+      logger.init('🚀 Initializing FeatureManager');
 
       // Initialize exclusion checker
+      logger.info('📋 Initializing exclusion checker...');
       await this.exclusionChecker.initialize();
+      logger.info('✅ Exclusion checker initialized');
 
       // Evaluate and register features
+      logger.info('📋 Starting feature evaluation...');
       await this.evaluateAndRegisterFeatures();
+      logger.info('✅ Feature evaluation completed');
 
       // Setup settings change listener
+      logger.info('📋 Setting up settings listener...');
       this.setupSettingsListener();
+      logger.info('✅ Settings listener setup');
 
       // Setup URL change detection for SPAs
+      logger.info('📋 Setting up URL change detection...');
       this.setupUrlChangeDetection();
+      logger.info('✅ URL change detection setup');
 
       this.initialized = true;
-      logger.info('FeatureManager initialized successfully', {
+      logger.info('🎉 FeatureManager initialized successfully', {
         activeFeatures: Array.from(this.activeFeatures)
       });
 
@@ -101,7 +109,7 @@ export class FeatureManager extends ResourceTracker {
           showToast: false
         });
       } catch {
-        logger.error('Error initializing FeatureManager:', error);
+        logger.error('❌ Error initializing FeatureManager:', error);
       }
       throw error;
     }
@@ -111,16 +119,23 @@ export class FeatureManager extends ResourceTracker {
     // Order matters: contentMessageHandler should be activated first
     // selectElement is managed directly by FeatureManager with its own Critical Protection
     const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut'];
-    
-    logger.debug('Evaluating features for registration:', features);
-    
+
+    logger.info('🚀 Starting feature evaluation for registration:', features);
+
     for (const feature of features) {
-      if (await this.shouldActivateFeature(feature)) {
+      logger.info(`🔍 Evaluating feature: ${feature}`);
+      const shouldActivate = await this.shouldActivateFeature(feature);
+      logger.info(`📊 Should activate ${feature}: ${shouldActivate}`);
+
+      if (shouldActivate) {
+        logger.info(`✅ Proceeding to activate feature: ${feature}`);
         await this.activateFeature(feature);
+      } else {
+        logger.info(`❌ Skipping feature: ${feature} (should not activate)`);
       }
     }
-    
-    logger.debug('Feature evaluation complete', {
+
+    logger.info('🏁 Feature evaluation complete', {
       activeFeatures: Array.from(this.activeFeatures)
     });
 
@@ -161,11 +176,12 @@ export class FeatureManager extends ResourceTracker {
 
   async shouldActivateFeature(featureName) {
     try {
+      logger.info(`🔍 Evaluating feature ${featureName} for URL: ${this.exclusionChecker.currentUrl}`);
       const allowed = await this.exclusionChecker.isFeatureAllowed(featureName);
-      logger.debug(`Feature ${featureName} evaluation:`, allowed ? 'ALLOWED' : 'BLOCKED');
+      logger.info(`✅ Feature ${featureName} evaluation:`, allowed ? 'ALLOWED' : 'BLOCKED');
       return allowed;
     } catch (error) {
-      logger.error(`Error evaluating feature ${featureName}:`, error);
+      logger.error(`❌ Error evaluating feature ${featureName}:`, error);
       return false;
     }
   }
@@ -559,12 +575,12 @@ export class FeatureManager extends ResourceTracker {
     await this.reevaluateFeatures('manual-refresh');
   }
 
-  getStatus() {
+  async getStatus() {
     return {
       initialized: this.initialized,
       activeFeatures: Array.from(this.activeFeatures),
       totalHandlers: this.featureHandlers.size,
-      exclusionStatus: this.exclusionChecker.getFeatureStatus()
+      exclusionStatus: await this.exclusionChecker.getFeatureStatus()
     };
   }
 

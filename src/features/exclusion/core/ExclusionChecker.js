@@ -27,7 +27,7 @@ export class ExclusionChecker {
 
     // Store singleton instance
     exclusionCheckerInstance = this;
-    logger.info('ExclusionChecker initialized');
+    logger.info('🚀 ExclusionChecker initialized at:', this.currentUrl);
   }
 
   // Static method to get singleton instance
@@ -153,40 +153,44 @@ export class ExclusionChecker {
     }
 
     try {
+      logger.info(`🔍 Checking feature ${featureName} for URL: ${this.currentUrl}`);
+
       // Global extension check
       const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
+      logger.info(`🌐 Extension enabled globally: ${isExtensionEnabled}`);
       if (!isExtensionEnabled) {
-        // Feature blocked - logged at TRACE level for detailed debugging
-        // logger.debug(`Feature ${featureName} blocked: extension disabled globally`);
+        logger.warn(`🚫 Feature ${featureName} blocked: extension disabled globally`);
         return false;
       }
 
       // Feature-specific setting check
-      if (!this.isFeatureEnabled(featureName)) {
-        // Feature blocked - logged at TRACE level for detailed debugging
-        // logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
+      const featureEnabled = this.isFeatureEnabled(featureName);
+      logger.info(`⚙️ Feature ${featureName} enabled: ${featureEnabled}`);
+      if (!featureEnabled) {
+        logger.warn(`🚫 Feature ${featureName} blocked: feature setting disabled`);
         return false;
       }
 
       // URL exclusion check
-      if (await this.isUrlExcludedForFeature(featureName)) {
-        // Feature blocked - logged at TRACE level for detailed debugging
-        // logger.debug(`Feature ${featureName} blocked: URL excluded`);
+      const urlExcluded = await this.isUrlExcludedForFeature(featureName);
+      logger.info(`🚫 URL excluded for ${featureName}: ${urlExcluded}`);
+      if (urlExcluded) {
+        logger.warn(`🚫 Feature ${featureName} blocked: URL excluded`);
         return false;
       }
 
-      // Feature allowed - logged at TRACE level for detailed debugging
-      // logger.debug(`Feature ${featureName} allowed`);
+      logger.info(`✅ Feature ${featureName} allowed`);
       return true;
 
     } catch (error) {
+      logger.error(`❌ Error in isFeatureAllowed for ${featureName}:`, error);
       const handler = ErrorHandler.getInstance();
       handler.handle(error, {
         type: ErrorTypes.SERVICE,
         context: `ExclusionChecker-isFeatureAllowed-${featureName}`,
         showToast: false
       });
-      
+
       // Default to blocked on error for safety
       return false;
     }
@@ -227,25 +231,33 @@ export class ExclusionChecker {
 
   async isUrlExcludedForFeature(featureName) {
     try {
+      logger.info(`🔍 Checking URL exclusion for ${featureName} at ${this.currentUrl}`);
       const { isUrlExcluded, isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
+
+      // Get excluded sites list for all features
+      const excludedSites = settingsManager.get('EXCLUDED_SITES', []);
+      logger.info(`📋 Current excluded sites:`, excludedSites);
 
       // Feature-specific exclusion logic
       if (featureName === 'textFieldIcon') {
-        return isUrlExcluded_TEXT_FIELDS_ICON(this.currentUrl);
+        const excluded = isUrlExcluded_TEXT_FIELDS_ICON(this.currentUrl, excludedSites);
+        logger.info(`🚫 Text field icon exclusion check result: ${excluded}`);
+        return excluded;
       }
-      
+
       // General exclusion for other features
-      const excludedSites = settingsManager.get('EXCLUDED_SITES', []);
-      return isUrlExcluded(this.currentUrl, excludedSites);
-      
+      const excluded = isUrlExcluded(this.currentUrl, excludedSites);
+      logger.info(`🚫 General exclusion check result for ${featureName}: ${excluded}`);
+      return excluded;
+
     } catch (error) {
-      logger.error('Error checking URL exclusion:', error);
+      logger.error('❌ Error checking URL exclusion:', error);
       // Default to excluded on error for safety
       return true;
     }
   }
 
-  getFeatureStatus() {
+  async getFeatureStatus() {
     if (!this.initialized) {
       return { initialized: false };
     }
@@ -259,15 +271,15 @@ export class ExclusionChecker {
       features: {}
     };
 
-    features.forEach(feature => {
+    for (const feature of features) {
       const featureEnabled = this.isFeatureEnabled(feature);
-      const urlExcluded = this.isUrlExcludedForFeature(feature);
+      const urlExcluded = await this.isUrlExcludedForFeature(feature);
       status.features[feature] = {
         settingEnabled: featureEnabled,
         urlExcluded: urlExcluded,
         allowed: isExtensionEnabled && featureEnabled && !urlExcluded
       };
-    });
+    }
 
     return status;
   }
