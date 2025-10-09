@@ -433,9 +433,40 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   }
 
   /**
+   * Check if WindowsManager should be allowed to operate
+   */
+  async shouldProcessWindowsManager() {
+    if (!this.featureManager) {
+      logger.debug('FeatureManager not available for WindowsManager check');
+      return false;
+    }
+
+    try {
+      const exclusionChecker = this.featureManager.exclusionChecker;
+      if (!exclusionChecker) {
+        logger.debug('ExclusionChecker not available');
+        return false;
+      }
+
+      const allowed = await exclusionChecker.isFeatureAllowed('windowsManager');
+      logger.debug(`WindowsManager check for text field: ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
+      return allowed;
+    } catch (error) {
+      logger.error('Error checking WindowsManager permission:', error);
+      return false;
+    }
+  }
+
+  /**
    * Show translation UI
    */
   async showTranslationUI(selectedText, position) {
+    // Check if WindowsManager should be allowed
+    if (!(await this.shouldProcessWindowsManager())) {
+      logger.info('WindowsManager is blocked by exclusion, skipping text field translation UI');
+      return;
+    }
+
     // Get WindowsManager directly from FeatureManager
     const windowsManager = this.getWindowsManager();
     if (!windowsManager) {
