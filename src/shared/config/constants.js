@@ -22,11 +22,15 @@ export const INPUT_TYPES = {
   // Control and non-text input types (should be ignored for translation)
   CONTROL: ['range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'],
 
+  // Technical and specialized input types (should be ignored for translation)
+  TECHNICAL: ['code', 'email', 'password', 'search', 'url', 'tel'],
+
   // All input types that should be detected as text fields (for ignoring)
   ALL_TEXT_FIELDS: [
     'text', 'email', 'password', 'search', 'url', 'tel', 'number',
     'cc-name', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year',
     'date', 'time', 'datetime-local', 'month', 'week',
-    'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'
+    'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image',
+    'code'
   ]
 }
