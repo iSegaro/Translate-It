@@ -136,6 +136,8 @@ class LifecycleManager {
       'setSelectElementState': Handlers.handleSetSelectElementStateLazy,
       'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
       'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
+      'clearElementSelectionHandlerCache': Handlers.clearElementSelectionHandlerCache,
+      'getElementSelectionHandlerStats': Handlers.getElementSelectionHandlerStats,
       
       // Screen capture handlers - Lazy loaded for better performance
       'startAreaCapture': Handlers.handleStartAreaCaptureLazy,
