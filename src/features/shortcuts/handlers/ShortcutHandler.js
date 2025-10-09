@@ -5,6 +5,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -329,22 +330,21 @@ export class ShortcutHandler extends ResourceTracker {
 
   isEditableElement(element) {
     if (!element) return false;
-    
+
     const tagName = element.tagName.toLowerCase();
     const type = element.type?.toLowerCase();
-    
-    // Check for input elements
+
+    // Check for input elements - include all text field types or empty type (which defaults to text)
     if (tagName === 'input') {
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number', 'cc-name', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'date', 'time', 'datetime-local', 'month', 'week', 'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'];
-      return !type || textTypes.includes(type);
+      return !type || INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
-    
+
     // Check for textarea
     if (tagName === 'textarea') return true;
-    
+
     // Check for contenteditable elements
     if (element.contentEditable === 'true') return true;
-    
+
     return false;
   }
 

@@ -11,6 +11,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -182,8 +183,8 @@ export class FieldShortcutManager {
 
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number', 'cc-name', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'date', 'time', 'datetime-local', 'month', 'week', 'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'];
-      return textTypes.includes(type);
+      // Use all text field types including financial, datetime, and control inputs
+      return INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
 
     if (element.tagName === 'TEXTAREA') {

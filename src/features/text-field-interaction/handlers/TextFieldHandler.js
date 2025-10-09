@@ -6,6 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldHandler');
 
@@ -266,8 +267,8 @@ export class TextFieldHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number', 'cc-name', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'date', 'time', 'datetime-local', 'month', 'week', 'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'];
-      return textTypes.includes(type);
+      // Use all text field types that should be detected for icon management
+      return INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
 
     // Textarea

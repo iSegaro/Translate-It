@@ -6,6 +6,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { INPUT_TYPES } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
@@ -531,8 +532,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     // Standard input fields
     if (element.tagName === 'INPUT') {
       const type = (element.type || '').toLowerCase();
-      const textTypes = ['text', 'email', 'password', 'search', 'url', 'tel', 'number', 'cc-name', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'date', 'time', 'datetime-local', 'month', 'week', 'range', 'color', 'file', 'hidden', 'submit', 'button', 'reset', 'image'];
-      return textTypes.includes(type);
+      // Use all text field types for selection detection (to ignore text selections in these fields)
+      return INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
 
     // Textarea
