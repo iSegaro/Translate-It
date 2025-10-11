@@ -1155,6 +1155,9 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
+    // REMOVED: Global typing flag checking - now handled by direct listener system only
+    // This prevents interference between SimpleTextSelectionHandler and TextFieldDoubleClickHandler
+
     // Check if we're in a Shift+Click operation
     if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
       return;
@@ -1225,6 +1228,9 @@ export class WindowsManager extends ResourceTracker {
     const activeElement = document.activeElement;
     const isInTextField = activeElement && activeElement.isConnected && this.isTextFieldElement(activeElement);
 
+    // Enhanced selection preservation logic
+    const hasRecentActivity = this._hasRecentSelectionActivity();
+
     const shouldClearSelection = this.state.isIconMode &&
                                ExtensionContextManager.isValidSync() &&
                                !preserveSelection &&
@@ -1232,13 +1238,15 @@ export class WindowsManager extends ResourceTracker {
                                !preventDismissDueToShiftClick &&
                                !this._preserveSelectionForTyping &&
                                !this._isDismissingDueToTyping &&
-                               !isInTextField; // NEVER clear selection if in text field
+                               !isInTextField && // NEVER clear selection if in text field
+                               !hasRecentActivity; // NEW: Don't clear if recent selection activity
     this.logger.debug('Dismiss selection logic', {
       shouldClearSelection,
       preserveSelection,
       preventDismissDueToDrag,
       preventDismissDueToShiftClick,
       isInTextField,
+      hasRecentActivity,
       activeElementTag: activeElement?.tagName,
       activeElementType: activeElement?.type || 'contenteditable'
     });
@@ -1368,6 +1376,74 @@ export class WindowsManager extends ResourceTracker {
     if (state && typeof state === 'object') {
       state.preventTextFieldIconCreation = false;
     }
+  }
+
+  /**
+   * Check if there's recent selection activity that should preserve text selection
+   */
+  _hasRecentSelectionActivity() {
+    const now = Date.now();
+
+    // Check global flags first (fastest check)
+    if (window.translateItShiftClickOperation) {
+      this.logger.debug('Shift+Click operation detected - preserving selection');
+      return true;
+    }
+
+    if (window.translateItJustFinishedSelection) {
+      this.logger.debug('Recent selection activity detected - preserving selection', {
+        reason: window.translateItSelectionPreservationReason || 'unknown'
+      });
+      return true;
+    }
+
+    // REMOVED: Global typing flag checking - now handled by direct listener system only
+    // This prevents interference between different typing detection systems
+
+    // Check TextFieldDoubleClickHandler typing detection
+    if (window.textFieldDoubleClickHandlerInstance) {
+      const handler = window.textFieldDoubleClickHandlerInstance;
+      if (handler.isTypingDetectionActive && handler.isTypingDetectionActive()) {
+        this.logger.debug('TextFieldDoubleClickHandler typing detection active - preserving selection', {
+          detectedField: handler.typingDetection?.detectedTextField?.tagName,
+          timeSinceStart: handler.typingDetection?.startTime ?
+            now - handler.typingDetection.startTime : null
+        });
+        return true;
+      }
+    }
+
+    // Check SimpleTextSelectionHandler preservation state
+    if (window.simpleTextSelectionHandlerInstance) {
+      const handler = window.simpleTextSelectionHandlerInstance;
+      if (handler._isPreservationActive && handler._isPreservationActive()) {
+        this.logger.debug('Selection preservation active in handler - preserving selection', {
+          reason: handler._preservationState.reason,
+          remainingTime: handler._preservationState.duration - (now - handler._preservationState.timestamp)
+        });
+        return true;
+      }
+    }
+
+    // Fallback: check for recent textSelectionManager activity (legacy support)
+    let textSelectionManager = null;
+    if (window.textSelectionManager) {
+      textSelectionManager = window.textSelectionManager;
+    } else if (window.TranslateItTextSelectionManager) {
+      textSelectionManager = window.TranslateItTextSelectionManager;
+    }
+
+    if (textSelectionManager) {
+      const recentActivityThreshold = 1000; // 1 second
+      const lastActivityTime = textSelectionManager.lastSelectionTime || 0;
+
+      if (now - lastActivityTime < recentActivityThreshold) {
+        this.logger.debug('Recent legacy selection manager activity detected - preserving selection');
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

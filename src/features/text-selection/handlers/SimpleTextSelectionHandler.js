@@ -68,6 +68,22 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.isWaitingForDragEnd = false;
     this.dragStartTime = 0;
 
+    // Smart selection preservation system
+    this._preservationState = {
+      active: false,
+      reason: null,
+      timestamp: 0,
+      timeout: null,
+      duration: 1000
+    };
+
+    // Simple typing detection for text field preservation
+    this.typingDetection = {
+      isActive: false,
+      startTime: 0,
+      timeout: null
+    };
+
     // Element detection service
     this.elementDetection = ElementDetectionService;
 
@@ -81,9 +97,14 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleInput = this.handleInput.bind(this);
 
     // Store singleton instance
     simpleTextSelectionHandlerInstance = this;
+
+    // Make instance globally available for WindowsManager
+    window.simpleTextSelectionHandlerInstance = this;
+
     logger.debug('SimpleTextSelectionHandler singleton created');
   }
 
@@ -196,6 +217,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this._mouseUpAnimationFrame = null;
       }
 
+      // Clean up typing detection
+      this.cleanupTypingDetection();
+
       // Clean up settings listeners
       this._settingsListeners.forEach(unsubscribe => {
         if (unsubscribe) unsubscribe();
@@ -211,6 +235,9 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this.selectionManager = null;
 
       // Manually clean up event listeners to be sure
+      // Clean up preservation system
+      this._clearPreservationTimer();
+
       this.cleanup();
 
       this.isActive = false;
@@ -254,6 +281,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       // Ctrl key tracking for requirement checking
       this.addEventListener(window, 'keydown', this.handleKeyDown);
       this.addEventListener(window, 'keyup', this.handleKeyUp);
+
+      // Simple input detection for text field typing
+      this.addEventListener(document, 'input', this.handleInput, {
+        capture: true,
+        critical: true
+      });
 
       logger.debug('Simple text selection listeners setup complete');
 
@@ -313,6 +346,116 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   }
 
   /**
+   * Smart selection preservation system
+   * Combines event-driven approach with timer optimization
+   */
+  _startSelectionPreservation(reason, customDuration = null) {
+    this._clearPreservationTimer();
+
+    const duration = customDuration || this._getOptimalDuration(reason);
+
+    this._preservationState = {
+      active: true,
+      reason,
+      timestamp: Date.now(),
+      timeout: setTimeout(() => {
+        this._preservationState.active = false;
+        this._preservationState.timeout = null;
+        logger.debug('Selection preservation expired', { reason });
+      }, duration),
+      duration
+    };
+
+    // Set global flags for cross-component communication
+    window.translateItJustFinishedSelection = true;
+    window.translateItSelectionPreservationReason = reason;
+
+    // Clear global flags after preservation period
+    setTimeout(() => {
+      window.translateItJustFinishedSelection = false;
+      window.translateItSelectionPreservationReason = null;
+    }, duration);
+
+    logger.debug('Selection preservation started', { reason, duration });
+  }
+
+  /**
+   * Clear preservation timer
+   */
+  _clearPreservationTimer() {
+    if (this._preservationState.timeout) {
+      clearTimeout(this._preservationState.timeout);
+      this._preservationState.timeout = null;
+    }
+    this._preservationState.active = false;
+  }
+
+  /**
+   * Get optimal preservation duration based on selection type
+   */
+  _getOptimalDuration(reason) {
+    const durations = {
+      'triple-click-drag': 2500,     // Longer for triple-click + drag
+      'shift-click': 2000,           // Medium for Shift+Click
+      'regular-drag': 1500,          // Standard for drag
+      'post-drag-selection': 1800,   // Extended for immediate post-drag
+      'keyboard-selection': 1000,    // Shorter for keyboard
+      'default': 1000                // Increased from 1000 to 1500 for better UX
+    };
+    return durations[reason] || durations.default;
+  }
+
+  /**
+   * Check if preservation is currently active
+   */
+  _isPreservationActive() {
+    return this._preservationState.active &&
+           Date.now() - this._preservationState.timestamp < this._preservationState.duration;
+  }
+
+  /**
+   * Detect selection type based on current state
+   */
+  _detectSelectionType() {
+    const currentTime = Date.now();
+
+    // Enhanced triple-click + drag detection
+    if (this.enhancedTripleClickDrag &&
+        currentTime - this.lastTripleClickTime < 500 &&
+        this.isDragging) {
+      return 'triple-click-drag';
+    }
+
+    // Regular drag detection with extended time window
+    if (this.isDragging) {
+      return 'regular-drag';
+    }
+
+    // Shift+Click detection
+    if (this.shiftKeyPressed) {
+      return 'shift-click';
+    }
+
+    // Check if keyboard selection (Ctrl+A, Shift+Arrow)
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) {
+      const recentKeyEvent = currentTime - this.lastKeyEventTime < 300; // Extended window
+      const recentMouseEvent = currentTime - this.lastMouseEventTime < 150; // Extended window
+
+      if (recentKeyEvent && !recentMouseEvent) {
+        return 'keyboard-selection';
+      }
+    }
+
+    // Check if this is immediate post-drag scenario
+    if (currentTime - this.mouseDownTime < 1000 && selection && selection.toString().trim()) {
+      return 'post-drag-selection';
+    }
+
+    return 'default';
+  }
+
+  /**
    * Handle selection change events - the heart of our simplified system
    */
   handleSelectionChange() {
@@ -352,6 +495,15 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       });
 
       if (!selectedText) {
+        // Check if preservation is active - if so, skip dismissal
+        if (this._isPreservationActive()) {
+          logger.debug('Selection preservation active - skipping dismissal', {
+            reason: this._preservationState.reason,
+            remainingTime: this._preservationState.duration - (Date.now() - this._preservationState.timestamp)
+          });
+          return;
+        }
+
         // No text selected, check if user clicked inside translation window
         if (this.isClickInsideTranslationWindow()) {
           logger.debug('Click inside translation window, not dismissing');
@@ -379,6 +531,26 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       // Skip if currently dragging (prevents selection during drag)
       if (this.isDragging) {
         logger.debug('Currently dragging, skipping selection processing');
+
+        // BUT: Start preservation for drag operations to prevent selection clearing
+        // EXCEPT: Don't preserve for regular-drag in text fields (let typing detection handle it)
+        if (selectedText) {
+          const selectionType = this._detectSelectionType();
+          const activeElement = document.activeElement;
+          const isInTextField = activeElement && activeElement.isConnected && this.isTextField(activeElement);
+
+          if (selectionType === 'regular-drag' && isInTextField) {
+            logger.debug('Skipping regular-drag preservation in text field - let typing detection handle it', {
+              selectionType,
+              textFieldType: activeElement.tagName
+            });
+          } else if (selectionType === 'regular-drag' ||
+                     selectionType === 'triple-click-drag' ||
+                     selectionType === 'post-drag-selection') {
+            this._startSelectionPreservation(selectionType);
+            logger.debug('Preservation started during drag operation', { selectionType });
+          }
+        }
         return;
       }
 
@@ -404,11 +576,16 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         return;
       }
 
+      // Detect selection type and start preservation
+      const selectionType = this._detectSelectionType();
+      this._startSelectionPreservation(selectionType);
+
       // Process the selection
       if (this.selectionManager) {
         this.logger.debug('Processing valid text selection', {
           textLength: selectedText.length,
-          sourceElement: selection?.anchorNode?.nodeName || 'unknown'
+          sourceElement: selection?.anchorNode?.nodeName || 'unknown',
+          selectionType: selectionType
         });
         await this.selectionManager.processSelection(selectedText, selection);
       } else {
@@ -808,7 +985,18 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this._mouseUpTimeout = setTimeout(() => {
         const selection = window.getSelection();
         if (selection && selection.toString().trim()) {
-          logger.debug('Processing selection after drag end', { wasShiftClick });
+          // Enhanced preservation for post-mouseup scenarios
+          const selectionType = this._detectSelectionType();
+          if (selectionType === 'triple-click-drag' || wasShiftClick) {
+            // Start preservation immediately for critical scenarios
+            this._startSelectionPreservation(selectionType);
+          }
+
+          logger.debug('Processing selection after drag end', {
+            wasShiftClick,
+            selectionType,
+            hasPreservation: this._isPreservationActive()
+          });
           this.processSelection();
         }
 
@@ -817,6 +1005,80 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this._mouseUpAnimationFrame = null;
       }, delay);
     });
+  }
+
+  /**
+   * Handle input events - simple text field typing detection for preservation
+   */
+  handleInput(event) {
+    if (!this.isActive) return;
+
+    const target = event.target;
+
+    // Check if target is a text field AND we have recent selection activity
+    if (this.isTextField(target) && this._isPreservationActive()) {
+      logger.debug('Text input detected in text field during preservation', {
+        target: target.tagName,
+        preservationReason: this._preservationState.reason,
+        timeSinceSelectionStart: Date.now() - this._preservationState.timestamp
+      });
+
+      // Start simple typing detection period to allow text replacement
+      this._startTypingDetection(target);
+    }
+  }
+
+  /**
+   * Start simple typing detection period to allow text replacement
+   */
+  _startTypingDetection(textField) {
+    // Clean up any existing typing detection
+    this._stopTypingDetection();
+
+    this.typingDetection = {
+      isActive: true,
+      startTime: Date.now(),
+      timeout: setTimeout(() => {
+        this._stopTypingDetection();
+      }, 800) // 800ms typing detection period
+    };
+
+    // Set global flags for cross-component communication
+    window.translateItTextFieldTypingActive = true;
+    window.translateItTextFieldTypingElement = textField;
+    window.translateItTextFieldTypingTimestamp = Date.now();
+
+    logger.debug('Text field typing detection started (SimpleTextSelectionHandler)', {
+      textField: textField.tagName,
+      duration: 800
+    });
+  }
+
+  /**
+   * Stop typing detection and clean up
+   */
+  _stopTypingDetection() {
+    if (this.typingDetection.timeout) {
+      clearTimeout(this.typingDetection.timeout);
+      this.typingDetection.timeout = null;
+    }
+
+    this.typingDetection.isActive = false;
+    this.typingDetection.startTime = 0;
+
+    // Clear global flags
+    window.translateItTextFieldTypingActive = false;
+    window.translateItTextFieldTypingElement = null;
+    window.translateItTextFieldTypingTimestamp = null;
+
+    logger.debug('Text field typing detection stopped (SimpleTextSelectionHandler)');
+  }
+
+  /**
+   * Clean up typing detection (alias for _stopTypingDetection)
+   */
+  cleanupTypingDetection() {
+    this._stopTypingDetection();
   }
 
   /**
@@ -883,11 +1145,47 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       ctrlPressed: this.ctrlKeyPressed,
       isDragging: this.isDragging,
       mouseDownTime: this.mouseDownTime,
-      currentSelection: this.getCurrentSelection()?.substring(0, 100)
+      currentSelection: this.getCurrentSelection()?.substring(0, 100),
+      preservation: {
+        active: this._isPreservationActive(),
+        reason: this._preservationState.reason,
+        remainingTime: this._preservationState.active ?
+          Math.max(0, this._preservationState.duration - (Date.now() - this._preservationState.timestamp)) : 0
+      },
+      typingDetection: {
+        isActive: this.typingDetection.isActive,
+        startTime: this.typingDetection.startTime,
+        timeSinceStart: this.typingDetection.isActive ? Date.now() - this.typingDetection.startTime : null
+      }
     };
   }
 
+  /**
+   * Check if typing detection is currently active
+   */
+  isTypingDetectionActive() {
+    return this.typingDetection.isActive;
+  }
+
+  /**
+   * Check if a specific element is the current typing target
+   */
+  isTypingTarget(element) {
+    return this.typingDetection.isActive && window.translateItTextFieldTypingElement === element;
+  }
+
   destroy() {
+    // Clean up preservation system
+    this._clearPreservationTimer();
+
+    // Clean up typing detection
+    this.cleanupTypingDetection();
+
+    // Clean up global reference
+    if (window.simpleTextSelectionHandlerInstance === this) {
+      window.simpleTextSelectionHandlerInstance = null;
+    }
+
     this.cleanup();
     // Reset singleton instance
     if (simpleTextSelectionHandlerInstance === this) {
