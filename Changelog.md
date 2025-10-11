@@ -1,3 +1,15 @@
+#### v1.4.4 – Released on October 12, 2025
+
+##### Added
+
+- The translation icon now automatically hides when text is entered in a textbox
+
+##### Fixed
+
+- **[69](https://github.com/iSegaro/Translate-It/issues/69)**: Fixed an issue where the selected text could become deselected unexpectedly
+
+---
+
 #### v1.4.3 – Released on October 09, 2025
 
 ##### Fixed
