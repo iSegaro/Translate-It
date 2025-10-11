@@ -56,9 +56,25 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
     // Bind methods
     this.handleDoubleClick = this.handleDoubleClick.bind(this);
+    this.handleTextInputStart = this.handleTextInputStart.bind(this);
+    this.handleTextInput = this.handleTextInput.bind(this);
 
     // Store last clicked element for position estimation
     this.lastClickedElement = null;
+
+    // Initialize typing detection state
+    this.typingDetection = {
+      isActive: false,
+      startTime: 0,
+      gracePeriod: 800,
+      detectedTextField: null,
+      originalSelection: null,
+      lastTypingTime: 0,
+      timeout: null
+    };
+
+    // Track typing listeners for cleanup
+    this._typingListeners = new Map(); // iconId -> {textField, handlers}
   }
 
   async activate() {
@@ -72,6 +88,9 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
       // Setup double-click listeners
       this.setupDoubleClickListeners();
+
+      // Setup typing detection listeners for text replacement scenarios
+      this.setupTypingDetectionListeners();
 
       // Setup postMessage listener for iframe requests
       this.setupPostMessageListener();
@@ -105,6 +124,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
       // Clear any processing flags
       this.doubleClickProcessing = false;
+
+      // Clean up typing detection
+      this.cleanupTypingDetection();
+
+      // Clean up typing listeners
+      this._cleanupAllTypingListeners();
 
       // Manually cleanup postMessage listener
       if (this.postMessageHandler) {
@@ -153,6 +178,46 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     } catch (error) {
       logger.error('Failed to setup double-click listeners:', error);
     }
+  }
+
+  /**
+   * Setup typing detection listeners for text replacement scenarios
+   */
+  setupTypingDetectionListeners() {
+    try {
+      // Listen for text input events (typing) on text fields
+      this.addEventListener(document, 'input', this.handleTextInput, {
+        capture: true,
+        critical: true
+      });
+
+      // Listen for keydown events to detect typing start
+      this.addEventListener(document, 'keydown', this.handleTextInputStart, {
+        capture: true,
+        critical: true
+      });
+
+      logger.debug('Text field typing detection listeners setup complete');
+
+    } catch (error) {
+      logger.error('Failed to setup typing detection listeners:', error);
+    }
+  }
+
+  /**
+   * Clean up typing detection
+   */
+  cleanupTypingDetection() {
+    if (this.typingDetection.timeout) {
+      clearTimeout(this.typingDetection.timeout);
+      this.typingDetection.timeout = null;
+    }
+
+    this.typingDetection.isActive = false;
+    this.typingDetection.detectedTextField = null;
+    this.typingDetection.originalSelection = null;
+
+    logger.debug('Text field typing detection cleaned up');
   }
 
   setupPostMessageListener() {
@@ -236,6 +301,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       return;
     }
 
+    // NEW: Prevent creating new icons during active typing
+    if (window.translateItTextFieldTypingActive) {
+      logger.debug('Double-click ignored - user is actively typing in text field');
+      return;
+    }
+
     // Mark processing start
     this.lastDoubleClickTime = Date.now();
     this.doubleClickProcessing = true;
@@ -250,6 +321,157 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     } catch (error) {
       this.doubleClickProcessing = false;
       logger.error('Error processing text field double-click:', error);
+    }
+  }
+
+  /**
+   * Handle text input start (keydown) - detect typing intent
+   */
+  handleTextInputStart(event) {
+    if (!this.isActive) return;
+
+    // Only process if it's a typing key (not special keys)
+    if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+      const target = event.target;
+
+      // Check if target is a text field and we have an active double-click scenario
+      if (this.isTextField(target) && this.doubleClickProcessing) {
+        const timeSinceDoubleClick = Date.now() - this.lastDoubleClickTime;
+
+        logger.debug('Text input start detected in text field after double-click', {
+          target: target.tagName,
+          key: event.key,
+          timeSinceDoubleClick: timeSinceDoubleClick
+        });
+
+        // FIXED: Ignore key presses that occur too quickly after double-click (likely incidental)
+        // This prevents false positives when user double-clicks while holding a key
+        if (timeSinceDoubleClick < 100) {
+          logger.debug('Ignoring key press - too soon after double-click (likely incidental)', {
+            key: event.key,
+            timeSinceDoubleClick: timeSinceDoubleClick
+          });
+          return;
+        }
+
+        // Start typing detection grace period
+        this._startTypingGracePeriod(target);
+
+        // NEW: Cancel any ongoing double-click processing when typing starts
+        if (this.doubleClickProcessing) {
+          this.doubleClickProcessing = false;
+          logger.debug('Cancelled double-click processing due to typing start');
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle text input events - detect ongoing typing
+   */
+  handleTextInput(event) {
+    if (!this.isActive) return;
+
+    const target = event.target;
+
+    // Check if this is a text field with active typing detection
+    if (this.isTextField(target) && this.typingDetection.isActive) {
+      this.typingDetection.lastTypingTime = Date.now();
+
+      logger.debug('Ongoing typing detected in text field', {
+        target: target.tagName,
+        timeSinceGraceStart: Date.now() - this.typingDetection.startTime
+      });
+
+      // Set global flag to prevent translation UI interference
+      window.translateItTextFieldTypingActive = true;
+      window.translateItTextFieldTypingElement = target;
+      window.translateItTextFieldTypingTimestamp = this.typingDetection.startTime;
+
+      // Extend the typing detection period
+      this._extendTypingDetection();
+    }
+  }
+
+  /**
+   * Start typing grace period to allow text replacement
+   */
+  _startTypingGracePeriod(textField) {
+    // Clean up any existing typing detection
+    this.cleanupTypingDetection();
+
+    // Get current selection for reference
+    const selection = window.getSelection();
+    const selectedText = selection ? selection.toString().trim() : '';
+
+    this.typingDetection = {
+      isActive: true,
+      startTime: Date.now(),
+      gracePeriod: 800,
+      detectedTextField: textField,
+      originalSelection: selectedText,
+      lastTypingTime: Date.now(),
+      timeout: setTimeout(() => {
+        this._endTypingGracePeriod();
+      }, this.typingDetection.gracePeriod)
+    };
+
+    // Set global flags for cross-component communication
+    window.translateItTextFieldTypingActive = true;
+    window.translateItTextFieldTypingElement = textField;
+    window.translateItTextFieldTypingStartTime = this.typingDetection.startTime;
+    window.translateItTextFieldTypingTimestamp = this.typingDetection.startTime;
+
+    logger.debug('Text field typing grace period started', {
+      textField: textField.tagName,
+      originalSelection: selectedText.substring(0, 30),
+      gracePeriod: this.typingDetection.gracePeriod
+    });
+  }
+
+  /**
+   * Extend typing detection period
+   */
+  _extendTypingDetection() {
+    // Clear existing timeout
+    if (this.typingDetection.timeout) {
+      clearTimeout(this.typingDetection.timeout);
+    }
+
+    // Extend the grace period
+    const extendedGracePeriod = 1200; // Longer period for ongoing typing
+    this.typingDetection.timeout = setTimeout(() => {
+      this._endTypingGracePeriod();
+    }, extendedGracePeriod);
+
+    logger.debug('Text field typing detection extended', {
+      extendedGracePeriod,
+      timeActive: Date.now() - this.typingDetection.startTime
+    });
+  }
+
+  /**
+   * End typing grace period
+   */
+  _endTypingGracePeriod() {
+    logger.debug('Text field typing grace period ended', {
+      duration: Date.now() - this.typingDetection.startTime,
+      textField: this.typingDetection.detectedTextField?.tagName
+    });
+
+    // Clean up typing detection
+    this.cleanupTypingDetection();
+
+    // Clear global flags
+    window.translateItTextFieldTypingActive = false;
+    window.translateItTextFieldTypingElement = null;
+    window.translateItTextFieldTypingStartTime = null;
+    window.translateItTextFieldTypingTimestamp = null;
+
+    // Also clear double-click processing flag if it's still active
+    if (this.doubleClickProcessing) {
+      this.doubleClickProcessing = false;
+      logger.debug('Cleared double-click processing flag after typing period');
     }
   }
 
@@ -389,6 +611,12 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
         return;
       }
 
+      // NEW: Additional check - don't create icon if typing has already started
+      if (window.translateItTextFieldTypingActive) {
+        logger.debug('Double-click processing cancelled - typing already active');
+        return;
+      }
+
       logger.debug('Processing text field selection', {
         text: selectedText.substring(0, 30) + '...',
         clickedElement: event.target?.tagName,
@@ -404,7 +632,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       }
 
       // Show translation UI
-      await this.showTranslationUI(selectedText, position);
+      await this.showTranslationUI(selectedText, position, actualTextField);
 
     } catch (error) {
       logger.error('Error processing text field double-click:', error);
@@ -607,7 +835,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   /**
    * Show translation UI using the same pattern as TextSelection system
    */
-  async showTranslationUI(selectedText, position) {
+  async showTranslationUI(selectedText, position, actualTextField = null) {
     // Check if WindowsManager should be allowed
     if (!(await this.shouldProcessWindowsManager())) {
       logger.info('WindowsManager is blocked by exclusion, skipping text field translation UI');
@@ -617,7 +845,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     // Use the same approach as TextSelection system
     if (window !== window.top) {
       // Iframe - request window creation in main frame (same as SelectionManager)
-      this.requestWindowCreationInMainFrame(selectedText, position);
+      this.requestWindowCreationInMainFrame(selectedText, position, actualTextField);
     } else {
       // Main frame - use WindowsManager directly
       const windowsManager = this.getWindowsManager();
@@ -630,6 +858,16 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
         // For text fields, always show icon first
         await windowsManager._showIcon(selectedText, position);
+
+        // NEW: Setup direct typing listener for the created icon
+        const iconId = windowsManager.state.iconClickContext?.iconId;
+        if (iconId) {
+          // Use actualTextField if available, otherwise fall back to the focused element
+          const textField = actualTextField || document.activeElement;
+          if (textField && this.isTextField(textField)) {
+            this._setupTypingListenerForIcon(textField, iconId);
+          }
+        }
       } else {
         logger.warn('WindowsManager not available in main frame');
       }
@@ -639,7 +877,7 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   /**
    * Request window creation in main frame (copied from SelectionManager)
    */
-  requestWindowCreationInMainFrame(selectedText, position) {
+  requestWindowCreationInMainFrame(selectedText, position, actualTextField = null) {
     try {
       // Import module for side effects (ensure module is loaded)
       import('@/features/windows/managers/core/WindowsConfig.js').then(() => {
@@ -648,7 +886,13 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
           frameId: ConfigUtils.generateFrameId(),
           selectedText: selectedText,
           position: position,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          // NEW: Include text field info for typing detection
+          textFieldInfo: actualTextField ? {
+            tagName: actualTextField.tagName,
+            id: actualTextField.id,
+            className: actualTextField.className
+          } : null
         };
 
         if (window.parent !== window) {
@@ -727,14 +971,134 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     }
   }
 
+  /**
+   * Setup direct typing listener for text field icons
+   * Simple and reliable approach: add one-time listener to detect first typing
+   */
+  _setupTypingListenerForIcon(textField, iconId) {
+    if (!textField || !iconId) {
+      logger.warn('Cannot setup typing listener - missing textField or iconId');
+      return;
+    }
+
+    logger.debug('Setting up direct typing listener for icon', {
+      textField: textField.tagName,
+      iconId: iconId
+    });
+
+    // Create handler for first typing detection
+    const handleFirstTyping = (event) => {
+      // Make sure this is the same text field
+      if (event.target === textField) {
+        logger.debug('First typing detected in text field - dismissing icon', {
+          textField: textField.tagName,
+          iconId: iconId,
+          eventType: event.type
+        });
+
+        // Dismiss the icon
+        this._dismissIconForTyping(iconId);
+
+        // Clean up listeners
+        this._cleanupTypingListener(iconId);
+      }
+    };
+
+    // Store listener info for cleanup
+    this._typingListeners.set(iconId, {
+      textField: textField,
+      handlers: [handleFirstTyping]
+    });
+
+    // Add one-time listeners (both input and keydown for comprehensive coverage)
+    textField.addEventListener('input', handleFirstTyping);
+    textField.addEventListener('keydown', handleFirstTyping);
+
+    logger.debug('Direct typing listener setup complete');
+  }
+
+  /**
+   * Dismiss icon when user starts typing
+   */
+  _dismissIconForTyping(iconId) {
+    try {
+      const windowsManager = this.getWindowsManager();
+      if (windowsManager && windowsManager.state.isIconMode) {
+        logger.debug('Dismissing icon due to typing', { iconId });
+
+        // Use WindowsManager to dismiss the icon
+        windowsManager.dismiss();
+      } else {
+        logger.debug('Icon already dismissed or WindowsManager not available', { iconId });
+      }
+    } catch (error) {
+      logger.error('Error dismissing icon for typing:', error);
+    }
+  }
+
+  /**
+   * Clean up typing listener for a specific icon
+   */
+  _cleanupTypingListener(iconId) {
+    const listenerInfo = this._typingListeners.get(iconId);
+    if (listenerInfo) {
+      const { textField, handlers } = listenerInfo;
+
+      // Remove all handlers from the text field
+      handlers.forEach(handler => {
+        textField.removeEventListener('input', handler);
+        textField.removeEventListener('keydown', handler);
+      });
+
+      // Remove from tracking
+      this._typingListeners.delete(iconId);
+
+      logger.debug('Cleaned up typing listener', { iconId });
+    }
+  }
+
+  /**
+   * Clean up all typing listeners
+   */
+  _cleanupAllTypingListeners() {
+    for (const iconId of this._typingListeners.keys()) {
+      this._cleanupTypingListener(iconId);
+    }
+    logger.debug('All typing listeners cleaned up');
+  }
+
   // Public API methods
   getStatus() {
     return {
       handlerActive: this.isActive,
       doubleClickProcessing: this.doubleClickProcessing,
       lastDoubleClickTime: this.lastDoubleClickTime,
-      timeSinceLastDoubleClick: this.lastDoubleClickTime ? Date.now() - this.lastDoubleClickTime : null
+      timeSinceLastDoubleClick: this.lastDoubleClickTime ? Date.now() - this.lastDoubleClickTime : null,
+      typingDetection: {
+        isActive: this.typingDetection.isActive,
+        startTime: this.typingDetection.startTime,
+        gracePeriod: this.typingDetection.gracePeriod,
+        timeSinceStart: this.typingDetection.isActive ? Date.now() - this.typingDetection.startTime : null,
+        detectedTextField: this.typingDetection.detectedTextField?.tagName || null,
+        originalSelection: this.typingDetection.originalSelection?.substring(0, 50) || null
+      }
     };
+  }
+
+  /**
+   * Check if typing detection is currently active
+   */
+  isTypingDetectionActive() {
+    return this.typingDetection.isActive &&
+           Date.now() - this.typingDetection.startTime < this.typingDetection.gracePeriod;
+  }
+
+  /**
+   * Check if a specific element is the current typing target
+   */
+  isTypingTarget(element) {
+    return this.typingDetection.isActive &&
+           this.typingDetection.detectedTextField === element;
   }
 }
 
