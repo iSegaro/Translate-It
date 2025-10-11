@@ -37,6 +37,7 @@ export class TextFieldHandler extends ResourceTracker {
     this.focusHandler = null;
     this.blurHandler = null;
     this.inputHandler = null;
+    this.keydownHandler = null;
 
     // Element detection service
     this.elementDetection = ElementDetectionService;
@@ -222,10 +223,30 @@ export class TextFieldHandler extends ResourceTracker {
         }
       };
 
+      // Keydown handler - detect Enter key for form submission
+      this.keydownHandler = (event) => {
+        if (!this.isActive) return;
+
+        const element = event.target;
+        if (!this.isEditableElement(element)) return;
+
+        // Detect Enter key without Ctrl/Shift (typically for submission)
+        if (event.key === 'Enter' && !event.ctrlKey && !event.shiftKey) {
+          // Short delay to check if field was actually submitted/cleared
+          setTimeout(() => {
+            if (this.isFieldEmpty(element) && this.textFieldIconManager) {
+              this.textFieldIconManager.cleanupElement(element);
+              logger.debug('Translation icon hidden: field cleared after Enter');
+            }
+          }, 150);
+        }
+      };
+
       // Register event listeners
       this.addEventListener(document, 'focusin', this.focusHandler, { capture: true, critical: true });
       this.addEventListener(document, 'focusout', this.blurHandler, { capture: true, critical: true });
       this.addEventListener(document, 'input', this.inputHandler, { capture: true, critical: true });
+      this.addEventListener(document, 'keydown', this.keydownHandler, { capture: true, critical: true });
 
       // Listen for resize and scroll events
       this.addEventListener(window, 'resize', () => {
@@ -282,6 +303,27 @@ export class TextFieldHandler extends ResourceTracker {
     }
 
     return false;
+  }
+
+  /**
+   * Check if editable field is empty (after potential submission)
+   * @param {HTMLElement} element - DOM element to check
+   * @returns {boolean} Whether field is empty
+   */
+  isFieldEmpty(element) {
+    if (!element) return true;
+
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+      const value = element.value || '';
+      return value.trim() === '';
+    }
+
+    if (element.contentEditable === 'true') {
+      const textContent = element.textContent || '';
+      return textContent.trim() === '';
+    }
+
+    return true;
   }
 
   // Public API methods
