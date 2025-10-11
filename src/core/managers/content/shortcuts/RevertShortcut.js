@@ -15,7 +15,7 @@ async function getActiveSelectElementManager() {
 
   if (!featureManager) {
     // FeatureManager might not be initialized yet, this can happen during startup
-    logger.warn('FeatureManager not available - attempting to initialize it');
+    logger.info('FeatureManager not available - attempting to initialize it');
 
     try {
       // Try to initialize FeatureManager dynamically
@@ -26,7 +26,7 @@ async function getActiveSelectElementManager() {
       if (featureManager) {
         logger.info('FeatureManager initialized successfully');
       } else {
-        logger.warn('Failed to initialize FeatureManager after attempt');
+        logger.info('Failed to initialize FeatureManager after attempt');
         return null;
       }
     } catch (error) {
