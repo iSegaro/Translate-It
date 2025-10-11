@@ -6,7 +6,7 @@
 
 ##### Fixed
 
-- **[69](https://github.com/iSegaro/Translate-It/issues/69)**: Fixed an issue where the selected text could become deselected unexpectedly
+- **[#69](https://github.com/iSegaro/Translate-It/issues/69)**: Fixed an issue where the selected text could become deselected unexpectedly
 
 ---
 
