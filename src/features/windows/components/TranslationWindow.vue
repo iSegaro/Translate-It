@@ -50,9 +50,9 @@
             />
           </svg>
         </button>
-        <button 
-          class="ti-action-btn" 
-          :disabled="!translatedText || translatedText.trim().length === 0" 
+        <button
+          class="ti-action-btn"
+          :disabled="!translatedText || translatedText.trim().length === 0"
           :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
           @click.stop="handleTTS"
         >
@@ -65,6 +65,29 @@
               v-if="!isSpeaking"
               fill="currentColor"
               d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+            />
+            <path
+              v-else
+              fill="currentColor"
+              d="M6 6h12v12H6z"
+            />
+          </svg>
+        </button>
+        <button
+          class="ti-action-btn ti-original-tts-btn"
+          :disabled="!originalText || originalText.trim().length === 0"
+          :title="isSpeaking ? 'Stop Original TTS' : 'Play Original Text'"
+          @click.stop="handleOriginalTTS"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              v-if="!isSpeaking"
+              fill="currentColor"
+              d="M12 15c1.66 0 3-1.34 3-3l.01-3c0-1.66-1.34-3-3.01-3S9 7.34 9 9v3c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.41 2.72 6.23 6 6.72V21h2v-2.28c3.28-.48 6-3.3 6-6.72h-1.7z"
             />
             <path
               v-else
@@ -346,6 +369,31 @@ const handleTTS = async () => {
   }
 };
 
+const handleOriginalTTS = async () => {
+  if (!originalText.value || originalText.value.trim().length === 0) {
+    logger.warn(`[TranslationWindow ${props.id}] No original text for TTS`);
+    return;
+  }
+
+  try {
+    if (tts.ttsState.value === 'playing') {
+      // Stop any currently playing TTS
+      await tts.stop();
+      logger.debug(`[TranslationWindow ${props.id}] Original TTS stopped`);
+    } else {
+      // Start TTS for original text
+      const result = await tts.speak(originalText.value, 'auto');
+      if (result) {
+        logger.debug(`[TranslationWindow ${props.id}] Original TTS started`);
+      } else {
+        logger.warn(`[TranslationWindow ${props.id}] Original TTS failed to start`);
+      }
+    }
+  } catch (error) {
+    logger.error(`[TranslationWindow ${props.id}] Original TTS failed:`, error);
+  }
+};
+
 
 // Enhanced drag handling with global state management
 const windowElement = ref(null);
@@ -447,6 +495,49 @@ const handleStartDrag = (event) => {
 .ti-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Special styling for original TTS button to distinguish it */
+.ti-original-tts-btn {
+  position: relative;
+}
+
+.ti-original-tts-btn::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #4CAF50, #2196F3);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.ti-original-tts-btn:hover::before {
+  opacity: 0.3;
+}
+
+/* Light theme specific styling for original TTS button */
+.translation-window.light .ti-original-tts-btn {
+  background-color: #e8f5e8 !important;
+  color: #2e7d32 !important;
+}
+
+.translation-window.light .ti-original-tts-btn:hover {
+  background-color: #c8e6c9 !important;
+}
+
+/* Dark theme specific styling for original TTS button */
+.translation-window.dark .ti-original-tts-btn {
+  background-color: #1b5e20 !important;
+  color: #81c784 !important;
+}
+
+.translation-window.dark .ti-original-tts-btn:hover {
+  background-color: #2e7d32 !important;
 }
 
 /* Theme-specific hover effects */
