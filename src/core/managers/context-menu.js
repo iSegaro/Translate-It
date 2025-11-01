@@ -585,8 +585,8 @@ export class ContextMenuManager extends ResourceTracker {
                 try {
                   const browserInfo = await browser.runtime.getBrowserInfo();
                   if (browserInfo.name === "Firefox") {
-                    // Use extension's options page for Firefox
-                    url = browser.runtime.getURL("html/options.html#help=shortcut");
+                    // Use extension's options page for Firefox with query param
+                    url = browser.runtime.getURL("html/options.html?tab=shortcuts");
                   } else {
                     // Use Chrome shortcuts page
                     url = "chrome://extensions/shortcuts";
@@ -609,7 +609,7 @@ export class ContextMenuManager extends ResourceTracker {
             logger.error("Could not open shortcuts page:", e);
             // Final fallback - try to open options page instead
             try {
-              await browser.tabs.create({ url: browser.runtime.getURL("html/options.html#help=shortcut") });
+              await browser.tabs.create({ url: browser.runtime.getURL("html/options.html?tab=shortcuts") });
             } catch (fallbackError) {
               logger.error("Failed to open fallback shortcuts page:", fallbackError);
             }
@@ -617,7 +617,25 @@ export class ContextMenuManager extends ResourceTracker {
           break;
 
         case HELP_MENU_ID:
-          await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+          // Check browser type for proper help navigation
+          if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
+            try {
+              const browserInfo = await browser.runtime.getBrowserInfo();
+              if (browserInfo.name === "Firefox") {
+                // Use query parameter for Firefox to ensure proper tab selection
+                await focusOrCreateTab(browser.runtime.getURL("html/options.html?tab=help"));
+              } else {
+                // Use hash for Chrome and other browsers
+                await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+              }
+            } catch (browserInfoError) {
+              logger.debug("Browser info not available, using default hash URL", browserInfoError);
+              await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+            }
+          } else {
+            // Fallback to hash URL
+            await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+          }
           break;
 
 
