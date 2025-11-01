@@ -55,7 +55,32 @@ backgroundService.initialize().then(() => {
     startMemoryMonitoring();
   }
   logger.info("[Background] Memory Garbage Collector initialized!");
-  
+
+  // Initialize keyboard shortcuts listener
+  if (browser.commands && browser.commands.onCommand) {
+    // Import command handler dynamically and register listener
+    (async function initializeShortcutsListener() {
+      try {
+        const { handleCommandEvent } = await import("@/handlers/command-handler.js");
+
+        if (typeof handleCommandEvent === 'function') {
+          // Register the command listener
+          browser.commands.onCommand.addListener(async (command, tab) => {
+            try {
+              await handleCommandEvent(command, tab);
+            } catch (error) {
+              logger.error(`Error handling command ${command}:`, error);
+            }
+          });
+
+          logger.info("Keyboard shortcuts listener registered successfully");
+        }
+      } catch (error) {
+        logger.error("Failed to register keyboard shortcuts listener:", error);
+      }
+    })();
+  }
+
 }).catch((error) => {
   logger.error("❌ [Background] Background service initialization failed:", error);
 });

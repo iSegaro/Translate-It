@@ -279,8 +279,21 @@ export class ContentMessageHandler extends ResourceTracker {
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
     try {
+      // If SelectElementManager is not available, try to load the feature on-demand
       if (!this.selectElementManager) {
-        throw new Error('SelectElementManager not available - FeatureManager dependency injection may have failed');
+        try {
+          // Import and load the selectElement feature directly
+          const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+          const selectElementHandler = await loadFeature('selectElement');
+
+          if (selectElementHandler) {
+            this.setSelectElementManager(selectElementHandler);
+          } else {
+            throw new Error('selectElement feature failed to load');
+          }
+        } catch (loadError) {
+          throw new Error('SelectElementManager not available - FeatureManager dependency injection may have failed and on-demand loading also failed');
+        }
       }
 
       // logger.trace("ContentMessageHandler: Activating SelectElementManager directly");

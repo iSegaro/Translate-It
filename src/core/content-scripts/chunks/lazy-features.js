@@ -588,8 +588,8 @@ export async function loadFeatureOnDemand(featureName) {
 // Feature categories (should match index.js)
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'],
-  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler'],
-  INTERACTIVE: ['selectElement'],
+  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'],
+  INTERACTIVE: [],
   ON_DEMAND: ['shortcut', 'textFieldIcon']
 };
 

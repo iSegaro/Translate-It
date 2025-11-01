@@ -297,9 +297,3 @@ function preloadRemainingFeatures() {
 
 // Export for debugging
 window.translateItContentScriptCore = contentScriptCore;
-window.translateItDebug = {
-  loadFeature,
-  featureLoadPromises,
-  interactionDetected,
-  FEATURE_CATEGORIES
-};
