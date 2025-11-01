@@ -57,6 +57,15 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
+import DOMPurify from 'dompurify'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+
+const openAccordion = ref('')
+const { t } = useI18n()
+const logger = getScopedLogger(LOG_COMPONENTS.OPTIONS, 'HelpTab')
 
 // Function to add target="_blank" only to external links
 const addTargetBlankToLinks = () => {
@@ -70,33 +79,6 @@ const addTargetBlankToLinks = () => {
     }
   })
 }
-
-// Watch for changes and process links
-watch([() => sanitizedShortcutHelp.value, () => sanitizedApiKeysHelp.value], () => {
-  nextTick(addTargetBlankToLinks)
-})
-
-// Process links when component mounts and when accordions are clicked
-onMounted(() => {
-  setTimeout(addTargetBlankToLinks, 200)
-
-  // Also process when accordion is clicked
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('.accordion-header')) {
-      setTimeout(addTargetBlankToLinks, 100)
-    }
-  })
-})
-
-import { useI18n } from 'vue-i18n'
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
-import DOMPurify from 'dompurify'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-
-const openAccordion = ref('')
-const { t } = useI18n()
-const logger = getScopedLogger(LOG_COMPONENTS.OPTIONS, 'HelpTab')
 
 const toggleAccordion = (section) => {
   openAccordion.value = openAccordion.value === section ? '' : section
@@ -127,22 +109,13 @@ ${t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:'}
   }
 })
 
-// Sanitized computed properties
-const sanitizedShortcutHelp = computed(() => {
-  return DOMPurify.sanitize(shortcutHelpContent.value)
-})
-
-const sanitizedApiKeysHelp = computed(() => {
-  return DOMPurify.sanitize(apiKeysHelpContent.value)
-})
-
 const apiKeysHelpContent = computed(() => {
   const content = `${t('help_api_keys_content') || 'This extension supports multiple translation providers. Some are free, while others require API keys:'}
 
 ## ${t('help_free_providers_title') || 'Free Providers (No API Key Required)'}
 
 - **Google Translate** - Uses the public Google Translate endpoint
-- **Microsoft Bing** - Uses the public Bing Translate endpoint  
+- **Microsoft Bing** - Uses the public Bing Translate endpoint
 - **Yandex Translate** - Uses the public Yandex Translate endpoint
 
 ## ${t('help_api_providers_title') || 'API-Based Providers (Require API Keys)'}
@@ -165,6 +138,57 @@ Your API keys are stored locally in your browser and are never shared with third
     logger.warn('API keys help markdown rendering failed:', error)
     return content.replace(/\n/g, '<br>')
   }
+})
+
+// Sanitized computed properties
+const sanitizedShortcutHelp = computed(() => {
+  return DOMPurify.sanitize(shortcutHelpContent.value)
+})
+
+const sanitizedApiKeysHelp = computed(() => {
+  return DOMPurify.sanitize(apiKeysHelpContent.value)
+})
+
+// Watch for changes and process links
+watch([sanitizedShortcutHelp, sanitizedApiKeysHelp], () => {
+  nextTick(addTargetBlankToLinks)
+})
+
+// Process links when component mounts and when accordions are clicked
+onMounted(() => {
+  setTimeout(addTargetBlankToLinks, 200)
+
+  // Check if user came from shortcuts menu and auto-open shortcuts section
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+
+    if (tabParam === 'shortcuts') {
+      logger.debug('Auto-opening shortcuts accordion for Firefox user');
+      // Auto-open the shortcuts section
+      openAccordion.value = 'shortcut';
+
+      // Scroll to shortcuts section after a brief delay
+      setTimeout(() => {
+        const shortcutsElement = document.querySelector('.accordion-item');
+        if (shortcutsElement) {
+          shortcutsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    } else if (tabParam === 'help') {
+      logger.debug('Firefox user accessing help tab via context menu');
+      // No auto-open needed for general help access, just log the navigation
+    }
+  } catch (e) {
+    logger.debug('Failed to check URL parameters for auto-opening accordion:', e);
+  }
+
+  // Also process when accordion is clicked
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.accordion-header')) {
+      setTimeout(addTargetBlankToLinks, 100)
+    }
+  })
 })
 </script>
 

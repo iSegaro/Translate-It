@@ -11,6 +11,7 @@ import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
@@ -150,24 +151,43 @@ async function getApiProviders() {
 async function deactivateSelectElementModeInAllTabs() {
   try {
     const tabs = await browser.tabs.query({});
+    let processedTabs = 0;
+
     for (const tab of tabs) {
       if (tab.id) {
-        // We send the message but don't wait for a response.
-        // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
-        browser.tabs
-          .sendMessage(tab.id, MessageFormat.create(
-            MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-            { forceDeactivate: true },
-            'context-menu'
-          ))
-          .catch(() => {
-            // It's normal for this to fail on tabs without the content script; ignore the error.
-          });
+        try {
+          // Check if tab is accessible before sending message
+          const tabAccess = await tabPermissionChecker.checkTabAccess(tab.id);
+
+          if (tabAccess.isAccessible) {
+            // We send the message but don't wait for a response.
+            // A try-catch block handles cases where content scripts aren't injected.
+            browser.tabs
+              .sendMessage(tab.id, MessageFormat.create(
+                MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+                { forceDeactivate: true },
+                'context-menu'
+              ))
+              .catch(() => {
+                // It's normal for this to fail on tabs without the content script; ignore the error.
+              });
+            processedTabs++;
+          } else {
+            logger.debug(`Skipping deactivation for restricted tab ${tab.id}: ${tabAccess.errorMessage}`);
+          }
+        } catch (permError) {
+          logger.debug(`Error checking permissions for tab ${tab.id}, skipping:`, permError);
+        }
       }
     }
+
     logger.info(
-      "Sent deactivation signal for Select Element mode to all tabs",
-      { tabsProcessed: tabs.length }
+      "Sent deactivation signal for Select Element mode to accessible tabs",
+      {
+        totalTabs: tabs.length,
+        processedTabs,
+        skippedTabs: tabs.length - processedTabs
+      }
     );
   } catch (e) {
     logger.error("Error trying to deactivate select element mode in all tabs:", e);
@@ -468,6 +488,14 @@ export class ContextMenuManager extends ResourceTracker {
     if (!tab || !tab.id) return;
 
     try {
+      // Check if tab is accessible before attempting activation
+      const tabAccess = await tabPermissionChecker.checkTabAccess(tab.id);
+
+      if (!tabAccess.isAccessible) {
+        logger.warn(`Cannot activate select element mode for tab ${tab.id}: ${tabAccess.errorMessage}`);
+        return;
+      }
+
       logger.info(`Activating select mode for tab ${tab.id} via central handler`);
       const message = {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
@@ -540,23 +568,74 @@ export class ContextMenuManager extends ResourceTracker {
 
         case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
           try {
-            const browserInfo = await browser.runtime.getBrowserInfo();
-            const url =
-              browserInfo.name === "Firefox" ?
-                browser.runtime.getURL("html/options.html#help=shortcut")
-              : "chrome://extensions/shortcuts";
+            let url;
+
+            // Check if current tab is accessible and determine appropriate shortcuts URL
+            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+
+            if (activeTab) {
+              // Check if current tab is accessible before determining shortcuts URL
+              const tabAccess = await tabPermissionChecker.checkTabAccess(activeTab.id);
+
+              if (!tabAccess.isAccessible) {
+                logger.debug(`Current tab is restricted (${tabAccess.errorMessage}), using fallback shortcuts URL`);
+              }
+
+              if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
+                try {
+                  const browserInfo = await browser.runtime.getBrowserInfo();
+                  if (browserInfo.name === "Firefox") {
+                    // Use extension's options page for Firefox with query param
+                    url = browser.runtime.getURL("html/options.html?tab=shortcuts");
+                  } else {
+                    // Use Chrome shortcuts page
+                    url = "chrome://extensions/shortcuts";
+                  }
+                } catch (browserInfoError) {
+                  logger.debug("Browser info not available, using default Chrome shortcuts URL", browserInfoError);
+                  url = "chrome://extensions/shortcuts";
+                }
+              } else {
+                // Fallback to Chrome shortcuts
+                url = "chrome://extensions/shortcuts";
+              }
+            } else {
+              // No active tab, use default behavior
+              url = "chrome://extensions/shortcuts";
+            }
+
             await browser.tabs.create({ url });
           } catch (e) {
-            logger.error(
-              "Could not determine browser type, opening for Chrome as default.",
-              e
-            );
-            await browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+            logger.error("Could not open shortcuts page:", e);
+            // Final fallback - try to open options page instead
+            try {
+              await browser.tabs.create({ url: browser.runtime.getURL("html/options.html?tab=shortcuts") });
+            } catch (fallbackError) {
+              logger.error("Failed to open fallback shortcuts page:", fallbackError);
+            }
           }
           break;
 
         case HELP_MENU_ID:
-          await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+          // Check browser type for proper help navigation
+          if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
+            try {
+              const browserInfo = await browser.runtime.getBrowserInfo();
+              if (browserInfo.name === "Firefox") {
+                // Use query parameter for Firefox to ensure proper tab selection
+                await focusOrCreateTab(browser.runtime.getURL("html/options.html?tab=help"));
+              } else {
+                // Use hash for Chrome and other browsers
+                await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+              }
+            } catch (browserInfoError) {
+              logger.debug("Browser info not available, using default hash URL", browserInfoError);
+              await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+            }
+          } else {
+            // Fallback to hash URL
+            await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+          }
           break;
 
 
