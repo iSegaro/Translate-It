@@ -1,8 +1,9 @@
-#### v1.4.5 – Released on November 1, 2025
+#### v1.4.6 – Released on November 1, 2025
 
 ##### Fixed
 
-- **[#71](https://github.com/iSegaro/Translate-It/issues/71)**: Fixed keyboard shortcuts support
+- **[#71](https://github.com/iSegaro/Translate-It/issues/71)**: Fixed an issue with keyboard shortcuts support.
+- Fixed issues with context menu items (Useful Help and Keyboard Shortcut).
 
 ---
 
