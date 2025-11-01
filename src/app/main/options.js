@@ -69,11 +69,12 @@ async function initializeApp() {
     await setI18nLocale(userLocale);
     logger.debug('✅ vue-i18n plugin locale set:', userLocale)
 
-    // Check for tab query parameter for Firefox shortcuts navigation
-    let initialRoute = '/';
+    // Check for tab query parameter for Firefox shortcuts navigation and hash URLs
+    let initialRoute = '/languages'; // Default to languages tab
     let shouldNavigateToHelp = false;
 
     try {
+      // First check query parameters (for Firefox shortcuts)
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
 
@@ -86,6 +87,21 @@ async function initializeApp() {
         // For Firefox help navigation, redirect to help tab
         initialRoute = '/help';
         logger.debug('Detected tab=help parameter, redirecting to help tab for Firefox');
+      } else {
+        // If no query parameter, check hash URL
+        const hash = window.location.hash.replace('#', '').replace('/', '');
+        if (hash === 'help' || hash === 'shortcuts') {
+          initialRoute = '/help';
+          logger.debug(`Detected hash #${hash}, redirecting to help tab`);
+        } else if (hash && hash !== '') {
+          // Use the hash path if it's valid
+          const validRoutes = ['languages', 'appearance', 'activation', 'prompt', 'api', 'import-export', 'advance', 'about', 'help'];
+          if (validRoutes.includes(hash)) {
+            initialRoute = `/${hash}`;
+            logger.debug(`Detected hash #${hash}, redirecting to ${initialRoute} tab`);
+          }
+        }
+        // If hash is empty or '/', keep default languages route
       }
     } catch (e) {
       logger.debug('Failed to parse URL parameters:', e);
@@ -96,7 +112,22 @@ async function initializeApp() {
     const router = createRouter({
       history: createWebHashHistory(),
       routes: [
-        { path: '/', redirect: initialRoute },
+        { path: '/', redirect: () => {
+          // Avoid infinite redirect by checking current hash
+          const currentHash = window.location.hash.replace('#', '').replace('/', '');
+          if (currentHash === '' || currentHash === '/') {
+            logger.debug(`Root redirect: current hash is empty, redirecting to ${initialRoute}`);
+            return initialRoute;
+          }
+          // If current hash matches a valid route, use it instead
+          const validRoutes = ['languages', 'appearance', 'activation', 'prompt', 'api', 'import-export', 'advance', 'about', 'help'];
+          if (validRoutes.includes(currentHash)) {
+            logger.debug(`Root redirect: current hash #${currentHash} is valid, using it`);
+            return `/${currentHash}`;
+          }
+          logger.debug(`Root redirect: using default route ${initialRoute}`);
+          return initialRoute;
+        }},
         { path: '/languages', component: LanguagesTab, name: 'languages' },
         { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/activation', component: ActivationTab, name: 'activation' },
