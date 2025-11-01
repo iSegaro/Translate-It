@@ -574,7 +574,12 @@ export class ContextMenuManager extends ResourceTracker {
             const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 
             if (activeTab) {
+              // Check if current tab is accessible before determining shortcuts URL
               const tabAccess = await tabPermissionChecker.checkTabAccess(activeTab.id);
+
+              if (!tabAccess.isAccessible) {
+                logger.debug(`Current tab is restricted (${tabAccess.errorMessage}), using fallback shortcuts URL`);
+              }
 
               if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
                 try {

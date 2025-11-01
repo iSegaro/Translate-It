@@ -386,30 +386,6 @@ const handleCopy = async () => {
   }
 };
 
-const handleTTS = async () => {
-  if (!translatedText.value || translatedText.value.trim().length === 0) {
-    logger.warn(`[TranslationWindow ${props.id}] No translation text for TTS`);
-    return;
-  }
-
-  try {
-    if (tts.ttsState.value === 'playing') {
-      // Stop TTS
-      await tts.stop();
-      logger.debug(`[TranslationWindow ${props.id}] TTS stopped`);
-    } else {
-      // Start TTS with unified composable
-      const result = await tts.speak(translatedText.value, 'auto');
-      if (result) {
-        logger.debug(`[TranslationWindow ${props.id}] TTS started`);
-      } else {
-        logger.warn(`[TranslationWindow ${props.id}] TTS failed to start`);
-      }
-    }
-  } catch (error) {
-    logger.error(`[TranslationWindow ${props.id}] TTS failed:`, error);
-  }
-};
 
 // Enhanced smart TTS handler that supports both original and translated text
 const handleSmartTTS = async () => {

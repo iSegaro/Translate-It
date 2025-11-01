@@ -292,7 +292,7 @@ export class ContentMessageHandler extends ResourceTracker {
             throw new Error('selectElement feature failed to load');
           }
         } catch (loadError) {
-          throw new Error('SelectElementManager not available - FeatureManager dependency injection may have failed and on-demand loading also failed');
+          throw new Error(`SelectElementManager not available - FeatureManager dependency injection may have failed and on-demand loading also failed: ${loadError.message}`);
         }
       }
 
