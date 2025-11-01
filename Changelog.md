@@ -1,4 +1,12 @@
-#### v1.4.6 – Released on November 1, 2025
+#### v1.4.7 – Released on November 01, 2025
+
+##### Fixed
+
+- Fixed options page opening issue.
+
+---
+
+#### v1.4.6 – Released on November 01, 2025
 
 ##### Fixed
 
