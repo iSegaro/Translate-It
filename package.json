@@ -1,6 +1,6 @@
 {
   "name": "translate-it",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "type": "module",
   "description": "Smart Translation Assistant",
   "scripts": {
