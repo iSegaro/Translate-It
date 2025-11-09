@@ -305,6 +305,12 @@ onMounted(async () => {
       color: var(--color-active-text, #1967d2);
       font-weight: var(--font-weight-medium);
     }
+
+    /* Dark mode styling for selected item */
+    :root.theme-dark &.selected {
+      background-color: #1a365d; /* Dark navy blue */
+      color: white;
+    }
   }
 
   .language-flag-image {
