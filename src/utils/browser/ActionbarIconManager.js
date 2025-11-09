@@ -178,9 +178,10 @@ class ActionbarIconManager {
       const providerIconPath = this.getProviderIconPath(provider);
       const providerIconBitmap = await this.loadImageBitmap(providerIconPath);
 
+      // Simple fallback check
       if (!mainIconBitmap || !providerIconBitmap) {
         const logger = getLogger();
-      logger.error('Failed to load main icon or provider icon');
+        logger.warn(`Icon loading failed - Main: ${!!mainIconBitmap}, Provider: ${!!providerIconBitmap} for ${provider}`);
         return null;
       }
 
@@ -235,11 +236,11 @@ class ActionbarIconManager {
       // Get full URL for the icon
       const fullUrl = browser.runtime.getURL(iconPath);
 
-      // Fetch the image
+      // Simple fetch with basic error handling
       const response = await fetch(fullUrl);
       if (!response.ok) {
         const logger = getLogger();
-        logger.error(`Failed to fetch image: ${fullUrl}`);
+        logger.warn(`Failed to fetch image: ${fullUrl} - Status: ${response.status}`);
         return null;
       }
 
@@ -247,7 +248,7 @@ class ActionbarIconManager {
       return await createImageBitmap(await response.blob());
     } catch (error) {
       const logger = getLogger();
-      logger.error('Error in loadImageBitmap:', error);
+      logger.warn(`Error in loadImageBitmap for ${iconPath}:`, error.message);
       return null;
     }
   }
