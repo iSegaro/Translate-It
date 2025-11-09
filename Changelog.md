@@ -1,8 +1,17 @@
+#### v1.4.8 – Released on November 09, 2025
+
+##### Fixed
+
+- **Dark Mode Action Toolbar**: Fixed visibility issues with action buttons (copy, paste, TTS) when the system is in dark mode
+
+---
+
 #### v1.4.7 – Released on November 01, 2025
 
 ##### Fixed
 
-- Fixed options page opening issue.
+- **[#71](https://github.com/iSegaro/Translate-It/issues/71)**: Fixed an issue with keyboard shortcuts support.
+- Fixed issues with context menu items (Useful Help and Keyboard Shortcut).
 
 ---
 
@@ -10,8 +19,7 @@
 
 ##### Fixed
 
-- **[#71](https://github.com/iSegaro/Translate-It/issues/71)**: Fixed an issue with keyboard shortcuts support.
-- Fixed issues with context menu items (Useful Help and Keyboard Shortcut).
+- Fixed options page opening issue.
 
 ---
 
