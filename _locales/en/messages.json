@@ -285,8 +285,9 @@
   },
   "custom_api_settings_api_url_label": { "message": "API URL" },
   "custom_api_url_placeholder": {
-    "message": "Enter the base URL of your custom API"
+    "message": "Enter the URL of your custom API's `v1/chat/completions` endpoint."
   },
+  "custom_api_url_example": { "message": "Example:" },
   "custom_api_settings_api_key_label": { "message": "API Key" },
   "custom_api_key_placeholder": { "message": "Paste your custom API key here" },
   "custom_api_settings_model_label": { "message": "Model" },
@@ -493,12 +494,15 @@
   "openai_custom_model_placeholder": {
     "message": "Enter custom model name"
   },
+  "openai_custom_model_label": { "message": "Custom Model Name" },
   "openrouter_custom_model_placeholder": {
     "message": "Enter custom model name (e.g., provider/model-name)"
   },
+  "openrouter_custom_model_label": { "message": "Custom Model Name" },
   "deepseek_custom_model_placeholder": {
     "message": "Enter custom model name"
   },
+  "deepseek_custom_model_label": { "message": "Custom Model Name" },
 
   "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },
   "ERRORS_INVALID_CONTEXT": {

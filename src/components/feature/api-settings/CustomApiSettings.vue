@@ -10,6 +10,9 @@
         v-model="customApiUrl"
         :placeholder="t('custom_api_url_placeholder') || 'Enter the base URL of your custom API'"
       />
+      <span class="setting-help-text">
+        {{ t('custom_api_url_example') || 'Example:' }} https://openai.com/v1/chat/completions
+      </span>
     </div>
     <div class="setting-group">
       <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
