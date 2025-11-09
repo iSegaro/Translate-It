@@ -115,8 +115,8 @@
   // Icon filters
   --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
   --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
-  --icon-opacity: 0.6;
-  --icon-hover-opacity: 0.9;
+  --icon-opacity: 0.8;
+  --icon-hover-opacity: 1;
   
   // Provider icon filtering
   --provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);
@@ -126,6 +126,8 @@
   --color-primary-alpha: rgba(88, 166, 255, 0.3);
   --color-surface-shadow: rgba(255, 255, 255, 0.1);
   --color-background-hover: rgba(255, 255, 255, 0.1);
+  --color-button-surface: rgba(32, 33, 36, 0.95);
+  --color-button-hover: rgba(255, 255, 255, 0.15);
   
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);

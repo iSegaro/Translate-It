@@ -272,6 +272,11 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   transition: all 0.2s ease;
   flex-shrink: 0;
   color: inherit;
+  opacity: var(--icon-opacity, 0.8);
+}
+
+.ti-tts-button:hover .ti-tts-icon {
+  opacity: var(--icon-hover-opacity, 1);
 }
 
 /* Ensure SVG paths inherit proper color */
