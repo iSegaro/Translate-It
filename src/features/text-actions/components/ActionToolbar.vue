@@ -372,4 +372,11 @@ const handleTTSStateChanged = (data) => {
   background: var(--color-surface, rgba(32, 33, 36, 0.9));
   border-color: var(--color-border, rgba(255, 255, 255, 0.15));
 }
+
+/* Ensure proper spacing for icon-only buttons */
+:root.theme-dark .ti-action-toolbar,
+.theme-dark .ti-action-toolbar {
+  /* Add slight padding to ensure icons have proper spacing */
+  gap: 2px;
+}
 </style>

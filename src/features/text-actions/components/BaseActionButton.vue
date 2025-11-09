@@ -169,16 +169,16 @@ const buttonClasses = computed(() => [
   white-space: nowrap;
 }
 
-/* Dark mode support */
+/* Dark mode support - remove background for icon-only display */
 :root.theme-dark .ti-variant-secondary,
 .theme-dark .ti-variant-secondary {
-  border-color: var(--color-border, rgba(255, 255, 255, 0.2));
-  background-color: var(--color-button-surface, rgba(32, 33, 36, 0.95));
+  border-color: transparent;
+  background-color: transparent;
 }
 
 :root.theme-dark .ti-variant-secondary:hover:not(.ti-disabled),
 .theme-dark .ti-variant-secondary:hover:not(.ti-disabled) {
-  background-color: var(--color-button-hover, rgba(255, 255, 255, 0.15));
-  border-color: var(--color-border, rgba(255, 255, 255, 0.3));
+  background-color: var(--color-background-hover, rgba(255, 255, 255, 0.1));
+  border-color: transparent;
 }
 </style>
