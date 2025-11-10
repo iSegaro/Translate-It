@@ -290,8 +290,9 @@
   },
   "custom_api_settings_api_url_label": { "message": "آدرس" },
   "custom_api_url_placeholder": {
-    "message": "آدرس پایه API خود را وارد کنید"
+    "message": "آدرس endpoint مخصوص `v1/chat/completions` مربوط به API سفارشی خود را وارد کنید."
   },
+  "custom_api_url_example": { "message": "مثال:" },
   "custom_api_settings_api_key_label": { "message": "کلید API" },
   "custom_api_key_placeholder": {
     "message": "کلید API خود را اینجا وارد کنید"
@@ -485,12 +486,15 @@
   "openai_custom_model_placeholder": {
     "message": "نام مدل سفارشی را وارد کنید"
   },
+  "openai_custom_model_label": { "message": "نام مدل سفارشی" },
   "openrouter_custom_model_placeholder": {
     "message": "نام مدل سفارشی را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
   },
+  "openrouter_custom_model_label": { "message": "نام مدل سفارشی" },
   "deepseek_custom_model_placeholder": {
     "message": "نام مدل سفارشی را وارد کنید"
   },
+  "deepseek_custom_model_label": { "message": "نام مدل سفارشی" },
 
   "browser_api_settings_title": { "message": "رابط ترجمه مرورگر" },
   "browser_api_description": {

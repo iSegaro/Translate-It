@@ -21,7 +21,7 @@
       </div>
       <div class="sidebar-section localization-controls">
         <h2>{{ t('localization_section_title') }}</h2>
-        <ul class="language-list">
+        <ul :class="['language-list', { 'rtl': selectedLanguage === 'fa' }]">
           <li
             v-for="lang in interfaceLanguages"
             :key="lang.code"
@@ -305,6 +305,12 @@ onMounted(async () => {
       color: var(--color-active-text, #1967d2);
       font-weight: var(--font-weight-medium);
     }
+
+    /* Dark mode styling for selected item */
+    :root.theme-dark &.selected {
+      background-color: #1a365d; /* Dark navy blue */
+      color: white;
+    }
   }
 
   .language-flag-image {
@@ -316,6 +322,12 @@ onMounted(async () => {
     vertical-align: middle;
     border-radius: 2px;
   }
+
+  /* RTL support using local class */
+  .language-list.rtl .language-flag-image {
+    margin-right: 0;
+    margin-left: 16px;
+  }
 }
 
 .sidebar-section.theme-controls {
@@ -325,11 +337,6 @@ onMounted(async () => {
 }
 
 :global(.options-layout.rtl) {
-  .language-flag-image {
-    margin-right: 0;
-    margin-left: 12px;
-  }
-
   .sidebar-section h2 {
     text-align: right;
   }

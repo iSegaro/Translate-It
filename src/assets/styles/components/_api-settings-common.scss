@@ -47,6 +47,19 @@
     line-height: 1.5;
     margin: 0;
   }
+
+  .setting-help-text {
+    display: block;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    margin-top: $spacing-xs;
+    line-height: 1.4;
+    font-family: monospace;
+    background: var(--color-surface, #f5f5f5);
+    padding: $spacing-xs;
+    border-radius: 4px;
+    border: 1px solid var(--color-border, #e0e0e0);
+  }
 }
 
 .api-link {

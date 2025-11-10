@@ -347,9 +347,10 @@ const handleTTSStateChanged = (data) => {
 .ti-mode-input,
 .ti-mode-output,
 .ti-mode-floating {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-background, rgba(255, 255, 255, 0.95));
   border-radius: 4px;
   padding: 2px;
+  border: 1px solid var(--color-border, transparent);
 }
 
 .ti-mode-inline,
@@ -361,12 +362,21 @@ const handleTTSStateChanged = (data) => {
 /* Content-based visibility - Removed to always show toolbar with full opacity
    Individual buttons now handle disabled state instead of toolbar transparency */
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ti-mode-input,
-  .ti-mode-output,
-  .ti-mode-floating {
-    background: rgba(0, 0, 0, 0.9);
-  }
+/* Dark mode support - using theme classes for consistency */
+:root.theme-dark .ti-mode-input,
+:root.theme-dark .ti-mode-output,
+:root.theme-dark .ti-mode-floating,
+.theme-dark .ti-mode-input,
+.theme-dark .ti-mode-output,
+.theme-dark .ti-mode-floating {
+  background: var(--color-surface, rgba(32, 33, 36, 0.9));
+  border-color: var(--color-border, rgba(255, 255, 255, 0.15));
+}
+
+/* Ensure proper spacing for icon-only buttons */
+:root.theme-dark .ti-action-toolbar,
+.theme-dark .ti-action-toolbar {
+  /* Add slight padding to ensure icons have proper spacing */
+  gap: 2px;
 }
 </style>

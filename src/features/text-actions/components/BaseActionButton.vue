@@ -137,25 +137,28 @@ const buttonClasses = computed(() => [
 
 /* Variant styles */
 .ti-variant-primary {
-  background-color: var(--primary-color, #007bff);
+  background-color: var(--color-primary, #007bff);
   color: white;
-  border: 1px solid var(--primary-color, #007bff);
+  border: 1px solid var(--color-primary, #007bff);
 }
 
 .ti-variant-primary:hover:not(.ti-disabled) {
-  background-color: var(--primary-color-hover, #0056b3);
+  background-color: var(--color-primary-dark, #0056b3);
 }
 
 .ti-variant-secondary {
   background-color: transparent;
-  color: var(--text-color, #333);
+  color: var(--color-text, #333);
   border: 1px solid transparent;
   margin: 0 1px;
+  opacity: var(--icon-opacity, 0.8);
+  transition: all 0.2s ease, opacity 0.2s ease;
 }
 
 .ti-variant-secondary:hover:not(.ti-disabled) {
   background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
-  border-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
+  border-color: var(--color-border, rgba(0, 0, 0, 0.1));
+  opacity: var(--icon-hover-opacity, 1);
 }
 
 /* Label */
@@ -166,11 +169,16 @@ const buttonClasses = computed(() => [
   white-space: nowrap;
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ti-variant-secondary {
-    border-color: rgba(255, 255, 255, 0.2);
-    background-color: rgba(0, 0, 0, 0.9);
-  }
+/* Dark mode support - remove background for icon-only display */
+:root.theme-dark .ti-variant-secondary,
+.theme-dark .ti-variant-secondary {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+:root.theme-dark .ti-variant-secondary:hover:not(.ti-disabled),
+.theme-dark .ti-variant-secondary:hover:not(.ti-disabled) {
+  background-color: var(--color-background-hover, rgba(255, 255, 255, 0.1));
+  border-color: transparent;
 }
 </style>
