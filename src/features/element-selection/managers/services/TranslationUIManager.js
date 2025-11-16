@@ -163,12 +163,20 @@ export class TranslationUIManager {
     const { data: translatedBatch, originalData: originalBatch } = data;
     const { textsToTranslate, originMapping, expandedTexts, textNodes } = request;
 
-    // Track multi-segment translations to avoid duplicate node replacement
+    // Enhanced tracking to prevent duplicate translations
     const processedNodeIds = new Set();
+    const processedOriginalTexts = new Set();
+    const appliedTranslations = new Map(); // Track which translations were applied to which nodes
 
     for (let i = 0; i < translatedBatch.length; i++) {
       const translatedText = translatedBatch[i];
       const originalText = originalBatch[i];
+
+      // Skip if we've already processed this exact original text
+      if (processedOriginalTexts.has(originalText)) {
+        this.logger.debug(`Skipping already processed original text: "${originalText.substring(0, 50)}..."`);
+        continue;
+      }
 
       // Find the original index in the expandedTexts array
       // Handle both actual text and empty line placeholders
@@ -200,6 +208,7 @@ export class TranslationUIManager {
       if (isEmptyLine) {
         this.logger.debug(`Preserving empty line segment at index ${expandedIndex}`);
         request.translatedSegments.set(expandedIndex, '\n'); // Use newline to preserve empty line structure
+        processedOriginalTexts.add(originalText);
         continue;
       }
 
@@ -211,9 +220,33 @@ export class TranslationUIManager {
       // Find nodes to update
       let nodesToUpdate = await this._findNodesToUpdate(textNodes, originalText, processedNodeIds);
 
+      // Additional validation: ensure we're not applying the same translation to unrelated nodes
+      if (nodesToUpdate.length > 0) {
+        nodesToUpdate = this._filterValidNodesForTranslation(nodesToUpdate, originalText, originalTextKey, appliedTranslations);
+      }
+
       // Mark nodes as processed for multi-segment translations
       if (isMultiSegment && nodesToUpdate.length > 0) {
-        nodesToUpdate.forEach(node => processedNodeIds.add(node));
+        nodesToUpdate.forEach(node => {
+          processedNodeIds.add(node);
+          // Track which translation was applied to this node
+          appliedTranslations.set(node, {
+            originalText: originalText,
+            originalTextKey: originalTextKey,
+            translatedText: translatedText,
+            isMultiSegment: true
+          });
+        });
+      } else if (nodesToUpdate.length > 0) {
+        // Also track single segment translations
+        nodesToUpdate.forEach(node => {
+          appliedTranslations.set(node, {
+            originalText: originalText,
+            originalTextKey: originalTextKey,
+            translatedText: translatedText,
+            isMultiSegment: false
+          });
+        });
       }
 
       if (nodesToUpdate.length > 0) {
@@ -225,6 +258,9 @@ export class TranslationUIManager {
         }
 
         request.translatedSegments.set(expandedIndex, translatedText);
+        processedOriginalTexts.add(originalText);
+      } else {
+        this.logger.debug(`No valid nodes found for translation: "${originalText.substring(0, 50)}..."`);
       }
     }
   }
@@ -234,55 +270,254 @@ export class TranslationUIManager {
    * @private
    */
   async _findNodesToUpdate(textNodes, originalText, processedNodeIds) {
-    // Try exact match first
-    let nodesToUpdate = textNodes.filter(node => {
+    const originalTextTrimmed = originalText.trim();
+
+    // Create a map of node text content to nodes for faster lookup
+    const nodeTextMap = new Map();
+    textNodes.forEach(node => {
+      if (processedNodeIds.has(node)) return;
+
       const nodeText = node.textContent.trim();
-      // Skip nodes that have already been processed
-      if (processedNodeIds.has(node)) return false;
-      return nodeText === originalText.trim();
+      const nodeFullText = node.textContent; // Keep full text for better matching
+
+      if (!nodeTextMap.has(nodeText)) {
+        nodeTextMap.set(nodeText, []);
+      }
+      nodeTextMap.get(nodeText).push({ node, fullText: nodeFullText });
     });
 
-    // If no exact match, the text might be split across multiple nodes
-    if (nodesToUpdate.length === 0) {
-      nodesToUpdate = await this._findNodesWithPartialMatch(textNodes, originalText, processedNodeIds);
+    // Priority 1: Exact trimmed match
+    if (nodeTextMap.has(originalTextTrimmed)) {
+      return nodeTextMap.get(originalTextTrimmed).map(item => item.node);
     }
 
-    return nodesToUpdate;
+    // Priority 2: Exact full text match
+    for (const [nodeText, nodeList] of nodeTextMap) {
+      for (const { node, fullText } of nodeList) {
+        if (fullText === originalText) {
+          return [node];
+        }
+      }
+    }
+
+    // Priority 3: Handle multi-segment text (text with newlines)
+    if (originalTextTrimmed.includes('\n')) {
+      return this._findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap);
+    }
+
+    // Priority 4: Partial match with high confidence
+    return this._findNodesWithConfidentPartialMatch(textNodes, originalText, processedNodeIds);
   }
 
   /**
-   * Find nodes using partial matching for split text
+   * Find nodes for multi-segment text (text with newlines)
    * @private
    */
-  async _findNodesWithPartialMatch(textNodes, originalText, processedNodeIds) {
-    const originalTextClean = originalText.trim();
-    let nodesToUpdate = [];
+  _findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap) {
+    const segments = originalText.trim().split('\n').filter(seg => seg.trim().length > 0);
 
-    // Special handling for text that might contain newlines
-    if (originalTextClean.includes('\n') || originalTextClean.includes('...')) {
-      const textParts = originalTextClean.split(/[\n...]+/).filter(part => part.length > 10);
+    if (segments.length === 0) return [];
 
-      if (textParts.length > 0) {
-        // Find nodes that contain any of the significant parts
-        nodesToUpdate = textNodes.filter(node => {
-          if (processedNodeIds.has(node)) return false;
-          const nodeText = node.textContent.trim();
-          return textParts.some(part =>
-            nodeText.includes(part) || part.includes(nodeText)
-          );
-        });
+    // Find nodes that contain the most substantial segments
+    const candidateNodes = [];
+
+    for (const segment of segments) {
+      const segmentTrimmed = segment.trim();
+      if (segmentTrimmed.length < 5) continue; // Skip very short segments
+
+      // Look for exact segment match
+      if (nodeTextMap.has(segmentTrimmed)) {
+        candidateNodes.push(...nodeTextMap.get(segmentTrimmed).map(item => item.node));
       }
-    } else {
-      // For non-split text, try substring matching
-      const firstPart = originalTextClean.substring(0, Math.min(50, originalTextClean.length));
-      nodesToUpdate = textNodes.filter(node => {
-        if (processedNodeIds.has(node)) return false;
-        const nodeText = node.textContent.trim();
-        return nodeText.includes(firstPart) || firstPart.includes(nodeText);
-      });
     }
 
-    return nodesToUpdate;
+    // If we found candidate nodes, return the most relevant ones
+    if (candidateNodes.length > 0) {
+      // Remove duplicates and already processed nodes
+      const uniqueNodes = [...new Set(candidateNodes)].filter(node => !processedNodeIds.has(node));
+
+      // If we have multiple candidates, prefer the one with the most substantial content
+      if (uniqueNodes.length > 1) {
+        return uniqueNodes.sort((a, b) => {
+          const aLength = a.textContent.trim().length;
+          const bLength = b.textContent.trim().length;
+          return bLength - aLength; // Prefer longer content
+        }).slice(0, 1); // Return only the best match
+      }
+
+      return uniqueNodes;
+    }
+
+    return [];
+  }
+
+  /**
+   * Find nodes with confident partial matching
+   * @private
+   */
+  _findNodesWithConfidentPartialMatch(textNodes, originalText, processedNodeIds) {
+    const originalTextClean = originalText.trim();
+    const originalTextLower = originalTextClean.toLowerCase();
+
+    // Create scoring system for node matching
+    const nodeScores = new Map();
+
+    textNodes.forEach(node => {
+      if (processedNodeIds.has(node)) return;
+
+      const nodeText = node.textContent.trim();
+      const nodeTextLower = nodeText.toLowerCase();
+
+      // Skip very short matches
+      if (nodeText.length < 3) return;
+
+      let score = 0;
+
+      // Exact match gets highest score
+      if (nodeText === originalTextClean) {
+        score = 100;
+      }
+      // Contains relationship
+      else if (nodeText.includes(originalTextClean)) {
+        score = 80;
+      }
+      else if (originalTextClean.includes(nodeText)) {
+        score = 70;
+      }
+      // Substring matching with length consideration
+      else {
+        const maxLen = Math.max(nodeText.length, originalTextClean.length);
+        const minLen = Math.min(nodeText.length, originalTextClean.length);
+
+        // If one is much shorter than the other, check if it's a meaningful substring
+        if (minLen / maxLen > 0.3) { // At least 30% length match
+          const longer = nodeText.length > originalTextClean.length ? nodeText : originalTextClean;
+          const shorter = nodeText.length > originalTextClean.length ? originalTextClean : nodeText;
+
+          if (longer.includes(shorter)) {
+            score = (minLen / maxLen) * 60;
+          }
+        }
+      }
+
+      // Additional scoring for exact word matches
+      if (score > 0 && score < 100) {
+        const originalWords = originalTextLower.split(/\s+/);
+        const nodeWords = nodeTextLower.split(/\s+/);
+
+        const commonWords = originalWords.filter(word =>
+          word.length > 2 && nodeWords.includes(word)
+        );
+
+        if (commonWords.length > 0) {
+          score += (commonWords.length / Math.max(originalWords.length, nodeWords.length)) * 20;
+        }
+      }
+
+      if (score > 30) { // Threshold for confident match
+        nodeScores.set(node, score);
+      }
+    });
+
+    // Sort by score and return the best match
+    const sortedNodes = Array.from(nodeScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+
+    return sortedNodes.length > 0 ? [sortedNodes[0]] : [];
+  }
+
+  /**
+   * Filter valid nodes for translation to prevent incorrect assignments
+   * @private
+   */
+  _filterValidNodesForTranslation(nodesToUpdate, originalText, originalTextKey, appliedTranslations) {
+    if (nodesToUpdate.length === 0) return nodesToUpdate;
+
+    const originalTextTrimmed = originalText.trim();
+    const originalTextKeyTrimmed = originalTextKey ? originalTextKey.trim() : '';
+
+    return nodesToUpdate.filter(node => {
+      const nodeText = node.textContent.trim();
+
+      // If this node already has a translation that's completely different, skip it
+      if (appliedTranslations.has(node)) {
+        const existingTranslation = appliedTranslations.get(node);
+
+        // If the existing translation is for a very different original text, skip
+        if (existingTranslation.originalTextKey && existingTranslation.originalTextKey !== originalTextKey) {
+          const existingTrimmed = existingTranslation.originalTextKey.trim();
+          const currentTrimmed = originalTextKeyTrimmed;
+
+          // Check if they're substantially different
+          if (this._areTextsSubstantiallyDifferent(existingTrimmed, currentTrimmed)) {
+            this.logger.debug(`Skipping node with existing different translation`, {
+              nodeText: nodeText.substring(0, 30),
+              existingOriginal: existingTrimmed.substring(0, 30),
+              currentOriginal: currentTrimmed.substring(0, 30)
+            });
+            return false;
+          }
+        }
+      }
+
+      // Additional validation: ensure node text is reasonable match for original
+      if (nodeText.length < 3) return false; // Skip very short nodes
+
+      // For very long original texts, ensure node has substantial content
+      if (originalTextTrimmed.length > 200 && nodeText.length < 20) {
+        return false;
+      }
+
+      // Check word overlap for confidence
+      const nodeWords = nodeText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const originalWords = originalTextTrimmed.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+      if (nodeWords.length > 0 && originalWords.length > 0) {
+        const commonWords = nodeWords.filter(word => originalWords.includes(word));
+        const overlapRatio = commonWords.length / Math.max(nodeWords.length, originalWords.length);
+
+        // Require at least 20% word overlap for confidence
+        if (overlapRatio < 0.2) {
+          this.logger.debug(`Node rejected due to insufficient word overlap`, {
+            nodeText: nodeText.substring(0, 30),
+            originalText: originalTextTrimmed.substring(0, 30),
+            overlapRatio
+          });
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Check if two texts are substantially different
+   * @private
+   */
+  _areTextsSubstantiallyDifferent(text1, text2) {
+    if (text1 === text2) return false;
+
+    // If one is empty and the other isn't
+    if ((text1.length === 0) !== (text2.length === 0)) return true;
+
+    // If length difference is more than 50%
+    const maxLength = Math.max(text1.length, text2.length);
+    const minLength = Math.min(text1.length, text2.length);
+    if (minLength / maxLength < 0.5) return true;
+
+    // Check word overlap
+    const words1 = text1.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const words2 = text2.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    if (words1.length > 0 && words2.length > 0) {
+      const commonWords = words1.filter(word => words2.includes(word));
+      const overlapRatio = commonWords.length / Math.max(words1.length, words2.length);
+      return overlapRatio < 0.3; // Less than 30% word overlap means substantially different
+    }
+
+    return false;
   }
 
   /**
@@ -290,10 +525,18 @@ export class TranslationUIManager {
    * @private
    */
   async _handleMultiSegmentTranslation(nodesToUpdate, request, expandedIndex, originalIndex, originalTextKey, translatedBatch, originalBatch) {
-    const { expandedTexts, originMapping, translatedSegments } = request;
+    const { expandedTexts, originMapping, translatedSegments, textNodes } = request;
+
+    // Enhanced node tracking to prevent incorrect assignments
+    const targetNodeTexts = new Set();
+    nodesToUpdate.forEach(node => {
+      targetNodeTexts.add(node.textContent.trim());
+      targetNodeTexts.add(node.textContent); // Include full text for better matching
+    });
 
     // Collect all related translations for this multi-segment text
     const allSegments = [];
+    const segmentMappings = [];
 
     // Find all segments that belong to the same original text
     for (let j = 0; j < expandedTexts.length; j++) {
@@ -302,33 +545,39 @@ export class TranslationUIManager {
         // Handle empty lines
         if (isEmptyLine) {
           allSegments.push('\n');
+          segmentMappings.push({ type: 'empty', originalIndex: j });
           continue;
         }
 
         // First check if we already have the translation from translatedSegments
         if (translatedSegments.has(j)) {
           allSegments.push(translatedSegments.get(j));
+          segmentMappings.push({ type: 'cached', originalIndex: j });
           continue;
         }
 
         // Find the translated text for this segment using originalBatch->translatedBatch mapping
         const originalSegment = expandedTexts[j];
         let segmentTranslation = null;
+        let batchIndex = -1;
 
         // Find the index in originalBatch that matches our segment
         for (let k = 0; k < originalBatch.length; k++) {
           if (originalBatch[k] === originalSegment && k < translatedBatch.length) {
             segmentTranslation = translatedBatch[k];
+            batchIndex = k;
             break;
           }
         }
 
         if (segmentTranslation) {
           allSegments.push(segmentTranslation);
+          segmentMappings.push({ type: 'translated', originalIndex: j, batchIndex });
         } else {
           // Fallback: use original segment if translation not found
           this.logger.warn(`Translation not found for segment: "${originalSegment}"`);
           allSegments.push(originalSegment);
+          segmentMappings.push({ type: 'fallback', originalIndex: j });
         }
       }
     }
@@ -336,8 +585,24 @@ export class TranslationUIManager {
     this.logger.debug(`Multi-segment translation collected:`, {
       originalIndex,
       segmentCount: allSegments.length,
-      segments: allSegments.map((s, i) => ({ index: i, content: s.substring(0, 50) + (s.length > 50 ? '...' : '') }))
+      targetNodeTexts: Array.from(targetNodeTexts),
+      segments: allSegments.map((s, i) => ({
+        index: i,
+        content: s.substring(0, 50) + (s.length > 50 ? '...' : ''),
+        mapping: segmentMappings[i]
+      }))
     });
+
+    // Validate that this translation should be applied to these nodes
+    const shouldApplyTranslation = this._validateNodeSegmentMatch(nodesToUpdate, originalTextKey, allSegments);
+
+    if (!shouldApplyTranslation) {
+      this.logger.warn(`Skipping multi-segment translation due to node-segment mismatch`, {
+        nodeTexts: Array.from(targetNodeTexts),
+        originalTextKey: originalTextKey.substring(0, 100)
+      });
+      return;
+    }
 
     // Combine all segments into a single translation with proper spacing
     let combinedTranslation = allSegments.join('');
@@ -365,11 +630,64 @@ export class TranslationUIManager {
     // Create a translation map with the combined translation
     const translationMap = new Map();
     nodesToUpdate.forEach(node => {
-      const nodeText = node.textContent.trim();
-      translationMap.set(nodeText, combinedTranslation);
+      // Use both full text and trimmed text as keys for robustness
+      const nodeFullText = node.textContent;
+      const nodeTrimmedText = nodeFullText.trim();
+
+      translationMap.set(nodeTrimmedText, combinedTranslation);
+      if (nodeFullText !== nodeTrimmedText) {
+        translationMap.set(nodeFullText, combinedTranslation);
+      }
     });
 
     await this.applyTranslationsToNodes(nodesToUpdate, translationMap);
+  }
+
+  /**
+   * Validate that nodes match segments for multi-segment translation
+   * @private
+   */
+  _validateNodeSegmentMatch(nodesToUpdate, originalTextKey, segments) {
+    if (nodesToUpdate.length === 0) return false;
+
+    const originalTextTrimmed = originalTextKey.trim();
+    const nonEmptySegments = segments.filter(s => s.trim().length > 0);
+
+    // For single node, check if it's reasonable to apply multi-segment translation
+    if (nodesToUpdate.length === 1) {
+      const node = nodesToUpdate[0];
+      const nodeText = node.textContent.trim();
+
+      // If node text is very short but we have long segments, this might be mismatch
+      if (nodeText.length < 10 && nonEmptySegments.some(s => s.trim().length > 50)) {
+        this.logger.debug(`Node text too short for multi-segment translation`, {
+          nodeText: nodeText.substring(0, 30),
+          segmentCount: nonEmptySegments.length
+        });
+        return false;
+      }
+
+      // Check if node text is a substring of the original or vice versa
+      if (nodeText === originalTextTrimmed ||
+          originalTextTrimmed.includes(nodeText) ||
+          nodeText.includes(originalTextTrimmed)) {
+        return true;
+      }
+
+      // Check word overlap for confidence
+      const nodeWords = nodeText.toLowerCase().split(/\s+/);
+      const originalWords = originalTextTrimmed.toLowerCase().split(/\s+/);
+      const commonWords = nodeWords.filter(word =>
+        word.length > 2 && originalWords.includes(word)
+      );
+
+      // If at least 30% of words match, consider it valid
+      const wordOverlapRatio = commonWords.length / Math.max(nodeWords.length, originalWords.length);
+      return wordOverlapRatio >= 0.3;
+    }
+
+    // For multiple nodes, this is more likely to be correct
+    return true;
   }
 
   /**
