@@ -112,7 +112,22 @@ function processTextIntoSegments(text, config) {
   // For short texts, keep them intact
   if (text.length <= config.maxSegmentLength) {
     if (config.splitOnDoubleNewlines) {
-      return text.split(/\n/);
+      // Split on newlines but preserve newline characters as separate segments
+      const parts = text.split(/\n/);
+      const segments = [];
+
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].length > 0) {
+          segments.push(parts[i]);
+        }
+
+        // Add newline segment between parts (but not after the last one)
+        if (i < parts.length - 1) {
+          segments.push('\n');
+        }
+      }
+
+      return segments;
     }
     return [text];
   }
@@ -121,11 +136,33 @@ function processTextIntoSegments(text, config) {
   let segments = [];
 
   if (config.splitOnDoubleNewlines) {
-    // Split on single newlines to preserve empty lines
-    segments = text.split(/\n/);
+    // Split on newlines but preserve newline characters as separate segments
+    const parts = text.split(/\n/);
+
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].length > 0) {
+        segments.push(parts[i]);
+      }
+
+      // Add newline segment between parts (but not after the last one)
+      if (i < parts.length - 1) {
+        segments.push('\n');
+      }
+    }
   } else {
-    // Split on single newlines for more granular control
-    segments = text.split(/\n/);
+    // Split on newlines but preserve newline characters as separate segments
+    const parts = text.split(/\n/);
+
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].length > 0) {
+        segments.push(parts[i]);
+      }
+
+      // Add newline segment between parts (but not after the last one)
+      if (i < parts.length - 1) {
+        segments.push('\n');
+      }
+    }
   }
 
   // Further split very long segments
