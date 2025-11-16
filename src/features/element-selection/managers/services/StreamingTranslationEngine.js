@@ -43,12 +43,7 @@ export class StreamingTranslationEngine {
 
     const shouldUseStreaming = payloadSize > STREAMING_THRESHOLD || segmentCount > 3;
 
-    this.logger.debug("Streaming decision:", {
-      payloadSize,
-      segmentCount,
-      threshold: STREAMING_THRESHOLD,
-      shouldUseStreaming
-    });
+    this.logger.debug(`Streaming decision: ${segmentCount} segments (${payloadSize} chars) → ${shouldUseStreaming ? 'streaming' : 'direct'}`);
 
     return shouldUseStreaming;
   }
@@ -107,15 +102,12 @@ export class StreamingTranslationEngine {
         messageId,
       };
 
-      this.logger.debug("Sending direct translation request", {
-        messageId,
-        payloadSize: jsonPayload.length
-      });
+      this.logger.debug(`Sending direct translation request ${messageId} (${jsonPayload.length} chars)`);
 
       // Send request and wait for result
       const result = await sendRegularMessage(translationRequest);
 
-      this.logger.debug("Direct translation request completed", result);
+      this.logger.debug(`Direct translation request ${messageId} completed: ${result?.success ? 'success' : 'failed'}`);
 
       return result;
     } catch (error) {
@@ -168,11 +160,7 @@ export class StreamingTranslationEngine {
         messageId,
       };
 
-      this.logger.debug("Sending unified translation request", {
-        messageId,
-        segmentCount,
-        payloadSize: jsonPayload.length
-      });
+      this.logger.debug(`Sending unified translation request ${messageId} (${segmentCount} segments)`);
 
       // Register streaming response handler for this request
       this.streamingHandler.registerHandler(messageId, {
@@ -185,7 +173,7 @@ export class StreamingTranslationEngine {
       // Send through unified messaging system (will coordinate streaming/regular)
       const result = await sendMessage(translationRequest);
 
-      this.logger.debug("Unified translation request completed", result);
+      this.logger.debug(`Unified translation request ${messageId} completed: ${result?.success ? 'success' : 'failed'}`);
 
       // Return the result for non-streaming translations
       return result;
@@ -202,13 +190,7 @@ export class StreamingTranslationEngine {
   processStreamUpdate(message) {
     const { messageId, data } = message;
 
-    this.logger.debug(`Received stream update:`, {
-      messageId,
-      success: data?.success,
-      batchIndex: data?.batchIndex,
-      translatedBatchLength: data?.data?.length,
-      originalBatchLength: data?.originalData?.length
-    });
+    this.logger.debug(`Stream update ${messageId}: batch ${data?.batchIndex}, ${data?.data?.length || 0} segments`);
 
     // Delegate to UI manager for DOM updates
     return this.orchestrator.uiManager.processStreamUpdate(message);

@@ -33,10 +33,7 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
     return { expandedTexts: [], originMapping: [], originalToExpandedIndices: new Map() };
   }
 
-  logger.debug(`Expanding ${textsToTranslate.length} texts for translation`, {
-    useOptimization: config.useOptimization,
-    maxSegmentLength: config.maxSegmentLength
-  });
+  logger.debug(`Expanding ${textsToTranslate.length} texts for translation (max segment: ${config.maxSegmentLength} chars)`);
 
   if (!config.useOptimization) {
     return expandTextsLegacy(textsToTranslate);
@@ -49,10 +46,11 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
 
   textsToTranslate.forEach((originalText, originalIndex) => {
     const segments = processTextIntoSegments(originalText, config);
-    logger.debug(`Processing original text ${originalIndex}: "${originalText}"`, {
-      segments: segments.map((s, i) => ({ index: i, content: `"${s}"`, length: s.length, isEmpty: s.length === 0 })),
-      segmentsCount: segments.length
-    });
+
+    // Only log detailed info for longer texts that are actually being segmented
+    if (originalText.length > 100 && segments.length > 1) {
+      logger.debug(`Text ${originalIndex}: split into ${segments.length} segments (${originalText.length} chars)`);
+    }
 
     const currentExpandedIndices = [];
 
@@ -61,11 +59,6 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
 
       // Special handling for empty lines - preserve as structural markers
       if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
-        logger.debug(`Empty line detected at segment ${segmentIndex}`, {
-          segment: `"${segment}"`,
-          segmentIndex,
-          originalIndex
-        });
         // Add empty line placeholder for structure preservation
         expandedTexts.push('\n'); // Use simple newline for empty lines
         originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
@@ -75,7 +68,6 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
 
       // Skip very short segments unless configured to preserve them
       if (!config.preserveShortSegments && trimmedSegment.length < config.minTextLength) {
-        logger.debug(`Skipping short segment: "${trimmedSegment}"`);
         return;
       }
 
@@ -94,7 +86,7 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
     originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
   });
 
-  logger.debug(`Text expansion: ${textsToTranslate.length} → ${expandedTexts.length} segments`);
+  logger.debug(`Text expansion complete: ${textsToTranslate.length} texts → ${expandedTexts.length} segments`);
   return { expandedTexts, originMapping, originalToExpandedIndices };
 }
 
@@ -311,10 +303,7 @@ export function reassembleTranslations(
         translatedSegmentsMap.get(originalIndex).push(processedTranslation);
       }
     } else {
-      logger.debug(`Invalid translation data at index ${i}:`, {
-        translatedItem,
-        mappingInfo
-      });
+      logger.debug(`Invalid translation data at index ${i}, using fallback`);
 
       // Use original text as fallback
       if (mappingInfo) {
@@ -337,10 +326,11 @@ export function reassembleTranslations(
   textsToTranslate.forEach((originalText, originalIndex) => {
     if (translatedSegmentsMap.has(originalIndex)) {
       const segments = translatedSegmentsMap.get(originalIndex);
-      logger.debug(`Reassembling translation for original text ${originalIndex}`, {
-        originalText: `"${originalText}"`,
-        segments: segments.map((s, i) => ({ index: i, content: `"${s}"`, type: s === '\n' ? 'newline' : 'text' }))
-      });
+
+      // Only log detailed reassembly info for complex texts
+      if (segments.length > 2) {
+        logger.debug(`Reassembling text ${originalIndex}: ${segments.length} segments (${originalText.length} chars)`);
+      }
 
       // Build reassembled text by joining segments directly
       // This preserves the original structure without adding extra newlines
@@ -377,11 +367,9 @@ export function reassembleTranslations(
         }
       }
 
-      logger.debug(`Final reassembled text for original ${originalIndex}: "${reassembledText}"`);
       newTranslations.set(originalText, reassembledText);
     } else {
       // No translated parts found for this text, use original
-      logger.debug(`No translated segments for original ${originalIndex}, using original`);
       newTranslations.set(originalText, originalText);
     }
   });

@@ -37,7 +37,6 @@ export class TranslationUIManager {
     // Only show status notification if not for SelectElement mode
     // SelectElement mode has its own notification management
     if (context === 'select-element') {
-      this.logger.debug("Skipping status notification for SelectElement mode");
       this.statusNotification = null;
       return null;
     }
@@ -51,8 +50,7 @@ export class TranslationUIManager {
       type: "status",
     });
 
-    this.logger.debug('Showed status notification', { messageId, context });
-    return this.statusNotification;
+  return this.statusNotification;
   }
 
   /**
@@ -61,7 +59,6 @@ export class TranslationUIManager {
   dismissStatusNotification() {
     if (this.statusNotification) {
       pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
-      this.logger.debug("Dismissed status notification");
       this.statusNotification = null;
     }
   }
@@ -75,8 +72,7 @@ export class TranslationUIManager {
       reason: 'translation-complete',
       ...options
     });
-    this.logger.debug("Dismissed Select Element notification", options);
-  }
+      }
 
   /**
    * Show timeout notification to user
@@ -93,8 +89,7 @@ export class TranslationUIManager {
       id: `timeout-${messageId}`
     });
 
-    this.logger.debug('Showed timeout notification', { messageId });
-  }
+      }
 
   
   
@@ -105,24 +100,16 @@ export class TranslationUIManager {
   async processStreamUpdate(message) {
     const { messageId, data } = message;
 
-    this.logger.debug(`Processing stream update:`, {
-      messageId,
-      success: data?.success,
-      batchIndex: data?.batchIndex,
-      translatedBatchLength: data?.data?.length,
-      originalBatchLength: data?.originalData?.length
-    });
+    this.logger.debug(`Processing stream update ${messageId} (success: ${data?.success})`);
 
     // Check if the request still exists (may have been cancelled)
     const request = this.orchestrator.requestManager.getRequest(messageId);
     if (!request) {
-      this.logger.debug(`Ignoring stream update for unknown/cancelled request: ${messageId}`);
       return;
     }
 
     // Check if request was cancelled
     if (request.status === 'cancelled') {
-      this.logger.debug(`Ignoring stream update for cancelled request: ${messageId}`);
       return;
     }
 
@@ -165,10 +152,7 @@ export class TranslationUIManager {
     const { data: translatedBatch, originalData: originalBatch } = data;
     const { textsToTranslate, originMapping, expandedTexts } = request;
 
-    this.logger.debug(`Processing stream translation data`, {
-      translatedBatchLength: translatedBatch.length,
-      originalBatchLength: originalBatch.length
-    });
+    this.logger.debug(`Processing translation batch: ${translatedBatch.length} segments`);
 
     // Store all translated segments for later reassembly
     // Let the existing reassembly logic handle the complex mapping
@@ -183,16 +167,12 @@ export class TranslationUIManager {
       expandedIndex = expandedTexts.findIndex(text => text === originalText);
 
       if (expandedIndex === -1) {
-        this.logger.debug(`Could not find original text for translated segment: "${originalText}"`);
+        this.logger.debug(`Original text not found for segment ${i}`);
         continue;
       }
 
       // Store the translation for reassembly later
       request.translatedSegments.set(expandedIndex, translatedText);
-      this.logger.debug(`Stored translation for segment ${expandedIndex}`, {
-        original: originalText.substring(0, 30) + '...',
-        translated: translatedText.substring(0, 30) + '...'
-      });
     }
   }
 
@@ -260,11 +240,7 @@ export class TranslationUIManager {
 
     if (segments.length === 0) return [];
 
-    this.logger.debug(`Finding nodes for multi-segment text with ${segments.length} segments`, {
-      segments: segments.map(s => `"${s.substring(0, 30)}..."`),
-      totalNodes: textNodes.length,
-      processedNodes: processedNodeIds.size
-    });
+    this.logger.debug(`Finding nodes for ${segments.length} segments (${textNodes.length} nodes available)`);
 
     // For each segment, try to find a corresponding node
     const foundNodes = [];
@@ -320,19 +296,13 @@ export class TranslationUIManager {
 
       if (bestMatch) {
         foundNodes.push(bestMatch);
-        this.logger.debug(`Found matching node for segment: "${segmentTrimmed.substring(0, 30)}..."`, {
-          nodeText: bestMatch.textContent.trim().substring(0, 30) + '...',
-          score: bestScore
-        });
-      } else {
-        this.logger.debug(`No matching node found for segment: "${segmentTrimmed.substring(0, 30)}..."`);
       }
     }
 
-    this.logger.debug(`Multi-segment node matching complete`, {
-      segments: segments.length,
-      foundNodes: foundNodes.length
-    });
+    // Only log matching summary if there were multiple segments
+    if (segments.length > 1) {
+      this.logger.debug(`Multi-segment matching: ${foundNodes.length}/${segments.length} nodes matched`);
+    }
 
     return foundNodes;
   }
@@ -437,11 +407,7 @@ export class TranslationUIManager {
 
           // Check if they're substantially different
           if (this._areTextsSubstantiallyDifferent(existingTrimmed, currentTrimmed)) {
-            this.logger.debug(`Skipping node with existing different translation`, {
-              nodeText: nodeText.substring(0, 30),
-              existingOriginal: existingTrimmed.substring(0, 30),
-              currentOriginal: currentTrimmed.substring(0, 30)
-            });
+            this.logger.debug(`Skipping node with existing different translation`);
             return false;
           }
         }
@@ -465,11 +431,7 @@ export class TranslationUIManager {
 
         // Require at least 20% word overlap for confidence
         if (overlapRatio < 0.2) {
-          this.logger.debug(`Node rejected due to insufficient word overlap`, {
-            nodeText: nodeText.substring(0, 30),
-            originalText: originalTextTrimmed.substring(0, 30),
-            overlapRatio
-          });
+          this.logger.debug(`Node rejected: insufficient word overlap (${(overlapRatio * 100).toFixed(0)}%)`);
           return false;
         }
       }
@@ -568,16 +530,7 @@ export class TranslationUIManager {
       }
     }
 
-    this.logger.debug(`Multi-segment translation collected:`, {
-      originalIndex,
-      segmentCount: allSegments.length,
-      targetNodeTexts: Array.from(targetNodeTexts),
-      segments: allSegments.map((s, i) => ({
-        index: i,
-        content: s.substring(0, 50) + (s.length > 50 ? '...' : ''),
-        mapping: segmentMappings[i]
-      }))
-    });
+    this.logger.debug(`Multi-segment translation collected: ${allSegments.length} segments`);
 
     // Validate that this translation should be applied to these nodes
     const shouldApplyTranslation = this._validateNodeSegmentMatch(nodesToUpdate, originalTextKey, allSegments);
@@ -652,10 +605,7 @@ export class TranslationUIManager {
 
       // If node text is very short but we have long segments, this might be mismatch
       if (nodeText.length < 10 && nonEmptySegments.some(s => s.trim().length > 50)) {
-        this.logger.debug(`Node text too short for multi-segment translation`, {
-          nodeText: nodeText.substring(0, 30),
-          segmentCount: nonEmptySegments.length
-        });
+        this.logger.debug(`Node too short for multi-segment translation`);
         return false;
       }
 
