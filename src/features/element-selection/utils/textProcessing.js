@@ -309,6 +309,9 @@ export function reassembleTranslations(
       // This preserves the original structure without adding extra newlines
       let reassembledText = segments.join('');
 
+      // Post-process to remove excessive newlines (3+ consecutive newlines -> 2 newlines)
+      reassembledText = reassembledText.replace(/\n{3,}/g, '\n\n');
+
       logger.debug(`Final reassembled text for original ${originalIndex}: "${reassembledText}"`);
       newTranslations.set(originalText, reassembledText);
     } else {

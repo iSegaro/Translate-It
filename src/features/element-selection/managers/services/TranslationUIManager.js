@@ -1,6 +1,8 @@
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
-import { applyTranslationsToNodes, reassembleTranslations } from "../../utils/textExtraction.js";
+import { reassembleTranslations } from "../../utils/textProcessing.js";
+import { generateUniqueId } from "../../utils/domManipulation.js";
+import { correctTextDirection } from "../../utils/textDirection.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
@@ -161,107 +163,36 @@ export class TranslationUIManager {
    */
   async _processStreamTranslationData(request, data) {
     const { data: translatedBatch, originalData: originalBatch } = data;
-    const { textsToTranslate, originMapping, expandedTexts, textNodes } = request;
+    const { textsToTranslate, originMapping, expandedTexts } = request;
 
-    // Enhanced tracking to prevent duplicate translations
-    const processedNodeIds = new Set();
-    const processedOriginalTexts = new Set();
-    const appliedTranslations = new Map(); // Track which translations were applied to which nodes
+    this.logger.debug(`Processing stream translation data`, {
+      translatedBatchLength: translatedBatch.length,
+      originalBatchLength: originalBatch.length
+    });
 
+    // Store all translated segments for later reassembly
+    // Let the existing reassembly logic handle the complex mapping
     for (let i = 0; i < translatedBatch.length; i++) {
       const translatedText = translatedBatch[i];
       const originalText = originalBatch[i];
 
-      // Skip if we've already processed this exact original text
-      if (processedOriginalTexts.has(originalText)) {
-        this.logger.debug(`Skipping already processed original text: "${originalText.substring(0, 50)}..."`);
-        continue;
-      }
-
-      // Find the original index in the expandedTexts array
-      // Handle both actual text and empty line placeholders
+      // Find the corresponding expanded index
       let expandedIndex = -1;
 
-      // First try exact match for non-empty lines
-      if (originalText.trim() !== '') {
-        expandedIndex = expandedTexts.findIndex(text => text === originalText);
-      } else {
-        // For empty strings, find the next empty line placeholder
-        // This handles cases where [[EMPTY_LINE]] was replaced with '' for API
-        for (let j = 0; j < expandedTexts.length; j++) {
-          if (expandedTexts[j] === '[[EMPTY_LINE]]' && originMapping[j]?.isEmptyLine) {
-            expandedIndex = j;
-            break;
-          }
-        }
-      }
+      // Try to find exact match
+      expandedIndex = expandedTexts.findIndex(text => text === originalText);
 
       if (expandedIndex === -1) {
         this.logger.debug(`Could not find original text for translated segment: "${originalText}"`);
         continue;
       }
 
-      const { originalIndex, isEmptyLine } = originMapping[expandedIndex];
-      const originalTextKey = textsToTranslate[originalIndex];
-
-      // Handle empty lines - preserve structure with newline character
-      if (isEmptyLine) {
-        this.logger.debug(`Preserving empty line segment at index ${expandedIndex}`);
-        request.translatedSegments.set(expandedIndex, '\n'); // Use newline to preserve empty line structure
-        processedOriginalTexts.add(originalText);
-        continue;
-      }
-
-      // Check if this is part of a multi-segment translation
-      const isMultiSegment = originalText.includes('\n') ||
-                            (originalTextKey && originalTextKey !== originalText &&
-                             (originalTextKey.includes('\n') || originalTextKey.length > 100));
-
-      // Find nodes to update
-      let nodesToUpdate = await this._findNodesToUpdate(textNodes, originalText, processedNodeIds);
-
-      // Additional validation: ensure we're not applying the same translation to unrelated nodes
-      if (nodesToUpdate.length > 0) {
-        nodesToUpdate = this._filterValidNodesForTranslation(nodesToUpdate, originalText, originalTextKey, appliedTranslations);
-      }
-
-      // Mark nodes as processed for multi-segment translations
-      if (isMultiSegment && nodesToUpdate.length > 0) {
-        nodesToUpdate.forEach(node => {
-          processedNodeIds.add(node);
-          // Track which translation was applied to this node
-          appliedTranslations.set(node, {
-            originalText: originalText,
-            originalTextKey: originalTextKey,
-            translatedText: translatedText,
-            isMultiSegment: true
-          });
-        });
-      } else if (nodesToUpdate.length > 0) {
-        // Also track single segment translations
-        nodesToUpdate.forEach(node => {
-          appliedTranslations.set(node, {
-            originalText: originalText,
-            originalTextKey: originalTextKey,
-            translatedText: translatedText,
-            isMultiSegment: false
-          });
-        });
-      }
-
-      if (nodesToUpdate.length > 0) {
-        // Apply translations based on segment type
-        if (isMultiSegment) {
-          await this._handleMultiSegmentTranslation(nodesToUpdate, request, expandedIndex, originalIndex, originalTextKey, translatedBatch, originalBatch);
-        } else {
-          await this._handleSingleSegmentTranslation(nodesToUpdate, originalText, translatedText);
-        }
-
-        request.translatedSegments.set(expandedIndex, translatedText);
-        processedOriginalTexts.add(originalText);
-      } else {
-        this.logger.debug(`No valid nodes found for translation: "${originalText.substring(0, 50)}..."`);
-      }
+      // Store the translation for reassembly later
+      request.translatedSegments.set(expandedIndex, translatedText);
+      this.logger.debug(`Stored translation for segment ${expandedIndex}`, {
+        original: originalText.substring(0, 30) + '...',
+        translated: translatedText.substring(0, 30) + '...'
+      });
     }
   }
 
@@ -286,8 +217,8 @@ export class TranslationUIManager {
       nodeTextMap.get(nodeText).push({ node, fullText: nodeFullText });
     });
 
-    // Priority 1: Exact trimmed match
-    if (nodeTextMap.has(originalTextTrimmed)) {
+    // Priority 1: Exact trimmed match (for segments without newlines)
+    if (!originalTextTrimmed.includes('\n') && nodeTextMap.has(originalTextTrimmed)) {
       return nodeTextMap.get(originalTextTrimmed).map(item => item.node);
     }
 
@@ -300,55 +231,110 @@ export class TranslationUIManager {
       }
     }
 
-    // Priority 3: Handle multi-segment text (text with newlines)
-    if (originalTextTrimmed.includes('\n')) {
+    // Priority 3: Handle multi-segment text and partial matching
+    // This includes both multi-segment text and single segments that need partial matching
+    if (originalTextTrimmed.includes('\n') || originalTextTrimmed.length > 50) {
       return this._findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap);
     }
 
-    // Priority 4: Partial match with high confidence
+    // Priority 4: Partial match with high confidence (fallback for short text)
     return this._findNodesWithConfidentPartialMatch(textNodes, originalText, processedNodeIds);
   }
 
   /**
-   * Find nodes for multi-segment text (text with newlines)
+   * Find nodes for multi-segment text and partial matching
    * @private
    */
   _findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap) {
-    const segments = originalText.trim().split('\n').filter(seg => seg.trim().length > 0);
+    const originalTextTrimmed = originalText.trim();
+
+    // Handle empty line segments differently
+    if (originalTextTrimmed === '' || originalTextTrimmed === '\n') {
+      return []; // Empty segments don't need DOM nodes
+    }
+
+    // Split into segments for multi-segment text, or treat as single segment
+    const segments = originalTextTrimmed.includes('\n')
+      ? originalTextTrimmed.split('\n').filter(seg => seg.trim().length > 0)
+      : [originalTextTrimmed];
 
     if (segments.length === 0) return [];
 
-    // Find nodes that contain the most substantial segments
-    const candidateNodes = [];
+    this.logger.debug(`Finding nodes for multi-segment text with ${segments.length} segments`, {
+      segments: segments.map(s => `"${s.substring(0, 30)}..."`),
+      totalNodes: textNodes.length,
+      processedNodes: processedNodeIds.size
+    });
 
+    // For each segment, try to find a corresponding node
+    const foundNodes = [];
+    const remainingNodes = textNodes.filter(node => !processedNodeIds.has(node));
+
+    // Try to match each segment with an unused node
     for (const segment of segments) {
       const segmentTrimmed = segment.trim();
-      if (segmentTrimmed.length < 5) continue; // Skip very short segments
 
-      // Look for exact segment match
-      if (nodeTextMap.has(segmentTrimmed)) {
-        candidateNodes.push(...nodeTextMap.get(segmentTrimmed).map(item => item.node));
+      // Skip empty or very short segments
+      if (segmentTrimmed.length < 3) continue;
+
+      let bestMatch = null;
+      let bestScore = 0;
+
+      // Find the best matching node for this segment
+      for (const node of remainingNodes) {
+        if (foundNodes.includes(node)) continue; // Skip already assigned nodes
+
+        const nodeText = node.textContent.trim();
+        let score = 0;
+
+        // Exact match gets highest score
+        if (nodeText === segmentTrimmed) {
+          score = 100;
+        }
+        // Node text contains segment
+        else if (nodeText.includes(segmentTrimmed)) {
+          score = 80;
+        }
+        // Segment contains node text
+        else if (segmentTrimmed.includes(nodeText)) {
+          score = 60;
+        }
+        // Partial match based on word overlap
+        else {
+          const segmentWords = segmentTrimmed.toLowerCase().split(/\s+/);
+          const nodeWords = nodeText.toLowerCase().split(/\s+/);
+          const commonWords = segmentWords.filter(word =>
+            word.length > 2 && nodeWords.includes(word)
+          );
+
+          if (commonWords.length > 0) {
+            score = (commonWords.length / Math.max(segmentWords.length, nodeWords.length)) * 40;
+          }
+        }
+
+        if (score > bestScore && score >= 30) { // Minimum threshold
+          bestScore = score;
+          bestMatch = node;
+        }
+      }
+
+      if (bestMatch) {
+        foundNodes.push(bestMatch);
+        this.logger.debug(`Found matching node for segment: "${segmentTrimmed.substring(0, 30)}..."`, {
+          nodeText: bestMatch.textContent.trim().substring(0, 30) + '...',
+          score: bestScore
+        });
+      } else {
+        this.logger.debug(`No matching node found for segment: "${segmentTrimmed.substring(0, 30)}..."`);
       }
     }
 
-    // If we found candidate nodes, return the most relevant ones
-    if (candidateNodes.length > 0) {
-      // Remove duplicates and already processed nodes
-      const uniqueNodes = [...new Set(candidateNodes)].filter(node => !processedNodeIds.has(node));
+    this.logger.debug(`Multi-segment node matching complete`, {
+      segments: segments.length,
+      foundNodes: foundNodes.length
+    });
 
-      // If we have multiple candidates, prefer the one with the most substantial content
-      if (uniqueNodes.length > 1) {
-        return uniqueNodes.sort((a, b) => {
-          const aLength = a.textContent.trim().length;
-          const bLength = b.textContent.trim().length;
-          return bLength - aLength; // Prefer longer content
-        }).slice(0, 1); // Return only the best match
-      }
-
-      return uniqueNodes;
-    }
-
-    return [];
+    return foundNodes;
   }
 
   /**
@@ -542,9 +528,9 @@ export class TranslationUIManager {
     for (let j = 0; j < expandedTexts.length; j++) {
       const { originalIndex: segOriginalIndex, isEmptyLine } = originMapping[j];
       if (segOriginalIndex === originalIndex) {
-        // Handle empty lines
+        // Handle empty lines - preserve structure without adding extra newlines
         if (isEmptyLine) {
-          allSegments.push('\n');
+          allSegments.push('\n'); // Use newline for structure preservation
           segmentMappings.push({ type: 'empty', originalIndex: j });
           continue;
         }
@@ -609,23 +595,29 @@ export class TranslationUIManager {
 
     // If the original text had newlines, preserve the paragraph structure
     if (originalTextKey && originalTextKey.includes('\n')) {
-      const originalLines = originalTextKey.split('\n').filter(line => line.trim());
-      if (originalLines.length > 1 && allSegments.length >= originalLines.length) {
+      const originalLines = originalTextKey.split('\n');
+      if (originalLines.length > 1 && allSegments.length >= originalLines.filter(line => line.trim()).length) {
         // Reconstruct with line breaks - preserve empty lines properly
         const translatedLines = [];
         let segmentIndex = 0;
 
         for (const line of originalLines) {
           if (line.trim() === '') {
+            // Preserve empty lines with empty string (newline will be added by join)
             translatedLines.push('');
           } else if (segmentIndex < allSegments.length) {
             translatedLines.push(allSegments[segmentIndex++]);
           }
         }
 
-        combinedTranslation = translatedLines.join('\n\n');
+        // Use single newlines to avoid extra spacing, but ensure proper paragraph breaks
+        combinedTranslation = translatedLines.join('\n');
       }
     }
+
+    // Post-process: Remove excessive newlines (3+ consecutive newlines -> 2 newlines for paragraphs)
+    // This preserves paragraph structure while removing extra spacing
+    combinedTranslation = combinedTranslation.replace(/\n{3,}/g, '\n\n');
 
     // Create a translation map with the combined translation
     const translationMap = new Map();
@@ -774,7 +766,7 @@ export class TranslationUIManager {
       }
     }
 
-    // Use the proper reassembly function to preserve empty lines
+    // Use the proper reassembly function to preserve empty lines and structure
     const newTranslations = reassembleTranslations(
       finalTranslatedData,
       request.expandedTexts, // Original expandedTexts with placeholders
@@ -783,9 +775,10 @@ export class TranslationUIManager {
       new Map() // No cached translations
     );
 
+    // Store in state manager for potential revert
     this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
 
-    // Apply translations to DOM nodes
+    // Apply translations to DOM nodes using the existing function
     await this.applyTranslationsToNodes(request.textNodes, newTranslations);
 
     // Notify UnifiedTranslationCoordinator that streaming completed successfully
@@ -803,7 +796,6 @@ export class TranslationUIManager {
         duration: 5000,
         id: `success-${messageId}`
       });
-      this.logger.debug("Showed success notification for previously timed out request");
     }
   }
 
@@ -1001,40 +993,183 @@ export class TranslationUIManager {
   }
 
   /**
-   * Apply translations directly to DOM nodes
+   * Apply translations directly to DOM nodes using wrapper approach for Revert compatibility
    * @param {Array} textNodes - Array of text nodes to translate
    * @param {Map} translations - Map of original text to translated text
    */
   async applyTranslationsToNodes(textNodes, translations) {
-    this.logger.debug("Applying translations directly to DOM nodes", {
+    this.logger.debug("Applying translations directly to DOM nodes using wrapper approach", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
-      sampleTranslations: Array.from(translations.entries()).slice(0, 3).map(([key, value]) => [
-      (typeof key === 'string' ? key.substring(0, 50) : String(key).substring(0, 50)) + ((typeof key === 'string' ? key : String(key)).length > 50 ? '...' : ''),
-      (typeof value === 'string' ? value.substring(0, 50) : String(value).substring(0, 50)) + ((typeof value === 'string' ? value : String(value)).length > 50 ? '...' : '')
-    ])
+      availableTranslations: Array.from(translations.entries()).map(([k, v]) => ({
+        original: k.substring(0, 50) + (k.length > 50 ? '...' : ''),
+        translated: v.substring(0, 50) + (v.length > 50 ? '...' : '')
+      }))
     });
 
     // Get target language for better RTL detection
     const { getTargetLanguageAsync } = await import("../../../../config.js");
     const targetLanguage = await getTargetLanguageAsync();
 
-    // Create context with target language for improved RTL detection
-    const context = {
-      state: {
-        originalTexts: this.orchestrator.stateManager.originalTexts || new Map()
-      },
+    let processedCount = 0;
+    const unmatchedNodes = [];
+
+    // Filter out undefined or null text nodes to prevent errors
+    const validTextNodes = textNodes.filter(node => node && node.nodeType === Node.TEXT_NODE);
+
+    this.logger.debug('Filtered text nodes', {
+      originalCount: textNodes.length,
+      validCount: validTextNodes.length
+    });
+
+    // Apply translations using wrapper approach for Revert compatibility
+    validTextNodes.forEach((textNode, nodeIndex) => {
+      if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
+        return;
+      }
+
+      const originalText = textNode.textContent;
+      const trimmedOriginalText = originalText.trim();
+
+      // Handle empty lines and whitespace-only text (preserve structure but don't translate)
+      if (originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) {
+        this.logger.debug('Preserving empty line or whitespace text node', {
+          originalText: JSON.stringify(originalText)
+        });
+        processedCount++;
+        return; // Don't translate empty lines, just preserve them
+      }
+
+      // Find matching translation
+      let translatedText = null;
+      let matchType = '';
+
+      // Try exact match first
+      if (translations.has(trimmedOriginalText)) {
+        translatedText = translations.get(trimmedOriginalText);
+        matchType = 'exact_trimmed';
+      } else if (translations.has(originalText)) {
+        translatedText = translations.get(originalText);
+        matchType = 'exact_full';
+      } else {
+        // Try to find a translation that contains this text
+        for (const [origText, transText] of translations.entries()) {
+          const origTextTrimmed = origText.trim();
+
+          if (origTextTrimmed.includes(trimmedOriginalText) || trimmedOriginalText.includes(origTextTrimmed)) {
+            translatedText = transText;
+            matchType = 'contains';
+            break;
+          }
+        }
+      }
+
+      if (translatedText && translatedText.trim() !== trimmedOriginalText) {
+        try {
+          const parentElement = textNode.parentNode;
+          const uniqueId = generateUniqueId();
+
+          // Create outer wrapper (similar to working extension)
+          const wrapperSpan = document.createElement("span");
+          wrapperSpan.className = "aiwc-translation-wrapper";
+          wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+
+          // Create inner span for translated content
+          const translationSpan = document.createElement("span");
+          translationSpan.className = "aiwc-translation-inner";
+
+          // Preserve leading whitespace from original text
+          const leadingWhitespace = originalText.match(/^\s*/)[0];
+
+          // Check if the original text ends with whitespace that should create a visual line break
+          const trailingWhitespace = originalText.match(/\s*$/)[0];
+          const hasNewlineOrSpace = /\n/.test(originalText) || (trailingWhitespace.length > 1);
+
+          // Start with leading whitespace
+          let processedText = leadingWhitespace + translatedText;
+
+          translationSpan.textContent = processedText;
+
+          // Apply text direction to the wrapper with target language if available
+          const detectOptions = targetLanguage ? {
+            targetLanguage: targetLanguage,
+            simpleDetection: true  // Use simple detection for RTL languages
+          } : {};
+
+          correctTextDirection(wrapperSpan, translatedText, {
+            useWrapperElement: false,
+            preserveExisting: true,
+            detectOptions: detectOptions
+          });
+
+          // Add the translation span to the wrapper
+          wrapperSpan.appendChild(translationSpan);
+
+          // Replace the original text node with the wrapper
+          try {
+            // Store reference to next sibling before replacement
+            const nextSibling = textNode.nextSibling;
+
+            // Remove the original text node
+            parentElement.removeChild(textNode);
+
+            // Insert the wrapper at the same position
+            if (nextSibling) {
+              parentElement.insertBefore(wrapperSpan, nextSibling);
+            } else {
+              parentElement.appendChild(wrapperSpan);
+            }
+
+            // Store the original text content in the wrapper for potential revert
+            wrapperSpan.setAttribute("data-aiwc-original-text", originalText);
+
+            processedCount++;
+
+            this.logger.debug(`Applied translation with wrapper to node ${nodeIndex}`, {
+              matchType: matchType,
+              original: originalText.substring(0, 30) + '...',
+              translated: translatedText.substring(0, 30) + '...',
+              uniqueId: uniqueId
+            });
+
+          } catch (error) {
+            this.logger.error('Failed to replace text node with wrapper', error, {
+              uniqueId: uniqueId,
+              parentElement: parentElement.tagName
+            });
+            return;
+          }
+
+        } catch (error) {
+          this.logger.error('Error applying translation to text node:', error, {
+            originalText: originalText.substring(0, 50),
+            nodeIndex: nodeIndex
+          });
+        }
+      } else {
+        unmatchedNodes.push({
+          index: nodeIndex,
+          originalText: originalText.substring(0, 50),
+          fullText: originalText.substring(0, 50)
+        });
+      }
+    });
+
+    this.logger.debug("Translation application complete using wrapper approach", {
+      totalNodes: textNodes.length,
+      validNodes: validTextNodes.length,
+      appliedCount: processedCount,
+      unmatchedCount: unmatchedNodes.length,
+      targetLanguage: targetLanguage,
+      unmatchedNodes: unmatchedNodes.slice(0, 3) // Show first few unmatched
+    });
+
+    // Return result for compatibility
+    return {
+      appliedCount: processedCount,
+      totalNodes: validTextNodes.length,
       targetLanguage: targetLanguage
     };
-
-    // Use the existing applyTranslationsToNodes from extraction utilities
-    const result = applyTranslationsToNodes(textNodes, translations, context);
-
-    this.logger.debug("Translations applied directly to DOM nodes", {
-      appliedCount: translations.size,
-      result: result,
-      targetLanguage: targetLanguage
-    });
   }
 
   /**
