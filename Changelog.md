@@ -1,8 +1,9 @@
-#### v1.4.10 – Released on November 16, 2025
+#### v1.4.10 – Released on November XX, 2025
 
 ##### Added
 
 - **Local File Support**: Added support for translating content from local files (`file:///` URLs)
+- **Enhanced Original Text TTS**: Added visual indicators and tooltips for better discoverability of original text pronunciation in floating windows
 
 ##### Fixed
 
