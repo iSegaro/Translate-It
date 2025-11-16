@@ -39,6 +39,7 @@ async function loadTTSHandlers() {
     const handlers = {
       handleGoogleTTSSpeak: googleTTS.handleGoogleTTSSpeak,
       handleGoogleTTSStopAll: googleTTS.handleGoogleTTSStopAll,
+      handleGoogleTTSEnded: googleTTS.handleGoogleTTSEnded,
       handleOffscreenReady: offscreenReady.handleOffscreenReady
     };
 
@@ -131,6 +132,30 @@ export const handleTTSStopLazy = async (message, sender) => {
       error: {
         message: 'Failed to stop TTS',
         type: 'TTS_STOP_ERROR'
+      }
+    };
+  }
+};
+
+/**
+ * Lazy handler for GOOGLE_TTS_ENDED action
+ */
+export const handleTTSEndedLazy = async (message, sender) => {
+  try {
+    logger.info('[TTSLazyHandler] GOOGLE_TTS_ENDED requested');
+
+    const { handleGoogleTTSEnded } = await loadTTSHandlers();
+
+    // Delegating to handleGoogleTTSEnded - logged at TRACE level for detailed debugging
+    // logger.trace('[TTSLazyHandler] Delegating to handleGoogleTTSEnded');
+    return await handleGoogleTTSEnded(message, sender);
+  } catch (error) {
+    logger.error('[TTSLazyHandler] Failed to handle GOOGLE_TTS_ENDED:', error);
+    return {
+      success: false,
+      error: {
+        message: 'Failed to process TTS completion',
+        type: 'TTS_COMPLETION_ERROR'
       }
     };
   }
