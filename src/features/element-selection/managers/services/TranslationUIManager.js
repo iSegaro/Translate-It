@@ -150,7 +150,7 @@ export class TranslationUIManager {
    */
   async _processStreamTranslationData(request, data) {
     const { data: translatedBatch, originalData: originalBatch } = data;
-    const { textsToTranslate, originMapping, expandedTexts } = request;
+    const { expandedTexts } = request;
 
     this.logger.debug(`Processing translation batch: ${translatedBatch.length} segments`);
 
@@ -203,7 +203,7 @@ export class TranslationUIManager {
     }
 
     // Priority 2: Exact full text match
-    for (const [nodeText, nodeList] of nodeTextMap) {
+    for (const [, nodeList] of nodeTextMap) {
       for (const { node, fullText } of nodeList) {
         if (fullText === originalText) {
           return [node];
@@ -214,7 +214,7 @@ export class TranslationUIManager {
     // Priority 3: Handle multi-segment text and partial matching
     // This includes both multi-segment text and single segments that need partial matching
     if (originalTextTrimmed.includes('\n') || originalTextTrimmed.length > 50) {
-      return this._findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap);
+      return this._findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds);
     }
 
     // Priority 4: Partial match with high confidence (fallback for short text)
@@ -225,7 +225,7 @@ export class TranslationUIManager {
    * Find nodes for multi-segment text and partial matching
    * @private
    */
-  _findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds, nodeTextMap) {
+  _findNodesForMultiSegmentText(textNodes, originalText, processedNodeIds) {
     const originalTextTrimmed = originalText.trim();
 
     // Handle empty line segments differently
@@ -473,7 +473,7 @@ export class TranslationUIManager {
    * @private
    */
   async _handleMultiSegmentTranslation(nodesToUpdate, request, expandedIndex, originalIndex, originalTextKey, translatedBatch, originalBatch) {
-    const { expandedTexts, originMapping, translatedSegments, textNodes } = request;
+    const { expandedTexts, originMapping, translatedSegments } = request;
 
     // Enhanced node tracking to prevent incorrect assignments
     const targetNodeTexts = new Set();
@@ -1032,8 +1032,7 @@ export class TranslationUIManager {
           const leadingWhitespace = originalText.match(/^\s*/)[0];
 
           // Check if the original text ends with whitespace that should create a visual line break
-          const trailingWhitespace = originalText.match(/\s*$/)[0];
-          const hasNewlineOrSpace = /\n/.test(originalText) || (trailingWhitespace.length > 1);
+          originalText.match(/\s*$/)[0];
 
           // Start with leading whitespace
           let processedText = leadingWhitespace + translatedText;

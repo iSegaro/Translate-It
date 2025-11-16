@@ -550,8 +550,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         const leadingWhitespace = originalText.match(/^\s*/)[0];
 
         // Check if the original text ends with whitespace that should create a visual line break
-        const trailingWhitespace = originalText.match(/\s*$/)[0];
-        const hasNewlineOrSpace = /\n/.test(originalText) || (trailingWhitespace.length > 1);
+        originalText.match(/\s*$/)[0];
 
         // Start with leading whitespace
         let processedText = leadingWhitespace + finalTranslatedText;

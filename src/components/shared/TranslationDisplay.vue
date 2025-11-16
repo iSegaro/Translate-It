@@ -37,7 +37,10 @@
     />
 
     <!-- Loading Spinner -->
-    <div v-if="isLoading" class="ti-loading-overlay">
+    <div
+      v-if="isLoading"
+      class="ti-loading-overlay"
+    >
       <div class="ti-loading-spinner">
         <div class="ti-spinner" />
       </div>

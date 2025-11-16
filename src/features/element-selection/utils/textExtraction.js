@@ -251,7 +251,6 @@ export class ElementTextExtraction {
    */
   async translateElement(element, translationFunction, options = {}) {
     const {
-      useCache = true,
       applyImmediately = true,
       returnDetails = true
     } = options;

@@ -659,12 +659,12 @@ class SelectElementManager extends ResourceTracker {
             let translationMap = new Map();
 
             // Use originalTextsMap from result if available (for non-streaming)
-            const workingOriginalTextsMap = result.originalTextsMap || originalTextsMap;
+            const workingOriginalTextsMap = result.originalTextsMap || extractionResult.originalTextsMap;
 
             this.logger.debug("Processing non-streaming translation result:", {
               translatedData: translatedData,
               originalTextsMap: workingOriginalTextsMap,
-              textNodes: textNodes.map(node => node.textContent),
+              textNodes: extractionResult.textNodes.map(node => node.textContent),
               fromCache: result.fromCache
             });
 
@@ -754,7 +754,7 @@ class SelectElementManager extends ResourceTracker {
             // Apply translations to DOM
             if (translationMap.size > 0) {
               this.logger.debug("Applying translations to DOM nodes...");
-              this.translationOrchestrator.applyTranslationsToNodes(textNodes, translationMap);
+              this.translationOrchestrator.applyTranslationsToNodes(extractionResult.textNodes, translationMap);
               this.stateManager.addTranslatedElement(targetElement, translationMap);
               this.logger.debug("Translation applied successfully from non-streaming result");
             } else {

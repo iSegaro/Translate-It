@@ -359,7 +359,7 @@ export function reassembleTranslations(
       }
 
       // 3. For punctuation-only segments (like ".", ":"), remove excessive newlines
-      if (/^[.:;,\!?]+$/.test(originalTrimmed)) {
+      if (/^[.:;,!?]+$/.test(originalTrimmed)) {
         reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
         // Ensure single punctuation doesn't have excessive spacing
         if (!reassembledText.includes('\n')) {

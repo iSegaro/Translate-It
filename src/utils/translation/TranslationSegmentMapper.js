@@ -106,8 +106,9 @@ export class TranslationSegmentMapper {
    */
   static splitByPattern(translatedText, originalSegments, providerName = 'Unknown') {
     const result = [];
-    let remainingText = translatedText;
     let delimiterPattern = new RegExp(`(\n\n---\n\n|\\n\\n---\\n|\\n---\\n\n|---|\\n\\n|\\n)`, 'g');
+
+    logger.debug(`[${providerName}] Splitting translated text by pattern matching`);
 
     // Try to find delimiters in translated text
     const matches = [...translatedText.matchAll(delimiterPattern)];
