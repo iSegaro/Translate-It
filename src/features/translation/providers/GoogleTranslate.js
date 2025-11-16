@@ -90,11 +90,25 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
         const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
 
         if (translatedSegments.length !== chunkTexts.length) {
-          logger.warn("[Google] Translated segment count mismatch after splitting.", { 
-            expected: chunkTexts.length, 
-            got: translatedSegments.length 
+          logger.warn("[Google] Translated segment count mismatch after splitting.", {
+            expected: chunkTexts.length,
+            got: translatedSegments.length
           });
-          return { translatedSegments: [translatedText], candidateText: '' };
+
+          // Enhanced fallback: try to map back to original segments
+          const fallbackSegments = this._mapTranslationToOriginalSegments(
+            translatedText,
+            chunkTexts,
+            RELIABLE_DELIMITER
+          );
+
+          if (fallbackSegments.length === chunkTexts.length) {
+            logger.info("[Google] Successfully mapped translation to original segments using fallback logic");
+            return { translatedSegments: fallbackSegments, candidateText: '' };
+          } else {
+            logger.warn("[Google] Fallback mapping also failed, using single segment");
+            return { translatedSegments: [translatedText], candidateText: '' };
+          }
         }
 
         let candidateText = "";
@@ -129,6 +143,131 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     }
 
     return finalResult;
+  }
+
+  /**
+   * Enhanced mapping: attempt to reconstruct original segments from translated text
+   * @param {string} translatedText - The complete translated text
+   * @param {string[]} originalSegments - Original segments that were sent for translation
+   * @param {string} delimiter - The delimiter that should separate segments
+   * @returns {string[]} - Mapped segments matching original count
+   */
+  _mapTranslationToOriginalSegments(translatedText, originalSegments, delimiter) {
+    if (!translatedText || !Array.isArray(originalSegments)) {
+      return [translatedText];
+    }
+
+    // First, try standard splitting
+    let segments = translatedText.split(delimiter);
+
+    // If standard splitting works, return it
+    if (segments.length === originalSegments.length) {
+      return segments;
+    }
+
+    // Enhanced fallback: try to split by alternative delimiters and patterns
+    const alternatives = [
+      delimiter.trim(),
+      '\n\n---\n',                    // Missing newline
+      '\n---\n\n',                    // Missing newline on other side
+      '---',                         // Just the separator
+      '\n\n',                         // Double newlines
+      '\n',                          // Single newlines (last resort)
+    ];
+
+    for (const altDelim of alternatives) {
+      const testSegments = translatedText.split(altDelim);
+      if (testSegments.length === originalSegments.length) {
+        logger.info(`[Google] Found working alternative delimiter: "${altDelim}"`);
+        return testSegments;
+      }
+    }
+
+    // Advanced fallback: map based on whitespace and empty segments
+    const emptySegmentIndices = originalSegments
+      .map((seg, idx) => seg.trim() === '' ? idx : -1)
+      .filter(idx => idx !== -1);
+
+    if (emptySegmentIndices.length > 0) {
+      // If we have empty segments in original, try to map them
+      const nonEmptyOriginals = originalSegments.filter(seg => seg.trim() !== '');
+      const nonEmptyTranslated = segments.filter(seg => seg.trim() !== '');
+
+      if (nonEmptyTranslated.length === nonEmptyOriginals.length) {
+        // Reconstruct full array with empty segments
+        const result = new Array(originalSegments.length);
+        let translatedIdx = 0;
+
+        for (let i = 0; i < originalSegments.length; i++) {
+          if (originalSegments[i].trim() === '') {
+            result[i] = originalSegments[i]; // Keep original empty/whitespace
+          } else {
+            result[i] = nonEmptyTranslated[translatedIdx++];
+          }
+        }
+
+        logger.info(`[Google] Successfully reconstructed segments with empty segment mapping`);
+        return result;
+      }
+    }
+
+    // Last resort: split by pattern matching original structure
+    try {
+      const result = this._splitByPattern(translatedText, originalSegments);
+      if (result.length === originalSegments.length) {
+        logger.info(`[Google] Successfully split by pattern matching`);
+        return result;
+      }
+    } catch (error) {
+      logger.warn(`[Google] Pattern splitting failed:`, error);
+    }
+
+    // If all else fails, return as single segment
+    return [translatedText];
+  }
+
+  /**
+   * Split translation text by matching patterns from original segments
+   * @param {string} translatedText - Complete translated text
+   * @param {string[]} originalSegments - Original segments for pattern reference
+   * @returns {string[]} - Split segments
+   */
+  _splitByPattern(translatedText, originalSegments) {
+    const result = [];
+    let remainingText = translatedText;
+    let delimiterPattern = new RegExp(`(\n\n---\n\n|\\n\\n---\\n|\\n---\\n\n|---|\\n\\n|\\n)`, 'g');
+
+    // Try to find delimiters in translated text
+    const matches = [...translatedText.matchAll(delimiterPattern)];
+
+    if (matches.length === originalSegments.length - 1) {
+      // Extract segments between delimiters
+      let lastIndex = 0;
+      for (let i = 0; i < matches.length; i++) {
+        const match = matches[i];
+        const segment = translatedText.substring(lastIndex, match.index);
+        result.push(segment);
+        lastIndex = match.index + match[0].length;
+      }
+      result.push(translatedText.substring(lastIndex)); // Last segment
+      return result;
+    }
+
+    // Fallback: try to estimate segment boundaries based on length ratios
+    const totalLength = translatedText.length;
+    const originalLengths = originalSegments.map(seg => seg.length);
+    const totalOriginalLength = originalLengths.reduce((a, b) => a + b, 0);
+
+    let currentIndex = 0;
+    for (let i = 0; i < originalSegments.length - 1; i++) {
+      const expectedLength = Math.round((originalLengths[i] / totalOriginalLength) * totalLength);
+      const segment = translatedText.substring(currentIndex, currentIndex + expectedLength);
+      result.push(segment);
+      currentIndex += expectedLength;
+    }
+    result.push(translatedText.substring(currentIndex)); // Last segment
+
+    return result;
   }
 
   _formatDictionaryAsMarkdown(candidateText) {
