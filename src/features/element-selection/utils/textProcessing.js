@@ -346,8 +346,36 @@ export function reassembleTranslations(
       // This preserves the original structure without adding extra newlines
       let reassembledText = segments.join('');
 
-      // Post-process to remove excessive newlines (3+ consecutive newlines -> 2 newlines)
+      // Enhanced post-processing to clean up provider-added excessive newlines
+      // 1. Remove excessive newlines (3+ consecutive newlines -> 2 newlines)
       reassembledText = reassembledText.replace(/\n{3,}/g, '\n\n');
+
+      // 2. Enhanced post-processing for texts that got wrapped in newlines by provider
+      const originalTrimmed = originalText.trim();
+
+      // For very short texts (≤10 chars) that don't have newlines in original
+      if (originalTrimmed.length <= 10 && !originalText.includes('\n')) {
+        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
+      }
+      // For medium-length texts (11-30 chars) - remove excessive newlines unless original had them
+      else if (originalTrimmed.length <= 30 && !originalText.includes('\n')) {
+        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
+      }
+      // For technical terms and model names (≤40 chars) that typically don't need paragraph spacing
+      else if (originalTrimmed.length <= 40 && !originalText.includes('\n') &&
+               (/^[a-zA-Z0-9.-]+$/.test(originalTrimmed) || // technical terms like "gpt-3.5-turbo"
+                /^[a-zA-Z\s]+$/.test(originalTrimmed))) { // proper names like "Google Gemini"
+        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
+      }
+
+      // 3. For punctuation-only segments (like ".", ":"), remove excessive newlines
+      if (/^[.:;,\!?]+$/.test(originalTrimmed)) {
+        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
+        // Ensure single punctuation doesn't have excessive spacing
+        if (!reassembledText.includes('\n')) {
+          reassembledText = reassembledText.trim();
+        }
+      }
 
       logger.debug(`Final reassembled text for original ${originalIndex}: "${reassembledText}"`);
       newTranslations.set(originalText, reassembledText);
