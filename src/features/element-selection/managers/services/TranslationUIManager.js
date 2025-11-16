@@ -502,7 +502,7 @@ export class TranslationUIManager {
     error.originalError = data?.error || request.lastError;
 
     // Check if we should retry with a fallback provider
-    const shouldRetry = this.orchestrator.errorHandler.isRecoverableError(error, request);
+    const shouldRetry = this.orchestrator.errorHandlerService.isRecoverableError(error, request);
 
     if (shouldRetry) {
       this.logger.info('Attempting retry with fallback provider due to recoverable error', {
@@ -510,7 +510,7 @@ export class TranslationUIManager {
         errorType: error.originalError?.type || 'unknown'
       });
 
-      const retrySuccess = await this.orchestrator.errorHandler.retryWithFallbackProvider(
+      const retrySuccess = await this.orchestrator.errorHandlerService.retryWithFallbackProvider(
         messageId,
         JSON.stringify(request.textsToTranslate.map(t => ({ text: t }))),
         error

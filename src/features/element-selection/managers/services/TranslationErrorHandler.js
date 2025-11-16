@@ -7,6 +7,7 @@ import { generateContentMessageId } from "@/utils/messaging/messageId.js";
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 /**
  * Handles error detection, classification, and retry logic with fallback providers
@@ -16,7 +17,7 @@ export class TranslationErrorHandler {
   constructor(orchestrator) {
     this.orchestrator = orchestrator;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'TranslationErrorHandler');
-    this.errorHandler = orchestrator.errorHandler; // Central error handler instance
+    this.errorHandler = ErrorHandler.getInstance(); // Direct access to ErrorHandler singleton
   }
 
   /**
