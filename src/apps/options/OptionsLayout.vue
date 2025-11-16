@@ -11,57 +11,54 @@
 </template>
 
 <script setup>
-import OptionsSidebar from './OptionsSidebar.vue'
-import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { createLanguageTransition, createThemeTransition } from '@/composables/ui/useUITransition.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
+import OptionsSidebar from "./OptionsSidebar.vue";
+import OptionsNavigation from "@/components/layout/OptionsNavigation.vue";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
+import {
+  createLanguageTransition,
+  createThemeTransition,
+} from "@/composables/ui/useUITransition.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+const logger = getScopedLogger(LOG_COMPONENTS.UI, "OptionsLayout");
 
-const { locale } = useUnifiedI18n()
-const settingsStore = useSettingsStore()
+const { locale } = useUnifiedI18n();
+const settingsStore = useSettingsStore();
 
 // Language transition animation
-createLanguageTransition(
-  () => locale.value,
-  {
-    containerSelector: '.options-layout',
-    onTransitionStart: (newLocale) => {
-      logger.debug('Language transition started:', newLocale)
-    },
-    onTransitionMid: (newLocale) => {
-      logger.debug('Language transition mid-point:', newLocale)
-    },
-    onTransitionEnd: (newLocale) => {
-      logger.debug('Language transition completed:', newLocale)
-    }
-  }
-)
+createLanguageTransition(() => locale.value, {
+  containerSelector: ".options-layout",
+  onTransitionStart: (newLocale) => {
+    logger.debug("Language transition started:", newLocale);
+  },
+  onTransitionMid: (newLocale) => {
+    logger.debug("Language transition mid-point:", newLocale);
+  },
+  onTransitionEnd: (newLocale) => {
+    logger.debug("Language transition completed:", newLocale);
+  },
+});
 
 // Theme transition animation
-createThemeTransition(
-  () => settingsStore.settings?.THEME,
-  {
-    containerSelector: '.options-layout',
-    onTransitionStart: (newTheme) => {
-      logger.debug('Theme transition started:', newTheme)
-    },
-    onTransitionMid: (newTheme) => {
-      logger.debug('Theme transition mid-point:', newTheme)
-    },
-    onTransitionEnd: (newTheme) => {
-      logger.debug('Theme transition completed:', newTheme)
-    }
-  }
-)
-
+createThemeTransition(() => settingsStore.settings?.THEME, {
+  containerSelector: ".options-layout",
+  onTransitionStart: (newTheme) => {
+    logger.debug("Theme transition started:", newTheme);
+  },
+  onTransitionMid: (newTheme) => {
+    logger.debug("Theme transition mid-point:", newTheme);
+  },
+  onTransitionEnd: (newTheme) => {
+    logger.debug("Theme transition completed:", newTheme);
+  },
+});
 </script>
 
 <style lang="scss">
 @use "@/assets/styles/base/variables" as *;
-@use "@/assets/styles/components/ui-transitions" as *;</style>
+@use "@/assets/styles/components/ui-transitions" as *;
+</style>
 
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
@@ -77,10 +74,17 @@ createThemeTransition(
   border: $border-width $border-style var(--color-border);
   margin: 0 auto;
   box-sizing: border-box;
-  height: calc(100vh - 40px) !important; /* Force height to leave space at the bottom */
+  height: calc(
+    100vh - 40px
+  ) !important; /* Force height to leave space at the bottom */
   margin-bottom: 40px !important; /* Force spacing at the bottom */
-  
+
   /* Debug outline removed */
+}
+
+/* RTL layout adjustments */
+:global(.extension-options.rtl) .options-layout {
+  flex-direction: row-reverse;
 }
 
 .options-main {
@@ -104,31 +108,31 @@ createThemeTransition(
   position: relative;
   scroll-behavior: smooth;
   box-sizing: border-box;
-  
+
   // Better scrollbar styling
   &::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background-color: var(--color-surface);
     border-radius: 4px;
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background-color: var(--color-border);
     border-radius: 4px;
-    
+
     &:hover {
       background-color: var(--color-text-secondary);
     }
   }
-  
+
   &::-webkit-scrollbar-corner {
     background-color: var(--color-surface);
   }
-  
+
   // Ensure all child content respects container width
   > * {
     max-width: 100%;
@@ -136,25 +140,29 @@ createThemeTransition(
     overflow-wrap: break-word;
     word-wrap: break-word;
   }
-  
+
   // Global styles for all tab content
   :global(.tab-content) {
     max-width: 100%;
     box-sizing: border-box;
-    
+
     // Ensure all form elements and content respect container width
     * {
       max-width: 100%;
       box-sizing: border-box;
     }
-    
+
     // Specific handling for wide elements
-    table, pre, code {
+    table,
+    pre,
+    code {
       overflow-x: auto;
     }
-    
+
     // Handle long text content
-    p, div, span {
+    p,
+    div,
+    span {
       word-wrap: break-word;
       overflow-wrap: break-word;
     }
@@ -168,12 +176,12 @@ createThemeTransition(
     height: auto;
     min-height: 90vh;
   }
-  
+
   .options-main {
     width: auto;
     max-width: none;
   }
-  
+
   .tab-content-container {
     width: auto;
     min-width: 300px;
@@ -190,13 +198,13 @@ createThemeTransition(
     width: 98vw;
     min-height: 95vh;
   }
-  
+
   .options-main {
     flex-direction: column;
     width: 100%;
     max-width: none;
   }
-  
+
   .tab-content-container {
     width: 100%;
     min-width: auto;
@@ -212,7 +220,7 @@ createThemeTransition(
     min-height: 100vh;
     width: 100vw;
   }
-  
+
   .tab-content-container {
     padding: $spacing-base;
   }
@@ -240,8 +248,12 @@ createThemeTransition(
 
 .tab-content-container {
   flex: 1; /* Allow the container to grow and fill available space */
-  height: calc(100% - var(--options-main-padding, 20px)); /* Dynamically adjust based on options-main height */
-  max-height: calc(100% - var(--options-main-padding, 20px)); /* Ensure it fits within options-main */
+  height: calc(
+    100% - var(--options-main-padding, 20px)
+  ); /* Dynamically adjust based on options-main height */
+  max-height: calc(
+    100% - var(--options-main-padding, 20px)
+  ); /* Ensure it fits within options-main */
   overflow-y: auto; /* Enable vertical scrolling */
   overflow-x: hidden; /* Prevent horizontal scrolling */
 }
