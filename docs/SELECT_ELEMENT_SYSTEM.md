@@ -86,15 +86,24 @@ Integrated notification system for user feedback:
 - **Resource Tracking**: Automatic cleanup with ResourceTracker integration
 - **Singleton Pattern**: Ensures consistency across the application
 
+### 🚀 Advanced Multi-Segment Translation
+- **Smart Text Segmentation**: Automatically splits complex content at optimal boundaries
+- **Paragraph Preservation**: Maintains original structure with empty lines and formatting
+- **Streaming Support**: Real-time translation of large content with progress updates
+- **Mixed Content Handling**: Seamlessly processes text, hashtags, links, and emojis
+- **Zero-Width Characters**: Uses \u200B for preserving visual spacing in translations
+
 ### 🛡️ Navigation Prevention
 - **Smart Blocking**: Prevents navigation on interactive elements during selection
 - **Content-Aware**: Allows translation of elements with text content
-- **Cross-Site**: Works consistently across all websites (Twitter, GitHub, etc.)
+- **Cross-Site**: Works consistently across all websites (Twitter, GitHub, LinkedIn, etc.)
+- **Modern Web App Support**: Optimized for complex single-page applications
 
 ### 🎨 Enhanced Visual Feedback
 - **Direct CSS Highlighting**: Maximum performance with direct DOM manipulation
 - **Global Styles**: Main DOM injection for crosshair cursor and link disabling
 - **Toast Styling**: Integrated toast styles with the main application
+- **Responsive Design**: Adapts to different element sizes and screen resolutions
 
 ## 🔄 Event Flow
 
@@ -156,12 +165,14 @@ class TextExtractionService {
 
 ### TranslationOrchestrator
 ```javascript
-// Translation coordination with local timeout utilities
+// Translation coordination with streaming support
 class TranslationOrchestrator {
-  translateElement(element, text)  // Execute translation
-  applyTranslation(element, result) // Apply to DOM
-  handleTranslationError(error)    // Error management
-  calculateDynamicTimeout(segments) // Local timeout calculation
+  translateElement(element, text)           // Execute translation
+  applyTranslation(element, result)          // Apply to DOM
+  handleTranslationError(error)              // Error management
+  calculateDynamicTimeout(segments)          // Local timeout calculation
+  handleStreamTranslation(data)              // Stream processing
+  processMultiSegmentTranslation(segments)   // Multi-segment coordination
 }
 ```
 
@@ -265,6 +276,9 @@ src/features/element-selection/
 │   │   ├── ElementHighlighter.js              # Visual feedback
 │   │   ├── TextExtractionService.js          # Text extraction
 │   │   ├── TranslationOrchestrator.js         # Translation coordination
+│   │   ├── StreamingTranslationEngine.js      # Streaming translation support
+│   │   ├── TranslationUIManager.js            # UI updates & multi-segment handling
+│   │   ├── TranslationRequestManager.js       # Request lifecycle management
 │   │   ├── ModeManager.js                    # Mode management
 │   │   ├── StateManager.js                   # State tracking
 │   │   └── ErrorHandlingService.js           # Error management
@@ -362,10 +376,19 @@ this.translationOrchestrator.translateElement(element, text)
     // Notification dismissed automatically in error handler
   });
 
-// Streaming translation coordination for large content
+// Enhanced streaming translation coordination for complex content
+// - Multi-segment text processing (handles tweets, articles with multiple lines)
+// - Preserves empty lines and paragraph structure
 // - Automatic notification updates during streaming
-// - Smart timeout management based on content size
+// - Smart timeout management based on content size and segment count
 // - Progress reporting through UnifiedTranslationCoordinator
+// - Advanced handling of complex DOM structures (Twitter, LinkedIn, etc.)
+
+// Multi-Segment Translation Processing
+// - Splits long texts into manageable segments at sentence boundaries
+// - Preserves empty lines as structural markers using \u200B\n\u200B
+// - Reassembles translations maintaining original paragraph structure
+// - Handles mixed content (text, hashtags, links) in single elements
 ```
 
 ### With State Management
@@ -412,14 +435,26 @@ getStatus() {
 
 ## 🚀 Future Enhancements
 
+### Recently Implemented (2025)
+- ✅ **Multi-Segment Translation**: Advanced processing of complex content with multiple lines
+- ✅ **Streaming Translation Engine**: Real-time translation for large content
+- ✅ **Paragraph Structure Preservation**: Maintains original formatting and empty lines
+- ✅ **Complex DOM Handling**: Optimized for Twitter, LinkedIn, and modern web apps
+- ✅ **Enhanced Text Processing**: Smart segmentation at sentence boundaries
+- ✅ **Zero-Width Character Preservation**: Uses \u200B for visual spacing integrity
+
 ### Planned Features
 - **Multi-Element Selection**: Batch translation capabilities
 - **Visual Translation**: Image and SVG content support
 - **Advanced AI Context**: Smart content understanding
 - **Collaborative Translation**: Multi-user features
+- **Adaptive Translation**: Context-aware translation based on content type
+- **Real-time Translation**: Live translation as user types or scrolls
 
 ### Technical Improvements
 - **WebAssembly Integration**: Performance-critical operations
 - **Service Worker Support**: Background processing
-- **Advanced Caching**: Intelligent content caching
+- **Advanced Caching**: Intelligent content caching with multi-segment awareness
 - **Progressive Enhancement**: Graceful feature degradation
+- **Memory Optimization**: Enhanced ResourceTracker integration for streaming
+- **Cross-Frame Translation**: Improved iframe and shadow DOM support

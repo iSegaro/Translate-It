@@ -153,9 +153,11 @@ export class TranslationEngine {
 
     try {
       let result;
-      // Check cache first for all contexts to improve performance
+      // Check cache first for non-SelectElement contexts to improve performance
       const cacheKey = this.generateCacheKey(data);
-      if (this.cache.has(cacheKey)) {
+      const isSelectElementMode = data.mode === TranslationMode.Select_Element;
+
+      if (this.cache.has(cacheKey) && !isSelectElementMode) {
         const cached = this.cache.get(cacheKey);
         // Cache hit
         result = {
@@ -171,9 +173,11 @@ export class TranslationEngine {
         } else {
           result = await this.executeTranslation(data, sender);
         }
-        
-        // Cache the result for future requests
-        this.cacheResult(cacheKey, result);
+
+        // Cache the result for future requests (but not for SelectElement mode)
+        if (!isSelectElementMode) {
+          this.cacheResult(cacheKey, result);
+        }
       }
 
       // Centralized history addition for all modes except SelectElement

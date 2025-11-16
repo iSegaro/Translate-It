@@ -1,3 +1,16 @@
+#### v1.4.10 – Released on November 16, 2025
+
+##### Added
+
+- **Local File Support**: Added support for translating content from local files (`file:///` URLs)
+
+##### Fixed
+
+- **Select Element Improvements**: Enhanced element selection functionality and reliability
+- Removed caching system from Select Element for better performance and accuracy
+
+---
+
 #### v1.4.8 – Released on November 10, 2025
 
 ##### Fixed

@@ -4,7 +4,6 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getElementSelectionCache } from './cache.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'textProcessing');
 
@@ -43,32 +42,52 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
     return expandTextsLegacy(textsToTranslate);
   }
 
-  // Optimized implementation: less aggressive splitting
+  // Optimized implementation: less aggressive splitting with structure preservation
   const expandedTexts = [];
   const originMapping = [];
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
     const segments = processTextIntoSegments(originalText, config);
+    logger.debug(`Processing original text ${originalIndex}: "${originalText}"`, {
+      segments: segments.map((s, i) => ({ index: i, content: `"${s}"`, length: s.length, isEmpty: s.length === 0 })),
+      segmentsCount: segments.length
+    });
+
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
       const trimmedSegment = segment.trim();
 
+      // Special handling for empty lines - preserve as structural markers
+      if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
+        logger.debug(`Empty line detected at segment ${segmentIndex}`, {
+          segment: `"${segment}"`,
+          segmentIndex,
+          originalIndex
+        });
+        // Add empty line placeholder for structure preservation
+        expandedTexts.push('\n'); // Use simple newline for empty lines
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
+
       // Skip very short segments unless configured to preserve them
       if (!config.preserveShortSegments && trimmedSegment.length < config.minTextLength) {
+        logger.debug(`Skipping short segment: "${trimmedSegment}"`);
         return;
       }
 
       expandedTexts.push(trimmedSegment);
-      originMapping.push({ originalIndex, segmentIndex });
+      originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
       currentExpandedIndices.push(expandedTexts.length - 1);
     });
 
     // If no segments were added (all were too short), add the original
     if (currentExpandedIndices.length === 0) {
       expandedTexts.push(originalText);
-      originMapping.push({ originalIndex, segmentIndex: 0 });
+      originMapping.push({ originalIndex, segmentIndex: 0, isEmptyLine: false });
       currentExpandedIndices.push(expandedTexts.length - 1);
     }
 
@@ -93,7 +112,7 @@ function processTextIntoSegments(text, config) {
   // For short texts, keep them intact
   if (text.length <= config.maxSegmentLength) {
     if (config.splitOnDoubleNewlines) {
-      return text.split(/\n\n+/).filter(segment => segment.trim());
+      return text.split(/\n/);
     }
     return [text];
   }
@@ -102,8 +121,8 @@ function processTextIntoSegments(text, config) {
   let segments = [];
 
   if (config.splitOnDoubleNewlines) {
-    // Split on double newlines first
-    segments = text.split(/\n\n+/);
+    // Split on single newlines to preserve empty lines
+    segments = text.split(/\n/);
   } else {
     // Split on single newlines for more granular control
     segments = text.split(/\n/);
@@ -121,7 +140,7 @@ function processTextIntoSegments(text, config) {
     }
   });
 
-  return finalSegments.filter(segment => segment.trim());
+  return finalSegments.filter(segment => segment.trim() !== '' || segment.length === 0);
 }
 
 /**
@@ -182,9 +201,17 @@ function expandTextsLegacy(textsToTranslate) {
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
-      expandedTexts.push(segment);
-      originMapping.push({ originalIndex, segmentIndex });
-      currentExpandedIndices.push(expandedTexts.length - 1);
+      // Special handling for empty lines - preserve as structural markers
+      if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
+        // Add empty line placeholder for structure preservation
+        expandedTexts.push('\n'); // Use simple newline for empty lines
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      } else {
+        expandedTexts.push(segment);
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      }
     });
     originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
   });
@@ -198,25 +225,24 @@ function expandTextsLegacy(textsToTranslate) {
  * @param {string[]} expandedTexts - Original expanded texts
  * @param {Array} originMapping - Mapping of segments to originals
  * @param {string[]} textsToTranslate - Original texts to translate
- * @param {Map} cachedTranslations - Cached translations
  * @returns {Map} Map of original texts to translated texts
  */
 export function reassembleTranslations(
   translatedData,
   expandedTexts,
   originMapping,
-  textsToTranslate,
-  cachedTranslations
+  textsToTranslate
 ) {
   if (!Array.isArray(translatedData) || !Array.isArray(expandedTexts) || !Array.isArray(originMapping)) {
     logger.error('reassembleTranslations: Invalid input parameters');
     return new Map();
   }
 
-  const cache = getElementSelectionCache();
   const newTranslations = new Map();
   const translatedSegmentsMap = new Map();
 
+  // Note: translatedData length should match filtered expandedTexts length
+  // but originMapping contains the original structure info
   const numItemsToProcess = Math.min(expandedTexts.length, translatedData.length);
 
   // Process translated segments
@@ -225,11 +251,28 @@ export function reassembleTranslations(
     const mappingInfo = originMapping[i];
 
     if (translatedItem && typeof translatedItem.text === "string" && mappingInfo) {
-      const { originalIndex } = mappingInfo;
+      const { originalIndex, isEmptyLine } = mappingInfo;
       if (!translatedSegmentsMap.has(originalIndex)) {
         translatedSegmentsMap.set(originalIndex, []);
       }
-      translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
+
+      // Handle empty line placeholders - preserve structure with simple newlines
+      if (isEmptyLine) {
+        // Use simple newline for empty lines
+        translatedSegmentsMap.get(originalIndex).push('\n');
+      } else {
+        // Check if the corresponding original text already ends with newline
+        // If so, don't add another newline to avoid double spacing
+        const originalText = expandedTexts[i] || '';
+        let processedTranslation = translatedItem.text;
+
+        // Only add newline if original had newline AND translation doesn't already have it
+        if (originalText.endsWith('\n') && !processedTranslation.endsWith('\n')) {
+          processedTranslation += '\n';
+        }
+
+        translatedSegmentsMap.get(originalIndex).push(processedTranslation);
+      }
     } else {
       logger.debug(`Invalid translation data at index ${i}:`, {
         translatedItem,
@@ -238,11 +281,17 @@ export function reassembleTranslations(
 
       // Use original text as fallback
       if (mappingInfo) {
-        const { originalIndex } = mappingInfo;
+        const { originalIndex, isEmptyLine } = mappingInfo;
         if (!translatedSegmentsMap.has(originalIndex)) {
           translatedSegmentsMap.set(originalIndex, []);
         }
-        translatedSegmentsMap.get(originalIndex).push(expandedTexts[i] || '');
+
+        if (isEmptyLine) {
+          translatedSegmentsMap.get(originalIndex).push('\n'); // Use simple newline for empty lines
+        } else {
+          // Use fallback text as-is, preserving original structure
+          translatedSegmentsMap.get(originalIndex).push(expandedTexts[i] || '');
+        }
       }
     }
   }
@@ -251,13 +300,20 @@ export function reassembleTranslations(
   textsToTranslate.forEach((originalText, originalIndex) => {
     if (translatedSegmentsMap.has(originalIndex)) {
       const segments = translatedSegmentsMap.get(originalIndex);
-      const reassembledText = segments.join("\n");
-      newTranslations.set(originalText, reassembledText);
+      logger.debug(`Reassembling translation for original text ${originalIndex}`, {
+        originalText: `"${originalText}"`,
+        segments: segments.map((s, i) => ({ index: i, content: `"${s}"`, type: s === '\n' ? 'newline' : 'text' }))
+      });
 
-      // Cache the translation
-      cache.setTranslation(originalText, reassembledText);
-    } else if (!cachedTranslations.has(originalText)) {
+      // Build reassembled text by joining segments directly
+      // This preserves the original structure without adding extra newlines
+      let reassembledText = segments.join('');
+
+      logger.debug(`Final reassembled text for original ${originalIndex}: "${reassembledText}"`);
+      newTranslations.set(originalText, reassembledText);
+    } else {
       // No translated parts found for this text, use original
+      logger.debug(`No translated segments for original ${originalIndex}, using original`);
       newTranslations.set(originalText, originalText);
     }
   });
@@ -266,33 +322,6 @@ export function reassembleTranslations(
   return newTranslations;
 }
 
-/**
- * Separate cached and new texts for efficient translation
- * @param {Map} originalTextsMap - Map of original texts to nodes
- * @returns {Object} Object with textsToTranslate and cachedTranslations
- */
-export function separateCachedAndNewTexts(originalTextsMap) {
-  if (!originalTextsMap || !(originalTextsMap instanceof Map)) {
-    logger.error('separateCachedAndNewTexts: Invalid originalTextsMap provided');
-    return { textsToTranslate: [], cachedTranslations: new Map() };
-  }
-
-  const cache = getElementSelectionCache();
-  const textsToTranslate = [];
-  const cachedTranslations = new Map();
-  const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
-
-  uniqueOriginalTexts.forEach((text) => {
-    if (cache.hasTranslation(text)) {
-      cachedTranslations.set(text, cache.getTranslation(text));
-    } else {
-      textsToTranslate.push(text);
-    }
-  });
-
-  logger.debug(`Separated texts: ${textsToTranslate.length} new, ${cachedTranslations.size} cached`);
-  return { textsToTranslate, cachedTranslations };
-}
 
 /**
  * Handle translation length mismatch between expected and received data
@@ -524,7 +553,6 @@ export function cleanText(text, options = {}) {
 export const ElementTextProcessingUtils = {
   expand: expandTextsForTranslation,
   reassemble: reassembleTranslations,
-  separate: separateCachedAndNewTexts,
   validate: isValidTextContent,
   clean: cleanText,
   parseResponse: parseAndCleanTranslationResponse,

@@ -12,7 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissions');
  */
 export function isRestrictedUrl(url) {
   if (!url || typeof url !== 'string') return true;
-  
+
   const restrictedPrefixes = [
     'chrome://',
     'chrome-extension://',
@@ -22,9 +22,9 @@ export function isRestrictedUrl(url) {
     'opera://',
     'vivaldi://',
     'brave://',
-    'file://', // Local files may be restricted depending on settings
+    // Note: file:// is removed from restricted prefixes to allow local file access
   ];
-  
+
   return restrictedPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
 }
 
@@ -51,7 +51,7 @@ export function isExtensionPage(url) {
  */
 export function isBrowserInternalPage(url) {
   if (!url || typeof url !== 'string') return false;
-  
+
   const internalPrefixes = [
     'chrome://',
     'about:',
@@ -60,8 +60,38 @@ export function isBrowserInternalPage(url) {
     'vivaldi://',
     'brave://',
   ];
-  
+
   return internalPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
+}
+
+/**
+ * Check if a URL is a local file
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if it's a local file
+ */
+export function isLocalFile(url) {
+  if (!url || typeof url !== 'string') return false;
+
+  return url.toLowerCase().startsWith('file://');
+}
+
+/**
+ * Check if a local file is safe to access
+ * @param {string} url - The file URL to check
+ * @returns {boolean} True if the file is safe to access
+ */
+export function isSafeLocalFile(url) {
+  if (!isLocalFile(url)) return false;
+
+  try {
+    // Simple check - if user opens the file, let's trust them
+    logger.debug(`[TabPermissions] Local file allowed: ${url}`);
+    return true;
+
+  } catch (error) {
+    logger.error('[TabPermissions] Error checking local file safety:', error);
+    return false;
+  }
 }
 
 /**
@@ -71,19 +101,22 @@ export function isBrowserInternalPage(url) {
  */
 export function getRestrictedUrlMessage(url) {
   if (!url) return 'Page information unavailable';
-  
+
   if (isBrowserInternalPage(url)) {
     return 'Feature not available on browser internal pages';
   }
-  
+
   if (isExtensionPage(url)) {
     return 'Feature not available on extension pages';
   }
-  
-  if (url.toLowerCase().startsWith('file://')) {
-    return 'Feature not available on local files (requires additional permissions)';
+
+  if (isLocalFile(url)) {
+    if (!isSafeLocalFile(url)) {
+      return 'File type blocked for security reasons';
+    }
+    return 'Local file access is enabled';
   }
-  
+
   return 'Feature not available on this type of page';
 }
 
@@ -95,22 +128,38 @@ export function getRestrictedUrlMessage(url) {
 export function checkContentScriptAccess() {
   try {
     const url = window.location.href;
-    const isRestricted = isRestrictedUrl(url);
-    
+    let isRestricted = isRestrictedUrl(url);
+    let errorMessage = null;
+
+    // Special handling for local files
+    if (isLocalFile(url)) {
+      // Check if the local file is safe
+      const isSafe = isSafeLocalFile(url);
+      isRestricted = !isSafe;
+      if (!isSafe) {
+        errorMessage = 'File type blocked for security reasons';
+        logger.warn(`[TabPermissions] Unsafe local file blocked: ${url}`);
+      } else {
+        logger.info(`[TabPermissions] Safe local file allowed: ${url}`);
+      }
+    }
+
     const result = {
       url,
       isAccessible: !isRestricted,
       isRestricted,
+      isLocalFile: isLocalFile(url),
+      isSafeLocalFile: isLocalFile(url) ? isSafeLocalFile(url) : null,
       isExtensionPage: isExtensionPage(url),
       isBrowserInternalPage: isBrowserInternalPage(url),
-      errorMessage: isRestricted ? getRestrictedUrlMessage(url) : null,
+      errorMessage: isRestricted ? (errorMessage || getRestrictedUrlMessage(url)) : null,
       timestamp: Date.now()
     };
-    
+
     if (isRestricted) {
       logger.info('[TabPermissions] Content script access restricted:', result);
     }
-    
+
     return result;
   } catch (error) {
     logger.error('[TabPermissions] Error checking content script access:', error);
@@ -148,7 +197,7 @@ export class TabPermissionChecker {
           timestamp: Date.now()
         };
       }
-      
+
       // Get tab information
       let tabInfo;
       try {
@@ -165,19 +214,35 @@ export class TabPermissionChecker {
           timestamp: Date.now()
         };
       }
-      
+
       const url = tabInfo.url || '';
-      const isRestricted = isRestrictedUrl(url);
-      
+      let isRestricted = isRestrictedUrl(url);
+      let errorMessage = null;
+
+      // Special handling for local files
+      if (isLocalFile(url)) {
+        // Check if the local file is safe
+        const isSafe = isSafeLocalFile(url);
+        isRestricted = !isSafe;
+        if (!isSafe) {
+          errorMessage = 'File type blocked for security reasons';
+          this.logger.warn(`[TabPermissionChecker] Unsafe local file blocked: ${url}`);
+        } else {
+          this.logger.info(`[TabPermissionChecker] Safe local file allowed: ${url}`);
+        }
+      }
+
       const result = {
         tabId,
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''), // Truncate for logging
         fullUrl: url,
         isAccessible: !isRestricted,
         isRestricted,
+        isLocalFile: isLocalFile(url),
+        isSafeLocalFile: isLocalFile(url) ? isSafeLocalFile(url) : null,
         isExtensionPage: isExtensionPage(url),
         isBrowserInternalPage: isBrowserInternalPage(url),
-        errorMessage: isRestricted ? getRestrictedUrlMessage(url) : null,
+        errorMessage: isRestricted ? (errorMessage || getRestrictedUrlMessage(url)) : null,
         tabInfo: {
           title: tabInfo.title,
           status: tabInfo.status,
@@ -185,13 +250,13 @@ export class TabPermissionChecker {
         },
         timestamp: Date.now()
       };
-      
+
       // if (isRestricted) {
       //   this.logger.info(`[TabPermissionChecker] Tab ${tabId} access restricted:`, result);
       // } else {
       //   this.logger.debug(`[TabPermissionChecker] Tab ${tabId} is accessible:`, result);
       // }
-      
+
       return result;
     } catch (error) {
       this.logger.error(`[TabPermissionChecker] Error checking tab ${tabId} access:`, error);

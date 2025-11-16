@@ -1,12 +1,7 @@
 // Element Selection Utilities Index
 // Centralized exports for all Element Selection utilities
 
-// Cache system
-export {
-  ElementSelectionCache,
-  getElementSelectionCache,
-  initializeCache
-} from './cache.js';
+// Note: Cache system has been removed from Select Element feature
 
 // Text direction utilities
 export {
@@ -41,7 +36,6 @@ export {
 export {
   expandTextsForTranslation,
   reassembleTranslations,
-  separateCachedAndNewTexts,
   handleTranslationLengthMismatch,
   parseAndCleanTranslationResponse,
   isValidTextContent,
@@ -54,7 +48,6 @@ export {
   ElementTextExtraction,
   getElementTextExtraction,
   initializeTextExtraction,
-  clearAllCaches,
 
   // Re-exported functions for compatibility
   collectTextNodes as collectTextNodesExtraction,
@@ -65,13 +58,11 @@ export {
   isValidTextElement as isValidTextElementExtraction,
   expandTextsForTranslation as expandTextsForTranslationExtraction,
   reassembleTranslations as reassembleTranslationsExtraction,
-  separateCachedAndNewTexts as separateCachedAndNewTextsExtraction,
   parseAndCleanTranslationResponse as parseAndCleanTranslationResponseExtraction,
   handleTranslationLengthMismatch as handleTranslationLengthMismatchExtraction,
   isValidTextContent as isValidTextContentExtraction,
   cleanText as cleanTextExtraction,
   correctTextDirection as correctTextDirectionExtraction,
   storeOriginalParentStyles as storeOriginalParentStylesExtraction,
-  restoreOriginalParentStyles as restoreOriginalParentStylesExtraction,
-  getElementSelectionCache as getTranslationCache
+  restoreOriginalParentStyles as restoreOriginalParentStylesExtraction
 } from './textExtraction.js';

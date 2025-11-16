@@ -11,6 +11,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 // Core services
 import { ElementHighlighter } from "./managers/services/ElementHighlighter.js";
 import { TextExtractionService } from "./managers/services/TextExtractionService.js";
+import { getElementTextExtraction } from "./utils/textExtraction.js";
 import { TranslationOrchestrator } from "./managers/services/TranslationOrchestrator.js";
 import { ModeManager } from "./managers/services/ModeManager.js";
 import { StateManager } from "./managers/services/StateManager.js";
@@ -43,6 +44,7 @@ class SelectElementManager extends ResourceTracker {
     this.stateManager = new StateManager();
     this.elementHighlighter = new ElementHighlighter();
     this.textExtractionService = new TextExtractionService();
+    this.textExtraction = getElementTextExtraction();
     this.translationOrchestrator = new TranslationOrchestrator(this.stateManager);
     this.modeManager = new ModeManager();
     this.errorHandlingService = new ErrorHandlingService();
@@ -120,6 +122,7 @@ class SelectElementManager extends ResourceTracker {
       await this.stateManager.initialize();
       await this.elementHighlighter.initialize();
       await this.textExtractionService.initialize();
+      await this.textExtraction.initialize();
       await this.translationOrchestrator.initialize();
       await this.modeManager.initialize();
       await this.errorHandlingService.initialize();
@@ -401,8 +404,13 @@ class SelectElementManager extends ResourceTracker {
       // Get the highlighted element (which might be different from event.target)
       const elementToTranslate = this.elementHighlighter.currentHighlighted || event.target;
 
-      // Extract text from the highlighted element
-      const text = await this.textExtractionService.extractTextFromElement(elementToTranslate);
+      // Extract text from the highlighted element using ElementTextExtraction (preserves structure)
+      const extractionResult = await this.textExtraction.extractTextForTranslation(elementToTranslate, {
+        validateText: false,  // Skip validation to preserve empty lines
+        cleanTextContent: false  // Skip cleaning to preserve structure
+      });
+
+      const text = extractionResult.textsToTranslate.join('\n\n'); // Rejoin with newlines for display
 
       this.logger.debug("Text extraction result:", {
         textLength: text?.length || 0,
@@ -426,7 +434,7 @@ class SelectElementManager extends ResourceTracker {
         this.removeEventListeners();
 
         // Start translation process with the highlighted element
-        await this.startTranslation(text, elementToTranslate);
+        await this.startTranslation(text, elementToTranslate, extractionResult);
         
       } else {
         this.logger.debug("No text found in element", {
@@ -564,7 +572,7 @@ class SelectElementManager extends ResourceTracker {
     });
   }
   
-  async startTranslation(text, targetElement) {
+  async startTranslation(text, targetElement, extractionResult) {
     try {
       this.logger.debug("Starting translation process");
 
@@ -580,63 +588,29 @@ class SelectElementManager extends ResourceTracker {
         return;
       }
 
-      // We'll update notification after translation call to avoid race conditions with cache
-      
-      // Create text nodes map and original texts map for translation
-      const textNodes = [];
-      const nodeToTextMap = new Map(); // Map<Node, string> for DOM operations
-      const originalTextsMap = new Map(); // Map<string, Node[]> for translation system
-      
-      // Find all text nodes within the element
-      const walker = document.createTreeWalker(
-        targetElement,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-      );
-      
-      let textNode;
-      while ((textNode = walker.nextNode())) {
-        const nodeText = textNode.textContent;
-        // Only skip completely empty nodes (whitespace-only nodes are important for spacing)
-        if (nodeText.length > 0) {
-          textNodes.push(textNode);
-          nodeToTextMap.set(textNode, nodeText);
-
-          // Use trimmed text for translation lookup, but preserve original for replacement
-          const trimmedText = nodeText.trim();
-          if (trimmedText) { // Only translate if there's actual content
-            // Add to originalTextsMap in the format expected by translation system
-            if (originalTextsMap.has(trimmedText)) {
-              originalTextsMap.get(trimmedText).push(textNode);
-            } else {
-              originalTextsMap.set(trimmedText, [textNode]);
-            }
-          }
-        }
-      }
-      
+      // Use extraction result from ElementTextExtraction
       this.logger.debug("Prepared translation data:", {
         targetElementTag: targetElement.tagName,
         targetElementClass: targetElement.className,
         targetInnerHTMLLength: targetElement.innerHTML.length,
-        textNodesCount: textNodes.length,
-        uniqueTextsCount: originalTextsMap.size,
-        sampleTexts: Array.from(originalTextsMap.keys()).slice(0, 3).map(text => text.substring(0, 50) + (text.length > 50 ? '...' : ''))
+        textNodesCount: extractionResult.textNodes.length,
+        uniqueTextsCount: extractionResult.originalTextsMap.size,
+        sampleTexts: Array.from(extractionResult.originalTextsMap.keys()).slice(0, 3).map(text => text.substring(0, 50) + (text.length > 50 ? '...' : ''))
       });
-
-      // Check if all texts are cached before showing notification
-      // For cache-only translations, don't show "Translating..." since they complete instantly
-      const isAllCached = this.translationOrchestrator.checkIfAllCached(originalTextsMap);
 
       // Update notification to show translation in progress before starting
       // This gives immediate feedback to the user when they click on an element
-      if (window === window.top && !isAllCached) {
+      if (window === window.top) {
         this.updateNotificationForTranslation();
       }
 
       // Perform translation via orchestrator with context
-      const result = await this.translationOrchestrator.processSelectedElement(targetElement, originalTextsMap, textNodes, 'select-element');
+      const result = await this.translationOrchestrator.processSelectedElement(
+        targetElement,
+        extractionResult.originalTextsMap,
+        extractionResult.textNodes,
+        'select-element'
+      );
 
       // Check if result is valid before accessing properties
       if (result && typeof result === 'object') {
@@ -666,11 +640,18 @@ class SelectElementManager extends ResourceTracker {
         // Note: For streaming translations, the translation will be applied via streaming handlers
         // Note: If translation was already applied in TranslationOrchestrator, skip to avoid double application
         // Note: Skip cache-only results since they're already applied
-        const shouldApply = result.success && result.translatedText && !result.cacheOnly && (
+        const shouldApply = result.success && result.translatedText && !result.cacheOnly && !result.applied && (
           !result.streaming ||                                               // Non-streaming
           result.fromCache ||                                                // Cached result
           result.originalTextsMap                                           // Has text map data
         );
+
+        // Skip if translation was already applied by UI Manager
+        if (result.success && result.fromUIManager) {
+          this.logger.debug("Translation already applied by UI Manager, skipping duplicate application");
+          this.deactivate();
+          return;
+        }
 
         if (shouldApply) {
           try {
