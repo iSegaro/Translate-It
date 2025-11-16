@@ -54,7 +54,7 @@
           class="ti-action-btn ti-smart-tts-btn"
           :class="{ 'ti-original-mode': ttsMode === 'original' }"
           :disabled="!hasTTSContent"
-          :title="getTTSButtonTitle"
+          :title="getEnhancedTTSButtonTitle"
           @click.stop="handleSmartTTS"
         >
           <svg
@@ -78,7 +78,8 @@
         </button>
         <button
           class="ti-action-btn"
-          title="Show/Hide Original Text"
+          :class="{ 'ti-original-visible': showOriginal }"
+          :title="getOriginalButtonTitle"
           @click.stop="toggleShowOriginal"
         >
           <svg
@@ -233,6 +234,31 @@ const getTTSButtonTitle = computed(() => {
   }
 
   return 'Speak translation';
+});
+
+// Enhanced TTS button title with more detailed guidance
+const getEnhancedTTSButtonTitle = computed(() => {
+  if (!hasTTSContent.value) {
+    return 'No text available for speech';
+  }
+
+  if (tts.ttsState.value === 'playing') {
+    return 'Stop speaking (Click to stop)';
+  }
+
+  if (ttsMode.value === 'original') {
+    return '🔊 Speak ORIGINAL text (Show original first, then click this button)';
+  }
+
+  return '🔊 Speak TRANSLATION (Current mode: translation)';
+});
+
+// Enhanced original button title with TTS hint
+const getOriginalButtonTitle = computed(() => {
+  if (showOriginal.value) {
+    return 'Hide Original Text (TTS button now speaks original text)';
+  }
+  return 'Show Original Text (Then use speaker button to listen to original)';
 });
 
 // TTS icon paths for different modes
@@ -518,6 +544,19 @@ const handleStartDrag = (event) => {
   cursor: not-allowed;
 }
 
+/* Original button visibility indicator */
+.ti-action-btn.ti-original-visible {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  color: #1e40af !important;
+}
+
+.translation-window.dark .ti-action-btn.ti-original-visible {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+}
+
 /* Smart TTS Button Styles */
 .ti-smart-tts-btn {
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
@@ -598,6 +637,7 @@ const handleStartDrag = (event) => {
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .ti-original-label {
@@ -660,17 +700,18 @@ const handleStartDrag = (event) => {
 }
 
 /* Dark theme adjustments */
-.translation-window.dark .original-text-section {
+.translation-window.dark .ti-original-text-section {
   border-bottom-color: rgba(255, 255, 255, 0.2);
 }
 
-.translation-window.dark .original-label {
+.translation-window.dark .ti-original-label {
   color: #aaa;
 }
 
-.translation-window.dark .original-text {
+.translation-window.dark .ti-original-text {
   color: #ccc;
 }
+
 
 /* Loading window specific styles */
 .translation-window.loading-window {
