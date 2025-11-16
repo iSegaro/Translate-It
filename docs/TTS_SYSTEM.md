@@ -188,10 +188,10 @@ The system has been enhanced to handle Chrome Manifest V3 messaging issues that 
 - **Port Messaging Fix**: Fixed ReliableMessaging to properly extract result data from port communication wrapper
 - **Smart Stop Logic**: Implemented unified `TTS_STOP` handler that differentiates between specific and global stops
 - **Persistent TTS ID Management**: Fixed `currentTTSId` lifecycle to persist during audio playback instead of being cleared prematurely
-- **Event-Driven Completion (v2.3)**: Replaced polling mechanism with event-driven system using `GOOGLE_TTS_ENDED` events
-- **Enhanced Notification System (v2.3)**: Added `notifyTTSEnded` function for proper sender notifications with reasons
-- **30-Second Safety Timeout (v2.3)**: Added emergency timeout fallback for completion detection
-- **MessageActions Constants (v2.3)**: Replaced hardcoded strings with `MessageActions.GOOGLE_TTS_ENDED` for maintainability
+- **Event-Driven Completion (v2.4)**: Fixed handler registration for proper `GOOGLE_TTS_ENDED` event processing
+- **Enhanced Notification System**: Added `notifyTTSEnded` function for proper sender notifications with reasons
+- **🚀 Adaptive Timeout System (v2.4)**: Smart timeout calculation (1-30s) based on text length and language
+- **MessageActions Constants**: All hardcoded strings replaced with `MessageActions.GOOGLE_TTS_ENDED` for maintainability
 
 ### Cross-Component Standardization
 Successfully standardized TTS functionality across all three extension components:
@@ -281,7 +281,7 @@ Successfully standardized TTS functionality across all three extension component
 **Status**: ✅ **Resolved in v2.2** - TTS ID now persists throughout audio playback, enabling reliable stop functionality
 
 #### WindowsManager TTS Stop Button Enhancement (v2.2)
-**Changes Implemented**: 
+**Changes Implemented**:
 - **Optimized Debug Logs**: Streamlined logging messages for better readability and reduced console noise
 - **Enhanced Error Reporting**: Added detailed debug information including current TTS ID when stop requests are skipped
 - **Improved Documentation**: Added comprehensive documentation for v2.2 changes and architecture decisions
@@ -293,14 +293,81 @@ Successfully standardized TTS functionality across all three extension component
 
 **Status**: ✅ **Enhanced in v2.2.1** - Better debugging experience and improved error handling
 
-### Major Improvements in v2.3 (Latest)
+#### 🔧 Critical Event-Driven Completion Fix (v2.4)
+**Problem**: TTS completion events (`GOOGLE_TTS_ENDED`) were being dispatched by offscreen document but no handler was registered, causing the system to fall back to timeout-based completion detection.
+
+**Root Cause**:
+- `GOOGLE_TTS_ENDED` handler was **NOT registered** in LifecycleManager's `registerMessageHandlers()`
+- Lazy loading system was missing `handleGoogleTTSEnded` from loaded handlers
+
+**Solution Implemented**:
+```javascript
+// 1. Registered handler in LifecycleManager.js
+'GOOGLE_TTS_ENDED': Handlers.handleTTSEndedLazy,
+
+// 2. Created lazy handler wrapper in handleTTSLazy.js
+export const handleTTSEndedLazy = async (message, sender) => {
+  const { handleGoogleTTSEnded } = await loadTTSHandlers();
+  return await handleGoogleTTSEnded(message, sender);
+};
+
+// 3. Added to loaded handlers
+const handlers = {
+  handleGoogleTTSSpeak: googleTTS.handleGoogleTTSSpeak,
+  handleGoogleTTSStopAll: googleTTS.handleGoogleTTSStopAll,
+  handleGoogleTTSEnded: googleTTS.handleGoogleTTSEnded, // ← Added
+  handleOffscreenReady: offscreenReady.handleOffscreenReady
+};
+```
+
+**Impact**:
+- **🚀 Immediate Response**: TTS button now responds immediately when audio completes
+- **📊 Reduced Timeout Reliance**: Adaptive timeout (1-30s) now serves as true safety net
+- **⚡ Better Performance**: No more 30-second waits for short words like "Process"
+- **🎯 Event-Driven Architecture**: Restored intended event-driven completion system
+
+**Status**: ✅ **Fixed in v2.4** - Event-driven completion now working properly with adaptive timeouts
+
+### Major Improvements in v2.4 (Latest)
 
 The TTS system has been significantly enhanced with event-driven architecture and improved reliability:
 
-#### Event-Driven Completion System
+#### Event-Driven Completion System (Critical Fix)
+- **✅ Fixed Handler Registration**: `GOOGLE_TTS_ENDED` handler now properly registered in LifecycleManager
 - **Eliminated Polling**: Replaced 500ms polling mechanism with event-driven `GOOGLE_TTS_ENDED` notifications
-- **30-Second Safety Timeout**: Added emergency fallback timeout for completion detection
+- **🚀 Adaptive Timeout System**: Intelligent timeout based on text length and language (1-30 seconds)
 - **Improved Efficiency**: Reduced background checks and improved resource utilization
+
+#### Adaptive Timeout Algorithm
+The system now uses smart timeout calculation instead of fixed 30-second timeouts:
+
+```javascript
+// Text-based timeout calculation
+const calculateAdaptiveTimeout = (text, language) => {
+  const readingSpeeds = {
+    'en': 200, 'fa': 150, 'ar': 150, 'zh': 280, 'ja': 300, // WPM/CPM
+    'default': 180
+  };
+
+  const contentUnits = ['ja', 'zh', 'ko'].includes(language)
+    ? text.length
+    : text.trim().split(/\s+/).length;
+
+  const estimatedSeconds = (contentUnits / readingSpeeds[language]) * 60;
+  const minTimeout = text.length <= 5 ? 1 : 2; // 1s for very short texts
+  const maxTimeout = 30; // Maximum 30 seconds
+  const timeoutWithBuffer = Math.max(minTimeout, Math.min(maxTimeout, estimatedSeconds * 3));
+
+  return Math.ceil(timeoutWithBuffer * 1000); // Convert to milliseconds
+};
+```
+
+**Timeout Examples:**
+- **Single words** ("Hello"): **1 second**
+- **Short words** ("Process"): **2 seconds**
+- **Medium sentences**: **~5 seconds**
+- **Long paragraphs**: **~18 seconds**
+- **Very long texts**: **30 seconds (maximum)**
 
 #### Enhanced Notification System
 - **Reason-Based Notifications**: Added support for `completed`, `interrupted`, and `stopped` reasons
@@ -344,15 +411,17 @@ The unified system is considered healthy when:
 - ✅ **Single Composable**: Only `useTTSSmart.js` imported for TTS functionality
 - ✅ **Language Fallbacks**: Persian `fa` automatically maps to Arabic `ar`
 - ✅ **Proper State Transitions**: `idle → loading → playing → idle`
-- ✅ **Cross-Context Coordination**: Exclusive playback between Popup/Sidepanel/WindowsManager  
+- ✅ **Cross-Context Coordination**: Exclusive playback between Popup/Sidepanel/WindowsManager
 - ✅ **Error Recovery**: Failed languages automatically attempt fallback
-- ✅ **UnifiedMessaging**: Optimized timeouts (20s for TTS operations)
+- ✅ **UnifiedMessaging**: Optimized adaptive timeouts (1-30s based on text length)
 - ✅ **Consistent UI**: Identical TTSButton behavior across all contexts
 - ✅ **Smart Stop Handler**: `TTS_STOP` handles both specific and global stops via `currentTTSId` matching
 - ✅ **Persistent ID Management**: `currentTTSId` persists during audio playback for reliable stop functionality
-- ✅ **Completion Event Handling**: `GOOGLE_TTS_ENDED` properly registered and handled for cleanup
+- ✅ **🔧 FIXED Completion Event Handling**: `GOOGLE_TTS_ENDED` properly registered in LifecycleManager with `handleTTSEndedLazy`
 - ✅ **Cross-Browser Audio Cleanup**: Proper ID clearing in both Firefox (`onended`) and Chrome (event-driven)
-- ✅ **Event-Driven System (v2.3)**: Polling eliminated, replaced with event-driven notifications
-- ✅ **MessageActions Constants (v2.3)**: All hardcoded strings replaced with constants
-- ✅ **Enhanced Notifications (v2.3)**: Reason-based notifications with proper sender tracking
-- ✅ **Safety Timeout (v2.3)**: 30-second emergency timeout for completion detection
+- ✅ **🚀 Event-Driven System (v2.4)**: Complete event-driven architecture with proper handler registration
+- ✅ **MessageActions Constants**: All hardcoded strings replaced with constants
+- ✅ **Enhanced Notifications**: Reason-based notifications with proper sender tracking
+- ✅ **⚡ Adaptive Timeout System**: Smart timeout calculation (1-30s) with language-specific reading speeds
+- ✅ **🎯 Event-Driven Completion**: Primary completion via `GOOGLE_TTS_ENDED` events, timeout only as emergency fallback
+- ✅ **🌍 Multi-Language Timeout Support**: Different reading speeds for character-based (Japanese/Chinese) vs word-based languages
