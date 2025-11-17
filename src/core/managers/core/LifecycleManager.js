@@ -121,6 +121,7 @@ class LifecycleManager {
       'revertTranslation': Handlers.handleRevertTranslationLazy,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
       'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResultLazy,
+      'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
 
       // TTS handlers - Lazy loaded for better performance
       'GOOGLE_TTS_SPEAK': Handlers.handleTTSSpeakLazy,

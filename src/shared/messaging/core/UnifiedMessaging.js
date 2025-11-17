@@ -114,6 +114,28 @@ export async function sendMessage(message, options = {}) {
       // If coordination fails, fall back to regular messaging
       getLogger().warn('Translation coordination failed, falling back to regular messaging:', error);
 
+      // Check if this is a streaming timeout and translation might already be complete
+      const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');
+
+      if (isStreamingTimeout && message.messageId && !message.messageId.startsWith('fallback-')) {
+        // For streaming timeouts, check if the translation was already completed
+        // by looking for any translation results in the content script
+        try {
+          // Send a simple check message to see if translation results are available
+          const checkResponse = await browser.runtime.sendMessage({
+            action: 'CHECK_TRANSLATION_STATUS',
+            messageId: message.messageId
+          });
+
+          if (checkResponse && checkResponse.completed) {
+            getLogger().info('Streaming timeout detected but translation already completed, skipping fallback');
+            return checkResponse.results;
+          }
+        } catch (checkError) {
+          getLogger().debug('Could not check translation status, proceeding with fallback:', checkError);
+        }
+      }
+
       // Create a new message with a fresh messageId to avoid duplicate detection
       const fallbackMessage = {
         ...message,

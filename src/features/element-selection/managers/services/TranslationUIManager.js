@@ -115,12 +115,36 @@ export class TranslationUIManager {
       return;
     }
 
-    // Additional check: if this is a fallback request and the original request is completed, ignore it
+    // Enhanced fallback request handling
     if (messageId.startsWith('fallback-')) {
-      const originalId = messageId.replace('fallback-', '');
+      this.logger.debug(`Processing fallback request: ${messageId}`);
+
+      // For fallback requests, always check if any related translation is already complete
+      const originalId = messageId.replace(/^fallback-/, '');
       const originalRequest = this.orchestrator.requestManager.getRequest(originalId);
-      if (originalRequest && originalRequest.status === 'completed') {
-        this.logger.debug(`Ignoring fallback stream update: original request ${originalId} is completed`);
+
+      // Check if original request completed successfully
+      if (originalRequest && originalRequest.status === 'completed' && originalRequest.translatedSegments.size > 0) {
+        this.logger.info(`Ignoring fallback stream update: original request ${originalId} already completed with ${originalRequest.translatedSegments.size} segments`);
+        return;
+      }
+
+      // Also check if there are any existing translated elements in the DOM that match this translation
+      const existingWrappers = document.querySelectorAll('.aiwc-translation-wrapper[data-message-id]');
+      if (existingWrappers.length > 0) {
+        // Check if any wrappers belong to the same original translation
+        for (const wrapper of existingWrappers) {
+          const wrapperMessageId = wrapper.getAttribute('data-message-id');
+          if (wrapperMessageId === originalId) {
+            this.logger.info(`Ignoring fallback stream update: found existing DOM translations for original request ${originalId}`);
+            return;
+          }
+        }
+      }
+
+      // Check global translation flag and last completed translation
+      if (!window.isTranslationInProgress && window.lastCompletedTranslationId === originalId) {
+        this.logger.info(`Ignoring fallback stream update: translation ${originalId} already completed globally`);
         return;
       }
     }
@@ -279,6 +303,7 @@ export class TranslationUIManager {
           wrapperSpan.className = "aiwc-translation-wrapper aiwc-streaming-update";
           wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
           wrapperSpan.setAttribute("data-aiwc-streaming", "true");
+          wrapperSpan.setAttribute("data-message-id", request.messageId);
 
           // Create inner span for translated content
           const translationSpan = document.createElement("span");
@@ -898,13 +923,18 @@ export class TranslationUIManager {
     // Apply translations to DOM nodes using the existing function
     // Skip nodes that were already updated during streaming
     await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
-      skipStreamingUpdates: true
+      skipStreamingUpdates: true,
+      messageId: messageId
     });
 
     // Mark request as completed to prevent further stream updates
     this.orchestrator.requestManager.updateRequestStatus(messageId, 'completed', {
       result: { success: true, translations: newTranslations }
     });
+
+    // Set global flag to indicate translation is complete to prevent fallback updates
+    window.lastCompletedTranslationId = messageId;
+    window.isTranslationInProgress = false;
 
     // Notify UnifiedTranslationCoordinator that streaming completed successfully
     unifiedTranslationCoordinator.completeStreamingOperation(messageId, {
@@ -1211,6 +1241,7 @@ export class TranslationUIManager {
           const wrapperSpan = document.createElement("span");
           wrapperSpan.className = "aiwc-translation-wrapper";
           wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+          wrapperSpan.setAttribute("data-message-id", options.messageId || '');
 
           // Create inner span for translated content
           const translationSpan = document.createElement("span");

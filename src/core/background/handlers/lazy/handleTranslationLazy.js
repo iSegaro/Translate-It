@@ -62,3 +62,15 @@ export async function handleCancelTranslationLazy(message, sender, sendResponse)
         return { success: false, error: 'Failed to load cancel translation functionality' };
     }
 }
+
+export async function handleCheckTranslationStatusLazy(message, sender, sendResponse) {
+    try {
+        logger.debug('Loading CheckTranslationStatus handler');
+        const { handleCheckTranslationStatus } = await import('@/features/translation/handlers/handleCheckTranslationStatus.js');
+        logger.debug('CheckTranslationStatus handler loaded successfully');
+        return handleCheckTranslationStatus(message, sender, sendResponse);
+    } catch (error) {
+        logger.error('Failed to load CheckTranslationStatus handler:', error);
+        return { success: false, error: 'Failed to load translation status check functionality' };
+    }
+}
