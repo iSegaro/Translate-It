@@ -1,6 +1,6 @@
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
-import { reassembleTranslations } from "../../utils/textProcessing.js";
+import { reassembleTranslations, normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore } from "../../utils/textProcessing.js";
 import { generateUniqueId } from "../../utils/domManipulation.js";
 import { correctTextDirection } from "../../utils/textDirection.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
@@ -105,12 +105,24 @@ export class TranslationUIManager {
     // Check if the request still exists (may have been cancelled)
     const request = this.orchestrator.requestManager.getRequest(messageId);
     if (!request) {
+      this.logger.debug(`Stream update for non-existent request: ${messageId}`);
       return;
     }
 
-    // Check if request was cancelled
-    if (request.status === 'cancelled') {
+    // Check if request was cancelled or completed
+    if (request.status === 'cancelled' || request.status === 'completed') {
+      this.logger.debug(`Ignoring stream update for ${request.status} request: ${messageId}`);
       return;
+    }
+
+    // Additional check: if this is a fallback request and the original request is completed, ignore it
+    if (messageId.startsWith('fallback-')) {
+      const originalId = messageId.replace('fallback-', '');
+      const originalRequest = this.orchestrator.requestManager.getRequest(originalId);
+      if (originalRequest && originalRequest.status === 'completed') {
+        this.logger.debug(`Ignoring fallback stream update: original request ${originalId} is completed`);
+        return;
+      }
     }
 
     if (!data.success) {
@@ -150,12 +162,13 @@ export class TranslationUIManager {
    */
   async _processStreamTranslationData(request, data) {
     const { data: translatedBatch, originalData: originalBatch } = data;
-    const { expandedTexts } = request;
+    const { expandedTexts, textNodes, originMapping } = request;
 
     this.logger.debug(`Processing translation batch: ${translatedBatch.length} segments`);
 
-    // Store all translated segments for later reassembly
-    // Let the existing reassembly logic handle the complex mapping
+    // Store translated segments and immediately apply to DOM for real-time streaming
+    const newlyAppliedTranslations = new Map();
+
     for (let i = 0; i < translatedBatch.length; i++) {
       const translatedText = translatedBatch[i];
       const originalText = originalBatch[i];
@@ -173,7 +186,161 @@ export class TranslationUIManager {
 
       // Store the translation for reassembly later
       request.translatedSegments.set(expandedIndex, translatedText);
+
+      // Create immediate translation for this segment
+      const mappingInfo = originMapping[expandedIndex];
+      if (mappingInfo && !mappingInfo.isEmptyLine) {
+        // Find the original text that this segment belongs to
+        const originalIndex = mappingInfo.originalIndex;
+        const originalTextKey = request.textsToTranslate[originalIndex];
+
+        if (originalTextKey) {
+          // For streaming, apply individual segments immediately for real-time experience
+          newlyAppliedTranslations.set(originalTextKey.trim(), translatedText);
+
+          // Also try with the full original text if it's different
+          const fullOriginalText = originalTextKey;
+          if (fullOriginalText.trim() !== originalTextKey.trim()) {
+            newlyAppliedTranslations.set(fullOriginalText, translatedText);
+          }
+        }
+      }
     }
+
+    // Apply newly translated segments immediately for real-time streaming
+    if (newlyAppliedTranslations.size > 0) {
+      await this._applyStreamingTranslationsImmediately(textNodes, newlyAppliedTranslations, request);
+    }
+  }
+
+  /**
+   * Apply streaming translations immediately to DOM nodes for real-time updates
+   * @private
+   */
+  async _applyStreamingTranslationsImmediately(textNodes, newTranslations, request) {
+    this.logger.debug(`Applying ${newTranslations.size} streaming translations immediately`);
+
+    // Get target language for better RTL detection
+    const { getTargetLanguageAsync } = await import("../../../../config.js");
+    const targetLanguage = await getTargetLanguageAsync();
+
+    const appliedNodes = new Set();
+    let appliedCount = 0;
+
+    // Apply translations to matching text nodes
+    for (const textNode of textNodes) {
+      if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE || appliedNodes.has(textNode)) {
+        continue;
+      }
+
+      const originalText = textNode.textContent;
+      const trimmedOriginalText = originalText.trim();
+
+      // Skip empty lines and structure-only text
+      if (originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) {
+        continue;
+      }
+
+      // Find matching translation using enhanced fuzzy matching for streaming
+      let translatedText = null;
+      let matchType = '';
+
+      // Try exact matches first (fastest path)
+      if (newTranslations.has(trimmedOriginalText)) {
+        translatedText = newTranslations.get(trimmedOriginalText);
+        matchType = 'exact_trimmed_streaming';
+      } else if (newTranslations.has(originalText)) {
+        translatedText = newTranslations.get(originalText);
+        matchType = 'exact_full_streaming';
+      } else {
+        // Use enhanced fuzzy matching for streaming updates
+        const bestMatch = findBestTranslationMatch(originalText, newTranslations, 45);
+
+        if (bestMatch) {
+          translatedText = bestMatch.translatedText;
+          matchType = `fuzzy_streaming_${bestMatch.type}_${Math.round(bestMatch.score)}`;
+        }
+      }
+
+      // Apply translation if found and it's different from original
+      if (translatedText && translatedText.trim() !== trimmedOriginalText) {
+        try {
+          const parentElement = textNode.parentNode;
+          const uniqueId = generateUniqueId();
+
+          // Check if this node is already inside a translation wrapper
+          if (textNode.parentNode?.classList?.contains?.('aiwc-translation-wrapper')) {
+            // Node already translated, skip
+            continue;
+          }
+
+          // Create outer wrapper
+          const wrapperSpan = document.createElement("span");
+          wrapperSpan.className = "aiwc-translation-wrapper aiwc-streaming-update";
+          wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+          wrapperSpan.setAttribute("data-aiwc-streaming", "true");
+
+          // Create inner span for translated content
+          const translationSpan = document.createElement("span");
+          translationSpan.className = "aiwc-translation-inner";
+
+          // Preserve leading whitespace from original text
+          const leadingWhitespace = originalText.match(/^\s*/)[0];
+          let processedText = leadingWhitespace + translatedText;
+
+          translationSpan.textContent = processedText;
+
+          // Apply text direction
+          const detectOptions = targetLanguage ? {
+            targetLanguage: targetLanguage,
+            simpleDetection: true
+          } : {};
+
+          correctTextDirection(wrapperSpan, translatedText, {
+            useWrapperElement: false,
+            preserveExisting: true,
+            detectOptions: detectOptions
+          });
+
+          // Add the translation span to the wrapper
+          wrapperSpan.appendChild(translationSpan);
+
+          // Replace the original text node with the wrapper
+          const nextSibling = textNode.nextSibling;
+          parentElement.removeChild(textNode);
+
+          if (nextSibling) {
+            parentElement.insertBefore(wrapperSpan, nextSibling);
+          } else {
+            parentElement.appendChild(wrapperSpan);
+          }
+
+          // Store original text for potential revert
+          wrapperSpan.setAttribute("data-aiwc-original-text", originalText);
+
+          appliedCount++;
+          appliedNodes.add(textNode);
+
+          this.logger.debug(`Applied streaming translation to node`, {
+            matchType: matchType,
+            original: originalText.substring(0, 30) + '...',
+            translated: translatedText.substring(0, 30) + '...',
+            uniqueId: uniqueId
+          });
+
+        } catch (error) {
+          this.logger.error('Error applying streaming translation to text node:', error, {
+            originalText: originalText.substring(0, 50)
+          });
+        }
+      }
+    }
+
+    this.logger.debug(`Streaming translation application complete`, {
+      totalNodes: textNodes.length,
+      appliedCount: appliedCount,
+      uniqueTranslations: newTranslations.size
+    });
   }
 
   /**
@@ -729,7 +896,15 @@ export class TranslationUIManager {
     this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
 
     // Apply translations to DOM nodes using the existing function
-    await this.applyTranslationsToNodes(request.textNodes, newTranslations);
+    // Skip nodes that were already updated during streaming
+    await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
+      skipStreamingUpdates: true
+    });
+
+    // Mark request as completed to prevent further stream updates
+    this.orchestrator.requestManager.updateRequestStatus(messageId, 'completed', {
+      result: { success: true, translations: newTranslations }
+    });
 
     // Notify UnifiedTranslationCoordinator that streaming completed successfully
     unifiedTranslationCoordinator.completeStreamingOperation(messageId, {
@@ -946,11 +1121,13 @@ export class TranslationUIManager {
    * Apply translations directly to DOM nodes using wrapper approach for Revert compatibility
    * @param {Array} textNodes - Array of text nodes to translate
    * @param {Map} translations - Map of original text to translated text
+   * @param {Object} options - Application options
    */
-  async applyTranslationsToNodes(textNodes, translations) {
+  async applyTranslationsToNodes(textNodes, translations, options = {}) {
     this.logger.debug("Applying translations directly to DOM nodes using wrapper approach", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
+      skipStreamingUpdates: options.skipStreamingUpdates || false,
       availableTranslations: Array.from(translations.entries()).map(([k, v]) => ({
         original: k.substring(0, 50) + (k.length > 50 ? '...' : ''),
         translated: v.substring(0, 50) + (v.length > 50 ? '...' : '')
@@ -978,6 +1155,13 @@ export class TranslationUIManager {
         return;
       }
 
+      // Skip nodes that were already updated during streaming (if requested)
+      if (options.skipStreamingUpdates && textNode.parentNode?.classList?.contains?.('aiwc-translation-wrapper')) {
+        this.logger.debug(`Skipping streaming-updated node ${nodeIndex}`);
+        processedCount++;
+        return;
+      }
+
       const originalText = textNode.textContent;
       const trimmedOriginalText = originalText.trim();
 
@@ -990,11 +1174,11 @@ export class TranslationUIManager {
         return; // Don't translate empty lines, just preserve them
       }
 
-      // Find matching translation
+      // Find matching translation using enhanced fuzzy matching
       let translatedText = null;
       let matchType = '';
 
-      // Try exact match first
+      // Try exact match first (fastest path)
       if (translations.has(trimmedOriginalText)) {
         translatedText = translations.get(trimmedOriginalText);
         matchType = 'exact_trimmed';
@@ -1002,15 +1186,19 @@ export class TranslationUIManager {
         translatedText = translations.get(originalText);
         matchType = 'exact_full';
       } else {
-        // Try to find a translation that contains this text
-        for (const [origText, transText] of translations.entries()) {
-          const origTextTrimmed = origText.trim();
+        // Use enhanced fuzzy matching for better text node compatibility
+        const bestMatch = findBestTranslationMatch(originalText, translations, 40);
 
-          if (origTextTrimmed.includes(trimmedOriginalText) || trimmedOriginalText.includes(origTextTrimmed)) {
-            translatedText = transText;
-            matchType = 'contains';
-            break;
-          }
+        if (bestMatch) {
+          translatedText = bestMatch.translatedText;
+          matchType = `fuzzy_${bestMatch.type}_${Math.round(bestMatch.score)}`;
+
+          this.logger.debug(`Fuzzy match found for node ${nodeIndex}`, {
+            original: originalText.substring(0, 50) + '...',
+            matchedTo: bestMatch.originalText.substring(0, 50) + '...',
+            score: bestMatch.score,
+            type: bestMatch.type
+          });
         }
       }
 
@@ -1099,7 +1287,10 @@ export class TranslationUIManager {
         unmatchedNodes.push({
           index: nodeIndex,
           originalText: originalText.substring(0, 50),
-          fullText: originalText.substring(0, 50)
+          fullText: originalText,
+          normalizedText: normalizeForMatching(originalText),
+          trimmedText: trimmedOriginalText,
+          textLength: originalText.length
         });
       }
     });
@@ -1110,8 +1301,32 @@ export class TranslationUIManager {
       appliedCount: processedCount,
       unmatchedCount: unmatchedNodes.length,
       targetLanguage: targetLanguage,
-      unmatchedNodes: unmatchedNodes.slice(0, 3) // Show first few unmatched
+      translationsAvailable: translations.size,
+      unmatchedNodes: unmatchedNodes.slice(0, 5), // Show more unmatched for debugging
+      unmatchedSample: unmatchedNodes.slice(0, 3).map(node => ({
+        index: node.index,
+        originalPreview: node.originalText,
+        normalizedPreview: node.normalizedText,
+        length: node.textLength
+      }))
     });
+
+    // Enhanced debug logging for unmatched nodes
+    if (unmatchedNodes.length > 0 && this.logger.isDebugEnabled()) {
+      const debugAnalysis = this.debugTextMatching(validTextNodes, translations);
+      this.logger.debug('Text matching analysis for debugging', {
+        exactMatches: debugAnalysis.exactMatches,
+        fuzzyMatches: debugAnalysis.fuzzyMatches,
+        unmatchedCount: debugAnalysis.unmatchedNodes.length,
+        recommendations: debugAnalysis.recommendations,
+        sampleUnmatched: debugAnalysis.unmatchedNodes.slice(0, 2).map(node => ({
+          index: node.index,
+          original: node.original,
+          normalized: node.normalized,
+          bestPotentialMatch: node.possibleMatches[0]
+        }))
+      });
+    }
 
     // Return result for compatibility
     return {
@@ -1143,6 +1358,90 @@ export class TranslationUIManager {
       cacheCompleted: this.cacheCompleted,
       translationInProgress: window.isTranslationInProgress || false
     };
+  }
+
+  /**
+   * Debug tool to analyze text matching issues
+   * @param {Array} textNodes - Text nodes to analyze
+   * @param {Map} translations - Available translations
+   * @returns {Object} Analysis results
+   */
+  debugTextMatching(textNodes, translations) {
+    const analysis = {
+      totalNodes: textNodes.length,
+      exactMatches: 0,
+      fuzzyMatches: 0,
+      unmatchedNodes: [],
+      translationKeys: Array.from(translations.keys()),
+      recommendations: []
+    };
+
+    const translationArray = Array.from(translations.entries());
+
+    textNodes.forEach((node, index) => {
+      if (!node || !node.textContent) return;
+
+      const originalText = node.textContent;
+      const trimmedText = originalText.trim();
+      const normalizedText = normalizeForMatching(originalText);
+
+      // Check for exact matches
+      const exactMatch = translations.has(trimmedText) || translations.has(originalText);
+      if (exactMatch) {
+        analysis.exactMatches++;
+        return;
+      }
+
+      // Check for fuzzy matches
+      const fuzzyMatch = findBestTranslationMatch(originalText, translations, 20);
+      if (fuzzyMatch) {
+        analysis.fuzzyMatches++;
+        return;
+      }
+
+      // Unmatched node - collect detailed info
+      analysis.unmatchedNodes.push({
+        index,
+        original: originalText,
+        trimmed: trimmedText,
+        normalized: normalizedText,
+        length: originalText.length,
+        possibleMatches: translationArray
+          .map(([key, value]) => {
+            const score = calculateTextMatchScore(normalizedText, key);
+            return { key: key.substring(0, 50), score, type: score.type };
+          })
+          .filter(match => match.score > 10)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 3)
+      });
+    });
+
+    // Generate recommendations
+    if (analysis.unmatchedNodes.length > 0) {
+      const unmatchedWithSimilarContent = analysis.unmatchedNodes.filter(node =>
+        node.possibleMatches.length > 0 && node.possibleMatches[0].score > 15
+      );
+
+      if (unmatchedWithSimilarContent.length > 0) {
+        analysis.recommendations.push({
+          type: 'lower_fuzzy_threshold',
+          message: `Consider lowering fuzzy matching threshold. ${unmatchedWithSimilarContent.length} nodes have potential matches with scores 15-30.`,
+          nodes: unmatchedWithSimilarContent.length
+        });
+      }
+
+      const veryShortUnmatched = analysis.unmatchedNodes.filter(node => node.length < 10);
+      if (veryShortUnmatched.length > 0) {
+        analysis.recommendations.push({
+          type: 'short_nodes',
+          message: `${veryShortUnmatched.length} very short nodes (< 10 chars) remain unmatched. Consider adjusting minimum text length.`,
+          nodes: veryShortUnmatched.length
+        });
+      }
+    }
+
+    return analysis;
   }
 
   /**

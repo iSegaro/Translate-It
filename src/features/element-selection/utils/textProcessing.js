@@ -604,6 +604,146 @@ export function cleanText(text, options = {}) {
 }
 
 /**
+ * Normalize text for consistent matching between extraction and translation application
+ * This function ensures that text extracted from DOM and text used for matching
+ * translations follow the same normalization rules
+ * @param {string} text - Text to normalize
+ * @param {Object} options - Normalization options
+ * @returns {string} Normalized text
+ */
+export function normalizeForMatching(text, options = {}) {
+  const {
+    preserveWhitespace = false,
+    normalizeNewlines = true,
+    trimExtreme = true,
+    collapseSpaces = false
+  } = options;
+
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  let normalized = text;
+
+  // Normalize line endings
+  if (normalizeNewlines) {
+    normalized = normalized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+
+  if (preserveWhitespace) {
+    // Preserve essential structure but normalize problematic whitespace
+    // Convert tabs to spaces
+    normalized = normalized.replace(/\t/g, ' ');
+
+    // Collapse multiple spaces into single spaces (but preserve newlines)
+    if (collapseSpaces) {
+      normalized = normalized.replace(/ {2,}/g, ' ');
+    }
+
+    // Trim only extreme whitespace at very beginning/end
+    if (trimExtreme) {
+      normalized = normalized.replace(/^[ \t]{6,}/g, '  ').replace(/[ \t]{6,}$/g, '  ');
+    }
+  } else {
+    // Standard trimming for matching
+    normalized = normalized.trim();
+  }
+
+  return normalized;
+}
+
+/**
+ * Enhanced text matching with multiple strategies
+ * @param {string} nodeText - Text from DOM node
+ * @param {string} translationKey - Text to match against
+ * @returns {Object} Match result with score and type
+ */
+export function calculateTextMatchScore(nodeText, translationKey) {
+  if (!nodeText || !translationKey) {
+    return { score: 0, type: 'invalid' };
+  }
+
+  const nodeNormalized = normalizeForMatching(nodeText, { preserveWhitespace: false });
+  const keyNormalized = normalizeForMatching(translationKey, { preserveWhitespace: false });
+
+  // Exact match gets highest score
+  if (nodeNormalized === keyNormalized) {
+    return { score: 100, type: 'exact' };
+  }
+
+  // Contains relationship
+  if (nodeNormalized.includes(keyNormalized) || keyNormalized.includes(nodeNormalized)) {
+    const longerText = Math.max(nodeNormalized.length, keyNormalized.length);
+    const shorterText = Math.min(nodeNormalized.length, keyNormalized.length);
+    const containsScore = (shorterText / longerText) * 90;
+    return { score: containsScore, type: 'contains' };
+  }
+
+  // Word overlap scoring with stricter criteria
+  const nodeWords = nodeNormalized.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const keyWords = keyNormalized.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+  if (nodeWords.length === 0 || keyWords.length === 0) {
+    return { score: 0, type: 'no_words' };
+  }
+
+  const commonWords = nodeWords.filter(word => keyWords.includes(word));
+  const overlapRatio = commonWords.length / Math.max(nodeWords.length, keyWords.length);
+  const overlapScore = overlapRatio * 50; // Reduced from 70
+
+  // Length similarity bonus with stricter penalty
+  const lengthRatio = Math.min(nodeNormalized.length, keyNormalized.length) /
+                      Math.max(nodeNormalized.length, keyNormalized.length);
+
+  // Only give length bonus if lengths are reasonably similar
+  const lengthBonus = lengthRatio > 0.5 ? lengthRatio * 15 : 0;
+
+  // Penalty for very different lengths
+  const lengthPenalty = lengthRatio < 0.3 ? -20 : 0;
+
+  const finalScore = overlapScore + lengthBonus + lengthPenalty;
+
+  return {
+    score: finalScore,
+    type: 'word_overlap',
+    details: {
+      overlapRatio,
+      lengthRatio,
+      commonWords: commonWords.length
+    }
+  };
+}
+
+/**
+ * Find best matching translation for a text node
+ * @param {string} nodeText - Text from DOM node
+ * @param {Map} translations - Available translations
+ * @param {number} minScore - Minimum acceptable score
+ * @returns {Object} Best match result
+ */
+export function findBestTranslationMatch(nodeText, translations, minScore = 30) {
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const [originalText, translatedText] of translations.entries()) {
+    const matchResult = calculateTextMatchScore(nodeText, originalText);
+
+    if (matchResult.score > bestScore && matchResult.score >= minScore) {
+      bestScore = matchResult.score;
+      bestMatch = {
+        originalText,
+        translatedText,
+        score: matchResult.score,
+        type: matchResult.type,
+        details: matchResult.details
+      };
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
  * Utility object with commonly used text processing functions
  */
 export const ElementTextProcessingUtils = {
@@ -612,5 +752,8 @@ export const ElementTextProcessingUtils = {
   validate: isValidTextContent,
   clean: cleanText,
   parseResponse: parseAndCleanTranslationResponse,
-  checkMismatch: handleTranslationLengthMismatch
+  checkMismatch: handleTranslationLengthMismatch,
+  normalizeForMatching,
+  calculateTextMatchScore,
+  findBestTranslationMatch
 };
