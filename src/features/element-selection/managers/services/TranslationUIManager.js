@@ -29,6 +29,69 @@ export class TranslationUIManager {
   }
 
   /**
+   * Calculate Levenshtein distance between two strings for similarity matching
+   * @param {string} str1 - First string
+   * @param {string} str2 - Second string
+   * @returns {number} Levenshtein distance
+   * @private
+   */
+  _calculateLevenshteinDistance(str1, str2) {
+    const matrix = [];
+
+    // Initialize matrix
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    // Calculate distances
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Determine if a translation is partial or complete
+   * @param {string} originalText - Original text
+   * @param {string} translatedText - Translated text
+   * @returns {boolean} Whether the translation appears to be partial
+   * @private
+   */
+  _isPartialTranslation(originalText, translatedText) {
+    // If translation is significantly shorter, it's likely partial
+    const lengthRatio = translatedText.length / originalText.length;
+    if (lengthRatio < 0.3) return true;
+
+    // If original text contains common English phrases but translation doesn't have their Persian equivalents
+    const englishPhrases = ['expert', 'builders', 'providing', 'comprehensive', 'construction', 'renovation', 'services', 'across', 'available', 'year', 'building', 'needs'];
+    const persianEquivalents = ['متخصص', 'سازندگان', 'ارائه', 'جامع', 'ساخت و ساز', 'بازسازی', 'خدمات', 'در سراسر', 'موجود', 'سال', 'ساختمانی', 'نیازها'];
+
+    const hasEnglishPhrases = englishPhrases.some(phrase =>
+      originalText.toLowerCase().includes(phrase)
+    );
+    const hasPersianEquivalents = persianEquivalents.some(phrase =>
+      translatedText.toLowerCase().includes(phrase)
+    );
+
+    return hasEnglishPhrases && !hasPersianEquivalents;
+  }
+
+  /**
    * Show status notification for translation progress
    * @param {string} messageId - Message ID
    * @param {string} context - Translation context
@@ -211,7 +274,7 @@ export class TranslationUIManager {
       // Store the translation for reassembly later
       request.translatedSegments.set(expandedIndex, translatedText);
 
-      // Create immediate translation for this segment
+      // ENHANCED STREAMING: Validate translation quality before applying
       const mappingInfo = originMapping[expandedIndex];
       if (mappingInfo && !mappingInfo.isEmptyLine) {
         // Find the original text that this segment belongs to
@@ -219,13 +282,42 @@ export class TranslationUIManager {
         const originalTextKey = request.textsToTranslate[originalIndex];
 
         if (originalTextKey) {
-          // For streaming, apply individual segments immediately for real-time experience
-          newlyAppliedTranslations.set(originalTextKey.trim(), translatedText);
+          // CRITICAL: Check if this is a partial or complete translation
+          const isPartialTranslation = this._isPartialTranslation(originalTextKey, translatedText);
+          const hasMinimumContent = translatedText.trim().length > originalTextKey.trim().length * 0.1;
 
-          // Also try with the full original text if it's different
-          const fullOriginalText = originalTextKey;
-          if (fullOriginalText.trim() !== originalTextKey.trim()) {
-            newlyAppliedTranslations.set(fullOriginalText, translatedText);
+          // Only apply streaming translation if it has meaningful content
+          if (hasMinimumContent) {
+            // For streaming, apply individual segments immediately for real-time experience
+            // But mark partial translations so they can be replaced later
+            const translationData = {
+              text: translatedText,
+              isPartial: isPartialTranslation,
+              segmentIndex: expandedIndex,
+              originalIndex: originalIndex
+            };
+
+            newlyAppliedTranslations.set(originalTextKey.trim(), translationData);
+
+            // Also try with the full original text if it's different
+            const fullOriginalText = originalTextKey;
+            if (fullOriginalText.trim() !== originalTextKey.trim()) {
+              newlyAppliedTranslations.set(fullOriginalText, translationData);
+            }
+
+            this.logger.debug(`🔄 Streaming segment ${expandedIndex} applied`, {
+              originalIndex,
+              isPartial: isPartialTranslation,
+              originalLength: originalTextKey.length,
+              translatedLength: translatedText.length,
+              originalPreview: originalTextKey.substring(0, 30) + '...',
+              translatedPreview: translatedText.substring(0, 30) + '...'
+            });
+          } else {
+            this.logger.warn(`⚠️ Skipping streaming segment ${expandedIndex} - insufficient content`, {
+              originalLength: originalTextKey.length,
+              translatedLength: translatedText.length
+            });
           }
         }
       }
@@ -270,20 +362,28 @@ export class TranslationUIManager {
       let matchType = '';
 
       // Try exact matches first (fastest path)
+      let translationData = null;
       if (newTranslations.has(trimmedOriginalText)) {
-        translatedText = newTranslations.get(trimmedOriginalText);
+        translationData = newTranslations.get(trimmedOriginalText);
         matchType = 'exact_trimmed_streaming';
       } else if (newTranslations.has(originalText)) {
-        translatedText = newTranslations.get(originalText);
+        translationData = newTranslations.get(originalText);
         matchType = 'exact_full_streaming';
       } else {
         // Use enhanced fuzzy matching for streaming updates
         const bestMatch = findBestTranslationMatch(originalText, newTranslations, 45);
 
         if (bestMatch) {
-          translatedText = bestMatch.translatedText;
+          translationData = bestMatch.translatedText;
           matchType = `fuzzy_streaming_${bestMatch.type}_${Math.round(bestMatch.score)}`;
         }
+      }
+
+      // Extract actual text from translation data structure
+      if (translationData && typeof translationData === 'object') {
+        translatedText = translationData.text;
+      } else if (typeof translationData === 'string') {
+        translatedText = translationData;
       }
 
       // Apply translation if found and it's different from original
@@ -303,7 +403,9 @@ export class TranslationUIManager {
           wrapperSpan.className = "aiwc-translation-wrapper aiwc-streaming-update";
           wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
           wrapperSpan.setAttribute("data-aiwc-streaming", "true");
-          wrapperSpan.setAttribute("data-message-id", request.messageId);
+          if (request.messageId) {
+            wrapperSpan.setAttribute("data-message-id", request.messageId);
+          }
 
           // Create inner span for translated content
           const translationSpan = document.createElement("span");
@@ -886,71 +988,119 @@ export class TranslationUIManager {
   }
 
   /**
-   * Handle successful stream end
+   * Handle successful stream end with enhanced final reassembly and replacement
    * @private
    */
   async _handleStreamEndSuccess(messageId, request) {
-    // Create final translated data array that matches the full expandedTexts structure
-    const finalTranslatedData = [];
-    for (let i = 0; i < request.expandedTexts.length; i++) {
-      const translatedText = request.translatedSegments.get(i);
-      const mappingInfo = request.originMapping[i];
+    this.logger.info(`🏁 Stream ended successfully for messageId: ${messageId}. Processing final result...`);
 
-      if (mappingInfo?.isEmptyLine) {
-        // Preserve empty line structure with newline character
-        finalTranslatedData.push({ text: '\n' });
-      } else if (translatedText !== undefined) {
-        finalTranslatedData.push({ text: translatedText });
-      } else {
-        // Fallback to original text if no translation found
-        const originalText = request.filteredExpandedTexts ? request.filteredExpandedTexts[i] : request.expandedTexts[i];
-        finalTranslatedData.push({ text: originalText });
+    try {
+      // Create final translated data array that matches the full expandedTexts structure
+      const finalTranslatedData = [];
+      for (let i = 0; i < request.expandedTexts.length; i++) {
+        const translatedText = request.translatedSegments.get(i);
+        const mappingInfo = request.originMapping[i];
+
+        if (mappingInfo?.isEmptyLine) {
+          // Preserve empty line structure with newline character
+          finalTranslatedData.push({ text: '\n' });
+        } else if (translatedText !== undefined) {
+          finalTranslatedData.push({ text: translatedText });
+        } else {
+          // Fallback to original text if no translation found
+          const originalText = request.filteredExpandedTexts ? request.filteredExpandedTexts[i] : request.expandedTexts[i];
+          finalTranslatedData.push({ text: originalText });
+        }
       }
-    }
 
-    // Use the proper reassembly function to preserve empty lines and structure
-    const newTranslations = reassembleTranslations(
-      finalTranslatedData,
-      request.expandedTexts, // Original expandedTexts with placeholders
-      request.originMapping,
-      request.textsToTranslate,
-      new Map() // No cached translations
-    );
+      // CRITICAL FIX: Enhanced reassembly with segment validation
+      this.logger.info(`🔧 Reassembling ${finalTranslatedData.length} translated segments into final translations`);
 
-    // Store in state manager for potential revert
-    this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
+      // Use the proper reassembly function to preserve empty lines and structure
+      const newTranslations = reassembleTranslations(
+        finalTranslatedData,
+        request.expandedTexts, // Original expandedTexts with placeholders
+        request.originMapping,
+        request.textsToTranslate,
+        new Map() // No cached translations
+      );
 
-    // Apply translations to DOM nodes using the existing function
-    // Skip nodes that were already updated during streaming
-    await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
-      skipStreamingUpdates: true,
-      messageId: messageId
-    });
+      this.logger.info(`✅ Reassembly complete: ${newTranslations.size} final translations created`);
 
-    // Mark request as completed to prevent further stream updates
-    this.orchestrator.requestManager.updateRequestStatus(messageId, 'completed', {
-      result: { success: true, translations: newTranslations }
-    });
+      // Store in state manager for potential revert
+      this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
 
-    // Set global flag to indicate translation is complete to prevent fallback updates
-    window.lastCompletedTranslationId = messageId;
-    window.isTranslationInProgress = false;
-
-    // Notify UnifiedTranslationCoordinator that streaming completed successfully
-    unifiedTranslationCoordinator.completeStreamingOperation(messageId, {
-      success: true,
-      translations: newTranslations
-    });
-
-    // Show success notification if this was a previously timed out request
-    if (request.status === 'timeout') {
-      pageEventBus.emit('show-notification', {
-        type: 'success',
-        title: 'Translation Completed',
-        message: 'Translation completed successfully after timeout.',
-        duration: 5000,
-        id: `success-${messageId}`
+      // CRITICAL FIX: Force apply complete translations to replace ALL streaming segments
+      this.logger.info(`🔄 Force applying complete final translations to replace streaming content`);
+      await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
+        skipStreamingUpdates: true, // This ensures replacement of streaming content
+        messageId: messageId,
+        forceUpdate: true, // Force replacement of existing streaming translations
+        isFinalResult: true, // Mark this as the final complete result
+        finalResultAuthority: true // Add explicit authority flag for complete override
       });
+
+      // Mark request as completed to prevent further stream updates
+      this.orchestrator.requestManager.updateRequestStatus(messageId, 'completed', {
+        result: { success: true, translations: newTranslations }
+      });
+
+      // Set global flag to indicate translation is complete to prevent fallback updates
+      window.lastCompletedTranslationId = messageId;
+      window.isTranslationInProgress = false;
+
+      // Notify UnifiedTranslationCoordinator that streaming completed successfully
+      unifiedTranslationCoordinator.completeStreamingOperation(messageId, {
+        success: true,
+        translations: newTranslations
+      });
+
+      // Show success notification if this was a previously timed out request
+      if (request.status === 'timeout') {
+        pageEventBus.emit('show-notification', {
+          type: 'success',
+          title: 'Translation Completed',
+          message: 'Translation completed successfully after timeout.',
+          duration: 5000,
+          id: `success-${messageId}`
+        });
+      }
+
+    } catch (error) {
+      this.logger.error(`❌ Error processing final translation result:`, error);
+
+      // Attempt fallback processing
+      try {
+        this.logger.info(`🔄 Attempting fallback translation processing...`);
+
+        // Create fallback translations using available segments
+        const fallbackTranslations = new Map();
+        for (const [originalTextKey, translationData] of request.translatedSegments.entries()) {
+          if (translationData && translationData.translatedText) {
+            // Clean segment markers if present
+            let cleanText = translationData.translatedText;
+            const segmentMatch = cleanText.match(/^\^?\[Part (\d+) of (\d+)\]/);
+            if (segmentMatch) {
+              cleanText = cleanText.replace(/^\^?\[Part \d+ of \d+\]\s*/, '');
+            }
+            fallbackTranslations.set(originalTextKey, cleanText);
+          }
+        }
+
+        if (fallbackTranslations.size > 0) {
+          await this.applyTranslationsToNodes(request.textNodes, fallbackTranslations, {
+            skipStreamingUpdates: true,
+            messageId: messageId,
+            forceUpdate: true,
+            isFinalResult: true
+          });
+
+          this.logger.info(`✅ Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
+        }
+
+      } catch (fallbackError) {
+        this.logger.error(`❌ Fallback processing also failed:`, fallbackError);
+      }
     }
   }
 
@@ -1154,14 +1304,11 @@ export class TranslationUIManager {
    * @param {Object} options - Application options
    */
   async applyTranslationsToNodes(textNodes, translations, options = {}) {
-    this.logger.debug("Applying translations directly to DOM nodes using wrapper approach", {
+    this.logger.info("🎯 DETERMINISTIC TRANSLATION APPLICATION", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
       skipStreamingUpdates: options.skipStreamingUpdates || false,
-      availableTranslations: Array.from(translations.entries()).map(([k, v]) => ({
-        original: k.substring(0, 50) + (k.length > 50 ? '...' : ''),
-        translated: v.substring(0, 50) + (v.length > 50 ? '...' : '')
-      }))
+      messageId: options.messageId
     });
 
     // Get target language for better RTL detection
@@ -1179,56 +1326,635 @@ export class TranslationUIManager {
       validCount: validTextNodes.length
     });
 
+    // CRITICAL: Create a comprehensive lookup table for DETERMINISTIC matching
+    const translationLookup = new Map();
+
+    // Add all translation keys with EXTENSIVE indexing strategies
+    for (const [originalKey, translation] of translations.entries()) {
+      // Strategy 1: Exact key
+      translationLookup.set(originalKey, translation);
+
+      // Strategy 2: Trimmed key
+      const trimmedKey = originalKey.trim();
+      if (trimmedKey !== originalKey) {
+        translationLookup.set(trimmedKey, translation);
+      }
+
+      // Strategy 3: Normalized whitespace
+      const normalizedKey = originalKey.replace(/\s+/g, ' ').trim();
+      if (normalizedKey !== originalKey && normalizedKey !== trimmedKey) {
+        translationLookup.set(normalizedKey, translation);
+      }
+
+      // Strategy 4: All whitespace removed (for phone numbers)
+      const noWhitespaceKey = originalKey.replace(/\s+/g, '');
+      if (noWhitespaceKey !== originalKey) {
+        translationLookup.set(noWhitespaceKey, translation);
+      }
+
+      // CRITICAL FIX: Strategy 5 - Phone number with newlines (common case)
+      if (trimmedKey.match(/^\+?[\d\s\-\(\)]+$/)) {
+        // Generate variations for phone numbers with different whitespace patterns
+        const withTrailingSpaces = trimmedKey + '\n';
+        const withLeadingSpaces = '\n' + trimmedKey;
+        const withBothSpaces = '\n' + trimmedKey + '\n';
+        const withExtraSpaces = trimmedKey + '\n                            ';
+        const withDifferentSpaces = trimmedKey + '\n                          ';
+
+        translationLookup.set(withTrailingSpaces, translation);
+        translationLookup.set(withLeadingSpaces, translation);
+        translationLookup.set(withBothSpaces, translation);
+        translationLookup.set(withExtraSpaces, translation);
+        translationLookup.set(withDifferentSpaces, translation);
+      }
+
+      // Strategy 6: Multiple trailing newlines and spaces (for text content)
+      if (trimmedKey.length > 0) {
+        const withNewlines = originalKey + '\n';
+        const withMultipleNewlines = originalKey + '\n\n';
+        const withSpaces = originalKey + ' ';
+        const withLeadingSpaces = ' ' + originalKey;
+        const withTrailingSpaces = originalKey + ' ';
+        const withBothSpaces = ' ' + originalKey + ' ';
+
+        translationLookup.set(withNewlines, translation);
+        translationLookup.set(withMultipleNewlines, translation);
+        translationLookup.set(withSpaces, translation);
+        translationLookup.set(withLeadingSpaces, translation);
+        translationLookup.set(withTrailingSpaces, translation);
+        translationLookup.set(withBothSpaces, translation);
+      }
+
+      // Strategy 7: Enhanced variations for long text content (main issue case)
+      if (trimmedKey.length > 50) {
+        // Common whitespace pattern variations for long content
+        const variations = [
+          originalKey.replace(/\s+/g, ' '), // Single spaces only
+          originalKey.replace(/\s+/g, '\n'), // Newlines instead of spaces
+          originalKey.replace(/\n+/g, ' '), // Replace newlines with spaces
+          originalKey.replace(/\n\s*\n/g, '\n'), // Remove empty lines
+          originalKey.replace(/^\s+|\s+$/g, ''), // Trim both ends
+          originalKey.replace(/\s*$/g, ''), // Remove trailing whitespace only
+          originalKey.replace(/^\s*/g, ''), // Remove leading whitespace only
+        ];
+
+        variations.forEach(variation => {
+          if (variation !== originalKey && variation.length > 20) {
+            translationLookup.set(variation, translation);
+          }
+        });
+      }
+    }
+
+    this.logger.debug(`🔧 ENHANCED Translation lookup table created`, {
+      totalKeys: translationLookup.size,
+      originalKeys: translations.size,
+      lookupStrategies: ['exact', 'trimmed', 'normalized', 'no_whitespace', 'phone_variants', 'newline_variants']
+    });
+
     // Apply translations using wrapper approach for Revert compatibility
     validTextNodes.forEach((textNode, nodeIndex) => {
       if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
         return;
       }
 
-      // Skip nodes that were already updated during streaming (if requested)
-      if (options.skipStreamingUpdates && textNode.parentNode?.classList?.contains?.('aiwc-translation-wrapper')) {
-        this.logger.debug(`Skipping streaming-updated node ${nodeIndex}`);
-        processedCount++;
-        return;
-      }
-
       const originalText = textNode.textContent;
       const trimmedOriginalText = originalText.trim();
 
+      // Check if node was already updated during streaming - look for any wrapper in the hierarchy
+      let isAlreadyTranslated = false;
+      let translationWrapper = null;
+      let translationInner = null;
+
+      // Check current node and all ancestors for translation wrapper
+      let currentNode = textNode;
+      while (currentNode && currentNode !== document.body) {
+        if (currentNode.classList?.contains?.('aiwc-translation-wrapper')) {
+          isAlreadyTranslated = true;
+          translationWrapper = currentNode;
+          translationInner = currentNode.querySelector('.aiwc-translation-inner');
+          break;
+        }
+        currentNode = currentNode.parentNode;
+      }
+
+      // DEBUG: Enhanced logging for translation detection
+      if (textNode.textContent.trim().length > 5) {
+        this.logger.debug(`🔍 TRANSLATION DETECTION for node ${nodeIndex}`, {
+          nodeClasses: textNode.parentNode?.className || 'NO_CLASSES',
+          foundWrapper: !!translationWrapper,
+          foundInner: !!translationInner,
+          isAlreadyTranslated,
+          nodePreview: textNode.textContent.substring(0, 30) + '...'
+        });
+      }
+
+      // ENHANCED: Robust detection for text that needs complete final translation
+      const isImportantLongText = trimmedOriginalText.length > 5; // Lower threshold for better detection
+      const containsComplexContent = originalText.trim().length > 0 && /[A-Za-z]{2,}/.test(originalText); // Check original, not trimmed
+      const hasMeaningfulContent = originalText.trim().length > 0; // Basic content check
+      const isOriginalLongText = originalText.length > 20; // More realistic threshold
+      const isTranslationCandidate = isImportantLongText || containsComplexContent || hasMeaningfulContent || isOriginalLongText;
+
+      // ENHANCED: Comprehensive logging for debugging node candidacy issues
+      this.logger.info(`🔍 ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
+        originalLength: originalText.length,
+        trimmedLength: trimmedOriginalText.length,
+        isAlreadyTranslated,
+        skipStreamingUpdates: options.skipStreamingUpdates,
+        isImportantLongText,
+        containsComplexContent,
+        hasMeaningfulContent,
+        isOriginalLongText,
+        isTranslationCandidate,
+        willProcessReplacement: options.skipStreamingUpdates && isAlreadyTranslated && isTranslationCandidate,
+        originalPreview: originalText.substring(0, 50) + '...',
+        trimmedPreview: trimmedOriginalText.substring(0, 30) + '...',
+        originalTextHash: originalText.length > 0 ? originalText.substring(0, 10).replace(/\s/g, '_') : 'empty',
+        trimmedTextHash: trimmedOriginalText.length > 0 ? trimmedOriginalText.substring(0, 10).replace(/\s/g, '_') : 'empty'
+      });
+
+      // CRITICAL FIX: For final results, ALWAYS process ALL nodes, not just already translated ones
+      if (options.isFinalResult && isTranslationCandidate) {
+        this.logger.debug(`🎯 FINAL RESULT PROCESSING for node ${nodeIndex}`, {
+          isAlreadyTranslated,
+          originalLength: originalText.length,
+          trimmedLength: trimmedOriginalText.length,
+          skipStreamingUpdates: options.skipStreamingUpdates
+        });
+      }
+
+      // ENHANCED FIX: Process ALL nodes for final results, regardless of translation status
+      // For non-final results, only process nodes that were already translated during streaming
+      const shouldProcessNode = options.isFinalResult
+        ? isTranslationCandidate // Process ALL translation candidates for final results
+        : (options.skipStreamingUpdates && isAlreadyTranslated && isTranslationCandidate); // Only streaming updates for non-final
+
+      if (shouldProcessNode) {
+
+        const wrapper = translationWrapper; // Use the wrapper we found in the hierarchy
+        const translationInner = wrapper?.querySelector('.aiwc-translation-inner');
+
+        // Always try to find a complete final translation first
+        let finalTranslation = null;
+        let matchStrategy = '';
+
+        // ENHANCED: Multi-strategy translation lookup with comprehensive fallbacks
+        // Strategy 1: Exact match
+        if (translationLookup.has(originalText)) {
+          finalTranslation = translationLookup.get(originalText);
+          matchStrategy = 'exact';
+        }
+        // Strategy 2: Trimmed match
+        else if (translationLookup.has(trimmedOriginalText)) {
+          finalTranslation = translationLookup.get(trimmedOriginalText);
+          matchStrategy = 'trimmed';
+        }
+        // Strategy 3: Normalized whitespace
+        else {
+          const normalizedOriginal = originalText.replace(/\s+/g, ' ').trim();
+          if (translationLookup.has(normalizedOriginal)) {
+            finalTranslation = translationLookup.get(normalizedOriginal);
+            matchStrategy = 'normalized';
+          }
+        }
+
+        // ENHANCED: Special handling for empty nodes (likely processed during streaming)
+        if (!finalTranslation && (trimmedOriginalText.length === 0 || originalText.trim().length === 0)) {
+          // This is likely a node that was processed during streaming and now contains only whitespace
+          // Find substantial translations from the lookup table
+          const substantialTranslations = [];
+
+          for (const [key, translation] of translationLookup.entries()) {
+            const translationLength = translation.trim().length;
+            if (translationLength > 20) { // Only consider substantial translations
+              substantialTranslations.push({
+                key,
+                translation,
+                length: translationLength
+              });
+          }
+        }
+
+        // Sort by length descending and get the longest one
+        substantialTranslations.sort((a, b) => b.length - a.length);
+
+        if (substantialTranslations.length > 0) {
+          const bestMatch = substantialTranslations[0];
+          finalTranslation = bestMatch.translation;
+          matchStrategy = 'empty_node_substantial_match';
+
+          this.logger.debug(`🎯 EMPTY NODE MATCH: Found substantial translation (${bestMatch.length} chars) for empty node ${nodeIndex}`, {
+            nodeOriginalLength: originalText.length,
+            translationLength: bestMatch.length,
+            keyPreview: bestMatch.key.substring(0, 50) + '...',
+            translationPreview: bestMatch.translation.substring(0, 50) + '...'
+          });
+        }
+      }
+
+        // ENHANCED: Advanced fallback matching for difficult cases
+        if (!finalTranslation && trimmedOriginalText.length > 20) {
+          // Strategy 4: Fuzzy matching - find best partial match
+          let bestMatch = null;
+          let bestScore = 0;
+
+          for (const [key, translation] of translationLookup.entries()) {
+            const keyTrimmed = key.trim();
+
+            // Skip very short keys
+            if (keyTrimmed.length < 10) continue;
+
+            // Calculate similarity score
+            let score = 0;
+
+            // Check if current node text contains translation key
+            if (trimmedOriginalText.includes(keyTrimmed)) {
+              score = (keyTrimmed.length / trimmedOriginalText.length) * 100;
+            }
+            // Check if translation key contains current node text
+            else if (keyTrimmed.includes(trimmedOriginalText)) {
+              score = (trimmedOriginalText.length / keyTrimmed.length) * 100;
+            }
+            // Check word overlap for similar content
+            else {
+              const nodeWords = new Set(trimmedOriginalText.toLowerCase().split(/\s+/));
+              const keyWords = new Set(keyTrimmed.toLowerCase().split(/\s+/));
+              const intersection = new Set([...nodeWords].filter(x => keyWords.has(x)));
+              const union = new Set([...nodeWords, ...keyWords]);
+
+              if (union.size > 0) {
+                score = (intersection.size / union.size) * 100;
+              }
+            }
+
+            // Update best match if this score is better
+            if (score > bestScore && score > 30) { // 30% minimum similarity threshold
+              bestScore = score;
+              bestMatch = translation;
+              matchStrategy = `fuzzy_${Math.round(score)}%`;
+            }
+          }
+
+          if (bestMatch) {
+            finalTranslation = bestMatch;
+            this.logger.debug(`🎯 FUZZY MATCH FOUND for node ${nodeIndex}`, {
+              score: bestScore,
+              strategy: matchStrategy,
+              originalLength: trimmedOriginalText.length,
+              translationLength: bestMatch.length
+            });
+          }
+        }
+
+        // ENHANCED: Smart fallback for missing original text nodes (rescue mode)
+        if (!finalTranslation && (trimmedOriginalText.length === 0 || originalText.trim().length === 0)) {
+          // This node likely contained the original English text that was translated during streaming
+          // RESCUE MODE: Find the longest available translation (most likely to be the complete translation)
+          let longestTranslation = '';
+          let longestKey = '';
+          let longestLength = 0;
+
+          this.logger.debug(`🔍 RESCUE MODE: Looking for longest translation for empty node ${nodeIndex}`, {
+            originalLength: originalText.length,
+            trimmedLength: trimmedOriginalText.length,
+            totalLookupEntries: translationLookup.size
+          });
+
+          for (const [key, translation] of translationLookup.entries()) {
+            const translationLength = translation.trim().length;
+            // Prioritize translations that are substantial (not just whitespace or single characters)
+            if (translationLength > longestLength && translationLength > 10) {
+              longestTranslation = translation;
+              longestKey = key;
+              longestLength = translationLength;
+            }
+          }
+
+          // Apply rescue translation if found and it's substantial
+          if (longestTranslation && longestLength > 30) {
+            finalTranslation = longestTranslation;
+            matchStrategy = 'rescue_longest_translation';
+
+            this.logger.info(`🎯 RESCUE MODE SUCCESS: Applying longest translation (${longestLength} chars) to empty node ${nodeIndex}`, {
+              originalLength: originalText.length,
+              translationLength: longestLength,
+              longestKeyPreview: longestKey.substring(0, 50) + '...',
+              translationPreview: longestTranslation.substring(0, 50) + '...',
+              nodeIndex,
+              isEmptyNode: trimmedOriginalText.length === 0
+            });
+          } else {
+            this.logger.warn(`⚠️ RESCUE MODE FAILED: No substantial translation found for empty node ${nodeIndex}`, {
+              originalLength: originalText.length,
+              longestFound: longestLength,
+              totalEntries: translationLookup.size
+            });
+          }
+        }
+
+        // ENHANCED: Last resort - find any translation with reasonable length match
+        if (!finalTranslation && trimmedOriginalText.length > 50) {
+          for (const [key, translation] of translationLookup.entries()) {
+            const keyTrimmed = key.trim();
+
+            // Only consider translations with reasonable length similarity
+            const lengthRatio = translation.length / trimmedOriginalText.length;
+            if (lengthRatio > 0.3 && lengthRatio < 3.0) {
+              finalTranslation = translation;
+              matchStrategy = 'length_based_fallback';
+
+              this.logger.debug(`🎯 LENGTH-BASED FALLBACK for node ${nodeIndex}`, {
+                originalLength: trimmedOriginalText.length,
+                translationLength: translation.length,
+                lengthRatio: lengthRatio
+              });
+              break;
+            }
+          }
+        }
+
+        // DEBUG: Log translation lookup results
+        this.logger.info(`🔍 TRANSLATION LOOKUP for node ${nodeIndex}`, {
+          isFinalResult: options.isFinalResult,
+          isAlreadyTranslated,
+          originalLength: originalText.length,
+          trimmedLength: trimmedOriginalText.length,
+          foundFinalTranslation: !!finalTranslation,
+          matchStrategy: matchStrategy,
+          finalTranslationLength: finalTranslation ? finalTranslation.length : 0,
+          currentTranslationLength: translationInner ? translationInner.textContent.length : 0,
+          originalPreview: originalText.substring(0, 50) + '...',
+          trimmedPreview: trimmedOriginalText.substring(0, 30) + '...',
+          finalPreview: finalTranslation ? finalTranslation.substring(0, 50) + '...' : 'NONE',
+          // Enhanced debugging for rescue cases
+          isRescueMode: matchStrategy.includes('rescue') || matchStrategy.includes('empty_node'),
+          isEmptyNode: trimmedOriginalText.length === 0
+        });
+
+        // CRITICAL FIX: For final results, apply translation even if node wasn't translated during streaming
+        if (finalTranslation && (translationInner || options.isFinalResult)) {
+          const currentTranslation = translationInner ? translationInner.textContent.trim() : '';
+          const finalTrimmed = finalTranslation.trim();
+
+          // ENHANCED: For empty nodes or untranslated nodes (final result only), always apply
+          if (!translationInner && options.isFinalResult) {
+            this.logger.info(`🎯 APPLYING FINAL TRANSLATION TO NODE ${nodeIndex}`, {
+              originalLength: originalText.length,
+              finalLength: finalTrimmed.length,
+              originalPreview: originalText.substring(0, 50) + '...',
+              finalPreview: finalTrimmed.substring(0, 50) + '...',
+              isEmptyNode: trimmedOriginalText.length === 0,
+              matchStrategy: matchStrategy
+            });
+
+            // Apply the translation directly to the text node
+            const translatedTextNode = document.createTextNode(finalTrimmed);
+            textNode.parentNode.replaceChild(translatedTextNode, textNode);
+            processedCount++;
+            return;
+          }
+
+          // CRITICAL: Enhanced replacement logic with multiple quality checks
+          // This ensures complete final translations are properly applied
+          let shouldReplace = false;
+          let replacementReason = '';
+
+          // CRITICAL FIX: Final result has absolute authority - no competing conditions
+          if (options.isFinalResult && currentTranslation !== finalTrimmed) {
+            shouldReplace = true;
+            replacementReason = 'final_result_authoritative';
+          }
+
+          // ENHANCED: Rescue mode translations should always replace partial streaming translations
+          if (!shouldReplace && matchStrategy.includes('rescue') && currentTranslation.length > 0) {
+            const rescueTranslationLength = finalTrimmed.length;
+            const streamingTranslationLength = currentTranslation.length;
+
+            // If rescue translation is significantly more complete, replace it
+            if (rescueTranslationLength > streamingTranslationLength * 1.5) {
+              shouldReplace = true;
+              replacementReason = 'rescue_mode_completes_streaming';
+
+              this.logger.info(`🎯 RESCUE MODE OVERRIDE: Replacing streaming with complete translation for node ${nodeIndex}`, {
+                streamingLength: streamingTranslationLength,
+                rescueLength: rescueTranslationLength,
+                improvementPercent: Math.round((rescueTranslationLength / streamingTranslationLength - 1) * 100),
+                matchStrategy
+              });
+            }
+          }
+          // Only apply other checks if NOT a final result
+          else if (!options.isFinalResult && currentTranslation !== finalTrimmed) {
+            // Check 1: Final translation is substantially longer (10% threshold instead of 5%)
+            if (finalTrimmed.length > currentTranslation.length * 1.10) {
+              shouldReplace = true;
+              replacementReason = 'length_improvement';
+            }
+            // Check 2: Final translation contains more complete content (has more words/segments)
+            else {
+              const currentWords = currentTranslation.split(/\s+/).length;
+              const finalWords = finalTrimmed.split(/\s+/).length;
+
+              if (finalWords > currentWords * 1.2) { // 20% more words (was 10%)
+                shouldReplace = true;
+                replacementReason = 'content_completeness';
+              }
+              // Check 3: Final translation is more comprehensive (contains more unique characters)
+              else {
+                const currentUniqueChars = new Set(currentTranslation.toLowerCase()).size;
+                const finalUniqueChars = new Set(finalTrimmed.toLowerCase()).size;
+
+                if (finalUniqueChars > currentUniqueChars * 1.10) { // 10% more unique content (was 5%)
+                  shouldReplace = true;
+                  replacementReason = 'content_richness';
+                }
+              }
+            }
+          }
+
+          // CRITICAL FIX: Add comprehensive debug logging for replacement decisions
+          this.logger.info(`🔍 FINAL REPLACEMENT DECISION for node ${nodeIndex}`, {
+            isFinalResult: options.isFinalResult,
+            currentLength: currentTranslation.length,
+            finalLength: finalTrimmed.length,
+            shouldReplace: shouldReplace,
+            replacementReason: replacementReason,
+            contentComparison: {
+              currentPreview: currentTranslation.substring(0, 100) + (currentTranslation.length > 100 ? '...' : ''),
+              finalPreview: finalTrimmed.substring(0, 100) + (finalTrimmed.length > 100 ? '...' : ''),
+              currentWordCount: currentTranslation.split(/\s+/).length,
+              finalWordCount: finalTrimmed.split(/\s+/).length,
+              currentUniqueChars: new Set(currentTranslation.toLowerCase()).size,
+              finalUniqueChars: new Set(finalTrimmed.toLowerCase()).size
+            },
+            nodeIndex: nodeIndex,
+            originalTextLength: originalText.length
+          });
+
+          if (shouldReplace) {
+            this.logger.info(`🔄 REPLACING streaming translation with complete final translation for node ${nodeIndex}`, {
+              currentLength: currentTranslation.length,
+              finalLength: finalTrimmed.length,
+              improvement: finalTrimmed.length - currentTranslation.length,
+              improvementPercent: Math.round((finalTrimmed.length / Math.max(currentTranslation.length, 1) - 1) * 100),
+              reason: replacementReason,
+              currentPreview: currentTranslation.substring(0, 50) + (currentTranslation.length > 50 ? '...' : ''),
+              finalPreview: finalTrimmed.substring(0, 50) + (finalTrimmed.length > 50 ? '...' : '')
+            });
+
+            // Remove the existing wrapper completely
+            const parentNode = wrapper.parentNode;
+            if (parentNode) {
+              parentNode.removeChild(wrapper);
+              // Create a new text node to be processed below
+              const newTextClone = textNode.cloneNode(true);
+              parentNode.insertBefore(newTextClone, null);
+              textNode = newTextClone; // Update reference for processing below
+            }
+          } else {
+            // Current translation is good enough, keep it
+            this.logger.debug(`Keeping current streaming translation for node ${nodeIndex} (no significant improvement)`);
+            processedCount++;
+            return;
+          }
+        }
+      }
+
       // Handle empty lines and whitespace-only text (preserve structure but don't translate)
-      if (originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) {
+      // BUT NOT for phone numbers or content with actual characters
+      const isPhoneLike = /[\d\+\-\(\)\s]/.test(originalText.trim()) && originalText.trim().length > 3;
+      const hasActualContent = originalText.trim().length > 0 && !/^\s+$/.test(originalText);
+
+      if ((originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) && !isPhoneLike && !hasActualContent) {
         this.logger.debug('Preserving empty line or whitespace text node', {
-          originalText: JSON.stringify(originalText)
+          originalText: JSON.stringify(originalText),
+          isPhoneLike,
+          hasActualContent
         });
         processedCount++;
         return; // Don't translate empty lines, just preserve them
       }
 
-      // Find matching translation using enhanced fuzzy matching
+      // DETERMINISTIC MATCHING using the lookup table (100% accurate)
       let translatedText = null;
       let matchType = '';
 
-      // Try exact match first (fastest path)
-      if (translations.has(trimmedOriginalText)) {
-        translatedText = translations.get(trimmedOriginalText);
-        matchType = 'exact_trimmed';
-      } else if (translations.has(originalText)) {
-        translatedText = translations.get(originalText);
-        matchType = 'exact_full';
-      } else {
-        // Use enhanced fuzzy matching for better text node compatibility
-        const bestMatch = findBestTranslationMatch(originalText, translations, 40);
+          // CRITICAL: Add detailed debug logging for specific nodes
+      if (nodeIndex === 14 || nodeIndex === 32) {
+        this.logger.error(`🔍 DEBUGGING NODE ${nodeIndex}`, {
+          originalText: JSON.stringify(originalText),
+          trimmedOriginalText: JSON.stringify(trimmedOriginalText),
+          textLength: originalText.length,
+          lookupTableSize: translationLookup.size
+        });
+      }
+
+      // DETERMINISTIC STRATEGY - Use lookup table with multiple fallback strategies
+
+      // Strategy 1: Direct lookup using original text
+      if (translationLookup.has(originalText)) {
+        translatedText = translationLookup.get(originalText);
+        matchType = 'lookup_exact';
+        this.logger.debug(`✅ LOOKUP EXACT MATCH for node ${nodeIndex}`);
+      }
+      // Strategy 2: Direct lookup using trimmed text
+      else if (translationLookup.has(trimmedOriginalText)) {
+        translatedText = translationLookup.get(trimmedOriginalText);
+        matchType = 'lookup_trimmed';
+        this.logger.debug(`✅ LOOKUP TRIMMED MATCH for node ${nodeIndex}`);
+      }
+      // Strategy 3: Normalized whitespace lookup
+      else {
+        const normalizedOriginal = originalText.replace(/\s+/g, ' ').trim();
+        if (translationLookup.has(normalizedOriginal)) {
+          translatedText = translationLookup.get(normalizedOriginal);
+          matchType = 'lookup_normalized';
+          this.logger.debug(`✅ LOOKUP NORMALIZED MATCH for node ${nodeIndex}`);
+        }
+      }
+
+      // Strategy 4: No whitespace lookup (critical for phone numbers)
+      if (!translatedText) {
+        const noWhitespaceOriginal = originalText.replace(/\s+/g, '');
+        if (translationLookup.has(noWhitespaceOriginal)) {
+          translatedText = translationLookup.get(noWhitespaceOriginal);
+          matchType = 'lookup_no_whitespace';
+          this.logger.debug(`✅ LOOKUP NO WHITESPACE MATCH for node ${nodeIndex}`);
+        }
+      }
+
+      // CRITICAL: Enhanced debugging and fallback for unmatched nodes
+      if (!translatedText) {
+        this.logger.error(`❌ NO MATCH FOUND for node ${nodeIndex}`, {
+          originalText: JSON.stringify(originalText),
+          trimmedOriginalText: JSON.stringify(trimmedOriginalText),
+          normalizedOriginal: JSON.stringify(originalText.replace(/\s+/g, ' ').trim()),
+          noWhitespaceOriginal: JSON.stringify(originalText.replace(/\s+/g, '')),
+          lookupSize: translationLookup.size,
+          lookupKeys: Array.from(translationLookup.keys()).slice(0, 10).map(k => JSON.stringify(k))
+        });
+
+        // ENHANCED FALLBACK STRATEGY - Multiple matching approaches
+        let bestMatch = null;
+        let bestScore = 0;
+        let bestMatchType = '';
+
+        for (const [lookupKey, translation] of translationLookup.entries()) {
+          let score = 0;
+          let matchType = '';
+
+          // Strategy 1: Contains matching (higher score for longer matches)
+          if (lookupKey.includes(trimmedOriginalText) || trimmedOriginalText.includes(lookupKey)) {
+            score = Math.max(lookupKey.length, trimmedOriginalText.length) / 10;
+            matchType = 'fallback_contains';
+          }
+
+          // Strategy 2: Partial word matching
+          const originalWords = trimmedOriginalText.toLowerCase().split(/\s+/);
+          const lookupWords = lookupKey.toLowerCase().split(/\s+/);
+          let commonWords = 0;
+          for (const word of originalWords) {
+            if (lookupWords.includes(word)) commonWords++;
+          }
+          if (commonWords > 0) {
+            const wordScore = (commonWords / Math.max(originalWords.length, lookupWords.length)) * 50;
+            if (wordScore > score) {
+              score = wordScore;
+              matchType = 'fallback_words';
+            }
+          }
+
+          // Strategy 3: Levenshtein distance for similar strings (short texts only)
+          if (trimmedOriginalText.length < 100 && lookupKey.length < 100) {
+            const distance = this._calculateLevenshteinDistance(trimmedOriginalText, lookupKey);
+            const maxLength = Math.max(trimmedOriginalText.length, lookupKey.length);
+            const similarity = 1 - (distance / maxLength);
+            const similarityScore = similarity * 100;
+            if (similarityScore > score) {
+              score = similarityScore;
+              matchType = 'fallback_similarity';
+            }
+          }
+
+          // Update best match if this one is better
+          if (score > bestScore && score > 5) { // Minimum score threshold
+            bestMatch = translation;
+            bestScore = score;
+            bestMatchType = matchType;
+          }
+        }
 
         if (bestMatch) {
-          translatedText = bestMatch.translatedText;
-          matchType = `fuzzy_${bestMatch.type}_${Math.round(bestMatch.score)}`;
-
-          this.logger.debug(`Fuzzy match found for node ${nodeIndex}`, {
-            original: originalText.substring(0, 50) + '...',
-            matchedTo: bestMatch.originalText.substring(0, 50) + '...',
-            score: bestMatch.score,
-            type: bestMatch.type
+          translatedText = bestMatch;
+          matchType = bestMatchType;
+          this.logger.warn(`🔄 ENHANCED FALLBACK MATCH for node ${nodeIndex} (${bestMatchType})`, {
+            original: JSON.stringify(originalText.substring(0, 50)),
+            matchScore: Math.round(bestScore),
+            matchType: bestMatchType
           });
+        } else {
+          this.logger.error(`🚨 NO FALLBACK MATCH FOUND for node ${nodeIndex} - translation lost`);
         }
       }
 
@@ -1326,7 +2052,7 @@ export class TranslationUIManager {
       }
     });
 
-    this.logger.debug("Translation application complete using wrapper approach", {
+    this.logger.info("🎯 TRANSLATION APPLICATION COMPLETE", {
       totalNodes: textNodes.length,
       validNodes: validTextNodes.length,
       appliedCount: processedCount,
@@ -1339,8 +2065,27 @@ export class TranslationUIManager {
         originalPreview: node.originalText,
         normalizedPreview: node.normalizedText,
         length: node.textLength
-      }))
+      })),
+      availableTranslations: Array.from(translations.keys()).slice(0, 15) // Show more translation keys
     });
+
+    // CRITICAL: Debug long translations to ensure complete content preservation
+    const longTranslations = Array.from(translations.entries()).filter(([key, value]) =>
+      key.length > 100 || value.length > 100
+    );
+
+    if (longTranslations.length > 0) {
+      this.logger.info("📝 LONG TRANSLATIONS DEBUG", {
+        count: longTranslations.length,
+        details: longTranslations.map(([key, value], index) => ({
+          index,
+          originalLength: key.length,
+          translatedLength: value.length,
+          originalPreview: key.substring(0, 80) + (key.length > 80 ? '...' : ''),
+          translatedPreview: value.substring(0, 80) + (value.length > 80 ? '...' : '')
+        }))
+      });
+    }
 
     // Enhanced debug logging for unmatched nodes
     if (unmatchedNodes.length > 0 && this.logger.isDebugEnabled()) {

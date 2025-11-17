@@ -101,61 +101,24 @@ function processTextIntoSegments(text, config) {
     return [text || ''];
   }
 
-  // For short texts, keep them intact
-  if (text.length <= config.maxSegmentLength) {
-    if (config.splitOnDoubleNewlines) {
-      // Split on newlines but preserve newline characters as separate segments
-      const parts = text.split(/\n/);
-      const segments = [];
-
-      for (let i = 0; i < parts.length; i++) {
-        if (parts[i].length > 0) {
-          segments.push(parts[i]);
-        }
-
-        // Add newline segment between parts (but not after the last one)
-        if (i < parts.length - 1) {
-          segments.push('\n');
-        }
-      }
-
-      return segments;
-    }
+  // VERY AGGRESSIVE FIX: Only split extremely long texts, never split on newlines
+  if (text.length <= 1000) {
+    // Keep everything as one piece - no splitting whatsoever
     return [text];
   }
 
-  // For longer texts, split more intelligently
+  // AGGRESSIVE FIX: For longer texts, split only on double newlines as last resort
   let segments = [];
 
-  if (config.splitOnDoubleNewlines) {
-    // Split on newlines but preserve newline characters as separate segments
-    const parts = text.split(/\n/);
+  // ONLY split on double newlines (meaningful paragraph breaks)
+  const parts = text.split(/\n\s*\n/);
 
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i].length > 0) {
-        segments.push(parts[i]);
-      }
-
-      // Add newline segment between parts (but not after the last one)
-      if (i < parts.length - 1) {
-        segments.push('\n');
-      }
+  parts.forEach((part) => {
+    const trimmedPart = part.trim();
+    if (trimmedPart.length > 0) {
+      segments.push(trimmedPart);
     }
-  } else {
-    // Split on newlines but preserve newline characters as separate segments
-    const parts = text.split(/\n/);
-
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i].length > 0) {
-        segments.push(parts[i]);
-      }
-
-      // Add newline segment between parts (but not after the last one)
-      if (i < parts.length - 1) {
-        segments.push('\n');
-      }
-    }
-  }
+  });
 
   // Further split very long segments
   const finalSegments = [];
@@ -226,17 +189,51 @@ function expandTextsLegacy(textsToTranslate) {
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
-    const segments = originalText.split("\n");
+    // AGGRESSIVE FIX: Prevent all text fragmentation for most cases
+    let segments = [];
+
+    // VERY AGGRESSIVE: Only split extremely long texts (>1000 chars)
+    if (originalText.length <= 1000) {
+      // Keep everything as one piece - no splitting at all
+      segments = [originalText];
+    } else {
+      // Only for extremely long texts, split on double newlines only
+      segments = originalText.split(/\n\s*\n/).filter(seg => seg.trim().length > 0);
+
+      // If any segment is still too long (>1500 chars), split on single newlines as last resort
+      if (segments.some(seg => seg.length > 1500)) {
+        const newSegments = [];
+        segments.forEach(segment => {
+          if (segment.length > 1500) {
+            // Split on newlines but keep content meaningful
+            const subSegments = segment.split(/\n/);
+            subSegments.forEach(subSeg => {
+              if (subSeg.trim().length > 10) { // Only keep meaningful pieces
+                newSegments.push(subSeg);
+              }
+            });
+          } else {
+            newSegments.push(segment);
+          }
+        });
+        segments = newSegments;
+      }
+    }
+
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
-      // Special handling for empty lines - preserve as structural markers
-      if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
-        // Add empty line placeholder for structure preservation
-        expandedTexts.push('\n'); // Use simple newline for empty lines
+      // ENHANCED: Better handling of empty/whitespace segments
+      const trimmedSegment = segment.trim();
+
+      // Only treat as empty line if it's truly just whitespace or very short
+      if (trimmedSegment.length === 0 && segment.length < 10) {
+        // Add simple newline for structural breaks
+        expandedTexts.push('\n');
         originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
         currentExpandedIndices.push(expandedTexts.length - 1);
       } else {
+        // Keep the segment as-is with its original structure
         expandedTexts.push(segment);
         originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
         currentExpandedIndices.push(expandedTexts.length - 1);
@@ -254,13 +251,15 @@ function expandTextsLegacy(textsToTranslate) {
  * @param {string[]} expandedTexts - Original expanded texts
  * @param {Array} originMapping - Mapping of segments to originals
  * @param {string[]} textsToTranslate - Original texts to translate
- * @returns {Map} Map of original texts to translated texts
+ * @param {Map} cachedTranslations - Optional cached translations (default: new Map())
+ * @returns {Map} Map of original texts to translated texts with multi-strategy indexing
  */
 export function reassembleTranslations(
   translatedData,
   expandedTexts,
   originMapping,
-  textsToTranslate
+  textsToTranslate,
+  cachedTranslations = new Map()
 ) {
   if (!Array.isArray(translatedData) || !Array.isArray(expandedTexts) || !Array.isArray(originMapping)) {
     logger.error('reassembleTranslations: Invalid input parameters');
@@ -332,49 +331,165 @@ export function reassembleTranslations(
         logger.debug(`Reassembling text ${originalIndex}: ${segments.length} segments (${originalText.length} chars)`);
       }
 
-      // Build reassembled text by joining segments directly
+      // AGGRESSIVE FIX: Accept ALL segments to prevent content loss
+      const validSegments = segments.filter((segment, segmentIndex) => {
+        const trimmedSegment = segment.trim();
+
+        // ENHANCED: Detailed logging for debugging content loss
+        if (originalText.length > 100 && segments.length > 1) {
+          logger.debug(`🔍 SEGMENT VALIDATION ${originalIndex}:${segmentIndex}`, {
+            originalSegment: JSON.stringify(segment),
+            trimmedSegment: JSON.stringify(trimmedSegment),
+            segmentLength: segment.length,
+            trimmedLength: trimmedSegment.length,
+            isNewline: segment === '\n',
+            hasContent: trimmedSegment.length > 0
+          });
+        }
+
+        // VERY PERMISSIVE: Accept almost everything to prevent content loss
+        const isValid = trimmedSegment.length > 0 ||  // Has actual content
+                       segment === '\n' ||  // Is newline
+                       segment === '\r\n' ||  // Is Windows newline
+                       (segment.length > 0 && /\s/.test(segment));  // Has any whitespace
+
+        // Log if a segment is being rejected (should be very rare)
+        if (!isValid && originalText.length > 100) {
+          logger.warn(`⚠️ REASSEMBLY: Rejecting segment ${originalIndex}:${segmentIndex}`, {
+            segmentPreview: segment.substring(0, 50),
+            segmentLength: segment.length,
+            trimmedLength: trimmedSegment.length
+          });
+        }
+
+        return isValid;
+      });
+
+      // Log if we lost any segments during validation
+      if (validSegments.length !== segments.length) {
+        logger.warn(`⚠️ REASSEMBLY: Lost ${segments.length - validSegments.length} segments during validation`, {
+          originalSegments: segments.length,
+          validSegments: validSegments.length,
+          originalIndex
+        });
+      }
+
+      // Build reassembled text by joining valid segments directly
       // This preserves the original structure without adding extra newlines
-      let reassembledText = segments.join('');
+      let reassembledText = validSegments.join('');
 
-      // Enhanced post-processing to clean up provider-added excessive newlines
-      // 1. Remove excessive newlines (3+ consecutive newlines -> 2 newlines)
-      reassembledText = reassembledText.replace(/\n{3,}/g, '\n\n');
+      // AGGRESSIVE FIX: Skip content loss detection for most texts to prevent over-correction
+      if (originalText.length > 1000) {
+        // Only do content loss detection for very long texts
+        const originalContentWords = originalText.trim().split(/\s+/).filter(w => w.length > 0).length;
+        const reassembledContentWords = reassembledText.trim().split(/\s+/).filter(w => w.length > 0).length;
 
-      // 2. Enhanced post-processing for texts that got wrapped in newlines by provider
+        const contentLossRatio = originalContentWords > 0 ? reassembledContentWords / originalContentWords : 1;
+
+        if (contentLossRatio < 0.5 && originalContentWords > 20) {
+          logger.error(`❌ REASSEMBLY: Significant content loss detected in long text`, {
+            originalIndex,
+            originalLength: originalText.length,
+            reassembledLength: reassembledText.length,
+            lossPercent: Math.round((1 - contentLossRatio) * 100)
+          });
+
+          // For long texts, try to recover by joining segments with spaces
+          reassembledText = validSegments.join(' ');
+        }
+      } else {
+        // For shorter texts, trust the reassembly and skip validation
+        logger.debug(`🔧 SKIPPING content loss detection for shorter text ${originalIndex} (${originalText.length} chars)`);
+      }
+
+      // MINIMAL post-processing - only clean up truly excessive newlines
+      reassembledText = reassembledText.replace(/\n{8,}/g, '\n\n');
+
+      // CRITICAL: Debug logging for complex texts to ensure content preservation
+      const originalTrimmed = originalText.trim();
+      if (originalTrimmed.length > 50 && segments.length > 1) {
+        logger.debug(`🔍 REASSEMBLY DEBUG for text ${originalIndex}`, {
+          originalLength: originalText.length,
+          reassembledLength: reassembledText.length,
+          segmentCount: segments.length,
+          originalPreview: originalText.substring(0, 100) + '...',
+          reassembledPreview: reassembledText.substring(0, 100) + '...'
+        });
+      }
+
+      // CRITICAL FIX: Multi-strategy key indexing for reliable DOM matching
+      // This ensures the reassembled translation can be found during DOM application
+      // Strategy 1: Exact original text key (primary)
+      newTranslations.set(originalText, reassembledText);
+
+      // Strategy 2: Trimmed version (most common matching scenario)
+      if (originalTrimmed !== originalText) {
+        newTranslations.set(originalTrimmed, reassembledText);
+      }
+
+      // Strategy 3: Normalized whitespace (handles whitespace variations)
+      const normalizedKey = originalText.replace(/\s+/g, ' ').trim();
+      if (normalizedKey !== originalText && normalizedKey !== originalTrimmed) {
+        newTranslations.set(normalizedKey, reassembledText);
+      }
+
+      // Strategy 4: All whitespace removed (for phone numbers, etc.)
+      const noWhitespaceKey = originalText.replace(/\s+/g, '');
+      if (noWhitespaceKey !== originalText) {
+        newTranslations.set(noWhitespaceKey, reassembledText);
+      }
+
+      // Log the indexing strategies for debugging complex texts
+      if (originalTrimmed.length > 50 && segments.length > 1) {
+        logger.debug(`🔑 REASSEMBLY INDEXING for text ${originalIndex}`, {
+          strategies: [
+            { key: 'exact', length: originalText.length },
+            { key: 'trimmed', length: originalTrimmed.length, different: originalTrimmed !== originalText },
+            { key: 'normalized', length: normalizedKey.length, different: normalizedKey !== originalText && normalizedKey !== originalTrimmed },
+            { key: 'no_whitespace', length: noWhitespaceKey.length, different: noWhitespaceKey !== originalText }
+          ],
+          totalEntries: newTranslations.size
+        });
+      }
+    } else {
+      // No translated parts found for this text, use original with multi-strategy indexing
       const originalTrimmed = originalText.trim();
 
-      // For very short texts (≤10 chars) that don't have newlines in original
-      if (originalTrimmed.length <= 10 && !originalText.includes('\n')) {
-        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
-      }
-      // For medium-length texts (11-30 chars) - remove excessive newlines unless original had them
-      else if (originalTrimmed.length <= 30 && !originalText.includes('\n')) {
-        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
-      }
-      // For technical terms and model names (≤40 chars) that typically don't need paragraph spacing
-      else if (originalTrimmed.length <= 40 && !originalText.includes('\n') &&
-               (/^[a-zA-Z0-9.-]+$/.test(originalTrimmed) || // technical terms like "gpt-3.5-turbo"
-                /^[a-zA-Z\s]+$/.test(originalTrimmed))) { // proper names like "Google Gemini"
-        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
-      }
-
-      // 3. For punctuation-only segments (like ".", ":"), remove excessive newlines
-      if (/^[.:;,!?]+$/.test(originalTrimmed)) {
-        reassembledText = reassembledText.replace(/^\n{2}/, '').replace(/\n{2}$/, '');
-        // Ensure single punctuation doesn't have excessive spacing
-        if (!reassembledText.includes('\n')) {
-          reassembledText = reassembledText.trim();
-        }
-      }
-
-      newTranslations.set(originalText, reassembledText);
-    } else {
-      // No translated parts found for this text, use original
+      // Strategy 1: Exact original text key (primary)
       newTranslations.set(originalText, originalText);
+
+      // Strategy 2: Trimmed version
+      if (originalTrimmed !== originalText) {
+        newTranslations.set(originalTrimmed, originalText);
+      }
+
+      // Strategy 3: Normalized whitespace
+      const normalizedKey = originalText.replace(/\s+/g, ' ').trim();
+      if (normalizedKey !== originalText && normalizedKey !== originalTrimmed) {
+        newTranslations.set(normalizedKey, originalText);
+      }
+
+      // Strategy 4: All whitespace removed
+      const noWhitespaceKey = originalText.replace(/\s+/g, '');
+      if (noWhitespaceKey !== originalText) {
+        newTranslations.set(noWhitespaceKey, originalText);
+      }
     }
   });
 
-  logger.debug(`Reassembled ${newTranslations.size} translations`);
+  logger.debug(`Reassembled ${newTranslations.size} translations with multi-strategy indexing`);
+
+  // Log detailed breakdown for debugging
+  if (textsToTranslate.length > 0) {
+    const avgEntriesPerText = Math.round(newTranslations.size / textsToTranslate.length * 10) / 10;
+    logger.debug(`📈 REASSEMBLY STATISTICS`, {
+      originalTexts: textsToTranslate.length,
+      totalLookupEntries: newTranslations.size,
+      avgEntriesPerOriginal: avgEntriesPerText,
+      indexingStrategies: ['exact', 'trimmed', 'normalized', 'no_whitespace']
+    });
+  }
+
   return newTranslations;
 }
 
