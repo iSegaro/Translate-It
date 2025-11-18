@@ -314,7 +314,7 @@ export class TranslationUIManager {
               translatedPreview: translatedText.substring(0, 30) + '...'
             });
           } else {
-            this.logger.warn(`⚠️ Skipping streaming segment ${expandedIndex} - insufficient content`, {
+            this.logger.debug(`⚠️ Skipping streaming segment ${expandedIndex} - insufficient content`, {
               originalLength: originalTextKey.length,
               translatedLength: translatedText.length
             });
