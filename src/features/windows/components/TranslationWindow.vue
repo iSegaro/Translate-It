@@ -115,18 +115,17 @@
     </div>
 
     <div class="ti-window-body">
-      <!-- Show Original Text Section -->
-      <div
-        v-if="showOriginal && !isLoading"
-        class="ti-original-text-section"
-      >
-        <div class="ti-original-label">
-          Original:
+      <!-- Show Original Text Section with smooth animation -->
+      <Transition name="ti-original-text" appear>
+        <div
+          v-if="showOriginal && !isLoading"
+          class="ti-original-text-section"
+        >
+          <div class="ti-original-text">
+            {{ originalText }}
+          </div>
         </div>
-        <div class="ti-original-text">
-          {{ originalText }}
-        </div>
-      </div>
+      </Transition>
       
       <!-- Translation Display Section -->
       <TranslationDisplay
@@ -632,30 +631,7 @@ const handleStartDrag = (event) => {
   flex-direction: column !important;
 }
 
-/* Original text section styling */
-.ti-original-text-section {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.ti-original-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.ti-original-text {
-  font-size: 13px;
-  line-height: 1.4;
-  color: #555;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+/* Original text section styles are now handled in global CSS for Shadow DOM compatibility */
 
 /* Translation display with modern containment */
 .ti-window-translation-display {
@@ -699,18 +675,7 @@ const handleStartDrag = (event) => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark theme adjustments */
-.translation-window.dark .ti-original-text-section {
-  border-bottom-color: rgba(255, 255, 255, 0.2);
-}
-
-.translation-window.dark .ti-original-label {
-  color: #aaa;
-}
-
-.translation-window.dark .ti-original-text {
-  color: #ccc;
-}
+/* Dark theme styles for original text section are now handled in global CSS for Shadow DOM compatibility */
 
 
 /* Loading window specific styles */
@@ -742,6 +707,8 @@ const handleStartDrag = (event) => {
   background: #333 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
+
+/* Transition animations for original text section are now handled in global CSS for Shadow DOM compatibility */
 
 /* Component-specific styles only - base window styles handled by global CSS */
 

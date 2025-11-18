@@ -63,6 +63,7 @@
         ...(fontStyles || {}),
         ...(cssVariables || {}),
         direction: textDirection?.dir || 'ltr',
+        textAlign: textDirection?.textAlign || 'left',
       }"
     >
       <!-- Safe: Content is sanitized with DOMPurify -->
@@ -74,6 +75,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
+import { isRTLText, getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -223,7 +225,7 @@ const containerRef = ref(null);
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
-// Font management with safe error handling
+// Font management with safe error handling and RTL-aware CSS variables
 let fontStyles = ref({});
 let cssVariables = ref({});
 
@@ -240,14 +242,41 @@ try {
     );
 
   fontStyles = computedFontStyles;
-  cssVariables = computedCssVariables;
 
-  logger.debug("Font management initialized successfully");
+  // Override CSS variables to ensure proper RTL/LTR direction
+  cssVariables = computed(() => {
+    const vars = { ...computedCssVariables.value };
+    // Ensure direction variables match our text direction
+    if (textDirection.value.dir === 'rtl') {
+      vars['--translation-direction'] = 'rtl';
+      vars['--translation-text-align'] = 'right';
+      vars['--list-padding'] = '0 3em 0 0';
+      vars['--list-text-align'] = 'right';
+    } else {
+      vars['--translation-direction'] = 'ltr';
+      vars['--translation-text-align'] = 'left';
+      vars['--list-padding'] = '0 0 0 3em';
+      vars['--list-text-align'] = 'left';
+    }
+    return vars;
+  });
+
+  logger.debug("Font management initialized successfully with RTL-aware CSS variables");
 } catch (error) {
   logger.warn("Font management not available, using fallback styles:", error);
   // Fallback styles when useFont fails
   fontStyles = computed(() => ({}));
-  cssVariables = computed(() => ({}));
+
+  // Create fallback CSS variables with proper RTL/LTR support
+  cssVariables = computed(() => {
+    const dir = textDirection.value.dir;
+    return {
+      '--translation-direction': dir,
+      '--translation-text-align': dir === 'rtl' ? 'right' : 'left',
+      '--list-padding': dir === 'rtl' ? '0 2em 0 0' : '0 0 0 2em',
+      '--list-text-align': dir === 'rtl' ? 'right' : 'left',
+    };
+  });
 }
 
 // Computed
@@ -256,13 +285,24 @@ const hasContent = computed(
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
 
-// Pre-compute text direction to prevent layout shift
+// Enhanced text direction computation with target language awareness
 const textDirection = computed(() => {
   const textToCheck = props.content || props.error || "";
-  const isRtl = shouldApplyRtl(textToCheck);
+
+  // Use advanced RTL detection with target language awareness
+  const isRtl = isRTLText(textToCheck, {
+    comprehensive: true,
+    threshold: 0.1, // Lower threshold for more sensitive detection
+    targetLanguage: props.targetLanguage || 'fa',
+    simpleDetection: false // Use threshold-based detection for better accuracy
+  });
+
+  // Fallback to basic detection if advanced detection fails
+  const finalDirection = isRtl || shouldApplyRtl(textToCheck);
+
   return {
-    dir: isRtl ? "rtl" : "ltr",
-    textAlign: isRtl ? "right" : "left",
+    dir: finalDirection ? "rtl" : "ltr",
+    textAlign: finalDirection ? "right" : "left",
   };
 });
 
@@ -458,50 +498,74 @@ onMounted(() => {
 }
 
 /*
-  UNIFIED MARKDOWN LIST SOLUTION
-  - This single set of rules works across all modes (Popup, Sidepanel, WindowsManager).
-  - It bypasses native browser list rendering (which is buggy in some extension contexts)
-    by creating markers manually with the ::before pseudo-element.
+  ROOT-CAUSE FIX: CSS Grid-based List Layout
+  - Eliminates absolute positioning issues
+  - Works identically for LTR and RTL
+  - No cascade or specificity conflicts
 */
 .ti-translation-content :deep(ul),
 .ti-translation-content :deep(ol) {
   list-style: none !important;
-  padding: 0 0 0 2em !important; /* Create space for our manual markers */
-  margin: 8px 0 !important;
+  padding: 0 !important;
+  margin: 6px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important; /* Consistent spacing between list items */
 }
 
 .ti-translation-content :deep(li) {
-  position: relative !important;
-  padding-left: 0.5em !important; /* Space between marker and text */
-  margin-bottom: 6px !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  align-items: start !important;
+  gap: 0.5em !important; /* Consistent gap between bullet/number and text */
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  min-height: 1.2em !important; /* Ensure consistent height */
 }
 
-/* Manual bullet for unordered lists */
-.ti-translation-content :deep(ul > li::before) {
+/* Bullet container for LTR */
+.ti-translation-content :deep(ul > li)::before {
   content: "•" !important;
-  position: absolute !important;
-  left: -1em !important; /* Position in the ul's padding */
-  top: 0 !important;
+  font-weight: bold !important;
   color: inherit !important;
-  font-weight: bold;
+  grid-column: 1 !important;
+  text-align: left !important;
 }
 
-/* Manual numbers for ordered lists */
+/* Bullet container for RTL */
+.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
+.ti-translation-content.rtl-content :deep(ul > li)::before {
+  text-align: right !important;
+}
+
+/* Number container for ordered lists */
 .ti-translation-content :deep(ol) {
-  counter-reset: list-counter; /* Initialize counter */
+  counter-reset: list-counter !important;
 }
 .ti-translation-content :deep(ol > li) {
-  counter-increment: list-counter; /* Increment counter for each li */
+  counter-increment: list-counter !important;
 }
-.ti-translation-content :deep(ol > li::before) {
-  content: counter(list-counter) "." !important; /* Display counter and dot */
-  position: absolute !important;
-  left: -1.5em !important; /* Adjust position for numbers */
-  top: 0 !important;
+.ti-translation-content :deep(ol > li)::before {
+  content: counter(list-counter) "." !important;
+  font-weight: normal !important;
   color: inherit !important;
-  font-weight: normal;
-  text-align: right;
-  width: 1em;
+  grid-column: 1 !important;
+  text-align: left !important;
+  min-width: 1.5em !important;
+}
+
+/* Number container for RTL ordered lists */
+.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
+.ti-translation-content.rtl-content :deep(ol > li)::before {
+  text-align: right !important;
+}
+
+/* Text content container */
+.ti-translation-content :deep(ul > li > span),
+.ti-translation-content :deep(ol > li > span),
+.ti-translation-content :deep(ul > li > *),
+.ti-translation-content :deep(ol > li > *) {
+  grid-column: 2 !important;
 }
 
 /* Sidepanel content adjustments */
@@ -749,29 +813,18 @@ onMounted(() => {
   background: var(--toolbar-link-color);
 }
 
-/* --- RTL Specific Overrides for Manual Bullets --- */
+/* --- REMOVED: Old RTL overrides - now using CSS Grid approach --- */
 
-/* When the content direction is RTL, reset left padding and add right padding */
-.ti-translation-content[dir="rtl"] :deep(ul),
-.ti-translation-content[dir="rtl"] :deep(ol) {
-  padding-left: 0 !important;
-  padding-right: 2em !important; /* Space for bullets on the right */
+/* --- CLEAN RTL STYLES (using CSS Grid approach) --- */
+
+/* RTL-specific text alignment for bullets and numbers */
+.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
+.ti-translation-content.rtl-content :deep(ul > li)::before {
+  text-align: right !important;
 }
 
-.ti-translation-content[dir="rtl"] :deep(li) {
-  padding-left: 0 !important;
-  padding-right: 0.5em !important; /* Space between bullet and text */
-}
-
-/* Position the bullet on the right for RTL */
-.ti-translation-content[dir="rtl"] :deep(ul > li::before) {
-  left: auto !important; /* Unset the left property */
-  right: -1.5em !important; /* Position on the right */
-}
-
-.ti-translation-content[dir="rtl"] :deep(ol > li::before) {
-  left: auto !important; /* Unset the left property */
-  right: -2em !important; /* Position on the right */
-  text-align: left; /* Ensure number itself is not reversed */
+.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
+.ti-translation-content.rtl-content :deep(ol > li)::before {
+  text-align: right !important;
 }
 </style>

@@ -105,7 +105,7 @@
     }
   }
 
-  // Normal window - using safe CSS variable function
+  // Normal window - restored to original behavior
   &.normal-window {
     width: #{css-var('normal-window-width', $selection-window-max-width)};
     height: max-content; // Height based on content
@@ -220,46 +220,46 @@
   }
 }
 
-// Window body with safe CSS variable usage
+// Window body with improved containment and overflow handling
 .ti-window .ti-window-body,
 .ti-window-body {
   padding: #{css-var('window-padding', $spacing-md)};
   min-height: #{css-var('normal-window-min-height', 120px)};
   display: flex;
   flex-direction: column;
-  margin-left: #{css-var('window-body-margin', 5px)};
-  margin-right: #{css-var('window-body-margin', 5px)};
+  margin-left: 0; // Removed excessive margins
+  margin-right: 0; // Removed excessive margins
   flex: 1; // Take remaining space in flex container
   overflow-y: auto; // Enable vertical scrolling when content exceeds height
   overflow-x: clip; // Modern way to clip overflow
 
-  // Content constraint with natural flow
+  // Improved content constraint with proper box-sizing
   width: 100%; // Take full width of parent
-  overflow-wrap: break-word; // Break long words naturally
+  max-width: 100%; // Prevent overflow
+  box-sizing: border-box; // Include padding and borders in width
 
-  // Modern CSS containment for better isolation
+  // Modern CSS containment for better isolation and performance
   contain: layout style paint; // Full containment for maximum isolation
   isolation: isolate; // Create stacking context
-  box-sizing: border-box; // Include padding in width
 
-  // List styles for dictionary/definition content
+  // Optimized list styles for dictionary/definition content
   .ti-window-body ul,
   .ti-window-body ol {
-    // Reset default padding
+    // Reset default padding and use more efficient spacing
     padding: 0;
-    margin: 8px 0;
+    margin: 6px 0; // Reduced margin for better spacing
   }
 
-  // LTR content
+  // LTR content with reduced padding
   .ti-window-body[dir="ltr"] ul,
   .ti-window-body[dir="ltr"] ol,
   .ti-window-body .simple-markdown[dir="ltr"] ul,
   .ti-window-body .simple-markdown[dir="ltr"] ol {
-    padding-left: 20px;
+    padding-left: 16px; // Reduced from 20px for less excessive padding
     padding-right: 0;
   }
 
-  // RTL content
+  // RTL content with reduced padding
   [dir="rtl"] .ti-window-body ul,
   [dir="rtl"] .ti-window-body ol,
   .ti-window-body[dir="rtl"] ul,
@@ -269,23 +269,31 @@
   .simple-markdown[dir="rtl"] ul,
   .simple-markdown[dir="rtl"] ol {
     padding-left: 0;
-    padding-right: 20px;
+    padding-right: 16px; // Reduced from 20px for less excessive padding
   }
 
-  // List items
+  // Optimized list items with better spacing and proper LTR positioning
   li {
-    // Ensure proper spacing between list items
-    margin-bottom: 4px;
+    // Ensure proper spacing between list items with reduced gaps
+    margin-bottom: 3px; // Reduced from 4px for tighter spacing
+    margin-left: 1.5em; // Add proper left margin for LTR bullet spacing
 
     &:last-child {
       margin-bottom: 0;
     }
+
+    // Override for RTL content
+    [dir="rtl"] &,
+    &.rtl-content {
+      margin-left: 0;
+      margin-right: 1.5em; // Add right margin for RTL
+    }
   }
 
-  // Nested lists
+  // Nested lists with improved spacing
   ul ul, ol ol, ul ol, ol ul {
-    margin-top: 4px;
-    margin-bottom: 4px;
+    margin-top: 3px; // Reduced from 4px
+    margin-bottom: 3px; // Reduced from 4px
   }
 
   // Firefox scrollbar
@@ -383,4 +391,142 @@
 
 .ti-window.light .ti-action-btn:hover {
   background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+}
+
+// Enhanced Original Text Section Styles for Shadow DOM
+.ti-window .ti-original-text-section {
+  margin: 0 0 16px 0;
+  padding: 12px 0;
+  position: relative;
+
+  /* Premium visual separator with enhanced visibility */
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px !important;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(59, 130, 246, 0.4) 15%,
+      rgba(59, 130, 246, 0.7) 50%,
+      rgba(59, 130, 246, 0.4) 85%,
+      transparent 100%
+    ) !important;
+    border-radius: 1px !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2) !important;
+    z-index: 1;
+  }
+}
+
+.ti-window .ti-original-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b82f6;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding-left: 2px;
+  position: relative;
+
+  /* Add decorative element */
+  &::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    border-radius: 50%;
+    opacity: 0.8;
+  }
+}
+
+.ti-window .ti-original-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4b5563;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 0; /* Removed padding */
+  background: transparent; /* Removed background */
+  border: none; /* Removed border */
+  border-radius: 0; /* Removed border-radius */
+  position: relative;
+
+  /* Improved text rendering */
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+}
+
+// Enhanced dark theme adjustments for original text section
+.ti-window.dark .ti-original-text-section {
+  /* Enhanced separator for dark theme with blue accent */
+  &::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(96, 165, 250, 0.5) 15%,
+      rgba(96, 165, 250, 0.8) 50%,
+      rgba(96, 165, 250, 0.5) 85%,
+      transparent 100%
+    ) !important;
+    box-shadow: 0 1px 6px rgba(96, 165, 250, 0.3) !important;
+  }
+}
+
+.ti-window.dark .ti-original-label {
+  color: #60a5fa;
+
+  /* Dark theme decorative element */
+  &::before {
+    background: linear-gradient(135deg, #60a5fa, #93c5fd);
+  }
+}
+
+.ti-window.dark .ti-original-text {
+  color: #d1d5db;
+  background: transparent; /* Removed background */
+  border: none; /* Removed border */
+  box-shadow: none; /* Removed box-shadow */
+}
+
+// Ultra-fast transitions with scale-based height for instant response
+.ti-original-text-enter-active {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out, margin-bottom 0.3s ease-out !important;
+  overflow: hidden !important;
+}
+
+.ti-original-text-leave-active {
+  transition: transform 0.2s ease-in, opacity 0.2s ease-in, margin-bottom 0.2s ease-in !important;
+  overflow: hidden !important;
+}
+
+.ti-original-text-enter-from {
+  opacity: 0 !important;
+  transform: scaleY(0) !important;
+  margin-bottom: 0 !important;
+}
+
+.ti-original-text-leave-to {
+  opacity: 0 !important;
+  transform: scaleY(0) !important;
+  margin-bottom: 0 !important;
+}
+
+.ti-original-text-enter-to {
+  opacity: 1 !important;
+  transform: scaleY(1) !important;
+  margin-bottom: 16px !important;
+}
+
+.ti-original-text-leave-from {
+  opacity: 1 !important;
+  transform: scaleY(1) !important;
+  margin-bottom: 16px !important;
 }
