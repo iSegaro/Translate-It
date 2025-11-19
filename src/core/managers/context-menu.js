@@ -89,7 +89,7 @@ async function getApiProviders() {
       // Check against known provider IDs for extra validation
       const knownProviderIds = [
         'google', 'yandex', 'gemini', 'openai', 'openrouter',
-        'deepseek', 'webai', 'bing', 'browser', 'custom'
+        'deepseek', 'webai', 'zai', 'bing', 'browser', 'custom'
       ];
 
       if (!knownProviderIds.includes(id.toLowerCase())) {
