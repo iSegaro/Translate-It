@@ -163,56 +163,7 @@ export class ZAIGLMProvider extends BaseAIProvider {
     }
   }
 
-  /**
-   * Override batch translation to use JSON strategy effectively
-   */
-  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null) {
-    // For single text, use individual translation
-    if (batch.length === 1) {
-      const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController);
-      return [result || batch[0]];
-    }
-
-    // Use JSON batch strategy
-    try {
-      const batchPrompt = this._buildBatchPrompt(batch, sourceLang, targetLang);
-      const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
-
-      // Parse batch result
-      const parsedResults = this._parseBatchResult(result, batch.length, batch);
-
-      // Validate results
-      if (parsedResults.length === batch.length) {
-        // Batch translation successful
-        logger.info(`[ZAI] JSON batch translation successful: ${batch.length} segments`);
-        return parsedResults;
-      } else {
-        logger.warn(`[ZAI] Batch result mismatch, falling back to individual requests`);
-        throw new Error('Batch result count mismatch');
-      }
-    } catch (error) {
-      logger.warn(`[ZAI] Batch translation failed, trying fallback:`, error);
-
-      // Try fallback, but if that fails too, throw the original error
-      try {
-        const fallbackResults = await this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
-        // Fallback successful
-        logger.info(`[ZAI] Fallback completed for ${batch.length} segments`);
-        return fallbackResults;
-      } catch (fallbackError) {
-        // Check if fallback was also cancelled by user
-        const fallbackErrorType = matchErrorToType(fallbackError);
-        if (fallbackErrorType === ErrorTypes.USER_CANCELLED || fallbackErrorType === ErrorTypes.TRANSLATION_CANCELLED) {
-          logger.debug(`[ZAI] Fallback cancelled by user`);
-        } else {
-          logger.error(`[ZAI] Fallback also failed:`, fallbackError);
-        }
-        // Throw the original batch error, not fallback error, for better context
-        throw error;
-      }
-    }
-  }
-
+  
   /**
    * Create error with proper type
    * @param {string} type - Error type from ErrorTypes
