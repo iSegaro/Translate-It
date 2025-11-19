@@ -61,6 +61,68 @@ async function handleBackgroundCommand(action, data = {}) {
     }
 }
 
+async function handleSelectElementCommand(tab) {
+  try {
+    logger.debug(`[CommandHandler] Activating select element mode for tab ${tab.id}`);
+
+    // Send activation command with force load flag to trigger on-demand loading
+    const message = MessageFormat.create(
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      { source: 'keyboard_shortcut', forceLoad: true },
+      MessagingContexts.BACKGROUND
+    );
+
+    await browser.tabs.sendMessage(tab.id, message);
+    logger.debug(`[CommandHandler] Select element activation sent to content script`);
+    return true;
+  } catch (error) {
+    logger.error(`[CommandHandler] Error handling select element command:`, error);
+
+    // Provide specific error context
+    if (error.message && error.message.includes('Receiving end does not exist')) {
+      logger.warn(`[CommandHandler] Content script not available in tab ${tab?.id} for select element command`);
+
+      // Try to inject content script as fallback
+      try {
+        logger.debug(`[CommandHandler] Attempting to inject content script for select element mode`);
+
+        if (browser.scripting) {
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['src/core/content-scripts/index.js']
+          });
+        } else {
+          await browser.tabs.executeScript(tab.id, {
+            file: 'src/core/content-scripts/index.js',
+            allFrames: false
+          });
+        }
+
+        // Wait for initialization and retry
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Create retry message
+        const retryMessage = MessageFormat.create(
+          MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+          { source: 'keyboard_shortcut', forceLoad: true },
+          MessagingContexts.BACKGROUND
+        );
+
+        // Retry the activation command
+        await browser.tabs.sendMessage(tab.id, retryMessage);
+        logger.debug(`[CommandHandler] Select element activation successful after content script injection`);
+        return true;
+      } catch (retryError) {
+        logger.error(`[CommandHandler] Fallback content script injection failed:`, retryError);
+      }
+    } else if (error.message && error.message.includes('Could not establish connection')) {
+      logger.warn(`[CommandHandler] Cannot connect to tab ${tab?.id} for select element command`);
+    }
+
+    return false;
+  }
+}
+
 async function handleOptionsCommand() {
   try {
     logger.debug('Options command triggered');
@@ -92,9 +154,9 @@ export async function handleCommandEvent(command, tab) {
       quick_translate: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TRANSLATE'),
 
       // Element selection commands (Chrome shortcut support)
-      'SELECT-ELEMENT-COMMAND': () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
-      select_element: () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
-      activate_select_element: () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
+      'SELECT-ELEMENT-COMMAND': () => handleSelectElementCommand(tab),
+      select_element: () => handleSelectElementCommand(tab),
+      activate_select_element: () => handleSelectElementCommand(tab),
 
       // UI commands
       toggle_popup: () => handleBackgroundCommand('togglePopup', { tabId: tab.id }),
