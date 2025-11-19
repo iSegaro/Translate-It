@@ -442,12 +442,42 @@ export class TranslationEngine {
                         () => {
                             // Check provider type to determine which method to call
                             const providerClass = providerInstance?.constructor;
-                            if (providerClass?.type === "ai") {
+
+                            // Check if provider is AI provider (has type "ai" or has _translateBatch method)
+                            const isAIProvider = providerClass?.type === "ai" ||
+                                               typeof providerInstance?._translateBatch === 'function';
+
+                            if (isAIProvider) {
                                 // AI providers use _translateBatch method directly
                                 return providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode, abortController);
-                            } {
+                            } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method for SelectElement mode
                                 return providerInstance._translateChunk(batch, sourceLanguage, targetLanguage, mode, abortController);
+                            } else {
+                                // Fallback: gather detailed information about the provider issue
+                                const providerInfo = {
+                                    providerName: provider,
+                                    hasTranslateBatch: typeof providerInstance?._translateBatch === 'function',
+                                    hasTranslateChunk: typeof providerInstance?._translateChunk === 'function',
+                                    providerType: providerClass?.type,
+                                    constructorName: providerInstance?.constructor?.name,
+                                    availableMethods: Object.getOwnPropertyNames(providerInstance)
+                                        .filter(method => method.startsWith('_translate'))
+                                };
+
+                                logger.error(`[TranslationEngine] Provider method detection failed:`, providerInfo);
+
+                                // Create a more informative error that helps with debugging
+                                const errorDetails = [
+                                    `Provider: ${providerInfo.providerName}`,
+                                    `Type: ${providerInfo.providerType || 'unknown'}`,
+                                    `Constructor: ${providerInfo.constructorName || 'unknown'}`,
+                                    `Has _translateBatch: ${providerInfo.hasTranslateBatch}`,
+                                    `Has _translateChunk: ${providerInfo.hasTranslateChunk}`,
+                                    `Available _translate methods: ${providerInfo.availableMethods.join(', ') || 'none'}`
+                                ].join(' | ');
+
+                                throw new Error(`Translation provider method not available: ${errorDetails}`);
                             }
                         },
                         `batch-${i + 1}/${batches.length}`,
