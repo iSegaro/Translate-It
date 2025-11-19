@@ -2,8 +2,8 @@
 
 ##### Added
 
-- **Z.AI Provider**: Added support for GLM provider ([z.ai](https://z.ai)) 
 - **Local File Support**: Added support for translating content from local files (`file:///` URLs)
+- **Z.AI Provider**: Added support for GLM provider ([z.ai](https://z.ai)) 
 
 ##### Fixed
 
@@ -11,6 +11,10 @@
 - **Enhanced Original Text TTS**: Added visual indicators and tooltips for better discoverability of original text pronunciation in floating windows
 - **Select Element Improvements**: Enhanced element selection functionality and reliability
 - Removed caching system from Select Element for better performance and accuracy
+
+##### Changed
+
+- Changed default macOS keyboard shortcut to `Option+A`
 
 ---
 
