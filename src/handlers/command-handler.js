@@ -4,6 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
 
 
@@ -64,6 +65,17 @@ async function handleBackgroundCommand(action, data = {}) {
 async function handleSelectElementCommand(tab) {
   try {
     logger.debug(`[CommandHandler] Activating select element mode for tab ${tab.id}`);
+
+    // Check tab accessibility before attempting command
+    const accessInfo = await tabPermissionChecker.checkTabAccess(tab.id);
+    if (!accessInfo.isAccessible) {
+      logger.debug(`[CommandHandler] Select element command ignored on restricted page:`, {
+        tabId: tab.id,
+        url: accessInfo.fullUrl,
+        reason: accessInfo.errorMessage
+      });
+      return false;
+    }
 
     // Send activation command with force load flag to trigger on-demand loading
     const message = MessageFormat.create(
