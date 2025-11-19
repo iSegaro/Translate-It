@@ -9,6 +9,8 @@ import {
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'ZAIGLM');
 
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
@@ -59,7 +61,7 @@ export class ZAIGLMProvider extends BaseAIProvider {
 
       // Check if it's a custom model (not in predefined list)
       const isCustomModel = !CONFIG.ZAI_MODELS?.some(model => model.value === zaiModel && model.value !== 'custom');
-      const actualModel = zaiModel || 'glm-4.5';
+      const actualModel = zaiModel || 'glm-4.5-air';
 
       // Configuration loaded successfully
       logger.info(`[ZAI] Using model: ${actualModel} (custom: ${isCustomModel})`);
@@ -141,6 +143,14 @@ export class ZAIGLMProvider extends BaseAIProvider {
       logger.info(`[ZAI] Translation completed successfully`);
       return result;
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[ZAI] Translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
       await ErrorHandler.getInstance().handle(error, {
         context: 'zai-translation'
@@ -190,7 +200,13 @@ export class ZAIGLMProvider extends BaseAIProvider {
         logger.info(`[ZAI] Fallback completed for ${batch.length} segments`);
         return fallbackResults;
       } catch (fallbackError) {
-        logger.error(`[ZAI] Fallback also failed:`, fallbackError);
+        // Check if fallback was also cancelled by user
+        const fallbackErrorType = matchErrorToType(fallbackError);
+        if (fallbackErrorType === ErrorTypes.USER_CANCELLED || fallbackErrorType === ErrorTypes.TRANSLATION_CANCELLED) {
+          logger.debug(`[ZAI] Fallback cancelled by user`);
+        } else {
+          logger.error(`[ZAI] Fallback also failed:`, fallbackError);
+        }
         // Throw the original batch error, not fallback error, for better context
         throw error;
       }

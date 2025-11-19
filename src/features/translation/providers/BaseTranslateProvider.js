@@ -432,9 +432,17 @@ export class BaseTranslateProvider extends BaseProvider {
     try {
       return await this._executeApiCall(params);
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[${this.providerName}] Operation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Import ErrorHandler for centralized error management
       const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
-      
+
       // Let the centralized error handler manage the error
       const errorHandler = ErrorHandler.getInstance();
       await errorHandler.handle(error, {
@@ -442,7 +450,7 @@ export class BaseTranslateProvider extends BaseProvider {
         provider: this.providerName,
         maxRetries: 2
       });
-      
+
       // If ErrorHandler returns, it means the error was handled (e.g., retried successfully)
       // Otherwise, it would have thrown the error
       throw error;

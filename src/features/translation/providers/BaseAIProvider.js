@@ -663,7 +663,9 @@ Important: Return only the JSON array with translated texts, no additional text 
     
     for (let i = 0; i < batch.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        throw new Error('Translation cancelled during fallback');
+        const cancelError = new Error('Translation cancelled during fallback');
+        cancelError.name = 'AbortError';
+        throw cancelError;
       }
       
       try {
@@ -763,6 +765,15 @@ Important: Return only the JSON array with translated texts, no additional text 
     try {
       return await this._executeApiCall(params);
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, this.providerName);
+        logger.debug(`[${this.providerName}] Operation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Let ErrorHandler automatically detect and handle all error types
       await ErrorHandler.getInstance().handle(error, {
         context: params.context || `${this.providerName.toLowerCase()}-translation`

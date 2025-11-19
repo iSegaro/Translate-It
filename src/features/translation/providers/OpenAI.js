@@ -9,7 +9,10 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
@@ -171,7 +174,19 @@ export class OpenAIProvider extends BaseAIProvider {
       logger.info(`[OpenAI] Image translation completed successfully`);
       return result;
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[OpenAI] Image translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       logger.error('image translation failed with error:', error);
+      // Let ErrorHandler automatically detect and handle all error types
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'openai-image-translation'
+      });
       throw error;
     }
   }

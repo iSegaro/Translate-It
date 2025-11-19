@@ -9,6 +9,8 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from 'webextension-polyfill';
 
 
@@ -350,6 +352,14 @@ export class browserTranslateProvider extends BaseProvider {
         return finalResult;
       }
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[BrowserAPI] Translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Enhanced error handling with specific context
       if (error.message?.includes("Translation not available")) {
         error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
@@ -361,8 +371,12 @@ export class browserTranslateProvider extends BaseProvider {
         error.type = ErrorTypes.API;
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
-      
+
       logger.error('Translation error:', error);
+      // Let ErrorHandler automatically detect and handle all error types
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'browser-api-translation'
+      });
       throw error;
     }
   }

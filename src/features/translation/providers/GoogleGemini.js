@@ -10,6 +10,8 @@ import {
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
@@ -94,7 +96,13 @@ export class GeminiProvider extends BaseAIProvider {
         logger.info(`[Gemini] Fallback completed for ${batch.length} segments`);
         return fallbackResults;
       } catch (fallbackError) {
-        logger.error(`[${this.providerName}] Fallback also failed:`, fallbackError);
+        // Check if fallback was also cancelled by user
+        const fallbackErrorType = matchErrorToType(fallbackError);
+        if (fallbackErrorType === ErrorTypes.USER_CANCELLED || fallbackErrorType === ErrorTypes.TRANSLATION_CANCELLED) {
+          logger.debug(`[${this.providerName}] Fallback cancelled by user`);
+        } else {
+          logger.error(`[${this.providerName}] Fallback also failed:`, fallbackError);
+        }
         // Throw the original batch error, not fallback error, for better context
         throw error;
       }
@@ -278,7 +286,14 @@ export class GeminiProvider extends BaseAIProvider {
       logger.info(`[Gemini] Translation completed successfully`);
       return result;
     } catch (error) {
-      
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[Gemini] Translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // If thinking-related error occurs, retry without thinking config
       if (
         error.message &&
@@ -307,11 +322,18 @@ export class GeminiProvider extends BaseAIProvider {
           // Fallback without thinking config successful
           return fallbackResult;
         } catch (fallbackError) {
+          // Check if fallback was also cancelled by user
+          const fallbackErrorType = matchErrorToType(fallbackError);
+          if (fallbackErrorType === ErrorTypes.USER_CANCELLED || fallbackErrorType === ErrorTypes.TRANSLATION_CANCELLED) {
+            logger.debug(`[Gemini] Translation fallback cancelled by user`);
+            throw fallbackError;
+          }
+
           // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
           await ErrorHandler.getInstance().handle(fallbackError, {
             context: 'gemini-translation-fallback'
           });
-          
+
           // Re-throw fallback error with enhanced context
           fallbackError.context = `${this.providerName.toLowerCase()}-translation-fallback`;
           fallbackError.provider = this.providerName;
@@ -427,6 +449,14 @@ export class GeminiProvider extends BaseAIProvider {
       logger.info(`[Gemini] Image translation completed successfully`);
       return result;
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[Gemini] Image translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       logger.error('image translation failed with error:', error);
       // Let ErrorHandler automatically detect and handle all error types
       await ErrorHandler.getInstance().handle(error, {
