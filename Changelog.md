@@ -1,3 +1,18 @@
+#### v1.4.10 – Released on November 19, 2025
+
+##### Added
+
+- **Local File Support**: Added support for translating content from local files (`file:///` URLs)
+- **Enhanced Floating Window**: Improved floating window display and performance for translation results
+- **Enhanced Original Text TTS**: Added visual indicators and tooltips for better discoverability of original text pronunciation in floating windows
+
+##### Fixed
+
+- **Select Element Improvements**: Enhanced element selection functionality and reliability
+- Removed caching system from Select Element for better performance and accuracy
+
+---
+
 #### v1.4.8 – Released on November 10, 2025
 
 ##### Fixed
@@ -108,7 +123,7 @@
 
 ##### Fixed
 
-- **Translation Status Notification**: Fixed issue where `Translating...` notification would remain stuck when text field translation failed due to text extraction errors or background service failures  
+- **Translation Status Notification**: Fixed issue where `Translating...` notification would remain stuck when text field translation failed due to text extraction errors or background service failures
 - **[#59](https://github.com/iSegaro/Translate-It/issues/59)**: Fixed issue where prompt changes from the recent update were not being applied
 - **[#65](https://github.com/iSegaro/Translate-It/issues/65)**: Fixed icon display issue when selecting text in advanced fields via drag, and resolved CSS injection problem.
 
@@ -118,7 +133,7 @@
 
 ##### Added
 
-- Scroll support for long translations in the floating window  
+- Scroll support for long translations in the floating window
 
 ##### Fixed
 
@@ -255,7 +270,7 @@
 
 ##### Fixed
 
-- Fixed an issue with in-field translation when using `Google Translate` as the provider.  
+- Fixed an issue with in-field translation when using `Google Translate` as the provider.
 - Fixed the issue where country flags were not displayed on Windows in the settings page.
 - Fixed several minor bugs.
 
@@ -295,7 +310,7 @@
 
 ##### Added
 
-- Added quick access options to the extension’s context (right-click) menu via the action toolbar.
+- Added quick access options to the extension's context (right-click) menu via the action toolbar.
 - Added a Help section to the Settings page.
 - Added a Changelog section to the Settings page.
 
@@ -323,7 +338,7 @@
 - Improved the positioning and behavior of the in-field translation icon to be more intelligent and less intrusive.
 - Enhanced translation prompts to yield more natural and human-like translations.
 - Updated Light Theme
-  
+
 ---
 
 #### v0.3.6 – Released on 28 June 2025

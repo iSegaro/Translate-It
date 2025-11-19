@@ -186,7 +186,7 @@ const emit = defineEmits([
 
 // Computed
 const hasContent = computed(() => {
-  return props.text && props.text.trim().length > 0
+  return props.text && typeof props.text === 'string' && props.text.trim().length > 0
 })
 
 const buttonSize = computed(() => {

@@ -4,6 +4,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
+import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -111,8 +114,43 @@ export async function sendMessage(message, options = {}) {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
+      // Check if this is a user cancellation - if so, don't attempt fallback
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        getLogger().debug('Translation coordination cancelled, not attempting fallback:', error);
+        throw error; // Re-throw cancellation error without fallback
+      }
+
       // If coordination fails, fall back to regular messaging
       getLogger().warn('Translation coordination failed, falling back to regular messaging:', error);
+
+      // Check if this is a streaming timeout and translation might already be complete
+      const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');
+
+      if (isStreamingTimeout && message.messageId && !message.messageId.startsWith('fallback-')) {
+        // For streaming timeouts, check if the translation was already completed
+        // by looking for any translation results in the content script
+        try {
+          // Send a simple check message to see if translation results are available
+          const checkResponse = await browser.runtime.sendMessage({
+            action: 'CHECK_TRANSLATION_STATUS',
+            messageId: message.messageId
+          });
+
+          if (checkResponse && checkResponse.completed) {
+            getLogger().info('Streaming timeout detected but translation already completed, skipping fallback');
+            return checkResponse.results;
+          }
+        } catch (checkError) {
+          getLogger().debug('Could not check translation status, proceeding with fallback:', checkError);
+        }
+      }
+
+      // Check if the original operation was cancelled before attempting fallback
+      if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
+        getLogger().debug('Original operation was cancelled, skipping fallback message');
+        throw new Error('Translation cancelled by user');
+      }
 
       // Create a new message with a fresh messageId to avoid duplicate detection
       const fallbackMessage = {
@@ -222,6 +260,13 @@ export async function sendRegularMessage(message, options = {}) {
                errorType === ErrorTypes.TAB_RESTRICTED) {
       // Tab accessibility errors should be debug level
       getLogger().debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
+    } else if (errorType === ErrorTypes.USER_CANCELLED) {
+      // User cancellation should be debug level, not error
+      getLogger().debug(`Message cancelled for ${message.action}:`, {
+        message: error.message || error,
+        errorType: errorType,
+        fullError: error
+      });
     } else {
       // All other errors are logged as error level
       getLogger().error(`Message failed for ${message.action}:`, {

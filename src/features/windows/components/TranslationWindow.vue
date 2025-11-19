@@ -54,7 +54,7 @@
           class="ti-action-btn ti-smart-tts-btn"
           :class="{ 'ti-original-mode': ttsMode === 'original' }"
           :disabled="!hasTTSContent"
-          :title="getTTSButtonTitle"
+          :title="getEnhancedTTSButtonTitle"
           @click.stop="handleSmartTTS"
         >
           <svg
@@ -78,7 +78,8 @@
         </button>
         <button
           class="ti-action-btn"
-          title="Show/Hide Original Text"
+          :class="{ 'ti-original-visible': showOriginal }"
+          :title="getOriginalButtonTitle"
           @click.stop="toggleShowOriginal"
         >
           <svg
@@ -114,18 +115,20 @@
     </div>
 
     <div class="ti-window-body">
-      <!-- Show Original Text Section -->
-      <div
-        v-if="showOriginal && !isLoading"
-        class="ti-original-text-section"
+      <!-- Show Original Text Section with smooth animation -->
+      <Transition
+        name="ti-original-text"
+        appear
       >
-        <div class="ti-original-label">
-          Original:
+        <div
+          v-if="showOriginal && !isLoading"
+          class="ti-original-text-section"
+        >
+          <div class="ti-original-text">
+            {{ originalText }}
+          </div>
         </div>
-        <div class="ti-original-text">
-          {{ originalText }}
-        </div>
-      </div>
+      </Transition>
       
       <!-- Translation Display Section -->
       <TranslationDisplay
@@ -219,20 +222,30 @@ const currentTTSText = computed(() => {
   return translatedText.value || '';
 });
 
-const getTTSButtonTitle = computed(() => {
+
+// Enhanced TTS button title with more detailed guidance
+const getEnhancedTTSButtonTitle = computed(() => {
   if (!hasTTSContent.value) {
     return 'No text available for speech';
   }
 
   if (tts.ttsState.value === 'playing') {
-    return 'Stop TTS';
+    return 'Stop speaking (Click to stop)';
   }
 
   if (ttsMode.value === 'original') {
-    return 'Speak original text';
+    return '🔊 Speak ORIGINAL text (Show original first, then click this button)';
   }
 
-  return 'Speak translation';
+  return '🔊 Speak TRANSLATION (Current mode: translation)';
+});
+
+// Enhanced original button title with TTS hint
+const getOriginalButtonTitle = computed(() => {
+  if (showOriginal.value) {
+    return 'Hide Original Text (TTS button now speaks original text)';
+  }
+  return 'Show Original Text (Then use speaker button to listen to original)';
 });
 
 // TTS icon paths for different modes
@@ -518,6 +531,19 @@ const handleStartDrag = (event) => {
   cursor: not-allowed;
 }
 
+/* Original button visibility indicator */
+.ti-action-btn.ti-original-visible {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  color: #1e40af !important;
+}
+
+.translation-window.dark .ti-action-btn.ti-original-visible {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+}
+
 /* Smart TTS Button Styles */
 .ti-smart-tts-btn {
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
@@ -593,29 +619,7 @@ const handleStartDrag = (event) => {
   flex-direction: column !important;
 }
 
-/* Original text section styling */
-.ti-original-text-section {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.ti-original-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.ti-original-text {
-  font-size: 13px;
-  line-height: 1.4;
-  color: #555;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+/* Original text section styles are now handled in global CSS for Shadow DOM compatibility */
 
 /* Translation display with modern containment */
 .ti-window-translation-display {
@@ -659,18 +663,8 @@ const handleStartDrag = (event) => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark theme adjustments */
-.translation-window.dark .original-text-section {
-  border-bottom-color: rgba(255, 255, 255, 0.2);
-}
+/* Dark theme styles for original text section are now handled in global CSS for Shadow DOM compatibility */
 
-.translation-window.dark .original-label {
-  color: #aaa;
-}
-
-.translation-window.dark .original-text {
-  color: #ccc;
-}
 
 /* Loading window specific styles */
 .translation-window.loading-window {
@@ -701,6 +695,8 @@ const handleStartDrag = (event) => {
   background: #333 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
+
+/* Transition animations for original text section are now handled in global CSS for Shadow DOM compatibility */
 
 /* Component-specific styles only - base window styles handled by global CSS */
 

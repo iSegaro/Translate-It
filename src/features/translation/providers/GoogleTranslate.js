@@ -7,13 +7,11 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
-const RELIABLE_DELIMITER = '\n\n---\n\n';
-
-const langNameToCodeMap = {
-  afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh", chinese: "zh", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
-};
 
 export class GoogleTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -21,13 +19,13 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   static displayName = "Google Translate";
   static reliableJsonMode = false;
   static supportsDictionary = true;
-  static CHAR_LIMIT = 3900;
-  
+  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;
+
   // BaseTranslateProvider capabilities
-  static supportsStreaming = true;
-  static chunkingStrategy = 'character_limit';
-  static characterLimit = 3900;
-  static maxChunksPerBatch = 10;
+  static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.GOOGLE;
+  static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.GOOGLE;
+  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;
+  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.GOOGLE;
 
   constructor() {
     super("GoogleTranslate");
@@ -36,7 +34,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   _getLangCode(lang) {
     if (!lang || typeof lang !== "string") return "auto";
     const lowerCaseLang = lang.toLowerCase();
-    return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
+    return LANGUAGE_NAME_TO_CODE_MAP[lowerCaseLang] || lowerCaseLang;
   }
 
   /**
@@ -53,7 +51,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     const isDictionaryEnabled = await getEnableDictionaryAsync();
 
     // Add key info log for translation start
-    logger.info(`[Google] Starting translation: ${chunkTexts.join(RELIABLE_DELIMITER).length} chars`);
+    logger.info(`[Google] Starting translation: ${chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER).length} chars`);
     // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
     const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
 
@@ -69,7 +67,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       queryParams.append('dt', 'bd');
     }
 
-    const textToTranslate = chunkTexts.join(RELIABLE_DELIMITER);
+    const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
     const result = await this._executeWithErrorHandling({
@@ -87,14 +85,29 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
         }
 
         const translatedText = data[0].map(segment => segment[0]).join('');
-        const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
+        const translatedSegments = translatedText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         if (translatedSegments.length !== chunkTexts.length) {
-          logger.warn("[Google] Translated segment count mismatch after splitting.", { 
-            expected: chunkTexts.length, 
-            got: translatedSegments.length 
+          logger.warn("[Google] Translated segment count mismatch after splitting.", {
+            expected: chunkTexts.length,
+            got: translatedSegments.length
           });
-          return { translatedSegments: [translatedText], candidateText: '' };
+
+          // Enhanced fallback: try to map back to original segments
+          const fallbackSegments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+            translatedText,
+            chunkTexts,
+            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+            'GoogleTranslate'
+          );
+
+          if (fallbackSegments.length === chunkTexts.length) {
+            logger.info("[Google] Successfully mapped translation to original segments using fallback logic");
+            return { translatedSegments: fallbackSegments, candidateText: '' };
+          } else {
+            logger.warn("[Google] Fallback mapping also failed, using single segment");
+            return { translatedSegments: [translatedText], candidateText: '' };
+          }
         }
 
         let candidateText = "";
@@ -131,6 +144,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     return finalResult;
   }
 
+  
   _formatDictionaryAsMarkdown(candidateText) {
     if (!candidateText || candidateText.trim() === "") {
       return "";

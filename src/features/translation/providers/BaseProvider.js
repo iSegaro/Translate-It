@@ -432,6 +432,7 @@ export class BaseProvider {
       if (abortController && abortController.signal.aborted) {
         const cancelError = new Error('Translation cancelled by user');
         cancelError.name = 'AbortError';
+        cancelError.type = ErrorTypes.USER_CANCELLED;
         throw cancelError;
       }
 

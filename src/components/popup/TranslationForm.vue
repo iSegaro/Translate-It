@@ -234,7 +234,7 @@ onMounted(async () => {
   tracker.addEventListener(document, 'clear-storage', clearStorage)
   tracker.addEventListener(document, 'revert-translation', revertTranslation)
   tracker.addEventListener(document, 'translate-request', (_event) => {
-    logger.debug("🔔 Translate request received from header");
+    logger.debug("Translate request received from header");
     if (sourceText.value.trim()) {
       handleTranslate()
     }

@@ -18,7 +18,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleRestartContentScript(message, sender, sendResponse) {
-  logger.debug('[Handler:restart_content_script] Processing content script restart:', message);
+  logger.debug('Processing content script restart:', message);
   
   try {
     const tabId = message.tabId || sender.tab?.id;
@@ -27,7 +27,7 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
       throw new Error('No tab ID provided for content script restart');
     }
     
-    logger.debug(`🔄 [restart_content_script] Restarting content script for tab ${tabId}`);
+    logger.debug(`Restarting content script for tab ${tabId}`);
     
     // Execute content script reinjection
     await browser.scripting.executeScript({
@@ -41,7 +41,7 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
       files: ['/styles/content.css']
     });
     
-    logger.debug(`✅ [restart_content_script] Content script restarted successfully for tab ${tabId}`);
+    logger.debug(`Content script restarted successfully for tab ${tabId}`);
     
     sendResponse({ 
       success: true, 

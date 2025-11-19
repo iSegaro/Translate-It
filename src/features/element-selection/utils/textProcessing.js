@@ -4,7 +4,6 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getElementSelectionCache } from './cache.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'textProcessing');
 
@@ -34,26 +33,38 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
     return { expandedTexts: [], originMapping: [], originalToExpandedIndices: new Map() };
   }
 
-  logger.debug(`Expanding ${textsToTranslate.length} texts for translation`, {
-    useOptimization: config.useOptimization,
-    maxSegmentLength: config.maxSegmentLength
-  });
+  logger.debug(`Expanding ${textsToTranslate.length} texts for translation (max segment: ${config.maxSegmentLength} chars)`);
 
   if (!config.useOptimization) {
     return expandTextsLegacy(textsToTranslate);
   }
 
-  // Optimized implementation: less aggressive splitting
+  // Optimized implementation: less aggressive splitting with structure preservation
   const expandedTexts = [];
   const originMapping = [];
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
     const segments = processTextIntoSegments(originalText, config);
+
+    // Only log detailed info for longer texts that are actually being segmented
+    if (originalText.length > 100 && segments.length > 1) {
+      logger.debug(`Text ${originalIndex}: split into ${segments.length} segments (${originalText.length} chars)`);
+    }
+
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
       const trimmedSegment = segment.trim();
+
+      // Special handling for empty lines - preserve as structural markers
+      if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
+        // Add empty line placeholder for structure preservation
+        expandedTexts.push('\n'); // Use simple newline for empty lines
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
 
       // Skip very short segments unless configured to preserve them
       if (!config.preserveShortSegments && trimmedSegment.length < config.minTextLength) {
@@ -61,21 +72,21 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
       }
 
       expandedTexts.push(trimmedSegment);
-      originMapping.push({ originalIndex, segmentIndex });
+      originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
       currentExpandedIndices.push(expandedTexts.length - 1);
     });
 
     // If no segments were added (all were too short), add the original
     if (currentExpandedIndices.length === 0) {
       expandedTexts.push(originalText);
-      originMapping.push({ originalIndex, segmentIndex: 0 });
+      originMapping.push({ originalIndex, segmentIndex: 0, isEmptyLine: false });
       currentExpandedIndices.push(expandedTexts.length - 1);
     }
 
     originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
   });
 
-  logger.debug(`Text expansion: ${textsToTranslate.length} → ${expandedTexts.length} segments`);
+  logger.debug(`Text expansion complete: ${textsToTranslate.length} texts → ${expandedTexts.length} segments`);
   return { expandedTexts, originMapping, originalToExpandedIndices };
 }
 
@@ -90,24 +101,24 @@ function processTextIntoSegments(text, config) {
     return [text || ''];
   }
 
-  // For short texts, keep them intact
-  if (text.length <= config.maxSegmentLength) {
-    if (config.splitOnDoubleNewlines) {
-      return text.split(/\n\n+/).filter(segment => segment.trim());
-    }
+  // VERY AGGRESSIVE FIX: Only split extremely long texts, never split on newlines
+  if (text.length <= 1000) {
+    // Keep everything as one piece - no splitting whatsoever
     return [text];
   }
 
-  // For longer texts, split more intelligently
+  // AGGRESSIVE FIX: For longer texts, split only on double newlines as last resort
   let segments = [];
 
-  if (config.splitOnDoubleNewlines) {
-    // Split on double newlines first
-    segments = text.split(/\n\n+/);
-  } else {
-    // Split on single newlines for more granular control
-    segments = text.split(/\n/);
-  }
+  // ONLY split on double newlines (meaningful paragraph breaks)
+  const parts = text.split(/\n\s*\n/);
+
+  parts.forEach((part) => {
+    const trimmedPart = part.trim();
+    if (trimmedPart.length > 0) {
+      segments.push(trimmedPart);
+    }
+  });
 
   // Further split very long segments
   const finalSegments = [];
@@ -121,7 +132,7 @@ function processTextIntoSegments(text, config) {
     }
   });
 
-  return finalSegments.filter(segment => segment.trim());
+  return finalSegments.filter(segment => segment.trim() !== '' || segment.length === 0);
 }
 
 /**
@@ -178,13 +189,55 @@ function expandTextsLegacy(textsToTranslate) {
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
-    const segments = originalText.split("\n");
+    // AGGRESSIVE FIX: Prevent all text fragmentation for most cases
+    let segments = [];
+
+    // VERY AGGRESSIVE: Only split extremely long texts (>1000 chars)
+    if (originalText.length <= 1000) {
+      // Keep everything as one piece - no splitting at all
+      segments = [originalText];
+    } else {
+      // Only for extremely long texts, split on double newlines only
+      segments = originalText.split(/\n\s*\n/).filter(seg => seg.trim().length > 0);
+
+      // If any segment is still too long (>1500 chars), split on single newlines as last resort
+      if (segments.some(seg => seg.length > 1500)) {
+        const newSegments = [];
+        segments.forEach(segment => {
+          if (segment.length > 1500) {
+            // Split on newlines but keep content meaningful
+            const subSegments = segment.split(/\n/);
+            subSegments.forEach(subSeg => {
+              if (subSeg.trim().length > 10) { // Only keep meaningful pieces
+                newSegments.push(subSeg);
+              }
+            });
+          } else {
+            newSegments.push(segment);
+          }
+        });
+        segments = newSegments;
+      }
+    }
+
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
-      expandedTexts.push(segment);
-      originMapping.push({ originalIndex, segmentIndex });
-      currentExpandedIndices.push(expandedTexts.length - 1);
+      // ENHANCED: Better handling of empty/whitespace segments
+      const trimmedSegment = segment.trim();
+
+      // Only treat as empty line if it's truly just whitespace or very short
+      if (trimmedSegment.length === 0 && segment.length < 10) {
+        // Add simple newline for structural breaks
+        expandedTexts.push('\n');
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      } else {
+        // Keep the segment as-is with its original structure
+        expandedTexts.push(segment);
+        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      }
     });
     originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
   });
@@ -198,25 +251,24 @@ function expandTextsLegacy(textsToTranslate) {
  * @param {string[]} expandedTexts - Original expanded texts
  * @param {Array} originMapping - Mapping of segments to originals
  * @param {string[]} textsToTranslate - Original texts to translate
- * @param {Map} cachedTranslations - Cached translations
- * @returns {Map} Map of original texts to translated texts
+  * @returns {Map} Map of original texts to translated texts with multi-strategy indexing
  */
 export function reassembleTranslations(
   translatedData,
   expandedTexts,
   originMapping,
-  textsToTranslate,
-  cachedTranslations
+  textsToTranslate
 ) {
   if (!Array.isArray(translatedData) || !Array.isArray(expandedTexts) || !Array.isArray(originMapping)) {
     logger.error('reassembleTranslations: Invalid input parameters');
     return new Map();
   }
 
-  const cache = getElementSelectionCache();
   const newTranslations = new Map();
   const translatedSegmentsMap = new Map();
 
+  // Note: translatedData length should match filtered expandedTexts length
+  // but originMapping contains the original structure info
   const numItemsToProcess = Math.min(expandedTexts.length, translatedData.length);
 
   // Process translated segments
@@ -225,24 +277,44 @@ export function reassembleTranslations(
     const mappingInfo = originMapping[i];
 
     if (translatedItem && typeof translatedItem.text === "string" && mappingInfo) {
-      const { originalIndex } = mappingInfo;
+      const { originalIndex, isEmptyLine } = mappingInfo;
       if (!translatedSegmentsMap.has(originalIndex)) {
         translatedSegmentsMap.set(originalIndex, []);
       }
-      translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
+
+      // Handle empty line placeholders - preserve structure with simple newlines
+      if (isEmptyLine) {
+        // Use simple newline for empty lines
+        translatedSegmentsMap.get(originalIndex).push('\n');
+      } else {
+        // Check if the corresponding original text already ends with newline
+        // If so, don't add another newline to avoid double spacing
+        const originalText = expandedTexts[i] || '';
+        let processedTranslation = translatedItem.text;
+
+        // Only add newline if original had newline AND translation doesn't already have it
+        if (originalText.endsWith('\n') && !processedTranslation.endsWith('\n')) {
+          processedTranslation += '\n';
+        }
+
+        translatedSegmentsMap.get(originalIndex).push(processedTranslation);
+      }
     } else {
-      logger.debug(`Invalid translation data at index ${i}:`, {
-        translatedItem,
-        mappingInfo
-      });
+      logger.debug(`Invalid translation data at index ${i}, using fallback`);
 
       // Use original text as fallback
       if (mappingInfo) {
-        const { originalIndex } = mappingInfo;
+        const { originalIndex, isEmptyLine } = mappingInfo;
         if (!translatedSegmentsMap.has(originalIndex)) {
           translatedSegmentsMap.set(originalIndex, []);
         }
-        translatedSegmentsMap.get(originalIndex).push(expandedTexts[i] || '');
+
+        if (isEmptyLine) {
+          translatedSegmentsMap.get(originalIndex).push('\n'); // Use simple newline for empty lines
+        } else {
+          // Use fallback text as-is, preserving original structure
+          translatedSegmentsMap.get(originalIndex).push(expandedTexts[i] || '');
+        }
       }
     }
   }
@@ -251,48 +323,174 @@ export function reassembleTranslations(
   textsToTranslate.forEach((originalText, originalIndex) => {
     if (translatedSegmentsMap.has(originalIndex)) {
       const segments = translatedSegmentsMap.get(originalIndex);
-      const reassembledText = segments.join("\n");
+
+      // Only log detailed reassembly info for complex texts
+      if (segments.length > 2) {
+        logger.debug(`Reassembling text ${originalIndex}: ${segments.length} segments (${originalText.length} chars)`);
+      }
+
+      // AGGRESSIVE FIX: Accept ALL segments to prevent content loss
+      const validSegments = segments.filter((segment, segmentIndex) => {
+        const trimmedSegment = segment.trim();
+
+        // ENHANCED: Detailed logging for debugging content loss
+        if (originalText.length > 100 && segments.length > 1) {
+          logger.debug(`🔍 SEGMENT VALIDATION ${originalIndex}:${segmentIndex}`, {
+            originalSegment: JSON.stringify(segment),
+            trimmedSegment: JSON.stringify(trimmedSegment),
+            segmentLength: segment.length,
+            trimmedLength: trimmedSegment.length,
+            isNewline: segment === '\n',
+            hasContent: trimmedSegment.length > 0
+          });
+        }
+
+        // VERY PERMISSIVE: Accept almost everything to prevent content loss
+        const isValid = trimmedSegment.length > 0 ||  // Has actual content
+                       segment === '\n' ||  // Is newline
+                       segment === '\r\n' ||  // Is Windows newline
+                       (segment.length > 0 && /\s/.test(segment));  // Has any whitespace
+
+        // Log if a segment is being rejected (should be very rare)
+        if (!isValid && originalText.length > 100) {
+          logger.warn(`⚠️ REASSEMBLY: Rejecting segment ${originalIndex}:${segmentIndex}`, {
+            segmentPreview: segment.substring(0, 50),
+            segmentLength: segment.length,
+            trimmedLength: trimmedSegment.length
+          });
+        }
+
+        return isValid;
+      });
+
+      // Log if we lost any segments during validation
+      if (validSegments.length !== segments.length) {
+        logger.warn(`⚠️ REASSEMBLY: Lost ${segments.length - validSegments.length} segments during validation`, {
+          originalSegments: segments.length,
+          validSegments: validSegments.length,
+          originalIndex
+        });
+      }
+
+      // Build reassembled text by joining valid segments directly
+      // This preserves the original structure without adding extra newlines
+      let reassembledText = validSegments.join('');
+
+      // AGGRESSIVE FIX: Skip content loss detection for most texts to prevent over-correction
+      if (originalText.length > 1000) {
+        // Only do content loss detection for very long texts
+        const originalContentWords = originalText.trim().split(/\s+/).filter(w => w.length > 0).length;
+        const reassembledContentWords = reassembledText.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+        const contentLossRatio = originalContentWords > 0 ? reassembledContentWords / originalContentWords : 1;
+
+        if (contentLossRatio < 0.5 && originalContentWords > 20) {
+          logger.error(`❌ REASSEMBLY: Significant content loss detected in long text`, {
+            originalIndex,
+            originalLength: originalText.length,
+            reassembledLength: reassembledText.length,
+            lossPercent: Math.round((1 - contentLossRatio) * 100)
+          });
+
+          // For long texts, try to recover by joining segments with spaces
+          reassembledText = validSegments.join(' ');
+        }
+      } else {
+        // For shorter texts, trust the reassembly and skip validation
+        logger.debug(`🔧 SKIPPING content loss detection for shorter text ${originalIndex} (${originalText.length} chars)`);
+      }
+
+      // MINIMAL post-processing - only clean up truly excessive newlines
+      reassembledText = reassembledText.replace(/\n{8,}/g, '\n\n');
+
+      // CRITICAL: Debug logging for complex texts to ensure content preservation
+      const originalTrimmed = originalText.trim();
+      if (originalTrimmed.length > 50 && segments.length > 1) {
+        logger.debug(`🔍 REASSEMBLY DEBUG for text ${originalIndex}`, {
+          originalLength: originalText.length,
+          reassembledLength: reassembledText.length,
+          segmentCount: segments.length,
+          originalPreview: originalText.substring(0, 100) + '...',
+          reassembledPreview: reassembledText.substring(0, 100) + '...'
+        });
+      }
+
+      // CRITICAL FIX: Multi-strategy key indexing for reliable DOM matching
+      // This ensures the reassembled translation can be found during DOM application
+      // Strategy 1: Exact original text key (primary)
       newTranslations.set(originalText, reassembledText);
 
-      // Cache the translation
-      cache.setTranslation(originalText, reassembledText);
-    } else if (!cachedTranslations.has(originalText)) {
-      // No translated parts found for this text, use original
+      // Strategy 2: Trimmed version (most common matching scenario)
+      if (originalTrimmed !== originalText) {
+        newTranslations.set(originalTrimmed, reassembledText);
+      }
+
+      // Strategy 3: Normalized whitespace (handles whitespace variations)
+      const normalizedKey = originalText.replace(/\s+/g, ' ').trim();
+      if (normalizedKey !== originalText && normalizedKey !== originalTrimmed) {
+        newTranslations.set(normalizedKey, reassembledText);
+      }
+
+      // Strategy 4: All whitespace removed (for phone numbers, etc.)
+      const noWhitespaceKey = originalText.replace(/\s+/g, '');
+      if (noWhitespaceKey !== originalText) {
+        newTranslations.set(noWhitespaceKey, reassembledText);
+      }
+
+      // Log the indexing strategies for debugging complex texts
+      if (originalTrimmed.length > 50 && segments.length > 1) {
+        logger.debug(`🔑 REASSEMBLY INDEXING for text ${originalIndex}`, {
+          strategies: [
+            { key: 'exact', length: originalText.length },
+            { key: 'trimmed', length: originalTrimmed.length, different: originalTrimmed !== originalText },
+            { key: 'normalized', length: normalizedKey.length, different: normalizedKey !== originalText && normalizedKey !== originalTrimmed },
+            { key: 'no_whitespace', length: noWhitespaceKey.length, different: noWhitespaceKey !== originalText }
+          ],
+          totalEntries: newTranslations.size
+        });
+      }
+    } else {
+      // No translated parts found for this text, use original with multi-strategy indexing
+      const originalTrimmed = originalText.trim();
+
+      // Strategy 1: Exact original text key (primary)
       newTranslations.set(originalText, originalText);
+
+      // Strategy 2: Trimmed version
+      if (originalTrimmed !== originalText) {
+        newTranslations.set(originalTrimmed, originalText);
+      }
+
+      // Strategy 3: Normalized whitespace
+      const normalizedKey = originalText.replace(/\s+/g, ' ').trim();
+      if (normalizedKey !== originalText && normalizedKey !== originalTrimmed) {
+        newTranslations.set(normalizedKey, originalText);
+      }
+
+      // Strategy 4: All whitespace removed
+      const noWhitespaceKey = originalText.replace(/\s+/g, '');
+      if (noWhitespaceKey !== originalText) {
+        newTranslations.set(noWhitespaceKey, originalText);
+      }
     }
   });
 
-  logger.debug(`Reassembled ${newTranslations.size} translations`);
+  logger.debug(`Reassembled ${newTranslations.size} translations with multi-strategy indexing`);
+
+  // Log detailed breakdown for debugging
+  if (textsToTranslate.length > 0) {
+    const avgEntriesPerText = Math.round(newTranslations.size / textsToTranslate.length * 10) / 10;
+    logger.debug(`📈 REASSEMBLY STATISTICS`, {
+      originalTexts: textsToTranslate.length,
+      totalLookupEntries: newTranslations.size,
+      avgEntriesPerOriginal: avgEntriesPerText,
+      indexingStrategies: ['exact', 'trimmed', 'normalized', 'no_whitespace']
+    });
+  }
+
   return newTranslations;
 }
 
-/**
- * Separate cached and new texts for efficient translation
- * @param {Map} originalTextsMap - Map of original texts to nodes
- * @returns {Object} Object with textsToTranslate and cachedTranslations
- */
-export function separateCachedAndNewTexts(originalTextsMap) {
-  if (!originalTextsMap || !(originalTextsMap instanceof Map)) {
-    logger.error('separateCachedAndNewTexts: Invalid originalTextsMap provided');
-    return { textsToTranslate: [], cachedTranslations: new Map() };
-  }
-
-  const cache = getElementSelectionCache();
-  const textsToTranslate = [];
-  const cachedTranslations = new Map();
-  const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
-
-  uniqueOriginalTexts.forEach((text) => {
-    if (cache.hasTranslation(text)) {
-      cachedTranslations.set(text, cache.getTranslation(text));
-    } else {
-      textsToTranslate.push(text);
-    }
-  });
-
-  logger.debug(`Separated texts: ${textsToTranslate.length} new, ${cachedTranslations.size} cached`);
-  return { textsToTranslate, cachedTranslations };
-}
 
 /**
  * Handle translation length mismatch between expected and received data
@@ -519,14 +717,156 @@ export function cleanText(text, options = {}) {
 }
 
 /**
+ * Normalize text for consistent matching between extraction and translation application
+ * This function ensures that text extracted from DOM and text used for matching
+ * translations follow the same normalization rules
+ * @param {string} text - Text to normalize
+ * @param {Object} options - Normalization options
+ * @returns {string} Normalized text
+ */
+export function normalizeForMatching(text, options = {}) {
+  const {
+    preserveWhitespace = false,
+    normalizeNewlines = true,
+    trimExtreme = true,
+    collapseSpaces = false
+  } = options;
+
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  let normalized = text;
+
+  // Normalize line endings
+  if (normalizeNewlines) {
+    normalized = normalized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+
+  if (preserveWhitespace) {
+    // Preserve essential structure but normalize problematic whitespace
+    // Convert tabs to spaces
+    normalized = normalized.replace(/\t/g, ' ');
+
+    // Collapse multiple spaces into single spaces (but preserve newlines)
+    if (collapseSpaces) {
+      normalized = normalized.replace(/ {2,}/g, ' ');
+    }
+
+    // Trim only extreme whitespace at very beginning/end
+    if (trimExtreme) {
+      normalized = normalized.replace(/^[ \t]{6,}/g, '  ').replace(/[ \t]{6,}$/g, '  ');
+    }
+  } else {
+    // Standard trimming for matching
+    normalized = normalized.trim();
+  }
+
+  return normalized;
+}
+
+/**
+ * Enhanced text matching with multiple strategies
+ * @param {string} nodeText - Text from DOM node
+ * @param {string} translationKey - Text to match against
+ * @returns {Object} Match result with score and type
+ */
+export function calculateTextMatchScore(nodeText, translationKey) {
+  if (!nodeText || !translationKey) {
+    return { score: 0, type: 'invalid' };
+  }
+
+  const nodeNormalized = normalizeForMatching(nodeText, { preserveWhitespace: false });
+  const keyNormalized = normalizeForMatching(translationKey, { preserveWhitespace: false });
+
+  // Exact match gets highest score
+  if (nodeNormalized === keyNormalized) {
+    return { score: 100, type: 'exact' };
+  }
+
+  // Contains relationship
+  if (nodeNormalized.includes(keyNormalized) || keyNormalized.includes(nodeNormalized)) {
+    const longerText = Math.max(nodeNormalized.length, keyNormalized.length);
+    const shorterText = Math.min(nodeNormalized.length, keyNormalized.length);
+    const containsScore = (shorterText / longerText) * 90;
+    return { score: containsScore, type: 'contains' };
+  }
+
+  // Word overlap scoring with stricter criteria
+  const nodeWords = nodeNormalized.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const keyWords = keyNormalized.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+  if (nodeWords.length === 0 || keyWords.length === 0) {
+    return { score: 0, type: 'no_words' };
+  }
+
+  const commonWords = nodeWords.filter(word => keyWords.includes(word));
+  const overlapRatio = commonWords.length / Math.max(nodeWords.length, keyWords.length);
+  const overlapScore = overlapRatio * 50; // Reduced from 70
+
+  // Length similarity bonus with stricter penalty
+  const lengthRatio = Math.min(nodeNormalized.length, keyNormalized.length) /
+                      Math.max(nodeNormalized.length, keyNormalized.length);
+
+  // Only give length bonus if lengths are reasonably similar
+  const lengthBonus = lengthRatio > 0.5 ? lengthRatio * 15 : 0;
+
+  // Penalty for very different lengths
+  const lengthPenalty = lengthRatio < 0.3 ? -20 : 0;
+
+  const finalScore = overlapScore + lengthBonus + lengthPenalty;
+
+  return {
+    score: finalScore,
+    type: 'word_overlap',
+    details: {
+      overlapRatio,
+      lengthRatio,
+      commonWords: commonWords.length
+    }
+  };
+}
+
+/**
+ * Find best matching translation for a text node
+ * @param {string} nodeText - Text from DOM node
+ * @param {Map} translations - Available translations
+ * @param {number} minScore - Minimum acceptable score
+ * @returns {Object} Best match result
+ */
+export function findBestTranslationMatch(nodeText, translations, minScore = 30) {
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const [originalText, translatedText] of translations.entries()) {
+    const matchResult = calculateTextMatchScore(nodeText, originalText);
+
+    if (matchResult.score > bestScore && matchResult.score >= minScore) {
+      bestScore = matchResult.score;
+      bestMatch = {
+        originalText,
+        translatedText,
+        score: matchResult.score,
+        type: matchResult.type,
+        details: matchResult.details
+      };
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
  * Utility object with commonly used text processing functions
  */
 export const ElementTextProcessingUtils = {
   expand: expandTextsForTranslation,
   reassemble: reassembleTranslations,
-  separate: separateCachedAndNewTexts,
   validate: isValidTextContent,
   clean: cleanText,
   parseResponse: parseAndCleanTranslationResponse,
-  checkMismatch: handleTranslationLengthMismatch
+  checkMismatch: handleTranslationLengthMismatch,
+  normalizeForMatching,
+  calculateTextMatchScore,
+  findBestTranslationMatch
 };

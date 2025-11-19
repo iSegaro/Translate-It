@@ -5,17 +5,11 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
-const TEXT_DELIMITER = "\n\n---\n\n";
-
-const bingLangCode = {
-  auto: "auto-detect", af: "af", am: "am", ar: "ar", az: "az", bg: "bg", bs: "bs", ca: "ca", cs: "cs", cy: "cy", da: "da", de: "de", el: "el", en: "en", es: "es", et: "et", fa: "fa", fi: "fi", fr: "fr", ga: "ga", gu: "gu", hi: "hi", hmn: "mww", hr: "hr", ht: "ht", hu: "hu", hy: "hy", id: "id", is: "is", it: "it", ja: "ja", kk: "kk", km: "km", kn: "kn", ko: "ko", ku: "ku", lo: "lo", lt: "lt", lv: "lv", mg: "mg", mi: "mi", ml: "ml", mr: "mr", ms: "ms", mt: "mt", my: "my", ne: "ne", nl: "nl", no: "nb", pa: "pa", pl: "pl", ps: "ps", ro: "ro", ru: "ru", sk: "sk", sl: "sl", sm: "sm", sq: "sq", sr: "sr-Cyrl", sv: "sv", sw: "sw", ta: "ta", te: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", vi: "vi", iw: "he", tl: "fil", pt: "pt", "zh-CN": "zh-Hans", "zh-TW": "zh-Hant",
-};
-
-const langNameToCodeMap = {
-  afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
-};
 
 export class BingTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -26,14 +20,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
-  static CHAR_LIMIT = 800; // Reduced from 1000 to avoid API limits
+  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING;
   static CHUNK_SIZE = 15; // Reduced from 25 to avoid API limits
-  
+
   // BaseTranslateProvider capabilities
-  static supportsStreaming = true;
-  static chunkingStrategy = 'character_limit';
-  static characterLimit = 800; // Bing's character limit - reduced for reliability
-  static maxChunksPerBatch = 15; // Bing's chunk size - reduced for reliability
+  static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.BING;
+  static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.BING;
+  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING; // Bing's character limit - reduced for reliability
+  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING; // Bing's chunk size - reduced for reliability
 
   constructor() {
     super("BingTranslate");
@@ -41,13 +35,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
   _getLangCode(lang) {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
-    if (normalized === AUTO_DETECT_VALUE) return "auto-detect";
-    if (bingLangCode[normalized]) return bingLangCode[normalized];
-    const lower = normalized.toLowerCase();
-    if (langNameToCodeMap[lower] && bingLangCode[langNameToCodeMap[lower]]) {
-      return bingLangCode[langNameToCodeMap[lower]];
-    }
-    return normalized;
+    if (normalized === AUTO_DETECT_VALUE) return PROVIDER_LANGUAGE_MAPPINGS.BING.auto;
+
+    // Use the utility function to get the provider-specific language code
+    return getProviderLanguageCode(normalized, 'BING') || normalized;
   }
 
   /**
@@ -104,7 +95,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         throw new Error('Translation cancelled by user');
       }
 
-      const textToTranslate = chunkTexts.join(TEXT_DELIMITER);
+      const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
       
       // Additional size validation
       if (textToTranslate.length > this.constructor.characterLimit * 2) {
@@ -200,7 +191,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
-          let translatedSegments = targetText.split(TEXT_DELIMITER).map(t => t.trim());
+          let translatedSegments = targetText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER).map(t => t.trim());
           
           // Validate segment count match
           if (translatedSegments.length !== chunkTexts.length) {
@@ -211,25 +202,27 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             
             // Try alternative splitting strategies
             if (translatedSegments.length === 1 && chunkTexts.length > 1) {
-              // If we got one big translation but expected multiple, try to split by common patterns
+              // If we got one big translation but expected multiple, try enhanced mapping
               const text = translatedSegments[0];
-              
-              // Try splitting by "---" (delimiter might have been translated)
-              const altSplit1 = text.split(/\n*---\n*/);
-              if (altSplit1.length === chunkTexts.length) {
-                translatedSegments = altSplit1.map(t => t.trim());
-                logger.debug("[Bing] Successfully recovered segments using alternative splitting");
+
+              // Use enhanced mapping similar to GoogleTranslate
+              const mappedSegments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+                text,
+                chunkTexts,
+                TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+                'BingTranslate'
+              );
+
+              if (mappedSegments.length === chunkTexts.length) {
+                translatedSegments = mappedSegments;
+                logger.info("[Bing] Successfully mapped translation to original segments");
               } else {
-                // Try splitting by double newlines
-                const altSplit2 = text.split(/\n\n+/);
-                if (altSplit2.length === chunkTexts.length) {
-                  translatedSegments = altSplit2.map(t => t.trim());
-                  logger.debug("[Bing] Successfully recovered segments using newline splitting");
-                } else {
-                  // Last resort: distribute text evenly
-                  logger.debug("[Bing] Using fallback: returning original text count with empty strings");
-                  translatedSegments = chunkTexts.map((_, index) => index === 0 ? text : "");
-                }
+                // Use the utility's fallback method
+                translatedSegments = TranslationSegmentMapper.createAlternativeFallback(
+                  text,
+                  chunkTexts,
+                  'BingTranslate'
+                );
               }
             } else if (translatedSegments.length > chunkTexts.length) {
               // If we got too many segments, take only what we need

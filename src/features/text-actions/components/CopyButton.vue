@@ -104,7 +104,7 @@ const canCopy = computed(() => {
 })
 
 const hasTextToCopy = computed(() => {
-  return props.text && props.text.trim().length > 0
+  return props.text && typeof props.text === 'string' && props.text.trim().length > 0
 })
 
 const iconSrc = computed(() => {
@@ -117,15 +117,16 @@ const handleCopy = async () => {
   if (!canCopy.value || !hasTextToCopy.value) return
   
   // Log click event
-  logger.debug('📋 Copy button clicked!', { 
-    text: props.text.slice(0, 20) + (props.text.length > 20 ? '...' : ''),
+  const safeText = props.text || ''
+  logger.debug('📋 Copy button clicked!', {
+    text: safeText.slice(0, 20) + (safeText.length > 20 ? '...' : ''),
     source: 'Vue CopyButton'
   })
-  
+
   try {
-    logger.debug('[CopyButton] Copying text:', props.text.substring(0, 50) + '...')
+    logger.debug('[CopyButton] Copying text:', safeText.substring(0, 50) + '...')
     
-    const success = await copyText(props.text)
+    const success = await copyText(safeText)
     
     if (success) {
       // Show feedback

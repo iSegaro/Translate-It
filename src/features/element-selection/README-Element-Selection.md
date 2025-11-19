@@ -10,6 +10,9 @@ The Element Selection feature enables users to select and translate any text ele
 - **`SelectElementManager.js`** - Main manager extending `ResourceTracker` for memory management
 - **`services/ElementHighlighter.js`** - Visual highlighting extending `ResourceTracker`
 - **`services/TranslationOrchestrator.js`** - Translation coordination extending `ResourceTracker`
+- **`services/StreamingTranslationEngine.js`** - Streaming translation with multi-segment support
+- **`services/TranslationUIManager.js`** - UI updates and multi-segment translation handling
+- **`services/TranslationRequestManager.js`** - Request lifecycle management
 - **`services/ModeManager.js`** - Mode switching extending `ResourceTracker`
 
 ### Services
@@ -59,8 +62,12 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 
 ### Translation Integration
 - **Text Extraction**: Advanced text extraction from complex DOM structures
+- **Multi-Segment Processing**: Intelligent text segmentation for complex content
+- **Streaming Translation**: Real-time translation of large content with progress updates
 - **Translation Orchestration**: Coordinated translation requests with timeout handling
 - **Result Application**: Smart application of translations to DOM elements
+- **Paragraph Preservation**: Maintains original structure with empty lines and formatting
+- **Mixed Content Handling**: Seamlessly processes text, hashtags, links, and emojis
 
 ## 🔧 Configuration
 
@@ -71,8 +78,10 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 
 ### Timeout Configuration
 - **Hover Delay**: Configurable delay for highlight removal (default: 50ms)
-- **Translation Timeout**: Request timeout with fallback handling
+- **Translation Timeout**: Dynamic timeout based on segment count and content size
+- **Streaming Threshold**: Content size threshold for streaming mode (default: 1000 chars or >3 segments)
 - **Cleanup Interval**: Periodic cleanup of old requests (5 minutes)
+- **Multi-Segment Timeout**: Extended timeout for complex content with multiple paragraphs
 
 ## 🚀 Integration
 
@@ -97,7 +106,7 @@ This feature integrates with:
 
 ## 🧪 Testing
 
-Testing considerations:
+### Core Functionality
 - DOM event listener attachment and cleanup
 - Timeout and interval management
 - Cross-browser compatibility
@@ -105,12 +114,56 @@ Testing considerations:
 - Error handling scenarios
 - Performance with complex DOM structures
 
+### Multi-Segment Translation Testing
+- **Complex Content**: Tweets, articles, and multi-paragraph text
+- **Mixed Content**: Text with hashtags, links, emojis, and formatting
+- **Empty Lines**: Preservation of paragraph structure and spacing
+- **Streaming Scenarios**: Large content translation with progress updates
+- **Boundary Cases**: Content exactly at streaming thresholds
+- **Error Recovery**: Handling of partial translation failures
+
+### Platform-Specific Testing
+- **Twitter/X**: Complex nested DOM structures with mixed content types
+- **LinkedIn**: Professional content with multi-line descriptions
+- **GitHub**: Code snippets and technical documentation
+- **Modern SPAs**: React, Vue, and Angular applications
+- **Legacy Sites**: Traditional HTML websites
+
+### Performance Testing
+- **Memory Usage**: Monitoring during streaming translations
+- **DOM Manipulation**: Performance with large text replacements
+- **Event Handling**: Responsiveness during active translation sessions
+- **Resource Cleanup**: Verification of complete resource deallocation
+
 ## 🔗 Related Systems
 
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Resource tracking and cleanup
-- **[Translation System](TRANSLATION_SYSTEM.md)** - Text translation processing
-- **[UI Host System](UI_HOST_SYSTEM.md)** - Overlay rendering
-- **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Error handling
+- **[Translation System](TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
+- **[Unified Translation Service](../../docs/TRANSLATION_SYSTEM.md)** - Centralized translation coordination
+- **[UI Host System](UI_HOST_SYSTEM.md)** - Overlay rendering and Shadow DOM
+- **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Error handling and recovery
+- **[Toast Integration System](../../docs/TOAST_INTEGRATION_SYSTEM.md)** - Notification management
+- **[Messaging System](../../docs/MessagingSystem.md)** - Unified communication layer
+
+## 🎯 Recent Improvements (2025)
+
+### Multi-Segment Translation Engine
+- **Smart Text Segmentation**: Intelligently splits content at sentence boundaries
+- **Empty Line Preservation**: Uses zero-width characters (\u200B) to maintain visual structure
+- **Streaming Support**: Real-time translation with progress updates
+- **Complex Content Handling**: Optimized for Twitter, LinkedIn, and modern web apps
+
+### Enhanced Text Processing
+- **Boundary Detection**: Accurate sentence and paragraph boundary identification
+- **Mixed Content Support**: Seamless processing of text, hashtags, links, and emojis
+- **Structure Preservation**: Maintains original formatting and paragraph breaks
+- **Performance Optimization**: Efficient processing of large content blocks
+
+### Improved Error Handling
+- **Graceful Degradation**: System remains functional during partial failures
+- **Stream Recovery**: Automatic recovery from streaming interruptions
+- **Resource Cleanup**: Comprehensive cleanup of translation resources
+- **User Feedback**: Clear error communication through toast notifications
 
 ---
 

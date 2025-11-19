@@ -98,6 +98,15 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
 
+  // User cancellation errors
+  if (
+    msg.includes("cancelled by user") ||
+    msg.includes("translation cancelled") ||
+    msg.includes("user cancelled") ||
+    msg.includes("operation cancelled")
+  )
+    return ErrorTypes.USER_CANCELLED;
+
   // Provider-specific response errors
   if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json"))
     return ErrorTypes.HTML_RESPONSE_ERROR;
@@ -293,6 +302,17 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
+  // User cancellation and message channel closed scenarios
+  if (
+    msg.includes("listener indicated an asynchronous response by returning true, but the message channel closed") ||
+    msg.includes("message channel closed before a response was received") ||
+    msg.includes("message port closed before a response") ||
+    msg.includes("receiving end does not exist")
+  ) {
+    // These often happen when user cancels operations
+    return ErrorTypes.USER_CANCELLED;
+  }
+
   // General Context
   if (
     msg.includes("context") ||
@@ -302,10 +322,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("not establish") ||
     msg.includes("not establish connection") ||
     msg.includes("could not establish connection") ||
-    msg.includes("receiving end does not exist") ||
     msg.includes("message port closed") ||
-    msg.includes("message channel closed") ||
-    msg.includes("message channel closed before a response was received") ||
     msg.includes("page moved to back/forward cache") ||
     msg.includes("page-moved-to-cache") ||
     msg.includes("page moved to cache") ||

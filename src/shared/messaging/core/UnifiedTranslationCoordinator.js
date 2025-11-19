@@ -12,6 +12,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -38,7 +40,7 @@ export class UnifiedTranslationCoordinator {
   async coordinateTranslation(message, options = {}) {
     const { action, data } = message;
 
-    getLogger().info(`🔄 Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
+    getLogger().info(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
     // Determine if this should be a streaming operation
     const shouldStream = this._shouldUseStreaming(message);
@@ -118,7 +120,13 @@ export class UnifiedTranslationCoordinator {
             this._handleStreamingTimeout(messageId);
           },
           onError: (error) => {
-            getLogger().error(`Streaming error: ${messageId}`, error);
+            // Log cancellation as debug instead of error using proper error management
+            const errorType = matchErrorToType(error);
+            if (errorType === ErrorTypes.USER_CANCELLED) {
+              getLogger().debug(`Streaming cancelled: ${messageId}`, error);
+            } else {
+              getLogger().error(`Streaming error: ${messageId}`, error);
+            }
           },
           maxProgressTimeout: streamingTimeouts.progressTimeout,
           gracePeriod: streamingTimeouts.gracePeriod
@@ -141,11 +149,26 @@ export class UnifiedTranslationCoordinator {
       }
 
     } catch (error) {
-      getLogger().error(`Streaming translation coordination failed: ${messageId}`, error);
+      // Log cancellation as debug instead of error using proper error management
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        getLogger().debug(`Streaming translation coordination cancelled: ${messageId}`, error);
+      } else {
+        getLogger().error(`Streaming translation coordination failed: ${messageId}`, error);
+      }
 
       // Cancel streaming if it was registered
       if (this.streamingOperations.has(messageId)) {
-        streamingTimeoutManager.cancelStreaming(messageId, `Coordination error: ${error.message}`);
+        const cancelReason = errorType === ErrorTypes.USER_CANCELLED
+          ? `User cancelled: ${error.message}`
+          : `Coordination error: ${error.message}`;
+
+        try {
+          streamingTimeoutManager.cancelStreaming(messageId, cancelReason);
+        } catch (cancelError) {
+          // Log cancellation errors as debug to avoid adding noise to console
+          getLogger().debug('Error during streaming cancellation (handled gracefully):', cancelError);
+        }
       }
 
       throw error;

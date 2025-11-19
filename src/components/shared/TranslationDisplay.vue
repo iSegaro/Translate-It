@@ -11,9 +11,9 @@
         'compact-mode': mode === 'compact',
         'popup-mode': mode === 'popup',
         'sidepanel-mode': mode === 'sidepanel',
-        'selection-mode': mode === 'selection'
+        'selection-mode': mode === 'selection',
       },
-      containerClass
+      containerClass,
     ]"
     :style="cssVariables || {}"
   >
@@ -35,7 +35,7 @@
       @tts-speaking="handleTTSSpeaking"
       @action-failed="handleActionFailed"
     />
-    
+
     <!-- Loading Spinner -->
     <div
       v-if="isLoading"
@@ -45,24 +45,25 @@
         <div class="ti-spinner" />
       </div>
     </div>
-    
+
     <!-- Content Display -->
-    <div 
+    <div
       ref="contentRef"
       class="ti-translation-content"
       :class="[
         {
-          'fade-in': false, /* Animation disabled */
+          'fade-in': false /* Animation disabled */,
           /* 'loading-dim': isLoading */
         },
-        contentClass
+        contentClass,
+        { 'rtl-content': textDirection?.dir === 'rtl' },
       ]"
       :dir="textDirection?.dir || 'ltr'"
       :style="{
         ...(fontStyles || {}),
         ...(cssVariables || {}),
+        direction: textDirection?.dir || 'ltr',
         textAlign: textDirection?.textAlign || 'left',
-        direction: textDirection?.dir || 'ltr'
       }"
     >
       <!-- Safe: Content is sanitized with DOMPurify -->
@@ -72,306 +73,360 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js'
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
-import DOMPurify from 'dompurify'
-import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
-import { useFont } from '@/composables/shared/useFont.js'
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ref, computed, watch, onMounted } from "vue";
+import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
+import { isRTLText } from "@/features/element-selection/utils/textDirection.js";
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
+import DOMPurify from "dompurify";
+import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
+import { useFont } from "@/composables/shared/useFont.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
 // Props
 const props = defineProps({
   // Core content
   content: {
     type: String,
-    default: ''
+    default: "",
   },
   language: {
     type: String,
-    default: 'fa'
+    default: "fa",
   },
-  
+
   // State
   isLoading: {
     type: Boolean,
-    default: false
+    default: false,
   },
   error: {
     type: String,
-    default: ''
+    default: "",
   },
-  
+
   // Enhanced error props
   canRetry: {
     type: Boolean,
-    default: false
+    default: false,
   },
   canOpenSettings: {
     type: Boolean,
-    default: false
+    default: false,
   },
   onRetry: {
     type: Function,
-    default: null
+    default: null,
   },
   onOpenSettings: {
     type: Function,
-    default: null
+    default: null,
   },
-  
+
   // Display options
   mode: {
     type: String,
-    default: 'standard', // standard, compact, popup, sidepanel, selection
-    validator: (value) => ['standard', 'compact', 'popup', 'sidepanel', 'selection'].includes(value)
+    default: "standard", // standard, compact, popup, sidepanel, selection
+    validator: (value) =>
+      ["standard", "compact", "popup", "sidepanel", "selection"].includes(
+        value,
+      ),
   },
   placeholder: {
     type: String,
-    default: 'Translation will appear here...'
+    default: "Translation will appear here...",
   },
-  
+
   // Formatting options
   enableMarkdown: {
     type: Boolean,
-    default: true
+    default: true,
   },
   enableLabelFormatting: {
     type: Boolean,
-    default: true
+    default: true,
   },
   maxHeight: {
     type: String,
-    default: null
+    default: null,
   },
-  
+
   // Toolbar options
   showToolbar: {
     type: Boolean,
-    default: true
+    default: true,
   },
   showCopyButton: {
     type: Boolean,
-    default: true
+    default: true,
   },
   showTTSButton: {
     type: Boolean,
-    default: true
+    default: true,
   },
-  
+
   // Animation
   showFadeInAnimation: {
     type: Boolean,
-    default: true
+    default: true,
   },
-  
+
   // i18n titles
   copyTitle: {
     type: String,
-    default: 'Copy result'
+    default: "Copy result",
   },
   copyAlt: {
     type: String,
-    default: 'Copy'
+    default: "Copy",
   },
   ttsTitle: {
     type: String,
-    default: 'Play result'
+    default: "Play result",
   },
   ttsAlt: {
     type: String,
-    default: 'Play'
+    default: "Play",
   },
   // Target language for TTS
   targetLanguage: {
     type: String,
-    default: 'fa'
+    default: "fa",
   },
-  
+
   // Enhanced popup-specific props
   containerClass: {
     type: String,
-    default: ''
+    default: "",
   },
   contentClass: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 
 // Emits
 const emit = defineEmits([
-  'text-copied',
-  'text-pasted',
-  'tts-started',
-  'tts-stopped', 
-  'tts-speaking', // backward compatibility
-  'action-failed',
-  'retry-requested',
-  'settings-requested'
-])
+  "text-copied",
+  "text-pasted",
+  "tts-started",
+  "tts-stopped",
+  "tts-speaking", // backward compatibility
+  "action-failed",
+  "retry-requested",
+  "settings-requested",
+]);
 
 // Refs
-const contentRef = ref(null)
-const containerRef = ref(null)
+const contentRef = ref(null);
+const containerRef = ref(null);
 // const showFadeIn = ref(false) // Disabled
 
 // Scoped logger
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
-// Font management with safe error handling
-let fontStyles = ref({})
-let cssVariables = ref({})
+// Font management with safe error handling and RTL-aware CSS variables
+let fontStyles = ref({});
+let cssVariables = ref({});
 
 try {
   // Initialize useFont with target language
-  const { 
-    fontStyles: computedFontStyles, 
-    cssVariables: computedCssVariables 
-  } = useFont(computed(() => props.targetLanguage), {
-    enableSmartDetection: true,
-    fallbackFont: 'system',
-    enableCSSVariables: true
-  })
-  
-  fontStyles = computedFontStyles
-  cssVariables = computedCssVariables
-  
-  logger.debug('Font management initialized successfully')
+  const { fontStyles: computedFontStyles, cssVariables: computedCssVariables } =
+    useFont(
+      computed(() => props.targetLanguage),
+      {
+        enableSmartDetection: true,
+        fallbackFont: "system",
+        enableCSSVariables: true,
+      },
+    );
+
+  fontStyles = computedFontStyles;
+
+  // Override CSS variables to ensure proper RTL/LTR direction
+  cssVariables = computed(() => {
+    const vars = { ...computedCssVariables.value };
+    // Ensure direction variables match our text direction
+    if (textDirection.value.dir === 'rtl') {
+      vars['--translation-direction'] = 'rtl';
+      vars['--translation-text-align'] = 'right';
+      vars['--list-padding'] = '0 3em 0 0';
+      vars['--list-text-align'] = 'right';
+    } else {
+      vars['--translation-direction'] = 'ltr';
+      vars['--translation-text-align'] = 'left';
+      vars['--list-padding'] = '0 0 0 3em';
+      vars['--list-text-align'] = 'left';
+    }
+    return vars;
+  });
+
+  logger.debug("Font management initialized successfully with RTL-aware CSS variables");
 } catch (error) {
-  logger.warn('Font management not available, using fallback styles:', error)
+  logger.warn("Font management not available, using fallback styles:", error);
   // Fallback styles when useFont fails
-  fontStyles = computed(() => ({}))
-  cssVariables = computed(() => ({}))
+  fontStyles = computed(() => ({}));
+
+  // Create fallback CSS variables with proper RTL/LTR support
+  cssVariables = computed(() => {
+    const dir = textDirection.value.dir;
+    return {
+      '--translation-direction': dir,
+      '--translation-text-align': dir === 'rtl' ? 'right' : 'left',
+      '--list-padding': dir === 'rtl' ? '0 2em 0 0' : '0 0 0 2em',
+      '--list-text-align': dir === 'rtl' ? 'right' : 'left',
+    };
+  });
 }
 
 // Computed
-const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)
-const hasError = computed(() => !!props.error && !props.isLoading)
+const hasContent = computed(
+  () => props.content.trim().length > 0 && !props.isLoading,
+);
+const hasError = computed(() => !!props.error && !props.isLoading);
 
-// Pre-compute text direction to prevent layout shift
+// Enhanced text direction computation with target language awareness
 const textDirection = computed(() => {
-  const textToCheck = props.content || props.error || ''
-  const isRtl = shouldApplyRtl(textToCheck)
+  const textToCheck = props.content || props.error || "";
+
+  // Use advanced RTL detection with target language awareness
+  const isRtl = isRTLText(textToCheck, {
+    comprehensive: true,
+    threshold: 0.1, // Lower threshold for more sensitive detection
+    targetLanguage: props.targetLanguage || 'fa',
+    simpleDetection: false // Use threshold-based detection for better accuracy
+  });
+
+  // Fallback to basic detection if advanced detection fails
+  const finalDirection = isRtl || shouldApplyRtl(textToCheck);
+
   return {
-    dir: isRtl ? 'rtl' : 'ltr',
-    textAlign: isRtl ? 'right' : 'left'
-  }
-})
+    dir: finalDirection ? "rtl" : "ltr",
+    textAlign: finalDirection ? "right" : "left",
+  };
+});
 
 // Sanitized content computed property
 const sanitizedContent = computed(() => {
-  return DOMPurify.sanitize(renderedContent.value)
-})
+  return DOMPurify.sanitize(renderedContent.value);
+});
 
 const renderedContent = computed(() => {
   if (props.error) {
-    const errorActions = []
-    
+    const errorActions = [];
+
     // Add retry action if available
     if (props.canRetry && props.onRetry) {
-      errorActions.push(`<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`) 
+      errorActions.push(
+        `<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`,
+      );
     }
-    
+
     // Add settings action if available
     if (props.canOpenSettings && props.onOpenSettings) {
-      errorActions.push(`<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`) 
+      errorActions.push(
+        `<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`,
+      );
     }
-    
-    const actionsHtml = errorActions.length > 0 
-      ? `<div class="error-actions">${errorActions.join('')}</div>`
-      : ''
-    
+
+    const actionsHtml =
+      errorActions.length > 0
+        ? `<div class="error-actions">${errorActions.join("")}</div>`
+        : "";
+
     return `<div class="error-message">
       <div class="error-text">⚠️ ${props.error}</div>
       ${actionsHtml}
-    </div>`
+    </div>`;
   }
-  
+
   if (props.isLoading) {
-    return `<div class="loading-message">در حال ترجمه...</div>`
+    return `<div class="loading-message">در حال ترجمه...</div>`;
   }
-  
+
   if (!props.content) {
-    return `<div class="placeholder-message">${props.placeholder}</div>`
+    return `<div class="placeholder-message">${props.placeholder}</div>`;
   }
-  
+
   if (props.enableMarkdown) {
     try {
-      const markdownElement = SimpleMarkdown.render(props.content)
+      const markdownElement = SimpleMarkdown.render(props.content);
       if (markdownElement) {
         // Wrap innerHTML in simple-markdown div for CSS targeting
-        return `<div class="simple-markdown">${markdownElement.innerHTML}</div>`
+        return `<div class="simple-markdown">${markdownElement.innerHTML}</div>`;
       }
-      return props.content.replace(/\n/g, '<br>')
+      return props.content.replace(/\n/g, "<br>");
     } catch (error) {
-  logger.warn('[TranslationDisplay] Markdown rendering failed:', error)
-      return props.content.replace(/\n/g, '<br>')
+      logger.warn("[TranslationDisplay] Markdown rendering failed:", error);
+      return props.content.replace(/\n/g, "<br>");
     }
   } else {
-    return props.content.replace(/\n/g, '<br>')
+    return props.content.replace(/\n/g, "<br>");
   }
-})
+});
 
 // Watchers
-watch(() => props.content, () => {
-  // Fade-in animation disabled as requested
-  // if (newContent && newContent !== oldContent) {
-  //   showFadeIn.value = true
-  //   setTimeout(() => {
-  //     showFadeIn.value = false
-  //   }, 400)
-  // }
-}, { immediate: true })
+watch(
+  () => props.content,
+  () => {
+    // Fade-in animation disabled as requested
+    // if (newContent && newContent !== oldContent) {
+    //   showFadeIn.value = true
+    //   setTimeout(() => {
+    //     showFadeIn.value = false
+    //   }, 400)
+    // }
+  },
+  { immediate: true },
+);
 
 // Action Toolbar Event Handlers
 const handleTextCopied = (text) => {
-  emit('text-copied', text)
-}
+  emit("text-copied", text);
+};
 
 const handleTTSStarted = (data) => {
-  emit('tts-started', data)
-  emit('tts-speaking', data) // backward compatibility
-}
+  emit("tts-started", data);
+  emit("tts-speaking", data); // backward compatibility
+};
 
 const handleTTSStopped = () => {
-  emit('tts-stopped')
-}
+  emit("tts-stopped");
+};
 
 const handleTTSSpeaking = (data) => {
-  emit('tts-speaking', data)
-}
+  emit("tts-speaking", data);
+};
 
 const handleActionFailed = (error) => {
-  emit('action-failed', error)
-}
+  emit("action-failed", error);
+};
 
 // Error action handlers
 const handleRetry = () => {
   if (props.onRetry) {
-    props.onRetry()
+    props.onRetry();
   }
-  emit('retry-requested')
-}
+  emit("retry-requested");
+};
 
 const handleSettings = () => {
   if (props.onOpenSettings) {
-    props.onOpenSettings()
+    props.onOpenSettings();
   }
-  emit('settings-requested')
-}
+  emit("settings-requested");
+};
 
 // Make handlers globally accessible for onclick handlers
-if (typeof window !== 'undefined') {
-  window.handleRetry = handleRetry
-  window.handleSettings = handleSettings
+if (typeof window !== "undefined") {
+  window.handleRetry = handleRetry;
+  window.handleSettings = handleSettings;
 }
 
 // Setup dynamic height for different modes
 onMounted(() => {
   if (props.maxHeight && contentRef.value) {
-    contentRef.value.style.maxHeight = props.maxHeight
+    contentRef.value.style.maxHeight = props.maxHeight;
   }
 });
 </script>
@@ -413,7 +468,7 @@ onMounted(() => {
   border-radius: 8px;
   background-color: var(--sw-bg-color, #f8f8f8);
   border: 1px solid var(--sw-border-color, #ddd);
-  box-shadow: 0 4px 12px var(--sw-shadow-color, rgba(0,0,0,0.1));
+  box-shadow: 0 4px 12px var(--sw-shadow-color, rgba(0, 0, 0, 0.1));
 }
 
 .ti-translation-display.compact-mode {
@@ -443,52 +498,75 @@ onMounted(() => {
 }
 
 /*
-  UNIFIED MARKDOWN LIST SOLUTION
-  - This single set of rules works across all modes (Popup, Sidepanel, WindowsManager).
-  - It bypasses native browser list rendering (which is buggy in some extension contexts)
-    by creating markers manually with the ::before pseudo-element.
+  ROOT-CAUSE FIX: CSS Grid-based List Layout
+  - Eliminates absolute positioning issues
+  - Works identically for LTR and RTL
+  - No cascade or specificity conflicts
 */
 .ti-translation-content :deep(ul),
 .ti-translation-content :deep(ol) {
   list-style: none !important;
-  padding: 0 0 0 2em !important; /* Create space for our manual markers */
-  margin: 8px 0 !important;
+  padding: 0 !important;
+  margin: 6px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important; /* Consistent spacing between list items */
 }
 
 .ti-translation-content :deep(li) {
-  position: relative !important;
-  padding-left: 0.5em !important; /* Space between marker and text */
-  margin-bottom: 6px !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  align-items: start !important;
+  gap: 0.5em !important; /* Consistent gap between bullet/number and text */
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  min-height: 1.2em !important; /* Ensure consistent height */
 }
 
-/* Manual bullet for unordered lists */
-.ti-translation-content :deep(ul > li::before) {
-  content: '•' !important;
-  position: absolute !important;
-  left: -1em !important; /* Position in the ul's padding */
-  top: 0 !important;
+/* Bullet container for LTR */
+.ti-translation-content :deep(ul > li)::before {
+  content: "•" !important;
+  font-weight: bold !important;
   color: inherit !important;
-  font-weight: bold;
+  grid-column: 1 !important;
+  text-align: left !important;
 }
 
-/* Manual numbers for ordered lists */
+/* Bullet container for RTL */
+.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
+.ti-translation-content.rtl-content :deep(ul > li)::before {
+  text-align: right !important;
+}
+
+/* Number container for ordered lists */
 .ti-translation-content :deep(ol) {
-  counter-reset: list-counter; /* Initialize counter */
+  counter-reset: list-counter !important;
 }
 .ti-translation-content :deep(ol > li) {
-  counter-increment: list-counter; /* Increment counter for each li */
+  counter-increment: list-counter !important;
 }
-.ti-translation-content :deep(ol > li::before) {
-  content: counter(list-counter) '.' !important; /* Display counter and dot */
-  position: absolute !important;
-  left: -1.5em !important; /* Adjust position for numbers */
-  top: 0 !important;
+.ti-translation-content :deep(ol > li)::before {
+  content: counter(list-counter) "." !important;
+  font-weight: normal !important;
   color: inherit !important;
-  font-weight: normal;
-  text-align: right;
-  width: 1em;
+  grid-column: 1 !important;
+  text-align: left !important;
+  min-width: 1.5em !important;
 }
 
+/* Number container for RTL ordered lists */
+.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
+.ti-translation-content.rtl-content :deep(ol > li)::before {
+  text-align: right !important;
+}
+
+/* Text content container */
+.ti-translation-content :deep(ul > li > span),
+.ti-translation-content :deep(ol > li > span),
+.ti-translation-content :deep(ul > li > *),
+.ti-translation-content :deep(ol > li > *) {
+  grid-column: 2 !important;
+}
 
 /* Sidepanel content adjustments */
 .ti-sidepanel-mode .ti-translation-content {
@@ -614,9 +692,15 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.ti-translation-content :deep(h1) { font-size: 18px; }
-.ti-translation-content :deep(h2) { font-size: 16px; }
-.ti-translation-content :deep(h3) { font-size: 15px; }
+.ti-translation-content :deep(h1) {
+  font-size: 18px;
+}
+.ti-translation-content :deep(h2) {
+  font-size: 16px;
+}
+.ti-translation-content :deep(h3) {
+  font-size: 15px;
+}
 
 .ti-translation-content :deep(p) {
   margin-bottom: 8px;
@@ -626,7 +710,7 @@ onMounted(() => {
   background: var(--bg-secondary, #f8f9fa);
   padding: 2px 4px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 13px;
 }
 
@@ -635,7 +719,7 @@ onMounted(() => {
   padding: 12px;
   border-radius: 4px;
   overflow-x: auto;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 13px;
   margin: 8px 0;
 }
@@ -696,12 +780,19 @@ onMounted(() => {
 
 /* Animations */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Custom scrollbar */
@@ -722,29 +813,18 @@ onMounted(() => {
   background: var(--toolbar-link-color);
 }
 
-/* --- RTL Specific Overrides for Manual Bullets --- */
+/* --- REMOVED: Old RTL overrides - now using CSS Grid approach --- */
 
-/* When the content direction is RTL, reset left padding and add right padding */
-.ti-translation-content[dir="rtl"] :deep(ul),
-.ti-translation-content[dir="rtl"] :deep(ol) {
-  padding-left: 0 !important;
-  padding-right: 2em !important; /* Space for bullets on the right */
+/* --- CLEAN RTL STYLES (using CSS Grid approach) --- */
+
+/* RTL-specific text alignment for bullets and numbers */
+.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
+.ti-translation-content.rtl-content :deep(ul > li)::before {
+  text-align: right !important;
 }
 
-.ti-translation-content[dir="rtl"] :deep(li) {
-  padding-left: 0 !important;
-  padding-right: 0.5em !important; /* Space between bullet and text */
-}
-
-/* Position the bullet on the right for RTL */
-.ti-translation-content[dir="rtl"] :deep(ul > li::before) {
-  left: auto !important; /* Unset the left property */
-  right: -1.5em !important; /* Position on the right */
-}
-
-.ti-translation-content[dir="rtl"] :deep(ol > li::before) {
-  left: auto !important; /* Unset the left property */
-  right: -2em !important; /* Position on the right */
-  text-align: left; /* Ensure number itself is not reversed */
+.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
+.ti-translation-content.rtl-content :deep(ol > li)::before {
+  text-align: right !important;
 }
 </style>

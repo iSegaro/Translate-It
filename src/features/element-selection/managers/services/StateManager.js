@@ -2,13 +2,13 @@ import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { getElementSelectionCache } from "../../utils/cache.js";
+
+// Note: Cache system has been removed from Select Element feature
 
 export class StateManager extends ResourceTracker {
   constructor() {
     super('state-manager')
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'StateManager');
-    this.cache = getElementSelectionCache();
     this.translatedElements = new Map(); // Keep track of top-level translated elements
   }
 
@@ -25,7 +25,7 @@ export class StateManager extends ResourceTracker {
   getContext() {
     return {
       state: {
-        originalTexts: this.cache.getAllOriginalTexts()
+        originalTexts: new Map() // No cache system - use empty map
       },
       // Mock other properties if needed by the utilities
       errorHandler: {
@@ -104,8 +104,7 @@ export class StateManager extends ResourceTracker {
       await this.revertTranslations();
     }
 
-    // Clear cache instead of this.originalTexts
-    this.cache.clearOriginalTexts();
+    // Note: Cache system has been removed - no cache to clear
     this.translatedElements.clear();
 
     // Use ResourceTracker cleanup for automatic resource management
@@ -118,8 +117,7 @@ export class StateManager extends ResourceTracker {
    * Clear all state data
    */
   clearState() {
-    // Clear cache instead of this.originalTexts
-    this.cache.clearOriginalTexts();
+    // Note: Cache system has been removed - no cache to clear
     this.translatedElements.clear();
     this.logger.debug('StateManager state cleared');
   }
@@ -130,7 +128,6 @@ export class StateManager extends ResourceTracker {
    */
   getDebugInfo() {
     return {
-      originalTextsCount: this.originalTexts.size,
       translatedElementsCount: this.translatedElements.size
     };
   }

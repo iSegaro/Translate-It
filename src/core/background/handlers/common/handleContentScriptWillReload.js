@@ -17,13 +17,13 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleContentScriptWillReload(message, sender, sendResponse) {
-  logger.debug('[Handler:CONTENT_SCRIPT_WILL_RELOAD] Processing content script reload notification:', message);
+  logger.debug('Processing content script reload notification:', message);
   
   try {
     const tabId = sender.tab?.id;
     const frameId = sender.frameId;
     
-    logger.debug(`🔄 [CONTENT_SCRIPT_WILL_RELOAD] Content script will reload in tab ${tabId}, frame ${frameId}`);
+    logger.debug(`Content script will reload in tab ${tabId}, frame ${frameId}`);
     
     const backgroundService = globalThis.backgroundService;
     if (backgroundService) {

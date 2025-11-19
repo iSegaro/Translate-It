@@ -418,7 +418,22 @@ export const createBaseConfig = (browser, options = {}) => {
     server: {
       port: browser === 'chrome' ? 3000 : 3001,
       open: false,
-      cors: true
+      cors: true,
+      fs: {
+        strict: false
+      },
+      watch: {
+        usePolling: false,
+        interval: 100
+      }
+    },
+
+    // Improved watch settings for development
+    watch: {
+      include: ['src/**/*', 'html/**/*', 'public/**/*'],
+      exclude: ['node_modules/**', 'dist/**'],
+      usePolling: false,
+      interval: 100
     },
     
     // Optimize dependencies

@@ -10,6 +10,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
@@ -153,9 +155,11 @@ export class TranslationEngine {
 
     try {
       let result;
-      // Check cache first for all contexts to improve performance
+      // Check cache first for non-SelectElement contexts to improve performance
       const cacheKey = this.generateCacheKey(data);
-      if (this.cache.has(cacheKey)) {
+      const isSelectElementMode = data.mode === TranslationMode.Select_Element;
+
+      if (this.cache.has(cacheKey) && !isSelectElementMode) {
         const cached = this.cache.get(cacheKey);
         // Cache hit
         result = {
@@ -171,9 +175,11 @@ export class TranslationEngine {
         } else {
           result = await this.executeTranslation(data, sender);
         }
-        
-        // Cache the result for future requests
-        this.cacheResult(cacheKey, result);
+
+        // Cache the result for future requests (but not for SelectElement mode)
+        if (!isSelectElementMode) {
+          this.cacheResult(cacheKey, result);
+        }
       }
 
       // Centralized history addition for all modes except SelectElement
@@ -439,16 +445,9 @@ export class TranslationEngine {
                             if (providerClass?.type === "ai") {
                                 // AI providers use _translateBatch method directly
                                 return providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode, abortController);
-                            } else {
-                                // Traditional providers (including streaming ones) use translate method
-                                const batchJson = JSON.stringify(batch);
-                                return providerInstance.translate(batchJson, sourceLanguage, targetLanguage, {
-                                    mode: mode,
-                                    messageId: messageId,
-                                    engine: this,
-                                    originalSourceLang: sourceLanguage,
-                                    originalTargetLang: targetLanguage
-                                });
+                            } {
+                                // Traditional providers use _translateChunk method for SelectElement mode
+                                return providerInstance._translateChunk(batch, sourceLanguage, targetLanguage, mode, abortController);
                             }
                         },
                         `batch-${i + 1}/${batches.length}`,
@@ -459,67 +458,13 @@ export class TranslationEngine {
                     consecutiveFailures = 0;
                     adaptiveDelay = Math.max(adaptiveDelay * 0.8, 0);
 
-                    // Parse result based on provider type
-                    const providerClass = providerInstance?.constructor;
-                    let finalBatchResult;
-                    if (providerClass?.type === "ai") {
-                        // AI providers return arrays directly
-                        finalBatchResult = batchResult;
-                    } else {
-                        // Traditional providers (including streaming ones) return JSON string from translate() method
-                        if (typeof batchResult === 'string') {
-                            try {
-                                const parsedResult = JSON.parse(batchResult);
-                                logger.debug(`[TranslationEngine] Parsed JSON result structure:`, parsedResult);
-                                if (Array.isArray(parsedResult)) {
-                                    // Extract text from objects: [{text: "..."}, ...] → ["...", ...]
-                                    finalBatchResult = parsedResult.map(item => 
-                                        typeof item === 'object' && item !== null && 'text' in item ? item.text : String(item)
-                                    );
-                                    logger.debug(`[TranslationEngine] Extracted texts:`, finalBatchResult);
-                                } else {
-                                    finalBatchResult = [String(parsedResult)];
-                                }
-                            } catch (error) {
-                                logger.warn(`[TranslationEngine] Failed to parse traditional provider JSON result:`, error);
-                                logger.debug(`[TranslationEngine] Raw result that failed to parse (${typeof batchResult}):`, batchResult);
-                                
-                                // Try to fix common JSON parsing issues (e.g., Persian commas)
-                                try {
-                                    const fixedResult = batchResult.replace(/،/g, ',').replace(/\s*،\s*/g, ', ');
-                                    const parsedFixed = JSON.parse(fixedResult);
-                                    if (Array.isArray(parsedFixed)) {
-                                        finalBatchResult = parsedFixed.map(item => 
-                                            typeof item === 'object' && item !== null && 'text' in item ? item.text : String(item)
-                                        );
-                                        logger.info(`[TranslationEngine] Successfully fixed malformed JSON with delimiter replacement`);
-                                    } else {
-                                        finalBatchResult = [String(parsedFixed)];
-                                    }
-                                } catch (fixError) {
-                                    logger.warn(`[TranslationEngine] JSON fix attempt also failed:`, fixError);
-                                    // Ultimate fallback: try to extract array content using regex
-                                    const arrayMatch = batchResult.match(/\["([^"]*)"(?:\s*[،,]\s*"([^"]*)")*\]/);
-                                    if (arrayMatch) {
-                                        // Extract all quoted strings from the array-like string
-                                        const extractedTexts = batchResult.match(/"([^"]*)"/g);
-                                        if (extractedTexts) {
-                                            finalBatchResult = extractedTexts.map(text => text.slice(1, -1)); // Remove quotes
-                                            logger.info(`[TranslationEngine] Successfully extracted texts using regex fallback`);
-                                        } else {
-                                            finalBatchResult = [String(batchResult)];
-                                        }
-                                    } else {
-                                        finalBatchResult = [String(batchResult)];
-                                    }
-                                }
-                            }
-                        } else if (Array.isArray(batchResult)) {
-                            // Fallback: already an array (shouldn't happen for traditional providers)
-                            finalBatchResult = batchResult;
-                        } else {
-                            finalBatchResult = [String(batchResult)];
-                        }
+                    // All providers now return arrays directly
+                    let finalBatchResult = batchResult;
+
+                    // Ensure we have an array
+                    if (!Array.isArray(finalBatchResult)) {
+                        logger.warn(`[TranslationEngine] Expected array from provider, got ${typeof finalBatchResult}:`, finalBatchResult);
+                        finalBatchResult = [String(finalBatchResult)];
                     }
 
                     const streamUpdateMessage = MessageFormat.create(
@@ -551,7 +496,13 @@ export class TranslationEngine {
                 } catch (error) {
                     consecutiveFailures++;
                     hasErrors = true;
-                    logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                    // Log cancellation as debug instead of warn using proper error management
+                    const errorType = matchErrorToType(error);
+                    if (errorType === ErrorTypes.USER_CANCELLED) {
+                      logger.debug(`[TranslationEngine] Batch ${i + 1} cancelled (consecutive failures: ${consecutiveFailures}):`, error);
+                    } else {
+                      logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                    }
                     
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,

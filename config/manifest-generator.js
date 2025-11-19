@@ -28,15 +28,15 @@ export function generateManifest(browser = 'chrome') {
       'notifications',
       'contextMenus'
     ],
-    
-    host_permissions: ['<all_urls>'],
+
+    host_permissions: ['<all_urls>', 'file://*/*'],
     
     // Content scripts
     content_scripts: [
       {
         js: ['src/core/content-scripts/index.js'],
         // CSS files will be manually copied and injected via JS
-        matches: ['<all_urls>'],
+        matches: ['<all_urls>', 'file://*/*'],
         run_at: 'document_idle',
         all_frames: true
       }
@@ -64,7 +64,7 @@ export function generateManifest(browser = 'chrome') {
           '_locales/*',
           'Changelog.md'
         ],
-        matches: ['<all_urls>'],
+        matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
       }
     ],
@@ -235,7 +235,7 @@ function generateFirefoxManifest(baseManifest) {
           '_locales/*',
           'Changelog.md'
         ],
-        matches: ['<all_urls>']
+        matches: ['<all_urls>', 'file://*/*']
         // Note: use_dynamic_url not supported in Firefox yet
       }
     ]

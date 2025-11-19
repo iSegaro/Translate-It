@@ -8,7 +8,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Import dedicated utilities
-import { getElementSelectionCache } from './cache.js';
+// Note: Cache system has been removed from Select Element feature
 import { correctTextDirection, storeOriginalElementStyles, restoreOriginalElementStyles } from './textDirection.js';
 import {
   collectTextNodes,
@@ -21,7 +21,6 @@ import {
 import {
   expandTextsForTranslation,
   reassembleTranslations,
-  separateCachedAndNewTexts,
   parseAndCleanTranslationResponse,
   handleTranslationLengthMismatch,
   isValidTextContent,
@@ -36,7 +35,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'textExtraction
  */
 export class ElementTextExtraction {
   constructor() {
-    this.cache = getElementSelectionCache();
     this.errorHandler = ErrorHandler.getInstance();
     this.initialized = false;
   }
@@ -50,7 +48,6 @@ export class ElementTextExtraction {
       return;
     }
 
-    this.cache.initialize();
     this.initialized = true;
     logger.debug('Element Text Extraction initialized');
   }
@@ -102,21 +99,19 @@ export class ElementTextExtraction {
         });
       }
 
-      // Separate cached and new texts
-      const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(processedTextsMap);
+      // Convert processed texts to array for translation
+      const textsToTranslate = Array.from(processedTextsMap.keys());
 
       logger.debug('Text extraction completed', {
         totalNodes: textNodes.length,
         uniqueTexts: processedTextsMap.size,
-        newTexts: textsToTranslate.length,
-        cachedTexts: cachedTranslations.size
+        textsToTranslate: textsToTranslate.length
       });
 
       return {
         textNodes,
         originalTextsMap: processedTextsMap,
         textsToTranslate,
-        cachedTranslations,
         totalTexts: processedTextsMap.size
       };
 
@@ -143,15 +138,15 @@ export class ElementTextExtraction {
       // Clean text if requested
       if (clean) {
         processedText = cleanText(text, {
-          normalizeWhitespace: true,
+          normalizeWhitespace: false,  // Don't normalize to preserve structure
           removeEmptyLines: false,
-          trimLines: true
+          trimLines: false  // Don't trim to preserve empty lines
         });
       }
 
-      // Validate text if requested
+      // Validate text if requested (but allow empty lines for structure)
       if (validate) {
-        if (!isValidTextContent(processedText)) {
+        if (processedText.length > 0 && !isValidTextContent(processedText)) {
           logger.debug(`Skipping invalid text: ${text.substring(0, 30)}...`);
           return;
         }
@@ -185,9 +180,6 @@ export class ElementTextExtraction {
     }
 
     const extractionContext = {
-      state: {
-        originalTexts: this.cache.getAllOriginalTexts()
-      },
       errorHandler: this.errorHandler,
       ...context
     };
@@ -222,9 +214,6 @@ export class ElementTextExtraction {
    */
   async revertAllTranslations(context = {}) {
     const extractionContext = {
-      state: {
-        originalTexts: this.cache.getAllOriginalTexts()
-      },
       errorHandler: this.errorHandler,
       ...context
     };
@@ -233,8 +222,7 @@ export class ElementTextExtraction {
       logger.debug('Starting translation revert process');
       const revertedCount = await revertTranslations(extractionContext);
 
-      // Clear cache after successful revert
-      this.cache.clearOriginalTexts();
+      // Note: Cache system has been removed - no cache to clear
 
       logger.debug(`Successfully reverted ${revertedCount} translations`);
       return revertedCount;
@@ -263,7 +251,6 @@ export class ElementTextExtraction {
    */
   async translateElement(element, translationFunction, options = {}) {
     const {
-      useCache = true,
       applyImmediately = true,
       returnDetails = true
     } = options;
@@ -272,7 +259,7 @@ export class ElementTextExtraction {
       // Extract text for translation
       const extractionResult = await this.extractTextForTranslation(element, options);
 
-      if (extractionResult.textsToTranslate.length === 0 && extractionResult.cachedTranslations.size === 0) {
+      if (extractionResult.textsToTranslate.length === 0) {
         logger.debug('No texts to translate found');
         return {
           success: false,
@@ -282,13 +269,6 @@ export class ElementTextExtraction {
       }
 
       let allTranslations = new Map();
-
-      // Add cached translations
-      if (useCache) {
-        extractionResult.cachedTranslations.forEach((translation, original) => {
-          allTranslations.set(original, translation);
-        });
-      }
 
       // Translate new texts if any
       if (extractionResult.textsToTranslate.length > 0) {
@@ -319,8 +299,7 @@ export class ElementTextExtraction {
         success: true,
         appliedCount,
         totalTranslations: allTranslations.size,
-        newTranslations: extractionResult.textsToTranslate.length,
-        cachedTranslations: extractionResult.cachedTranslations.size
+        newTranslations: extractionResult.textsToTranslate.length
       };
 
       if (returnDetails) {
@@ -377,8 +356,7 @@ export class ElementTextExtraction {
         translatedData,
         expandedTexts,
         originMapping,
-        textsToTranslate,
-        new Map() // No additional cached translations at this level
+        textsToTranslate
       );
 
       logger.debug(`Reassembled ${reassembledTranslations.size} translations`);
@@ -396,7 +374,6 @@ export class ElementTextExtraction {
    */
   getStats() {
     return {
-      cacheStats: this.cache.getStats(),
       initialized: this.initialized
     };
   }
@@ -405,15 +382,13 @@ export class ElementTextExtraction {
    * Clear all cached data
    */
   clearCache() {
-    this.cache.clearAllCaches();
-    logger.debug('Text extraction cache cleared');
+    logger.debug('Text extraction cache cleared (cache system removed)');
   }
 
   /**
    * Cleanup resources
    */
   cleanup() {
-    this.cache.cleanup();
     this.initialized = false;
     logger.debug('Text extraction cleanup completed');
   }
@@ -432,7 +407,6 @@ export {
   // Text processing functions
   expandTextsForTranslation,
   reassembleTranslations,
-  separateCachedAndNewTexts,
   parseAndCleanTranslationResponse,
   handleTranslationLengthMismatch,
   isValidTextContent,
@@ -441,10 +415,7 @@ export {
   // Text direction functions
   correctTextDirection,
   storeOriginalElementStyles as storeOriginalParentStyles,
-  restoreOriginalElementStyles as restoreOriginalParentStyles,
-
-  // Cache functions
-  getElementSelectionCache as getTranslationCache
+  restoreOriginalElementStyles as restoreOriginalParentStyles
 };
 
 // Singleton instance
@@ -472,25 +443,9 @@ export async function initializeTextExtraction() {
 }
 
 /**
- * Get translation cache as Map for legacy compatibility
- * @returns {Map} Translation cache map
- */
-export function getTranslationCacheMap() {
-  const cache = getElementSelectionCache();
-  return cache.getAllTranslations();
-}
-
-/**
  * Clear all caches (legacy compatibility function)
- * @param {Object} context - Context object (for compatibility)
+ * Note: Cache system has been removed from Select Element feature
  */
-export function clearAllCaches(context = {}) {
-  const extraction = getElementTextExtraction();
-  extraction.clearCache();
-
-  if (context && context.state && context.state.originalTexts) {
-    context.state.originalTexts.clear();
-  }
-
-  logger.debug('All Element Selection caches cleared');
+export function clearAllCaches() {
+  logger.debug('All Element Selection caches cleared (cache system removed)');
 }

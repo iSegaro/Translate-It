@@ -4,7 +4,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getElementSelectionCache } from './cache.js';
+// Note: Cache system has been removed from Select Element feature
 import { correctTextDirection } from './textDirection.js';
 
 // Inject translation styles
@@ -107,6 +107,8 @@ function injectTranslationStyles() {
       .aiwc-translation-wrapper .aiwc-ltr-text + .aiwc-rtl-text {
         margin-left: 0.25em;
       }
+
+
     `;
     document.head.appendChild(styleElement);
     stylesInjected = true;
@@ -178,8 +180,8 @@ function collectTextNodesBasic(targetElement) {
           // If getComputedStyle fails, accept the node
         }
 
-        // Accept all visible text nodes
-        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        // Accept all visible text nodes, including empty ones (for structure preservation)
+        return NodeFilter.FILTER_ACCEPT;
       }
     },
     false,
@@ -190,14 +192,19 @@ function collectTextNodesBasic(targetElement) {
   let node;
 
   while ((node = walker.nextNode())) {
-    const trimmedText = node.textContent.trim();
-    if (trimmedText) {
+    const text = node.textContent;
+    const trimmedText = text.trim();
+
+    // Include empty nodes too for structure preservation
+    if (trimmedText || text.length === 0 || (/^\s*$/.test(text) && text.length > 0)) {
       textNodes.push(node);
 
-      if (originalTextsMap.has(trimmedText)) {
-        originalTextsMap.get(trimmedText).push(node);
+      // Use full text (including whitespace) to preserve structure
+      const mapKey = text; // Keep original text with whitespace for structure preservation
+      if (originalTextsMap.has(mapKey)) {
+        originalTextsMap.get(mapKey).push(node);
       } else {
-        originalTextsMap.set(trimmedText, [node]);
+        originalTextsMap.set(mapKey, [node]);
       }
     }
   }
@@ -237,8 +244,8 @@ function collectTextNodesOptimized(targetElement) {
           return NodeFilter.FILTER_REJECT;
         }
 
-        // Accept all visible text nodes
-        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        // Accept all visible text nodes, including empty ones (for structure preservation)
+        return NodeFilter.FILTER_ACCEPT;
       }
     },
     false,
@@ -249,19 +256,184 @@ function collectTextNodesOptimized(targetElement) {
   let node;
 
   while ((node = walker.nextNode())) {
-    const trimmedText = node.textContent.trim();
-    if (trimmedText) {
+    const text = node.textContent;
+    const trimmedText = text.trim();
+
+    // Include empty nodes too for structure preservation
+    if (trimmedText || text.length === 0 || (/^\s*$/.test(text) && text.length > 0)) {
       textNodes.push(node);
-      if (originalTextsMap.has(trimmedText)) {
-        originalTextsMap.get(trimmedText).push(node);
+
+      // Use full text (including whitespace) to preserve structure
+      const mapKey = text; // Keep original text with whitespace for structure preservation
+      if (originalTextsMap.has(mapKey)) {
+        originalTextsMap.get(mapKey).push(node);
       } else {
-        originalTextsMap.set(trimmedText, [node]);
+        originalTextsMap.set(mapKey, [node]);
       }
     }
   }
 
-  logger.debug(`Optimized collection: ${textNodes.length} nodes, ${originalTextsMap.size} unique texts`);
-  return { textNodes, originalTextsMap };
+  // Enhanced structure preservation for Twitter-style layouts
+  // Detect missing empty lines between block-level elements
+  const enhancedTextNodes = enhanceTextNodeStructure(targetElement, textNodes, originalTextsMap);
+
+  logger.debug(`Optimized collection with structure enhancement: ${enhancedTextNodes.length} nodes, ${originalTextsMap.size} unique texts`);
+  return { textNodes: enhancedTextNodes, originalTextsMap };
+}
+
+/**
+ * Enhance text node structure to preserve empty lines between elements
+ * @param {HTMLElement} targetElement - Target element
+ * @param {Array} textNodes - Original text nodes
+ * @param {Map} originalTextsMap - Original texts map
+ * @returns {Array} Enhanced text nodes
+ */
+function enhanceTextNodeStructure(targetElement, textNodes, originalTextsMap) {
+  const enhancedNodes = [...textNodes];
+
+  // Look for adjacent block elements that should have empty lines between them
+  const walker = document.createTreeWalker(
+    targetElement,
+    NodeFilter.SHOW_ELEMENT,
+    {
+      acceptNode: (node) => {
+        // Skip hidden elements
+        try {
+          if (typeof window !== 'undefined') {
+            const style = window.getComputedStyle(node);
+            if (style.display === "none" || style.visibility === "hidden") {
+              return NodeFilter.FILTER_REJECT;
+            }
+          }
+        } catch {
+          // If getComputedStyle fails, accept the node
+        }
+
+        // Focus on block-level and inline-block elements
+        const tagName = node.tagName.toLowerCase();
+        const display = node.style?.display || window.getComputedStyle?.(node)?.display;
+
+        // Twitter-specific: look for spans and anchors that might need spacing
+        if (tagName === 'span' || tagName === 'a' || display === 'inline-block' || display === 'block') {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+
+        return NodeFilter.FILTER_REJECT;
+      }
+    },
+    false
+  );
+
+  let previousElement = null;
+  let element;
+
+  while ((element = walker.nextNode())) {
+    if (previousElement && shouldInsertEmptyLine(previousElement, element)) {
+      // Check if there's already a text node with only whitespace between these elements
+      const hasEmptyTextNode = checkForEmptyTextNodeBetween(previousElement, element);
+
+      if (!hasEmptyTextNode) {
+        // Create a synthetic text node for the empty line
+        const syntheticTextNode = document.createTextNode('\n\n');
+        syntheticTextNode._syntheticEmptyLine = true;
+
+        // Create a wrapper for the synthetic empty line to ensure proper spacing
+        const emptyLineWrapper = document.createElement('div');
+        emptyLineWrapper.className = 'aiwc-synthetic-empty-line';
+        emptyLineWrapper.style.display = 'block';
+        emptyLineWrapper.style.height = '1em';
+        emptyLineWrapper.setAttribute('data-aiwc-synthetic', 'true');
+
+        // Insert the synthetic node and wrapper in the DOM temporarily for processing
+        if (element.parentNode && previousElement.parentNode === element.parentNode) {
+          try {
+            // Insert the wrapper first
+            element.parentNode.insertBefore(emptyLineWrapper, element);
+            // Insert the text node inside the wrapper
+            emptyLineWrapper.appendChild(syntheticTextNode);
+
+            enhancedNodes.push(syntheticTextNode);
+
+            // Add to texts map
+            originalTextsMap.set('\n\n', [syntheticTextNode]);
+
+            logger.debug('Inserted synthetic empty line wrapper between elements', {
+              prevTag: previousElement.tagName,
+              nextTag: element.tagName
+            });
+          } catch (error) {
+            logger.debug('Failed to insert synthetic empty line:', error);
+          }
+        }
+      }
+    }
+
+    previousElement = element;
+  }
+
+  return enhancedNodes;
+}
+
+/**
+ * Check if empty line should be inserted between two elements
+ * @param {Element} prevElement - Previous element
+ * @param {Element} nextElement - Next element
+ * @returns {boolean} Whether to insert empty line
+ */
+function shouldInsertEmptyLine(prevElement, nextElement) {
+  const prevTag = prevElement.tagName.toLowerCase();
+  const nextTag = nextElement.tagName.toLowerCase();
+
+  // Twitter-specific patterns
+  // If we have a content-containing element followed by a link, likely need empty line
+  const prevHasSubstantialText = prevElement.textContent && prevElement.textContent.trim().length > 20;
+  const nextIsLink = nextTag === 'a' || (nextTag === 'span' && nextElement.querySelector('a'));
+
+  // Check if previous element ends with substantial content and next is a different type
+  if (prevHasSubstantialText && nextIsLink) {
+    return true;
+  }
+
+  // Other block-level transitions
+  const blockTags = ['div', 'p', 'section', 'article'];
+  const prevIsBlock = blockTags.includes(prevTag);
+  const nextIsBlock = blockTags.includes(nextTag);
+
+  if (prevIsBlock && nextIsBlock) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if there's already an empty text node between two elements
+ * @param {Element} prevElement - Previous element
+ * @param {Element} nextElement - Next element
+ * @returns {boolean} Whether empty text node exists
+ */
+function checkForEmptyTextNodeBetween(prevElement, nextElement) {
+  // Find sibling relationship
+  if (prevElement.nextSibling === nextElement) {
+    // Direct siblings - no text node between them
+    return false;
+  }
+
+  // Check if the next sibling is a text node with only whitespace
+  const nextSibling = prevElement.nextSibling;
+  if (nextSibling && nextSibling.nodeType === Node.TEXT_NODE) {
+    const text = nextSibling.textContent.trim();
+    if (text.length === 0) {
+      return true; // Already has empty text node
+    }
+
+    // Check if the next sibling after this text node is our target element
+    if (nextSibling.nextSibling === nextElement) {
+      return true; // Text node exists between elements
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -279,7 +451,6 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
   // Inject styles before applying translations
   injectTranslationStyles();
 
-  const cache = getElementSelectionCache();
   let processedCount = 0;
 
   // Filter out undefined or null text nodes to prevent errors
@@ -298,6 +469,31 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
     const originalText = textNode.textContent;
     const trimmedOriginalText = originalText.trim();
+
+    // Handle empty lines and whitespace-only text (preserve structure but don't translate)
+    if (textNode._syntheticEmptyLine || originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) {
+      logger.debug('Preserving empty line or whitespace text node', {
+        originalText: JSON.stringify(originalText),
+        isSynthetic: !!textNode._syntheticEmptyLine
+      });
+
+      // For synthetic empty lines, we need to preserve their wrapper structure
+      if (textNode._syntheticEmptyLine && textNode.parentNode) {
+        const wrapper = textNode.parentNode;
+        if (wrapper.getAttribute('data-aiwc-synthetic') === 'true') {
+          // Ensure the wrapper maintains its styling
+          wrapper.style.display = 'block';
+          wrapper.style.height = '1em';
+          processedCount++;
+          return;
+        }
+      }
+
+      // For regular whitespace text nodes, ensure they maintain their structure
+      // Don't translate them, just count them as processed
+      processedCount++;
+      return; // Don't translate empty lines, just preserve them
+    }
 
     // Look for translation with chunk index support
     let translatedText = translations.get(trimmedOriginalText);
@@ -349,7 +545,20 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         // Create inner span for translated content
         const translationSpan = document.createElement("span");
         translationSpan.className = "aiwc-translation-inner";
-        translationSpan.textContent = finalTranslatedText;
+
+        // Preserve leading whitespace from original text
+        const leadingWhitespace = originalText.match(/^\s*/)[0];
+
+        // Check if the original text ends with whitespace that should create a visual line break
+        originalText.match(/\s*$/)[0];
+
+        // Start with leading whitespace
+        let processedText = leadingWhitespace + finalTranslatedText;
+
+        // No additional spacing logic here - let text processing handle spacing
+        // This prevents double newline issues
+
+        translationSpan.textContent = processedText;
 
         // Apply text direction to the wrapper with target language if available
         const detectOptions = context.targetLanguage ? {
@@ -397,14 +606,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
           return;
         }
 
-        // Store translation data in cache
-        cache.storeOriginalText(uniqueId, {
-          originalText: originalText,
-          translatedText: translatedText,
-          wrapperElement: wrapperSpan,
-          originalTextNode: textNode,
-          isWrapperBased: true
-        });
+        // Note: Cache system has been removed - no storage of translation data
 
         processedCount++;
 
@@ -432,7 +634,6 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
  * @returns {Promise<number>} Number of successfully reverted elements
  */
 export async function revertTranslations(context) {
-  const cache = getElementSelectionCache();
   let successfulReverts = 0;
   let failedReverts = 0;
 
@@ -536,8 +737,7 @@ export async function revertTranslations(context) {
     }
   });
 
-  // Clear cache
-  cache.clearOriginalTexts();
+  // Note: Cache system has been removed - no cache to clear
 
   // Clean up any orphaned translation elements
   try {
@@ -548,6 +748,49 @@ export async function revertTranslations(context) {
     });
   } catch (cleanupError) {
     logger.debug('Failed to cleanup orphaned elements:', cleanupError);
+  }
+
+  // Clean up synthetic empty lines - new improved cleanup
+  try {
+    // Clean up synthetic empty line wrappers first
+    const syntheticWrappers = document.querySelectorAll('[data-aiwc-synthetic="true"]');
+    syntheticWrappers.forEach(wrapper => {
+      if (wrapper.parentNode) {
+        wrapper.parentNode.removeChild(wrapper);
+        logger.debug('Removed synthetic empty line wrapper');
+      }
+    });
+
+    // Find all text nodes that are synthetic empty lines (fallback)
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          return node._syntheticEmptyLine ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    let syntheticNode;
+    const syntheticNodesToRemove = [];
+    while ((syntheticNode = walker.nextNode())) {
+      syntheticNodesToRemove.push(syntheticNode);
+    }
+
+    syntheticNodesToRemove.forEach(node => {
+      if (node.parentNode) {
+        node.parentNode.removeChild(node);
+        logger.debug('Removed synthetic empty line');
+      }
+    });
+
+    const totalCleaned = syntheticWrappers.length + syntheticNodesToRemove.length;
+    if (totalCleaned > 0) {
+      logger.info(`Cleaned up ${totalCleaned} synthetic empty line elements`);
+    }
+  } catch (cleanupError) {
+    logger.debug('Failed to cleanup synthetic empty lines:', cleanupError);
   }
 
   // Clean up injected styles if no translations remain
@@ -658,14 +901,6 @@ function isGoodContainerElement(element) {
 export function isValidTextElement(element) {
   if (!element) return false;
 
-  const cache = getElementSelectionCache();
-
-  // Check cache first
-  const cached = cache.getCachedElementValidation(element);
-  if (cached !== undefined) {
-    return cached;
-  }
-
   let isValid = false;
 
   try {
@@ -692,8 +927,7 @@ export function isValidTextElement(element) {
     isValid = false;
   }
 
-  // Cache the result
-  cache.cacheElementValidation(element, isValid);
+  // Note: Cache system has been removed - no caching of validation results
   return isValid;
 }
 
@@ -712,13 +946,7 @@ export function extractElementText(element, options = {}) {
     trimWhitespace = true
   } = options;
 
-  const cache = getElementSelectionCache();
-
-  // Check cache first
-  const cached = cache.getCachedTextContent(element);
-  if (cached !== undefined) {
-    return cached;
-  }
+  // Note: Cache system has been removed - no caching of text content
 
   let text = '';
 
@@ -741,8 +969,7 @@ export function extractElementText(element, options = {}) {
     text = '';
   }
 
-  // Cache the result
-  cache.cacheTextContent(element, text);
+  // Note: Cache system has been removed - no caching of text content
   return text;
 }
 
