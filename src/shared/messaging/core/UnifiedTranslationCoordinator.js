@@ -14,6 +14,7 @@ import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -42,13 +43,32 @@ export class UnifiedTranslationCoordinator {
 
     getLogger().info(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
-    // Determine if this should be a streaming operation
-    const shouldStream = this._shouldUseStreaming(message);
+    try {
+      // Determine if this should be a streaming operation
+      const shouldStream = this._shouldUseStreaming(message);
 
-    if (shouldStream) {
-      return this._coordinateStreamingTranslation(message, options);
-    } else {
-      return this._coordinateRegularTranslation(message, options);
+      if (shouldStream) {
+        return await this._coordinateStreamingTranslation(message, options);
+      } else {
+        return await this._coordinateRegularTranslation(message, options);
+      }
+    } catch (error) {
+      // Final catch-all for any unhandled errors in coordination
+      getLogger().error(`Translation coordination failed: ${message.messageId}`, error);
+
+      // Use centralized error handling for coordination errors
+      try {
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'translation-coordination-top-level',
+          messageId: message.messageId,
+          action: action,
+          showToast: false
+        });
+      } catch (handlerError) {
+        getLogger().warn('Top-level ErrorHandler failed:', handlerError);
+      }
+
+      throw error;
     }
   }
 
@@ -75,6 +95,18 @@ export class UnifiedTranslationCoordinator {
 
     } catch (error) {
       getLogger().error(`Regular translation failed: ${messageId}`, error);
+
+      // Use centralized error handling
+      try {
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'regular-translation-coordination',
+          messageId: messageId,
+          showToast: false // Regular translation errors are handled by callers
+        });
+      } catch (handlerError) {
+        getLogger().warn('ErrorHandler failed to handle regular translation error:', handlerError);
+      }
+
       throw error;
     } finally {
       this.activeTranslations.delete(messageId);
@@ -155,6 +187,19 @@ export class UnifiedTranslationCoordinator {
         getLogger().debug(`Streaming translation coordination cancelled: ${messageId}`, error);
       } else {
         getLogger().error(`Streaming translation coordination failed: ${messageId}`, error);
+      }
+
+      // Use centralized error handling for non-cancellation errors
+      if (errorType !== ErrorTypes.USER_CANCELLED) {
+        try {
+          await ErrorHandler.getInstance().handle(error, {
+            context: 'streaming-translation-coordination',
+            messageId: messageId,
+            showToast: false // Streaming errors are handled by the streaming system
+          });
+        } catch (handlerError) {
+          getLogger().warn('ErrorHandler failed to handle streaming error:', handlerError);
+        }
       }
 
       // Cancel streaming if it was registered
