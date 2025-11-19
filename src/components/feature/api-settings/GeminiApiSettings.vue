@@ -58,7 +58,7 @@
       </span>
     </div>
     <div
-      v-if="selectedModelOption !== 'custom' && isThinkingSupported"
+      v-if="isThinkingSupported"
       class="setting-group"
     >
       <BaseCheckbox
@@ -179,9 +179,16 @@ const updateThinkingModeAvailability = (newModel) => {
       }
     }
   } else {
-    // For unknown models or those without thinking support
-    isThinkingSupported.value = false
-    isThinkingControllable.value = false
+    // For custom models, allow user to control thinking mode
+    if (newModel === 'custom') {
+      isThinkingSupported.value = true
+      isThinkingControllable.value = true
+      thinkingDescription.value = 'Allow the model to think step-by-step before responding.'
+    } else {
+      // For unknown models or those without thinking support
+      isThinkingSupported.value = false
+      isThinkingControllable.value = false
+    }
   }
 }
 
