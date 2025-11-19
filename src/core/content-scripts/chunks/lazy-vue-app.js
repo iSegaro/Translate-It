@@ -23,6 +23,54 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyVueApp');
 let vueApp = null;
 let pinia = null;
 
+function isSuitableEnvironmentForVue() {
+  // Check if document.body exists and is accessible
+  if (!document.body) {
+    logger.debug('Document body not available for Vue mounting');
+    return false;
+  }
+
+  // Check if we're in a browser-generated XML/JSON viewer page
+  const isXMLViewer = document.title?.includes('XML') ||
+                     document.title?.includes('JSON') ||
+                     document.title?.includes('This.*file does not appear to have any style information') ||
+                     document.body.querySelector('.pretty-print') !== null ||
+                     document.body.querySelector('#webkit-xml-viewer-source-xml') !== null ||
+                     document.body.querySelector('.header')?.textContent?.includes('XML file');
+
+  if (isXMLViewer) {
+    logger.debug('Detected browser viewer page, skipping Vue app mount');
+    return false;
+  }
+
+  // Check if the page has minimal HTML structure needed for Vue
+  if (!document.head || !document.body) {
+    logger.debug('Page lacks basic HTML structure for Vue');
+    return false;
+  }
+
+  // Check if documentElement is accessible
+  if (!document.documentElement || !document.documentElement.style) {
+    logger.debug('Document element not properly accessible for Vue');
+    return false;
+  }
+
+  // Check if we can safely create elements in the DOM
+  try {
+    const testElement = document.createElement('div');
+    testElement.style.setProperty('test', 'value');
+    if (testElement.style.getPropertyValue('test') !== 'value') {
+      logger.debug('Cannot safely set styles on elements, skipping Vue app');
+      return false;
+    }
+  } catch (error) {
+    logger.debug('DOM manipulation test failed, skipping Vue app:', error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function loadVueApp(contentCore) {
   if (vueApp) {
     logger.debug('Vue app already mounted');
@@ -35,6 +83,12 @@ export async function loadVueApp(contentCore) {
     // Validate extension context
     if (!ExtensionContextManager.isValidSync()) {
       logger.warn('Extension context invalid, skipping Vue app load');
+      return;
+    }
+
+    // Check if we're in a suitable environment for Vue app mounting
+    if (!isSuitableEnvironmentForVue()) {
+      logger.info('Environment not suitable for Vue app, skipping load');
       return;
     }
 
@@ -82,6 +136,11 @@ export async function loadVueApp(contentCore) {
 }
 
 async function createMountPoint() {
+  // Verify document.body is still available before proceeding
+  if (!document.body) {
+    throw new Error('Document body not available for mount point creation');
+  }
+
   const isInIframe = window !== window.top;
   const hostId = `translate-it-host-${isInIframe ? 'iframe' : 'main'}`;
 
@@ -142,7 +201,13 @@ async function createMountPoint() {
   }
 
   // Return the app container within shadow root
-  return hostElement.shadowRoot.getElementById('translate-it-app-container');
+  const appContainer = hostElement.shadowRoot.getElementById('translate-it-app-container');
+
+  if (!appContainer) {
+    throw new Error('Failed to create app container in shadow root');
+  }
+
+  return appContainer;
 }
 
 // Export cleanup function
