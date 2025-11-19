@@ -6,6 +6,7 @@ import {
   getApiUrlAsync,
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
+  getGeminiApiUrlAsync,
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -167,16 +168,21 @@ export class GeminiProvider extends BaseAIProvider {
   async _getConfig() {
     try {
       // Use project's existing config system with built-in caching
-      const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
+      const [apiKey, geminiModel, thinkingEnabled, geminiApiUrl] = await Promise.all([
         getApiKeyAsync(),
         getGeminiModelAsync(),
         getGeminiThinkingEnabledAsync(),
+        getGeminiApiUrlAsync(),
       ]);
-      
+
+      // Check if the model is a custom model (following Z.AI pattern)
+      const isCustomModel = !CONFIG.GEMINI_MODELS?.some(model => model.value === geminiModel && model.value !== 'custom');
+      const actualModel = geminiModel || 'gemini-2.5-flash';
+
       // Configuration loaded successfully
-      logger.info(`[Gemini] Using model: ${geminiModel}${thinkingEnabled ? ' with thinking' : ''}`);
-      
-      return { apiKey, geminiModel, thinkingEnabled };
+      logger.info(`[Gemini] Using model: ${actualModel}${thinkingEnabled ? ' with thinking' : ''}${isCustomModel ? ' (custom)' : ''}`);
+
+      return { apiKey, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
     } catch (error) {
       logger.error(`[Gemini] Error loading configuration:`, error);
       throw error;
@@ -187,21 +193,22 @@ export class GeminiProvider extends BaseAIProvider {
    * Single text translation - extracted from original translate method
    */
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const { apiKey, geminiModel, thinkingEnabled } = await this._getConfig();
+    const { apiKey, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
 
     // Configuration applied for translation
     logger.info(`[Gemini] Starting translation: ${text.length} chars`);
 
-    // Build API URL based on selected model
+    // Build API URL with enhanced custom model and URL support
     let apiUrl;
-    if (geminiModel === "custom") {
-      apiUrl = await getApiUrlAsync(); // Use custom URL from user input
+    if (isCustomModel) {
+      // For custom models, use custom API URL if provided, otherwise fallback to default Gemini endpoint
+      apiUrl = geminiApiUrl || CONFIG.GEMINI_API_URL;
     } else {
-      // Use predefined URL for selected model
+      // For predefined models, use hardcoded URL from model config
       const modelConfig = CONFIG.GEMINI_MODELS?.find(
         (m) => m.value === geminiModel
       );
-      apiUrl = modelConfig?.url || CONFIG.API_URL; // Fallback to default
+      apiUrl = modelConfig?.url || CONFIG.GEMINI_API_URL;
     }
 
     // Validate configuration
@@ -336,17 +343,19 @@ export class GeminiProvider extends BaseAIProvider {
   async translateImage(imageData, sourceLang, targetLang) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    const { apiKey, geminiModel } = await this._getConfig();
+    const { apiKey, geminiModel, geminiApiUrl, isCustomModel } = await this._getConfig();
 
-    // Build API URL based on selected model
+    // Build API URL with enhanced custom model and URL support
     let apiUrl;
-    if (geminiModel === "custom") {
-      apiUrl = await getApiUrlAsync();
+    if (isCustomModel) {
+      // For custom models, use custom API URL if provided, otherwise fallback to default Gemini endpoint
+      apiUrl = geminiApiUrl || CONFIG.GEMINI_API_URL;
     } else {
+      // For predefined models, use hardcoded URL from model config
       const modelConfig = CONFIG.GEMINI_MODELS?.find(
         (m) => m.value === geminiModel
       );
-      apiUrl = modelConfig?.url || CONFIG.API_URL;
+      apiUrl = modelConfig?.url || CONFIG.GEMINI_API_URL;
     }
 
     // Validate configuration

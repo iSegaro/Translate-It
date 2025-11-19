@@ -22,7 +22,7 @@ function getDefaultSettings() {
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
     API_KEY: CONFIG.API_KEY || '',
-    API_URL: CONFIG.API_URL || '',
+    GEMINI_API_URL: CONFIG.GEMINI_API_URL || '',
     GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
     GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? true,
     WEBAI_API_URL: CONFIG.WEBAI_API_URL || 'http://localhost:6969/translate',

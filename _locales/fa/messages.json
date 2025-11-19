@@ -238,7 +238,11 @@
     "message": "کلید API خود را اینجا وارد کنید"
   },
   "gemini_api_settings_api_url_label": { "message": "آدرس API" },
-  "gemini_api_url_placeholder": { "message": "آدرس API را وارد کنید" },
+  "gemini_api_url_placeholder": { "message": "آدرس پیش‌فرض Gemini API" },
+  "gemini_api_url_info": { "message": "برای استفاده از نقطه پایانی پیش‌فرض Gemini، این قسمت را خالی بگذارید" },
+  "gemini_custom_model_label": { "message": "نام مدل سفارشی" },
+  "gemini_custom_model_placeholder": { "message": "نام مدل سفارشی را وارد کنید" },
+  "gemini_custom_model_info": { "message": "نام دقیق مدل را که توسط Google ارائه شده است وارد کنید" },
   "webai_api_settings_title": { "message": "تنظیمات WebAI" },
   "webai_api_key_info": {
     "message": "شما می‌توانید یک API Server شخصی در کامپیوتر خود اجرا کنید."
