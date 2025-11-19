@@ -243,6 +243,7 @@
   "gemini_custom_model_label": { "message": "نام مدل سفارشی" },
   "gemini_custom_model_placeholder": { "message": "نام مدل سفارشی را وارد کنید" },
   "gemini_custom_model_info": { "message": "نام دقیق مدل را که توسط Google ارائه شده است وارد کنید" },
+  "gemini_custom_api_url_info": { "message": "آدرس کامل API به همراه نام مدل را وارد کنید" },
   "webai_api_settings_title": { "message": "تنظیمات WebAI" },
   "webai_api_key_info": {
     "message": "شما می‌توانید یک API Server شخصی در کامپیوتر خود اجرا کنید."

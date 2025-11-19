@@ -256,6 +256,7 @@
   "gemini_custom_model_label": { "message": "Custom Model Name" },
   "gemini_custom_model_placeholder": { "message": "Enter custom model name" },
   "gemini_custom_model_info": { "message": "Enter the exact model name as provided by Google" },
+  "gemini_custom_api_url_info": { "message": "Enter the complete API URL including the model name" },
   "webai_api_settings_title": { "message": "WebAI Settings" },
   "webai_api_url_label": { "message": "API URL" },
   "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
