@@ -2,6 +2,7 @@ import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { reassembleTranslations, normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore } from "../../utils/textProcessing.js";
 import { generateUniqueId } from "../../utils/domManipulation.js";
+import { ensureSpacingBeforeInlineElements } from "../../utils/spacingUtils.js";
 import { correctTextDirection } from "../../utils/textDirection.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -435,9 +436,15 @@ export class TranslationUIManager {
           const translationSpan = document.createElement("span");
           translationSpan.className = "aiwc-translation-inner";
 
-          // Preserve leading whitespace from original text
+          // CRITICAL FIX: Apply general spacing correction for streaming translations
+          // This prevents words from sticking together when followed by inline elements
+          let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
+
+          // Preserve original whitespace as fallback
           const leadingWhitespace = originalText.match(/^\s*/)[0];
-          let processedText = leadingWhitespace + translatedText;
+          if (leadingWhitespace && !processedText.startsWith(' ')) {
+            processedText = leadingWhitespace + processedText;
+          }
 
           translationSpan.textContent = processedText;
 
@@ -457,11 +464,11 @@ export class TranslationUIManager {
           wrapperSpan.appendChild(translationSpan);
 
           // Replace the original text node with the wrapper
-          const nextSibling = textNode.nextSibling;
+          const nextElementSibling = textNode.nextSibling;
           parentElement.removeChild(textNode);
 
-          if (nextSibling) {
-            parentElement.insertBefore(wrapperSpan, nextSibling);
+          if (nextElementSibling) {
+            parentElement.insertBefore(wrapperSpan, nextElementSibling);
           } else {
             parentElement.appendChild(wrapperSpan);
           }
@@ -2010,14 +2017,15 @@ export class TranslationUIManager {
           const translationSpan = document.createElement("span");
           translationSpan.className = "aiwc-translation-inner";
 
-          // Preserve leading whitespace from original text
+          // CRITICAL FIX: Apply general spacing correction for final translations
+          // This prevents words from sticking together when followed by inline elements
+          let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
+
+          // Preserve original whitespace as fallback
           const leadingWhitespace = originalText.match(/^\s*/)[0];
-
-          // Check if the original text ends with whitespace that should create a visual line break
-          originalText.match(/\s*$/)[0];
-
-          // Start with leading whitespace
-          let processedText = leadingWhitespace + translatedText;
+          if (leadingWhitespace && !processedText.startsWith(' ')) {
+            processedText = leadingWhitespace + processedText;
+          }
 
           translationSpan.textContent = processedText;
 
