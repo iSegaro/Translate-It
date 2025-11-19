@@ -16,7 +16,7 @@ async function initializeApp() {
   try {
     // Add popup context class to body
     document.body.classList.add('popup-context')
-    logger.debug('✅ Added popup-context class to body')
+    logger.debug('Added popup-context class to body')
     
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('popup')
@@ -29,7 +29,7 @@ async function initializeApp() {
     // Setup browser API globals for compatibility
     setupBrowserAPIGlobals()
     
-    logger.debug('🌐 Browser API globals configured')
+    logger.debug('Browser API globals configured')
 
     // Import unified i18n plugin after browser API is ready and globally available
     const { default: i18n } = await import('@/utils/i18n/plugin.js')
