@@ -10,6 +10,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
@@ -494,7 +496,13 @@ export class TranslationEngine {
                 } catch (error) {
                     consecutiveFailures++;
                     hasErrors = true;
-                    logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                    // Log cancellation as debug instead of warn using proper error management
+                    const errorType = matchErrorToType(error);
+                    if (errorType === ErrorTypes.USER_CANCELLED) {
+                      logger.debug(`[TranslationEngine] Batch ${i + 1} cancelled (consecutive failures: ${consecutiveFailures}):`, error);
+                    } else {
+                      logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                    }
                     
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,

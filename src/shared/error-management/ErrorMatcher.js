@@ -98,6 +98,15 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
 
+  // User cancellation errors
+  if (
+    msg.includes("cancelled by user") ||
+    msg.includes("translation cancelled") ||
+    msg.includes("user cancelled") ||
+    msg.includes("operation cancelled")
+  )
+    return ErrorTypes.USER_CANCELLED;
+
   // Provider-specific response errors
   if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json"))
     return ErrorTypes.HTML_RESPONSE_ERROR;

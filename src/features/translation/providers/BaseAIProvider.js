@@ -10,7 +10,8 @@ import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translat
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-// import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
@@ -92,10 +93,14 @@ export class BaseAIProvider extends BaseProvider {
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       // Check for cancellation
       if (abortController && abortController.signal.aborted) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
       if (engine && engine.isCancelled(messageId)) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
 
       const batch = batches[batchIndex];
@@ -131,7 +136,13 @@ export class BaseAIProvider extends BaseProvider {
                 // Streamed batch progress
 
       } catch (error) {
-        logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);
+        // Log cancellation as debug instead of error using proper error management
+        const errorType = matchErrorToType(error);
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          logger.debug(`[${this.providerName}] Streaming batch ${batchIndex + 1} cancelled:`, error);
+        } else {
+          logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);
+        }
         
         // Send error stream message to content script
         await this._streamErrorResults(error, batchIndex, messageId, engine);
@@ -168,10 +179,14 @@ export class BaseAIProvider extends BaseProvider {
     
     for (let i = 0; i < texts.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
       if (engine && engine.isCancelled(messageId)) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
       
       try {
@@ -183,7 +198,13 @@ export class BaseAIProvider extends BaseProvider {
         );
         results.push(result || texts[i]);
       } catch (error) {
-        logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
+        // Log cancellation as debug instead of warn using proper error management
+        const errorType = matchErrorToType(error);
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          logger.debug(`[${this.providerName}] Segment ${i + 1} cancelled:`, error);
+        } else {
+          logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
+        }
         // Instead of returning original text, throw the error to be handled properly
         throw error;
       }
@@ -669,8 +690,14 @@ Important: Return only the JSON array with translated texts, no additional text 
           await this._streamFallbackResult([translatedResult], [batch[i]], i, messageId, engine);
         }
       } catch (error) {
-        logger.warn(`[${this.providerName}] Fallback segment ${i + 1} failed:`, error);
-        
+        // Log cancellation as debug instead of warn using proper error management
+        const errorType = matchErrorToType(error);
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          logger.debug(`[${this.providerName}] Fallback segment ${i + 1} cancelled:`, error);
+        } else {
+          logger.warn(`[${this.providerName}] Fallback segment ${i + 1} failed:`, error);
+        }
+
         // Throw error to be handled by system error management
         throw error;
       }

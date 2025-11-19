@@ -7,6 +7,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
@@ -270,7 +272,13 @@ export class StreamingManager extends ResourceTracker {
    * @param {Error} error - Error that occurred
    */
   async handleStreamError(messageId, error) {
-    logger.error(`[StreamingManager] Stream error for ${messageId}:`, error);
+    // Log cancellation as debug instead of error using proper error management
+    const errorType = matchErrorToType(error);
+    if (errorType === ErrorTypes.USER_CANCELLED) {
+      logger.debug(`[StreamingManager] Stream cancelled for ${messageId}:`, error);
+    } else {
+      logger.error(`[StreamingManager] Stream error for ${messageId}:`, error);
+    }
     
     const streamInfo = this.activeStreams.get(messageId);
     if (streamInfo) {

@@ -13,6 +13,8 @@ import { TranslationMode } from "@/shared/config/config.js";
 // import browser from 'webextension-polyfill';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -186,10 +188,14 @@ export class BaseTranslateProvider extends BaseProvider {
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       // Check for cancellation
       if (abortController && abortController.signal.aborted) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
       if (engine && engine.isCancelled(messageId)) {
-        throw new Error('Translation cancelled by user');
+        const error = new Error('Translation cancelled by user');
+        error.type = ErrorTypes.USER_CANCELLED;
+        throw error;
       }
 
       const chunk = chunks[chunkIndex];
@@ -221,7 +227,13 @@ export class BaseTranslateProvider extends BaseProvider {
         // Streamed chunk progress
 
       } catch (error) {
-        logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
+        // Log cancellation as debug instead of error using proper error management
+        const errorType = matchErrorToType(error);
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
+        } else {
+          logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
+        }
         
         // Send error stream message to content script
         await this._streamChunkError(error, chunkIndex, messageId, engine);
@@ -384,6 +396,7 @@ export class BaseTranslateProvider extends BaseProvider {
       if (abortController && abortController.signal.aborted) {
         const cancelError = new Error('Translation cancelled by user');
         cancelError.name = 'AbortError';
+        cancelError.type = ErrorTypes.USER_CANCELLED;
         throw cancelError;
       }
 
