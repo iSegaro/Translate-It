@@ -105,8 +105,15 @@ export function correctTextDirection(element, text, options = {}) {
     return;
   }
 
+  // Additional validation for element properties
+  if (!element.dataset || typeof element.dataset !== 'object') {
+    logger.warn('correctTextDirection: Element dataset not available, proceeding without style preservation');
+    // Disable preserveExisting if dataset is not available
+    options.preserveExisting = false;
+  }
+
   // Store original styles if preserving
-  if (preserveExisting && !element.dataset.aiwcOriginalDirection) {
+  if (preserveExisting && element.dataset && !element.dataset.aiwcOriginalDirection) {
     storeOriginalElementStyles(element);
   }
 
@@ -140,21 +147,43 @@ export function correctTextDirection(element, text, options = {}) {
     }
   } else {
     // Legacy approach: apply styles directly to element
-    // Apply direction only if it doesn't conflict with existing styles
-    const currentStyle = window.getComputedStyle(element);
-    if (!currentStyle.direction || currentStyle.direction === 'ltr' || !preserveExisting) {
-      element.style.direction = direction;
+    // Validate element has style property
+    if (!element.style || typeof element.style !== 'object') {
+      logger.warn('correctTextDirection: Element style not available, using CSS classes only');
+
+      // Only add CSS classes if style is not available
+      if (addClasses && element.classList) {
+        element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
+        element.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+      }
+
+      return;
     }
 
-    // Apply text alignment only if needed
-    if (setTextAlign) {
-      if (!currentStyle.textAlign || currentStyle.textAlign === 'start' || !preserveExisting) {
+    // Apply direction only if it doesn't conflict with existing styles
+    try {
+      const currentStyle = window.getComputedStyle(element);
+      if (!currentStyle.direction || currentStyle.direction === 'ltr' || !preserveExisting) {
+        element.style.direction = direction;
+      }
+
+      // Apply text alignment only if needed
+      if (setTextAlign) {
+        if (!currentStyle.textAlign || currentStyle.textAlign === 'start' || !preserveExisting) {
+          element.style.textAlign = isRTL ? 'right' : 'left';
+        }
+      }
+    } catch (error) {
+      logger.warn('correctTextDirection: Error accessing computed styles, applying direction directly:', error);
+      // Fallback: apply direction directly without checking existing styles
+      element.style.direction = direction;
+      if (setTextAlign) {
         element.style.textAlign = isRTL ? 'right' : 'left';
       }
     }
 
     // Add CSS classes for styling
-    if (addClasses) {
+    if (addClasses && element.classList) {
       element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
       element.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
     }
@@ -176,14 +205,20 @@ export function correctTextDirection(element, text, options = {}) {
 export function storeOriginalElementStyles(element) {
   if (!element) return;
 
-  // Store direction
-  if (!element.dataset.aiwcOriginalDirection) {
-    element.dataset.aiwcOriginalDirection = element.style.direction || '';
+  // Validate element has dataset property
+  if (!element.dataset || typeof element.dataset !== 'object') {
+    logger.warn('storeOriginalElementStyles: Element dataset not available, skipping style storage');
+    return;
   }
 
-  // Store text-align
+  // Store direction if element has style property
+  if (!element.dataset.aiwcOriginalDirection) {
+    element.dataset.aiwcOriginalDirection = (element.style && element.style.direction) || '';
+  }
+
+  // Store text-align if element has style property
   if (!element.dataset.aiwcOriginalTextAlign) {
-    element.dataset.aiwcOriginalTextAlign = element.style.textAlign || '';
+    element.dataset.aiwcOriginalTextAlign = (element.style && element.style.textAlign) || '';
   }
 
   // Store classes
@@ -199,9 +234,19 @@ export function storeOriginalElementStyles(element) {
 export function restoreOriginalElementStyles(element) {
   if (!element) return;
 
+  // Validate element has dataset property before accessing it
+  if (!element.dataset || typeof element.dataset !== 'object') {
+    logger.warn('restoreOriginalElementStyles: Element dataset not available, skipping style restoration');
+    // Only remove classes if dataset is not available
+    if (element.classList) {
+      element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text', 'aiwc-translated-text');
+    }
+    return;
+  }
+
   // Check if element is wrapped
   const wrapper = element.parentNode;
-  if (wrapper && wrapper.classList.contains('aiwc-translation-wrapper')) {
+  if (wrapper && wrapper.classList && wrapper.classList.contains('aiwc-translation-wrapper')) {
     // Move element out of wrapper and remove wrapper
     const parent = wrapper.parentNode;
     if (parent) {
@@ -210,20 +255,22 @@ export function restoreOriginalElementStyles(element) {
     }
   }
 
-  // Restore direction
-  if (element.dataset.aiwcOriginalDirection !== undefined) {
+  // Restore direction if element has style property
+  if (element.dataset.aiwcOriginalDirection !== undefined && element.style && typeof element.style === 'object') {
     element.style.direction = element.dataset.aiwcOriginalDirection;
     delete element.dataset.aiwcOriginalDirection;
   }
 
-  // Restore text-align
-  if (element.dataset.aiwcOriginalTextAlign !== undefined) {
+  // Restore text-align if element has style property
+  if (element.dataset.aiwcOriginalTextAlign !== undefined && element.style && typeof element.style === 'object') {
     element.style.textAlign = element.dataset.aiwcOriginalTextAlign;
     delete element.dataset.aiwcOriginalTextAlign;
   }
 
   // Remove direction classes
-  element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text', 'aiwc-translated-text');
+  if (element.classList) {
+    element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text', 'aiwc-translated-text');
+  }
 
   // Optionally restore original classes (usually not needed for direction)
   if (element.dataset.aiwcOriginalClasses !== undefined) {

@@ -157,15 +157,26 @@ export class TranslationRenderer {
    */
   _applyTextDirection(element, text) {
     if (!element || !text) return;
-    
+
+    // Check if element has style property before accessing it
+    if (!element.style || typeof element.style !== 'object') {
+      this.logger.warn('Element style not available for text direction application');
+      // Fallback: add CSS classes only
+      if (element.classList) {
+        const isRtl = CONFIG.RTL_REGEX.test(text);
+        element.classList.add(isRtl ? 'ti-rtl-text' : 'ti-ltr-text');
+      }
+      return;
+    }
+
     const isRtl = CONFIG.RTL_REGEX.test(text);
     element.style.direction = isRtl ? "rtl" : "ltr";
     element.style.textAlign = isRtl ? "right" : "left";
-    
-    this.logger.debug('Applied text direction', { 
-      isRtl, 
+
+    this.logger.debug('Applied text direction', {
+      isRtl,
       direction: element.style.direction,
-      textAlign: element.style.textAlign 
+      textAlign: element.style.textAlign
     });
   }
 
