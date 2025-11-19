@@ -251,15 +251,13 @@ function expandTextsLegacy(textsToTranslate) {
  * @param {string[]} expandedTexts - Original expanded texts
  * @param {Array} originMapping - Mapping of segments to originals
  * @param {string[]} textsToTranslate - Original texts to translate
- * @param {Map} cachedTranslations - Optional cached translations (default: new Map())
- * @returns {Map} Map of original texts to translated texts with multi-strategy indexing
+  * @returns {Map} Map of original texts to translated texts with multi-strategy indexing
  */
 export function reassembleTranslations(
   translatedData,
   expandedTexts,
   originMapping,
-  textsToTranslate,
-  cachedTranslations = new Map()
+  textsToTranslate
 ) {
   if (!Array.isArray(translatedData) || !Array.isArray(expandedTexts) || !Array.isArray(originMapping)) {
     logger.error('reassembleTranslations: Invalid input parameters');

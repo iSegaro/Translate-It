@@ -116,7 +116,10 @@
 
     <div class="ti-window-body">
       <!-- Show Original Text Section with smooth animation -->
-      <Transition name="ti-original-text" appear>
+      <Transition
+        name="ti-original-text"
+        appear
+      >
         <div
           v-if="showOriginal && !isLoading"
           class="ti-original-text-section"
@@ -219,21 +222,6 @@ const currentTTSText = computed(() => {
   return translatedText.value || '';
 });
 
-const getTTSButtonTitle = computed(() => {
-  if (!hasTTSContent.value) {
-    return 'No text available for speech';
-  }
-
-  if (tts.ttsState.value === 'playing') {
-    return 'Stop TTS';
-  }
-
-  if (ttsMode.value === 'original') {
-    return 'Speak original text';
-  }
-
-  return 'Speak translation';
-});
 
 // Enhanced TTS button title with more detailed guidance
 const getEnhancedTTSButtonTitle = computed(() => {

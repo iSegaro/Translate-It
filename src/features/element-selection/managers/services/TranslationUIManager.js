@@ -1353,7 +1353,7 @@ export class TranslationUIManager {
       }
 
       // CRITICAL FIX: Strategy 5 - Phone number with newlines (common case)
-      if (trimmedKey.match(/^\+?[\d\s\-\(\)]+$/)) {
+      if (trimmedKey.match(/^\+?[\d\s\-()]+$/)) {
         // Generate variations for phone numbers with different whitespace patterns
         const withTrailingSpaces = trimmedKey + '\n';
         const withLeadingSpaces = '\n' + trimmedKey;
@@ -1655,9 +1655,7 @@ export class TranslationUIManager {
 
         // ENHANCED: Last resort - find any translation with reasonable length match
         if (!finalTranslation && trimmedOriginalText.length > 50) {
-          for (const [key, translation] of translationLookup.entries()) {
-            const keyTrimmed = key.trim();
-
+          for (const [, translation] of translationLookup.entries()) {
             // Only consider translations with reasonable length similarity
             const lengthRatio = translation.length / trimmedOriginalText.length;
             if (lengthRatio > 0.3 && lengthRatio < 3.0) {
@@ -1823,7 +1821,7 @@ export class TranslationUIManager {
 
       // Handle empty lines and whitespace-only text (preserve structure but don't translate)
       // BUT NOT for phone numbers or content with actual characters
-      const isPhoneLike = /[\d\+\-\(\)\s]/.test(originalText.trim()) && originalText.trim().length > 3;
+      const isPhoneLike = /[\d+\-()\s]/.test(originalText.trim()) && originalText.trim().length > 3;
       const hasActualContent = originalText.trim().length > 0 && !/^\s+$/.test(originalText);
 
       if ((originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) && !isPhoneLike && !hasActualContent) {
@@ -2183,7 +2181,7 @@ export class TranslationUIManager {
         normalized: normalizedText,
         length: originalText.length,
         possibleMatches: translationArray
-          .map(([key, value]) => {
+          .map(([key]) => {
             const score = calculateTextMatchScore(normalizedText, key);
             return { key: key.substring(0, 50), score, type: score.type };
           })
