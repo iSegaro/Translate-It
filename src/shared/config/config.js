@@ -35,7 +35,7 @@ export const CONFIG = {
   THEME: "auto",
   TIMEOUT: 30000,
   selectionTranslationMode: "onClick", // "immediate",
-  COPY_REPLACE: "copy", // "replace",
+  COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
