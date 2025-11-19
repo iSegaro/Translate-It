@@ -423,8 +423,6 @@ export class browserTranslateProvider extends BaseTranslateProvider {
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
-    const context = `${this.providerName.toLowerCase()}-translate-chunk`;
-
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
