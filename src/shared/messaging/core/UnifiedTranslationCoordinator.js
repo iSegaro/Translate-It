@@ -173,7 +173,14 @@ export class UnifiedTranslationCoordinator {
       // If initial response indicates streaming started, wait for streaming completion
       if (initialResponse.streaming) {
         getLogger().debug(`Streaming initiated successfully: ${messageId}`);
-        return await streamingPromise;
+        const streamingResult = await streamingPromise;
+
+        // Check if streaming failed (resolved with error instead of rejected to avoid uncaught promise)
+        if (streamingResult && !streamingResult.success) {
+          throw streamingResult.error;
+        }
+
+        return streamingResult;
       } else {
         // Not streaming, return regular response
         streamingTimeoutManager.completeStreaming(messageId, initialResponse);

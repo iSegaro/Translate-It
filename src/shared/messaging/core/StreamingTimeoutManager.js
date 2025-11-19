@@ -9,6 +9,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -189,7 +190,22 @@ export class StreamingTimeoutManager {
           messageId
         });
       } else {
-        streamState.reject(error);
+        // Use centralized error handling and resolve instead of reject to avoid uncaught promise
+        ErrorHandler.getInstance().handle(error, {
+          context: 'streaming-timeout-manager',
+          messageId: messageId,
+          showToast: false // Streaming errors are handled by the streaming system
+        }).catch(handlerError => {
+          getLogger().warn(`ErrorHandler failed to handle streaming timeout error:`, handlerError);
+        });
+
+        // Resolve with error result instead of rejecting to prevent uncaught promise errors
+        streamState.resolve({
+          success: false,
+          error: error,
+          messageId: messageId,
+          timedOut: true
+        });
       }
     } catch (callbackError) {
       getLogger().warn(`Error in error callback for ${messageId}:`, callbackError);
@@ -368,6 +384,15 @@ export class StreamingTimeoutManager {
       getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
+    // Use centralized error handling for progress timeout errors
+    ErrorHandler.getInstance().handle(timeoutError, {
+      context: 'streaming-progress-timeout',
+      messageId: messageId,
+      showToast: false // Timeout errors are handled by the streaming system
+    }).catch(handlerError => {
+      getLogger().warn(`ErrorHandler failed to handle progress timeout:`, handlerError);
+    });
+
     this.errorStreaming(messageId, timeoutError);
   }
 
@@ -406,6 +431,15 @@ export class StreamingTimeoutManager {
     } catch (error) {
       getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
     }
+
+    // Use centralized error handling for timeout errors
+    ErrorHandler.getInstance().handle(timeoutError, {
+      context: 'streaming-final-timeout',
+      messageId: messageId,
+      showToast: false // Timeout errors are handled by the streaming system
+    }).catch(handlerError => {
+      getLogger().warn(`ErrorHandler failed to handle final timeout:`, handlerError);
+    });
 
     this.errorStreaming(messageId, timeoutError);
   }
