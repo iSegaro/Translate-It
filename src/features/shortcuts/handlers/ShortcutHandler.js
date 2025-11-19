@@ -52,7 +52,7 @@ export class ShortcutHandler extends ResourceTracker {
     // Track this instance for debugging
     window.__shortcutHandlerInstances.add(this);
     // Instance created - logged at TRACE level for detailed debugging
-    // getLogger().debug(`🔍 ShortcutHandler instance created. Total instances: ${window.__shortcutHandlerInstances.size}`);
+    // getLogger().debug(`ShortcutHandler instance created. Total instances: ${window.__shortcutHandlerInstances.size}`);
   }
 
   // Static method to get or create singleton instance
@@ -61,7 +61,7 @@ export class ShortcutHandler extends ResourceTracker {
       // Check global disable flag before creating instance
       if (window.__shortcutHandlerDisabled) {
         // Creation blocked - logged at TRACE level for detailed debugging
-        // getLogger().debug('🚫 ShortcutHandler creation blocked - feature is globally disabled');
+        // getLogger().debug('ShortcutHandler creation blocked - feature is globally disabled');
         return null;
       }
 
@@ -73,7 +73,7 @@ export class ShortcutHandler extends ResourceTracker {
         shortcutHandlerInstance.featureManager = options.featureManager;
       }
       // Singleton reused - logged at TRACE level for detailed debugging
-      // getLogger().debug('🔄 ShortcutHandler singleton instance reused');
+      // getLogger().debug('ShortcutHandler singleton instance reused');
     }
 
     return shortcutHandlerInstance;
@@ -112,7 +112,7 @@ export class ShortcutHandler extends ResourceTracker {
     // Check global disable flag - don't activate if disabled
     if (window.__shortcutHandlerDisabled) {
       // Activation blocked - logged at TRACE level for detailed debugging
-      // getLogger().debug('🚫 ShortcutHandler activation blocked - feature is globally disabled');
+      // getLogger().debug('ShortcutHandler activation blocked - feature is globally disabled');
       return false;
     }
 

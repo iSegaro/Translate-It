@@ -305,7 +305,7 @@ export class TranslationUIManager {
               newlyAppliedTranslations.set(fullOriginalText, translationData);
             }
 
-            this.logger.debug(`🔄 Streaming segment ${expandedIndex} applied`, {
+            this.logger.debug(`Streaming segment ${expandedIndex} applied`, {
               originalIndex,
               isPartial: isPartialTranslation,
               originalLength: originalTextKey.length,
@@ -314,7 +314,7 @@ export class TranslationUIManager {
               translatedPreview: translatedText.substring(0, 30) + '...'
             });
           } else {
-            this.logger.debug(`⚠️ Skipping streaming segment ${expandedIndex} - insufficient content`, {
+            this.logger.debug(`Skipping streaming segment ${expandedIndex} - insufficient content`, {
               originalLength: originalTextKey.length,
               translatedLength: translatedText.length
             });
@@ -992,7 +992,7 @@ export class TranslationUIManager {
    * @private
    */
   async _handleStreamEndSuccess(messageId, request) {
-    this.logger.info(`🏁 Stream ended successfully for messageId: ${messageId}. Processing final result...`);
+    this.logger.info(`Stream ended successfully for messageId: ${messageId}. Processing final result...`);
 
     try {
       // Create final translated data array that matches the full expandedTexts structure
@@ -1014,7 +1014,7 @@ export class TranslationUIManager {
       }
 
       // CRITICAL FIX: Enhanced reassembly with segment validation
-      this.logger.info(`🔧 Reassembling ${finalTranslatedData.length} translated segments into final translations`);
+      this.logger.info(`Reassembling ${finalTranslatedData.length} translated segments into final translations`);
 
       // Use the proper reassembly function to preserve empty lines and structure
       const newTranslations = reassembleTranslations(
@@ -1025,13 +1025,13 @@ export class TranslationUIManager {
         new Map() // No cached translations
       );
 
-      this.logger.info(`✅ Reassembly complete: ${newTranslations.size} final translations created`);
+      this.logger.info(`Reassembly complete: ${newTranslations.size} final translations created`);
 
       // Store in state manager for potential revert
       this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
 
       // CRITICAL FIX: Force apply complete translations to replace ALL streaming segments
-      this.logger.info(`🔄 Force applying complete final translations to replace streaming content`);
+      this.logger.info(`Force applying complete final translations to replace streaming content`);
       await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
         skipStreamingUpdates: true, // This ensures replacement of streaming content
         messageId: messageId,
@@ -1067,11 +1067,11 @@ export class TranslationUIManager {
       }
 
     } catch (error) {
-      this.logger.error(`❌ Error processing final translation result:`, error);
+      this.logger.error(`Error processing final translation result:`, error);
 
       // Attempt fallback processing
       try {
-        this.logger.info(`🔄 Attempting fallback translation processing...`);
+        this.logger.info(`Attempting fallback translation processing...`);
 
         // Create fallback translations using available segments
         const fallbackTranslations = new Map();
@@ -1095,11 +1095,11 @@ export class TranslationUIManager {
             isFinalResult: true
           });
 
-          this.logger.info(`✅ Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
+          this.logger.info(`Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
         }
 
       } catch (fallbackError) {
-        this.logger.error(`❌ Fallback processing also failed:`, fallbackError);
+        this.logger.error(`Fallback processing also failed:`, fallbackError);
       }
     }
   }
@@ -1304,7 +1304,7 @@ export class TranslationUIManager {
    * @param {Object} options - Application options
    */
   async applyTranslationsToNodes(textNodes, translations, options = {}) {
-    this.logger.info("🎯 DETERMINISTIC TRANSLATION APPLICATION", {
+    this.logger.info("DETERMINISTIC TRANSLATION APPLICATION", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
       skipStreamingUpdates: options.skipStreamingUpdates || false,
@@ -1406,7 +1406,7 @@ export class TranslationUIManager {
       }
     }
 
-    this.logger.debug(`🔧 ENHANCED Translation lookup table created`, {
+    this.logger.debug(`ENHANCED Translation lookup table created`, {
       totalKeys: translationLookup.size,
       originalKeys: translations.size,
       lookupStrategies: ['exact', 'trimmed', 'normalized', 'no_whitespace', 'phone_variants', 'newline_variants']
@@ -1440,7 +1440,7 @@ export class TranslationUIManager {
 
       // DEBUG: Enhanced logging for translation detection
       if (textNode.textContent.trim().length > 5) {
-        this.logger.debug(`🔍 TRANSLATION DETECTION for node ${nodeIndex}`, {
+        this.logger.debug(`TRANSLATION DETECTION for node ${nodeIndex}`, {
           nodeClasses: textNode.parentNode?.className || 'NO_CLASSES',
           foundWrapper: !!translationWrapper,
           foundInner: !!translationInner,
@@ -1457,7 +1457,7 @@ export class TranslationUIManager {
       const isTranslationCandidate = isImportantLongText || containsComplexContent || hasMeaningfulContent || isOriginalLongText;
 
       // ENHANCED: Comprehensive logging for debugging node candidacy issues
-      this.logger.info(`🔍 ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
+      this.logger.info(`ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
         originalLength: originalText.length,
         trimmedLength: trimmedOriginalText.length,
         isAlreadyTranslated,
@@ -1476,7 +1476,7 @@ export class TranslationUIManager {
 
       // CRITICAL FIX: For final results, ALWAYS process ALL nodes, not just already translated ones
       if (options.isFinalResult && isTranslationCandidate) {
-        this.logger.debug(`🎯 FINAL RESULT PROCESSING for node ${nodeIndex}`, {
+        this.logger.debug(`FINAL RESULT PROCESSING for node ${nodeIndex}`, {
           isAlreadyTranslated,
           originalLength: originalText.length,
           trimmedLength: trimmedOriginalText.length,
@@ -1544,7 +1544,7 @@ export class TranslationUIManager {
           finalTranslation = bestMatch.translation;
           matchStrategy = 'empty_node_substantial_match';
 
-          this.logger.debug(`🎯 EMPTY NODE MATCH: Found substantial translation (${bestMatch.length} chars) for empty node ${nodeIndex}`, {
+          this.logger.debug(`EMPTY NODE MATCH: Found substantial translation (${bestMatch.length} chars) for empty node ${nodeIndex}`, {
             nodeOriginalLength: originalText.length,
             translationLength: bestMatch.length,
             keyPreview: bestMatch.key.substring(0, 50) + '...',
@@ -1598,7 +1598,7 @@ export class TranslationUIManager {
 
           if (bestMatch) {
             finalTranslation = bestMatch;
-            this.logger.debug(`🎯 FUZZY MATCH FOUND for node ${nodeIndex}`, {
+            this.logger.debug(`FUZZY MATCH FOUND for node ${nodeIndex}`, {
               score: bestScore,
               strategy: matchStrategy,
               originalLength: trimmedOriginalText.length,
@@ -1615,7 +1615,7 @@ export class TranslationUIManager {
           let longestKey = '';
           let longestLength = 0;
 
-          this.logger.debug(`🔍 RESCUE MODE: Looking for longest translation for empty node ${nodeIndex}`, {
+          this.logger.debug(`RESCUE MODE: Looking for longest translation for empty node ${nodeIndex}`, {
             originalLength: originalText.length,
             trimmedLength: trimmedOriginalText.length,
             totalLookupEntries: translationLookup.size
@@ -1636,7 +1636,7 @@ export class TranslationUIManager {
             finalTranslation = longestTranslation;
             matchStrategy = 'rescue_longest_translation';
 
-            this.logger.info(`🎯 RESCUE MODE SUCCESS: Applying longest translation (${longestLength} chars) to empty node ${nodeIndex}`, {
+            this.logger.info(`RESCUE MODE SUCCESS: Applying longest translation (${longestLength} chars) to empty node ${nodeIndex}`, {
               originalLength: originalText.length,
               translationLength: longestLength,
               longestKeyPreview: longestKey.substring(0, 50) + '...',
@@ -1645,7 +1645,7 @@ export class TranslationUIManager {
               isEmptyNode: trimmedOriginalText.length === 0
             });
           } else {
-            this.logger.warn(`⚠️ RESCUE MODE FAILED: No substantial translation found for empty node ${nodeIndex}`, {
+            this.logger.warn(`RESCUE MODE FAILED: No substantial translation found for empty node ${nodeIndex}`, {
               originalLength: originalText.length,
               longestFound: longestLength,
               totalEntries: translationLookup.size
@@ -1664,7 +1664,7 @@ export class TranslationUIManager {
               finalTranslation = translation;
               matchStrategy = 'length_based_fallback';
 
-              this.logger.debug(`🎯 LENGTH-BASED FALLBACK for node ${nodeIndex}`, {
+              this.logger.debug(`LENGTH-BASED FALLBACK for node ${nodeIndex}`, {
                 originalLength: trimmedOriginalText.length,
                 translationLength: translation.length,
                 lengthRatio: lengthRatio
@@ -1675,7 +1675,7 @@ export class TranslationUIManager {
         }
 
         // DEBUG: Log translation lookup results
-        this.logger.info(`🔍 TRANSLATION LOOKUP for node ${nodeIndex}`, {
+        this.logger.info(`TRANSLATION LOOKUP for node ${nodeIndex}`, {
           isFinalResult: options.isFinalResult,
           isAlreadyTranslated,
           originalLength: originalText.length,
@@ -1699,7 +1699,7 @@ export class TranslationUIManager {
 
           // ENHANCED: For empty nodes or untranslated nodes (final result only), always apply
           if (!translationInner && options.isFinalResult) {
-            this.logger.info(`🎯 APPLYING FINAL TRANSLATION TO NODE ${nodeIndex}`, {
+            this.logger.info(`APPLYING FINAL TRANSLATION TO NODE ${nodeIndex}`, {
               originalLength: originalText.length,
               finalLength: finalTrimmed.length,
               originalPreview: originalText.substring(0, 50) + '...',
@@ -1736,7 +1736,7 @@ export class TranslationUIManager {
               shouldReplace = true;
               replacementReason = 'rescue_mode_completes_streaming';
 
-              this.logger.info(`🎯 RESCUE MODE OVERRIDE: Replacing streaming with complete translation for node ${nodeIndex}`, {
+              this.logger.info(`RESCUE MODE OVERRIDE: Replacing streaming with complete translation for node ${nodeIndex}`, {
                 streamingLength: streamingTranslationLength,
                 rescueLength: rescueTranslationLength,
                 improvementPercent: Math.round((rescueTranslationLength / streamingTranslationLength - 1) * 100),
@@ -1774,7 +1774,7 @@ export class TranslationUIManager {
           }
 
           // CRITICAL FIX: Add comprehensive debug logging for replacement decisions
-          this.logger.info(`🔍 FINAL REPLACEMENT DECISION for node ${nodeIndex}`, {
+          this.logger.info(`FINAL REPLACEMENT DECISION for node ${nodeIndex}`, {
             isFinalResult: options.isFinalResult,
             currentLength: currentTranslation.length,
             finalLength: finalTrimmed.length,
@@ -1793,7 +1793,7 @@ export class TranslationUIManager {
           });
 
           if (shouldReplace) {
-            this.logger.info(`🔄 REPLACING streaming translation with complete final translation for node ${nodeIndex}`, {
+            this.logger.info(`REPLACING streaming translation with complete final translation for node ${nodeIndex}`, {
               currentLength: currentTranslation.length,
               finalLength: finalTrimmed.length,
               improvement: finalTrimmed.length - currentTranslation.length,
@@ -1842,7 +1842,7 @@ export class TranslationUIManager {
 
           // CRITICAL: Add detailed debug logging for specific nodes
       if (nodeIndex === 14 || nodeIndex === 32) {
-        this.logger.error(`🔍 DEBUGGING NODE ${nodeIndex}`, {
+        this.logger.error(`DEBUGGING NODE ${nodeIndex}`, {
           originalText: JSON.stringify(originalText),
           trimmedOriginalText: JSON.stringify(trimmedOriginalText),
           textLength: originalText.length,
@@ -1856,13 +1856,13 @@ export class TranslationUIManager {
       if (translationLookup.has(originalText)) {
         translatedText = translationLookup.get(originalText);
         matchType = 'lookup_exact';
-        this.logger.debug(`✅ LOOKUP EXACT MATCH for node ${nodeIndex}`);
+        this.logger.debug(`LOOKUP EXACT MATCH for node ${nodeIndex}`);
       }
       // Strategy 2: Direct lookup using trimmed text
       else if (translationLookup.has(trimmedOriginalText)) {
         translatedText = translationLookup.get(trimmedOriginalText);
         matchType = 'lookup_trimmed';
-        this.logger.debug(`✅ LOOKUP TRIMMED MATCH for node ${nodeIndex}`);
+        this.logger.debug(`LOOKUP TRIMMED MATCH for node ${nodeIndex}`);
       }
       // Strategy 3: Normalized whitespace lookup
       else {
@@ -1870,7 +1870,7 @@ export class TranslationUIManager {
         if (translationLookup.has(normalizedOriginal)) {
           translatedText = translationLookup.get(normalizedOriginal);
           matchType = 'lookup_normalized';
-          this.logger.debug(`✅ LOOKUP NORMALIZED MATCH for node ${nodeIndex}`);
+          this.logger.debug(`LOOKUP NORMALIZED MATCH for node ${nodeIndex}`);
         }
       }
 
@@ -1880,13 +1880,13 @@ export class TranslationUIManager {
         if (translationLookup.has(noWhitespaceOriginal)) {
           translatedText = translationLookup.get(noWhitespaceOriginal);
           matchType = 'lookup_no_whitespace';
-          this.logger.debug(`✅ LOOKUP NO WHITESPACE MATCH for node ${nodeIndex}`);
+          this.logger.debug(`LOOKUP NO WHITESPACE MATCH for node ${nodeIndex}`);
         }
       }
 
       // CRITICAL: Enhanced debugging and fallback for unmatched nodes
       if (!translatedText) {
-        this.logger.error(`❌ NO MATCH FOUND for node ${nodeIndex}`, {
+        this.logger.error(`NO MATCH FOUND for node ${nodeIndex}`, {
           originalText: JSON.stringify(originalText),
           trimmedOriginalText: JSON.stringify(trimmedOriginalText),
           normalizedOriginal: JSON.stringify(originalText.replace(/\s+/g, ' ').trim()),
@@ -1948,13 +1948,13 @@ export class TranslationUIManager {
         if (bestMatch) {
           translatedText = bestMatch;
           matchType = bestMatchType;
-          this.logger.warn(`🔄 ENHANCED FALLBACK MATCH for node ${nodeIndex} (${bestMatchType})`, {
+          this.logger.warn(`ENHANCED FALLBACK MATCH for node ${nodeIndex} (${bestMatchType})`, {
             original: JSON.stringify(originalText.substring(0, 50)),
             matchScore: Math.round(bestScore),
             matchType: bestMatchType
           });
         } else {
-          this.logger.error(`🚨 NO FALLBACK MATCH FOUND for node ${nodeIndex} - translation lost`);
+          this.logger.error(`NO FALLBACK MATCH FOUND for node ${nodeIndex} - translation lost`);
         }
       }
 

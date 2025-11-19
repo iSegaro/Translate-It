@@ -32,7 +32,7 @@ export class RevertHandler extends ResourceTracker {
     }
 
     this.isExecuting = true;
-    logger.info('🔄 Starting unified revert process');
+    logger.info('Starting unified revert process');
 
     try {
       let totalRevertedCount = 0;
@@ -76,7 +76,7 @@ export class RevertHandler extends ResourceTracker {
       }
 
       const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
-      logger.info(`🏁 Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+      logger.info(`Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
 
       if (errors.length > 0) {
         logger.warn('Revert completed with errors:', errors);
