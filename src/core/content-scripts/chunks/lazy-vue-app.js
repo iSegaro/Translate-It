@@ -31,15 +31,22 @@ function isSuitableEnvironmentForVue() {
   }
 
   // Check if we're in a browser-generated XML/JSON viewer page
-  const isXMLViewer = document.title?.includes('XML') ||
-                     document.title?.includes('JSON') ||
-                     document.title?.includes('This.*file does not appear to have any style information') ||
-                     document.body.querySelector('.pretty-print') !== null ||
-                     document.body.querySelector('#webkit-xml-viewer-source-xml') !== null ||
-                     document.body.querySelector('.header')?.textContent?.includes('XML file');
+  // More specific detection to avoid blocking legitimate content pages like GitHub
+  const isBrowserXMLViewer =
+    // Chrome/Firefox XML viewer specific elements
+    document.body.querySelector('#webkit-xml-viewer-source-xml') !== null ||
+    document.body.querySelector('[data-viewer="xml"]') !== null ||
+    // Firefox JSON viewer specific elements
+    document.body.querySelector('#json') !== null && document.body.querySelector('.toolbar') !== null ||
+    // Browser error pages about XML/JSON
+    document.title?.includes('XML page cannot be displayed') ||
+    document.title?.includes('JSON page cannot be displayed') ||
+    // Generic XML viewer with specific URL patterns
+    (window.location.pathname.endsWith('.xml') && document.body.children.length <= 2) ||
+    (window.location.pathname.endsWith('.json') && document.body.children.length <= 2);
 
-  if (isXMLViewer) {
-    logger.debug('Detected browser viewer page, skipping Vue app mount');
+  if (isBrowserXMLViewer) {
+    logger.debug('Detected browser XML/JSON viewer page, skipping Vue app mount');
     return false;
   }
 
@@ -58,8 +65,16 @@ function isSuitableEnvironmentForVue() {
   // Check if we can safely create elements in the DOM
   try {
     const testElement = document.createElement('div');
-    testElement.style.setProperty('test', 'value');
-    if (testElement.style.getPropertyValue('test') !== 'value') {
+
+    // Test with valid CSS properties instead of custom properties
+    testElement.style.setProperty('display', 'block');
+    const retrievedValue = testElement.style.getPropertyValue('display');
+
+    // Also test direct assignment
+    testElement.style.color = 'red';
+    const directValue = testElement.style.color;
+
+    if (retrievedValue !== 'block' && directValue !== 'red') {
       logger.debug('Cannot safely set styles on elements, skipping Vue app');
       return false;
     }
