@@ -5,6 +5,8 @@ import { generateContentMessageId } from "@/utils/messaging/messageId.js";
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Import the four new services
 import { TranslationRequestManager } from "./TranslationRequestManager.js";
@@ -156,8 +158,11 @@ export class TranslationOrchestrator extends ResourceTracker {
         throw error;
       }
 
-      // Check if this request was user-cancelled
-      if (this.requestManager.isUserCancelled(messageId)) {
+      // Check if this request was user-cancelled using proper error management
+      const isUserCancelled = this.requestManager.isUserCancelled(messageId) ||
+                              matchErrorToType(error) === ErrorTypes.USER_CANCELLED;
+
+      if (isUserCancelled) {
         this.logger.info("Translation process cancelled by user", { messageId });
       } else if (!error.alreadyHandled) {
         this.logger.error("Translation process failed", error);

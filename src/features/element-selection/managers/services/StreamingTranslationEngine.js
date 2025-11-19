@@ -8,6 +8,8 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { sendMessage, sendRegularMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
 import { createStreamingResponseHandler } from '@/shared/messaging/core/StreamingResponseHandler.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 /**
  * Handles streaming translation coordination and timeout management
@@ -111,7 +113,13 @@ export class StreamingTranslationEngine {
 
       return result;
     } catch (error) {
-      this.logger.error("Failed to send direct translation request", error);
+      // Log cancellation as debug instead of error using proper error management
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        this.logger.debug("Direct translation request cancelled", error);
+      } else {
+        this.logger.error("Failed to send direct translation request", error);
+      }
       throw error;
     }
   }
@@ -178,7 +186,13 @@ export class StreamingTranslationEngine {
       // Return the result for non-streaming translations
       return result;
     } catch (error) {
-      this.logger.error("Failed to send streaming translation request", error);
+      // Log cancellation as debug instead of error using proper error management
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        this.logger.debug("Streaming translation request cancelled", error);
+      } else {
+        this.logger.error("Failed to send streaming translation request", error);
+      }
       throw error;
     }
   }

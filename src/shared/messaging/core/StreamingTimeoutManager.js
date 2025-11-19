@@ -163,10 +163,9 @@ export class StreamingTimeoutManager {
     // Store error for cancellation detection
     streamState.lastError = error;
 
-    // Check if this is a user cancellation and log accordingly
-    const errorType = matchErrorToType(error);
-    if (errorType === ErrorTypes.USER_CANCELLED) {
-      getLogger().debug(`Streaming cancelled for ${messageId}:`, error);
+    // Handle both Error objects and cancellation info objects
+    if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
+      getLogger().debug(`Streaming cancelled for ${messageId}:`, error.message || error);
     } else {
       getLogger().debug(`Streaming error for ${messageId}:`, error);
     }
@@ -179,7 +178,19 @@ export class StreamingTimeoutManager {
     // Call error callback
     try {
       streamState.onError(error);
-      streamState.reject(error);
+
+      // For user cancellations, resolve with a cancelled result instead of rejecting
+      if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
+        // Resolve with a cancellation result instead of rejecting to avoid uncaught promise
+        streamState.resolve({
+          success: false,
+          cancelled: true,
+          reason: error.message || error.reason,
+          messageId
+        });
+      } else {
+        streamState.reject(error);
+      }
     } catch (callbackError) {
       getLogger().warn(`Error in error callback for ${messageId}:`, callbackError);
     }
@@ -210,11 +221,20 @@ export class StreamingTimeoutManager {
       abortController.abort();
     }
 
-    // Create cancellation error with proper error type
-    const cancelError = new Error(reason);
-    cancelError.type = ErrorTypes.USER_CANCELLED;
+    // Create cancellation object for logging purposes (not for throwing)
+    const cancellationInfo = {
+      message: reason,
+      type: ErrorTypes.USER_CANCELLED,
+      isCancellation: true
+    };
 
-    this.errorStreaming(messageId, cancelError);
+    // Handle cancellation gracefully
+    try {
+      this.errorStreaming(messageId, cancellationInfo);
+    } catch (error) {
+      // Log any secondary errors but don't throw them to avoid uncaught promise rejections
+      getLogger().warn(`Secondary error during cancellation of ${messageId}:`, error);
+    }
   }
 
   /**

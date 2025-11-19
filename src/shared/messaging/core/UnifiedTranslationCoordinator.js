@@ -162,7 +162,13 @@ export class UnifiedTranslationCoordinator {
         const cancelReason = errorType === ErrorTypes.USER_CANCELLED
           ? `User cancelled: ${error.message}`
           : `Coordination error: ${error.message}`;
-        streamingTimeoutManager.cancelStreaming(messageId, cancelReason);
+
+        try {
+          streamingTimeoutManager.cancelStreaming(messageId, cancelReason);
+        } catch (cancelError) {
+          // Log cancellation errors as debug to avoid adding noise to console
+          getLogger().debug('Error during streaming cancellation (handled gracefully):', cancelError);
+        }
       }
 
       throw error;

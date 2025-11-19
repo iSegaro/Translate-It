@@ -7,6 +7,8 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Core services
 import { ElementHighlighter } from "./managers/services/ElementHighlighter.js";
@@ -825,7 +827,13 @@ class SelectElementManager extends ResourceTracker {
           operationId: currentMessageId
         });
       } else {
-        this.logger.error("Error during translation:", error);
+        // Check if this is a user cancellation using proper error management
+        const errorType = matchErrorToType(error);
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          this.logger.debug("Translation cancelled by user:", error);
+        } else {
+          this.logger.error("Error during translation:", error);
+        }
       }
       this.performPostTranslationCleanup();
 
