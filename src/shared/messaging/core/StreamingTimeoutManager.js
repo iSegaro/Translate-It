@@ -7,6 +7,8 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -58,8 +60,10 @@ export class StreamingTimeoutManager {
       startTime: Date.now(),
       lastProgressTime: Date.now(),
       isCompleted: false,
+      isCancelled: false,
       progressCount: 0,
       hasTimedOut: false,
+      lastError: null, // Store last error for cancellation detection
       onProgress,
       onComplete,
       onTimeout,
@@ -156,7 +160,16 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    getLogger().debug(`Streaming error for ${messageId}:`, error);
+    // Store error for cancellation detection
+    streamState.lastError = error;
+
+    // Check if this is a user cancellation and log accordingly
+    const errorType = matchErrorToType(error);
+    if (errorType === ErrorTypes.USER_CANCELLED) {
+      getLogger().debug(`Streaming cancelled for ${messageId}:`, error);
+    } else {
+      getLogger().debug(`Streaming error for ${messageId}:`, error);
+    }
 
     streamState.isCompleted = true;
 
@@ -188,15 +201,18 @@ export class StreamingTimeoutManager {
 
     getLogger().debug(`Cancelling streaming for ${messageId}: ${reason}`);
 
+    // Mark as cancelled for timeout detection
+    streamState.isCancelled = true;
+
     // Abort the operation
     const abortController = this.abortControllers.get(messageId);
     if (abortController) {
       abortController.abort();
     }
 
-    // Create cancellation error
+    // Create cancellation error with proper error type
     const cancelError = new Error(reason);
-    cancelError.type = 'USER_CANCELLED';
+    cancelError.type = ErrorTypes.USER_CANCELLED;
 
     this.errorStreaming(messageId, cancelError);
   }
@@ -208,7 +224,17 @@ export class StreamingTimeoutManager {
    */
   isStreaming(messageId) {
     const streamState = this.activeStreams.get(messageId);
-    return streamState && !streamState.isCompleted;
+    return streamState && !streamState.isCompleted && !streamState.isCancelled;
+  }
+
+  /**
+   * Check if an operation should continue (not cancelled or completed)
+   * @param {string} messageId - Message ID
+   * @returns {boolean} - Whether operation should continue
+   */
+  shouldContinue(messageId) {
+    const streamState = this.activeStreams.get(messageId);
+    return streamState && !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut;
   }
 
   /**
@@ -252,6 +278,19 @@ export class StreamingTimeoutManager {
       return;
     }
 
+    // Check if this was cancelled by user
+    if (streamState.isCancelled) {
+      getLogger().debug(`Initial timeout ignored for cancelled streaming operation ${messageId}`);
+      return;
+    }
+
+    // Check if this is a user cancellation scenario using proper error management
+    const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
+    if (errorType === ErrorTypes.USER_CANCELLED) {
+      getLogger().debug(`Initial timeout ignored for user-cancelled streaming operation ${messageId}`);
+      return;
+    }
+
     // Check if we have recent progress
     const timeSinceProgress = Date.now() - streamState.lastProgressTime;
 
@@ -283,6 +322,19 @@ export class StreamingTimeoutManager {
       return;
     }
 
+    // Check if this was cancelled by user
+    if (streamState.isCancelled) {
+      getLogger().debug(`Progress timeout ignored for cancelled streaming operation ${messageId}`);
+      return;
+    }
+
+    // Check if this is a user cancellation scenario using proper error management
+    const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
+    if (errorType === ErrorTypes.USER_CANCELLED) {
+      getLogger().debug(`Progress timeout ignored for user-cancelled streaming operation ${messageId}`);
+      return;
+    }
+
     getLogger().warn(`Progress timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out - no progress for too long`);
@@ -306,6 +358,19 @@ export class StreamingTimeoutManager {
   _handleFinalTimeout(messageId) {
     const streamState = this.activeStreams.get(messageId);
     if (!streamState || streamState.isCompleted) {
+      return;
+    }
+
+    // Check if this was actually cancelled by user before timing out
+    if (streamState.isCancelled) {
+      getLogger().debug(`Final timeout ignored for cancelled streaming operation ${messageId}`);
+      return;
+    }
+
+    // Check if this is a user cancellation scenario using proper error management
+    const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
+    if (errorType === ErrorTypes.USER_CANCELLED) {
+      getLogger().debug(`Final timeout ignored for user-cancelled streaming operation ${messageId}`);
       return;
     }
 
