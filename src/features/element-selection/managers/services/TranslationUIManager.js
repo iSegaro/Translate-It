@@ -212,6 +212,12 @@ export class TranslationUIManager {
       }
     }
 
+    // Check if request is already completed (error state) to prevent processing failed stream updates after termination
+    if (request && (request.status === 'error' || request.status === 'completed')) {
+      this.logger.info(`Ignoring stream update for already completed request: ${messageId} (status: ${request.status})`);
+      return;
+    }
+
     if (!data.success) {
       this.logger.warn(`Received failed stream update for messageId: ${messageId}`, data.error);
 
@@ -231,6 +237,24 @@ export class TranslationUIManager {
       // Notify SelectElementManager to perform cleanup
       if (window.selectElementManagerInstance) {
         window.selectElementManagerInstance.performPostTranslationCleanup();
+      }
+
+      // Trigger stream end processing to properly clean up the failed stream
+      try {
+        await this.processStreamEnd({
+          messageId: messageId,
+          data: {
+            success: false,
+            error: data.error,
+            finished: true
+          }
+        });
+      } catch (streamEndError) {
+        this.logger.error('Error during stream end processing for failed stream update:', streamEndError);
+        // Fallback cleanup if stream end processing fails
+        this.orchestrator.requestManager.updateRequestStatus(messageId, 'error', {
+          error: data.error?.message || 'Translation stream failed'
+        });
       }
 
       return;
@@ -961,6 +985,15 @@ export class TranslationUIManager {
       return;
     }
 
+    // Check if request was already completed (e.g., by failed stream update processing)
+    if (request.status === 'completed' || request.status === 'error') {
+      this.logger.debug("Ignoring stream end for already completed message:", {
+        messageId,
+        status: request.status
+      });
+      return;
+    }
+
     this.logger.info("Translation stream finished for message:", messageId, {
       success: data?.success,
       error: data?.error,
@@ -1146,6 +1179,12 @@ export class TranslationUIManager {
 
     // Notify UnifiedTranslationCoordinator about the streaming error
     unifiedTranslationCoordinator.handleStreamingError(messageId, error);
+
+    // Mark request as completed with error to prevent further stream updates
+    this.orchestrator.requestManager.updateRequestStatus(messageId, 'error', {
+      error: error.message || 'Translation failed'
+    });
+    this.logger.debug(`Request ${messageId} marked as error state to prevent further stream updates`);
   }
 
   /**
