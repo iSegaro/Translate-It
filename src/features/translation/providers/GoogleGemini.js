@@ -3,7 +3,6 @@ import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.
 import {
   CONFIG,
   getApiKeyAsync,
-  getApiUrlAsync,
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
   getGeminiApiUrlAsync,
