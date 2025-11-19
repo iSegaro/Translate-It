@@ -95,6 +95,15 @@ export const CONFIG = {
     { value: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
     { value: "custom", name: "Custom Model" }
   ],
+  ZAI_API_KEY: "",
+  ZAI_API_URL: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+  ZAI_API_MODEL: "glm-4.5-air",
+  ZAI_MODELS: [
+    { value: "glm-4.5", name: "GLM-4.5" },
+    { value: "glm-4.5-air", name: "GLM-4.5 Air" },
+    { value: "glm-4.6", name: "GLM-4.6" },
+    { value: "custom", name: "Custom Model" }
+  ],
   CUSTOM_API_URL: "",
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
@@ -550,6 +559,19 @@ export const getDeepSeekApiKeyAsync = async () => {
 
 export const getDeepSeekApiModelAsync = async () => {
   return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
+};
+
+// ZAI GLM Specific
+export const getZaiApiKeyAsync = async () => {
+  return getSettingValueAsync("ZAI_API_KEY", CONFIG.ZAI_API_KEY);
+};
+
+export const getZaiApiUrlAsync = async () => {
+  return getSettingValueAsync("ZAI_API_URL", CONFIG.ZAI_API_URL);
+};
+
+export const getZaiModelAsync = async () => {
+  return getSettingValueAsync("ZAI_API_MODEL", CONFIG.ZAI_API_MODEL);
 };
 
 // Custom Provider Specific

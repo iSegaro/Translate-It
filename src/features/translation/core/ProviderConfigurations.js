@@ -255,6 +255,54 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Z.AI GLM - GLM models with OpenAI-compatible API
+  ZAI: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 2000, // 2 seconds between subsequent requests
+      burstLimit: 3,
+      burstWindow: 4000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.8,
+        maxDelay: 45000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'json', // Use JSON batch strategy like OpenAI
+      optimalSize: 15,
+      maxComplexity: 300,
+      singleBatchThreshold: 15
+    },
+    streaming: {
+      enabled: true, // Enable streaming for real-time segment translation
+      chunkSize: 'fixed',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'tokens_per_minute',
+        'rate_limit'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'tokens_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 30000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false, // GLM models don't support image translation
+      supportsBatchRequests: true, // Enable batch requests
+      supportsThinking: false,
+      reliableJsonMode: false
+    }
+  },
+
   // Google Translate - Free translation service settings
   GoogleTranslate: {
     rateLimit: {
@@ -502,6 +550,7 @@ function normalizeProviderName(providerName) {
     'deepseek': 'DeepSeek',
     'openrouter': 'OpenRouter',
     'webai': 'WebAI',
+    'zai': 'ZAI',
     'googletranslate': 'GoogleTranslate',
     'google-translate': 'GoogleTranslate',
     'yandextranslate': 'YandexTranslate',
