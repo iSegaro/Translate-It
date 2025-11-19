@@ -182,8 +182,8 @@ export class GeminiProvider extends BaseAIProvider {
         getGeminiApiUrlAsync(),
       ]);
 
-      // Check if the model is a custom model (empty string means custom in UI)
-      const isCustomModel = !geminiModel;
+      // Check if the model is a custom model ("custom" means custom in UI)
+      const isCustomModel = geminiModel === 'custom';
       const actualModel = isCustomModel ? null : geminiModel;
 
       // Configuration loaded successfully
@@ -211,7 +211,7 @@ export class GeminiProvider extends BaseAIProvider {
       // For custom models, use custom API URL if provided, otherwise fallback to default Gemini endpoint
       apiUrl = geminiApiUrl || CONFIG.GEMINI_API_URL;
     } else {
-      // For predefined models, use hardcoded URL from model config
+      // For predefined models, use model-specific URL from config
       const modelConfig = CONFIG.GEMINI_MODELS?.find(
         (m) => m.value === geminiModel
       );
@@ -372,7 +372,7 @@ export class GeminiProvider extends BaseAIProvider {
       // For custom models, use custom API URL if provided, otherwise fallback to default Gemini endpoint
       apiUrl = geminiApiUrl || CONFIG.GEMINI_API_URL;
     } else {
-      // For predefined models, use hardcoded URL from model config
+      // For predefined models, use model-specific URL from config
       const modelConfig = CONFIG.GEMINI_MODELS?.find(
         (m) => m.value === geminiModel
       );

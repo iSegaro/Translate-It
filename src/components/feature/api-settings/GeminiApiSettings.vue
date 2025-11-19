@@ -93,20 +93,17 @@ const selectedModelOption = ref('gemini-2.5-flash')
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash';
+  // If currentModel is 'custom' or not in predefined options, set to 'custom'
   const isPredefined = geminiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
-  selectedModelOption.value = isPredefined ? currentModel : 'custom';
+  selectedModelOption.value = (currentModel === 'custom' || !isPredefined) ? 'custom' : currentModel;
 }
 
 const geminiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
     selectedModelOption.value = value;
-    if (value !== 'custom') {
-      settingsStore.updateSettingLocally('GEMINI_MODEL', value)
-    } else {
-      // Clear GEMINI_MODEL when custom is selected
-      settingsStore.updateSettingLocally('GEMINI_MODEL', '')
-    }
+    // Always save the selected value, including 'custom'
+    settingsStore.updateSettingLocally('GEMINI_MODEL', value)
   }
 })
 
