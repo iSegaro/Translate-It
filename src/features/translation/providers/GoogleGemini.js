@@ -182,12 +182,12 @@ export class GeminiProvider extends BaseAIProvider {
         getGeminiApiUrlAsync(),
       ]);
 
-      // Check if the model is a custom model (following Z.AI pattern)
-      const isCustomModel = !CONFIG.GEMINI_MODELS?.some(model => model.value === geminiModel && model.value !== 'custom');
-      const actualModel = geminiModel || 'gemini-2.5-flash';
+      // Check if the model is a custom model (empty string means custom in UI)
+      const isCustomModel = !geminiModel;
+      const actualModel = isCustomModel ? null : geminiModel;
 
       // Configuration loaded successfully
-      logger.info(`[Gemini] Using model: ${actualModel}${thinkingEnabled ? ' with thinking' : ''}${isCustomModel ? ' (custom)' : ''}`);
+      logger.info(`[Gemini] Using model: ${actualModel || 'custom'}${thinkingEnabled && !isCustomModel ? ' with thinking' : ''}${isCustomModel ? ' (custom API URL)' : ''}`);
 
       return { apiKey, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
     } catch (error) {

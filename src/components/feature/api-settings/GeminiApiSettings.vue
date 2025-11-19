@@ -36,25 +36,14 @@
       v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
-      <label>{{ t('gemini_custom_model_label') || 'Custom Model Name' }}</label>
-      <BaseInput
-        v-model="geminiCustomModel"
-        :placeholder="t('gemini_custom_model_placeholder') || 'Enter custom model name'"
-        class="custom-model-input"
-      />
-      <span class="setting-description">
-        {{ t('gemini_custom_model_info') || 'Enter the exact model name as provided by Google' }}
-      </span>
-    </div>
-    <div class="setting-group">
       <label>{{ t('gemini_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
         v-model="geminiApiUrl"
-        :placeholder="t('gemini_api_url_placeholder') || 'Default Gemini API URL'"
+        :placeholder="t('gemini_api_url_placeholder') || 'Enter custom API URL'"
         class="api-url-input"
       />
       <span class="setting-description">
-        {{ t('gemini_api_url_info') || 'Leave empty to use the default Gemini API endpoint' }}
+        {{ t('gemini_custom_api_url_info') || 'Enter the complete API URL including the model name' }}
       </span>
     </div>
     <div
@@ -114,19 +103,10 @@ const geminiModel = computed({
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+    } else {
+      // Clear GEMINI_MODEL when custom is selected
+      settingsStore.updateSettingLocally('GEMINI_MODEL', '')
     }
-    // If 'custom' is selected, wait for user input in custom field
-  }
-})
-
-const geminiCustomModel = computed({
-  get: () => {
-    const currentModel = settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash';
-    const isPredefined = geminiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
-    return isPredefined ? '' : currentModel;
-  },
-  set: (value) => {
-    settingsStore.updateSettingLocally('GEMINI_MODEL', value);
   }
 })
 
@@ -143,7 +123,6 @@ const geminiModelOptions = ref(
   })) || [
     { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-flash-lite-preview', label: 'Gemini 2.5 Flash-Lite Preview' },
     { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
     { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite' },
     { value: 'custom', label: 'Custom Model' }
