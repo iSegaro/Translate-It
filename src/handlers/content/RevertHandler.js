@@ -27,12 +27,12 @@ export class RevertHandler extends ResourceTracker {
   async executeRevert() {
     // Prevent concurrent executions
     if (this.isExecuting) {
-      logger.debug('[RevertHandler] Revert already in progress, skipping duplicate request');
+      logger.debug('Revert already in progress, skipping duplicate request');
       return { success: false, reason: 'already_executing' };
     }
 
     this.isExecuting = true;
-    logger.info('[RevertHandler] 🔄 Starting unified revert process');
+    logger.info('🔄 Starting unified revert process');
 
     try {
       let totalRevertedCount = 0;
@@ -41,15 +41,15 @@ export class RevertHandler extends ResourceTracker {
 
       // Attempt to revert Vue / SelectElementManager translations
       try {
-        logger.info('[RevertHandler] 🎯 Attempting Vue revert...');
+        logger.info('Attempting Vue revert...');
         const vueRevertedCount = await this.revertVueTranslations();
-        logger.info(`[RevertHandler] ✅ Vue revert result: ${vueRevertedCount} items reverted`);
+        logger.info(`Vue revert result: ${vueRevertedCount} items reverted`);
         if (vueRevertedCount > 0) {
           totalRevertedCount += vueRevertedCount;
           systemsUsed.push('vue');
         }
       } catch (error) {
-        logger.error('[RevertHandler] ❌ Error during Vue revert portion:', {
+        logger.error('Error during Vue revert portion:', {
           error: error.message,
           stack: error.stack,
           errorType: error.name
@@ -59,15 +59,15 @@ export class RevertHandler extends ResourceTracker {
 
       // Attempt to revert legacy translations
       try {
-        logger.info('[RevertHandler] 🎯 Attempting legacy revert...');
+        logger.info('Attempting legacy revert...');
         const legacyRevertedCount = await this.revertLegacyTranslations();
-        logger.info(`[RevertHandler] ✅ Legacy revert result: ${legacyRevertedCount} items reverted`);
+        logger.info(`Legacy revert result: ${legacyRevertedCount} items reverted`);
         if (legacyRevertedCount > 0) {
           totalRevertedCount += legacyRevertedCount;
           systemsUsed.push('legacy');
         }
       } catch (error) {
-        logger.error('[RevertHandler] ❌ Error during legacy revert portion:', {
+        logger.error('Error during legacy revert portion:', {
           error: error.message,
           stack: error.stack,
           errorType: error.name
@@ -76,10 +76,10 @@ export class RevertHandler extends ResourceTracker {
       }
 
       const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
-      logger.info(`[RevertHandler] 🏁 Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+      logger.info(`🏁 Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
 
       if (errors.length > 0) {
-        logger.warn('[RevertHandler] ⚠️ Revert completed with errors:', errors);
+        logger.warn('Revert completed with errors:', errors);
       }
 
       // Show a single, unified notification
@@ -87,12 +87,12 @@ export class RevertHandler extends ResourceTracker {
         const { getTranslationString } = await utilsFactory.getI18nUtils();
         const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
         pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
-        logger.info('[RevertHandler] 📢 Success notification sent');
+        logger.info('Success notification sent');
       } else {
         const { getTranslationString } = await utilsFactory.getI18nUtils();
         const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
         pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
-        logger.info('[RevertHandler] 📢 Warning notification sent - no translations found');
+        logger.info('Warning notification sent - no translations found');
       }
 
       const result = {
@@ -102,11 +102,11 @@ export class RevertHandler extends ResourceTracker {
         errors: errors.length > 0 ? errors : undefined
       };
 
-      logger.info('[RevertHandler] 🎉 Returning result:', result);
+      logger.info('Returning result:', result);
       return result;
 
     } catch (error) {
-      logger.error('[RevertHandler] 💥 Critical error in executeRevert:', {
+      logger.error('Critical error in executeRevert:', {
         error: error.message,
         stack: error.stack,
         errorType: error.name
@@ -115,7 +115,7 @@ export class RevertHandler extends ResourceTracker {
     } finally {
       // Reset execution flag
       this.isExecuting = false;
-      logger.debug('[RevertHandler] 🔄 Execution flag reset');
+      logger.debug('Execution flag reset');
     }
   }
 
@@ -130,14 +130,14 @@ export class RevertHandler extends ResourceTracker {
 
       if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
         const revertedCount = await selectElementManager.revertTranslations();
-        logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementManager.`);
+        logger.debug(`Reverted ${revertedCount} translations via SelectElementManager.`);
         return revertedCount;
       } else {
-        logger.debug('[RevertHandler] SelectElementManager not available or revertTranslations method not found');
+        logger.debug('SelectElementManager not available or revertTranslations method not found');
         return 0;
       }
     } catch (error) {
-      logger.error('[RevertHandler] Error in Vue revert:', error);
+      logger.error('Error in Vue revert:', error);
       // Return 0 if this specific revert fails, so legacy can still try
       return 0;
     }
@@ -164,17 +164,17 @@ export class RevertHandler extends ResourceTracker {
       try {
         const { revertTranslations } = await import("../../features/element-selection/utils/textExtraction.js");
         const elementSelectionResult = await revertTranslations(context);
-        logger.debug('[RevertHandler] Used Element Selection revert system');
+        logger.debug('Used Element Selection revert system');
         return elementSelectionResult;
       } catch {
-        logger.debug('[RevertHandler] Element Selection revert not available, using legacy system');
+        logger.debug('Element Selection revert not available, using legacy system');
 
         // Fallback to legacy system
         const { revertTranslations } = await import("@/shared/utils/text/extraction.js");
         return await revertTranslations(context);
       }
     } catch (error) {
-      logger.error('[RevertHandler] Error in legacy revert:', error);
+      logger.error('Error in legacy revert:', error);
       throw error;
     }
   }
@@ -186,31 +186,31 @@ export class RevertHandler extends ResourceTracker {
   async getSelectElementManagerFromFeatureManager() {
     try {
       // Try to get FeatureManager from global window object
-      logger.debug('[RevertHandler] Checking for window.featureManager...', {
+      logger.debug('Checking for window.featureManager...', {
         hasFeatureManager: !!window.featureManager,
         hasGetFeatureHandler: !!(window.featureManager && typeof window.featureManager.getFeatureHandler === 'function')
       });
 
       if (window.featureManager && typeof window.featureManager.getFeatureHandler === 'function') {
         const selectElementManager = window.featureManager.getFeatureHandler('selectElement');
-        logger.debug('[RevertHandler] FeatureManager.getFeatureHandler result:', {
+        logger.debug('FeatureManager.getFeatureHandler result:', {
           hasSelectElementManager: !!selectElementManager,
           managerType: typeof selectElementManager
         });
 
         if (selectElementManager) {
-          logger.debug('[RevertHandler] Found SelectElementManager through FeatureManager');
+          logger.debug('Found SelectElementManager through FeatureManager');
           return selectElementManager;
         } else {
-          logger.debug('[RevertHandler] FeatureManager returned null for selectElement');
+          logger.debug('FeatureManager returned null for selectElement');
         }
       } else {
-        logger.debug('[RevertHandler] FeatureManager not available or invalid');
+        logger.debug('FeatureManager not available or invalid');
       }
 
       return null;
     } catch (error) {
-      logger.warn('[RevertHandler] Could not get SelectElementManager from FeatureManager:', error);
+      logger.warn('Could not get SelectElementManager from FeatureManager:', error);
       return null;
     }
   }
@@ -235,7 +235,7 @@ export class RevertHandler extends ResourceTracker {
       // Fallback: try to find in existing instances
       return null;
     } catch (error) {
-      logger.warn('[RevertHandler] Could not get SelectElementManager:', error);
+      logger.warn('Could not get SelectElementManager:', error);
       return null;
     }
   }
@@ -255,7 +255,7 @@ export class RevertHandler extends ResourceTracker {
       const { getTranslationHandlerInstance } = await import("../../core/InstanceManager.js");
       return getTranslationHandlerInstance();
     } catch (error) {
-      logger.warn('[RevertHandler] Could not get TranslationHandler:', error);
+      logger.warn('Could not get TranslationHandler:', error);
       return null;
     }
   }
