@@ -96,10 +96,9 @@ export const CONFIG = {
   ],
   ZAI_API_KEY: "",
   ZAI_API_URL: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-  ZAI_API_MODEL: "glm-4.5-air",
+  ZAI_API_MODEL: "glm-4.5",
   ZAI_MODELS: [
     { value: "glm-4.5", name: "GLM-4.5" },
-    { value: "glm-4.5-air", name: "GLM-4.5 Air" },
     { value: "glm-4.6", name: "GLM-4.6" },
     { value: "custom", name: "Custom Model" }
   ],

@@ -61,7 +61,7 @@ export class ZAIGLMProvider extends BaseAIProvider {
 
       // Check if it's a custom model (not in predefined list)
       const isCustomModel = !CONFIG.ZAI_MODELS?.some(model => model.value === zaiModel && model.value !== 'custom');
-      const actualModel = zaiModel || 'glm-4.5-air';
+      const actualModel = zaiModel || 'glm-4.5';
 
       // Configuration loaded successfully
       logger.info(`[ZAI] Using model: ${actualModel} (custom: ${isCustomModel})`);
