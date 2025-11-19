@@ -112,7 +112,7 @@ export const CONFIG = {
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
-  TRANSLATE_ON_TEXT_FIELDS: true, // نمایش آیکون ترجمه در فیلدهای متنی
+  TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
