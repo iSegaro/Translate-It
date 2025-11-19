@@ -101,13 +101,13 @@ export function correctTextDirection(element, text, options = {}) {
   } = options;
 
   if (!element || !text) {
-    logger.warn('correctTextDirection: Invalid element or text provided');
+    logger.debug('correctTextDirection: Invalid element or text provided');
     return;
   }
 
   // Additional validation for element properties
   if (!element.dataset || typeof element.dataset !== 'object') {
-    logger.warn('correctTextDirection: Element dataset not available, proceeding without style preservation');
+    logger.debug('correctTextDirection: Element dataset not available, proceeding without style preservation');
     // Disable preserveExisting if dataset is not available
     options.preserveExisting = false;
   }
@@ -149,7 +149,7 @@ export function correctTextDirection(element, text, options = {}) {
     // Legacy approach: apply styles directly to element
     // Validate element has style property
     if (!element.style || typeof element.style !== 'object') {
-      logger.warn('correctTextDirection: Element style not available, using CSS classes only');
+      logger.debug('correctTextDirection: Element style not available, using CSS classes only');
 
       // Only add CSS classes if style is not available
       if (addClasses && element.classList) {
@@ -174,7 +174,7 @@ export function correctTextDirection(element, text, options = {}) {
         }
       }
     } catch (error) {
-      logger.warn('correctTextDirection: Error accessing computed styles, applying direction directly:', error);
+      logger.debug('correctTextDirection: Error accessing computed styles, applying direction directly:', error);
       // Fallback: apply direction directly without checking existing styles
       element.style.direction = direction;
       if (setTextAlign) {
@@ -207,7 +207,7 @@ export function storeOriginalElementStyles(element) {
 
   // Validate element has dataset property
   if (!element.dataset || typeof element.dataset !== 'object') {
-    logger.warn('storeOriginalElementStyles: Element dataset not available, skipping style storage');
+    logger.debug('storeOriginalElementStyles: Element dataset not available, skipping style storage');
     return;
   }
 
@@ -236,7 +236,7 @@ export function restoreOriginalElementStyles(element) {
 
   // Validate element has dataset property before accessing it
   if (!element.dataset || typeof element.dataset !== 'object') {
-    logger.warn('restoreOriginalElementStyles: Element dataset not available, skipping style restoration');
+    logger.debug('restoreOriginalElementStyles: Element dataset not available, skipping style restoration');
     // Only remove classes if dataset is not available
     if (element.classList) {
       element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text', 'aiwc-translated-text');
