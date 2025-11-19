@@ -128,6 +128,14 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
 
+  // Chrome Translation API availability errors
+  if (
+    msg.includes("Chrome Translation API not available") ||
+    msg.includes("Translation API not available") ||
+    (msg.includes("Requires Chrome") && msg.includes("138"))
+  )
+    return ErrorTypes.API;
+
   // Import/Export password issues
   if (
     msg.includes("password is required to import") ||
