@@ -3,7 +3,6 @@
 ##### Added
 
 - **Local File Support**: Added support for translating content from local files (`file:///` URLs)
-- **Z.AI Provider**: Added support for GLM provider ([z.ai](https://z.ai)) 
 
 ##### Fixed
 
