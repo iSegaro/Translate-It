@@ -281,7 +281,7 @@ try {
 
 // Computed
 const hasContent = computed(
-  () => props.content.trim().length > 0 && !props.isLoading,
+  () => props.content && props.content.trim().length > 0 && !props.isLoading,
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
 

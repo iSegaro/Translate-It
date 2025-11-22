@@ -14,6 +14,8 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getProviderBatching } from '../core/ProviderConfigurations.js';
 import { getPromptBASEAIBatchAsync } from '@/shared/config/config.js';
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
@@ -34,6 +36,23 @@ export class BaseAIProvider extends BaseProvider {
     super(providerName);
   }
 
+  /**
+   * Convert language to AI provider format (full language names)
+   * AI providers work best with full language names instead of codes
+   * @param {string} lang - Language code or name
+   * @returns {string} - Full language name or AUTO_DETECT_VALUE
+   */
+  _getLangCode(lang) {
+    // AI providers use full language names, so convert codes to names
+    if (!lang) return AUTO_DETECT_VALUE;
+
+    // Convert language code to full language name for AI providers
+    const languageName = getLanguageNameFromCode(lang);
+    logger.debug(`[${this.providerName}] Language conversion: "${lang}" → "${languageName}"`);
+    return languageName || AUTO_DETECT_VALUE;
+  }
+
+  
   /**
    * Enhanced batch translation with streaming support
    * @param {string[]} texts - Array of texts to translate

@@ -3,6 +3,8 @@
  * Shared language name to code mappings used across translation providers
  */
 
+import { AUTO_DETECT_VALUE } from './constants.js';
+
 // Standard language name to code mapping
 export const LANGUAGE_NAME_TO_CODE_MAP = {
   afrikaans: "af",
@@ -69,6 +71,11 @@ export const LANGUAGE_NAME_TO_CODE_MAP = {
   uzbek: "uz",
   vietnamese: "vi",
 };
+
+// Reverse mapping: language code to language name
+export const LANGUAGE_CODE_TO_NAME_MAP = Object.fromEntries(
+  Object.entries(LANGUAGE_NAME_TO_CODE_MAP).map(([name, code]) => [code, name])
+);
 
 // Provider-specific language code mappings
 export const PROVIDER_LANGUAGE_MAPPINGS = {
@@ -182,4 +189,47 @@ export function getProviderLanguageCode(lang, provider = 'GOOGLE') {
   }
 
   return normalized; // Return as-is if not found
+}
+
+// Enhanced language mappings for AI providers that need more specific names
+const AI_ENHANCED_LANGUAGE_MAPPINGS = {
+  'ar': 'Arabic (Modern Standard)',
+  'zh': 'Chinese (Simplified)',
+  'zh-tw': 'Chinese (Traditional)',
+  'he': 'Hebrew (Modern)',
+  'fa': 'Persian (Farsi)',
+};
+
+// Utility function to convert language code to language name (for AI providers)
+export function getLanguageNameFromCode(code) {
+  if (!code || typeof code !== "string") return "";
+
+  // Handle special cases
+  if (code.toLowerCase() === AUTO_DETECT_VALUE) return AUTO_DETECT_VALUE;
+
+  const normalizedCode = code.toLowerCase().trim();
+
+  // Check AI-enhanced mappings first (for better AI provider compatibility)
+  if (AI_ENHANCED_LANGUAGE_MAPPINGS[normalizedCode]) {
+    return AI_ENHANCED_LANGUAGE_MAPPINGS[normalizedCode];
+  }
+
+  // Check reverse mapping
+  if (LANGUAGE_CODE_TO_NAME_MAP[normalizedCode]) {
+    return LANGUAGE_CODE_TO_NAME_MAP[normalizedCode];
+  }
+
+  // If it's already a full name (not in code format), return as-is
+  if (normalizedCode.length > 3 && !LANGUAGE_NAME_TO_CODE_MAP[normalizedCode]) {
+    return code;
+  }
+
+  // Fallback: try to find in original mapping by checking values
+  for (const [name, langCode] of Object.entries(LANGUAGE_NAME_TO_CODE_MAP)) {
+    if (langCode === normalizedCode) {
+      return name;
+    }
+  }
+
+  return code; // Return as-is if not found
 }

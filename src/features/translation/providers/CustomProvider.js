@@ -33,11 +33,7 @@ export class CustomProvider extends BaseAIProvider {
     super("Custom");
   }
 
-  _getLangCode(lang) {
-    // Custom provider works well with full language names, no mapping needed
-    return LanguageSwappingService._normalizeLangValue(lang);
-  }
-
+  
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiUrl, apiKey, model] = await Promise.all([
       getCustomApiUrlAsync(),

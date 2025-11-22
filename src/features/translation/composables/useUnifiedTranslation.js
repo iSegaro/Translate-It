@@ -140,7 +140,15 @@ export function useUnifiedTranslation(context = 'popup') {
       sourceLanguage: resultData.sourceLanguage,
       targetLanguage: resultData.targetLanguage
     };
-    getLogger().info(`[${context}] Translation updated successfully`);
+
+    // If same language translation, show appropriate message
+    if (resultData.translatedText === null && resultData.sourceLanguage === resultData.targetLanguage) {
+      const originalText = resultData.originalText || sourceText.value;
+      translatedText.value = originalText;
+      getLogger().debug(`[${context}] Same language detected - showing original text: "${originalText}"`);
+    }
+
+    getLogger().debug(`[${context}] Translation updated successfully - final translatedText: "${translatedText.value}"`);
   };
 
   const handleTranslationError = (error, messageId = null) => {
@@ -194,12 +202,15 @@ export function useUnifiedTranslation(context = 'popup') {
       
       const response = await sendMessage(requestData, timeoutOptions);
 
-      if (response && (response.result || response.data || response.translatedText)) {
+      getLogger().debug(`[${context}] Response received:`, response);
+
+      if (response && (response.result || response.data || response.translatedText !== undefined)) {
         let resultData = response.result || response.data || response;
-        
+        getLogger().debug(`[${context}] Processing direct response - resultData:`, resultData);
+
         if (resultData.success === false && resultData.error) {
           handleTranslationError(resultData.error, messageId);
-        } else if (resultData.translatedText) {
+        } else if (resultData.success === true && resultData.translatedText !== undefined) {
           handleTranslationSuccess(resultData);
           if (context === 'sidepanel') {
             pendingRequests.value.delete(messageId);
@@ -207,9 +218,14 @@ export function useUnifiedTranslation(context = 'popup') {
           }
         }
         isTranslating.value = false;
+        getLogger().debug(`[${context}] Direct response processed successfully`);
         return true;
       } else if (response && response.success === false && response.error) {
         handleTranslationError(response.error, messageId);
+        isTranslating.value = false;
+        return false;
+      } else {
+        getLogger().warn(`[${context}] No valid response received`, response);
         isTranslating.value = false;
         return false;
       }
@@ -264,18 +280,25 @@ export function useUnifiedTranslation(context = 'popup') {
 
     messageListener = (message) => {
       if (context === 'popup') {
+        getLogger().debug(`[${context}] Message listener triggered - isTranslating: ${isTranslating.value}`);
         getLogger().debug(`[${context}] Raw message received:`, message);
         let resultData = message.result || message.data || (message.translatedText ? message : null);
+        getLogger().debug(`[${context}] Extracted resultData:`, resultData);
 
-        if (resultData && (resultData.translatedText || resultData.success === false)) {
+        if (resultData && (resultData.translatedText !== undefined || resultData.success === false || resultData.success === true)) {
+          getLogger().debug(`[${context}] Processing result - setting isTranslating to false`);
           isTranslating.value = false;
           if (resultData.success === false && resultData.error) {
             handleTranslationError(resultData.error);
-          } else if (resultData.translatedText) {
+          } else if (resultData.success === true && resultData.translatedText !== undefined) {
+            // Handle both cases: translatedText (string) and null (same language)
             handleTranslationSuccess(resultData);
+            getLogger().debug(`[${context}] Translation result processed - translatedText: ${resultData.translatedText}`);
           } else {
             handleTranslationError("Unexpected response format");
           }
+        } else {
+          getLogger().debug(`[${context}] Message ignored - no result data found`, { message, resultData });
         }
       } else if (context === 'sidepanel') {
         if (message.action !== MessageActions.TRANSLATION_RESULT_UPDATE || (message.context && message.context !== MessagingContexts.SIDEPANEL)) {
@@ -290,7 +313,8 @@ export function useUnifiedTranslation(context = 'popup') {
           isTranslating.value = false;
           if (message.data.success === false && message.data.error) {
             handleTranslationError(message.data.error);
-          } else if (message.data.translatedText) {
+          } else if (message.data.success === true && message.data.translatedText !== undefined) {
+            // Handle both cases: translatedText (string) and null (same language)
             handleTranslationSuccess(message.data);
           } else {
             handleTranslationError("Unexpected response format in sidepanel");

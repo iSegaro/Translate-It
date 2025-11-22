@@ -37,11 +37,7 @@ export class OpenAIProvider extends BaseAIProvider {
     super("OpenAI");
   }
 
-  _getLangCode(lang) {
-    // OpenAI works well with full language names, no mapping needed
-    return LanguageSwappingService._normalizeLangValue(lang);
-  }
-
+  
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiKey, apiUrl, model] = await Promise.all([
       getOpenAIApiKeyAsync(),

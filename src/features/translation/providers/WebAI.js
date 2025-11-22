@@ -32,11 +32,7 @@ export class WebAIProvider extends BaseAIProvider {
     super("WebAI");
   }
 
-  _getLangCode(lang) {
-    // WebAI works well with full language names, no mapping needed
-    return LanguageSwappingService._normalizeLangValue(lang);
-  }
-
+  
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),

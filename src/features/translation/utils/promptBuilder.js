@@ -123,10 +123,8 @@ export async function buildPrompt(
       /\$_{TEXT}/g,
       text,
     );
-    logger.debug('Final prompt with TEXT replacement:', finalPrompt);
   } else {
     finalPrompt = `${finalPromptWithUserRules}\n\n${text}\n\n`;
-    logger.debug('Final prompt with appended text:', finalPrompt);
   }
 
   return finalPrompt;

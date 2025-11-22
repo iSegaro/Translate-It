@@ -44,14 +44,7 @@ export class GeminiProvider extends BaseAIProvider {
     super("Gemini");
   }
 
-  /**
-   * Convert language to Gemini-specific format
-   */
-  _getLangCode(lang) {
-    // Gemini uses full language names, so we return the input as-is
-    return lang || "auto";
-  }
-
+  
   /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers

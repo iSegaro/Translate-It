@@ -33,11 +33,7 @@ export class DeepSeekProvider extends BaseAIProvider {
     super("DeepSeek");
   }
 
-  _getLangCode(lang) {
-    // DeepSeek works well with full language names, no mapping needed
-    return LanguageSwappingService._normalizeLangValue(lang);
-  }
-
+  
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiKey, model] = await Promise.all([
       getDeepSeekApiKeyAsync(),
