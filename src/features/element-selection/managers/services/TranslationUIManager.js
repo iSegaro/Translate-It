@@ -170,6 +170,13 @@ export class TranslationUIManager {
     const request = this.orchestrator.requestManager.getRequest(messageId);
     if (!request) {
       this.logger.debug(`Stream update for non-existent request: ${messageId}`);
+
+      // For fallback requests, we should actively ignore them to prevent background from sending more
+      if (messageId.startsWith('fallback-')) {
+        this.logger.debug(`Ignoring fallback stream update for non-existent request: ${messageId}`);
+        return;
+      }
+
       return;
     }
 
@@ -189,7 +196,7 @@ export class TranslationUIManager {
 
       // Check if original request completed successfully
       if (originalRequest && originalRequest.status === 'completed' && originalRequest.translatedSegments.size > 0) {
-        this.logger.info(`Ignoring fallback stream update: original request ${originalId} already completed with ${originalRequest.translatedSegments.size} segments`);
+        this.logger.debug(`Ignoring fallback stream update: original request ${originalId} already completed with ${originalRequest.translatedSegments.size} segments`);
         return;
       }
 
@@ -200,7 +207,7 @@ export class TranslationUIManager {
         for (const wrapper of existingWrappers) {
           const wrapperMessageId = wrapper.getAttribute('data-message-id');
           if (wrapperMessageId === originalId) {
-            this.logger.info(`Ignoring fallback stream update: found existing DOM translations for original request ${originalId}`);
+            this.logger.debug(`Ignoring fallback stream update: found existing DOM translations for original request ${originalId}`);
             return;
           }
         }
@@ -208,19 +215,19 @@ export class TranslationUIManager {
 
       // Check global translation flag and last completed translation
       if (!window.isTranslationInProgress && window.lastCompletedTranslationId === originalId) {
-        this.logger.info(`Ignoring fallback stream update: translation ${originalId} already completed globally`);
+        this.logger.debug(`Ignoring fallback stream update: translation ${originalId} already completed globally`);
         return;
       }
     }
 
     // Check if request is already completed (error state) to prevent processing failed stream updates after termination
     if (request && (request.status === 'error' || request.status === 'completed')) {
-      this.logger.info(`Ignoring stream update for already completed request: ${messageId} (status: ${request.status})`);
+      this.logger.debug(`Ignoring stream update for already completed request: ${messageId} (status: ${request.status})`);
       return;
     }
 
     if (!data.success) {
-      this.logger.warn(`Received failed stream update for messageId: ${messageId}`, data.error);
+      this.logger.debug(`Received failed stream update for messageId: ${messageId}`, data.error);
 
       // Mark request as having errors
       this.orchestrator.requestManager.markRequestError(messageId, data.error);
@@ -848,7 +855,7 @@ export class TranslationUIManager {
           segmentMappings.push({ type: 'translated', originalIndex: j, batchIndex });
         } else {
           // Fallback: use original segment if translation not found
-          this.logger.warn(`Translation not found for segment: "${originalSegment}"`);
+          this.logger.debug(`Translation not found for segment: "${originalSegment}"`);
           allSegments.push(originalSegment);
           segmentMappings.push({ type: 'fallback', originalIndex: j });
         }
@@ -861,7 +868,7 @@ export class TranslationUIManager {
     const shouldApplyTranslation = this._validateNodeSegmentMatch(nodesToUpdate, originalTextKey, allSegments);
 
     if (!shouldApplyTranslation) {
-      this.logger.warn(`Skipping multi-segment translation due to node-segment mismatch`, {
+      this.logger.debug(`Skipping multi-segment translation due to node-segment mismatch`, {
         nodeTexts: Array.from(targetNodeTexts),
         originalTextKey: originalTextKey.substring(0, 100)
       });
@@ -1001,7 +1008,7 @@ export class TranslationUIManager {
       return;
     }
 
-    this.logger.info("Translation stream finished for message:", messageId, {
+    this.logger.debug("Translation stream finished for message:", messageId, {
       success: data?.success,
       error: data?.error,
       completed: data?.completed
@@ -1032,7 +1039,7 @@ export class TranslationUIManager {
    * @private
    */
   async _handleStreamEndSuccess(messageId, request) {
-    this.logger.info(`Stream ended successfully for messageId: ${messageId}. Processing final result...`);
+    this.logger.debug(`Stream ended successfully for messageId: ${messageId}. Processing final result...`);
 
     try {
       // Create final translated data array that matches the full expandedTexts structure
@@ -1054,7 +1061,7 @@ export class TranslationUIManager {
       }
 
       // CRITICAL FIX: Enhanced reassembly with segment validation
-      this.logger.info(`Reassembling ${finalTranslatedData.length} translated segments into final translations`);
+      this.logger.debug(`Reassembling ${finalTranslatedData.length} translated segments into final translations`);
 
       // Use the proper reassembly function to preserve empty lines and structure
       const newTranslations = reassembleTranslations(
@@ -1065,13 +1072,13 @@ export class TranslationUIManager {
         new Map() // No cached translations
       );
 
-      this.logger.info(`Reassembly complete: ${newTranslations.size} final translations created`);
+      this.logger.debug(`Reassembly complete: ${newTranslations.size} final translations created`);
 
       // Store in state manager for potential revert
       this.orchestrator.stateManager.addTranslatedElement(request.element, newTranslations);
 
       // CRITICAL FIX: Force apply complete translations to replace ALL streaming segments
-      this.logger.info(`Force applying complete final translations to replace streaming content`);
+      this.logger.debug(`Force applying complete final translations to replace streaming content`);
       await this.applyTranslationsToNodes(request.textNodes, newTranslations, {
         skipStreamingUpdates: true, // This ensures replacement of streaming content
         messageId: messageId,
@@ -1111,7 +1118,7 @@ export class TranslationUIManager {
 
       // Attempt fallback processing
       try {
-        this.logger.info(`Attempting fallback translation processing...`);
+        this.logger.debug(`Attempting fallback translation processing...`);
 
         // Create fallback translations using available segments
         const fallbackTranslations = new Map();
@@ -1135,7 +1142,7 @@ export class TranslationUIManager {
             isFinalResult: true
           });
 
-          this.logger.info(`Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
+          this.logger.debug(`Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
         }
 
       } catch (fallbackError) {
@@ -1149,7 +1156,7 @@ export class TranslationUIManager {
    * @private
    */
   async _handleStreamEndError(messageId, request, data) {
-    this.logger.warn(`Stream ended with error for messageId: ${messageId}`, data?.error || request.lastError);
+    this.logger.debug(`Stream ended with error for messageId: ${messageId}`, data?.error || request.lastError);
 
     // Create error object
     const errorMessage = data?.error?.message || request.lastError?.message || 'Translation failed during streaming';
@@ -1160,7 +1167,7 @@ export class TranslationUIManager {
     const shouldRetry = this.orchestrator.errorHandlerService.isRecoverableError(error, request);
 
     if (shouldRetry) {
-      this.logger.info('Attempting retry with fallback provider due to recoverable error', {
+      this.logger.debug('Attempting retry with fallback provider due to recoverable error', {
         messageId,
         errorType: error.originalError?.type || 'unknown'
       });
@@ -1305,7 +1312,7 @@ export class TranslationUIManager {
     await this.applyTranslationsToNodes(textNodes, newTranslations);
 
     this.orchestrator.requestManager.updateRequestStatus(request.id, 'completed', { result: data });
-    this.logger.info("Translation applied successfully to DOM elements (fallback)", { messageId: request.id });
+    this.logger.debug("Translation applied successfully to DOM elements (fallback)", { messageId: request.id });
   }
 
   /**
@@ -1350,7 +1357,7 @@ export class TranslationUIManager {
    * @param {Object} options - Application options
    */
   async applyTranslationsToNodes(textNodes, translations, options = {}) {
-    this.logger.info("DETERMINISTIC TRANSLATION APPLICATION", {
+    this.logger.debug("DETERMINISTIC TRANSLATION APPLICATION", {
       textNodesCount: textNodes.length,
       translationsSize: translations.size,
       skipStreamingUpdates: options.skipStreamingUpdates || false,
@@ -1503,7 +1510,7 @@ export class TranslationUIManager {
       const isTranslationCandidate = isImportantLongText || containsComplexContent || hasMeaningfulContent || isOriginalLongText;
 
       // ENHANCED: Comprehensive logging for debugging node candidacy issues
-      this.logger.info(`ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
+      this.logger.debug(`ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
         originalLength: originalText.length,
         trimmedLength: trimmedOriginalText.length,
         isAlreadyTranslated,
@@ -1682,7 +1689,7 @@ export class TranslationUIManager {
             finalTranslation = longestTranslation;
             matchStrategy = 'rescue_longest_translation';
 
-            this.logger.info(`RESCUE MODE SUCCESS: Applying longest translation (${longestLength} chars) to empty node ${nodeIndex}`, {
+            this.logger.debug(`RESCUE MODE SUCCESS: Applying longest translation (${longestLength} chars) to empty node ${nodeIndex}`, {
               originalLength: originalText.length,
               translationLength: longestLength,
               longestKeyPreview: longestKey.substring(0, 50) + '...',
@@ -1691,7 +1698,7 @@ export class TranslationUIManager {
               isEmptyNode: trimmedOriginalText.length === 0
             });
           } else {
-            this.logger.warn(`RESCUE MODE FAILED: No substantial translation found for empty node ${nodeIndex}`, {
+            this.logger.debug(`RESCUE MODE FAILED: No substantial translation found for empty node ${nodeIndex}`, {
               originalLength: originalText.length,
               longestFound: longestLength,
               totalEntries: translationLookup.size
@@ -1719,7 +1726,7 @@ export class TranslationUIManager {
         }
 
         // DEBUG: Log translation lookup results
-        this.logger.info(`TRANSLATION LOOKUP for node ${nodeIndex}`, {
+        this.logger.debug(`TRANSLATION LOOKUP for node ${nodeIndex}`, {
           isFinalResult: options.isFinalResult,
           isAlreadyTranslated,
           originalLength: originalText.length,
@@ -1743,7 +1750,7 @@ export class TranslationUIManager {
 
           // ENHANCED: For empty nodes or untranslated nodes (final result only), always apply
           if (!translationInner && options.isFinalResult) {
-            this.logger.info(`APPLYING FINAL TRANSLATION TO NODE ${nodeIndex}`, {
+            this.logger.debug(`APPLYING FINAL TRANSLATION TO NODE ${nodeIndex}`, {
               originalLength: originalText.length,
               finalLength: finalTrimmed.length,
               originalPreview: originalText.substring(0, 50) + '...',
@@ -1780,7 +1787,7 @@ export class TranslationUIManager {
               shouldReplace = true;
               replacementReason = 'rescue_mode_completes_streaming';
 
-              this.logger.info(`RESCUE MODE OVERRIDE: Replacing streaming with complete translation for node ${nodeIndex}`, {
+              this.logger.debug(`RESCUE MODE OVERRIDE: Replacing streaming with complete translation for node ${nodeIndex}`, {
                 streamingLength: streamingTranslationLength,
                 rescueLength: rescueTranslationLength,
                 improvementPercent: Math.round((rescueTranslationLength / streamingTranslationLength - 1) * 100),
@@ -1818,7 +1825,7 @@ export class TranslationUIManager {
           }
 
           // CRITICAL FIX: Add comprehensive debug logging for replacement decisions
-          this.logger.info(`FINAL REPLACEMENT DECISION for node ${nodeIndex}`, {
+          this.logger.debug(`FINAL REPLACEMENT DECISION for node ${nodeIndex}`, {
             isFinalResult: options.isFinalResult,
             currentLength: currentTranslation.length,
             finalLength: finalTrimmed.length,
@@ -1837,7 +1844,7 @@ export class TranslationUIManager {
           });
 
           if (shouldReplace) {
-            this.logger.info(`REPLACING streaming translation with complete final translation for node ${nodeIndex}`, {
+            this.logger.debug(`REPLACING streaming translation with complete final translation for node ${nodeIndex}`, {
               currentLength: currentTranslation.length,
               finalLength: finalTrimmed.length,
               improvement: finalTrimmed.length - currentTranslation.length,
@@ -1930,7 +1937,7 @@ export class TranslationUIManager {
 
       // CRITICAL: Enhanced debugging and fallback for unmatched nodes
       if (!translatedText) {
-        this.logger.error(`NO MATCH FOUND for node ${nodeIndex}`, {
+        this.logger.debug(`NO MATCH FOUND for node ${nodeIndex}`, {
           originalText: JSON.stringify(originalText),
           trimmedOriginalText: JSON.stringify(trimmedOriginalText),
           normalizedOriginal: JSON.stringify(originalText.replace(/\s+/g, ' ').trim()),
@@ -1992,7 +1999,7 @@ export class TranslationUIManager {
         if (bestMatch) {
           translatedText = bestMatch;
           matchType = bestMatchType;
-          this.logger.warn(`ENHANCED FALLBACK MATCH for node ${nodeIndex} (${bestMatchType})`, {
+          this.logger.debug(`ENHANCED FALLBACK MATCH for node ${nodeIndex} (${bestMatchType})`, {
             original: JSON.stringify(originalText.substring(0, 50)),
             matchScore: Math.round(bestScore),
             matchType: bestMatchType
@@ -2097,7 +2104,7 @@ export class TranslationUIManager {
       }
     });
 
-    this.logger.info("🎯 TRANSLATION APPLICATION COMPLETE", {
+    this.logger.debug("TRANSLATION APPLICATION COMPLETE", {
       totalNodes: textNodes.length,
       validNodes: validTextNodes.length,
       appliedCount: processedCount,
@@ -2120,7 +2127,7 @@ export class TranslationUIManager {
     );
 
     if (longTranslations.length > 0) {
-      this.logger.info("📝 LONG TRANSLATIONS DEBUG", {
+      this.logger.debug("LONG TRANSLATIONS DEBUG", {
         count: longTranslations.length,
         details: longTranslations.map(([key, value], index) => ({
           index,
@@ -2165,7 +2172,7 @@ export class TranslationUIManager {
       this.logger.debug('Triggering SelectElementManager cleanup');
       window.selectElementManagerInstance.performPostTranslationCleanup();
     } else {
-      this.logger.warn('Cannot trigger cleanup: SelectElementManager not available');
+      this.logger.debug('Cannot trigger cleanup: SelectElementManager not available');
     }
   }
 

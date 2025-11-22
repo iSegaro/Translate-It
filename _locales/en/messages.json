@@ -24,7 +24,6 @@
   "api_provider_openai": { "message": "OpenAI" },
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
-  "api_provider_zai": { "message": "Z.AI" },
   "api_provider_bing": { "message": "Microsoft Bing" },
   "api_provider_browser": { "message": "Browser API" },
   "api_provider_yandex": { "message": "Yandex Translate" },
@@ -599,20 +598,6 @@
   "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "Select Element mode activated. Click on any text element to translate." },
   "SELECT_ELEMENT_TRANSLATING": { "message": "Translating..." },
   "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
-  "SELECT_ELEMENT_REVERT": { "message": "Revert" },
+  "SELECT_ELEMENT_REVERT": { "message": "Revert" }
 
-  "zai_api_settings_title": { "message": "Z.AI GLM API Settings" },
-  "zai_api_key_info": { "message": "You can get your Z.AI API key from:" },
-  "zai_api_key_international_link": { "message": "Get Your API Key" },
-  "zai_api_key_china_link": { "message": "Get Your API Key" },
-  "zai_api_key_international_site": { "message": "For international users" },
-  "zai_api_key_china_site": { "message": "For users in China" },
-  "zai_api_settings_api_key_label": { "message": "API Key" },
-  "zai_api_key_placeholder": { "message": "Paste your Z.AI API key here" },
-  "zai_custom_model_label": { "message": "Custom Model Name" },
-  "zai_custom_model_placeholder": { "message": "Enter custom model name" },
-  "zai_custom_model_info": { "message": "Enter the exact model name as provided by Z.AI" },
-  "zai_api_settings_api_url_label": { "message": "API URL" },
-  "zai_api_url_placeholder": { "message": "Default Z.AI API URL" },
-  "zai_api_url_info": { "message": "Leave empty to use the default Z.AI API endpoint" }
-}
+  }

@@ -27,7 +27,7 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
         reason: reason,
         targetFrameId: sender.frameId // Send to specific frame if available
       });
-      logger.debug(`[GoogleTTSHandler] ✅ Notified content script in tab ${sender.tab.id} (${reason})`);
+      logger.debug(`✅ Notified content script in tab ${sender.tab.id} (${reason})`);
     } else {
       // Popup/Sidepanel request - send via runtime.sendMessage (global)
       await browserAPI.runtime.sendMessage({
@@ -36,10 +36,10 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
         reason: reason,
         targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
       });
-      logger.debug(`[GoogleTTSHandler] ✅ Notified popup/sidepanel via runtime.sendMessage (${reason})`);
+      logger.debug(`✅ Notified popup/sidepanel via runtime.sendMessage (${reason})`);
     }
   } catch (sendError) {
-    logger.debug(`[GoogleTTSHandler] Could not notify sender (${reason}):`, sendError.message);
+    logger.debug(`Could not notify sender (${reason}):`, sendError.message);
     throw sendError; // Re-throw for caller handling
   }
 };
@@ -85,46 +85,46 @@ const isLanguageSupported = (language) => {
  */
 export const handleGoogleTTSSpeak = async (message, sender) => {
   try {
-    logger.debug('[GoogleTTSHandler] 🎤 Processing Google TTS request:', message);
+    logger.debug('Processing Google TTS request:', message);
     
     const { text, language } = message.data || {};
     
     // Request deduplication - prevent duplicate requests with same text/language
     if (currentTTSRequest && text === lastTTSText && language === lastTTSLanguage) {
-      logger.debug('[GoogleTTSHandler] 🚫 Duplicate request detected, using existing promise');
+      logger.debug('Duplicate request detected, using existing promise');
       return await currentTTSRequest;
     }
     
     // If there's a different request in progress, notify previous sender and wait for completion
     if (currentTTSRequest) {
-      logger.debug('[GoogleTTSHandler] ⏳ Waiting for current TTS request to complete');
+      logger.debug('Waiting for current TTS request to complete');
 
       // Send GOOGLE_TTS_ENDED to previous sender before starting new request
       if (currentTTSSender) {
         try {
-          logger.debug('[GoogleTTSHandler] 📤 Notifying previous sender of TTS interruption');
+          logger.debug('Notifying previous sender of TTS interruption');
           await notifyTTSEnded(currentTTSSender, 'interrupted');
         } catch (notifyError) {
-          logger.debug('[GoogleTTSHandler] Could not notify previous sender:', notifyError.message);
+          logger.debug('Could not notify previous sender:', notifyError.message);
         }
       }
 
       try {
         await currentTTSRequest;
       } catch {
-        logger.debug('[GoogleTTSHandler] Previous request failed, continuing with new one');
+        logger.debug('Previous request failed, continuing with new one');
       }
     }
     
     if (!text || !text.trim() || text.trim().length === 0) {
-      logger.error('[GoogleTTSHandler] ❌ No valid text provided for Google TTS');
+      logger.error('No valid text provided for Google TTS');
       throw new Error('No valid text provided for Google TTS');
     }
     
     // Validate language support
     const targetLanguage = language || 'en';
     if (!isLanguageSupported(targetLanguage)) {
-      logger.warn('[GoogleTTSHandler] ⚠️ Unsupported language for TTS:', targetLanguage);
+      logger.warn('Unsupported language for TTS:', targetLanguage);
       return {
         success: false,
         error: `Language '${targetLanguage}' is not supported by Google TTS`,
@@ -133,8 +133,8 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     }
     
     const trimmedText = text.trim();
-    logger.debug('[GoogleTTSHandler] 📝 Text to speak:', trimmedText.substring(0, 100) + (trimmedText.length > 100 ? '...' : ''));
-    logger.debug('[GoogleTTSHandler] 🌍 Language:', targetLanguage, '(validated)');
+    logger.debug('Text to speak:', trimmedText.substring(0, 100) + (trimmedText.length > 100 ? '...' : ''));
+    logger.debug('Language:', targetLanguage, '(validated)');
     
     // Create Google TTS URL with better parameters to avoid HTTP 400
     let finalText = trimmedText;
@@ -162,14 +162,14 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     }
     
     if (finalText.length < 1) {
-      logger.error('[GoogleTTSHandler] ❌ Text became empty after cleaning');
+      logger.error('Text became empty after cleaning');
       throw new Error('Text became empty after cleaning');
     }
     
-    logger.debug('[GoogleTTSHandler] 🧹 Cleaned text:', finalText.substring(0, 100) + (finalText.length > 100 ? '...' : ''));
+    logger.debug('Cleaned text:', finalText.substring(0, 100) + (finalText.length > 100 ? '...' : ''));
     
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(finalText)}&tl=${targetLanguage}&client=tw-ob`;
-    logger.debug('[GoogleTTSHandler] 🔗 TTS URL created:', ttsUrl.substring(0, 100) + '...');
+    logger.debug('TTS URL created:', ttsUrl.substring(0, 100) + '...');
     
     // Store current request info for deduplication
     lastTTSText = text;
@@ -182,10 +182,10 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       try {
         // Chrome: delegate to offscreen document
         // Firefox: play directly in background
-        logger.debug('[GoogleTTSHandler] 🚀 Starting browser-specific TTS playback...');
+        logger.debug('Starting browser-specific TTS playback...');
         await playGoogleTTSWithBrowserDetection(ttsUrl);
         
-        logger.debug('[GoogleTTSHandler] ✅ Google TTS completed successfully');
+        logger.debug('Google TTS completed successfully');
         return { success: true, processedVia: 'background-google-tts' };
       } catch (error) {
         // Clear ID on error
@@ -202,7 +202,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     return await currentTTSRequest;
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS failed:', error);
+    logger.error('Google TTS failed:', error);
     
     // Clear request state on error
     currentTTSRequest = null;
@@ -226,14 +226,14 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
 const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
   const isChromiumBrowser = isChromium();
   
-  logger.debug('[GoogleTTSHandler] 🔍 Browser detection:', { isChromium: isChromiumBrowser, userAgent: navigator.userAgent });
+  logger.debug('Browser detection:', { isChromium: isChromiumBrowser, userAgent: navigator.userAgent });
   
   if (isChromiumBrowser) {
-    logger.debug('[GoogleTTSHandler] 🟢 Using Chromium offscreen document method');
+    logger.debug('Using Chromium offscreen document method');
     // Chromium-based browsers: use offscreen document
     return await playWithOffscreenDocument(ttsUrl);
   } else {
-    logger.debug('[GoogleTTSHandler] 🟠 Using Firefox direct audio method');
+    logger.debug('Using Firefox direct audio method');
     // Firefox: play directly (Audio API available in background context)
     return await playGoogleTTSAudio(ttsUrl);
   }
@@ -251,9 +251,9 @@ const playWithOffscreenDocument = async (ttsUrl) => {
   const sendMessageAndGetResponse = (browserAPI) => {
     return new Promise((resolve, reject) => {
       const responseTimeout = setTimeout(() => {
-        logger.warn('[GoogleTTSHandler] Offscreen response timeout - but audio might have started playing');
+        logger.warn('Offscreen response timeout - but audio might have started playing');
         setTimeout(() => {
-          logger.error('[GoogleTTSHandler] Final timeout - assuming failure');
+          logger.error('Final timeout - assuming failure');
           reject(new Error('Offscreen TTS response timeout'));
         }, 2000);
       }, 5000);
@@ -264,12 +264,12 @@ const playWithOffscreenDocument = async (ttsUrl) => {
         target: 'offscreen'
       }).then((response) => {
         clearTimeout(responseTimeout);
-        logger.debug('[GoogleTTSHandler] Offscreen response received:', response);
+        logger.debug('Offscreen response received:', response);
         
         // Chrome MV3 has bugs with sendResponse - ignore empty responses
         // Audio will play and send GOOGLE_TTS_ENDED when complete
         if (response === undefined || response === null || (typeof response === 'object' && Object.keys(response).length === 0)) {
-          logger.debug('[GoogleTTSHandler] Empty response from offscreen (Chrome MV3 issue) - assuming success');
+          logger.debug('Empty response from offscreen (Chrome MV3 issue) - assuming success');
           resolve(); // Assume success, audio will play
           return;
         }
@@ -279,12 +279,12 @@ const playWithOffscreenDocument = async (ttsUrl) => {
           // This handles both { success: true } and successful completion messages
           resolve();
         } else {
-          logger.error('[GoogleTTSHandler] Offscreen failed with response:', response);
+          logger.error('Offscreen failed with response:', response);
           reject(new Error(response?.error || 'Offscreen TTS failed'));
         }
       }).catch((err) => {
         clearTimeout(responseTimeout);
-        logger.error('[GoogleTTSHandler] Runtime sendMessage failed:', err);
+        logger.error('Runtime sendMessage failed:', err);
         reject(err);
       });
     });
@@ -293,32 +293,32 @@ const playWithOffscreenDocument = async (ttsUrl) => {
   // This function ensures that the offscreen document is created only once.
   const setupOffscreenDocument = async (browserAPI) => {
     try {
-      logger.debug('[GoogleTTSHandler] Starting setupOffscreenDocument...');
+      logger.debug('Starting setupOffscreenDocument...');
       
       // Check if offscreen API is available
       if (!browserAPI.offscreen) {
-        logger.error('[GoogleTTSHandler] Offscreen API not available!');
+        logger.error('Offscreen API not available!');
         throw new Error('Offscreen API not available');
       }
       
-      logger.debug('[GoogleTTSHandler] Offscreen API available, checking hasDocument...');
+      logger.debug('Offscreen API available, checking hasDocument...');
       const hasDocument = await browserAPI.offscreen.hasDocument();
-      logger.debug('[GoogleTTSHandler] Checking if offscreen document exists:', hasDocument);
+      logger.debug('Checking if offscreen document exists:', hasDocument);
       
       if (hasDocument) {
-          logger.debug('[GoogleTTSHandler] Offscreen document already exists.');
+          logger.debug('Offscreen document already exists.');
           return;
       }
 
-      logger.debug('[GoogleTTSHandler] No offscreen document found. Creating new one...');
+      logger.debug('No offscreen document found. Creating new one...');
       await browserAPI.offscreen.createDocument({
         url: OFFSCREEN_DOCUMENT_PATH,
         reasons: ['AUDIO_PLAYBACK'],
         justification: 'Play Google TTS audio'
       });
-      logger.debug('[GoogleTTSHandler] Offscreen document created successfully.');
+      logger.debug('Offscreen document created successfully.');
     } catch (error) {
-      logger.error('[GoogleTTSHandler] Error in setupOffscreenDocument:', error);
+      logger.error('Error in setupOffscreenDocument:', error);
       throw error;
     }
   };
@@ -326,41 +326,41 @@ const playWithOffscreenDocument = async (ttsUrl) => {
   try {
     const browserAPI = await initializebrowserAPI();
     
-    logger.debug('[GoogleTTSHandler] Initializing offscreen document setup...');
+    logger.debug('Initializing offscreen document setup...');
     
     // Check if we have an existing promise but offscreen document doesn't actually exist
     if (offscreenDocumentPromise) {
       try {
         const hasDocument = await browserAPI.offscreen.hasDocument();
-        logger.debug('[GoogleTTSHandler] Checking existing promise - hasDocument:', hasDocument);
+        logger.debug('Checking existing promise - hasDocument:', hasDocument);
         
         if (!hasDocument) {
-          logger.debug('[GoogleTTSHandler] Existing promise but no offscreen document - resetting promise...');
+          logger.debug('Existing promise but no offscreen document - resetting promise...');
           offscreenDocumentPromise = null;
         }
       } catch (error) {
-        logger.warn('[GoogleTTSHandler] Error checking existing offscreen document - resetting promise:', error);
+        logger.warn('Error checking existing offscreen document - resetting promise:', error);
         offscreenDocumentPromise = null;
       }
     }
     
     // Use the promise to ensure setup is only called once.
     if (!offscreenDocumentPromise) {
-      logger.debug('[GoogleTTSHandler] Creating new offscreen document promise...');
+      logger.debug('Creating new offscreen document promise...');
       offscreenDocumentPromise = setupOffscreenDocument(browserAPI);
     } else {
-      logger.debug('[GoogleTTSHandler] Using existing offscreen document promise...');
+      logger.debug('Using existing offscreen document promise...');
     }
     
-    logger.debug('[GoogleTTSHandler] Waiting for offscreen document setup...');
+    logger.debug('Waiting for offscreen document setup...');
     await offscreenDocumentPromise;
-    logger.debug('[GoogleTTSHandler] Offscreen document setup completed.');
+    logger.debug('Offscreen document setup completed.');
 
-    logger.debug('[GoogleTTSHandler] Sending to offscreen:', ttsUrl);
+    logger.debug('Sending to offscreen:', ttsUrl);
     return await sendMessageAndGetResponse(browserAPI);
 
   } catch (error) {
-    logger.error('[GoogleTTSHandler] Offscreen document error:', error);
+    logger.error('Offscreen document error:', error);
     // Reset the promise on error so we can try again.
     offscreenDocumentPromise = null;
     throw error;
@@ -396,16 +396,16 @@ const playGoogleTTSAudio = (ttsUrl) => {
         clearTimeout(timeout);
         currentFirefoxAudio = null; // Clear reference when ended
         currentTTSId = null; // Clear TTS ID when audio actually ends
-        logger.debug('[GoogleTTSHandler] Background Google TTS audio completed');
+        logger.debug('Background Google TTS audio completed');
 
         // Send completion event for event-driven system (Firefox)
         // Note: Firefox completion is handled here, Chrome uses offscreen document
         initializebrowserAPI().then(browserAPI => {
           browserAPI.runtime.sendMessage({ action: MessageActions.GOOGLE_TTS_ENDED }).catch(() => {
-            logger.debug('[GoogleTTSHandler] Failed to send TTS ended notification (Firefox)');
+            logger.debug('Failed to send TTS ended notification (Firefox)');
           });
         }).catch(error => {
-          logger.debug('[GoogleTTSHandler] Could not send TTS ended event:', error.message);
+          logger.debug('Could not send TTS ended event:', error.message);
         });
 
         resolve();
@@ -413,7 +413,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
       
       audio.onerror = (error) => {
         clearTimeout(timeout);
-        logger.error('[GoogleTTSHandler] Background Google TTS audio error:', error);
+        logger.error('Background Google TTS audio error:', error);
         reject(new Error(`Background Google TTS failed: ${error.message}`));
       };
       
@@ -422,7 +422,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
         reject(new Error(`Background Google TTS play failed: ${playError.message}`));
       });
       
-      logger.debug('[GoogleTTSHandler] Background Google TTS audio started');
+      logger.debug('Background Google TTS audio started');
       
     } catch (error) {
       reject(error);
@@ -440,14 +440,14 @@ export const handleGoogleTTSStopAll = async (message) => {
     const { ttsId } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
     
-    logger.debug(`[GoogleTTSHandler] 🛑 Processing TTS Stop request - ${isSpecificStop ? `Specific: ${ttsId}` : 'All TTS'}`);
-    logger.debug(`[GoogleTTSHandler] TTS state - ID: ${currentTTSId}, specific: ${isSpecificStop}`);
+    logger.debug(`Processing TTS Stop request - ${isSpecificStop ? `Specific: ${ttsId}` : 'All TTS'}`);
+    logger.debug(`TTS state - ID: ${currentTTSId}, specific: ${isSpecificStop}`);
     
     // Check if we should stop this TTS
     const shouldStop = !isSpecificStop || currentTTSId === ttsId;
     
     if (!shouldStop) {
-      logger.debug(`[GoogleTTSHandler] Skipping stop - requested ttsId ${ttsId} doesn't match current ${currentTTSId}`);
+      logger.debug(`Skipping stop - requested ttsId ${ttsId} doesn't match current ${currentTTSId}`);
       return { 
         success: true, 
         skipped: true, 
@@ -460,10 +460,10 @@ export const handleGoogleTTSStopAll = async (message) => {
     // Send GOOGLE_TTS_ENDED to current sender before clearing (when stopping all)
     if (!isSpecificStop && currentTTSSender) {
       try {
-        logger.debug('[GoogleTTSHandler] 📤 Notifying current sender of TTS stop');
+        logger.debug('Notifying current sender of TTS stop');
         await notifyTTSEnded(currentTTSSender, 'stopped');
       } catch (notifyError) {
-        logger.debug('[GoogleTTSHandler] Could not notify sender of stop:', notifyError.message);
+        logger.debug('Could not notify sender of stop:', notifyError.message);
       }
     }
 
@@ -479,18 +479,18 @@ export const handleGoogleTTSStopAll = async (message) => {
     const isChromiumBrowser = isChromium();
     
     if (isChromiumBrowser) {
-      logger.debug('[GoogleTTSHandler] 🟢 Stopping TTS via offscreen document');
+      logger.debug('Stopping TTS via offscreen document');
       await stopWithOffscreenDocument();
     } else {
-      logger.debug('[GoogleTTSHandler] 🟠 Stopping TTS directly in Firefox');
+      logger.debug('Stopping TTS directly in Firefox');
       await stopGoogleTTSAudio();
     }
     
-    logger.debug('[GoogleTTSHandler] ✅ Google TTS stopped successfully');
+    logger.debug('Google TTS stopped successfully');
     return { success: true, action: 'stopped' };
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS stop failed:', error);
+    logger.error('Google TTS stop failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS stop failed'
@@ -505,23 +505,23 @@ export const handleGoogleTTSStopAll = async (message) => {
  */
 export const handleGoogleTTSPause = async () => {
   try {
-    logger.debug('[GoogleTTSHandler] ⏸️ Processing Google TTS Pause request');
+    logger.debug('Processing Google TTS Pause request');
     
     const isChromiumBrowser = isChromium();
     
     if (isChromiumBrowser) {
-      logger.debug('[GoogleTTSHandler] 🟢 Pausing TTS via offscreen document');
+      logger.debug('Pausing TTS via offscreen document');
       await pauseWithOffscreenDocument();
     } else {
-      logger.debug('[GoogleTTSHandler] 🟠 Pausing TTS directly in Firefox');
+      logger.debug('Pausing TTS directly in Firefox');
       await pauseGoogleTTSAudio();
     }
     
-    logger.debug('[GoogleTTSHandler] ✅ Google TTS paused successfully');
+    logger.debug('✅ Google TTS paused successfully');
     return { success: true, action: 'paused' };
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS pause failed:', error);
+    logger.error('❌ Google TTS pause failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS pause failed'
@@ -536,23 +536,23 @@ export const handleGoogleTTSPause = async () => {
  */
 export const handleGoogleTTSResume = async () => {
   try {
-    logger.debug('[GoogleTTSHandler] ▶️ Processing Google TTS Resume request');
+    logger.debug('Processing Google TTS Resume request');
     
     const isChromiumBrowser = isChromium();
     
     if (isChromiumBrowser) {
-      logger.debug('[GoogleTTSHandler] 🟢 Resuming TTS via offscreen document');
+      logger.debug('Resuming TTS via offscreen document');
       await resumeWithOffscreenDocument();
     } else {
-      logger.debug('[GoogleTTSHandler] 🟠 Resuming TTS directly in Firefox');
+      logger.debug('Resuming TTS directly in Firefox');
       await resumeGoogleTTSAudio();
     }
     
-    logger.debug('[GoogleTTSHandler] ✅ Google TTS resumed successfully');
+    logger.debug('✅ Google TTS resumed successfully');
     return { success: true, action: 'resumed' };
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS resume failed:', error);
+    logger.error('❌ Google TTS resume failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS resume failed'
@@ -567,29 +567,29 @@ export const handleGoogleTTSResume = async () => {
  */
 export const handleGoogleTTSEnded = async () => {
   try {
-    logger.debug('[GoogleTTSHandler] 🏁 Processing Google TTS End notification');
+    logger.debug('Processing Google TTS End notification');
 
     // Clear the current TTS ID when audio ends
     currentTTSId = null;
-    logger.debug('[GoogleTTSHandler] 🧹 Cleared currentTTSId on completion');
+    logger.debug('Cleared currentTTSId on completion');
 
     // Send GOOGLE_TTS_ENDED event only to the original requester
     if (currentTTSSender) {
       try {
         await notifyTTSEnded(currentTTSSender, 'completed');
       } catch (sendError) {
-        logger.debug('[GoogleTTSHandler] Could not send GOOGLE_TTS_ENDED to requester:', sendError.message);
+        logger.debug('Could not send GOOGLE_TTS_ENDED to requester:', sendError.message);
       }
 
       // Clear sender after sending event
       currentTTSSender = null;
     } else {
-      logger.debug('[GoogleTTSHandler] No sender info stored - skipping event forwarding');
+      logger.debug('No sender info stored - skipping event forwarding');
     }
 
     return { success: true, action: 'cleared' };
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS end handling failed:', error);
+    logger.error('❌ Google TTS end handling failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS end handling failed'
@@ -604,25 +604,25 @@ export const handleGoogleTTSEnded = async () => {
  */
 export const handleGoogleTTSGetStatus = async () => {
   try {
-    logger.debug('[GoogleTTSHandler] 📊 Processing Google TTS Get Status request');
+    logger.debug('Processing Google TTS Get Status request');
     
     const isChromiumBrowser = isChromium();
     
     let status = 'idle';
     
     if (isChromiumBrowser) {
-      logger.debug('[GoogleTTSHandler] 🟢 Getting TTS status via offscreen document');
+      logger.debug('Getting TTS status via offscreen document');
       status = await getStatusWithOffscreenDocument();
     } else {
-      logger.debug('[GoogleTTSHandler] 🟠 Getting TTS status directly in Firefox');
+      logger.debug('Getting TTS status directly in Firefox');
       status = await getGoogleTTSAudioStatus();
     }
     
-    logger.debug('[GoogleTTSHandler] ✅ Google TTS status retrieved:', status);
+    logger.debug('✅ Google TTS status retrieved:', status);
     return { success: true, status };
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] ❌ Google TTS get status failed:', error);
+    logger.error('❌ Google TTS get status failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS get status failed',
@@ -641,16 +641,16 @@ const stopWithOffscreenDocument = async () => {
 
     if (browserAPI.offscreen && typeof browserAPI.offscreen.hasDocument === 'function') {
       if (await browserAPI.offscreen.hasDocument()) {
-        logger.debug('[GoogleTTSHandler] Closing offscreen document to stop TTS.');
+        logger.debug('Closing offscreen document to stop TTS.');
         await browserAPI.offscreen.closeDocument();
         // Reset the promise so a new document can be created next time.
         offscreenDocumentPromise = null;
       } else {
-        logger.debug('[GoogleTTSHandler] No offscreen document to close, stop is successful.');
+        logger.debug('No offscreen document to close, stop is successful.');
       }
     }
   } catch (error) {
-    logger.debug('[GoogleTTSHandler] Error closing offscreen document:', error);
+    logger.debug('Error closing offscreen document:', error);
     // Reset promise on error as well.
     offscreenDocumentPromise = null;
     // We don't re-throw because for a "stop" operation, we don't want to surface an error.
@@ -685,7 +685,7 @@ const pauseWithOffscreenDocument = async () => {
       
       // Handle connection errors gracefully
       if (err.message && err.message.includes('Receiving end does not exist')) {
-        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected for pause');
+        logger.debug('Offscreen document already disconnected for pause');
         resolve();
       } else {
         reject(err);
@@ -721,7 +721,7 @@ const resumeWithOffscreenDocument = async () => {
       
       // Handle connection errors gracefully
       if (err.message && err.message.includes('Receiving end does not exist')) {
-        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected for resume');
+        logger.debug('Offscreen document already disconnected for resume');
         resolve();
       } else {
         reject(err);
@@ -772,12 +772,12 @@ const stopGoogleTTSAudio = async () => {
       currentFirefoxAudio.currentTime = 0;
       currentFirefoxAudio.src = '';
       currentFirefoxAudio = null;
-      logger.debug('[GoogleTTSHandler] Firefox TTS audio stopped');
+      logger.debug('Firefox TTS audio stopped');
     } else {
-      logger.debug('[GoogleTTSHandler] No Firefox TTS audio to stop');
+      logger.debug('No Firefox TTS audio to stop');
     }
   } catch (error) {
-    logger.warn('[GoogleTTSHandler] Firefox TTS stop error (ignoring):', error.message);
+    logger.warn('Firefox TTS stop error (ignoring):', error.message);
     // Reset reference anyway
     currentFirefoxAudio = null;
   }
@@ -789,7 +789,7 @@ const stopGoogleTTSAudio = async () => {
 const pauseGoogleTTSAudio = async () => {
   if (currentFirefoxAudio && !currentFirefoxAudio.paused) {
     currentFirefoxAudio.pause();
-    logger.debug('[GoogleTTSHandler] Firefox TTS audio paused');
+    logger.debug('Firefox TTS audio paused');
   }
 };
 
@@ -800,9 +800,9 @@ const resumeGoogleTTSAudio = async () => {
   if (currentFirefoxAudio && currentFirefoxAudio.paused) {
     try {
       await currentFirefoxAudio.play();
-      logger.debug('[GoogleTTSHandler] Firefox TTS audio resumed');
+      logger.debug('Firefox TTS audio resumed');
     } catch (error) {
-      logger.error('[GoogleTTSHandler] Firefox TTS resume failed:', error);
+      logger.error('Firefox TTS resume failed:', error);
       throw error;
     }
   }

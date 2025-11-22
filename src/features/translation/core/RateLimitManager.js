@@ -57,6 +57,42 @@ export class RateLimitManager {
     }
     return RateLimitManager.instance;
   }
+
+  /**
+   * Get performance statistics for a provider
+   * @param {string} providerName - Provider name
+   * @returns {object} - Performance statistics
+   */
+  getPerformanceStats(providerName) {
+    const state = this._initializeProvider(providerName);
+    const stats = { ...state.performanceStats };
+
+    // Calculate success rate
+    const totalProcessed = stats.successfulRequests + stats.failedRequests;
+    stats.successRate = totalProcessed > 0 ? (stats.successfulRequests / totalProcessed) * 100 : 0;
+    stats.averageWaitTime = stats.totalRequests > 0 ? stats.totalWaitTime / stats.totalRequests : 0;
+
+    return stats;
+  }
+
+  /**
+   * Reset performance statistics for a provider
+   * @param {string} providerName - Provider name
+   */
+  resetPerformanceStats(providerName) {
+    const state = this._initializeProvider(providerName);
+    state.performanceStats = {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      totalWaitTime: 0,
+      totalProcessingTime: 0,
+      averageRequestTime: 0,
+      requestsPerMinute: 0,
+      lastPerformanceReset: Date.now()
+    };
+    logger.debug(`[RateLimitManager] Performance stats reset for ${providerName}`);
+  }
   
   /**
    * Initialize provider state if not exists
@@ -92,7 +128,18 @@ export class RateLimitManager {
       // Adaptive backoff properties
       currentBackoffMultiplier: 1,
       successfulRequestsCount: 0,
-      lastFailureTime: 0
+      lastFailureTime: 0,
+      // Performance monitoring
+      performanceStats: {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        totalWaitTime: 0,
+        totalProcessingTime: 0,
+        averageRequestTime: 0,
+        requestsPerMinute: 0,
+        lastPerformanceReset: Date.now()
+      }
     };
     
     this.providerStates.set(providerName, state);
@@ -101,12 +148,37 @@ export class RateLimitManager {
   }
   
   /**
+   * Get effective configuration for a specific mode
+   * @param {object} baseConfig - Base provider configuration
+   * @param {string} translateMode - Translation mode
+   * @returns {object} - Mode-specific configuration
+   * @private
+   */
+  _getEffectiveConfig(baseConfig, translateMode) {
+    if (!translateMode || !baseConfig.modeOverrides || !baseConfig.modeOverrides[translateMode]) {
+      return baseConfig;
+    }
+
+    // Merge base config with mode-specific overrides
+    return {
+      ...baseConfig,
+      ...baseConfig.modeOverrides[translateMode],
+      adaptiveBackoff: {
+        ...baseConfig.adaptiveBackoff,
+        ...(baseConfig.modeOverrides[translateMode].adaptiveBackoff || {})
+      }
+    };
+  }
+
+  /**
    * Check if provider can make a request immediately
    * @param {string} providerName - Provider name
    * @param {string} context - Request context (e.g., "segment-1/2", "standard")
+   * @param {string} translateMode - Translation mode
    */
   canMakeRequest(providerName, context = 'standard', translateMode = null) {
     const state = this._initializeProvider(providerName);
+    const effectiveConfig = this._getEffectiveConfig(state.config, translateMode);
     const now = Date.now();
     
     // Determine if this is a multi-segment Select Element operation
@@ -115,15 +187,15 @@ export class RateLimitManager {
     // For non-multi-segment operations, allow immediate execution (no rate limiting)
     if (!isMultiSegmentSelectElement) {
       // Still respect concurrent limit for all operations
-      if (state.activeRequests >= state.config.maxConcurrent) {
+      if (state.activeRequests >= effectiveConfig.maxConcurrent) {
         return false;
       }
       return true;
     }
-    
+
     // Apply full rate limiting only for multi-segment Select Element operations
     // Check concurrent limit
-    if (state.activeRequests >= state.config.maxConcurrent) {
+    if (state.activeRequests >= effectiveConfig.maxConcurrent) {
       return false;
     }
     
@@ -133,27 +205,27 @@ export class RateLimitManager {
     }
     
     // Check time-based delay with adaptive backoff for subsequent requests
-    const baseDelay = state.config.subsequentDelay || state.config.delayBetweenRequests;
+    const baseDelay = effectiveConfig.subsequentDelay || effectiveConfig.delayBetweenRequests;
     let adjustedDelay = baseDelay;
-    
+
     // Apply adaptive backoff if enabled
-    if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
+    if (effectiveConfig.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
       adjustedDelay = Math.min(
         baseDelay * state.currentBackoffMultiplier,
-        state.config.adaptiveBackoff.maxDelay
+        effectiveConfig.adaptiveBackoff.maxDelay
       );
     }
-    
+
     const timeSinceLastRequest = now - state.lastRequestTime;
     if (timeSinceLastRequest < adjustedDelay) {
       return false;
     }
-    
+
     // Check burst limit
     const recentRequests = state.requestHistory.filter(
-      time => (now - time) < state.config.burstWindow
+      time => (now - time) < effectiveConfig.burstWindow
     );
-    if (recentRequests.length >= state.config.burstLimit) {
+    if (recentRequests.length >= effectiveConfig.burstLimit) {
       return false;
     }
     
@@ -191,14 +263,20 @@ export class RateLimitManager {
     await this._waitForSlot(providerName, context, translateMode);
     
     const waitTime = Date.now() - startTime;
+    const requestStartTime = Date.now();
+
+    // Update performance stats
+    state.performanceStats.totalRequests++;
+    state.performanceStats.totalWaitTime += waitTime;
+
     if (waitTime > 0) {
       logger.debug(`Rate limit wait: ${waitTime}ms for ${providerName} (${context})`);
     }
-    
+
     // Mark request as active
     state.activeRequests++;
-    state.lastRequestTime = Date.now();
-    state.requestHistory.push(state.lastRequestTime);
+    state.lastRequestTime = requestStartTime;
+    state.requestHistory.push(requestStartTime);
     
     // Clean old history entries
     const cutoffTime = state.lastRequestTime - state.config.burstWindow;
@@ -209,21 +287,36 @@ export class RateLimitManager {
       logger.warn(`Resetting activeRequests counter for ${providerName}: was ${state.activeRequests}, max should be ${state.config.maxConcurrent}`);
       state.activeRequests = state.config.maxConcurrent;
     }
-    
-    const requestStartTime = Date.now();
-    
+
     try {
       logger.debug(`Executing request for ${providerName} (active: ${state.activeRequests})`);
       const result = await requestFunction();
-      const responseTime = Date.now() - requestStartTime;
-      
+      const responseTime = Date.now() - state.lastRequestTime;
+
+      // Update performance stats for success
+      state.performanceStats.successfulRequests++;
+      state.performanceStats.totalProcessingTime += responseTime;
+      state.performanceStats.averageRequestTime =
+        state.performanceStats.totalProcessingTime / state.performanceStats.successfulRequests;
+
+      // Calculate requests per minute
+      const timeSinceReset = Date.now() - state.performanceStats.lastPerformanceReset;
+      if (timeSinceReset > 0) {
+        state.performanceStats.requestsPerMinute =
+          (state.performanceStats.totalRequests / timeSinceReset) * 60000;
+      }
+
       // Success - reset circuit breaker and record health
       this._recordSuccess(state);
       requestHealthMonitor.recordSuccess(providerName, responseTime, { context });
-      
+
       return result;
     } catch (error) {
-      const responseTime = Date.now() - requestStartTime;
+      const responseTime = Date.now() - state.lastRequestTime;
+
+      // Update performance stats for failure
+      state.performanceStats.failedRequests++;
+      state.performanceStats.totalProcessingTime += responseTime;
       
       // Fast-fail for deterministic errors - don't update circuit breaker or health monitor
       if (ErrorClassifier.isDeterministicError(error)) {

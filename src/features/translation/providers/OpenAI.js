@@ -26,8 +26,8 @@ export class OpenAIProvider extends BaseAIProvider {
   // AI Provider capabilities
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 15;
-  static maxComplexity = 300;
+  static optimalBatchSize = 25;
+  static maxComplexity = 400;
   static supportsImageTranslation = true;
   
   // Batch processing strategy

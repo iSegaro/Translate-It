@@ -23,7 +23,6 @@
   "api_provider_openai": { "message": "OpenAI" },
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
-  "api_provider_zai": { "message": "Z.AI" },
   "api_provider_bing": { "message": "مترجم بینگ" },
   "api_provider_browser": { "message": "مترجم مرورگر" },
   "api_provider_yandex": { "message": "مترجم یاندکس" },
@@ -597,20 +596,6 @@
   "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "حالت انتخاب فعال شد. روی متنی که می‌خواهید ترجمه شود کلیک کنید." },
   "SELECT_ELEMENT_TRANSLATING": { "message": "در حال ترجمه..." },
   "SELECT_ELEMENT_CANCEL": { "message": "کنسل" },
-  "SELECT_ELEMENT_REVERT": { "message": "بازگشت" },
+  "SELECT_ELEMENT_REVERT": { "message": "بازگشت" }
 
-  "zai_api_settings_title": { "message": "تنظیمات Z.ai" },
-  "zai_api_key_info": { "message": "می‌توانید کلید API خود را از اینجا دریافت کنید:" },
-  "zai_api_key_international_link": { "message": "دریافت کلید API" },
-  "zai_api_key_china_link": { "message": "دریافت کلید API" },
-  "zai_api_key_international_site": { "message": "برای کاربران بین‌المللی" },
-  "zai_api_key_china_site": { "message": "برای کاربران چینی" },
-  "zai_api_settings_api_key_label": { "message": "کلید API" },
-  "zai_api_key_placeholder": { "message": "کلید API خود را اینجا قرار دهید" },
-  "zai_custom_model_label": { "message": "نام مدل سفارشی" },
-  "zai_custom_model_placeholder": { "message": "نام مدل سفارشی را وارد کنید" },
-  "zai_custom_model_info": { "message": "نام دقیق مدل را همانطور که ارائه کرده وارد کنید" },
-  "zai_api_settings_api_url_label": { "message": "آدرس API" },
-  "zai_api_url_placeholder": { "message": "آدرس پیش‌فرض API" },
-  "zai_api_url_info": { "message": "برای استفاده از آدرس پیش‌فرض این قسمت را خالی بگذارید" }
-}
+  }

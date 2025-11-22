@@ -8,33 +8,52 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderConfigurations');
 
+const UNIFIED_AI_BATCHING_CONFIG = {
+  strategy: 'smart',
+  optimalSize: 20,
+  maxComplexity: 350,
+  singleBatchThreshold: 15,
+  modeOverrides: {
+    select_element: {
+      optimalSize: 25,
+      maxComplexity: 500,
+      singleBatchThreshold: 20,
+      maxBatchSizeChars: 3500,
+      balancedBatching: true,
+    },
+  },
+};
+
 /**
  * Provider-specific configurations
  * Each provider has optimized settings based on their API characteristics and limitations
  */
 export const PROVIDER_CONFIGURATIONS = {
-  // Google Gemini - Conservative settings due to strict quotas
+  // Google Gemini - Optimized settings for Select Element performance
   Gemini: {
     rateLimit: {
-      maxConcurrent: 1,
+      maxConcurrent: 3, // Increased for even better throughput
       delayBetweenRequests: 0, // No delay for first request, adaptive backoff handles errors
       initialDelay: 0, // First request immediate
-      subsequentDelay: 8000, // 8 seconds between subsequent requests after errors
-      burstLimit: 1,
-      burstWindow: 10000, // Increased burst window
+      subsequentDelay: 2000, // Reduced from 8000ms to 2000ms for better UX
+      burstLimit: 3, // Allow more burst processing for better performance
+      burstWindow: 5000, // Reduced burst window
       adaptiveBackoff: {
         enabled: true,
-        baseMultiplier: 3, // More aggressive backoff
-        maxDelay: 60000, // 60 seconds max delay
-        resetAfterSuccess: 5 // Wait more successes before reducing backoff
+        baseMultiplier: 2, // Reduced multiplier for less aggressive backoff
+        maxDelay: 30000, // Reduced max delay for faster recovery
+        resetAfterSuccess: 3 // Faster recovery after success
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 1000, // Even faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 3 // Maintain concurrency for Select Element
+        }
       }
     },
-    batching: {
-      strategy: 'smart', // Use smart batching
-      optimalSize: 15, // Reduced batch size for 503 overload prevention  
-      maxComplexity: 250, // Reduced complexity threshold
-      singleBatchThreshold: 12 // Use single batch for ≤12 segments
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'adaptive', // Adapt chunk size based on complexity
@@ -81,12 +100,7 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: {
-      strategy: 'smart',
-      optimalSize: 15, // Smaller batches than Gemini
-      maxComplexity: 300,
-      singleBatchThreshold: 15
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'fixed', // Fixed chunk sizes work well
@@ -113,28 +127,31 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
-  // DeepSeek - Conservative settings due to newer/less stable API
+  // DeepSeek - Optimized settings for better performance
   DeepSeek: {
     rateLimit: {
-      maxConcurrent: 1,
+      maxConcurrent: 2, // Increased from 1 for better throughput
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
-      subsequentDelay: 2000, // 2 seconds between subsequent requests
-      burstLimit: 2,
+      subsequentDelay: 1200, // Reduced from 2000ms to 1200ms
+      burstLimit: 3, // Increased from 2
       burstWindow: 3000,
       adaptiveBackoff: {
         enabled: true,
         baseMultiplier: 2,
         maxDelay: 30000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 800, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
-    batching: {
-      strategy: 'fixed', // More predictable for newer APIs
-      optimalSize: 10, // Smaller batches for safety
-      maxComplexity: 200,
-      singleBatchThreshold: 10
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -159,13 +176,13 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
-  // OpenRouter - Flexible settings that adapt to underlying model
+  // OpenRouter - Optimized settings for multi-model support
   OpenRouter: {
     rateLimit: {
       maxConcurrent: 2,
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
-      subsequentDelay: 1500, // 1.5 seconds for subsequent requests
+      subsequentDelay: 1000, // Reduced from 1500ms to 1000ms
       burstLimit: 3,
       burstWindow: 3000,
       adaptiveBackoff: {
@@ -173,14 +190,17 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.8,
         maxDelay: 45000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 800, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 3 // Increased from 2 for Select Element
+        }
       }
     },
-    batching: {
-      strategy: 'smart',
-      optimalSize: 12, // Conservative for multi-model support
-      maxComplexity: 250,
-      singleBatchThreshold: 12
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Most models support streaming
       chunkSize: 'adaptive',
@@ -223,12 +243,7 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: {
-      strategy: 'smart', // Use smart batching like other providers
-      optimalSize: 15, // Moderate batch size
-      maxComplexity: 300,
-      singleBatchThreshold: 15
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -249,54 +264,6 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsImageTranslation: false, // Depends on model
-      supportsBatchRequests: true, // Enable batch requests
-      supportsThinking: false,
-      reliableJsonMode: false
-    }
-  },
-
-  // Z.AI GLM - GLM models with OpenAI-compatible API
-  ZAI: {
-    rateLimit: {
-      maxConcurrent: 2,
-      delayBetweenRequests: 0, // No delay for first request
-      initialDelay: 0,
-      subsequentDelay: 2000, // 2 seconds between subsequent requests
-      burstLimit: 3,
-      burstWindow: 4000,
-      adaptiveBackoff: {
-        enabled: true,
-        baseMultiplier: 1.8,
-        maxDelay: 45000,
-        resetAfterSuccess: 2
-      }
-    },
-    batching: {
-      strategy: 'json', // Use JSON batch strategy like OpenAI
-      optimalSize: 15,
-      maxComplexity: 300,
-      singleBatchThreshold: 15
-    },
-    streaming: {
-      enabled: true, // Enable streaming for real-time segment translation
-      chunkSize: 'fixed',
-      realTimeUpdates: true
-    },
-    errorHandling: {
-      quotaTypes: [
-        'requests_per_minute',
-        'tokens_per_minute',
-        'rate_limit'
-      ],
-      retryStrategies: {
-        'requests_per_minute': { delay: 60000, temporary: true },
-        'tokens_per_minute': { delay: 60000, temporary: true },
-        'rate_limit': { delay: 30000, temporary: true }
-      },
-      enableCircuitBreaker: true
-    },
-    features: {
-      supportsImageTranslation: false, // GLM models don't support image translation
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
       reliableJsonMode: false
@@ -476,12 +443,7 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: {
-      strategy: 'fixed', // Safe default for unknown APIs
-      optimalSize: 10,
-      maxComplexity: 200,
-      singleBatchThreshold: 10
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -550,7 +512,6 @@ function normalizeProviderName(providerName) {
     'deepseek': 'DeepSeek',
     'openrouter': 'OpenRouter',
     'webai': 'WebAI',
-    'zai': 'ZAI',
     'googletranslate': 'GoogleTranslate',
     'google-translate': 'GoogleTranslate',
     'yandextranslate': 'YandexTranslate',
@@ -576,11 +537,21 @@ export function getProviderRateLimit(providerName) {
 /**
  * Get batching configuration for a provider
  * @param {string} providerName - Provider name
+ * @param {string} translateMode - Translation mode (optional)
  * @returns {object} - Batching configuration
  */
-export function getProviderBatching(providerName) {
+export function getProviderBatching(providerName, translateMode = null) {
   const config = getProviderConfiguration(providerName);
-  return config.batching;
+
+  if (!translateMode || !config.batching.modeOverrides || !config.batching.modeOverrides[translateMode]) {
+    return config.batching;
+  }
+
+  // Merge base config with mode-specific overrides
+  return {
+    ...config.batching,
+    ...config.batching.modeOverrides[translateMode]
+  };
 }
 
 /**

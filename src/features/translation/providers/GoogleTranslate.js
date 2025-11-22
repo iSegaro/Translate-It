@@ -88,7 +88,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
         const translatedSegments = translatedText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         if (translatedSegments.length !== chunkTexts.length) {
-          logger.warn("[Google] Translated segment count mismatch after splitting.", {
+          logger.debug("[Google] Translated segment count mismatch after splitting.", {
             expected: chunkTexts.length,
             got: translatedSegments.length
           });
@@ -105,7 +105,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
             logger.info("[Google] Successfully mapped translation to original segments using fallback logic");
             return { translatedSegments: fallbackSegments, candidateText: '' };
           } else {
-            logger.warn("[Google] Fallback mapping also failed, using single segment");
+            logger.debug("[Google] Fallback mapping also failed, using single segment");
             return { translatedSegments: [translatedText], candidateText: '' };
           }
         }

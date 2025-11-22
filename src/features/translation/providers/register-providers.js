@@ -29,10 +29,6 @@ const providerConfigs = {
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     metadata: { id: "webai", name: "WebAI", type: "ai" }
   },
-  "zai": {
-    importFunction: () => import("./ZAIGLM.js").then(m => ({ default: m.ZAIGLMProvider })),
-    metadata: { id: "zai", name: "Z.AI GLM", type: "ai" }
-  },
   "bing": {
     importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
     metadata: { id: "bing", name: "Bing Translate", type: "translate" }

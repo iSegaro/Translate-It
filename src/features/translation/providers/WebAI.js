@@ -21,12 +21,12 @@ export class WebAIProvider extends BaseAIProvider {
   // AI Provider capabilities - Standard API service settings
   static supportsStreaming = true; // Enable streaming for segment-based real-time translation
   static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 15; // Moderate batch size for external API
-  static maxComplexity = 300;
+  static optimalBatchSize = 25; // Moderate batch size for external API
+  static maxComplexity = 400;
   static supportsImageTranslation = false; // Depends on model
   
   // Batch processing strategy
-  static batchStrategy = 'numbered'; // Uses numbered format for batch translation
+  static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super("WebAI");

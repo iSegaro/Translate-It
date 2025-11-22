@@ -331,7 +331,8 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     if (!this.isActive) return;
 
     // Only process if it's a typing key (not special keys)
-    if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+    // Add safety check for event.key existence
+    if (event && event.key && (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete')) {
       const target = event.target;
 
       // Check if target is a text field and we have an active double-click scenario

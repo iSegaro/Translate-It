@@ -21,13 +21,13 @@ export class DeepSeekProvider extends BaseAIProvider {
   
   // AI Provider capabilities - Conservative settings for DeepSeek
   static supportsStreaming = true; // Enable streaming for segment-based real-time translation
-  static preferredBatchStrategy = 'fixed';
-  static optimalBatchSize = 10;
-  static maxComplexity = 200;
+  static preferredBatchStrategy = 'smart';
+  static optimalBatchSize = 25;
+  static maxComplexity = 400;
   static supportsImageTranslation = false;
   
   // Batch processing strategy
-  static batchStrategy = 'numbered'; // Uses numbered format for batch translation
+  static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super("DeepSeek");

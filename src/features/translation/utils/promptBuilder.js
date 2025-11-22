@@ -7,6 +7,7 @@ import {
   getEnableDictionaryAsync,
   getPromptDictionaryAsync,
   getPromptBASEBatchAsync, // Import the new getter
+  getPromptBASEAIBatchAsync,
   TranslationMode,
 } from "@/shared/config/config.js";
 
@@ -49,7 +50,8 @@ export async function buildPrompt(
   text,
   sourceLang,
   targetLang,
-  translateMode = TranslationMode.Field
+  translateMode = TranslationMode.Field,
+  providerType = 'translate'
 ) {
   let isJsonMode = false;
   try {
@@ -60,6 +62,19 @@ export async function buildPrompt(
   } catch {
     // Not JSON
   }
+
+  const isAI = providerType === 'ai';
+
+  // Handle AI provider batch translation for select_element or any JSON text
+  if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
+    logger.debug('AI provider in Batch mode. Using AI batch prompt.');
+    const batchPromptTemplate = await getPromptBASEAIBatchAsync();
+    return batchPromptTemplate
+      .replace("_{SOURCE}", sourceLang)
+      .replace("_{TARGET}", targetLang)
+      .replace("_{TEXT}", text);
+  }
+
 
   // If mode is Select_Element and text is NOT JSON,
   // it means it's a pre-processed batch of texts. Use the batch prompt.

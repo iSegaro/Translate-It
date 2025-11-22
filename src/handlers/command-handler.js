@@ -12,7 +12,7 @@ async function handleCommand(tab, action, data = {}) {
   try {
     // Validate tab before proceeding
     if (!tab || !tab.id) {
-      logger.warn(`[CommandHandler] Invalid tab provided for command ${action}:`, tab);
+      logger.debug(`[CommandHandler] Invalid tab provided for command ${action}:`, tab);
       return false;
     }
 
@@ -43,9 +43,9 @@ async function handleCommand(tab, action, data = {}) {
 
     // Provide specific error context
     if (error.message && error.message.includes('Receiving end does not exist')) {
-      logger.warn(`[CommandHandler] Content script not available in tab ${tab?.id} for command ${action}`);
+      logger.debug(`[CommandHandler] Content script not available in tab ${tab?.id} for command ${action}`);
     } else if (error.message && error.message.includes('Could not establish connection')) {
-      logger.warn(`[CommandHandler] Cannot connect to tab ${tab?.id} for command ${action}`);
+      logger.debug(`[CommandHandler] Cannot connect to tab ${tab?.id} for command ${action}`);
     }
 
     return false;
@@ -88,11 +88,11 @@ async function handleSelectElementCommand(tab) {
     logger.debug(`[CommandHandler] Select element activation sent to content script`);
     return true;
   } catch (error) {
-    logger.error(`[CommandHandler] Error handling select element command:`, error);
+    logger.debug(`[CommandHandler] Error handling select element command:`, error);
 
     // Provide specific error context
     if (error.message && error.message.includes('Receiving end does not exist')) {
-      logger.warn(`[CommandHandler] Content script not available in tab ${tab?.id} for select element command`);
+      logger.debug(`[CommandHandler] Content script not available in tab ${tab?.id} for select element command`);
 
       // Try to inject content script as fallback
       try {
@@ -128,7 +128,7 @@ async function handleSelectElementCommand(tab) {
         logger.error(`[CommandHandler] Fallback content script injection failed:`, retryError);
       }
     } else if (error.message && error.message.includes('Could not establish connection')) {
-      logger.warn(`[CommandHandler] Cannot connect to tab ${tab?.id} for select element command`);
+      logger.debug(`[CommandHandler] Cannot connect to tab ${tab?.id} for select element command`);
     }
 
     return false;
@@ -196,7 +196,7 @@ export async function handleCommandEvent(command, tab) {
         const duration = Date.now() - startTime;
 
         if (result === false) {
-          logger.warn(`[CommandHandler] Command ${command} handler returned false (likely validation failure)`);
+          logger.debug(`[CommandHandler] Command ${command} handler returned false (likely validation failure)`);
         } else {
           logger.info(`[CommandHandler] Command handled successfully: ${command}`, {
             duration: `${duration}ms`,
@@ -209,7 +209,7 @@ export async function handleCommandEvent(command, tab) {
         return false;
       }
     } else {
-      logger.warn(`[CommandHandler] Unknown command received: ${command}`, {
+      logger.debug(`[CommandHandler] Unknown command received: ${command}`, {
         availableCommands: Object.keys(commandMap)
       });
       return false;

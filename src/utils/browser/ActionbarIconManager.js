@@ -111,7 +111,6 @@ class ActionbarIconManager {
       'openai': 'icons/providers/openai.png',
       'openrouter': 'icons/providers/openrouter.png',
       'deepseek': 'icons/providers/deepseek.png',
-      'zai': 'icons/providers/zai.png',
       'webai': 'icons/providers/webai.png',
       'custom': 'icons/providers/custom.png',
       'browserapi': 'icons/providers/chrome-translate.png',

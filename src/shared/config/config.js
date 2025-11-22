@@ -94,14 +94,6 @@ export const CONFIG = {
     { value: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
     { value: "custom", name: "Custom Model" }
   ],
-  ZAI_API_KEY: "",
-  ZAI_API_URL: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-  ZAI_API_MODEL: "glm-4.5",
-  ZAI_MODELS: [
-    { value: "glm-4.5", name: "GLM-4.5" },
-    { value: "glm-4.6", name: "GLM-4.6" },
-    { value: "custom", name: "Custom Model" }
-  ],
   CUSTOM_API_URL: "",
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
@@ -252,6 +244,17 @@ Now, please translate the following texts:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_BATCH ---*/
+
+/*--- Start PROMPT_BASE_AI_BATCH ---*/
+  PROMPT_BASE_AI_BATCH: `Your are an exper translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON array of texts from $_{SOURCE} to $_{TARGET}.
+  Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text. 
+  Maintain the original JSON structure.
+
+Important: Return only the JSON array with translated texts, no additional text or explanations.
+
+$_{TEXT}
+`,
+/*--- End PROMPT_BASE_AI_BATCH ---*/
 
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
@@ -526,6 +529,10 @@ export const getPromptBASEBatchAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_BATCH", CONFIG.PROMPT_BASE_BATCH);
 };
 
+export const getPromptBASEAIBatchAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_AI_BATCH", CONFIG.PROMPT_BASE_AI_BATCH);
+};
+
 export const getPromptBASEFieldAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_FIELD", CONFIG.PROMPT_BASE_FIELD);
 };
@@ -557,19 +564,6 @@ export const getDeepSeekApiKeyAsync = async () => {
 
 export const getDeepSeekApiModelAsync = async () => {
   return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
-};
-
-// ZAI GLM Specific
-export const getZaiApiKeyAsync = async () => {
-  return getSettingValueAsync("ZAI_API_KEY", CONFIG.ZAI_API_KEY);
-};
-
-export const getZaiApiUrlAsync = async () => {
-  return getSettingValueAsync("ZAI_API_URL", CONFIG.ZAI_API_URL);
-};
-
-export const getZaiModelAsync = async () => {
-  return getSettingValueAsync("ZAI_API_MODEL", CONFIG.ZAI_API_MODEL);
 };
 
 // Custom Provider Specific

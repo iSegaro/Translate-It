@@ -67,8 +67,6 @@ const providerSettingsComponent = computed(() => {
       return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenRouterApiSettings.vue'));
     case 'deepseek':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepseekApiSettings.vue'));
-    case 'zai':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/ZaiApiSettings.vue'));
     case 'custom':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/CustomApiSettings.vue'));
     default:

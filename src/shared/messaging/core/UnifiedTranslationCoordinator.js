@@ -44,6 +44,12 @@ export class UnifiedTranslationCoordinator {
     getLogger().info(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
     try {
+      // Early check if operation was cancelled before any processing
+      if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
+        getLogger().debug('Translation operation cancelled before coordination');
+        throw new Error('Translation cancelled by user');
+      }
+
       // Determine if this should be a streaming operation
       const shouldStream = this._shouldUseStreaming(message);
 
@@ -54,7 +60,13 @@ export class UnifiedTranslationCoordinator {
       }
     } catch (error) {
       // Final catch-all for any unhandled errors in coordination
-      getLogger().error(`Translation coordination failed: ${message.messageId}`, error);
+      // Don't log user cancellations as errors
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        getLogger().debug(`Translation coordination cancelled by user: ${message.messageId}`, error);
+      } else {
+        getLogger().error(`Translation coordination failed: ${message.messageId}`, error);
+      }
 
       // Use centralized error handling for coordination errors
       try {
@@ -80,6 +92,12 @@ export class UnifiedTranslationCoordinator {
     const { messageId } = message;
 
     try {
+      // Check if operation was cancelled before sending the request
+      if (messageId && streamingTimeoutManager.shouldContinue(messageId) === false) {
+        getLogger().debug('Regular translation operation cancelled');
+        throw new Error('Translation cancelled by user');
+      }
+
       // Track regular translation
       this.activeTranslations.set(messageId, {
         type: 'regular',
@@ -342,11 +360,24 @@ export class UnifiedTranslationCoordinator {
       segmentCount = Math.ceil(textLength / 500);
     }
 
-    // Calculate timeouts based on segment count
-    const baseTimeout = Math.min(30000, Math.max(15000, segmentCount * 3000)); // 3s per segment, 15-30s range
-    const initialTimeout = customTimeout || Math.min(300000, baseTimeout + (segmentCount * 2000)); // Up to 5 minutes
-    const progressTimeout = Math.max(60000, segmentCount * 1000); // At least 1 minute between progress
-    const gracePeriod = Math.min(120000, segmentCount * 5000); // Up to 2 minutes grace period
+    // Enhanced timeouts for Select Element mode - allow longer processing times
+    const isSelectElementMode = data?.mode === 'select_element' || data?.options?.mode === 'select_element';
+
+    let baseTimeout, initialTimeout, progressTimeout, gracePeriod;
+
+    if (isSelectElementMode) {
+      // Select Element mode needs much longer timeouts due to batching and API delays
+      baseTimeout = Math.min(120000, Math.max(30000, segmentCount * 5000)); // 5s per segment, 30-120s range
+      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 4000)); // Up to 10 minutes
+      progressTimeout = Math.max(180000, segmentCount * 2000); // At least 3 minutes between progress
+      gracePeriod = Math.min(300000, segmentCount * 10000); // Up to 5 minutes grace period
+    } else {
+      // Standard timeouts for regular translation
+      baseTimeout = Math.min(30000, Math.max(15000, segmentCount * 3000)); // 3s per segment, 15-30s range
+      initialTimeout = customTimeout || Math.min(300000, baseTimeout + (segmentCount * 2000)); // Up to 5 minutes
+      progressTimeout = Math.max(60000, segmentCount * 1000); // At least 1 minute between progress
+      gracePeriod = Math.min(120000, segmentCount * 5000); // Up to 2 minutes grace period
+    }
 
     return {
       initialTimeout,

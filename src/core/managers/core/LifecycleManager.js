@@ -314,34 +314,43 @@ class LifecycleManager {
 
   /**
    * Direct context menu creation as ultimate fallback
+   * NOTE: This method is now deprecated. ContextMenuManager should be the sole authority.
+   * This is kept only as emergency fallback and will not create duplicate menus.
    */
   async createContextMenuDirectly() {
     try {
-      logger.info("[LifecycleManager] Attempting direct context menu creation...");
+      logger.info("[LifecycleManager] ContextMenuManager failed, checking if menus exist...");
 
       const browser = await import("webextension-polyfill");
 
-      // Clear existing menus
-      await browser.contextMenus.removeAll();
+      // Check if any menus already exist before doing anything
+      try {
+        const existingMenus = await browser.contextMenus.getAll();
+        if (existingMenus && existingMenus.length > 0) {
+          logger.info("[LifecycleManager] Context menus already exist, skipping creation to avoid duplicates");
+          return;
+        }
+      } catch (checkError) {
+        logger.debug("[LifecycleManager] Could not check existing menus, proceeding with caution");
+      }
 
-      // Create basic action menu
-      await browser.contextMenus.create({
-        id: "action-translate-element-direct",
-        title: "Translate Element (Direct)",
-        contexts: ["action"]
-      });
+      logger.warn("[LifecycleManager] Creating minimal fallback menus only if absolutely necessary...");
 
-      // Create options menu
-      await browser.contextMenus.create({
-        id: "open-options-page-direct",
-        title: "Options (Direct)",
-        contexts: ["action"]
-      });
+      // Create minimal fallback menus with unique IDs that won't conflict
+      try {
+        await browser.contextMenus.create({
+          id: "lifecycle-emergency-translate",
+          title: "Translate (Emergency)",
+          contexts: ["action"]
+        });
+      } catch (createError) {
+        logger.error("[LifecycleManager] Even emergency menu creation failed:", createError);
+      }
 
-      logger.info("[LifecycleManager] Direct context menu creation completed");
+      logger.info("[LifecycleManager] Emergency context menu setup completed");
 
     } catch (directError) {
-      logger.error("❌ [LifecycleManager] Direct context menu creation failed:", directError);
+      logger.error("❌ [LifecycleManager] Emergency context menu creation failed:", directError);
     }
   }
 

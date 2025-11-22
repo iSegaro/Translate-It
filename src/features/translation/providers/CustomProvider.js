@@ -18,16 +18,16 @@ export class CustomProvider extends BaseAIProvider {
   static displayName = "Custom Provider";
   static reliableJsonMode = false;
   static supportsDictionary = true;
-  
+
   // AI Provider capabilities - Safe defaults for unknown APIs
   static supportsStreaming = true; // Enable streaming for segment-based real-time translation
-  static preferredBatchStrategy = 'fixed';
-  static optimalBatchSize = 10; // Conservative batch size
-  static maxComplexity = 200;
+  static preferredBatchStrategy = 'smart';
+  static optimalBatchSize = 25; // Conservative batch size
+  static maxComplexity = 400;
   static supportsImageTranslation = false; // Conservative default
-  
-  // Batch processing strategy
-  static batchStrategy = 'numbered'; // Uses numbered format for batch translation
+
+  // Batch processing strategy - Use JSON like Gemini for better compatibility
+  static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super("Custom");
@@ -55,13 +55,16 @@ export class CustomProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const prompt = await buildPrompt(
-      text,
-      sourceLang,
-      targetLang,
-      translateMode,
-      this.constructor.type
-    );
+    // Check if text is already a batch prompt (like Gemini does)
+    const prompt = text.includes('Translate the following')
+      ? text
+      : await buildPrompt(
+          text,
+          sourceLang,
+          targetLang,
+          translateMode,
+          this.constructor.type
+        );
 
     const fetchOptions = {
       method: "POST",

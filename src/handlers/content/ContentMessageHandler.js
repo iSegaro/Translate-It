@@ -178,10 +178,10 @@ export class ContentMessageHandler extends ResourceTracker {
       }, { isCritical: true });
 
       this.isActive = true;
-      this.logger.info('🎉 ContentMessageHandler activated successfully with smart message handling');
+      this.logger.info('ContentMessageHandler activated successfully with smart message handling');
       return true;
     } catch (error) {
-      this.logger.error('❌ Failed to activate ContentMessageHandler:', error);
+      this.logger.error('Failed to activate ContentMessageHandler:', error);
       return false;
     }
   }
