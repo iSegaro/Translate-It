@@ -1052,7 +1052,23 @@ export class TranslationUIManager {
           // Preserve empty line structure with newline character
           finalTranslatedData.push({ text: '\n' });
         } else if (translatedText !== undefined) {
-          finalTranslatedData.push({ text: translatedText });
+          // Handle single segment case where translatedText might be a JSON string
+          if (request.expandedTexts.length === 1) {
+            try {
+              // Try to parse as JSON array and extract the first element
+              const parsed = JSON.parse(translatedText);
+              if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
+                finalTranslatedData.push({ text: parsed[0] });
+              } else {
+                finalTranslatedData.push({ text: translatedText });
+              }
+            } catch {
+              // If parsing fails, use as-is
+              finalTranslatedData.push({ text: translatedText });
+            }
+          } else {
+            finalTranslatedData.push({ text: translatedText });
+          }
         } else {
           // Fallback to original text if no translation found
           const originalText = request.filteredExpandedTexts ? request.filteredExpandedTexts[i] : request.expandedTexts[i];
@@ -1174,7 +1190,9 @@ export class TranslationUIManager {
 
       const retrySuccess = await this.orchestrator.errorHandlerService.retryWithFallbackProvider(
         messageId,
-        JSON.stringify(request.textsToTranslate.map(t => ({ text: t }))),
+        request.textsToTranslate.length === 1
+          ? JSON.stringify(request.textsToTranslate)
+          : JSON.stringify(request.textsToTranslate.map(t => ({ text: t }))),
         error
       );
 
@@ -1289,7 +1307,12 @@ export class TranslationUIManager {
       } else {
         // Use translated data if available, fallback to original
         if (translatedIndex < translatedData.length && translatedData[translatedIndex]) {
-          finalTranslatedData.push({ text: translatedData[translatedIndex].text });
+          // Handle single segment case where translatedData might be a simple array of strings
+          if (expandedTexts.length === 1 && typeof translatedData[translatedIndex] === 'string') {
+            finalTranslatedData.push({ text: translatedData[translatedIndex] });
+          } else {
+            finalTranslatedData.push({ text: translatedData[translatedIndex].text });
+          }
         } else {
           finalTranslatedData.push({ text: filteredExpandedTexts?.[i] || expandedTexts[i] || '' });
         }

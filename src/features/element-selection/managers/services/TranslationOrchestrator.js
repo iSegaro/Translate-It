@@ -101,7 +101,10 @@ export class TranslationOrchestrator extends ResourceTracker {
         text === '[[EMPTY_LINE]]' ? '' : text
       );
 
-      const jsonPayload = JSON.stringify(filteredExpandedTexts.map(t => ({ text: t })));
+      // For single segment, send the text directly to avoid nested array brackets
+      const jsonPayload = filteredExpandedTexts.length === 1
+        ? JSON.stringify(filteredExpandedTexts)
+        : JSON.stringify(filteredExpandedTexts.map(t => ({ text: t })));
 
       // Determine if streaming should be used
       if (this.streamingEngine.isStreamingTranslation(jsonPayload)) {

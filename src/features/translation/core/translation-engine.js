@@ -394,7 +394,10 @@ export class TranslationEngine {
       throw new Error('SelectElement JSON must be an array');
     }
 
-    const segments = originalJson.map(item => item.text);
+    // Handle both single string arrays and object arrays with text field
+    const segments = originalJson.length === 1 && typeof originalJson[0] === 'string'
+      ? originalJson
+      : originalJson.map(item => item.text);
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     
     // Force reload configurations to ensure latest rate limiting settings

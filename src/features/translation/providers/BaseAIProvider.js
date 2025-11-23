@@ -593,18 +593,24 @@ export class BaseAIProvider extends BaseProvider {
       const parsed = JSON.parse(jsonString);
       
       if (Array.isArray(parsed)) {
-        // Handle flexible array parsing
-        if (parsed.length === expectedCount) {
+        // Check if this is a simple string array (single segment case)
+        if (expectedCount === 1 && parsed.length === 1 && typeof parsed[0] === 'string') {
+          logger.debug(`[${this.providerName}] Single segment translation detected, using string directly`);
+          return [parsed[0]];
+        }
+
+        // Handle object array format (multi-segment case)
+        if (parsed.length === expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
           // Ensure the order is correct based on id
           const sortedResults = parsed.sort((a, b) => a.id - b.id);
           return sortedResults.map(item => item.text);
-        } else if (parsed.length > expectedCount) {
+        } else if (parsed.length > expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
           // Sometimes AI returns extra items - take first N items
           logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Taking first ${expectedCount} items.`);
           const firstItems = parsed.slice(0, expectedCount);
           const sortedResults = firstItems.sort((a, b) => a.id - b.id);
           return sortedResults.map(item => item.text);
-        } else if (parsed.length < expectedCount) {
+        } else if (parsed.length < expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
           // Sometimes AI returns fewer items - pad with original texts
           logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Padding with original texts.`);
           const sortedResults = parsed.sort((a, b) => a.id - b.id);
