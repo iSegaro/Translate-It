@@ -39,7 +39,7 @@
     "test:e2e:debug": "playwright test --debug --config config/test/playwright.config.js",
     "analyze": "node scripts/dev/analyze-bundles.js",
     "perf:monitor": "node scripts/dev/performance-monitor.js",
-    "setup": "node scripts/setup/setup.js",
+    "setup": "node scripts/setup/setup.cjs",
     "setup:chrome-validator": "pnpm add -D web-ext && echo '✅ Chrome validator installed! You can now use: pnpm run validate:chrome'",
     "lint:styles": "stylelint \"src/assets/styles/**/*.{css,scss}\"",
     "lint:styles:fix": "stylelint \"src/assets/styles/**/*.{css,scss}\" --fix"
