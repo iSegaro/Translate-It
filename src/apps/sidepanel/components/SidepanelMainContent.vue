@@ -1,7 +1,11 @@
 <template>
   <div class="sidepanel-wrapper main-content">
     <!-- Language Controls Section -->
-    <div class="language-controls">
+    <div
+      ref="languageControlsRef"
+      class="language-controls"
+      :class="{ 'language-controls--wide': isWideLayout }"
+    >
       <!-- Language Selector Row -->
       <div class="language-selector-row">
         <LanguageSelector
@@ -13,10 +17,20 @@
           :swap-alt="t('SIDEPANEL_SWAP_LANGUAGES_ALT', 'Swap')"
           :auto-detect-label="'Auto-Detect'"
         />
+
+        <!-- Translate Button (shown alongside language selectors in wide layout) -->
+        <div v-if="isWideLayout" class="translate-button-inline">
+          <ProviderSelector
+            mode="split"
+            :disabled="!canTranslateFromForm"
+            @translate="handleTranslate"
+            @provider-change="handleProviderChange"
+          />
+        </div>
       </div>
-      
-      <!-- Translate Button Row -->
-      <div class="translate-button-row">
+
+      <!-- Translate Button Row (only shown in narrow layout) -->
+      <div v-if="!isWideLayout" class="translate-button-row">
         <ProviderSelector
           mode="split"
           :disabled="!canTranslateFromForm"
@@ -75,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -117,6 +131,50 @@ const translationResultRef = ref(null)
 // Language state management
 const autoTranslateOnPaste = ref(false)
 const canTranslateFromForm = ref(false)
+
+// Responsive layout management for Translate button placement
+const languageControlsRef = ref(null)
+const isWideLayout = ref(false)
+const WIDE_LAYOUT_THRESHOLD = 470 // Minimum width for horizontal layout with Translate button
+
+// Resize observer for responsive layout
+let resizeObserver = null
+
+const checkLayout = () => {
+  if (languageControlsRef.value) {
+    const width = languageControlsRef.value.offsetWidth
+    isWideLayout.value = width >= WIDE_LAYOUT_THRESHOLD
+
+    logger.debug('[SidepanelMainContent] Layout check:', {
+      width: width,
+      isWideLayout: isWideLayout.value,
+      threshold: WIDE_LAYOUT_THRESHOLD
+    })
+  }
+}
+
+// Setup resize observer
+const setupResizeObserver = () => {
+  if (languageControlsRef.value && 'ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        checkLayout()
+      }
+    })
+    resizeObserver.observe(languageControlsRef.value)
+
+    // Initial check
+    checkLayout()
+  }
+}
+
+// Cleanup resize observer
+const cleanupResizeObserver = () => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+}
 
 // Watch canTranslate and emit changes
 watch(canTranslate, (newValue) => {
@@ -185,6 +243,16 @@ onMounted(async () => {
   // Language initialization is now handled by useUnifiedTranslation.
   // Load last translation if any
   await loadLastTranslation()
+
+  // Setup resize observer for responsive layout
+  // Use setTimeout to ensure DOM is ready and initial width is calculated
+  setTimeout(() => {
+    setupResizeObserver()
+  }, 100)
+});
+
+onUnmounted(() => {
+  cleanupResizeObserver()
 });
 </script>
 
@@ -214,6 +282,29 @@ onMounted(async () => {
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+}
+
+/* Wide layout: Translate button alongside language selectors */
+.language-controls--wide {
+  flex-direction: column;
+}
+
+.language-controls--wide .language-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.language-controls--wide .translate-button-inline {
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+
+.language-controls--wide .translate-button-inline :deep(.provider-selector) {
+  min-width: auto;
+  max-width: none;
 }
 
 .language-selector-row {
@@ -246,13 +337,19 @@ onMounted(async () => {
 
 .language-selector-row :deep(.language-select) {
   flex: 1 1 auto !important;
-  min-width: 80px;
-  max-width: 150px !important;
+  min-width: 70px;
+  max-width: 120px !important;
   opacity: 1 !important;
   visibility: visible !important;
   display: block !important;
   position: relative !important;
   box-sizing: border-box !important;
+}
+
+/* In wide layout, make language selects slightly smaller to make room for Translate button */
+.language-controls--wide .language-selector-row :deep(.language-select) {
+  max-width: 100px !important;
+  min-width: 65px;
 }
 
 .language-selector-row :deep(.swap-button) {
