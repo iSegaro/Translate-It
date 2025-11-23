@@ -19,7 +19,10 @@
         />
 
         <!-- Translate Button (shown alongside language selectors in wide layout) -->
-        <div v-if="isWideLayout" class="translate-button-inline">
+        <div
+          v-if="isWideLayout"
+          class="translate-button-inline"
+        >
           <ProviderSelector
             mode="split"
             :disabled="!canTranslateFromForm"
@@ -30,7 +33,10 @@
       </div>
 
       <!-- Translate Button Row (only shown in narrow layout) -->
-      <div v-if="!isWideLayout" class="translate-button-row">
+      <div
+        v-if="!isWideLayout"
+        class="translate-button-row"
+      >
         <ProviderSelector
           mode="split"
           :disabled="!canTranslateFromForm"
@@ -156,10 +162,11 @@ const checkLayout = () => {
 // Setup resize observer
 const setupResizeObserver = () => {
   if (languageControlsRef.value && 'ResizeObserver' in window) {
-    resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+    resizeObserver = new ResizeObserver(() => {
+      // Use requestAnimationFrame to prevent ResizeObserver loop warnings
+      requestAnimationFrame(() => {
         checkLayout()
-      }
+      })
     })
     resizeObserver.observe(languageControlsRef.value)
 
