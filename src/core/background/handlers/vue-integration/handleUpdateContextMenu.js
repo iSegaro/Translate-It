@@ -8,8 +8,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleUpdateContextMe
 const errorHandler = new ErrorHandler();
 
 export async function handleUpdateContextMenu(message) {
-  const { menuItems } = message.data;
-
   try {
     logger.info("Vue app requested context menu update - delegating to ContextMenuManager");
 

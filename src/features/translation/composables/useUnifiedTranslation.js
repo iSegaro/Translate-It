@@ -230,11 +230,6 @@ export function useUnifiedTranslation(context = 'popup') {
         return false;
       }
 
-      if (context === 'popup') {
-        getLogger().operation('Translation request sent. Waiting for result...');
-      }
-      return true;
-
     } catch (error) {
       getLogger().error(`[${context}] Failed to send/process translation request:`, error);
       handleTranslationError(error);
