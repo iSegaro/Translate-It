@@ -1,5 +1,8 @@
 <template>
-  <div class="ti-language-controls">
+  <div
+    ref="languageControlsRef"
+    :class="['ti-language-controls', { 'ti-language-controls--vertical': isVerticalLayout && isSidepanelContext }]"
+  >
     <!-- Target Language Dropdown -->
     <select
       v-model="targetLanguage"
@@ -53,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
@@ -140,6 +143,68 @@ const swapIcon = computed(() => {
   return browser.runtime.getURL('icons/ui/swap.png')
 })
 
+// Reactive data for responsive layout (only for sidepanel)
+const languageControlsRef = ref(null)
+const isVerticalLayout = ref(false)
+const MIN_WIDTH_THRESHOLD = 220 // Minimum width before switching to vertical layout
+const isSidepanelContext = ref(false)
+
+// Check if component is inside sidepanel
+const checkIsSidepanelContext = () => {
+  let element = languageControlsRef.value
+  while (element && element.parentElement) {
+    if (element.parentElement.classList.contains('sidepanel-wrapper') ||
+        element.parentElement.closest('.sidepanel-container')) {
+      isSidepanelContext.value = true
+      return
+    }
+    element = element.parentElement
+  }
+  isSidepanelContext.value = false
+}
+
+// Resize observer for responsive behavior (only for sidepanel)
+let resizeObserver = null
+
+const checkLayout = () => {
+  if (languageControlsRef.value && isSidepanelContext.value) {
+    const width = languageControlsRef.value.offsetWidth
+    isVerticalLayout.value = width < MIN_WIDTH_THRESHOLD
+
+    logger.debug('[LanguageSelector] Layout check:', {
+      width: width,
+      isVertical: isVerticalLayout.value,
+      threshold: MIN_WIDTH_THRESHOLD,
+      isSidepanel: isSidepanelContext.value
+    })
+  }
+}
+
+// Setup resize observer (only for sidepanel)
+const setupResizeObserver = () => {
+  checkIsSidepanelContext()
+
+  if (languageControlsRef.value && isSidepanelContext.value && 'ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        checkLayout()
+      }
+    })
+    resizeObserver.observe(languageControlsRef.value)
+
+    // Initial check
+    checkLayout()
+  }
+}
+
+// Cleanup resize observer
+const cleanupResizeObserver = () => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+}
+
 // Methods
 const handleSwapLanguages = async () => {
   try {
@@ -197,7 +262,7 @@ const handleDropdownClick = () => {
   }
 }
 
-// Initialize languages
+// Initialize languages and setup resize observer
 onMounted(async () => {
   // Languages should already be preloaded by SidepanelApp
   // If not, load them asynchronously
@@ -206,7 +271,18 @@ onMounted(async () => {
       handleError(error, 'language-selector-languages')
     })
   }
+
+  // Setup resize observer for responsive layout
+  // Use setTimeout to ensure DOM is ready and initial width is calculated
+  setTimeout(() => {
+    setupResizeObserver()
+  }, 100)
 });
+
+// Cleanup resize observer on unmount
+onUnmounted(() => {
+  cleanupResizeObserver()
+})
 </script>
 
 <style scoped>
@@ -218,6 +294,32 @@ onMounted(async () => {
   gap: 6px;
   background: var(--language-controls-bg-color);
   margin: 8px 12px 0 12px;
+}
+
+/* Vertical layout for small sidepanel widths */
+.ti-language-controls--vertical {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 12px;
+  min-height: fit-content;
+}
+
+.ti-language-controls--vertical .ti-language-select {
+  width: 100%;
+  max-width: none;
+  min-width: auto;
+  order: 1;
+}
+
+.ti-language-controls--vertical .ti-swap-button {
+  order: 2;
+  align-self: center;
+  margin: 1px 0;
+}
+
+.ti-language-controls--vertical .ti-language-select:first-of-type {
+  order: 3;
 }
 
 .ti-language-select {
@@ -377,5 +479,29 @@ onMounted(async () => {
 .sidepanel-wrapper .ti-swap-button img {
   width: 18px;
   height: 18px;
+}
+
+/* Vertical layout adjustments for sidepanel */
+.sidepanel-wrapper .ti-language-controls--vertical {
+  background: transparent;
+  padding: 2px 0;
+  margin: 0;
+  height: auto;
+  min-height: fit-content;
+}
+
+.sidepanel-wrapper .ti-language-controls--vertical .ti-language-select {
+  width: 100%;
+  max-width: none;
+  min-width: auto;
+  flex: none;
+  height: 32px;
+}
+
+.sidepanel-wrapper .ti-language-controls--vertical .ti-swap-button {
+  width: 32px;
+  height: 32px;
+  margin: 1px 0;
+  align-self: center;
 }
 </style>
