@@ -26,7 +26,7 @@ const globalState = {
   // Organized into logical categories and sorted alphabetically within each category.
   componentLogLevels: {
     // Core
-    Background: 3,
+    Background: 2,
     Content: 2,
     Core: 2,
 
@@ -43,7 +43,7 @@ const globalState = {
     TextFieldInteraction: 2,
     TextActions: 2,
     TextSelection: 2,
-    Translation: 3,
+    Translation: 2,
     Shortcuts: 2,
     Exclusion: 2,
     Capture: 2,
