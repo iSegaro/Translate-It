@@ -1291,7 +1291,33 @@ export class TranslationUIManager {
    */
   async _processNonStreamingSuccess(request, data) {
     const { translatedText } = data;
-    const translatedData = JSON.parse(translatedText);
+
+    // Handle JSON responses with markdown code blocks (similar to BaseAIProvider._parseBatchResult)
+    let parsedData;
+    try {
+      // First try direct JSON parsing
+      parsedData = JSON.parse(translatedText);
+    } catch (error) {
+      try {
+        // Try to extract JSON from markdown code blocks
+        const jsonMatch = translatedText.match(/```json\s*([\s\S]*?)\s*```|(\[[\s\S]*\])/);
+        if (jsonMatch) {
+          const jsonString = jsonMatch[1] || jsonMatch[2];
+          parsedData = JSON.parse(jsonString);
+        } else {
+          throw error;
+        }
+      } catch (secondError) {
+        this.logger.error('Failed to parse JSON from API response:', {
+          originalError: error.message,
+          fallbackError: secondError.message,
+          response: translatedText.substring(0, 200) + '...'
+        });
+        throw new Error(`Invalid JSON response from translation API: ${secondError.message}`);
+      }
+    }
+
+    const translatedData = parsedData;
     const { textsToTranslate, originMapping, expandedTexts, filteredExpandedTexts, textNodes, element } = request;
 
     // Map filtered translation results back to original expanded structure
