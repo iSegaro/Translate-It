@@ -20,4 +20,4 @@ By using my Web Extension, you signify your consent and agreement to the terms o
 
 ## Feedback
 
-If you have questions or concerns about this Privacy Policy, you can contact me by [email](mailto:m.khani2810@gmail.com).
+If you have questions or concerns about this Privacy Policy, you can contact me by email.

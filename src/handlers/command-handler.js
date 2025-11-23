@@ -4,6 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
 
 
@@ -11,7 +12,7 @@ async function handleCommand(tab, action, data = {}) {
   try {
     // Validate tab before proceeding
     if (!tab || !tab.id) {
-      logger.warn(`[CommandHandler] Invalid tab provided for command ${action}:`, tab);
+      logger.debug(`[CommandHandler] Invalid tab provided for command ${action}:`, tab);
       return false;
     }
 
@@ -42,9 +43,9 @@ async function handleCommand(tab, action, data = {}) {
 
     // Provide specific error context
     if (error.message && error.message.includes('Receiving end does not exist')) {
-      logger.warn(`[CommandHandler] Content script not available in tab ${tab?.id} for command ${action}`);
+      logger.debug(`[CommandHandler] Content script not available in tab ${tab?.id} for command ${action}`);
     } else if (error.message && error.message.includes('Could not establish connection')) {
-      logger.warn(`[CommandHandler] Cannot connect to tab ${tab?.id} for command ${action}`);
+      logger.debug(`[CommandHandler] Cannot connect to tab ${tab?.id} for command ${action}`);
     }
 
     return false;
@@ -59,6 +60,79 @@ async function handleBackgroundCommand(action, data = {}) {
   } catch (error) {
     logger.error('Error handling background command', action, error);
     }
+}
+
+async function handleSelectElementCommand(tab) {
+  try {
+    logger.debug(`[CommandHandler] Activating select element mode for tab ${tab.id}`);
+
+    // Check tab accessibility before attempting command
+    const accessInfo = await tabPermissionChecker.checkTabAccess(tab.id);
+    if (!accessInfo.isAccessible) {
+      logger.debug(`[CommandHandler] Select element command ignored on restricted page:`, {
+        tabId: tab.id,
+        url: accessInfo.fullUrl,
+        reason: accessInfo.errorMessage
+      });
+      return false;
+    }
+
+    // Send activation command with force load flag to trigger on-demand loading
+    const message = MessageFormat.create(
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      { source: 'keyboard_shortcut', forceLoad: true },
+      MessagingContexts.BACKGROUND
+    );
+
+    await browser.tabs.sendMessage(tab.id, message);
+    logger.debug(`[CommandHandler] Select element activation sent to content script`);
+    return true;
+  } catch (error) {
+    logger.debug(`[CommandHandler] Error handling select element command:`, error);
+
+    // Provide specific error context
+    if (error.message && error.message.includes('Receiving end does not exist')) {
+      logger.debug(`[CommandHandler] Content script not available in tab ${tab?.id} for select element command`);
+
+      // Try to inject content script as fallback
+      try {
+        logger.debug(`[CommandHandler] Attempting to inject content script for select element mode`);
+
+        if (browser.scripting) {
+          await browser.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['src/core/content-scripts/index.js']
+          });
+        } else {
+          await browser.tabs.executeScript(tab.id, {
+            file: 'src/core/content-scripts/index.js',
+            allFrames: false
+          });
+        }
+
+        // Wait for initialization and retry
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Create retry message
+        const retryMessage = MessageFormat.create(
+          MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+          { source: 'keyboard_shortcut', forceLoad: true },
+          MessagingContexts.BACKGROUND
+        );
+
+        // Retry the activation command
+        await browser.tabs.sendMessage(tab.id, retryMessage);
+        logger.debug(`[CommandHandler] Select element activation successful after content script injection`);
+        return true;
+      } catch (retryError) {
+        logger.error(`[CommandHandler] Fallback content script injection failed:`, retryError);
+      }
+    } else if (error.message && error.message.includes('Could not establish connection')) {
+      logger.debug(`[CommandHandler] Cannot connect to tab ${tab?.id} for select element command`);
+    }
+
+    return false;
+  }
 }
 
 async function handleOptionsCommand() {
@@ -92,9 +166,9 @@ export async function handleCommandEvent(command, tab) {
       quick_translate: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TRANSLATE'),
 
       // Element selection commands (Chrome shortcut support)
-      'SELECT-ELEMENT-COMMAND': () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
-      select_element: () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
-      activate_select_element: () => handleCommand(tab, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE),
+      'SELECT-ELEMENT-COMMAND': () => handleSelectElementCommand(tab),
+      select_element: () => handleSelectElementCommand(tab),
+      activate_select_element: () => handleSelectElementCommand(tab),
 
       // UI commands
       toggle_popup: () => handleBackgroundCommand('togglePopup', { tabId: tab.id }),
@@ -122,7 +196,7 @@ export async function handleCommandEvent(command, tab) {
         const duration = Date.now() - startTime;
 
         if (result === false) {
-          logger.warn(`[CommandHandler] Command ${command} handler returned false (likely validation failure)`);
+          logger.debug(`[CommandHandler] Command ${command} handler returned false (likely validation failure)`);
         } else {
           logger.info(`[CommandHandler] Command handled successfully: ${command}`, {
             duration: `${duration}ms`,
@@ -135,7 +209,7 @@ export async function handleCommandEvent(command, tab) {
         return false;
       }
     } else {
-      logger.warn(`[CommandHandler] Unknown command received: ${command}`, {
+      logger.debug(`[CommandHandler] Unknown command received: ${command}`, {
         availableCommands: Object.keys(commandMap)
       });
       return false;

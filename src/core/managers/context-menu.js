@@ -237,7 +237,7 @@ export class ContextMenuManager extends ResourceTracker {
     try {
       this.browser = browser;
 
-      logger.info("📋 Initializing context menu manager", force ? '(forced)' : '');
+      logger.info("Initializing context menu manager", force ? '(forced)' : '');
 
       // Set up default context menus (this clears existing ones)
       await this.setupDefaultMenus(locale);
@@ -265,19 +265,23 @@ export class ContextMenuManager extends ResourceTracker {
   async setupDefaultMenus(locale = null) {
     logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
 
+    // Global lock to prevent any race conditions across the entire extension
     if (this._menuSetupLock) {
-      logger.warn("setupDefaultMenus called concurrently, skipping.");
+      logger.debug("setupDefaultMenus called concurrently, skipping to prevent duplicate menus");
       return;
     }
     this._menuSetupLock = true;
+
     try {
       // Get i18n utility from factory
       const { getTranslationString } = await utilsFactory.getI18nUtils();
 
       // Clear existing menus first and wait for completion
+      // Add a small delay to ensure any pending operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
       await browser.contextMenus.removeAll();
       this.createdMenus.clear();
-      logger.debug("🧹 [ContextMenuManager] Cleared existing menus");
+      logger.debug("[ContextMenuManager] Cleared existing menus");
 
       // Get the currently active API to set the 'checked' state
       const currentApi = await getTranslationApiAsync();
@@ -414,6 +418,12 @@ export class ContextMenuManager extends ResourceTracker {
       );
       return menuId;
     } catch (error) {
+      // Check if this is a duplicate ID error - if so, log but don't fail
+      if (error.message && error.message.includes('duplicate id')) {
+        logger.debug(`⚠️ Context menu with duplicate ID "${menuConfig.id}" already exists, skipping:`, error);
+        return menuConfig.id; // Return the ID without failing
+      }
+
       logger.error("❌ Failed to create context menu:", error);
       throw error;
     }

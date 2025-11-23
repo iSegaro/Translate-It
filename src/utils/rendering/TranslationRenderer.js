@@ -68,7 +68,10 @@ export class TranslationRenderer {
     if (params.content) {
       const isRtl = shouldApplyRtl(params.content)
       div.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
-      div.style.textAlign = isRtl ? 'right' : 'left'
+      // Check if element has style property before accessing it
+      if (div.style && typeof div.style === 'object') {
+        div.style.textAlign = isRtl ? 'right' : 'left'
+      }
     }
     
     // Use DOM methods instead of innerHTML for security
@@ -91,7 +94,10 @@ export class TranslationRenderer {
     if (params.content) {
       const isRtl = shouldApplyRtl(params.content)
       element.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
-      element.style.textAlign = isRtl ? 'right' : 'left'
+      // Check if element has style property before accessing it
+      if (element.style && typeof element.style === 'object') {
+        element.style.textAlign = isRtl ? 'right' : 'left'
+      }
     }
     
     // Use DOM methods instead of innerHTML for security

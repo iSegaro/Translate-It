@@ -23,22 +23,18 @@ export class OpenRouterProvider extends BaseAIProvider {
   // AI Provider capabilities - Flexible settings for multi-model support
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 12; // Conservative for multi-model support
-  static maxComplexity = 250;
+  static optimalBatchSize = 25;
+  static maxComplexity = 400;
   static supportsImageTranslation = true; // Depends on selected model
   
   // Batch processing strategy
-  static batchStrategy = 'numbered'; // Uses numbered format for batch translation
+  static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super("OpenRouter");
   }
 
-  _getLangCode(lang) {
-    // OpenRouter works well with full language names, no mapping needed
-    return LanguageSwappingService._normalizeLangValue(lang);
-  }
-
+  
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiKey, model] = await Promise.all([
       getOpenRouterApiKeyAsync(),

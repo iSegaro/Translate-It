@@ -35,7 +35,7 @@ export const CONFIG = {
   THEME: "auto",
   TIMEOUT: 30000,
   selectionTranslationMode: "onClick", // "immediate",
-  COPY_REPLACE: "copy", // "replace",
+  COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
@@ -43,17 +43,16 @@ export const CONFIG = {
   // --- API Settings ---
   TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
-  API_URL:
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
   API_KEY: "", // Gemini specific
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: true, // Enable/disable thinking for supported models
   GEMINI_MODELS: [
     { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: true } },
     { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: true } },
-    { value: "gemini-2.5-flash-lite-preview", name: "Gemini 2.5 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
     { value: "gemini-2.0-flash", name: "Gemini 2.0 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
-    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } }
+    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
   WEBAI_API_URL: "http://localhost:6969/translate",
@@ -105,7 +104,7 @@ export const CONFIG = {
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
-  TRANSLATE_ON_TEXT_FIELDS: true, // نمایش آیکون ترجمه در فیلدهای متنی
+  TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
@@ -245,6 +244,17 @@ Now, please translate the following texts:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_BATCH ---*/
+
+/*--- Start PROMPT_BASE_AI_BATCH ---*/
+  PROMPT_BASE_AI_BATCH: `Your are an exper translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON array of texts from $_{SOURCE} to $_{TARGET}.
+  Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text. 
+  Maintain the original JSON structure.
+
+Important: Return only the JSON array with translated texts, no additional text or explanations.
+
+$_{TEXT}
+`,
+/*--- End PROMPT_BASE_AI_BATCH ---*/
 
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
@@ -450,15 +460,15 @@ export const getApiKeyAsync = async () => {
   return getSettingValueAsync("API_KEY", CONFIG.API_KEY);
 };
 
-export const getApiUrlAsync = async () => {
-  return getSettingValueAsync("API_URL", CONFIG.API_URL);
-};
-
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
 };
 export const getGeminiThinkingEnabledAsync = async () => {
   return getSettingValueAsync("GEMINI_THINKING_ENABLED", CONFIG.GEMINI_THINKING_ENABLED);
+};
+
+export const getGeminiApiUrlAsync = async () => {
+  return getSettingValueAsync("GEMINI_API_URL", CONFIG.GEMINI_API_URL);
 };
 
 // Google Translate Specific
@@ -517,6 +527,10 @@ export const getPromptBASESelectAsync = async () => {
 
 export const getPromptBASEBatchAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_BATCH", CONFIG.PROMPT_BASE_BATCH);
+};
+
+export const getPromptBASEAIBatchAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_AI_BATCH", CONFIG.PROMPT_BASE_AI_BATCH);
 };
 
 export const getPromptBASEFieldAsync = async () => {

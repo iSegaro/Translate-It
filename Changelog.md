@@ -1,15 +1,19 @@
-#### v1.4.10 – Released on November 19, 2025
+#### v1.4.10 – Released on November X, 2025
 
 ##### Added
 
 - **Local File Support**: Added support for translating content from local files (`file:///` URLs)
-- **Enhanced Floating Window**: Improved floating window display and performance for translation results
-- **Enhanced Original Text TTS**: Added visual indicators and tooltips for better discoverability of original text pronunciation in floating windows
 
 ##### Fixed
 
+- **Enhanced Floating Window**: Improved floating window display and performance for translation results
+- **Enhanced Original Text TTS**: Added visual indicators and tooltips for better discoverability of original text pronunciation in floating windows
 - **Select Element Improvements**: Enhanced element selection functionality and reliability
 - Removed caching system from Select Element for better performance and accuracy
+
+##### Changed
+
+- Changed default macOS keyboard shortcut to `Option+A`
 
 ---
 

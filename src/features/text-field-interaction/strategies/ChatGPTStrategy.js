@@ -121,6 +121,15 @@ export default class ChatGPTStrategy extends PlatformStrategy {
 
   applyBaseStyling(element, translatedText) {
     // بررسی جهت متن و اعمال استایل
+    if (!element || !element.style || typeof element.style !== 'object') {
+      // Fallback: use CSS classes if style is not available
+      if (element && element.classList) {
+        const isRtl = CONFIG.RTL_REGEX.test(translatedText);
+        element.classList.add(isRtl ? 'ti-rtl-text' : 'ti-ltr-text');
+      }
+      return;
+    }
+
     const isRtl = CONFIG.RTL_REGEX.test(translatedText);
     element.style.direction = isRtl ? "rtl" : "ltr";
     element.style.textAlign = isRtl ? "right" : "left";

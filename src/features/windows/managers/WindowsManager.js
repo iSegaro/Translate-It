@@ -1167,7 +1167,7 @@ export class WindowsManager extends ResourceTracker {
     this._isDismissing = true;
 
     const dismissMode = this.state.isIconMode ? 'icon' : 'window';
-    this.logger.info('Dismissing translation UI', {
+    this.logger.debug('Dismissing translation UI', {
       mode: dismissMode,
       reason: this._isDismissingDueToTyping ? 'user_typing' : 'user_action'
     });
@@ -1293,7 +1293,7 @@ export class WindowsManager extends ResourceTracker {
       // Check if cancelAllTranslations method exists (compatibility between core and windows TranslationHandler)
       if (typeof this.translationHandler.cancelAllTranslations === 'function') {
         this.translationHandler.cancelAllTranslations();
-        this.logger.info('All pending translations cancelled during dismiss');
+        this.logger.debug('All pending translations cancelled during dismiss');
       }
     }
 
@@ -1319,7 +1319,7 @@ export class WindowsManager extends ResourceTracker {
       this._lastDismissTime = null;
     }, 200);
 
-    this.logger.info('Translation UI dismissed successfully');
+    this.logger.debug('Translation UI dismissed successfully');
   }
 
   /**

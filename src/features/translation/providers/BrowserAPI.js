@@ -1,5 +1,5 @@
 // src/providers/core/browserTranslateProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -9,6 +9,8 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from 'webextension-polyfill';
 
 
@@ -66,10 +68,14 @@ const langNameToCodeMap = {
   vietnamese: "vi",
 };
 
-export class browserTranslateProvider extends BaseProvider {
+export class browserTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Browser native translation";
   static displayName = "Browser API";
+
+  // Browser API doesn't support traditional streaming, so disable it
+  static supportsStreaming = false;
+  static characterLimit = 10000; // Higher limit for browser API
   static detector = null;
   static reliableJsonMode = true;
   static supportsDictionary = false;
@@ -350,6 +356,14 @@ export class browserTranslateProvider extends BaseProvider {
         return finalResult;
       }
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        logger.debug(`[BrowserAPI] Translation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Enhanced error handling with specific context
       if (error.message?.includes("Translation not available")) {
         error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
@@ -361,8 +375,12 @@ export class browserTranslateProvider extends BaseProvider {
         error.type = ErrorTypes.API;
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
-      
+
       logger.error('Translation error:', error);
+      // Let ErrorHandler automatically detect and handle all error types
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'browser-api-translation'
+      });
       throw error;
     }
   }
@@ -393,6 +411,63 @@ export class browserTranslateProvider extends BaseProvider {
         delete this.translators[key];
       }
     }
+  }
+
+  /**
+   * Translate a chunk of texts using Browser Translation API
+   * @param {string[]} chunkTexts - Texts in this chunk to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts for this chunk
+   */
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+    // Check API availability first
+    if (!this._isAPIAvailable()) {
+      const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
+      err.type = ErrorTypes.API;
+      err.context = `${this.providerName.toLowerCase()}-api-unavailable`;
+      throw err;
+    }
+
+    // Handle language swapping using centralized service
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      chunkTexts.join(' '), sourceLang, targetLang, 'English', 'Farsi',
+      { providerName: 'BrowserAPI', useRegexFallback: true }
+    );
+
+    // Convert language codes
+    const sourceLanguageCode = sourceLang === AUTO_DETECT_VALUE
+      ? await this._detectLanguage(chunkTexts.join(' '), sourceLang)
+      : this._getLangCode(sourceLang);
+    const targetLanguageCode = this._getLangCode(targetLang);
+
+    // Get translator instance
+    const translator = await this._getTranslator(sourceLanguageCode, targetLanguageCode);
+
+    // Translate each text in the chunk
+    const results = [];
+    for (const text of chunkTexts) {
+      // Check for cancellation
+      if (abortController?.signal.aborted) {
+        const error = new Error('Translation cancelled');
+        error.name = 'AbortError';
+        throw error;
+      }
+
+      try {
+        const result = await translator.translate(text);
+        results.push(result);
+      } catch (error) {
+        logger.error(`[BrowserAPI] Chunk translation failed for text: ${text.slice(0, 50)}...`, error);
+        // Return original text on failure to maintain chunk structure
+        results.push(text);
+      }
+    }
+
+    logger.debug(`[BrowserAPI] Chunk translated: ${chunkTexts.length} texts`);
+    return results;
   }
 
   /**

@@ -12,6 +12,10 @@ import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getProviderBatching } from '../core/ProviderConfigurations.js';
+import { getPromptBASEAIBatchAsync } from '@/shared/config/config.js';
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
@@ -32,6 +36,23 @@ export class BaseAIProvider extends BaseProvider {
     super(providerName);
   }
 
+  /**
+   * Convert language to AI provider format (full language names)
+   * AI providers work best with full language names instead of codes
+   * @param {string} lang - Language code or name
+   * @returns {string} - Full language name or AUTO_DETECT_VALUE
+   */
+  _getLangCode(lang) {
+    // AI providers use full language names, so convert codes to names
+    if (!lang) return AUTO_DETECT_VALUE;
+
+    // Convert language code to full language name for AI providers
+    const languageName = getLanguageNameFromCode(lang);
+    logger.debug(`[${this.providerName}] Language conversion: "${lang}" → "${languageName}"`);
+    return languageName || AUTO_DETECT_VALUE;
+  }
+
+  
   /**
    * Enhanced batch translation with streaming support
    * @param {string[]} texts - Array of texts to translate
@@ -84,10 +105,12 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {Promise<string[]>} - All translated texts
    */
   async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
-    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments`);
-    
-    // Create optimal batches based on provider strategy
-    const batches = this._createOptimalBatches(texts);
+    const startTime = Date.now();
+    const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments (${totalChars} chars, mode: ${translateMode})`);
+
+    // Create optimal batches based on provider strategy and mode
+    const batches = this._createOptimalBatches(texts, translateMode);
     const allResults = [];
     
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -157,7 +180,20 @@ export class BaseAIProvider extends BaseProvider {
 
     // Send streaming end notification
     await this._sendStreamEnd(messageId, engine);
-    
+
+    // Log performance metrics for Select Element mode
+    const totalTime = Date.now() - startTime;
+    const charsPerSecond = (totalChars / totalTime) * 1000;
+
+    if (translateMode === 'select_element') {
+      // Get rate limit manager performance stats
+      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+      const perfStats = rateLimitManager.getPerformanceStats(this.providerName);
+
+      logger.info(`[${this.providerName}] Select Element performance: ${texts.length} segments, ${totalChars} chars, ${batches.length} batches, ${totalTime}ms, ${charsPerSecond.toFixed(1)} chars/s`);
+      logger.info(`[${this.providerName}] Rate limit stats: ${perfStats.averageWaitTime.toFixed(1)}ms avg wait, ${perfStats.averageRequestTime.toFixed(1)}ms avg request, ${perfStats.requestsPerMinute.toFixed(1)} req/min, ${perfStats.successRate.toFixed(1)}% success`);
+    }
+
     // Streaming translation completed
     return allResults;
   }
@@ -216,13 +252,22 @@ export class BaseAIProvider extends BaseProvider {
   /**
    * Create optimal batches based on provider strategy
    * @param {string[]} texts - Texts to translate
+   * @param {string} translateMode - Translation mode (optional)
    * @returns {string[][]} - Array of batches
    */
-  _createOptimalBatches(texts) {
-    const strategy = this.constructor.preferredBatchStrategy;
-    const optimalSize = this.constructor.optimalBatchSize;
-    const maxComplexity = this.constructor.maxComplexity;
-    
+  _createOptimalBatches(texts, translateMode = null) {
+    // Get mode-specific batching configuration
+    const batchingConfig = this._getBatchingConfig(translateMode);
+    const strategy = batchingConfig.strategy || this.constructor.preferredBatchStrategy;
+    const optimalSize = batchingConfig.optimalSize || this.constructor.optimalBatchSize;
+    const maxComplexity = batchingConfig.maxComplexity || this.constructor.maxComplexity;
+    const maxBatchSizeChars = batchingConfig.maxBatchSizeChars;
+
+    // For Select Element mode with character target, use character-based batching
+    if (translateMode === 'select_element' && maxBatchSizeChars) {
+      return this._createCharacterBasedBatches(texts, maxBatchSizeChars, batchingConfig.balancedBatching);
+    }
+
     switch (strategy) {
       case 'smart':
         return this._createSmartBatches(texts, optimalSize, maxComplexity);
@@ -471,12 +516,10 @@ export class BaseAIProvider extends BaseProvider {
     
     // Use strategy pattern based on provider configuration
     try {
-      let result;
-      
       if (batchStrategy === 'json') {
         // JSON batch strategy (used by Gemini, OpenAI)
-        const batchPrompt = this._buildBatchPrompt(batch, sourceLang, targetLang);
-        result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
+        const batchPrompt = await this._buildBatchPrompt(batch, sourceLang, targetLang);
+        const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
         
         // Parse JSON batch result
         const parsedResults = this._parseBatchResult(result, batch.length, batch);
@@ -486,23 +529,9 @@ export class BaseAIProvider extends BaseProvider {
         } else {
           throw new Error('JSON batch result count mismatch');
         }
-        
-      } else if (batchStrategy === 'numbered') {
-        // Numbered batch strategy (used by OpenRouter, DeepSeek, WebAI)
-        const batchPrompt = this._buildNumberedBatchPrompt(batch, sourceLang, targetLang, translateMode);
-        result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
-        
-        // Parse numbered batch result
-        const parsedResults = this._parseNumberedBatchResult(result, batch.length);
-        if (parsedResults.length === batch.length) {
-          logger.debug(`[${this.providerName}] Numbered batch translation successful: ${batch.length} segments`);
-          return parsedResults;
-        } else {
-          throw new Error('Numbered batch result count mismatch');
-        }
       }
       
-      throw new Error(`Unknown batch strategy: ${batchStrategy}`);
+      throw new Error(`Unknown or unsupported batch strategy: ${batchStrategy}`);
       
     } catch (error) {
       logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
@@ -530,17 +559,18 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} targetLang - Target language
    * @returns {string} - Batch prompt
    */
-  _buildBatchPrompt(textBatch, sourceLang, targetLang) {
+  async _buildBatchPrompt(textBatch, sourceLang, targetLang) {
     const jsonInput = textBatch.map((text, index) => ({
       id: index,
       text: text
     }));
     
-    return `Translate the following JSON array of texts from ${sourceLang} to ${targetLang}. Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text. Maintain the original JSON structure.
-
-${JSON.stringify(jsonInput, null, 2)}
-
-Important: Return only the JSON array with translated texts, no additional text or explanations.`;
+    const promptTemplate = await getPromptBASEAIBatchAsync();
+    
+    return promptTemplate
+      .replace("_{SOURCE}", sourceLang)
+      .replace("_{TARGET}", targetLang)
+      .replace("_{TEXT}", JSON.stringify(jsonInput, null, 2));
   }
 
   /**
@@ -562,12 +592,39 @@ Important: Return only the JSON array with translated texts, no additional text 
       const jsonString = jsonMatch[1] || jsonMatch[2];
       const parsed = JSON.parse(jsonString);
       
-      if (Array.isArray(parsed) && parsed.length === expectedCount) {
-        // Ensure the order is correct based on id
-        const sortedResults = parsed.sort((a, b) => a.id - b.id);
-        return sortedResults.map(item => item.text);
+      if (Array.isArray(parsed)) {
+        // Check if this is a simple string array (single segment case)
+        if (expectedCount === 1 && parsed.length === 1 && typeof parsed[0] === 'string') {
+          logger.debug(`[${this.providerName}] Single segment translation detected, using string directly`);
+          return [parsed[0]];
+        }
+
+        // Handle object array format (multi-segment case)
+        if (parsed.length === expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
+          // Ensure the order is correct based on id
+          const sortedResults = parsed.sort((a, b) => a.id - b.id);
+          return sortedResults.map(item => item.text);
+        } else if (parsed.length > expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
+          // Sometimes AI returns extra items - take first N items
+          logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Taking first ${expectedCount} items.`);
+          const firstItems = parsed.slice(0, expectedCount);
+          const sortedResults = firstItems.sort((a, b) => a.id - b.id);
+          return sortedResults.map(item => item.text);
+        } else if (parsed.length < expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
+          // Sometimes AI returns fewer items - pad with original texts
+          logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Padding with original texts.`);
+          const sortedResults = parsed.sort((a, b) => a.id - b.id);
+          const translatedTexts = sortedResults.map(item => item.text);
+
+          // Pad with original texts if needed
+          while (translatedTexts.length < expectedCount) {
+            translatedTexts.push(originalBatch[translatedTexts.length] || '');
+          }
+
+          return translatedTexts;
+        }
       }
-      
+
       throw new Error(`Invalid batch result format. Expected ${expectedCount} items, got ${parsed.length}.`);
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to parse batch result: ${error.message}. Falling back to splitting by lines.`);
@@ -583,66 +640,25 @@ Important: Return only the JSON array with translated texts, no additional text 
    * @returns {string[]} - Parsed results or original texts
    */
   _fallbackParsing(result, expectedCount, originalBatch) {
-    // Simple fallback: split the result by newlines
-    const lines = result.split('\\n').filter(line => line.trim() !== '');
-    if (lines.length === expectedCount) {
-      return lines;
-    }
-    // If all else fails, return the original texts for this batch
-    logger.warn(`[${this.providerName}] Fallback parsing failed, returning original texts`);
-    return originalBatch;
-  }
-
-  /**
-   * Parse numbered batch results (for numbered strategy providers)
-   * @param {string} result - API response
-   * @param {number} expectedCount - Expected number of results
-   * @param {string[]} originalBatch - Original texts for fallback
-   * @returns {string[]} - Parsed results
-   */
-  _parseNumberedBatchResult(result, expectedCount, originalBatch) {
-    if (!result) return originalBatch;
+    // A simple fallback: split the result by newlines.
+    // Preserve empty lines to maintain formatting for AI responses
+    const lines = result.split('\\n');
     
-    // Split by lines and process numbered format
-    const rawLines = result.split('\n');
-    const lines = [];
-    
-    for (let line of rawLines) {
-      line = line.trim();
-      if (!line) continue;
-      
-      // Check if line starts with number format like "1. ", "2. ", etc.
-      const numberMatch = line.match(/^(\d+)\.\s*(.*)$/);
-      if (numberMatch) {
-        const content = numberMatch[2].trim();
-        if (content) {
-          lines.push(content);
-        }
+    // Filter out completely empty lines only if we have too many lines
+    if (lines.length > expectedCount) {
+      const nonEmptyLines = lines.filter(line => line.trim() !== '');
+      if (nonEmptyLines.length === expectedCount) {
+        return nonEmptyLines;
       }
     }
     
-    logger.debug(`[${this.providerName}] Parsed ${lines.length} translations from numbered response (expected: ${expectedCount})`);
-    
-    // If we got the expected number of translations, return them
+    // If line count matches, return as-is (preserving formatting)
     if (lines.length === expectedCount) {
-      logger.info(`[${this.providerName}] Successfully parsed numbered response: ${lines.length} translations`);
       return lines;
-    } else {
-      logger.warn(`[${this.providerName}] Numbered response parsing failed. Expected: ${expectedCount}, Got: ${lines.length}`);
-      return this._fallbackParsing(result, expectedCount, originalBatch);
     }
-  }
-
-  /**
-   * Build numbered batch prompt (for numbered strategy providers)
-   * @param {string[]} textBatch - Batch of texts
-   * @param {string} _sourceLang - Source language
-   * @param {string} _targetLang - Target language
-   * @returns {string} - Numbered batch prompt
-   */
-  _buildNumberedBatchPrompt(textBatch /* , sourceLang, targetLang */) {
-    const numberedText = textBatch.map((text, index) => `${index + 1}. ${text}`).join('\n');
-    return numberedText + '\n\nPlease return the translations in the same order, one per line, numbered 1. 2. 3. etc.';
+    
+    // If all else fails, return the original texts for this batch
+    return originalBatch;
   }
 
   /**
@@ -663,7 +679,9 @@ Important: Return only the JSON array with translated texts, no additional text 
     
     for (let i = 0; i < batch.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        throw new Error('Translation cancelled during fallback');
+        const cancelError = new Error('Translation cancelled during fallback');
+        cancelError.name = 'AbortError';
+        throw cancelError;
       }
       
       try {
@@ -763,6 +781,15 @@ Important: Return only the JSON array with translated texts, no additional text 
     try {
       return await this._executeApiCall(params);
     } catch (error) {
+      // Check if this is a user cancellation (should be handled silently)
+      const errorType = matchErrorToType(error);
+      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
+        // Log user cancellation at debug level only
+        const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, this.providerName);
+        logger.debug(`[${this.providerName}] Operation cancelled by user`);
+        throw error; // Re-throw without ErrorHandler processing
+      }
+
       // Let ErrorHandler automatically detect and handle all error types
       await ErrorHandler.getInstance().handle(error, {
         context: params.context || `${this.providerName.toLowerCase()}-translation`
@@ -773,5 +800,85 @@ Important: Return only the JSON array with translated texts, no additional text 
       error.provider = this.providerName;
       throw error;
     }
+  }
+
+  /**
+   * Get batching configuration for a specific translation mode
+   * @param {string} translateMode - Translation mode
+   * @returns {object} - Batching configuration
+   * @private
+   */
+  _getBatchingConfig(translateMode = null) {
+    try {
+      return getProviderBatching(this.providerName, translateMode);
+    } catch (error) {
+      // Fallback to class defaults if configuration fails to load
+      logger.debug(`[${this.providerName}] Failed to load batching config, using defaults:`, error.message);
+      return {
+        strategy: this.constructor.preferredBatchStrategy,
+        optimalSize: this.constructor.optimalBatchSize,
+        maxComplexity: this.constructor.maxComplexity
+      };
+    }
+  }
+
+  /**
+   * Create character-based batches for optimal API usage in Select Element mode
+   * @param {string[]} texts - Texts to translate
+   * @param {number} maxCharsPerBatch - Maximum characters per batch
+   * @param {boolean} balancedBatching - Enable balanced batch sizes
+   * @returns {string[][]} - Array of batches
+   * @private
+   */
+  _createCharacterBasedBatches(texts, maxCharsPerBatch, balancedBatching = false) {
+    const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+
+    // If total content fits in one batch, return early to avoid unnecessary splitting
+    if (totalChars <= maxCharsPerBatch) {
+      logger.debug(`[${this.providerName}] Total content (${totalChars} chars) fits in single batch (limit: ${maxCharsPerBatch}), skipping batching`);
+      return [texts];
+    }
+
+    const idealBatchCount = Math.ceil(totalChars / maxCharsPerBatch);
+    const balancedBatchSize = Math.ceil(totalChars / Math.min(idealBatchCount + 1, texts.length));
+
+    const batches = [];
+    let currentBatch = [];
+    let currentChars = 0;
+    const targetBatchChars = balancedBatching ? Math.min(balancedBatchSize, maxCharsPerBatch) : maxCharsPerBatch;
+
+    for (const text of texts) {
+      const textLength = text.length;
+
+      // If adding this text would exceed the limit and we have items in the batch, create new batch
+      if (currentChars + textLength > targetBatchChars && currentBatch.length > 0) {
+        batches.push(currentBatch);
+        currentBatch = [];
+        currentChars = 0;
+      }
+
+      // If a single text exceeds the limit, it goes in its own batch
+      if (textLength > targetBatchChars) {
+        if (currentBatch.length > 0) {
+          batches.push(currentBatch);
+          currentBatch = [];
+          currentChars = 0;
+        }
+        batches.push([text]); // Single item batch for oversized text
+        continue;
+      }
+
+      currentBatch.push(text);
+      currentChars += textLength;
+    }
+
+    // Add the last batch if it has items
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+
+    logger.debug(`[${this.providerName}] Created ${batches.length} ${balancedBatching ? 'balanced' : ''}character-based batches for ${texts.length} segments (${totalChars} chars, target: ${targetBatchChars} chars/batch)`);
+
+    return batches;
   }
 }

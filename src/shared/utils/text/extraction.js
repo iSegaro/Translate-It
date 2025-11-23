@@ -597,6 +597,20 @@ export function storeOriginalParentStyles(parentElement) {
  * @param {HTMLElement} parentElement المان پدر مورد نظر.
  */
 export function restoreOriginalParentStyles(parentElement) {
+  // Check if element has style property before accessing it
+  if (!parentElement.style || typeof parentElement.style !== 'object') {
+    // Just remove dataset properties if style is not available
+    if (parentElement.dataset) {
+      if (parentElement.dataset.aiwcOriginalDirection !== undefined) {
+        delete parentElement.dataset.aiwcOriginalDirection;
+      }
+      if (parentElement.dataset.aiwcOriginalTextAlign !== undefined) {
+        delete parentElement.dataset.aiwcOriginalTextAlign;
+      }
+    }
+    return;
+  }
+
   if (parentElement.dataset.aiwcOriginalDirection !== undefined) {
     parentElement.style.direction = parentElement.dataset.aiwcOriginalDirection;
     delete parentElement.dataset.aiwcOriginalDirection;

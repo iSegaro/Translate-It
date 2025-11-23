@@ -178,6 +178,12 @@ export class StreamingTranslationEngine {
         onError: (error) => this.orchestrator.errorHandler._handleStreamingError(messageId, error)
       });
 
+      // Check if operation was cancelled before sending the request
+      if (request && request.status === 'cancelled') {
+        this.logger.debug('[StreamingTranslationEngine] Translation cancelled, not sending request');
+        return { success: false, error: 'Translation cancelled' };
+      }
+
       // Send through unified messaging system (will coordinate streaming/regular)
       const result = await sendMessage(translationRequest);
 

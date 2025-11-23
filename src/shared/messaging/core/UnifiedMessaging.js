@@ -42,10 +42,10 @@ const OPERATION_TIMEOUTS = {
   'CANCEL_TRANSLATION': 2000,
   
   // Medium operations (translation, processing)
-  'TRANSLATE': 15000,
-  'TRANSLATE_SELECTION': 12000,
+  'TRANSLATE': 20000,
+  'TRANSLATE_SELECTION': 15000,
   'TRANSLATE_PAGE': 20000,
-  'TRANSLATE_TEXT': 12000,
+  'TRANSLATE_TEXT': 15000,
   'TRANSLATE_IMAGE': 18000,
   'FETCH_TRANSLATION': 10000,
   'PROCESS_SELECTED_ELEMENT': 8000,
@@ -76,7 +76,11 @@ const OPERATION_TIMEOUTS = {
   'DEFAULT': 8000
 };
 
-function getTimeoutForAction(action) {
+function getTimeoutForAction(action, context = null) {
+  // Enhanced timeout for Select Element mode TRANSLATE actions
+  if (action === 'TRANSLATE' && (context === 'select-element' || context?.mode === 'select_element')) {
+    return 300000; // 5 minutes for Select Element mode
+  }
   return OPERATION_TIMEOUTS[action] || OPERATION_TIMEOUTS.DEFAULT || 8000;
 }
 
@@ -122,7 +126,7 @@ export async function sendMessage(message, options = {}) {
       }
 
       // If coordination fails, fall back to regular messaging
-      getLogger().warn('Translation coordination failed, falling back to regular messaging:', error);
+      getLogger().debug('Translation coordination failed, falling back to regular messaging:', error);
 
       // Check if this is a streaming timeout and translation might already be complete
       const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');
@@ -152,6 +156,18 @@ export async function sendMessage(message, options = {}) {
         throw new Error('Translation cancelled by user');
       }
 
+      // Additional check: if the error is a timeout for streaming translation, don't fallback
+      if (error.type === 'OPERATION_TIMEOUT' || (error.message && error.message.includes('timed out'))) {
+        // For streaming timeouts, we should not fallback as the user likely cancelled
+        if (message.context === 'select-element' || (message.data && message.data.mode === 'select_element')) {
+          getLogger().debug('Streaming timeout detected for select element, not attempting fallback');
+          throw new Error('Streaming translation timed out - user likely cancelled');
+        }
+
+        getLogger().debug('Timeout detected, not attempting fallback as operation is likely cancelled');
+        throw new Error('Translation timed out - operation cancelled');
+      }
+
       // Create a new message with a fresh messageId to avoid duplicate detection
       const fallbackMessage = {
         ...message,
@@ -176,7 +192,7 @@ export async function sendMessage(message, options = {}) {
  */
 export async function sendRegularMessage(message, options = {}) {
   const { timeout: customTimeout } = options;
-  const actionTimeout = customTimeout || getTimeoutForAction(message.action);
+  const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
 
   getLogger().debug(`📤 Sending ${message.action} to background (${actionTimeout}ms timeout)`);
 
@@ -187,10 +203,48 @@ export async function sendRegularMessage(message, options = {}) {
       throw contextError;
     }
 
+    // Check if streaming operation was cancelled before sending the message
+    if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
+      getLogger().debug('Streaming operation was cancelled, not sending message');
+      throw new Error('Translation cancelled by user');
+    }
+
     const sendPromise = browser.runtime.sendMessage(message);
+
+    // Create a cancellation promise for this messageId
+    let isCancelled = false;
+    const cancellationPromise = new Promise((_, reject) => {
+      const checkCancellation = () => {
+        // Check streaming timeout manager first
+        if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
+          isCancelled = true;
+          reject(new Error('Translation cancelled by user'));
+          return;
+        }
+
+        // Also check for global ESC flag (faster response to user ESC)
+        if (window.selectElementHandlingESC === true) {
+          isCancelled = true;
+          getLogger().debug('ESC flag detected, cancelling message immediately');
+          const cancelError = new Error('Translation cancelled by user ESC');
+          cancelError.type = 'USER_CANCELLED';
+          reject(cancelError);
+          return;
+        }
+
+        // Check again more frequently - every 50ms for faster response
+        if (!isCancelled) {
+          setTimeout(checkCancellation, 50);
+        }
+      };
+
+      // Start cancellation checking immediately for faster response to ESC
+      setTimeout(checkCancellation, 50);
+    });
 
     const response = await Promise.race([
       sendPromise,
+      cancellationPromise,
       timeout(actionTimeout, message.action),
     ]);
 

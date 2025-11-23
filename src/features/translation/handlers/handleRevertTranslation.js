@@ -69,7 +69,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
       }
     };
 
-    logger.debug(`📤 [revertTranslation] Sending revert message to content script:`, {
+    logger.debug(`Sending revert message to content script:`, {
       tabId: targetTabId,
       action: revertMessage.action,
       messageId: revertMessage.messageId
@@ -79,14 +79,14 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     try {
       contentScriptResponse = await browser.tabs.sendMessage(targetTabId, revertMessage);
     } catch (error) {
-      logger.error(`❌ [revertTranslation] browser.tabs.sendMessage failed:`, error);
+      logger.error(`browser.tabs.sendMessage failed:`, error);
       throw error;
     }
 
     // Fix: Handle the case where multiple listeners cause false response
     if (contentScriptResponse === false) {
       // Try again with a different approach - assume success for now
-      logger.debug(`[revertTranslation] Received false, assuming revert success (no active translations)`);
+      logger.debug(`Received false, assuming revert success (no active translations)`);
       sendResponse({
         success: true,
         message: 'Translation reverted successfully',
@@ -99,7 +99,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
 
     // Handle normal response
     if (contentScriptResponse && contentScriptResponse.success) {
-      logger.info(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+      logger.info(`✅ Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
 
       sendResponse({
         success: true,
@@ -110,7 +110,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
       });
     } else {
       const errorMessage = contentScriptResponse?.error || 'Content script revert failed';
-      logger.warn(`❌ [revertTranslation] Content script returned failure for tab ${targetTabId}:`, {
+      logger.warn(`Content script returned failure for tab ${targetTabId}:`, {
         response: contentScriptResponse,
         error: errorMessage
       });

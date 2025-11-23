@@ -82,7 +82,7 @@ export function generateManifest(browser = 'chrome') {
       'SELECT-ELEMENT-COMMAND': {
         suggested_key: {
           default: 'Alt+A',
-          mac: 'Command+A'
+          mac: 'Alt+A'
         },
         description: 'Activate the \'Select Element\' mode for translation.'
       }

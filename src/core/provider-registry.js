@@ -94,7 +94,7 @@ export const PROVIDER_REGISTRY = [
     id: "deepseek",
     name: "DeepSeek",
     description: "DeepSeek AI models for translation",
-    icon: "providers/deepseek.svg", 
+    icon: "providers/deepseek.svg",
     category: PROVIDER_CATEGORIES.AI,
     needsApiKey: true,
     supported: true,

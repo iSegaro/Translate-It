@@ -143,7 +143,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           const responseText = await response.text();
 
           if (contentType && contentType.includes('text/html')) {
-            logger.warn(`[Bing] Received HTML response instead of JSON. Chunk size: ${chunkTexts.length}`);
+            logger.debug(`[Bing] Received HTML response instead of JSON. Chunk size: ${chunkTexts.length}`);
             const htmlError = new Error('Bing returned HTML response instead of JSON');
             htmlError.name = 'BingHtmlResponseError';
             htmlError.context = context;
@@ -157,11 +157,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           try {
             data = JSON.parse(responseText);
           } catch (parseError) {
-            logger.warn(`[Bing] JSON parsing failed: ${parseError.message}. Response length: ${responseText.length}`);
+            logger.debug(`[Bing] JSON parsing failed: ${parseError.message}. Response length: ${responseText.length}`);
 
             // Check if response might be HTML despite content-type
             if (responseText.trim().startsWith('<')) {
-              logger.warn(`[Bing] Response appears to be HTML despite content-type`);
+              logger.debug(`[Bing] Response appears to be HTML despite content-type`);
               const htmlError = new Error('Bing returned HTML response (detected after parsing)');
               htmlError.name = 'BingHtmlResponseError';
               htmlError.context = context;
@@ -257,7 +257,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         const minChunkSize = providerConfig?.batching?.minChunkSize || 100;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
 
-        logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${error.chunkSize || chunkTexts.length}`);
+        logger.debug(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${error.chunkSize || chunkTexts.length}`);
 
         // Check if we should retry with smaller chunks
         if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
@@ -328,7 +328,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       }
 
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
-        logger.warn(`[Bing] Chunk translation failed, will be handled by fallback. Chunk size: ${chunkTexts.length}`);
+        logger.debug(`[Bing] Chunk translation failed, will be handled by fallback. Chunk size: ${chunkTexts.length}`);
         // Let BaseTranslateProvider handle the error and fallback
         throw error;
       }

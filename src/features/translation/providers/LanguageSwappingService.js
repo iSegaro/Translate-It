@@ -41,34 +41,33 @@ export class LanguageSwappingService {
 
   static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi', options = {}) {
     const { providerName = 'LanguageSwapping', useRegexFallback = true } = options;
-    
+
     try {
       const detectionResult = await browser.i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
-        
+
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = targetNorm.split("-")[0];
         // Language detection details logged at TRACE level
 
-        if (detectedLangCode === targetLangCode) {
+        // Only swap if text detected as target language AND source is auto-detect
+        if (detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE) {
           let newTargetLang;
-          
-          if (sourceNorm !== AUTO_DETECT_VALUE) {
-            newTargetLang = sourceNorm;
-          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+
+          if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
             newTargetLang = originalSourceLang;
           } else {
-            // Use the current target language instead of defaulting to English
-            newTargetLang = targetLang;
+            // Default to English when user has auto-detect and target matches detected language
+            newTargetLang = "en";
           }
-          
-          // Languages swapped
+
+          logger.debug(`${providerName}: Languages swapped due to detection from ${targetLang} to ${newTargetLang}`);
           return [targetNorm, newTargetLang];
         }
-        
+
         // No language swapping needed
       } else if (useRegexFallback) {
         return this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
@@ -88,22 +87,28 @@ export class LanguageSwappingService {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
     const targetLangCode = targetNorm.split("-")[0];
+    const sourceLangCode = sourceNorm.split("-")[0];
 
+    // Only swap languages if:
+    // 1. Text is Persian AND
+    // 2. Source is auto-detect AND
+    // 3. Target is Persian or Arabic AND
+    // 4. Target language is NOT what the user actually wants (not explicit source)
     if (
       isPersianText(text) &&
-      (targetLangCode === "fa" || targetLangCode === "ar")
+      sourceNorm === AUTO_DETECT_VALUE &&
+      (targetLangCode === "fa" || targetLangCode === "ar") &&
+      targetLangCode !== sourceLangCode
     ) {
       let newTargetLang;
-      
-      if (sourceNorm !== AUTO_DETECT_VALUE) {
-        newTargetLang = sourceNorm;
-      } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+
+      if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
         newTargetLang = originalSourceLang;
       } else {
-        // Use the current target language instead of defaulting to English
-        newTargetLang = targetLang;
+        // Default to English when source is auto and target is Persian/Arabic
+        newTargetLang = "en";
       }
-      
+
       logger.debug(`${providerName}: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
       return [targetNorm, newTargetLang];
     }

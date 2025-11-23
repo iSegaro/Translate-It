@@ -15,6 +15,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
  * @returns {string} One of the keys from ErrorTypes.
  */
 export function matchErrorToType(rawOrError = "") {
+  // Priority 0: Check for AbortError (user cancellation)
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.name === 'AbortError') {
+    return ErrorTypes.USER_CANCELLED;
+  }
+
   // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     // Ensure API_RESPONSE_INVALID is properly recognized
@@ -122,6 +127,14 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("language not supported")
   )
     return ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
+
+  // Chrome Translation API availability errors
+  if (
+    msg.includes("Chrome Translation API not available") ||
+    msg.includes("Translation API not available") ||
+    (msg.includes("Requires Chrome") && msg.includes("138"))
+  )
+    return ErrorTypes.API;
 
   // Import/Export password issues
   if (

@@ -33,11 +33,25 @@
       />
     </div>
     <div
-      v-if="geminiModel !== 'custom' && isThinkingSupported"
+      v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
-      <BaseCheckbox 
-        v-model="geminiThinking" 
+      <label>{{ t('gemini_api_settings_api_url_label') || 'API URL' }}</label>
+      <BaseInput
+        v-model="geminiApiUrl"
+        :placeholder="t('gemini_api_url_placeholder') || 'Enter custom API URL'"
+        class="api-url-input"
+      />
+      <span class="setting-description">
+        {{ t('gemini_custom_api_url_info') || 'Enter the complete API URL including the model name' }}
+      </span>
+    </div>
+    <div
+      v-if="isThinkingSupported"
+      class="setting-group"
+    >
+      <BaseCheckbox
+        v-model="geminiThinking"
         :disabled="!isThinkingControllable"
         :label="t('gemini_thinking_label') || 'Enable Thinking Mode'"
       />
@@ -49,7 +63,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
@@ -68,20 +82,35 @@ const geminiApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('API_KEY', value)
 })
 
+const geminiApiUrl = computed({
+  get: () => settingsStore.settings?.GEMINI_API_URL || CONFIG.GEMINI_API_URL,
+  set: (value) => settingsStore.updateSettingLocally('GEMINI_API_URL', value)
+})
+
+// Track dropdown selection separately from stored value
+const selectedModelOption = ref('gemini-2.5-flash')
+
+// Initialize selectedModelOption based on current stored value
+const initializeModelSelection = () => {
+  const currentModel = settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash';
+  // If currentModel is 'custom' or not in predefined options, set to 'custom'
+  const isPredefined = geminiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  selectedModelOption.value = (currentModel === 'custom' || !isPredefined) ? 'custom' : currentModel;
+}
+
 const geminiModel = computed({
-  get: () => settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash',
-  set: (value) => settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+  get: () => selectedModelOption.value,
+  set: (value) => {
+    selectedModelOption.value = value;
+    // Always save the selected value, including 'custom'
+    settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+  }
 })
 
 const geminiThinking = computed({
   get: () => settingsStore.settings?.GEMINI_THINKING_ENABLED ?? true,
   set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_ENABLED', value)
 })
-
-// const geminiCustomUrl = computed({
-//   get: () => settingsStore.settings?.API_URL || '',
-//   set: (value) => settingsStore.updateSettingLocally('API_URL', value)
-// })
 
 // Get model options from CONFIG to maintain consistency
 const geminiModelOptions = ref(
@@ -91,10 +120,9 @@ const geminiModelOptions = ref(
   })) || [
     { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-flash-lite-preview', label: 'Gemini 2.5 Flash-Lite Preview' },
     { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
     { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite' },
-    { value: 'custom', label: 'Custom URL' }
+    { value: 'custom', label: 'Custom Model' }
   ]
 )
 
@@ -104,34 +132,52 @@ const isThinkingControllable = ref(true)
 const thinkingDescription = ref('Allow the model to think step-by-step before responding.')
 
 // Watch for model changes to update thinking mode availability
-watch(geminiModel, (newModel) => {
+const updateThinkingModeAvailability = (newModel) => {
   const modelConfig = CONFIG.GEMINI_MODELS?.find(model => model.value === newModel)
   if (modelConfig && modelConfig.thinking) {
     const { supported, controllable, defaultEnabled } = modelConfig.thinking
-    
+
     isThinkingSupported.value = supported
-    
+
     if (supported) {
       isThinkingControllable.value = controllable
-      
+
       // Update description based on model
       if (newModel === 'gemini-2.5-pro' && !controllable) {
         thinkingDescription.value = 'Thinking mode is always enabled for Gemini 2.5 Pro and cannot be disabled.'
       } else {
         thinkingDescription.value = 'Allow the model to think step-by-step before responding.'
       }
-      
+
       // Set default value for non-controllable models
       if (!controllable) {
         geminiThinking.value = defaultEnabled
       }
     }
   } else {
-    // For unknown models or those without thinking support
-    isThinkingSupported.value = false
-    isThinkingControllable.value = false
+    // For custom models, allow user to control thinking mode
+    if (newModel === 'custom') {
+      isThinkingSupported.value = true
+      isThinkingControllable.value = true
+      thinkingDescription.value = 'Allow the model to think step-by-step before responding.'
+    } else {
+      // For unknown models or those without thinking support
+      isThinkingSupported.value = false
+      isThinkingControllable.value = false
+    }
   }
+}
+
+// Watch for selectedModelOption changes to update thinking mode availability
+const watchRef = ref(null)
+watchRef.value = watch(selectedModelOption, (newModel) => {
+  updateThinkingModeAvailability(newModel)
 }, { immediate: true })
+
+// Initialize model selection on mount
+onMounted(() => {
+  initializeModelSelection()
+})
 </script>
 
 <style lang="scss" scoped>

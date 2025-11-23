@@ -101,7 +101,10 @@ export class TranslationOrchestrator extends ResourceTracker {
         text === '[[EMPTY_LINE]]' ? '' : text
       );
 
-      const jsonPayload = JSON.stringify(filteredExpandedTexts.map(t => ({ text: t })));
+      // For single segment, send the text directly to avoid nested array brackets
+      const jsonPayload = filteredExpandedTexts.length === 1
+        ? JSON.stringify(filteredExpandedTexts)
+        : JSON.stringify(filteredExpandedTexts.map(t => ({ text: t })));
 
       // Determine if streaming should be used
       if (this.streamingEngine.isStreamingTranslation(jsonPayload)) {
@@ -248,7 +251,13 @@ export class TranslationOrchestrator extends ResourceTracker {
         }
       });
     } catch (err) {
-      this.logger.warn('Failed to send specific cancellation to background:', err);
+      // Check if this is a user cancellation error
+      const isUserCancellation = err.message && (
+        err.message.includes('cancelled') ||
+        err.message.includes('ESC') ||
+        err.message.includes('user cancelled')
+      );
+      this.logger[isUserCancellation ? 'debug' : 'warn']('Failed to send specific cancellation to background:', err);
     }
 
     // Check if this was the only active request
@@ -285,10 +294,26 @@ export class TranslationOrchestrator extends ResourceTracker {
             action: MessageActions.CANCEL_TRANSLATION,
             messageId: messageId,
             data: { messageId: messageId }
-          }).catch(err => this.logger.warn('Failed to send cancellation message to background', err));
+          }).catch(err => {
+        // Check if this is a user cancellation error
+        const isUserCancellation = err.message && (
+          err.message.includes('cancelled') ||
+          err.message.includes('ESC') ||
+          err.message.includes('user cancelled')
+        );
+        this.logger[isUserCancellation ? 'debug' : 'warn']('Failed to send cancellation message to background', err);
+      });
         });
       });
-    })).catch(err => this.logger.warn('Error sending cancellation messages', err));
+    })).catch(err => {
+      // Check if this is a user cancellation error
+      const isUserCancellation = err.message && (
+        err.message.includes('cancelled') ||
+        err.message.includes('ESC') ||
+        err.message.includes('user cancelled')
+      );
+      this.logger[isUserCancellation ? 'debug' : 'warn']('Error sending cancellation messages', err);
+    });
 
     this.uiManager.dismissStatusNotification();
   }

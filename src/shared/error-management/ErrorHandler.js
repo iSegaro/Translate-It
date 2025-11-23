@@ -222,12 +222,15 @@ export class ErrorHandler {
         
         // Prefer the original message if it's more specific and descriptive
         // This ensures specific provider errors are shown to the user
-        if (raw && raw.length > 20 && 
-            (raw.includes('Translation not available') || 
-             raw.includes('not supported') || 
+        if (raw && raw.length > 20 &&
+            (raw.includes('Translation not available') ||
+             raw.includes('not supported') ||
              raw.includes('API Key') ||
              raw.includes('quota') ||
-             raw.includes('limit'))) {
+             raw.includes('limit') ||
+             raw.includes('not available') ||
+             raw.includes('Requires Chrome') ||
+             raw.includes('Chrome Translation API'))) {
           msg = raw;
         } else {
           msg = localizedMsg || raw || 'An error occurred';

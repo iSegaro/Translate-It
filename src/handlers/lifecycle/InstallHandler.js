@@ -251,13 +251,22 @@ async function handleExtensionUpdate() {
 /**
  * Setup context menus on installation
  * Note: Context menu creation is now handled by ContextMenuManager
- * This function only clears existing menus to prevent duplicates
+ * This function only clears existing menus if they might cause conflicts
  */
 async function setupContextMenus() {
   try {
-    await browser.contextMenus.removeAll();
+    // Only clear menus if this is a fresh install, not on extension update/reload
+    // to prevent interfering with existing working menus
+    const details = arguments[0] || {};
+
+    if (details.reason === 'install') {
+      logger.info('Fresh install detected, clearing any existing context menus');
+      await browser.contextMenus.removeAll();
+    } else {
+      logger.info('Extension update/reload detected, skipping menu cleanup to avoid conflicts');
+    }
   } catch (error) {
-    logger.error('Failed to cleanup context menus:', error);
+    logger.error('Failed to check/cleanup context menus:', error);
   }
 }
 
