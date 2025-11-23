@@ -330,7 +330,7 @@ class LifecycleManager {
           logger.info("[LifecycleManager] Context menus already exist, skipping creation to avoid duplicates");
           return;
         }
-      } catch (checkError) {
+      } catch {
         logger.debug("[LifecycleManager] Could not check existing menus, proceeding with caution");
       }
 
