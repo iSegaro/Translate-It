@@ -185,10 +185,11 @@ const setupResizeObserver = () => {
   checkIsSidepanelContext()
 
   if (languageControlsRef.value && isSidepanelContext.value && 'ResizeObserver' in window) {
-    resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+    resizeObserver = new ResizeObserver(() => {
+      // Use requestAnimationFrame to prevent ResizeObserver loop warnings
+      requestAnimationFrame(() => {
         checkLayout()
-      }
+      })
     })
     resizeObserver.observe(languageControlsRef.value)
 
