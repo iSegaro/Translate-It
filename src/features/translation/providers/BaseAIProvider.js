@@ -593,9 +593,9 @@ export class BaseAIProvider extends BaseProvider {
       const parsed = JSON.parse(jsonString);
       
       if (Array.isArray(parsed)) {
-        // Check if this is a simple string array (single segment case)
-        if (expectedCount === 1 && parsed.length === 1 && typeof parsed[0] === 'string') {
-          logger.debug(`[${this.providerName}] Single segment translation detected, using string directly`);
+        // Check if this is a simple string array (the main issue we're fixing)
+        if (parsed.length === 1 && typeof parsed[0] === 'string') {
+          logger.debug(`[${this.providerName}] Single segment array detected, extracting text properly`);
           return [parsed[0]];
         }
 

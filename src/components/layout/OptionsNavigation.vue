@@ -34,6 +34,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { settingsManager } from '@/shared/managers/SettingsManager.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
@@ -78,18 +80,12 @@ const saveAllSettings = async () => {
     // Refresh settings in all content scripts
     await settingsManager.refreshSettings()
 
-    // Notify all tabs about settings change
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      try {
-        await chrome.runtime.sendMessage({
-          type: 'SETTINGS_UPDATED',
-          timestamp: Date.now()
-        })
-        logger.debug('✅ Settings update notification sent to all tabs')
-      } catch (error) {
-        logger.debug('Could not send settings update notification:', error)
-      }
-    }
+    // Notify all tabs about settings change using cross-browser compatible approach
+    await ExtensionContextManager.safeSendMessage({
+      action: MessageActions.SETTINGS_UPDATED,
+      timestamp: Date.now()
+    }, 'settings-notification')
+    logger.debug('✅ Settings update notification sent to all tabs')
     statusType.value = 'success'
   statusMessage.value = t('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     

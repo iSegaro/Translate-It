@@ -179,8 +179,11 @@ async function handleFreshInstallation() {
   if (hasExistingData) {
     logger.init('Legacy migration detected during fresh install');
 
-    // Open options page with welcome message for migrated users
-    const optionsUrl = browser.runtime.getURL("html/options.html#about");
+    // Initialize with default settings for migrated users
+    await storageManager.set(CONFIG);
+
+    // Open options page to languages page for initial setup
+    const optionsUrl = browser.runtime.getURL("html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   } else {
     // Truly fresh installation - initialize with default settings

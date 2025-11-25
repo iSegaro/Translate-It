@@ -21,8 +21,7 @@ function getLogger() {
 const OPERATION_TIMEOUTS = {
   // Fast operations (UI, settings, status)
   'GET_SETTINGS': 3000,
-  'SET_SETTINGS': 3000, 
-  'SYNC_SETTINGS': 3000,
+  'SET_SETTINGS': 3000,
   'GET_SELECT_ELEMENT_STATE': 2000,
   'SET_SELECT_ELEMENT_STATE': 2000,
   'SHOW_NOTIFICATION': 2000,

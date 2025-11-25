@@ -831,8 +831,11 @@ class SelectElementManager extends ResourceTracker {
         const errorType = matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) {
           this.logger.debug("Translation cancelled by user:", error);
-        } else {
+        } else if (!error.alreadyHandled) {
+          // Only log error if it hasn't been handled and shown to user yet
           this.logger.error("Error during translation:", error);
+        } else {
+          this.logger.debug("Error already handled by TranslationOrchestrator, skipping duplicate display");
         }
       }
       this.performPostTranslationCleanup();

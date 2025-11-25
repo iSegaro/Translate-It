@@ -474,12 +474,15 @@ class SettingsManager {
       return
     }
 
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) {
-      getLogger().warn('Chrome storage API not available, cannot setup storage listener')
+    // Use cross-browser compatible approach for storage API
+    const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+
+    if (!browserAPI?.storage || !browserAPI.storage.onChanged) {
+      getLogger().warn('Storage API not available, cannot setup storage listener')
       return
     }
 
-    chrome.storage.onChanged.addListener((changes, areaName) => {
+    browserAPI.storage.onChanged.addListener((changes, areaName) => {
       getLogger().debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
 
       if (areaName !== 'local') return

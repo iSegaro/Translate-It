@@ -3,6 +3,13 @@
 ##### Fixed
 
 - Enhanced sidepanel language controls with responsive layout
+- Fixed various issues in Firefox
+- Fixed minor issues
+
+##### Changed
+
+- Changed default macOS shortcut to Command+A for Select Element activation
+- Disabled `Thinking Mode` by default for Gemini models to improve translation speed
 
 ---
 

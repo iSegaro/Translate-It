@@ -103,7 +103,7 @@ export class TranslationOrchestrator extends ResourceTracker {
 
       // For single segment, send the text directly to avoid nested array brackets
       const jsonPayload = filteredExpandedTexts.length === 1
-        ? JSON.stringify(filteredExpandedTexts)
+        ? JSON.stringify([{ text: filteredExpandedTexts[0] }])  // Fix: Always use object format
         : JSON.stringify(filteredExpandedTexts.map(t => ({ text: t })));
 
       // Determine if streaming should be used
@@ -169,6 +169,17 @@ export class TranslationOrchestrator extends ResourceTracker {
         this.logger.info("Translation process cancelled by user", { messageId });
       } else if (!error.alreadyHandled) {
         this.logger.error("Translation process failed", error);
+
+        // Show error notification to user for direct translation failures
+        this.uiManager.dismissStatusNotification();
+        await this.errorHandlerService.showErrorToUser(error, {
+          context: 'select-element-translation-direct',
+          type: 'TRANSLATION_FAILED',
+          showToast: true
+        });
+
+        // Mark error as handled to prevent duplicate display in SelectElementManager
+        error.alreadyHandled = true;
       }
 
       // Clean up on error

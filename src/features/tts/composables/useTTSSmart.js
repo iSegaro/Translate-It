@@ -464,8 +464,10 @@ export function useTTSSmart() {
   };
 
   // Listen for TTS completion messages from offscreen (event-driven system)
-  if (typeof chrome !== 'undefined' && chrome.runtime) {
-    chrome.runtime.onMessage.addListener((message) => {
+  // Use cross-browser compatible approach
+  const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+  if (browserAPI?.runtime) {
+    browserAPI.runtime.onMessage.addListener((message) => {
       if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
         logger.info("[useTTSSmart] TTS completed successfully");
 

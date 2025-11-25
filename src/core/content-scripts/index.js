@@ -152,11 +152,15 @@ async function initializeLogger() {
 
 function setupSmartListeners() {
   // Extension popup interaction
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.action === 'popupOpened') {
-      loadFeature('vue', 'INTERACTIVE');
-    }
-  });
+  // Use cross-browser compatible approach
+  const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+  if (browserAPI?.runtime) {
+    browserAPI.runtime.onMessage.addListener((message) => {
+      if (message.action === 'popupOpened') {
+        loadFeature('vue', 'INTERACTIVE');
+      }
+    });
+  }
 
   // Text selection interaction
   document.addEventListener('mouseup', handleTextSelection, { passive: true });
