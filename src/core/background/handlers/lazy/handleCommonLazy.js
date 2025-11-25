@@ -49,3 +49,15 @@ export async function handlePingLazy(message, sender, sendResponse) {
         return { success: false, error: 'Failed to load ping functionality' };
     }
 }
+
+export async function handleSettingsUpdatedLazy(message, sender, sendResponse) {
+    try {
+        logger.debug('Loading SettingsUpdated handler');
+        const { handleSettingsUpdated } = await import('@/shared/messaging/handlers/SettingsUpdateHandler.js');
+        logger.debug('SettingsUpdated handler loaded successfully');
+        return handleSettingsUpdated(message, sender, sendResponse);
+    } catch (error) {
+        logger.error('Failed to load SettingsUpdated handler:', error);
+        return { success: false, error: 'Failed to load settings update functionality' };
+    }
+}

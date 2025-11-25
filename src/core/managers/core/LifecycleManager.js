@@ -108,6 +108,7 @@ class LifecycleManager {
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
+      [MessageActions.SETTINGS_UPDATED]: Handlers.handleSettingsUpdatedLazy,
       
       // Lifecycle handlers
       'contextInvalid': Handlers.handleContextInvalid,
