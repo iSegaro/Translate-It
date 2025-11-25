@@ -159,9 +159,44 @@ export class GeminiProvider extends BaseAIProvider {
         abortController: abortController
       });
 
+      // CRITICAL FIX: Handle single segment JSON arrays properly
+      // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content
+      let processedResult = result;
+
+      if (result && typeof result === 'string') {
+        let jsonMatch = null;
+        let jsonString = null;
+
+        // First try to find JSON array in markdown code blocks
+        const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+        if (markdownMatch) {
+          jsonString = markdownMatch[1].trim();
+        } else {
+          // Try to find direct JSON array (without markdown)
+          const directMatch = result.match(/^\s*\[([\s\S]*)\]\s*$/);
+          if (directMatch) {
+            // Reconstruct the JSON string for parsing
+            jsonString = `[${directMatch[1]}]`;
+          }
+        }
+
+        if (jsonString) {
+          try {
+            const parsed = JSON.parse(jsonString);
+
+            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
+              logger.debug(`[Gemini] Single segment JSON array detected, extracting text properly`);
+              processedResult = parsed[0];
+            }
+          } catch (error) {
+            logger.debug(`[Gemini] Failed to parse JSON array, using original result:`, error.message);
+          }
+        }
+      }
+
       // API call completed successfully
       logger.info(`[Gemini] Translation completed successfully`);
-      return result;
+      return processedResult;
     } catch (error) {
       // Check if this is a user cancellation (should be handled silently)
       const errorType = matchErrorToType(error);

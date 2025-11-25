@@ -1055,10 +1055,17 @@ export class TranslationUIManager {
           // Handle single segment case where translatedText might be a JSON string
           if (request.expandedTexts.length === 1) {
             try {
-              // Try to parse as JSON array and extract the first element
+              // Try to parse as JSON and extract the text properly
               const parsed = JSON.parse(translatedText);
-              if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
-                finalTranslatedData.push({ text: parsed[0] });
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                // Handle both string and object formats in array
+                if (typeof parsed[0] === 'string') {
+                  finalTranslatedData.push({ text: parsed[0] });
+                } else if (parsed[0] && parsed[0].text) {
+                  finalTranslatedData.push({ text: parsed[0].text });
+                } else {
+                  finalTranslatedData.push({ text: translatedText });
+                }
               } else {
                 finalTranslatedData.push({ text: translatedText });
               }
@@ -1333,11 +1340,13 @@ export class TranslationUIManager {
       } else {
         // Use translated data if available, fallback to original
         if (translatedIndex < translatedData.length && translatedData[translatedIndex]) {
-          // Handle single segment case where translatedData might be a simple array of strings
-          if (expandedTexts.length === 1 && typeof translatedData[translatedIndex] === 'string') {
+          // Handle both object and string formats uniformly
+          if (typeof translatedData[translatedIndex] === 'string') {
             finalTranslatedData.push({ text: translatedData[translatedIndex] });
-          } else {
+          } else if (translatedData[translatedIndex].text) {
             finalTranslatedData.push({ text: translatedData[translatedIndex].text });
+          } else {
+            finalTranslatedData.push({ text: filteredExpandedTexts?.[i] || expandedTexts[i] || '' });
           }
         } else {
           finalTranslatedData.push({ text: filteredExpandedTexts?.[i] || expandedTexts[i] || '' });
