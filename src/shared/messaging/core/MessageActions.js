@@ -100,7 +100,6 @@ export class MessageActions {
   // Storage actions
   static GET_SETTINGS = 'GET_SETTINGS';
   static SET_SETTINGS = 'SET_SETTINGS';
-  static SYNC_SETTINGS = 'SYNC_SETTINGS';
   static SETTINGS_UPDATED = 'SETTINGS_UPDATED';
   
   // Provider actions
