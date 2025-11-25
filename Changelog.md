@@ -1,4 +1,4 @@
-#### v1.4.11 – Released on November X, 2025
+#### v1.4.11 – Released on November 25, 2025
 
 ##### Fixed
 
