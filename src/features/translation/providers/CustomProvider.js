@@ -86,7 +86,6 @@ export class CustomProvider extends BaseAIProvider {
     let processedResult = result;
 
     if (result && typeof result === 'string') {
-      let jsonMatch = null;
       let jsonString = null;
 
       // First try to find JSON array in markdown code blocks

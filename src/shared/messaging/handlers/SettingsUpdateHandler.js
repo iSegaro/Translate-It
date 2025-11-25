@@ -28,7 +28,7 @@ export class SettingsUpdateHandler {
       return
     }
 
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((message) => {
       // Support both legacy 'type' and unified 'action' formats for backward compatibility
       const isSettingsUpdate = message.type === MessageActions.SETTINGS_UPDATED ||
                               message.action === MessageActions.SETTINGS_UPDATED
