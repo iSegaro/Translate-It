@@ -85,6 +85,15 @@ export function ContentScriptCore() {
       // Initialize core infrastructure
       await this.initializeCore();
 
+      // Initialize DebugModeBridge for content script
+      try {
+        const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+        await debugModeBridge.initialize();
+        logger.debug('[ContentScriptCore] DebugModeBridge initialized in content script');
+      } catch (error) {
+        logger.warn('[ContentScriptCore] Failed to initialize DebugModeBridge:', error);
+      }
+
       // Setup message handler
       await this.initializeMessaging();
 

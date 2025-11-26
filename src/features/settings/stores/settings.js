@@ -305,10 +305,34 @@ export const useSettingsStore = defineStore('settings', () => {
           const newValue = changes[key].newValue
           // Update the reactive settings ref
           if (settings.value[key] !== newValue) {
+            const oldValue = settings.value[key]
             settings.value[key] = newValue
+
+            // Special handling for DEBUG_MODE - sync with logging system
+            if (key === 'DEBUG_MODE' && oldValue !== newValue) {
+              handleDebugModeChange(Boolean(newValue))
+            }
           }
         }
       }
+    }
+  }
+
+  // Handle DEBUG_MODE changes and sync with logging system
+  const handleDebugModeChange = async (debugMode) => {
+    try {
+      // Import and initialize DebugModeBridge
+      const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js')
+
+      // Apply debug mode to logging system
+      debugModeBridge.handleDebugModeChange(debugMode)
+
+      logger.info('[SettingsStore] DEBUG_MODE changed and synced with logging system', {
+        debugMode,
+        source: 'storage_change'
+      })
+    } catch (error) {
+      logger.warn('[SettingsStore] Failed to sync DEBUG_MODE with logging system:', error)
     }
   }
 
@@ -336,8 +360,20 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // Initialize settings on store creation and setup listener
-  loadSettings().then(() => {
+  loadSettings().then(async () => {
     setupStorageListener()
+
+    // Initialize DebugModeBridge after settings are loaded
+    try {
+      const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js')
+      await debugModeBridge.initialize()
+
+      logger.info('[SettingsStore] DebugModeBridge initialized successfully', {
+        currentDebugMode: settings.value.DEBUG_MODE
+      })
+    } catch (error) {
+      logger.warn('[SettingsStore] Failed to initialize DebugModeBridge:', error)
+    }
   }).catch(error => {
     logger.error('Failed to initialize settings store:', error)
   })
