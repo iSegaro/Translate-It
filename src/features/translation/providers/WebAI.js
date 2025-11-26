@@ -42,7 +42,7 @@ export class WebAIProvider extends BaseAIProvider {
     logger.info(`[WebAI] Starting translation: ${text.length} chars`);
 
     // Validate configuration
-    this._validateConfig(
+    await this._validateConfig(
       { apiUrl, apiModel },
       ["apiUrl", "apiModel"],
       `${this.providerName.toLowerCase()}-translation`

@@ -44,7 +44,7 @@ export class CustomProvider extends BaseAIProvider {
     logger.info(`[Custom] Starting translation: ${text.length} chars`);
 
     // Validate configuration
-    this._validateConfig(
+    await this._validateConfig(
       { apiUrl, apiKey },
       ["apiUrl", "apiKey"],
       `${this.providerName.toLowerCase()}-translation`
