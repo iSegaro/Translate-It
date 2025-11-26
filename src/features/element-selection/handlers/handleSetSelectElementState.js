@@ -16,12 +16,18 @@ export async function handleSetSelectElementState(message, sender) {
   const tabId = sender?.tab?.id || message?.data?.tabId;
   const frameId = sender?.frameId;
 
-  logger.operation('handleSetSelectElementState called', {
-    activate,
-    tabId,
-    frameId,
-    from: sender?.tab?.id ? 'content' : 'internal',
-  });
+  // Log meaningful state changes with proper context
+  if (activate) {
+    logger.info(`Select Element mode activated for tab ${tabId} from ${sender?.tab?.id ? 'content' : 'internal'} source`);
+  } else {
+    logger.info(`Select Element mode deactivated for tab ${tabId} from ${sender?.tab?.id ? 'content' : 'internal'} source`);
+  }
+  // logger.operation('handleSetSelectElementState called', {
+  //   activate,
+  //   tabId,
+  //   frameId,
+  //   from: sender?.tab?.id ? 'content' : 'internal',
+  // });
 
   if (!tabId) {
     return { success: false, error: 'No tabId available' };

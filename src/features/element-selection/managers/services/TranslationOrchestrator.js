@@ -45,13 +45,13 @@ export class TranslationOrchestrator extends ResourceTracker {
   }
 
   async initialize() {
-    this.logger.debug('TranslationOrchestrator initialized with service composition');
+    this.logger.debug('TranslationOrchestrator initializing');
 
     // Initialize all services
     this.requestManager.initialize();
     this.uiManager.initialize();
 
-    this.logger.debug('All translation services initialized successfully');
+    this.logger.debug('TranslationOrchestrator ready');
   }
 
   /**
@@ -59,7 +59,7 @@ export class TranslationOrchestrator extends ResourceTracker {
    * Maintains exact same interface as before for backward compatibility
    */
   async processSelectedElement(element, originalTextsMap, textNodes, context = 'select-element') {
-    this.logger.operation("Starting advanced translation process for selected element");
+    this.logger.operation(`Element translation started: ${textNodes.length} text segments, context: ${context}`);
 
     // Check extension context before proceeding
     if (!ExtensionContextManager.isValidSync()) {
@@ -79,10 +79,7 @@ export class TranslationOrchestrator extends ResourceTracker {
 
       // Convert Map to array for translation (cache removed)
       const textsToTranslate = Array.from(originalTextsMap.keys());
-      this.logger.debug("Starting translation for texts:", {
-        textsCount: textsToTranslate.length,
-        totalUniqueTexts: originalTextsMap.size
-      });
+      this.logger.debug(`Translating ${textsToTranslate.length} texts (${originalTextsMap.size} unique)`);
 
       // Handle no texts to translate scenario
       if (textsToTranslate.length === 0) {
@@ -392,7 +389,7 @@ export class TranslationOrchestrator extends ResourceTracker {
    */
   async cleanup() {
     this.logger.debug('Starting TranslationOrchestrator cleanup');
-
+    
     // Cancel all translations first
     this.cancelAllTranslations();
 
