@@ -1,3 +1,13 @@
+#### v1.5.0 – Released on December XX, 2025
+
+##### Fixed
+
+- Enhanced handling of unknown errors
+- Made keyboard shortcuts configurable for text field translation
+- Enabled debug logs for troubleshooting in production environment
+
+---
+
 #### v1.4.11 – Released on November 25, 2025
 
 ##### Fixed

@@ -219,6 +219,57 @@ export class ShortcutHandler extends ResourceTracker {
     }
   }
 
+  /**
+   * Parse shortcut string into object
+   * @param {string} shortcut - Shortcut string (e.g., "Ctrl+Alt+T")
+   * @returns {Object} Parsed shortcut object
+   */
+  parseShortcut(shortcut) {
+    if (!shortcut || typeof shortcut !== 'string') {
+      return { ctrl: true, alt: false, shift: false, meta: false, key: '/' }; // fallback to Ctrl+/
+    }
+
+    const keys = shortcut.split('+').map(key => key.trim().toLowerCase());
+    const mainKey = keys.find(k => !['ctrl', 'control', 'alt', 'shift', 'meta', 'cmd'].includes(k));
+
+    // Handle special keys
+    let normalizedKey = mainKey || '/';
+    if (normalizedKey === 'space') normalizedKey = ' ';
+    if (normalizedKey === 'escape') normalizedKey = 'Escape';
+
+    getLogger().debug(`Parsed shortcut "${shortcut}" to keys:`, keys, `mainKey: ${mainKey}`);
+
+    return {
+      ctrl: keys.includes('ctrl') || keys.includes('control'),
+      alt: keys.includes('alt'),
+      shift: keys.includes('shift'),
+      meta: keys.includes('meta') || keys.includes('cmd'),
+      key: normalizedKey
+    };
+  }
+
+  /**
+   * Check if event matches the shortcut
+   * @param {KeyboardEvent} event - Keyboard event
+   * @param {Object} parsedShortcut - Parsed shortcut object
+   * @returns {boolean} Whether event matches the shortcut
+   */
+  isShortcutMatch(event, parsedShortcut) {
+    // Ignore modifier keys by themselves (Control, Shift, Alt, Meta)
+    const modifierKeys = ['Control', 'Shift', 'Alt', 'Meta'];
+    if (modifierKeys.includes(event.key)) {
+      return false;
+    }
+
+    return (
+      parsedShortcut.ctrl === event.ctrlKey &&
+      parsedShortcut.alt === event.altKey &&
+      parsedShortcut.shift === event.shiftKey &&
+      parsedShortcut.meta === event.metaKey &&
+      (event.key.toLowerCase() === parsedShortcut.key.toLowerCase())
+    );
+  }
+
   setupShortcutListeners() {
     try {
       // Ctrl+/ (or Cmd+/ on Mac) shortcut handler
@@ -230,10 +281,9 @@ export class ShortcutHandler extends ResourceTracker {
 
         if (!this.isActive) return;
 
-        // Check for Ctrl+/ or Cmd+/ combination
-        if (event[this.modifierKey] && event.key === '/') {
-          // Check settings first before logging
-          (async () => {
+        // Check for configured shortcut combination
+        (async () => {
+          try {
             const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
             const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
             const isShortcutEnabled = settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false);
@@ -242,22 +292,89 @@ export class ShortcutHandler extends ResourceTracker {
               return; // Silently ignore when disabled
             }
 
-            getLogger().info('Translation shortcut triggered');
+            // Get current shortcut from settings
+            let currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
 
-            // Prevent default behavior
-            event.preventDefault();
-            event.stopPropagation();
+            // If still default, try to refresh from settings store
+            if (currentShortcut === 'Ctrl+/') {
+              try {
+                const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
+                const settingsStore = useSettingsStore();
+                if (settingsStore.settings?.TEXT_FIELD_SHORTCUT && settingsStore.settings.TEXT_FIELD_SHORTCUT !== 'Ctrl+/') {
+                  currentShortcut = settingsStore.settings.TEXT_FIELD_SHORTCUT;
+                  getLogger().debug(`Updated shortcut from settings store: ${currentShortcut}`);
+                }
+              } catch (storeError) {
+                getLogger().error(`Failed to get shortcut from settings store: ${storeError.message}`);
+              }
+            }
 
-            // Handle the shortcut
-            await this.handleTranslationShortcut(event);
-          })();
-        }
+            const parsedShortcut = this.parseShortcut(currentShortcut);
+
+            // Debug: Log what we're checking
+            getLogger().debug(`Checking shortcut: ${currentShortcut}`, {
+              event: {
+                key: event.key,
+                ctrlKey: event.ctrlKey,
+                altKey: event.altKey,
+                shiftKey: event.shiftKey,
+                metaKey: event.metaKey
+              },
+              parsed: parsedShortcut,
+              matches: this.isShortcutMatch(event, parsedShortcut)
+            });
+
+            // Check if event matches the current shortcut
+            if (this.isShortcutMatch(event, parsedShortcut)) {
+              getLogger().info(`Translation shortcut triggered: ${currentShortcut}`);
+
+              // Prevent default behavior
+              event.preventDefault();
+              event.stopPropagation();
+
+              // Handle the shortcut
+              await this.handleTranslationShortcut(event);
+            }
+          } catch (error) {
+            getLogger().error('Error checking shortcut:', error);
+            // Fallback to original behavior
+            if (event[this.modifierKey] && event.key === '/') {
+              this.handleTranslationShortcut(event);
+            }
+          }
+        })();
       };
 
       // Register the keydown listener
       this.addEventListener(document, 'keydown', this.keydownHandler, { capture: true });
 
-      getLogger().info(`Shortcut listener setup: ${this.modifierKey} + /`);
+      // Get initial shortcut for logging
+      (async () => {
+        try {
+          const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+          const currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
+
+          // Force refresh of settings if they're not loaded
+          if (currentShortcut === 'Ctrl+/') {
+            // Try to get settings store directly
+            try {
+              const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
+              const settingsStore = useSettingsStore();
+              await settingsStore.loadSettings();
+              const refreshedShortcut = settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/';
+              getLogger().info(`Shortcut listener setup: ${refreshedShortcut} (refreshed from settings store)`);
+            } catch (storeError) {
+              getLogger().error(`Failed to refresh from settings store: ${storeError.message}`);
+              getLogger().info(`Shortcut listener setup: ${currentShortcut} (using cache)`);
+            }
+          } else {
+            getLogger().info(`Shortcut listener setup: ${currentShortcut}`);
+          }
+        } catch (error) {
+          getLogger().error(`Failed to load shortcut settings: ${error.message}`);
+          getLogger().info(`Shortcut listener setup: Ctrl+/ (default)`);
+        }
+      })();
       
     } catch (error) {
       getLogger().error('Failed to setup shortcut listeners:', error);

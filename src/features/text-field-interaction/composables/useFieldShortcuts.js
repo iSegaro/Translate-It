@@ -1,6 +1,6 @@
 /**
  * useFieldShortcuts - Vue composable for text field keyboard shortcuts
- * Provides reactive state and methods for handling field shortcuts like Ctrl+/
+ * Provides reactive state and methods for handling field shortcuts dynamically
  */
 
 import { ref, computed, onMounted } from 'vue';
@@ -18,6 +18,7 @@ export function useFieldShortcuts() {
   const isProcessing = ref(false);
   const lastShortcutTime = ref(0);
   const shortcutManager = ref(null);
+  const currentShortcut = ref('Ctrl+/');
   
   // Computed properties
   const canExecuteShortcuts = computed(() => 
@@ -35,17 +36,23 @@ export function useFieldShortcuts() {
       logger.debug('Already initialized');
       return;
     }
-    
+
     if (!manager) {
       logger.error('No shortcut manager provided');
       return;
     }
-    
+
     shortcutManager.value = manager;
+
+    // Get current shortcut from manager
+    if (typeof manager.getCurrentShortcut === 'function') {
+      currentShortcut.value = manager.getCurrentShortcut();
+    }
+
     setupKeyboardListeners();
     isInitialized.value = true;
-    
-    logger.debug('Field shortcuts system initialized');
+
+    logger.debug('Field shortcuts system initialized with:', currentShortcut.value);
   };
   
   /**
@@ -65,9 +72,10 @@ export function useFieldShortcuts() {
     if (!canExecuteShortcuts.value) {
       return;
     }
-    
-    // Check if this is a Ctrl+/ event
-    if (!isCtrlSlashEvent(event)) {
+
+    // Let the manager handle shortcut detection
+    const shouldExecute = await shortcutManager.value.shouldExecute(event);
+    if (!shouldExecute) {
       return;
     }
     
@@ -139,16 +147,32 @@ export function useFieldShortcuts() {
   };
   
   /**
-   * Check if event is Ctrl+/ combination
-   * @param {KeyboardEvent} event - Keyboard event
-   * @returns {boolean} Whether event is Ctrl+/
+   * Create mock event based on current shortcut
+   * @returns {KeyboardEvent} Mock keyboard event
    */
-  const isCtrlSlashEvent = (event) => {
-    return (
-      (event.ctrlKey || event.metaKey) && 
-      event.key === '/' && 
-      !event.repeat
-    );
+  const createMockEvent = () => {
+    if (!shortcutManager.value || typeof shortcutManager.value.getCurrentShortcut !== 'function') {
+      // Fallback to Ctrl+/
+      return new KeyboardEvent('keydown', {
+        key: '/',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true
+      });
+    }
+
+    const shortcut = shortcutManager.value.getCurrentShortcut();
+    const parsed = shortcutManager.value.parseShortcut(shortcut);
+
+    return new KeyboardEvent('keydown', {
+      key: parsed.key || '/',
+      ctrlKey: parsed.ctrl,
+      altKey: parsed.alt,
+      shiftKey: parsed.shift,
+      metaKey: parsed.meta,
+      bubbles: true,
+      cancelable: true
+    });
   };
   
   /**
@@ -167,13 +191,8 @@ export function useFieldShortcuts() {
       isProcessing.value = true;
       store.incrementShortcutAttempt();
       
-      // Create a mock event if needed
-      const mockEvent = new KeyboardEvent('keydown', {
-        key: '/',
-        ctrlKey: true,
-        bubbles: true,
-        cancelable: true
-      });
+      // Create a mock event based on current shortcut
+      const mockEvent = createMockEvent();
       
       const result = await shortcutManager.value.execute(mockEvent);
       
@@ -201,10 +220,14 @@ export function useFieldShortcuts() {
       canExecute: canExecuteShortcuts.value,
       lastExecution: lastShortcutTime.value,
       stats: shortcutStats.value,
+      currentShortcut: currentShortcut.value,
       manager: shortcutManager.value ? {
         key: shortcutManager.value.key,
         description: shortcutManager.value.description,
-        initialized: shortcutManager.value.initialized
+        initialized: shortcutManager.value.initialized,
+        currentShortcut: typeof shortcutManager.value.getCurrentShortcut === 'function'
+          ? shortcutManager.value.getCurrentShortcut()
+          : 'Ctrl+/'
       } : null
     };
   };
@@ -231,12 +254,20 @@ export function useFieldShortcuts() {
     isProcessing,
     canExecuteShortcuts,
     shortcutStats,
+    currentShortcut,
 
     // Methods
     initialize,
     triggerShortcut,
     getShortcutInfo,
-    resetStats
+    resetStats,
+    updateShortcut: () => {
+      if (shortcutManager.value && typeof shortcutManager.value.updateShortcut === 'function') {
+        shortcutManager.value.updateShortcut();
+        currentShortcut.value = shortcutManager.value.getCurrentShortcut();
+        logger.debug('Shortcut updated to:', currentShortcut.value);
+      }
+    }
     // cleanup removed - now automatic
   };
 }
