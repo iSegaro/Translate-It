@@ -296,14 +296,17 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn'],
+        // Remove regular console calls but preserve SafeConsole methods
+        pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn', 'console.error'],
         passes: 2
       },
       mangle: {
         safari10: true,
         properties: {
           regex: /^_/
-        }
+        },
+        // Preserve SafeConsole from name mangling
+        reserved: ['safeConsole', 'SafeConsole']
       },
       format: {
         comments: false

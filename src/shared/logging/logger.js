@@ -24,6 +24,7 @@ import {
   getPerformanceStats,
   resetPerformanceStats
 } from './GlobalDebugState.js';
+import { safeConsole } from './SafeConsole.js';
 
 // Development environment detection - use Vite's build-time constant
 const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPMENT__ :
@@ -242,15 +243,15 @@ function processLogBatch() {
 }
 
 /**
- * Get console method for log level
+ * Get safe console method for log level
  */
 function getConsoleMethod(level) {
   switch (level) {
-    case 0: return console.error;
-    case 1: return console.warn;
-    case 2: return console.info;
-    case 3: return console.log;
-    default: return console.log;
+    case 0: return safeConsole.error.bind(safeConsole);
+    case 1: return safeConsole.warn.bind(safeConsole);
+    case 2: return safeConsole.info.bind(safeConsole);
+    case 3: return safeConsole.log.bind(safeConsole);
+    default: return safeConsole.log.bind(safeConsole);
   }
 }
 
@@ -300,7 +301,7 @@ export function createLogger(component, subComponent = null) {
           batchLog(loggerName, 'error', ERROR_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, ERROR_LEVEL, message, data);
-          console.error(...formatted);
+          safeConsole.error(...formatted);
         }
       }
     },
@@ -313,7 +314,7 @@ export function createLogger(component, subComponent = null) {
           batchLog(loggerName, 'warn', WARN_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, WARN_LEVEL, message, data);
-          console.warn(...formatted);
+          safeConsole.warn(...formatted);
         }
       }
     },
@@ -326,7 +327,7 @@ export function createLogger(component, subComponent = null) {
           batchLog(loggerName, 'info', INFO_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
-          console.info(...formatted);
+          safeConsole.info(...formatted);
         }
       }
     },
@@ -339,7 +340,7 @@ export function createLogger(component, subComponent = null) {
           batchLog(loggerName, 'debug', DEBUG_LEVEL, message, data);
         } else {
           const formatted = formatMessage(loggerName, DEBUG_LEVEL, message, data);
-          console.log(...formatted);
+          safeConsole.log(...formatted);
         }
       }
     },
@@ -352,13 +353,13 @@ export function createLogger(component, subComponent = null) {
     },
 
     // Lazy debug: accept function returning (message, data?) tuple or array of args
-    debugLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.DEBUG, console.log),
+    debugLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.DEBUG, safeConsole.log.bind(safeConsole)),
 
     // Lazy info: similar to debugLazy but for info level
-    infoLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.INFO, console.info),
+    infoLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.INFO, safeConsole.info.bind(safeConsole)),
 
     // Lazy warn: similar to debugLazy but for warn level
-    warnLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.WARN, console.warn),
+    warnLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.WARN, safeConsole.warn.bind(safeConsole)),
 
     // Special method for initialization logs (always important)
     init: (message, data) => {
@@ -370,7 +371,7 @@ export function createLogger(component, subComponent = null) {
           `✅ ${message}`,
           data
         );
-        console.log(...formatted);
+        safeConsole.log(...formatted);
       }
     },
 
@@ -379,7 +380,7 @@ export function createLogger(component, subComponent = null) {
       const INFO_LEVEL = 2; // LOG_LEVELS.INFO
       if (shouldLog(component, INFO_LEVEL)) {
         const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
-        console.log(...formatted);
+        safeConsole.log(...formatted);
       }
     },
   };

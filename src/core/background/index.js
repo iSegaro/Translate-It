@@ -39,8 +39,17 @@ browser.runtime.onInstalled.addListener(async (details) => {
 const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
 
-backgroundService.initialize().then(() => {
+backgroundService.initialize().then(async () => {
   logger.info("[Background] Background service initialization completed!");
+
+  // Initialize DebugModeBridge for background script
+  try {
+    const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+    await debugModeBridge.initialize();
+    logger.info("[Background] DebugModeBridge initialized in background script");
+  } catch (error) {
+    logger.warn("[Background] Failed to initialize DebugModeBridge:", error);
+  }
 
   // Initialize UnifiedTranslationService with dependencies
   unifiedTranslationService.initialize({

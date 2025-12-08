@@ -112,14 +112,17 @@ export class UnifiedTranslationCoordinator {
       return result;
 
     } catch (error) {
-      getLogger().error(`Regular translation failed: ${messageId}`, error);
-
-      // Use centralized error handling
+      // Use centralized error handling with better context (no direct logger.error needed)
       try {
         await ErrorHandler.getInstance().handle(error, {
           context: 'regular-translation-coordination',
           messageId: messageId,
-          showToast: false // Regular translation errors are handled by callers
+          showToast: false, // Regular translation errors are handled by callers
+          metadata: {
+            messageId: messageId,
+            coordinatorAction: 'regular-translation',
+            timestamp: Date.now()
+          }
         });
       } catch (handlerError) {
         getLogger().warn('ErrorHandler failed to handle regular translation error:', handlerError);

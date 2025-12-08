@@ -12,6 +12,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from 
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
@@ -534,7 +535,16 @@ export class TranslationEngine {
                     if (errorType === ErrorTypes.USER_CANCELLED) {
                       logger.debug(`[TranslationEngine] Batch ${i + 1} cancelled (consecutive failures: ${consecutiveFailures}):`, error);
                     } else {
-                      logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                      // Use ErrorHandler for consistent error handling and user-friendly messages
+                      await ErrorHandler.getInstance().handle(error, {
+                        context: 'TranslationEngine.batch',
+                        showToast: false, // Don't show toast for batch errors
+                        metadata: {
+                          batchIndex: i + 1,
+                          consecutiveFailures,
+                          providerName: error.providerName || 'unknown'
+                        }
+                      });
                     }
                     
                     const streamUpdateMessage = MessageFormat.create(

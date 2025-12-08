@@ -231,8 +231,39 @@ export class BaseProvider {
           message: msg,
           url: url
         });
+
+        // Determine error type based on status code
+        let errorType = ErrorTypes.HTTP_ERROR;
+        switch (response.status) {
+          case 401:
+            errorType = ErrorTypes.API_KEY_INVALID;
+            break;
+          case 402:
+            errorType = ErrorTypes.INSUFFICIENT_BALANCE;
+            break;
+          case 403:
+            errorType = ErrorTypes.FORBIDDEN_ERROR;
+            break;
+          case 404:
+            errorType = ErrorTypes.MODEL_MISSING;
+            break;
+          case 400:
+          case 422:
+            errorType = ErrorTypes.INVALID_REQUEST;
+            break;
+          case 429:
+            errorType = ErrorTypes.RATE_LIMIT_REACHED;
+            break;
+          case 500:
+          case 502:
+          case 503:
+          case 524:
+            errorType = ErrorTypes.SERVER_ERROR;
+            break;
+        }
+
         const err = new Error(msg);
-        err.type = ErrorTypes.HTTP_ERROR;
+        err.type = errorType;
         err.statusCode = response.status;
         err.context = context;
         throw err;
@@ -302,9 +333,9 @@ export class BaseProvider {
    * @param {Object} config - Configuration object
    * @param {Array<string>} requiredFields - Required field names
    * @param {string} context - Context for error reporting
-   * @throws {Error} - If validation fails
+   * @returns {Promise<void>} - Throws Error if validation fails
    */
-  _validateConfig(config, requiredFields, context) {
+  async _validateConfig(config, requiredFields, context) {
     for (const field of requiredFields) {
       if (!config[field]) {
         const errorType = field.toLowerCase().includes('key')
@@ -318,6 +349,21 @@ export class BaseProvider {
         const err = new Error(errorType);
         err.type = errorType;
         err.context = context;
+        err.providerName = this.providerName;
+
+        // Use ErrorHandler for consistent error handling
+        await import('@/shared/error-management/ErrorHandler.js').then(({ ErrorHandler }) => {
+          return ErrorHandler.getInstance().handle(err, {
+            context: `${this.providerName}._validateConfig`,
+            showToast: false,
+            metadata: {
+              missingField: field,
+              providerName: this.providerName,
+              validationContext: context
+            }
+          });
+        });
+
         throw err;
       }
     }

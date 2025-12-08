@@ -7,6 +7,7 @@ import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.j
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -321,11 +322,15 @@ export async function sendRegularMessage(message, options = {}) {
         fullError: error
       });
     } else {
-      // All other errors are logged as error level
-      getLogger().error(`Message failed for ${message.action}:`, {
-        message: error.message || error,
-        errorType: errorType,
-        fullError: error
+      // Use ErrorHandler for consistent error handling and categorization
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'UnifiedMessaging',
+        action: message.action,
+        showToast: false, // Messaging errors are handled by callers
+        metadata: {
+          messageAction: message.action,
+          errorType: errorType
+        }
       });
     }
 

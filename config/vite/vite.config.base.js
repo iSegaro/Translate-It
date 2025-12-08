@@ -379,10 +379,13 @@ export const createBaseConfig = (browser, options = {}) => {
         compress: {
           drop_console: true,
           drop_debugger: true,
-          pure_funcs: ['console.log', 'console.debug', 'console.info']
+          // Remove regular console calls but preserve SafeConsole methods
+          pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn', 'console.error']
         },
         mangle: {
-          safari10: true
+          safari10: true,
+          // Preserve SafeConsole from name mangling
+          reserved: ['safeConsole', 'SafeConsole']
         },
         format: {
           comments: false

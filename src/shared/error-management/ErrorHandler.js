@@ -60,6 +60,10 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.QUOTA_EXCEEDED,
   ErrorTypes.HTTP_ERROR,
   ErrorTypes.GEMINI_QUOTA_REGION,
+  ErrorTypes.INSUFFICIENT_BALANCE,
+  ErrorTypes.FORBIDDEN_ERROR,
+  ErrorTypes.INVALID_REQUEST,
+  ErrorTypes.SERVER_ERROR,
 ]);
 
 export class ErrorHandler {
@@ -226,8 +230,29 @@ export class ErrorHandler {
             (raw.includes('Translation not available') ||
              raw.includes('not supported') ||
              raw.includes('API Key') ||
+             raw.includes('api key') ||
              raw.includes('quota') ||
              raw.includes('limit') ||
+             raw.includes('rate limit') ||
+             raw.includes('too many requests') ||
+             raw.includes('429') ||
+             raw.includes('401') ||
+             raw.includes('403') ||
+             raw.includes('404') ||
+             raw.includes('500') ||
+             raw.includes('502') ||
+             raw.includes('503') ||
+             raw.includes('unauthorized') ||
+             raw.includes('forbidden') ||
+             raw.includes('not found') ||
+             raw.includes('model not found') ||
+             raw.includes('server error') ||
+             raw.includes('service unavailable') ||
+             raw.includes('bad gateway') ||
+             raw.includes('payment required') ||
+             raw.includes('insufficient balance') ||
+             raw.includes('bad request') ||
+             raw.includes('invalid request') ||
              raw.includes('not available') ||
              raw.includes('Requires Chrome') ||
              raw.includes('Chrome Translation API'))) {

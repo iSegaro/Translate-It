@@ -679,7 +679,17 @@ export class WindowsManager extends ResourceTracker {
         return null;
       }
       
-      this.logger.error('Translation failed', { error });
+      // Use ErrorHandler for better error categorization and logging
+      await this.errorHandler.handle(error, {
+        context: 'WindowsManager.translation',
+        showToast: false, // Don't show toast - window will display error
+        metadata: {
+          provider: this.state.provider || 'unknown',
+          sourceLang: this.state.sourceLanguage || 'unknown',
+          targetLang: this.state.targetLanguage || 'unknown',
+          textLength: this.state.originalText?.length || 0
+        }
+      });
       // Instead of returning null, throw the error so the caller can handle it properly
       throw error;
     }
