@@ -1,4 +1,4 @@
-#### v1.5.0 – Released on December XX, 2025
+#### v1.5.0 – Released on December 09, 2025
 
 ##### Added
 
