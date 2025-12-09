@@ -14,7 +14,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleSetSelec
 export async function handleSetSelectElementState(message, sender) {
   const activate = message?.data?.activate === true;
   const tabId = sender?.tab?.id || message?.data?.tabId;
-  const frameId = sender?.frameId;
 
   // Log meaningful state changes with proper context
   if (activate) {

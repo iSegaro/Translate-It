@@ -41,7 +41,10 @@
             class="inline-picker"
           />
         </div>
-        <span v-if="!enableShortcutForTextFields" class="setting-description">
+        <span
+          v-if="!enableShortcutForTextFields"
+          class="setting-description"
+        >
           {{ t('enable_shortcut_for_text_fields_description') || 'Allow using a keyboard shortcut to trigger translation when inside a text field.' }}
         </span>
       </div>

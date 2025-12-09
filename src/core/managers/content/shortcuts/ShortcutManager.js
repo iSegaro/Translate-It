@@ -172,7 +172,7 @@ export class ShortcutManager extends ResourceTracker {
     try {
       const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
       return settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
-    } catch (error) {
+    } catch {
       return 'Ctrl+/';
     }
   }

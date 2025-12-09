@@ -7,27 +7,41 @@
       @click="toggleRecording"
     >
       <span v-if="!shortcut">{{ placeholder || 'Click to set shortcut' }}</span>
-      <span v-else class="shortcut-display">{{ formatShortcut(shortcut) }}</span>
+      <span
+        v-else
+        class="shortcut-display"
+      >{{ formatShortcut(shortcut) }}</span>
     </BaseButton>
 
-    <div v-if="isRecording" class="recording-overlay">
+    <div
+      v-if="isRecording"
+      class="recording-overlay"
+    >
       <div class="recording-dialog">
         <div class="dialog-header">
           <h4>{{ t('shortcut_recording_title') || 'Press Your Shortcut' }}</h4>
           <button
             class="clear-button"
-            @click="clearCurrentKeys"
             :disabled="currentKeys.length === 0"
             :title="t('clear') || 'Clear'"
+            @click="clearCurrentKeys"
           >
             ✕
           </button>
         </div>
         <div class="current-keys">
-          <span v-if="currentKeys.length === 0" class="placeholder">
+          <span
+            v-if="currentKeys.length === 0"
+            class="placeholder"
+          >
             {{ t('shortcut_waiting') || 'Waiting for keys...' }}
           </span>
-          <kbd v-else v-for="key in currentKeys" :key="key" class="key-display">
+          <kbd
+            v-for="key in currentKeys"
+            v-else
+            :key="key"
+            class="key-display"
+          >
             {{ formatKey(key) }}
           </kbd>
         </div>
@@ -53,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
@@ -186,7 +200,7 @@ const normalizeKey = (key) => {
 
   // Only allow valid modifier keys and printable characters
   const validModifiers = ['Ctrl', 'Alt', 'Shift', 'Cmd']
-  const validKeys = /^[A-Za-z0-9`~!@#$%^&*()\-_=+\[\]{};:'",.<>\/\\|?]$/
+  const validKeys = /^[A-Za-z0-9`~!@#$%^&*()\-_=+[\]{};:'",.<>/\\|?]$/
 
   if (validModifiers.includes(key)) return key
   if (validKeys.test(key) && key.length === 1) return key.toUpperCase()

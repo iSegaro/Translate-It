@@ -589,7 +589,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   z-index: 9999;
   min-width: 160px;
-  max-height: 300px;
+  max-height: 240px;
   overflow-y: auto;
   display: block;
   opacity: 1 !important;
