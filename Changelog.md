@@ -1,10 +1,16 @@
 #### v1.5.0 – Released on December XX, 2025
 
+##### Added
+
+- Made **[keyboard shortcuts](#/activation)** configurable for text field translation
+
 ##### Fixed
 
-- Enhanced handling of unknown errors
-- Made keyboard shortcuts configurable for text field translation
-- Enabled debug logs for troubleshooting in production environment
+- **[#84](https://github.com/iSegaro/Translate-It/issues/84)**: Enhanced handling of unknown errors
+
+##### Changed
+
+- Enabled **[debug logs](#/advance)** for troubleshooting in production environment
 
 ---
 
