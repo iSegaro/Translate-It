@@ -167,6 +167,75 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("api key is missing") || msg.includes("key missing"))
     return ErrorTypes.API_KEY_MISSING;
 
+  // Specific HTTP status code matching for string-based errors
+  if (
+    msg.includes("http 400") ||
+    msg.includes("400 error") ||
+    msg.includes("http 422") ||
+    msg.includes("422 error") ||
+    msg.includes("bad request") ||
+    msg.includes("invalid request")
+  )
+    return ErrorTypes.INVALID_REQUEST;
+
+  if (
+    msg.includes("http 401") ||
+    msg.includes("401 error") ||
+    msg.includes("unauthorized") ||
+    msg.includes("authentication failed")
+  )
+    return ErrorTypes.API_KEY_INVALID;
+
+  if (
+    msg.includes("http 402") ||
+    msg.includes("402 error") ||
+    msg.includes("payment required") ||
+    msg.includes("insufficient balance")
+  )
+    return ErrorTypes.INSUFFICIENT_BALANCE;
+
+  if (
+    msg.includes("http 403") ||
+    msg.includes("403 error") ||
+    msg.includes("forbidden") ||
+    msg.includes("access denied")
+  )
+    return ErrorTypes.FORBIDDEN_ERROR;
+
+  if (
+    msg.includes("http 404") ||
+    msg.includes("404 error") ||
+    msg.includes("not found") ||
+    msg.includes("model not found") ||
+    msg.includes("resource not found")
+  )
+    return ErrorTypes.MODEL_MISSING;
+
+  if (
+    msg.includes("http 429") ||
+    msg.includes("429 error") ||
+    msg.includes("status 429") ||
+    msg.includes("rate limit") ||
+    msg.includes("too many requests")
+  )
+    return ErrorTypes.RATE_LIMIT_REACHED;
+
+  if (
+    msg.includes("http 500") ||
+    msg.includes("500 error") ||
+    msg.includes("internal server error") ||
+    msg.includes("http 502") ||
+    msg.includes("502 error") ||
+    msg.includes("bad gateway") ||
+    msg.includes("http 503") ||
+    msg.includes("503 error") ||
+    msg.includes("service unavailable") ||
+    msg.includes("http 524") ||
+    msg.includes("524 error") ||
+    msg.includes("timeout occurred")
+  )
+    return ErrorTypes.SERVER_ERROR;
+
   // Google Translate
   if (
     msg.includes("http 400 error") ||

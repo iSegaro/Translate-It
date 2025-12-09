@@ -152,10 +152,10 @@
     "message": "Quick access to translation via icon directly within input/textarea fields."
   },
   "enable_shortcut_for_text_fields_label": {
-    "message": "Enable Ctrl+/ shortcut for text fields"
+    "message": "Enable shortcut for text fields"
   },
   "enable_shortcut_for_text_fields_description": {
-    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field. (alternative: Ctrl+Alt+/)"
+    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field."
   },
   "translate_with_select_element_label": {
     "message": "Enable translation via select element"
@@ -598,6 +598,16 @@
   "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "Select Element mode activated. Click on any text element to translate." },
   "SELECT_ELEMENT_TRANSLATING": { "message": "Translating..." },
   "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
-  "SELECT_ELEMENT_REVERT": { "message": "Revert" }
+  "SELECT_ELEMENT_REVERT": { "message": "Revert" },
+
+  "text_field_shortcut_label": { "message": "Custom Shortcut:" },
+  "click_to_set_shortcut": { "message": "Click to set shortcut" },
+  "text_field_shortcut_description": { "message": "Choose your preferred keyboard shortcut for triggering translation in text fields." },
+  "shortcut_recording_title": { "message": "Press Your Shortcut" },
+  "shortcut_recording_instruction": { "message": "Press the keys you want to use for this shortcut." },
+  "shortcut_waiting": { "message": "Waiting for keys..." },
+  "cancel": { "message": "Cancel" },
+  "clear": { "message": "Clear" },
+  "confirm": { "message": "Confirm" }
 
   }

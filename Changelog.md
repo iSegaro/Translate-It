@@ -1,3 +1,19 @@
+#### v1.5.0 – Released on December 09, 2025
+
+##### Added
+
+- Made **[keyboard shortcuts](#/activation)** configurable for text field translation
+
+##### Fixed
+
+- **[#84](https://github.com/iSegaro/Translate-It/issues/84)**: Enhanced handling of unknown errors
+
+##### Changed
+
+- Enabled **[debug logs](#/advance)** for troubleshooting in production environment
+
+---
+
 #### v1.4.11 – Released on November 25, 2025
 
 ##### Fixed

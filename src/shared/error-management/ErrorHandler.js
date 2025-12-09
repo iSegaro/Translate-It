@@ -60,6 +60,10 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.QUOTA_EXCEEDED,
   ErrorTypes.HTTP_ERROR,
   ErrorTypes.GEMINI_QUOTA_REGION,
+  ErrorTypes.INSUFFICIENT_BALANCE,
+  ErrorTypes.FORBIDDEN_ERROR,
+  ErrorTypes.INVALID_REQUEST,
+  ErrorTypes.SERVER_ERROR,
 ]);
 
 export class ErrorHandler {
@@ -108,19 +112,21 @@ export class ErrorHandler {
       let msg;
       try {
         const genericMsg = await getErrorMessage(type);
-        
-        // If error type is UNKNOWN or generic, prefer the original message
-        if (type === ErrorTypes.UNKNOWN || type === ErrorTypes.TRANSLATION_FAILED) {
-          // Use original message if it's informative, otherwise use generic
-          if (raw && raw.length > 5 && !raw.includes('[object Object]')) {
-            msg = raw;
-          } else {
-            msg = genericMsg;
-          }
+
+        // Prefer the original message if it's informative and not generic
+        if (raw &&
+            raw.length > 5 && // Must have meaningful content
+            !raw.includes('[object Object]') && // Not just object string
+            !raw.startsWith('Error:') && // Not generic error prefix
+            !raw.match(/^(undefined|null|object)$/) && // Not undefined/null
+            !raw.includes('Script error.') && // Not generic script error
+            !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
+          msg = raw;
         } else {
+          // Use generic message for generic errors
           msg = genericMsg;
         }
-            } catch {
+      } catch {
         // Fallback to original message
         msg = raw || 'An error occurred';
       }
@@ -219,20 +225,19 @@ export class ErrorHandler {
       let msg;
       try {
         const localizedMsg = await getErrorMessage(type);
-        
-        // Prefer the original message if it's more specific and descriptive
+
+        // Prefer the original message if it's informative and not generic
         // This ensures specific provider errors are shown to the user
-        if (raw && raw.length > 20 &&
-            (raw.includes('Translation not available') ||
-             raw.includes('not supported') ||
-             raw.includes('API Key') ||
-             raw.includes('quota') ||
-             raw.includes('limit') ||
-             raw.includes('not available') ||
-             raw.includes('Requires Chrome') ||
-             raw.includes('Chrome Translation API'))) {
+        if (raw &&
+            raw.length > 5 && // Must have meaningful content
+            !raw.includes('[object Object]') && // Not just object string
+            !raw.startsWith('Error:') && // Not generic error prefix
+            !raw.match(/^(undefined|null|object)$/) && // Not undefined/null
+            !raw.includes('Script error.') && // Not generic script error
+            !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
           msg = raw;
         } else {
+          // Use localized message for generic errors, but fall back to raw if no localized message
           msg = localizedMsg || raw || 'An error occurred';
         }
       } catch (msgError) {

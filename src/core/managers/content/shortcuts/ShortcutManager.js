@@ -50,7 +50,7 @@ export class ShortcutManager extends ResourceTracker {
 
     // Initialize shortcuts with dependencies
     if (dependencies.featureManager) {
-      this.initializeShortcuts(dependencies);
+      await this.initializeShortcuts(dependencies);
     }
 
     this.initialized = true;
@@ -80,12 +80,15 @@ export class ShortcutManager extends ResourceTracker {
     // Register ESC shortcut for revert
     this.registerShortcut('Escape', new RevertShortcut());
     
-    // Register Ctrl+/ shortcut for translation
+    // Register Ctrl+/ shortcut for translation (will be updated dynamically)
     const ctrlSlashShortcut = new FieldShortcutManager();
     this.registerShortcut('Ctrl+/', ctrlSlashShortcut);
 
     // Store reference for initialization later
     this.ctrlSlashShortcut = ctrlSlashShortcut;
+
+    // Setup dynamic shortcut updates
+    this.setupDynamicShortcutUpdates(this.ctrlSlashShortcut);
 
     // Track ctrlSlashShortcut for automatic cleanup
     this.trackResource('ctrlSlashShortcut', () => {
@@ -102,7 +105,7 @@ export class ShortcutManager extends ResourceTracker {
    * Initialize shortcuts with required dependencies
    * @param {Object} dependencies - Dependencies for shortcuts
    */
-  initializeShortcuts(dependencies) {
+  async initializeShortcuts(dependencies) {
     // Initialize CtrlSlashShortcut with dependencies
     if (this.ctrlSlashShortcut) {
       this.ctrlSlashShortcut.initialize({
@@ -111,8 +114,67 @@ export class ShortcutManager extends ResourceTracker {
       this.logger.debug('FieldShortcutManager initialized with dependencies');
     }
 
-    // Future: Initialize other shortcuts that need dependencies
+    // Setup dynamic shortcut updates
+    this.setupDynamicShortcutUpdates(this.ctrlSlashShortcut);
+
+    // Initialize settings listener for dynamic shortcuts
+    await this.initializeDynamicShortcuts();
+
     this.logger.debug('All shortcuts initialized with dependencies');
+  }
+
+  /**
+   * Initialize dynamic shortcuts from settings
+   */
+  async initializeDynamicShortcuts() {
+    try {
+      const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+
+      // Subscribe to shortcut changes
+      this._settingsUnsubscribe = settingsManager.onChange('TEXT_FIELD_SHORTCUT', async (newShortcut) => {
+        try {
+          if (this.ctrlSlashShortcut) {
+            // Update the FieldShortcutManager's shortcut
+            if (typeof this.ctrlSlashShortcut.updateShortcut === 'function') {
+              this.ctrlSlashShortcut.updateShortcut();
+            }
+
+            this.logger.debug(`Text field shortcut updated to: ${newShortcut || 'Ctrl+/'}`);
+          }
+        } catch (error) {
+          this.logger.error('Failed to update text field shortcut:', error);
+        }
+      });
+
+      // Initial setup
+      const currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
+      this.logger.debug(`Initial text field shortcut: ${currentShortcut}`);
+
+    } catch (error) {
+      this.logger.error('Failed to initialize dynamic shortcuts:', error);
+    }
+  }
+
+  /**
+   * Setup dynamic shortcut updates
+   * @param {Object} fieldShortcutManager - FieldShortcutManager instance
+   */
+  setupDynamicShortcutUpdates(fieldShortcutManager) {
+    // Store reference for future use
+    this.fieldShortcutManager = fieldShortcutManager;
+  }
+
+  /**
+   * Get current field shortcut from settings
+   * @returns {string} Current shortcut
+   */
+  async getCurrentFieldShortcut() {
+    try {
+      const { settingsManager } = await import('@/shared/managers/SettingsManager.js');
+      return settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
+    } catch {
+      return 'Ctrl+/';
+    }
   }
 
   /**
@@ -124,7 +186,7 @@ export class ShortcutManager extends ResourceTracker {
     if (this.shortcuts.has(key)) {
       this.logger.warn(`Overwriting shortcut for key: ${key}`);
     }
-    
+
     this.shortcuts.set(key, handler);
     this.logger.debug(`Registered shortcut for: ${key}`);
   }
@@ -149,7 +211,10 @@ export class ShortcutManager extends ResourceTracker {
 
     // Build key combination string
     const keyCombo = this.buildKeyCombo(event);
-    
+
+    // If empty key combo (modifier only), ignore
+    if (!keyCombo) return;
+
     // Check if we have a handler for this key combination
     const handler = this.shortcuts.get(keyCombo);
     if (!handler) return;
@@ -186,18 +251,23 @@ export class ShortcutManager extends ResourceTracker {
    */
   buildKeyCombo(event) {
     const parts = [];
-    
+
     if (event.ctrlKey || event.metaKey) parts.push('Ctrl');
     if (event.altKey) parts.push('Alt');
     if (event.shiftKey) parts.push('Shift');
-    
-    // Add the main key
-    if (event.key) {
+
+    // Add the main key (but ignore modifier keys by themselves)
+    if (event.key && !['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
       parts.push(event.key);
-    } else if (event.code) {
+    } else if (event.code && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(event.code)) {
       parts.push(event.code);
     }
-    
+
+    // If only modifier keys are present, return empty string (no match)
+    if (parts.length === 1 && ['Ctrl', 'Alt', 'Shift'].includes(parts[0])) {
+      return '';
+    }
+
     return parts.join('+');
   }
 

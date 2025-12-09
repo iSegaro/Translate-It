@@ -16,10 +16,12 @@ import { INPUT_TYPES } from '@/shared/config/constants.js';
 export class FieldShortcutManager {
   constructor() {
     this.key = 'Ctrl+/';
-    this.description = 'Translate text in active field using Ctrl+/ shortcut';
+    this.description = 'Translate text in active field using keyboard shortcut';
     this.translationHandler = null;
     this.featureManager = null;
     this.initialized = false;
+    this.currentShortcut = null;
+    this.parsedShortcut = null;
 
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'FieldShortcutManager');
@@ -34,22 +36,59 @@ export class FieldShortcutManager {
     this.featureManager = dependencies.featureManager;
     this.initialized = true;
 
+    // Load initial shortcut
+    this.updateShortcut();
+
     // Listen for settings changes
     this._settingsUnsubscribe = settingsManager.onChange('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', (newValue) => {
       this.logger.debug('ENABLE_SHORTCUT_FOR_TEXT_FIELDS changed:', newValue);
+    }, 'field-shortcut-manager');
+
+    this._shortcutUnsubscribe = settingsManager.onChange('TEXT_FIELD_SHORTCUT', (newValue) => {
+      this.logger.debug('TEXT_FIELD_SHORTCUT changed:', newValue);
+      this.updateShortcut();
     }, 'field-shortcut-manager');
 
     this.logger.debug('Initialized with dependencies');
   }
 
   /**
+   * Update shortcut from settings
+   */
+  updateShortcut() {
+    this.currentShortcut = settingsManager.get('TEXT_FIELD_SHORTCUT', 'Ctrl+/');
+    this.parsedShortcut = this.parseShortcut(this.currentShortcut);
+    this.logger.debug('Updated shortcut:', this.currentShortcut, this.parsedShortcut);
+  }
+
+/**
+   * Parse shortcut string into object
+   * @param {string} shortcut - Shortcut string (e.g., "Ctrl+Alt+T")
+   * @returns {Object} Parsed shortcut object
+   */
+  parseShortcut(shortcut) {
+    if (!shortcut || typeof shortcut !== 'string') {
+      return this.parseShortcut('Ctrl+/'); // fallback
+    }
+
+    const keys = shortcut.split('+').map(key => key.trim().toLowerCase());
+    return {
+      ctrl: keys.includes('ctrl') || keys.includes('control'),
+      alt: keys.includes('alt'),
+      shift: keys.includes('shift'),
+      meta: keys.includes('meta') || keys.includes('cmd'),
+      key: keys.find(k => !['ctrl', 'control', 'alt', 'shift', 'meta', 'cmd'].includes(k)) || '/'
+    };
+  }
+
+/**
    * Check if shortcut should be executed
    * @param {KeyboardEvent} event - Keyboard event
    * @returns {Promise<boolean>} Whether to execute the shortcut
    */
   async shouldExecute(event) {
-    // Only execute on Ctrl+/ combination
-    if (!this.isCtrlSlashEvent(event)) {
+    // Only execute on configured shortcut combination
+    if (!this.isShortcutEvent(event)) {
       return false;
     }
 
@@ -218,15 +257,27 @@ export class FieldShortcutManager {
   }
 
   /**
-   * Check if event is Ctrl+/ combination
+   * Check if event matches the configured shortcut
    * @param {KeyboardEvent} event - Keyboard event
-   * @returns {boolean} Whether event is Ctrl+/
+   * @returns {boolean} Whether event matches the shortcut
    */
-  isCtrlSlashEvent(event) {
+  isShortcutEvent(event) {
+    if (!this.parsedShortcut || event.repeat) {
+      return false;
+    }
+
+    // Ignore modifier keys by themselves (Control, Shift, Alt, Meta)
+    const modifierKeys = ['Control', 'Shift', 'Alt', 'Meta'];
+    if (modifierKeys.includes(event.key)) {
+      return false;
+    }
+
     return (
-      (event.ctrlKey || event.metaKey) &&
-      event.key === "/" &&
-      !event.repeat
+      (this.parsedShortcut.ctrl === event.ctrlKey) &&
+      (this.parsedShortcut.alt === event.altKey) &&
+      (this.parsedShortcut.shift === event.shiftKey) &&
+      (this.parsedShortcut.meta === event.metaKey) &&
+      (event.key.toLowerCase() === this.parsedShortcut.key.toLowerCase())
     );
   }
 
@@ -236,6 +287,14 @@ export class FieldShortcutManager {
    */
   getDescription() {
     return this.description;
+  }
+
+  /**
+   * Get current shortcut string
+   * @returns {string} Current shortcut
+   */
+  getCurrentShortcut() {
+    return this.currentShortcut || 'Ctrl+/';
   }
 
   /**

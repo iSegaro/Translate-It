@@ -27,13 +27,25 @@
       </div>
 
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="enableShortcutForTextFields"
-          :disabled="!extensionEnabled"
-          :label="t('enable_shortcut_for_text_fields_label') || 'Enable Ctrl+/ shortcut for text fields'"
-        />
-        <span class="setting-description">
-          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field.' }}
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="enableShortcutForTextFields"
+            :disabled="!extensionEnabled"
+            :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
+          />
+          <ShortcutPicker
+            v-if="enableShortcutForTextFields"
+            v-model="textFieldShortcut"
+            :disabled="!extensionEnabled"
+            :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
+            class="inline-picker"
+          />
+        </div>
+        <span
+          v-if="!enableShortcutForTextFields"
+          class="setting-description"
+        >
+          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using a keyboard shortcut to trigger translation when inside a text field.' }}
         </span>
       </div>
 
@@ -164,6 +176,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
+import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -195,6 +208,11 @@ const translateOnTextFields = computed({
 const enableShortcutForTextFields = computed({
   get: () => settingsStore.settings?.ENABLE_SHORTCUT_FOR_TEXT_FIELDS || false,
   set: (value) => settingsStore.updateSettingLocally('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', value)
+})
+
+const textFieldShortcut = computed({
+  get: () => settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
+  set: (value) => settingsStore.updateSettingLocally('TEXT_FIELD_SHORTCUT', value)
 })
 
 const textFieldMode = computed({
@@ -265,21 +283,52 @@ h2 {
 .setting-group {
   margin-bottom: $spacing-lg;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: $spacing-sm;
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
-  
+
   &:last-child {
     border-bottom: none;
     margin-bottom: 0;
   }
-  
+
   label {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
   }
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  width: 100%;
+}
+
+.shortcut-setting {
+  width: 100%;
+  margin-top: $spacing-md;
+  padding: $spacing-md;
+  background-color: var(--color-surface);
+  border-radius: $border-radius-sm;
+  border: 1px solid var(--color-border);
+
+  .shortcut-label {
+    display: block;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    margin-bottom: $spacing-sm;
+  }
+}
+
+.shortcut-setting-compact {
+  width: 100%;
+  margin-top: $spacing-sm;
+  margin-left: $spacing-lg;
+  display: flex;
+  align-items: center;
 }
 
 .setting-description {
@@ -317,10 +366,16 @@ h2 {
     flex-direction: column;
     align-items: stretch;
     gap: $spacing-sm;
-    
+
     .setting-description {
       padding-left: 0;
     }
+  }
+
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: $spacing-sm;
   }
   
   .sub-options-group {
