@@ -96,7 +96,7 @@ export class GeminiProvider extends BaseAIProvider {
     }
 
     // Validate configuration
-    await this._validateConfig(
+    this._validateConfig(
       { apiKey, apiUrl },
       ["apiKey", "apiUrl"],
       `${this.providerName.toLowerCase()}-translation`
@@ -291,7 +291,7 @@ export class GeminiProvider extends BaseAIProvider {
     }
 
     // Validate configuration
-    await this._validateConfig(
+    this._validateConfig(
       { apiKey, apiUrl },
       ["apiKey", "apiUrl"],
       `${this.providerName.toLowerCase()}-image-translation`

@@ -44,7 +44,7 @@ export class OpenRouterProvider extends BaseAIProvider {
     logger.info(`[OpenRouter] Starting translation: ${text.length} chars`);
 
     // Validate configuration
-    await this._validateConfig(
+    this._validateConfig(
       { apiKey },
       ["apiKey"],
       `${this.providerName.toLowerCase()}-translation`

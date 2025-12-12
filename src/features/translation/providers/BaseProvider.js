@@ -333,9 +333,9 @@ export class BaseProvider {
    * @param {Object} config - Configuration object
    * @param {Array<string>} requiredFields - Required field names
    * @param {string} context - Context for error reporting
-   * @returns {Promise<void>} - Throws Error if validation fails
+   * @throws {Error} - If validation fails
    */
-  async _validateConfig(config, requiredFields, context) {
+  _validateConfig(config, requiredFields, context) {
     for (const field of requiredFields) {
       if (!config[field]) {
         const errorType = field.toLowerCase().includes('key')
@@ -350,20 +350,6 @@ export class BaseProvider {
         err.type = errorType;
         err.context = context;
         err.providerName = this.providerName;
-
-        // Use ErrorHandler for consistent error handling
-        await import('@/shared/error-management/ErrorHandler.js').then(({ ErrorHandler }) => {
-          return ErrorHandler.getInstance().handle(err, {
-            context: `${this.providerName}._validateConfig`,
-            showToast: false,
-            metadata: {
-              missingField: field,
-              providerName: this.providerName,
-              validationContext: context
-            }
-          });
-        });
-
         throw err;
       }
     }

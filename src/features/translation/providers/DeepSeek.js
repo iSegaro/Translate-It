@@ -43,7 +43,7 @@ export class DeepSeekProvider extends BaseAIProvider {
     logger.info(`[DeepSeek] Starting translation: ${text.length} chars`);
 
     // Validate configuration
-    await this._validateConfig(
+    this._validateConfig(
       { apiKey },
       ["apiKey"],
       `${this.providerName.toLowerCase()}-translation`
