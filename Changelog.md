@@ -1,3 +1,11 @@
+#### v1.5.1 – Released on December 12, 2025
+
+##### Fixed
+
+- **[#87](https://github.com/iSegaro/Translate-It/issues/87)**: Fixed an issue where validation errors (like missing API keys) incorrectly triggered the circuit breaker, causing false quota exceeded errors for Gemini and other providers
+
+---
+
 #### v1.5.0 – Released on December 09, 2025
 
 ##### Added
