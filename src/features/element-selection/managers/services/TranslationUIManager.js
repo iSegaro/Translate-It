@@ -19,13 +19,63 @@ function processMixedContentForDisplay(text, targetLanguage = null) {
     return text;
   }
 
-  // Pattern to find English/technical terms and proper nouns
-  // This matches: words with letters only, technical terms, acronyms
-  const ltrWordPattern = /\b[A-Za-z][A-Za-z0-9\-_.]*\b|\b[A-Z]{2,}\b/g;
+  // First, check if this is RTL text with embedded LTR content
+  const isRTL = isTextRTL(text, targetLanguage);
 
-  return text.replace(ltrWordPattern, (match) => {
-    // Don't wrap very short words
-    if (match.length < 2) return match;
+  if (isRTL) {
+    // For RTL text, wrap English/technical terms with LTR spans
+    return processRTLTextWithLTERMS(text, targetLanguage);
+  }
+
+  // For LTR text, return as-is
+  return text;
+}
+
+/**
+ * Check if text is primarily RTL
+ * @param {string} text - Text to check
+ * @param {string} targetLanguage - Target language code
+ * @returns {boolean} Whether text is primarily RTL
+ */
+function isTextRTL(text, targetLanguage) {
+  // RTL languages list
+  const rtlLanguages = ['fa', 'ar', 'ur', 'he', 'ku', 'ps', 'sd', 'am', 'ti', 'dz', 'ks', 'yi', 'syr'];
+
+  // If target language is RTL, assume text is RTL
+  if (targetLanguage && rtlLanguages.includes(targetLanguage)) {
+    return true;
+  }
+
+  // Otherwise, check for RTL characters in text
+  const rtlCharPattern = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+  return rtlCharPattern.test(text);
+}
+
+/**
+ * Process RTL text that contains embedded LTR terms
+ * @param {string} text - RTL text to process
+ * @param {string} targetLanguage - Target language code
+ * @returns {string} Processed text with LTR terms wrapped
+ */
+function processRTLTextWithLTERMS(text, targetLanguage) {
+  // Pattern to find English/technical terms, proper nouns, numbers, and special entities
+  // This matches:
+  // - English words: \b[A-Za-z][A-Za-z0-9\-_.]*\b
+  // - Acronyms: \b[A-Z]{2,}\b
+  // - Numbers: \b\d+\b
+  // - Mixed alphanumeric: \b[A-Za-z0-9]+\b
+  // - Domain names: \b[A-Za-z0-9\-_]+\.[A-Za-z]{2,}\b
+  // - Special patterns like Z.ai: \b[A-Za-z]\.[A-Za-z]{1,3}\b
+  const ltrTermPattern = /\b[A-Za-z][A-Za-z0-9\-_.]*\b|\b[A-Z]{2,}\b|\b\d+\b|[A-Za-z0-9\-_]+\.[A-Za-z]{2,}|[A-Za-z]\.[A-Za-z]{1,3}/g;
+
+  return text.replace(ltrTermPattern, (match) => {
+    // Don't wrap very short single letters (except for patterns like "Z.ai")
+    if (match.length === 1 && !match.includes('.')) return match;
+
+    // Always wrap numbers and technical terms
+    if (/^\d+$/.test(match) || match.includes('.') || /[A-Z]{2,}/.test(match)) {
+      return `<span dir="ltr" class="ltr-term">${match}</span>`;
+    }
 
     // Language-specific filtering for common words written with Latin letters
     const commonLatinWords = getCommonLatinWordsForLanguage(targetLanguage);
@@ -33,8 +83,44 @@ function processMixedContentForDisplay(text, targetLanguage = null) {
       return match;
     }
 
+    // Don't wrap very short words (2 characters or less, except for special cases)
+    if (match.length <= 2 && !match.includes('.')) return match;
+
     return `<span dir="ltr" class="ltr-term">${match}</span>`;
   });
+}
+
+/**
+ * Check if a language code represents an RTL language
+ * @param {string} targetLanguage - Target language code
+ * @returns {boolean} Whether the language is RTL
+ */
+function isRTLLanguage(targetLanguage) {
+  if (!targetLanguage) return false;
+
+  // Comprehensive list of RTL languages
+  const rtlLanguages = [
+    'fa',  // Persian/Farsi
+    'ar',  // Arabic
+    'ur',  // Urdu
+    'he',  // Hebrew
+    'ku',  // Kurdish (Sorani)
+    'ps',  // Pashto
+    'sd',  // Sindhi
+    'am',  // Amharic
+    'ti',  // Tigrinya
+    'dz',  // Dzongkha
+    'ks',  // Kashmiri
+    'yi',  // Yiddish
+    'syr', // Syriac
+    'arc', // Aramaic
+    'aze', // Azerbaijani (Arabic script)
+    'msa', // Malay (Arabic script)
+    'ota', // Ottoman Turkish
+    'ckb'  // Kurdish (Sorani)
+  ];
+
+  return rtlLanguages.includes(targetLanguage.toLowerCase());
 }
 
 /**
@@ -557,12 +643,15 @@ export class TranslationUIManager {
             processedText = leadingWhitespace + processedText;
           }
 
-          // ENHANCED: Apply mixed content processing for streaming translations
-          if (detectMixedContent(processedText)) {
+          // ENHANCED: Apply mixed content processing for RTL languages and mixed content
+          const shouldProcessMixedContent = detectMixedContent(processedText) || isRTLLanguage(targetLanguage);
+          if (shouldProcessMixedContent) {
             processedText = processMixedContentForDisplay(processedText, targetLanguage);
             translationSpan.innerHTML = processedText; // Use innerHTML for mixed content
             this.logger.debug('Applied mixed content processing for streaming translation', {
               targetLanguage,
+              hasMixedContent: detectMixedContent(processedText),
+              isRTLLanguage: isRTLLanguage(targetLanguage),
               hasHtmlSpans: processedText.includes('<span dir="ltr"'),
               originalLength: processedText.length,
               preview: processedText.substring(0, 100) + (processedText.length > 100 ? '...' : '')
@@ -2022,10 +2111,14 @@ export class TranslationUIManager {
             // ENHANCED: Apply mixed content processing for final translations
             let processedFinalText = finalTrimmed;
             const hasMixedContent = detectMixedContent(finalTrimmed);
-            if (hasMixedContent) {
+            const shouldProcessMixedContent = hasMixedContent || isRTLLanguage(targetLanguage);
+
+            if (shouldProcessMixedContent) {
               processedFinalText = processMixedContentForDisplay(finalTrimmed, targetLanguage);
               this.logger.debug('Applied mixed content processing for final translation', {
                 targetLanguage,
+                hasMixedContent,
+                isRTLLanguage: isRTLLanguage(targetLanguage),
                 hasHtmlSpans: processedFinalText.includes('<span dir="ltr"'),
                 originalLength: finalTrimmed.length,
                 processedLength: processedFinalText.length,
@@ -2037,7 +2130,7 @@ export class TranslationUIManager {
             const translationSpan = document.createElement('span');
             translationSpan.className = 'aiwc-translation-final';
 
-            if (hasMixedContent) {
+            if (shouldProcessMixedContent) {
               translationSpan.innerHTML = processedFinalText; // Use innerHTML for mixed content
             } else {
               translationSpan.textContent = processedFinalText; // Use textContent for plain text
@@ -2369,13 +2462,19 @@ export class TranslationUIManager {
           }
 
           // ENHANCED: Process mixed content for better LTR word display
-          // Apply for all languages when mixed content is detected
-          if (detectMixedContent(processedText)) {
+          // Apply for RTL languages and when mixed content is detected
+          const hasMixedContent = detectMixedContent(processedText);
+          const shouldProcessMixedContent = hasMixedContent || isRTLLanguage(targetLanguage);
+
+          if (shouldProcessMixedContent) {
             // Wrap English/technical terms with LTR spans for better display
             processedText = processMixedContentForDisplay(processedText, targetLanguage);
             translationSpan.innerHTML = processedText; // Use innerHTML for spans
             this.logger.debug('Applied mixed content processing for bidirectional text display', {
-              targetLanguage
+              targetLanguage,
+              hasMixedContent,
+              isRTLLanguage: isRTLLanguage(targetLanguage),
+              hasHtmlSpans: processedText.includes('<span dir="ltr"')
             });
           } else {
             translationSpan.textContent = processedText;
