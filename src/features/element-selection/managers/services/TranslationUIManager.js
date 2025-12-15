@@ -289,8 +289,50 @@ export class TranslationUIManager {
     const newlyAppliedTranslations = new Map();
 
     for (let i = 0; i < translatedBatch.length; i++) {
-      const translatedText = translatedBatch[i];
+      let translatedText = translatedBatch[i];
       const originalText = originalBatch[i];
+
+      // CRITICAL FIX: Handle JSON array in streaming translations
+      if (typeof translatedText === 'string') {
+        let cleanTranslatedText = translatedText;
+
+        // Remove markdown code blocks
+        if (translatedText.includes('```json')) {
+          cleanTranslatedText = translatedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+        }
+
+        if (cleanTranslatedText.startsWith('[') && cleanTranslatedText.endsWith(']')) {
+          try {
+            const parsedArray = JSON.parse(cleanTranslatedText);
+            if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+              // Extract translation text from array
+              if (typeof parsedArray[0] === 'string') {
+                if (parsedArray.length === 1) {
+                  translatedText = parsedArray[0];
+                } else {
+                  // Check if original text has paragraph structure
+                  const originalExpandedText = expandedTexts[i] || '';
+                  const originalHasParagraphs = originalExpandedText.includes('\n\n');
+                  translatedText = originalHasParagraphs ? parsedArray.join('\n\n') : parsedArray.join('\n');
+                }
+              } else if (parsedArray[0] && parsedArray[0].text) {
+                const objectTexts = parsedArray.map(item => item.text).filter(Boolean);
+                if (objectTexts.length === 1) {
+                  translatedText = objectTexts[0];
+                } else {
+                  const originalExpandedText = expandedTexts[i] || '';
+                  const originalHasParagraphs = originalExpandedText.includes('\n\n');
+                  translatedText = originalHasParagraphs ? objectTexts.join('\n\n') : objectTexts.join('\n');
+                }
+              }
+              this.logger.debug(`Streaming JSON array parsed: ${parsedArray.length} segments`);
+            }
+          } catch (parseError) {
+            this.logger.warn(`Failed to parse streaming JSON array: ${parseError.message}`);
+            // Use original translatedText if parsing fails
+          }
+        }
+      }
 
       // Find the corresponding expanded index
       let expandedIndex = -1;
