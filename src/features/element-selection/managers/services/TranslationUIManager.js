@@ -1052,28 +1052,46 @@ export class TranslationUIManager {
           // Preserve empty line structure with newline character
           finalTranslatedData.push({ text: '\n' });
         } else if (translatedText !== undefined) {
-          // Handle single segment case where translatedText might be a JSON string
-          if (request.expandedTexts.length === 1) {
-            try {
-              // Try to parse as JSON and extract the text properly
+          // Enhanced JSON array handling for all cases (not just single segment)
+          try {
+            // Check if translatedText is a JSON array string
+            if (translatedText.startsWith('[') && translatedText.endsWith(']')) {
               const parsed = JSON.parse(translatedText);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 // Handle both string and object formats in array
                 if (typeof parsed[0] === 'string') {
-                  finalTranslatedData.push({ text: parsed[0] });
+                  // For multiple translations, join them with proper spacing
+                  if (parsed.length === 1) {
+                    finalTranslatedData.push({ text: parsed[0] });
+                  } else {
+                    // Check if any translations contain newlines for proper joining
+                    const hasNewlines = parsed.some(text => text.includes('\n'));
+                    const joinedText = hasNewlines ? parsed.join('\n') : parsed.join(' ');
+                    finalTranslatedData.push({ text: joinedText });
+                  }
                 } else if (parsed[0] && parsed[0].text) {
-                  finalTranslatedData.push({ text: parsed[0].text });
+                  // Handle object format
+                  const objectTexts = parsed.map(item => item.text).filter(Boolean);
+                  if (objectTexts.length === 1) {
+                    finalTranslatedData.push({ text: objectTexts[0] });
+                  } else {
+                    const hasNewlines = objectTexts.some(text => text.includes('\n'));
+                    const joinedText = hasNewlines ? objectTexts.join('\n') : objectTexts.join(' ');
+                    finalTranslatedData.push({ text: joinedText });
+                  }
                 } else {
                   finalTranslatedData.push({ text: translatedText });
                 }
               } else {
                 finalTranslatedData.push({ text: translatedText });
               }
-            } catch {
-              // If parsing fails, use as-is
+            } else {
+              // Not a JSON array, use as-is
               finalTranslatedData.push({ text: translatedText });
             }
-          } else {
+          } catch (parseError) {
+            // If parsing fails, use as-is
+            this.logger.warn(`Failed to parse JSON array translation in streaming: ${parseError.message}`);
             finalTranslatedData.push({ text: translatedText });
           }
         } else {
@@ -1342,7 +1360,30 @@ export class TranslationUIManager {
         if (translatedIndex < translatedData.length && translatedData[translatedIndex]) {
           // Handle both object and string formats uniformly
           if (typeof translatedData[translatedIndex] === 'string') {
-            finalTranslatedData.push({ text: translatedData[translatedIndex] });
+            let translationText = translatedData[translatedIndex];
+
+            // CRITICAL FIX: Handle case where translation text is a JSON array string
+            if (translationText.startsWith('[') && translationText.endsWith(']')) {
+              try {
+                const parsedArray = JSON.parse(translationText);
+                if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+                  // Join multiple translations with proper spacing or use the first one
+                  if (parsedArray.length === 1) {
+                    translationText = parsedArray[0];
+                  } else {
+                    // For multiple translations, join them with spaces or newlines based on content
+                    const hasNewlines = parsedArray.some(text => text.includes('\n'));
+                    translationText = hasNewlines ? parsedArray.join('\n') : parsedArray.join(' ');
+                  }
+                  this.logger.debug(`Parsed JSON array translation: ${parsedArray.length} segments -> final length: ${translationText.length}`);
+                }
+              } catch (parseError) {
+                this.logger.warn(`Failed to parse JSON array translation: ${parseError.message}`);
+                // Use original translation text if parsing fails
+              }
+            }
+
+            finalTranslatedData.push({ text: translationText });
           } else if (translatedData[translatedIndex].text) {
             finalTranslatedData.push({ text: translatedData[translatedIndex].text });
           } else {
@@ -2085,6 +2126,26 @@ export class TranslationUIManager {
           // CRITICAL FIX: Apply general spacing correction for final translations
           // This prevents words from sticking together when followed by inline elements
           let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
+
+          // FINAL SAFETY CHECK: Handle any remaining JSON array strings in DOM application
+          if (processedText && processedText.startsWith('[') && processedText.endsWith(']')) {
+            try {
+              const parsedArray = JSON.parse(processedText);
+              if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+                // Extract actual translation text from the array
+                if (typeof parsedArray[0] === 'string') {
+                  processedText = parsedArray.length === 1 ? parsedArray[0] : parsedArray.join(' ');
+                } else if (parsedArray[0] && parsedArray[0].text) {
+                  const objectTexts = parsedArray.map(item => item.text).filter(Boolean);
+                  processedText = objectTexts.length === 1 ? objectTexts[0] : objectTexts.join(' ');
+                }
+                this.logger.debug(`Final DOM safety check: Extracted translation from JSON array`);
+              }
+            } catch (parseError) {
+              this.logger.warn(`Final DOM safety check failed: ${parseError.message}`);
+              // Use processedText as-is if parsing fails
+            }
+          }
 
           // Preserve original whitespace as fallback
           const leadingWhitespace = originalText.match(/^\s*/)[0];
