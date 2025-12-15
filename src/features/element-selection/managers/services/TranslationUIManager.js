@@ -3,10 +3,38 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { reassembleTranslations, normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore } from "../../utils/textProcessing.js";
 import { generateUniqueId } from "../../utils/domManipulation.js";
 import { ensureSpacingBeforeInlineElements } from "../../utils/spacingUtils.js";
-import { correctTextDirection } from "../../utils/textDirection.js";
+import { correctTextDirection, detectMixedContent } from "../../utils/textDirection.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
+
+/**
+ * Process mixed content for better display of LTR words in RTL context
+ * @param {string} text - Text to process
+ * @returns {string} Processed text with LTR words wrapped in spans
+ */
+function processMixedContentForDisplay(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+
+  // Pattern to find English/technical terms and proper nouns
+  // This matches: words with letters only, technical terms, acronyms
+  const ltrWordPattern = /\b[A-Za-z][A-Za-z0-9\-_.]*\b|\b[A-Z]{2,}\b/g;
+
+  return text.replace(ltrWordPattern, (match) => {
+    // Don't wrap very short words or common Persian words that happen to use Latin letters
+    if (match.length < 2) return match;
+
+    // Don't wrap common Persian words written with Latin letters
+    const commonPersianLatinWords = ['in', 'va', 'az', 'be', 'ra', 'ke', 'ta', 'dar'];
+    if (commonPersianLatinWords.includes(match.toLowerCase())) {
+      return match;
+    }
+
+    return `<span dir="ltr" class="ltr-term">${match}</span>`;
+  });
+}
 
 /**
  * Manages UI notifications, DOM updates, and SelectElementManager coordination
@@ -495,7 +523,18 @@ export class TranslationUIManager {
             processedText = leadingWhitespace + processedText;
           }
 
-          translationSpan.textContent = processedText;
+          // ENHANCED: Apply mixed content processing for streaming translations
+          if (detectMixedContent(processedText)) {
+            processedText = processMixedContentForDisplay(processedText);
+            translationSpan.innerHTML = processedText; // Use innerHTML for mixed content
+            this.logger.debug('Applied mixed content processing for streaming translation', {
+              hasHtmlSpans: processedText.includes('<span dir="ltr"'),
+              originalLength: processedText.length,
+              preview: processedText.substring(0, 100) + (processedText.length > 100 ? '...' : '')
+            });
+          } else {
+            translationSpan.textContent = processedText;
+          }
 
           // Apply text direction
           const detectOptions = targetLanguage ? {
@@ -1945,9 +1984,30 @@ export class TranslationUIManager {
               matchStrategy: matchStrategy
             });
 
-            // Apply the translation directly to the text node
-            const translatedTextNode = document.createTextNode(finalTrimmed);
-            textNode.parentNode.replaceChild(translatedTextNode, textNode);
+            // ENHANCED: Apply mixed content processing for final translations
+            let processedFinalText = finalTrimmed;
+            if (detectMixedContent(finalTrimmed)) {
+              processedFinalText = processMixedContentForDisplay(finalTrimmed);
+              this.logger.debug('Applied mixed content processing for final translation', {
+                hasHtmlSpans: processedFinalText.includes('<span dir="ltr"'),
+                originalLength: finalTrimmed.length,
+                processedLength: processedFinalText.length,
+                preview: processedFinalText.substring(0, 100) + (processedFinalText.length > 100 ? '...' : '')
+              });
+            }
+
+            // Create a span wrapper to preserve HTML for mixed content
+            const translationSpan = document.createElement('span');
+            translationSpan.className = 'aiwc-translation-final';
+
+            if (detectMixedContent(finalTrimmed)) {
+              translationSpan.innerHTML = processedFinalText; // Use innerHTML for mixed content
+            } else {
+              translationSpan.textContent = processedFinalText; // Use textContent for plain text
+            }
+
+            // Replace the text node with the translation span
+            textNode.parentNode.replaceChild(translationSpan, textNode);
             processedCount++;
             return;
           }
@@ -2271,7 +2331,16 @@ export class TranslationUIManager {
             processedText = leadingWhitespace + processedText;
           }
 
-          translationSpan.textContent = processedText;
+          // ENHANCED: Process mixed content for better LTR word display
+          // Apply for all languages when mixed content is detected
+          if (detectMixedContent(processedText)) {
+            // Wrap English/technical terms with LTR spans for better display
+            processedText = processMixedContentForDisplay(processedText);
+            translationSpan.innerHTML = processedText; // Use innerHTML for spans
+            this.logger.debug('Applied mixed content processing for bidirectional text display');
+          } else {
+            translationSpan.textContent = processedText;
+          }
 
           // Apply text direction to the wrapper with target language if available
           const detectOptions = targetLanguage ? {

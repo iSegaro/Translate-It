@@ -98,3 +98,98 @@ html body .translate-it-element-highlighted.translate-it-element-highlighted {
     outline: none;
   }
 }
+
+/* ==========================================================================
+   Text Direction Classes for Translations - Mixed Content Support
+   ========================================================================== */
+
+/* RTL text with proper bidirectional support */
+.aiwc-rtl-text {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+/* LTR text (default behavior) */
+.aiwc-ltr-text {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+
+/* Mixed RTL/LTR content - Enhanced bidirectional support */
+.aiwc-mixed-text {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+/* Enhanced support for mixed content - translation inner */
+.aiwc-mixed-text .aiwc-translation-inner {
+  unicode-bidi: normal;
+  direction: rtl;
+  text-align: right;
+}
+
+/* Handle embedded LTR content properly in mixed text */
+.aiwc-mixed-text .aiwc-translation-inner * {
+  unicode-bidi: embed;
+}
+
+/* Special handling for technical terms and proper nouns in mixed text */
+.aiwc-mixed-text .aiwc-translation-inner [lang="en"],
+.aiwc-mixed-text .aiwc-translation-inner .latin-term,
+.aiwc-mixed-text .aiwc-translation-inner .technical-term {
+  unicode-bidi: embed;
+  direction: ltr;
+  text-align: left;
+}
+
+/* Translation wrapper with direction support */
+.aiwc-translation-wrapper {
+  display: inline;
+  unicode-bidi: isolate;
+}
+
+.aiwc-translation-wrapper.aiwc-rtl-text,
+.aiwc-translation-wrapper.aiwc-mixed-text {
+  text-align: right;
+}
+
+.aiwc-translation-wrapper.aiwc-ltr-text {
+  text-align: left;
+}
+
+/* Enhanced mixed content support with auto-direction */
+.aiwc-mixed-text.aiwc-translation-wrapper {
+  unicode-bidi: embed;
+  direction: rtl;
+}
+
+/* Ensure proper bidirectional algorithm for mixed content */
+.aiwc-translation-inner {
+  unicode-bidi: plaintext;
+}
+
+/* Handle English/technical terms in any context */
+.aiwc-translation-inner [lang="en"],
+.aiwc-translation-inner .latin-term,
+.aiwc-translation-inner .technical-term {
+  unicode-bidi: embed;
+  direction: ltr;
+}
+
+/* LTR terms in mixed content - enhanced bidirectional support */
+.ltr-term {
+  unicode-bidi: embed;
+  direction: ltr;
+  display: inline;
+  margin: 0 1px;
+}
+
+/* Ensure proper spacing around LTR terms in RTL context */
+.aiwc-rtl-text .ltr-term,
+.aiwc-mixed-text .ltr-term {
+  margin: 0 2px;
+  padding: 0;
+}

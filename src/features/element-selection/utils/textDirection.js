@@ -24,6 +24,25 @@ const RTL_PATTERNS = {
 };
 
 /**
+ * Detect if text contains mixed RTL/LTR content
+ * @param {string} text - Text to analyze
+ * @returns {boolean} Whether text contains mixed bidirectional content
+ */
+export function detectMixedContent(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+
+  // Detect strong RTL characters
+  const hasStrongRTL = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
+
+  // Detect strong LTR characters (including extended Latin)
+  const hasStrongLTR = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u1E00-\u1EFF]/.test(text);
+
+  return hasStrongRTL && hasStrongLTR;
+}
+
+/**
  * Detect if text contains RTL characters
  * @param {string} text - Text to analyze
  * @param {Object} options - Detection options
@@ -41,11 +60,41 @@ export function isRTLText(text, options = {}) {
     return false;
   }
 
-  // For Persian/Arabic target languages, use more sensitive detection
+  // For Persian/Arabic target languages, use smart mixed-content detection
   if (targetLanguage && ['fa', 'ar', 'ur', 'he'].includes(targetLanguage)) {
-    // Use simple detection for RTL target languages - any RTL character makes it RTL
     const rtlPattern = comprehensive ? RTL_PATTERNS.COMPREHENSIVE : RTL_PATTERNS.ARABIC_HEBREW;
+
     if (rtlPattern.test(text)) {
+      // ENHANCED: Smart detection for mixed RTL/LTR content
+      // Use Unicode Bidirectional Algorithm properties for better detection
+      const hasStrongRTL = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
+      const hasStrongLTR = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u1E00-\u1EFF]/.test(text);
+
+      if (hasStrongRTL && hasStrongLTR) {
+        // For mixed content, check the primary language patterns
+        const rtlWords = text.match(/[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]+/g) || [];
+        const ltrWords = text.match(/[A-Za-z0-9]+/g) || [];
+
+        // Count words (not individual characters) for better language detection
+        const rtlWordCount = rtlWords.length;
+        const ltrWordCount = ltrWords.length;
+        const totalWords = rtlWordCount + ltrWordCount;
+
+        if (totalWords > 0) {
+          const rtlWordRatio = rtlWordCount / totalWords;
+
+          // If the text is primarily RTL (>60% RTL words), use RTL direction
+          // CSS will automatically handle LTR words within RTL context properly
+          if (rtlWordRatio > 0.6) {
+            logger.debug(`Mixed text detected: ${rtlWordRatio.toFixed(2)} RTL words ratio - using RTL with CSS bidirectional support`);
+            return true;
+          } else {
+            logger.debug(`Mixed text detected: ${rtlWordRatio.toFixed(2)} RTL words ratio - using LTR direction`);
+            return false;
+          }
+        }
+      }
+
       logger.debug(`RTL detected by target language (${targetLanguage}): using simple detection`);
       return true;
     }
@@ -184,8 +233,20 @@ export function correctTextDirection(element, text, options = {}) {
 
     // Add CSS classes for styling
     if (addClasses && element.classList) {
-      element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text');
-      element.classList.add(isRTL ? 'aiwc-rtl-text' : 'aiwc-ltr-text');
+      element.classList.remove('aiwc-rtl-text', 'aiwc-ltr-text', 'aiwc-mixed-text');
+
+      if (isRTL) {
+        // Check for mixed content and add appropriate class
+        const hasMixedContent = detectMixedContent(text);
+        if (hasMixedContent) {
+          element.classList.add('aiwc-mixed-text', 'aiwc-rtl-text');
+          logger.debug(`Applied mixed-text class for better bidirectional rendering`);
+        } else {
+          element.classList.add('aiwc-rtl-text');
+        }
+      } else {
+        element.classList.add('aiwc-ltr-text');
+      }
     }
   }
 
@@ -405,7 +466,8 @@ export const ElementDirectionUtils = {
   restore: restoreOriginalElementStyles,
   detectBulk: detectBulkTextDirection,
   createContainer: createDirectionAwareContainer,
-  hasRTL: hasRTLDirection
+  hasRTL: hasRTLDirection,
+  detectMixed: detectMixedContent
 };
 
 // Export patterns for advanced usage
