@@ -2,7 +2,7 @@ import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { reassembleTranslations, normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore } from "../../utils/textProcessing.js";
 import { generateUniqueId } from "../../utils/domManipulation.js";
-import { ensureSpacingBeforeInlineElements } from "../../utils/spacingUtils.js";
+import { ensureSpacingBeforeInlineElements, preserveAdjacentSpacing } from "../../utils/spacingUtils.js";
 import { correctTextDirection, detectMixedContent } from "../../utils/textDirection.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -636,6 +636,10 @@ export class TranslationUIManager {
           // CRITICAL FIX: Apply general spacing correction for streaming translations
           // This prevents words from sticking together when followed by inline elements
           let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
+
+          // ENHANCED: Preserve spacing between adjacent translated segments
+          // This fixes issues like "به روز شد6 روز پیش" vs "به روز شد 6 روز پیش"
+          processedText = preserveAdjacentSpacing(textNode, originalText, processedText);
 
           // Preserve original whitespace as fallback
           const leadingWhitespace = originalText.match(/^\s*/)[0];
@@ -2403,6 +2407,10 @@ export class TranslationUIManager {
           // CRITICAL FIX: Apply general spacing correction for final translations
           // This prevents words from sticking together when followed by inline elements
           let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
+
+          // ENHANCED: Preserve spacing between adjacent translated segments
+          // This fixes issues like "به روز شد6 روز پیش" vs "به روز شد 6 روز پیش"
+          processedText = preserveAdjacentSpacing(textNode, originalText, processedText);
 
           // FINAL SAFETY CHECK: Handle any remaining JSON array strings in DOM application
           if (processedText) {
