@@ -1054,20 +1054,38 @@ export class TranslationUIManager {
         } else if (translatedText !== undefined) {
           // Enhanced JSON array handling for all cases (not just single segment)
           try {
+            // Clean translatedText by removing markdown code blocks first
+            let cleanTranslatedText = translatedText;
+
+            // Remove markdown code blocks
+            if (translatedText.includes('```json')) {
+              cleanTranslatedText = translatedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+            }
+
             // Check if translatedText is a JSON array string
-            if (translatedText.startsWith('[') && translatedText.endsWith(']')) {
-              const parsed = JSON.parse(translatedText);
+            if (cleanTranslatedText.startsWith('[') && cleanTranslatedText.endsWith(']')) {
+              const parsed = JSON.parse(cleanTranslatedText);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 // Handle both string and object formats in array
                 if (typeof parsed[0] === 'string') {
-                  // For multiple translations, join them with proper spacing
+                  // For multiple translations, join them with proper spacing and structure preservation
                   if (parsed.length === 1) {
                     finalTranslatedData.push({ text: parsed[0] });
                   } else {
-                    // Check if any translations contain newlines for proper joining
-                    const hasNewlines = parsed.some(text => text.includes('\n'));
-                    const joinedText = hasNewlines ? parsed.join('\n') : parsed.join(' ');
-                    finalTranslatedData.push({ text: joinedText });
+                    // Check if original text has paragraph structure to preserve
+                    const originalExpandedText = request.expandedTexts[i] || '';
+                    const originalHasParagraphs = originalExpandedText.includes('\n\n');
+
+                    if (originalHasParagraphs) {
+                      // Preserve paragraph structure with double newlines
+                      const joinedText = parsed.join('\n\n');
+                      finalTranslatedData.push({ text: joinedText });
+                    } else {
+                      // Check if any translations contain newlines for proper joining
+                      const hasNewlines = parsed.some(text => text.includes('\n'));
+                      const joinedText = hasNewlines ? parsed.join('\n') : parsed.join(' ');
+                      finalTranslatedData.push({ text: joinedText });
+                    }
                   }
                 } else if (parsed[0] && parsed[0].text) {
                   // Handle object format
@@ -1075,9 +1093,19 @@ export class TranslationUIManager {
                   if (objectTexts.length === 1) {
                     finalTranslatedData.push({ text: objectTexts[0] });
                   } else {
-                    const hasNewlines = objectTexts.some(text => text.includes('\n'));
-                    const joinedText = hasNewlines ? objectTexts.join('\n') : objectTexts.join(' ');
-                    finalTranslatedData.push({ text: joinedText });
+                    // Check if original text has paragraph structure to preserve
+                    const originalExpandedText = request.expandedTexts[i] || '';
+                    const originalHasParagraphs = originalExpandedText.includes('\n\n');
+
+                    if (originalHasParagraphs) {
+                      // Preserve paragraph structure with double newlines
+                      const joinedText = objectTexts.join('\n\n');
+                      finalTranslatedData.push({ text: joinedText });
+                    } else {
+                      const hasNewlines = objectTexts.some(text => text.includes('\n'));
+                      const joinedText = hasNewlines ? objectTexts.join('\n') : objectTexts.join(' ');
+                      finalTranslatedData.push({ text: joinedText });
+                    }
                   }
                 } else {
                   finalTranslatedData.push({ text: translatedText });
@@ -1363,17 +1391,34 @@ export class TranslationUIManager {
             let translationText = translatedData[translatedIndex];
 
             // CRITICAL FIX: Handle case where translation text is a JSON array string
-            if (translationText.startsWith('[') && translationText.endsWith(']')) {
+            // Check for both direct JSON array and markdown code blocks
+            let cleanTranslationText = translationText;
+
+            // Remove markdown code blocks first
+            if (translationText.includes('```json')) {
+              cleanTranslationText = translationText.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+            }
+
+            if (cleanTranslationText.startsWith('[') && cleanTranslationText.endsWith(']')) {
               try {
-                const parsedArray = JSON.parse(translationText);
+                const parsedArray = JSON.parse(cleanTranslationText);
                 if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-                  // Join multiple translations with proper spacing or use the first one
+                  // Join multiple translations with proper spacing and structure preservation
                   if (parsedArray.length === 1) {
                     translationText = parsedArray[0];
                   } else {
-                    // For multiple translations, join them with spaces or newlines based on content
-                    const hasNewlines = parsedArray.some(text => text.includes('\n'));
-                    translationText = hasNewlines ? parsedArray.join('\n') : parsedArray.join(' ');
+                    // Check if original text has paragraph structure to preserve
+                    const originalExpandedText = expandedTexts[translatedIndex] || '';
+                    const originalHasParagraphs = originalExpandedText.includes('\n\n');
+
+                    if (originalHasParagraphs) {
+                      // Preserve paragraph structure with double newlines
+                      translationText = parsedArray.join('\n\n');
+                    } else {
+                      // Check if any translations contain newlines for structure preservation
+                      const hasNewlines = parsedArray.some(text => text.includes('\n'));
+                      translationText = hasNewlines ? parsedArray.join('\n') : parsedArray.join(' ');
+                    }
                   }
                   this.logger.debug(`Parsed JSON array translation: ${parsedArray.length} segments -> final length: ${translationText.length}`);
                 }
@@ -2128,22 +2173,53 @@ export class TranslationUIManager {
           let processedText = ensureSpacingBeforeInlineElements(textNode, originalText, translatedText);
 
           // FINAL SAFETY CHECK: Handle any remaining JSON array strings in DOM application
-          if (processedText && processedText.startsWith('[') && processedText.endsWith(']')) {
-            try {
-              const parsedArray = JSON.parse(processedText);
-              if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-                // Extract actual translation text from the array
-                if (typeof parsedArray[0] === 'string') {
-                  processedText = parsedArray.length === 1 ? parsedArray[0] : parsedArray.join(' ');
-                } else if (parsedArray[0] && parsedArray[0].text) {
-                  const objectTexts = parsedArray.map(item => item.text).filter(Boolean);
-                  processedText = objectTexts.length === 1 ? objectTexts[0] : objectTexts.join(' ');
+          if (processedText) {
+            let cleanProcessedText = processedText;
+
+            // Remove markdown code blocks first
+            if (processedText.includes('```json')) {
+              cleanProcessedText = processedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+            }
+
+            if (cleanProcessedText.startsWith('[') && cleanProcessedText.endsWith(']')) {
+              try {
+                const parsedArray = JSON.parse(cleanProcessedText);
+                if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+                  // Extract actual translation text from the array with proper line break preservation
+                  if (typeof parsedArray[0] === 'string') {
+                    // For multiple translations, check if they should be joined with newlines for structure
+                    if (parsedArray.length === 1) {
+                      processedText = parsedArray[0];
+                    } else {
+                      // Check if original text has newlines to preserve structure
+                      const originalHasNewlines = originalText.includes('\n\n');
+                      if (originalHasNewlines) {
+                        // Preserve paragraph structure with double newlines
+                        processedText = parsedArray.join('\n\n');
+                      } else {
+                        // Join with single newlines for better readability
+                        processedText = parsedArray.join('\n');
+                      }
+                    }
+                  } else if (parsedArray[0] && parsedArray[0].text) {
+                    const objectTexts = parsedArray.map(item => item.text).filter(Boolean);
+                    if (objectTexts.length === 1) {
+                      processedText = objectTexts[0];
+                    } else {
+                      const originalHasNewlines = originalText.includes('\n\n');
+                      if (originalHasNewlines) {
+                        processedText = objectTexts.join('\n\n');
+                      } else {
+                        processedText = objectTexts.join('\n');
+                      }
+                    }
+                  }
+                  this.logger.debug(`Final DOM safety check: Extracted translation from JSON array with markdown - preserved structure`);
                 }
-                this.logger.debug(`Final DOM safety check: Extracted translation from JSON array`);
+              } catch (parseError) {
+                this.logger.warn(`Final DOM safety check failed: ${parseError.message}`);
+                // Use processedText as-is if parsing fails
               }
-            } catch (parseError) {
-              this.logger.warn(`Final DOM safety check failed: ${parseError.message}`);
-              // Use processedText as-is if parsing fails
             }
           }
 
@@ -2161,7 +2237,7 @@ export class TranslationUIManager {
             simpleDetection: true  // Use simple detection for RTL languages
           } : {};
 
-          correctTextDirection(wrapperSpan, translatedText, {
+          correctTextDirection(wrapperSpan, processedText, {
             useWrapperElement: false,
             preserveExisting: true,
             detectOptions: detectOptions
