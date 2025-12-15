@@ -11,9 +11,10 @@ import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTr
 /**
  * Process mixed content for better display of LTR words in RTL context
  * @param {string} text - Text to process
+ * @param {string} [targetLanguage=null] - Target language code for better processing
  * @returns {string} Processed text with LTR words wrapped in spans
  */
-function processMixedContentForDisplay(text) {
+function processMixedContentForDisplay(text, targetLanguage = null) {
   if (!text || typeof text !== 'string') {
     return text;
   }
@@ -23,17 +24,50 @@ function processMixedContentForDisplay(text) {
   const ltrWordPattern = /\b[A-Za-z][A-Za-z0-9\-_.]*\b|\b[A-Z]{2,}\b/g;
 
   return text.replace(ltrWordPattern, (match) => {
-    // Don't wrap very short words or common Persian words that happen to use Latin letters
+    // Don't wrap very short words
     if (match.length < 2) return match;
 
-    // Don't wrap common Persian words written with Latin letters
-    const commonPersianLatinWords = ['in', 'va', 'az', 'be', 'ra', 'ke', 'ta', 'dar'];
-    if (commonPersianLatinWords.includes(match.toLowerCase())) {
+    // Language-specific filtering for common words written with Latin letters
+    const commonLatinWords = getCommonLatinWordsForLanguage(targetLanguage);
+    if (commonLatinWords.includes(match.toLowerCase())) {
       return match;
     }
 
     return `<span dir="ltr" class="ltr-term">${match}</span>`;
   });
+}
+
+/**
+ * Get list of common words written with Latin letters for different languages
+ * @param {string} targetLanguage - Target language code
+ * @returns {string[]} Array of common Latin words to exclude from wrapping
+ */
+function getCommonLatinWordsForLanguage(targetLanguage) {
+  // Language-specific common words that are written with Latin letters
+  const languageWordLists = {
+    // Persian/Farsi
+    'fa': ['in', 'va', 'az', 'be', 'ra', 'ke', 'ta', 'dar', 'bar', 'bede'],
+    // Arabic
+    'ar': ['fi', 'wa', 'min', 'ila', 'an', 'la', 'li', 'ha', 'hada'],
+    // Urdu
+    'ur': ['aur', 'or', 'hai', 'hain', 'se', 'me', 'ko', 'ki', 'ka'],
+    // Hebrew
+    'he': ['ve', 'she', 'lo', 'be', 'le', 'mi', 'im', 'al', 'et'],
+    // Kurdish (Sorani)
+    'ku': ['u', 'we', 'ji', 'bo', 'di', 'de', 'da', 'bi', 're'],
+    // Pashto
+    'ps': ['da', 'de', 'wa', 'ye', 'pe', 'wr', 'dr', 'ma'],
+    // Sindhi
+    'sd': ['the', 'jo', 'je', 'to', 'so', 'se', 'han', 'na', 'ne'],
+    // Amharic
+    'am': ['and', 'en', 'inn', 'yen', 'bes', 'le', 'be', 'che', 'ne'],
+    // Tigrinya
+    'ti': ['and', 'n', 'te', 'ze', 'ne', 'bl', 'km', 'tw', 'hdm'],
+    // Default/Fallback (English-like common words)
+    'default': ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of']
+  };
+
+  return languageWordLists[targetLanguage] || languageWordLists['default'] || [];
 }
 
 /**
@@ -525,9 +559,10 @@ export class TranslationUIManager {
 
           // ENHANCED: Apply mixed content processing for streaming translations
           if (detectMixedContent(processedText)) {
-            processedText = processMixedContentForDisplay(processedText);
+            processedText = processMixedContentForDisplay(processedText, targetLanguage);
             translationSpan.innerHTML = processedText; // Use innerHTML for mixed content
             this.logger.debug('Applied mixed content processing for streaming translation', {
+              targetLanguage,
               hasHtmlSpans: processedText.includes('<span dir="ltr"'),
               originalLength: processedText.length,
               preview: processedText.substring(0, 100) + (processedText.length > 100 ? '...' : '')
@@ -1986,9 +2021,11 @@ export class TranslationUIManager {
 
             // ENHANCED: Apply mixed content processing for final translations
             let processedFinalText = finalTrimmed;
-            if (detectMixedContent(finalTrimmed)) {
-              processedFinalText = processMixedContentForDisplay(finalTrimmed);
+            const hasMixedContent = detectMixedContent(finalTrimmed);
+            if (hasMixedContent) {
+              processedFinalText = processMixedContentForDisplay(finalTrimmed, targetLanguage);
               this.logger.debug('Applied mixed content processing for final translation', {
+                targetLanguage,
                 hasHtmlSpans: processedFinalText.includes('<span dir="ltr"'),
                 originalLength: finalTrimmed.length,
                 processedLength: processedFinalText.length,
@@ -2000,7 +2037,7 @@ export class TranslationUIManager {
             const translationSpan = document.createElement('span');
             translationSpan.className = 'aiwc-translation-final';
 
-            if (detectMixedContent(finalTrimmed)) {
+            if (hasMixedContent) {
               translationSpan.innerHTML = processedFinalText; // Use innerHTML for mixed content
             } else {
               translationSpan.textContent = processedFinalText; // Use textContent for plain text
@@ -2335,9 +2372,11 @@ export class TranslationUIManager {
           // Apply for all languages when mixed content is detected
           if (detectMixedContent(processedText)) {
             // Wrap English/technical terms with LTR spans for better display
-            processedText = processMixedContentForDisplay(processedText);
+            processedText = processMixedContentForDisplay(processedText, targetLanguage);
             translationSpan.innerHTML = processedText; // Use innerHTML for spans
-            this.logger.debug('Applied mixed content processing for bidirectional text display');
+            this.logger.debug('Applied mixed content processing for bidirectional text display', {
+              targetLanguage
+            });
           } else {
             translationSpan.textContent = processedText;
           }

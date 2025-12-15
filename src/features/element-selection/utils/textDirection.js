@@ -60,8 +60,11 @@ export function isRTLText(text, options = {}) {
     return false;
   }
 
-  // For Persian/Arabic target languages, use smart mixed-content detection
-  if (targetLanguage && ['fa', 'ar', 'ur', 'he'].includes(targetLanguage)) {
+  // Comprehensive list of RTL languages for better detection
+  const rtlLanguages = ['fa', 'ar', 'ur', 'he', 'ku', 'ps', 'sd', 'am', 'ti', 'dz', 'ks', 'yi', 'syr'];
+
+  // For any RTL target language, use smart mixed-content detection
+  if (targetLanguage && rtlLanguages.includes(targetLanguage)) {
     const rtlPattern = comprehensive ? RTL_PATTERNS.COMPREHENSIVE : RTL_PATTERNS.ARABIC_HEBREW;
 
     if (rtlPattern.test(text)) {
