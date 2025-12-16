@@ -86,9 +86,9 @@ export function isRTLText(text, options = {}) {
         if (totalWords > 0) {
           const rtlWordRatio = rtlWordCount / totalWords;
 
-          // If the text is primarily RTL (>60% RTL words), use RTL direction
-          // CSS will automatically handle LTR words within RTL context properly
-          if (rtlWordRatio > 0.6) {
+          // Lower threshold to 0.3 to favor RTL when target language is RTL,
+          // as translation outputs often contain mixed content (English terms).
+          if (rtlWordRatio > 0.3) {
             logger.debug(`Mixed text detected: ${rtlWordRatio.toFixed(2)} RTL words ratio - using RTL with CSS bidirectional support`);
             return true;
           } else {
