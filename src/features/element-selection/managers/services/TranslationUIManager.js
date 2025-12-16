@@ -58,36 +58,48 @@ function isTextRTL(text, targetLanguage) {
  * @returns {string} Processed text with LTR terms wrapped
  */
 function processRTLTextWithLTERMS(text, targetLanguage) {
-  // Pattern to find English/technical terms, proper nouns, numbers, and special entities
-  // This matches:
-  // - English words: \b[A-Za-z][A-Za-z0-9\-_.]*\b
-  // - Acronyms: \b[A-Z]{2,}\b
-  // - Numbers: \b\d+\b
-  // - Mixed alphanumeric: \b[A-Za-z0-9]+\b
-  // - Domain names: \b[A-Za-z0-9\-_]+\.[A-Za-z]{2,}\b
-  // - Special patterns like Z.ai: \b[A-Za-z]\.[A-Za-z]{1,3}\b
-  const ltrTermPattern = /\b[A-Za-z][A-Za-z0-9\-_.]*\b|\b[A-Z]{2,}\b|\b\d+\b|[A-Za-z0-9\-_]+\.[A-Za-z]{2,}|[A-Za-z]\.[A-Za-z]{1,3}/g;
+  // Check if text is already processed to avoid double-wrapping
+  if (text.includes('ltr-term">') || text.includes('<span dir="ltr"')) {
+    return text;
+  }
 
-  return text.replace(ltrTermPattern, (match) => {
-    // Don't wrap very short single letters (except for patterns like "Z.ai")
-    if (match.length === 1 && !match.includes('.')) return match;
-
-    // Always wrap numbers and technical terms
-    if (/^\d+$/.test(match) || match.includes('.') || /[A-Z]{2,}/.test(match)) {
-      return `<span dir="ltr" class="ltr-term">${match}</span>`;
-    }
-
-    // Language-specific filtering for common words written with Latin letters
-    const commonLatinWords = getCommonLatinWordsForLanguage(targetLanguage);
-    if (commonLatinWords.includes(match.toLowerCase())) {
-      return match;
-    }
-
-    // Don't wrap very short words (2 characters or less, except for special cases)
-    if (match.length <= 2 && !match.includes('.')) return match;
-
-    return `<span dir="ltr" class="ltr-term">${match}</span>`;
+  // Find and temporarily replace LTR spans to avoid interference
+  const spans = [];
+  let tempText = text.replace(/<span[^>]*>.*?<\/span>/gi, (match) => {
+    const placeholder = `__SPAN_${spans.length}__`;
+    spans.push(match);
+    return placeholder;
   });
+
+  // Process LTR terms with a comprehensive pattern
+  const ltrPattern = /\b[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*\b/g;
+
+  const processedText = tempText.replace(ltrPattern, (match) => {
+    // Skip if already in a span placeholder
+    if (match.includes('__SPAN_')) return match;
+
+    // Only wrap terms that look like proper nouns, brands, or technical terms
+    // Criteria: Starts with capital AND (is multi-word OR is reasonably long)
+    const words = match.split(/\s+/);
+    const shouldBeWrapped = words.length > 1 ||
+                          (words.length === 1 && (match.length > 4 || /[A-Z]{2,}/.test(match)));
+
+    if (shouldBeWrapped) {
+      // Use LRM (Left-to-Right Mark) and RLM (Right-to-Left Mark) to ensure proper direction
+      // &lrm; = \u200A, &rlm; = \u200F
+      return `<span dir="ltr" class="ltr-term" style="unicode-bidi: isolate; display: inline-block;">${match}</span>`;
+    }
+
+    return match;
+  });
+
+  // Restore original spans
+  let finalText = processedText;
+  spans.forEach((span, index) => {
+    finalText = finalText.replace(`__SPAN_${index}__`, span);
+  });
+
+  return finalText;
 }
 
 /**

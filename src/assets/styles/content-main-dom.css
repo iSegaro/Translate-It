@@ -181,15 +181,19 @@ html body .translate-it-element-highlighted.translate-it-element-highlighted {
 
 /* LTR terms in mixed content - enhanced bidirectional support */
 .ltr-term {
-  unicode-bidi: embed;
+  unicode-bidi: isolate;
   direction: ltr;
-  display: inline;
+  display: inline-block;
   margin: 0 1px;
 }
 
 /* Ensure proper spacing around LTR terms in RTL context */
 .aiwc-rtl-text .ltr-term,
 .aiwc-mixed-text .ltr-term {
+  unicode-bidi: isolate;
+  direction: ltr;
+  display: inline-block;
   margin: 0 2px;
   padding: 0;
+  white-space: nowrap;
 }
