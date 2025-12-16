@@ -244,7 +244,7 @@ export class RateLimitManager {
     
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const error = new Error(`Circuit breaker is open for ${providerName}. Too many recent failures.`);
+      const error = new Error(`Too many failed requests to ${providerName}. Please wait a moment and try again.`);
       error.type = 'CIRCUIT_BREAKER_OPEN';
       throw error;
     }
