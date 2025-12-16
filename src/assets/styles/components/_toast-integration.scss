@@ -26,6 +26,8 @@ div[data-sonner-toast][data-sonner-toast] {
   cursor: var(--toast-cursor);
   pointer-events: auto;
   contain: layout style;
+  max-width: 356px;
+  min-width: 280px;
 
   // Apply to all child elements
   * {
@@ -80,40 +82,56 @@ html[data-translate-it-select-mode="true"] {
   min-height: auto;
   height: auto;
   max-height: none;
+  max-width: 320px;
+  min-width: 280px;
+  overflow: hidden;
 
   // Direct child content container
   > div[data-content] {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
     gap: 12px;
     width: 100%;
+    overflow: hidden;
 
     // Text content (title/description) container
     > div {
       flex: 1;
       text-align: left;
       direction: ltr;
-      white-space: normal;
+      white-space: pre-wrap;
       word-wrap: break-word;
+      overflow-wrap: break-word;
       line-height: 1.4;
       align-self: flex-start;
+      overflow: hidden;
+      word-break: break-word;
+      hyphens: auto;
     }
 
     // Title specific styling
     [data-title] {
-      white-space: normal;
+      white-space: pre-wrap;
       word-wrap: break-word;
+      overflow-wrap: break-word;
       line-height: 1.4;
       display: block;
+      overflow: hidden;
+      word-break: break-word;
+      hyphens: auto;
     }
 
     // Description specific styling
     [data-description] {
-      white-space: normal;
+      white-space: pre-wrap;
       word-wrap: break-word;
+      overflow-wrap: break-word;
       line-height: 1.4;
       display: block;
+      overflow: hidden;
+      word-break: break-word;
+      hyphens: auto;
     }
   }
 
