@@ -47,7 +47,7 @@ export class StateManager extends ResourceTracker {
    * @param {Map} translations - Map of translations for revert functionality
    */
   addTranslatedElement(element, translations = new Map()) {
-    const elementId = this._generateElementId(element);
+    const elementId = this._generateElementId();
     this.translatedElements.set(elementId, {
       element,
       timestamp: Date.now(),
@@ -59,10 +59,9 @@ export class StateManager extends ResourceTracker {
 
   /**
    * Generate unique ID for an element
-   * @param {HTMLElement} element - The element to generate ID for
    * @returns {string} Unique element ID
    */
-  _generateElementId(_element) { // eslint-disable-line no-unused-vars
+  _generateElementId() {
     return `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
