@@ -168,7 +168,10 @@ function generateFirefoxManifest(baseManifest) {
     browser_specific_settings: {
       gecko: {
         id: 'ai-writing-companion@amm1rr.com',
-        strict_min_version: '112.0' // Firefox 112+ for background.type module support
+        strict_min_version: '142.0', // Firefox 142+ for data_collection_permissions support (Android requires 142)
+        data_collection_permissions: {
+          required: ['none'] // Extension processes translations locally/externally without storing data
+        }
       }
     },
 
