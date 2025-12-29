@@ -39,7 +39,7 @@ const globalState = {
     
     // Features
     Windows: 2,
-    ElementSelection: 3,
+    ElementSelection: 2,
     TextFieldInteraction: 2,
     TextActions: 2,
     TextSelection: 2,
