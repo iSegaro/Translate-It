@@ -7,6 +7,10 @@
 - Improved Select Element for Eastern European languages like Russian
 - Fixed various minor issues
 
+##### Changed
+
+- **[#88](https://github.com/iSegaro/Translate-It/issues/88)**: Changed default macOS shortcut for Select Element to `Option+Shift+S`
+
 ---
 
 #### v1.5.1 – Released on December 12, 2025
