@@ -1,3 +1,14 @@
+#### v1.6.0 – Released on December 29, 2025
+
+##### Fixed
+
+- Fixed Select Element display direction for RTL languages such as Persian, Arabic, Hebrew, and others
+- Improved Select Element for CJK languages (Chinese, Japanese, Korean)
+- Improved Select Element for Eastern European languages like Russian
+- Fixed various minor issues
+
+---
+
 #### v1.5.1 – Released on December 12, 2025
 
 ##### Fixed
