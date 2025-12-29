@@ -233,8 +233,8 @@ export class TranslationOrchestrator extends ResourceTracker {
   /**
    * Apply translations to nodes (delegated to UI manager)
    */
-  async applyTranslationsToNodes(textNodes, translations) {
-    return await this.uiManager.applyTranslationsToNodes(textNodes, translations);
+  async applyTranslationsToNodes(textNodes, translations, options = {}) {
+    return await this.uiManager.applyTranslationsToNodes(textNodes, translations, options);
   }
 
   /**

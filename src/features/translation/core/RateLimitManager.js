@@ -244,7 +244,7 @@ export class RateLimitManager {
     
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const error = new Error(`Circuit breaker is open for ${providerName}. Too many recent failures.`);
+      const error = new Error(`Too many failed requests to ${providerName}. Please wait a moment and try again.`);
       error.type = 'CIRCUIT_BREAKER_OPEN';
       throw error;
     }
@@ -665,11 +665,11 @@ export class RateLimitManager {
    * This prevents duplicate API calls while catching configuration errors
    * @private
    */
-  async _testForDeterministicErrors(_requestFunction, _providerName, _context) { // eslint-disable-line no-unused-vars
+  async _testForDeterministicErrors() {
     // Instead of executing the full request, we'll rely on ErrorClassifier
     // to identify deterministic errors during the actual execution
     // This prevents duplicate API calls
-    
+
     // For now, we'll skip the test and let the actual request handle errors
     // The ErrorClassifier will still catch deterministic errors during real execution
     return null;

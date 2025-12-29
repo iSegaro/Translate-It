@@ -177,14 +177,13 @@ export function useFieldShortcuts() {
   
   /**
    * Manually trigger shortcut (for testing or programmatic use)
-   * @param {Element} targetElement - Target element (optional)
    * @returns {Promise<Object>} Execution result
    */
-  const triggerShortcut = async (_targetElement = null) => { // eslint-disable-line no-unused-vars
+  const triggerShortcut = async () => {
     if (!canExecuteShortcuts.value) {
       throw new Error('Shortcuts system not ready');
     }
-    
+
     logger.debug('Manually triggering shortcut');
     
     try {

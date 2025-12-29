@@ -606,6 +606,11 @@ class SelectElementManager extends ResourceTracker {
         this.updateNotificationForTranslation();
       }
 
+      // CRITICAL FIX: Cleanup previous direction attributes before new translation
+      // This prevents direction attributes from previous translations from affecting
+      // new translations, especially when targetElements have dir="auto"
+      this._cleanupPreviousDirections();
+
       // Perform translation via orchestrator with context
       const result = await this.translationOrchestrator.processSelectedElement(
         targetElement,
@@ -756,7 +761,9 @@ class SelectElementManager extends ResourceTracker {
             // Apply translations to DOM
             if (translationMap.size > 0) {
               this.logger.debug("Applying translations to DOM nodes...");
-              this.translationOrchestrator.applyTranslationsToNodes(extractionResult.textNodes, translationMap);
+              this.translationOrchestrator.applyTranslationsToNodes(extractionResult.textNodes, translationMap, {
+                isFinalResult: true
+              });
               this.stateManager.addTranslatedElement(targetElement, translationMap);
               this.logger.debug("Translation applied successfully from non-streaming result");
             } else {
@@ -1093,9 +1100,101 @@ class SelectElementManager extends ResourceTracker {
     // Clear the global translation in progress flag since revert completes the translation process
     window.isTranslationInProgress = false;
 
-    return await this.stateManager.revertTranslations();
+    // First, revert translations via stateManager (this clears translatedElements)
+    const revertedCount = await this.stateManager.revertTranslations();
+
+    // CRITICAL FIX: Clean up direction and text-align attributes AFTER reverting
+    // This ensures elements still exist when we clean up their attributes
+    this._cleanupPreviousDirections();
+
+    return revertedCount;
   }
-  
+
+  /**
+   * Cleanup previous direction attributes before new translation
+   * This prevents direction attributes from previous translations from affecting
+   * new translations, especially when targetElements have dir="auto"
+   * @private
+   */
+  _cleanupPreviousDirections() {
+    try {
+      // Clean up elements with direction changes
+      const elementsWithDirection = document.querySelectorAll('[data-original-direction]');
+      // Clean up elements with text-align changes
+      const elementsWithAlign = document.querySelectorAll('[data-original-text-align]');
+
+      const totalElements = elementsWithDirection.length + elementsWithAlign.length;
+
+      if (totalElements === 0) {
+        return;
+      }
+
+      this.logger.debug(`Cleaning up direction/align attributes from ${totalElements} elements`);
+
+      let cleanedCount = 0;
+
+      // Clean up direction attributes
+      elementsWithDirection.forEach(element => {
+        try {
+          const hasOriginalDir = element.hasAttribute('data-original-direction');
+          const originalDir = element.getAttribute('data-original-direction');
+
+          if (hasOriginalDir) {
+            // Restore original direction if it was stored (not empty)
+            if (originalDir && originalDir.trim() !== '') {
+              element.setAttribute('dir', originalDir);
+            } else {
+              // If original direction was empty, remove the dir attribute
+              element.removeAttribute('dir');
+            }
+
+            // Clean up the data attribute
+            element.removeAttribute('data-original-direction');
+
+            // Also remove lang attribute if it was added during translation
+            element.removeAttribute('lang');
+
+            // CRITICAL FIX: Also clean up unicode-bidi inline style
+            element.style.unicodeBidi = '';
+
+            cleanedCount++;
+          }
+        } catch (error) {
+          this.logger.debug('Failed to cleanup direction for element:', error);
+        }
+      });
+
+      // Clean up text-align attributes
+      elementsWithAlign.forEach(element => {
+        try {
+          const hasOriginalAlign = element.hasAttribute('data-original-text-align');
+          const originalAlign = element.getAttribute('data-original-text-align');
+
+          if (hasOriginalAlign) {
+            // Restore original text-align
+            if (originalAlign && originalAlign.trim() !== '') {
+              element.style.textAlign = originalAlign;
+            } else {
+              // If original was empty, remove the inline style
+              element.style.textAlign = '';
+            }
+
+            // Clean up the data attribute
+            element.removeAttribute('data-original-text-align');
+
+            cleanedCount++;
+          }
+        } catch (error) {
+          this.logger.debug('Failed to cleanup text-align for element:', error);
+        }
+      });
+
+      this.logger.debug(`Cleaned up direction/align attributes from ${cleanedCount} elements`);
+    } catch (error) {
+      this.logger.debug('Error during direction cleanup:', error);
+    }
+  }
+
   // Handle translation results from background script
   async handleTranslationResult(message) {
     this.logger.debug("SelectElementManager received translation result", {

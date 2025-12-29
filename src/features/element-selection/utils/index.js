@@ -5,19 +5,14 @@
 
 // Text direction utilities
 export {
-  isRTLText,
+  isRTLLanguage,
   getTextDirection,
-  correctTextDirection,
-  storeOriginalElementStyles,
-  restoreOriginalElementStyles,
-  storeOriginalParentStyles,
-  restoreOriginalParentStyles,
-  applyTextDirectionToParent,
-  detectBulkTextDirection,
+  applyContainerDirection,
+  restoreOriginalDirection,
   createDirectionAwareContainer,
-  hasRTLDirection,
   ElementDirectionUtils,
-  RTL_PATTERNS
+  RTL_LANGUAGES,
+  RTL_CHARACTER_PATTERN
 } from './textDirection.js';
 
 // DOM manipulation utilities
@@ -62,7 +57,6 @@ export {
   handleTranslationLengthMismatch as handleTranslationLengthMismatchExtraction,
   isValidTextContent as isValidTextContentExtraction,
   cleanText as cleanTextExtraction,
-  correctTextDirection as correctTextDirectionExtraction,
-  storeOriginalParentStyles as storeOriginalParentStylesExtraction,
-  restoreOriginalParentStyles as restoreOriginalParentStylesExtraction
+  applyContainerDirection as applyContainerDirectionExtraction,
+  restoreOriginalDirection as restoreOriginalDirectionExtraction
 } from './textExtraction.js';

@@ -118,11 +118,16 @@ export async function sendMessage(message, options = {}) {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
-      // Check if this is a user cancellation - if so, don't attempt fallback
+      // Check if this is a user cancellation or non-retryable error - if so, don't attempt fallback
       const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED) {
-        getLogger().debug('Translation coordination cancelled, not attempting fallback:', error);
-        throw error; // Re-throw cancellation error without fallback
+      if (errorType === ErrorTypes.USER_CANCELLED ||
+          errorType === ErrorTypes.RATE_LIMIT_REACHED ||
+          errorType === ErrorTypes.QUOTA_EXCEEDED ||
+          errorType === ErrorTypes.MODEL_OVERLOADED ||
+          errorType === ErrorTypes.SERVER_ERROR ||
+          (error.message && error.message.includes('Circuit breaker is open'))) {
+        getLogger().debug('Translation failed with non-retryable error, not attempting fallback:', error);
+        throw error; // Re-throw error without fallback
       }
 
       // If coordination fails, fall back to regular messaging

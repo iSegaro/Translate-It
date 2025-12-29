@@ -98,3 +98,93 @@ html body .translate-it-element-highlighted.translate-it-element-highlighted {
     outline: none;
   }
 }
+
+/* ==========================================================================
+   Translation Direction Support - Simplified (Immersive Translate Pattern)
+   ========================================================================== */
+
+/* Translation container styles - rely on dir attribute for direction */
+.aiwc-translation-final {
+  unicode-bidi: isolate;
+}
+
+/* Translation wrapper for proper isolation */
+.aiwc-translation-wrapper {
+  display: inline;
+  unicode-bidi: isolate;
+}
+
+/* Immersive Translate compatibility classes */
+.immersive-translate-target-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+.immersive-translate-target-inner {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Immersive Translate wrapper pattern for proper text direction */
+font.immersive-translate-target-wrapper,
+.notranslate.immersive-translate-target-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+font.immersive-translate-target-inner,
+.notranslate.immersive-translate-target-inner {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Specific handling for segment translations */
+.immersive-translate-segment-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Ensure proper text alignment when dir attribute is set */
+[dir="rtl"] {
+  text-align: right;
+}
+
+[dir="ltr"] {
+  text-align: left;
+}
+
+/* Override text alignment for Immersive Translate wrappers to preserve original layout */
+.immersive-translate-target-wrapper,
+.immersive-translate-target-inner,
+.immersive-translate-segment-wrapper {
+  text-align: inherit !important;
+}
+
+/* Ensure proper bidirectional text handling */
+.immersive-translate-target-wrapper[dir="rtl"],
+.immersive-translate-segment-wrapper[dir="rtl"] {
+  text-align: right;
+  unicode-bidi: embed;
+}
+
+.immersive-translate-target-wrapper[dir="ltr"],
+.immersive-translate-segment-wrapper[dir="ltr"] {
+  text-align: left;
+  unicode-bidi: embed;
+}
+
+/* Special handling for nested fonts to ensure inheritance */
+font.immersive-translate-target-wrapper font {
+  unicode-bidi: isolate;
+}
+
+/* Preserve font inheritance through wrapper hierarchy */
+.immersive-translate-target-wrapper,
+.immersive-translate-target-inner {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  color: inherit;
+  line-height: inherit;
+}

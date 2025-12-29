@@ -192,7 +192,7 @@ class MemoryManager {
    * Uses the shared DOM observer for better performance
    * @param {Element} element
    */
-  setupDOMElementCleanup(element, _resourceId) { // eslint-disable-line no-unused-vars
+  setupDOMElementCleanup(element) {
     if (!this.isDOMElement(element) || element === window || element === document) return
     if (typeof MutationObserver === 'undefined') return
 

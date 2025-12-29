@@ -52,6 +52,25 @@ export function ensureSpacingBeforeInlineElements(textNode, originalText, transl
     }
   }
 
+  // ENHANCED: Check if the original text had trailing whitespace that should be preserved
+  if (originalText.endsWith(' ') && !processedText.endsWith(' ')) {
+    processedText = processedText + ' ';
+  }
+
+  // ENHANCED: Check if the original text had trailing newline that should be preserved
+  if (originalText.endsWith('\n') && !processedText.endsWith('\n')) {
+    processedText = processedText + '\n';
+  }
+
+  // ENHANCED: Preserve spacing patterns from original text
+  const originalEndsWithSpace = originalText.match(/\s$/);
+  const translatedEndsWithSpace = processedText.match(/\s$/);
+
+  if (originalEndsWithSpace && !translatedEndsWithSpace) {
+    // Add the same whitespace pattern as original
+    processedText = processedText + originalEndsWithSpace[0];
+  }
+
   return processedText;
 }
 
@@ -138,10 +157,51 @@ export function applySpacingCorrections(text, spacingRequirements) {
 }
 
 /**
+ * Preserve whitespace between adjacent text nodes during translation
+ * This ensures that spacing between separate translated segments is maintained
+ * @param {Text} textNode - The current text node
+ * @param {string} originalText - Original text content of this node
+ * @param {string} translatedText - Translated text content for this node
+ * @returns {string} Processed text with preserved spacing
+ */
+export function preserveAdjacentSpacing(textNode, originalText, translatedText) {
+  if (!textNode || !originalText || !translatedText) {
+    return translatedText;
+  }
+
+  let processedText = translatedText;
+
+  // Check if the original text ends with whitespace that should be preserved
+  const originalEndsWithSpace = originalText.match(/\s+$/);
+  if (originalEndsWithSpace) {
+    // If original had trailing whitespace, ensure translation has it too
+    const translatedEndsWithSpace = processedText.match(/\s+$/);
+    if (!translatedEndsWithSpace) {
+      processedText = processedText + originalEndsWithSpace[0];
+    }
+  }
+
+  // Special handling for cases where the next node is a text node that might need spacing
+  const nextSibling = textNode.nextSibling;
+  if (nextSibling && nextSibling.nodeType === Node.TEXT_NODE) {
+    const nextText = nextSibling.textContent || '';
+
+    // If the next node starts with whitespace but our translation doesn't end with it
+    if (nextText.match(/^\s+/) && !processedText.match(/\s+$/)) {
+      // Add a space to maintain the separation
+      processedText = processedText + ' ';
+    }
+  }
+
+  return processedText;
+}
+
+/**
  * Utility object for convenient access to spacing functions
  */
 export const SpacingUtils = {
   ensureSpacingBeforeInlineElements,
   analyzeSpacingRequirements,
-  applySpacingCorrections
+  applySpacingCorrections,
+  preserveAdjacentSpacing
 };
