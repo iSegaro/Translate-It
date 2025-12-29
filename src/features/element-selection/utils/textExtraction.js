@@ -9,7 +9,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Import dedicated utilities
 // Note: Cache system has been removed from Select Element feature
-import { correctTextDirection, storeOriginalElementStyles, restoreOriginalElementStyles } from './textDirection.js';
+import { applyContainerDirection, restoreOriginalDirection } from './textDirection.js';
 import {
   collectTextNodes,
   applyTranslationsToNodes,
@@ -53,14 +53,13 @@ export class ElementTextExtraction {
   }
 
   /**
-   * Extract and prepare text from element for translation
+   * Extract and prepare text from element for translation with segment IDs
    * @param {HTMLElement} element - Element to extract text from
    * @param {Object} options - Extraction options
-   * @returns {Object} Extraction result
+   * @returns {Object} Extraction result with segment IDs
    */
   async extractTextForTranslation(element, options = {}) {
     const {
-      useIntelligentGrouping = true,
       validateText = true,
       cleanTextContent = true
     } = options;
@@ -69,21 +68,21 @@ export class ElementTextExtraction {
       throw new Error('No element provided for text extraction');
     }
 
-    logger.debug('Starting text extraction for translation', {
+    logger.debug('Starting text extraction for translation with segment IDs', {
       element: element.tagName,
-      className: element.className,
-      useIntelligentGrouping
+      className: element.className
     });
 
     try {
-      // Collect text nodes from element
-      const { textNodes, originalTextsMap } = collectTextNodes(element, useIntelligentGrouping);
+      // Collect text nodes from element with segment IDs
+      const { textNodes, originalTextsMap, segmentMap } = this.collectTextNodesWithSegments(element);
 
       if (textNodes.length === 0) {
         logger.debug('No text nodes found in element');
         return {
           textNodes: [],
           originalTextsMap: new Map(),
+          segmentMap: new Map(),
           textsToTranslate: [],
           cachedTranslations: new Map(),
           totalTexts: 0
@@ -92,17 +91,22 @@ export class ElementTextExtraction {
 
       // Validate and clean texts if requested
       let processedTextsMap = originalTextsMap;
+      let processedSegmentMap = segmentMap;
       if (validateText || cleanTextContent) {
-        processedTextsMap = this.processTextsMap(originalTextsMap, {
+        ({ processedTextsMap, processedSegmentMap } = this.processTextsWithSegments(originalTextsMap, segmentMap, {
           validate: validateText,
           clean: cleanTextContent
-        });
+        }));
       }
 
-      // Convert processed texts to array for translation
-      const textsToTranslate = Array.from(processedTextsMap.keys());
+      // Convert processed texts to array for translation with segment metadata
+      const textsToTranslate = Array.from(processedTextsMap.keys()).map(text => ({
+        text,
+        segmentId: processedSegmentMap.get(text),
+        originalText: text
+      }));
 
-      logger.debug('Text extraction completed', {
+      logger.debug('Text extraction completed with segment IDs', {
         totalNodes: textNodes.length,
         uniqueTexts: processedTextsMap.size,
         textsToTranslate: textsToTranslate.length
@@ -111,6 +115,7 @@ export class ElementTextExtraction {
       return {
         textNodes,
         originalTextsMap: processedTextsMap,
+        segmentMap: processedSegmentMap,
         textsToTranslate,
         totalTexts: processedTextsMap.size
       };
@@ -120,6 +125,200 @@ export class ElementTextExtraction {
       logger.error('Text extraction failed:', processedError);
       throw processedError;
     }
+  }
+
+  /**
+   * Collect text nodes from element with unique segment IDs
+   * @param {HTMLElement} element - Element to collect text from
+   * @returns {Object} Collection result with segment mappings
+   */
+  collectTextNodesWithSegments(element) {
+    const textNodes = [];
+    const originalTextsMap = new Map();
+    const segmentMap = new Map();
+    let segmentCounter = 0;
+
+    // Generate a unique prefix for this extraction session
+    const sessionId = `seg-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const traverseNode = (node, depth = 0) => {
+      // Skip script and style tags
+      if (node.nodeName === 'SCRIPT' || node.nodeName === 'STYLE') {
+        return;
+      }
+
+      // Handle text nodes
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent; // Don't trim here to preserve whitespace
+        
+        // Always process the node to wrap it and give it an ID, even if it's just whitespace
+        const segmentId = `${sessionId}-${segmentCounter}`;
+        segmentCounter++;
+
+        const wrapper = document.createElement('span');
+        wrapper.setAttribute('data-segment-id', segmentId);
+        wrapper.textContent = text;
+        wrapper.setAttribute('data-original-text', text);
+
+        if (node.parentNode) {
+          node.parentNode.replaceChild(wrapper, node);
+        }
+
+        const nodeInfo = {
+          node: wrapper,
+          originalNode: node,
+          text,
+          segmentId,
+          wrapper,
+          depth,
+          parentNode: wrapper.parentNode,
+          parentTag: wrapper.parentNode?.tagName,
+          index: Array.from(wrapper.parentNode?.childNodes || []).indexOf(wrapper)
+        };
+
+        textNodes.push(nodeInfo);
+
+        if (text.trim().length > 0) {
+          if (!originalTextsMap.has(text)) {
+            originalTextsMap.set(text, []);
+          }
+          originalTextsMap.get(text).push(nodeInfo);
+          segmentMap.set(text, segmentId);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // Recursively traverse child elements
+        for (const child of node.childNodes) {
+          traverseNode(child, depth + 1);
+        }
+      }
+    };
+
+    // Start traversal from the element
+    traverseNode(element);
+
+    logger.debug('Collected text nodes with segment IDs', {
+      totalNodes: textNodes.length,
+      uniqueTexts: originalTextsMap.size,
+      sessionId
+    });
+
+    return {
+      textNodes,
+      originalTextsMap,
+      segmentMap
+    };
+  }
+
+  /**
+   * Process texts with their segment IDs
+   * @param {Map} originalTextsMap - Original texts map
+   * @param {Map} segmentMap - Segment ID map
+   * @param {Object} options - Processing options
+   * @returns {Object} Processed maps
+   */
+  processTextsWithSegments(originalTextsMap, segmentMap, options = {}) {
+    const { validate = true, clean = true } = options;
+    const processedMap = new Map();
+    const processedSegmentMap = new Map();
+
+    originalTextsMap.forEach((nodes, text) => {
+      let processedText = text;
+
+      // Clean text if requested
+      if (clean) {
+        processedText = cleanText(text, {
+          normalizeWhitespace: false,
+          removeEmptyLines: false,
+          trimLines: false
+        });
+      }
+
+      // Validate text if requested
+      if (validate) {
+        if (processedText.length > 0 && !isValidTextContent(processedText)) {
+          logger.debug(`Skipping invalid text: ${text.substring(0, 30)}...`);
+          return;
+        }
+      }
+
+      // Use processed text as key if it changed
+      const finalKey = processedText !== text ? processedText : text;
+
+      // Preserve segment ID mapping
+      const segmentId = segmentMap.get(text);
+
+      if (processedMap.has(finalKey)) {
+        // Merge nodes if text already exists
+        processedMap.get(finalKey).push(...nodes);
+      } else {
+        processedMap.set(finalKey, [...nodes]);
+      }
+
+      // Map processed text to segment ID
+      if (segmentId) {
+        processedSegmentMap.set(finalKey, segmentId);
+      }
+    });
+
+    return {
+      processedTextsMap: processedMap,
+      processedSegmentMap
+    };
+  }
+
+  /**
+   * Apply translations using segment IDs for reliable mapping
+   * @param {Array} translationResults - Translation results with segment IDs
+   * @param {Object} context - Application context
+   * @returns {Promise<number>} Number of applied translations
+   */
+  async applyTranslationsWithSegments(translationResults, context = {}) {
+    if (!translationResults || !Array.isArray(translationResults)) {
+      logger.error('Invalid translation results provided');
+      return 0;
+    }
+
+    logger.debug(`Applying ${translationResults.length} translations with segment IDs`);
+
+    let appliedCount = 0;
+
+    for (const result of translationResults) {
+      try {
+        const { segmentId, translatedText } = result;
+
+        if (!translatedText || !segmentId) {
+          logger.debug('Skipping translation result missing data', { segmentId });
+          continue;
+        }
+
+        // Find DOM elements using segment ID
+        const elements = document.querySelectorAll(`[data-segment-id="${segmentId}"]`);
+
+        if (elements.length === 0) {
+          logger.debug(`No elements found for segment ID: ${segmentId}`);
+          continue;
+        }
+
+        // Apply translation to all matching elements
+        for (const element of elements) {
+          element.textContent = translatedText;
+
+          // Apply container-level direction if needed
+          if (context.targetLanguage) {
+            applyContainerDirection(element, context.targetLanguage, translatedText);
+          }
+        }
+
+        appliedCount++;
+        logger.debug(`Applied translation for segment ${segmentId}`);
+
+      } catch (error) {
+        logger.error(`Failed to apply translation for segment:`, error);
+      }
+    }
+
+    logger.debug(`Successfully applied ${appliedCount} translations`);
+    return appliedCount;
   }
 
   /**
@@ -413,9 +612,8 @@ export {
   cleanText,
 
   // Text direction functions
-  correctTextDirection,
-  storeOriginalElementStyles as storeOriginalParentStyles,
-  restoreOriginalElementStyles as restoreOriginalParentStyles
+  applyContainerDirection as applyContainerDirectionExtraction,
+  restoreOriginalDirection as restoreOriginalDirectionExtraction
 };
 
 // Singleton instance

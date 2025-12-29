@@ -58,12 +58,24 @@ The central controller that manages the entire Select Element lifecycle:
 #### 2. **Service Layer** (Decoupled Services)
 Each service has a single responsibility:
 
+**Core Services:**
 - **ElementHighlighter**: Visual feedback and highlighting
 - **TextExtractionService**: Text content extraction and validation
 - **TranslationOrchestrator**: Translation process coordination
+- **StreamingTranslationEngine**: Streaming translation support
+- **TranslationRequestManager**: Request lifecycle management
 - **ModeManager**: Selection mode management (Simple/Smart)
 - **StateManager**: Translation state tracking and reverts
 - **ErrorHandlingService**: Centralized error management
+
+**UI Services (split from TranslationUIManager):**
+- **TranslationUIManager**: Main coordinator for UI operations (~190 lines)
+- **NotificationService**: Status and toast notifications
+- **StreamingUpdateService**: Real-time streaming updates
+- **StreamEndService**: Stream completion handling
+- **DOMNodeMatcher**: Node finding and text matching
+- **TranslationApplier**: Core DOM manipulation
+- **DirectionManager**: RTL/LTR direction handling
 
 #### 3. **Toast Integration System** (New)
 Integrated notification system for user feedback:
@@ -186,6 +198,80 @@ class StateManager {
 }
 ```
 
+### TranslationUIManager (Coordinator)
+```javascript
+// Main coordinator for UI operations - delegates to specialized services
+class TranslationUIManager {
+  showStatusNotification(messageId, context)     // Show progress notification
+  processStreamUpdate(message)                   // Process streaming updates
+  processStreamEnd(message)                      // Handle stream completion
+  applyTranslationsToNodes(nodes, translations)  // Apply to DOM
+  cleanup()                                      // Cleanup all services
+}
+```
+
+### NotificationService
+```javascript
+// UI notification management
+class NotificationService {
+  showStatusNotification(messageId, context)     // Status notifications
+  dismissStatusNotification()                    // Dismiss active notification
+  showTimeoutNotification(messageId)             // Timeout warnings
+}
+```
+
+### StreamingUpdateService
+```javascript
+// Real-time streaming translation processing
+class StreamingUpdateService {
+  processStreamUpdate(message)                   // Main streaming entry
+  _processStreamTranslationData(request, data)   // Process translation data
+  _applyStreamingTranslationsImmediately(...)    // Real-time DOM updates
+}
+```
+
+### StreamEndService
+```javascript
+// Stream completion and result processing
+class StreamEndService {
+  processStreamEnd(message)                      // Handle stream end
+  handleTranslationResult(message)               // Non-streaming results
+  _handleStreamEndSuccess(messageId, request)    // Success handling
+  _handleStreamEndError(messageId, request, data)// Error handling
+}
+```
+
+### DOMNodeMatcher
+```javascript
+// Node finding and text matching
+class DOMNodeMatcher {
+  _findNodesToUpdate(textNodes, originalText)    // Find nodes to update
+  _findNodesForMultiSegmentText(...)             // Multi-segment matching
+  _filterValidNodesForTranslation(...)           // Validation
+  debugTextMatching(textNodes, translations)     // Debug utility
+}
+```
+
+### TranslationApplier
+```javascript
+// Core DOM manipulation for applying translations
+class TranslationApplier {
+  applyTranslationsToNodes(textNodes, translations) // Main application
+  // Creates wrappers and replaces TEXT_NODE/ELEMENT_NODE
+  // Handles multiple matching strategies for translation lookup
+}
+```
+
+### DirectionManager
+```javascript
+// RTL/LTR direction management
+class DirectionManager {
+  applyImmersiveTranslatePattern(element, translations, targetLanguage)
+  _findTextContainerParent(segment)              // Find text container
+  // Detects direction from translated content, not just target language
+}
+```
+
 ## 🛠️ Technical Implementation
 
 ### Resource Management
@@ -277,8 +363,14 @@ src/features/element-selection/
 │   │   ├── TextExtractionService.js          # Text extraction
 │   │   ├── TranslationOrchestrator.js         # Translation coordination
 │   │   ├── StreamingTranslationEngine.js      # Streaming translation support
-│   │   ├── TranslationUIManager.js            # UI updates & multi-segment handling
 │   │   ├── TranslationRequestManager.js       # Request lifecycle management
+│   │   ├── TranslationUIManager.js            # UI coordinator (~190 lines)
+│   │   ├── NotificationService.js            # Status notifications
+│   │   ├── StreamingUpdateService.js         # Real-time streaming updates
+│   │   ├── StreamEndService.js               # Stream completion handling
+│   │   ├── DOMNodeMatcher.js                 # Node finding & matching
+│   │   ├── TranslationApplier.js             # DOM manipulation
+│   │   ├── DirectionManager.js               # RTL/LTR direction
 │   │   ├── ModeManager.js                    # Mode management
 │   │   ├── StateManager.js                   # State tracking
 │   │   └── ErrorHandlingService.js           # Error management
@@ -436,6 +528,8 @@ getStatus() {
 ## 🚀 Future Enhancements
 
 ### Recently Implemented (2025)
+- ✅ **Service Refactoring**: TranslationUIManager split into 6 focused services (3,016 → 190 lines coordinator)
+- ✅ **Service Composition Pattern**: UI operations delegated to specialized, testable services
 - ✅ **Multi-Segment Translation**: Advanced processing of complex content with multiple lines
 - ✅ **Streaming Translation Engine**: Real-time translation for large content
 - ✅ **Paragraph Structure Preservation**: Maintains original formatting and empty lines

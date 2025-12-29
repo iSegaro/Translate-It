@@ -75,7 +75,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { isRTLText } from "@/features/element-selection/utils/textDirection.js";
+import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -289,13 +289,9 @@ const hasError = computed(() => !!props.error && !props.isLoading);
 const textDirection = computed(() => {
   const textToCheck = props.content || props.error || "";
 
-  // Use advanced RTL detection with target language awareness
-  const isRtl = isRTLText(textToCheck, {
-    comprehensive: true,
-    threshold: 0.1, // Lower threshold for more sensitive detection
-    targetLanguage: props.targetLanguage || 'fa',
-    simpleDetection: false // Use threshold-based detection for better accuracy
-  });
+  // Use new target-language-first detection following Immersive Translate pattern
+  const direction = getTextDirection(props.targetLanguage || 'fa', textToCheck);
+  const isRtl = direction === 'rtl';
 
   // Fallback to basic detection if advanced detection fails
   const finalDirection = isRtl || shouldApplyRtl(textToCheck);

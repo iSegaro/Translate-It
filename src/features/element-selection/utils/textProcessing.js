@@ -57,12 +57,26 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
     segments.forEach((segment, segmentIndex) => {
       const trimmedSegment = segment.trim();
 
-      // Special handling for empty lines - preserve as structural markers
-      if (segment.length === 0 || segment === '' || segment === '\n' || segment === '\r\n' || segment === '\n\n') {
-        // Add empty line placeholder for structure preservation
-        expandedTexts.push('\n'); // Use simple newline for empty lines
-        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+      // CRITICAL FIX: Handle blank line markers (double newlines) - preserve as structural markers
+      if (segment === '\n\n') {
+        // Add blank line placeholder for structure preservation
+        expandedTexts.push('\n\n'); // Use double newline for blank lines
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: true, isEmptyLine: true });
         currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
+
+      // Handle single newlines (also preserve structure)
+      if (segment === '\n' || segment === '\r\n') {
+        expandedTexts.push('\n'); // Single newline marker
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: false, isSingleNewline: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
+
+      // Special handling for truly empty segments
+      if (segment.length === 0 || segment === '') {
+        // Skip truly empty segments
         return;
       }
 
@@ -72,14 +86,14 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
       }
 
       expandedTexts.push(trimmedSegment);
-      originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
+      originMapping.push({ originalIndex, segmentIndex, isBlankLine: false, isContent: true });
       currentExpandedIndices.push(expandedTexts.length - 1);
     });
 
     // If no segments were added (all were too short), add the original
     if (currentExpandedIndices.length === 0) {
       expandedTexts.push(originalText);
-      originMapping.push({ originalIndex, segmentIndex: 0, isEmptyLine: false });
+      originMapping.push({ originalIndex, segmentIndex: 0, isBlankLine: false, isContent: true });
       currentExpandedIndices.push(expandedTexts.length - 1);
     }
 
@@ -92,9 +106,10 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
 
 /**
  * Process text into segments based on configuration
+ * CRITICAL: Preserves blank lines between segments by including them as empty segments
  * @param {string} text - Text to process
  * @param {Object} config - Processing configuration
- * @returns {string[]} Array of text segments
+ * @returns {string[]} Array of text segments including empty line markers
  */
 function processTextIntoSegments(text, config) {
   if (!text || typeof text !== 'string') {
@@ -107,23 +122,72 @@ function processTextIntoSegments(text, config) {
     return [text];
   }
 
-  // AGGRESSIVE FIX: For longer texts, split only on double newlines as last resort
-  let segments = [];
+  // CRITICAL FIX: Use a more sophisticated splitting that preserves blank lines
+  // We split on double newlines but preserve the structure
+  const segments = [];
+  const DOUBLE_NEWLINE_REGEX = /\n\s*\n/;
 
-  // ONLY split on double newlines (meaningful paragraph breaks)
-  const parts = text.split(/\n\s*\n/);
+  // Split while keeping track of what was between segments
+  let lastIndex = 0;
+  let match;
 
+  // Create a regex with lastIndex tracking
+  const regex = new RegExp(DOUBLE_NEWLINE_REGEX, 'g');
+  const parts = [];
+  let matchIndex;
+
+  // Split on double newlines, but preserve the segments and the delimiters
+  while ((match = regex.exec(text)) !== null) {
+    // Add the part before this delimiter
+    parts.push(text.substring(lastIndex, match.index));
+
+    // Add a marker for the double newline (blank line)
+    parts.push('\n\n');
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add the remaining part after the last delimiter
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  } else if (parts.length === 0) {
+    // No delimiters found, return entire text as single segment
+    return [text];
+  }
+
+  // Process parts: keep actual content, normalize blank line markers
+  let hasContentAfterProcessing = false;
   parts.forEach((part) => {
-    const trimmedPart = part.trim();
-    if (trimmedPart.length > 0) {
-      segments.push(trimmedPart);
+    // Check if this is a blank line marker
+    if (part === '\n\n') {
+      // Preserve blank line as special marker
+      segments.push('\n\n');
+    } else {
+      const trimmedPart = part.trim();
+      if (trimmedPart.length > 0) {
+        segments.push(trimmedPart);
+        hasContentAfterProcessing = true;
+      }
     }
   });
 
-  // Further split very long segments
+  // If we ended up with no actual content (only blank lines), return original
+  if (!hasContentAfterProcessing && text.length > 0) {
+    return [text];
+  }
+
+  // If we have no segments after processing, return original
+  if (segments.length === 0) {
+    return [text];
+  }
+
+  // Further split very long segments (but not blank line markers)
   const finalSegments = [];
   segments.forEach(segment => {
-    if (segment.length <= config.maxSegmentLength) {
+    if (segment === '\n\n') {
+      // Preserve blank line markers
+      finalSegments.push('\n\n');
+    } else if (segment.length <= config.maxSegmentLength) {
       finalSegments.push(segment);
     } else {
       // Split long segments at sentence boundaries
@@ -132,7 +196,7 @@ function processTextIntoSegments(text, config) {
     }
   });
 
-  return finalSegments.filter(segment => segment.trim() !== '' || segment.length === 0);
+  return finalSegments;
 }
 
 /**
@@ -180,6 +244,7 @@ function splitAtSentenceBoundaries(text, maxLength) {
 
 /**
  * Legacy text expansion for backward compatibility
+ * CRITICAL: Preserves blank lines by including them as markers in segments
  * @param {string[]} textsToTranslate - Texts to expand
  * @returns {Object} Expansion result
  */
@@ -197,21 +262,52 @@ function expandTextsLegacy(textsToTranslate) {
       // Keep everything as one piece - no splitting at all
       segments = [originalText];
     } else {
-      // Only for extremely long texts, split on double newlines only
-      segments = originalText.split(/\n\s*\n/).filter(seg => seg.trim().length > 0);
+      // CRITICAL FIX: Split on double newlines while preserving the blank line markers
+      const DOUBLE_NEWLINE_REGEX = /\n\s*\n/;
+      const parts = [];
 
-      // If any segment is still too long (>1500 chars), split on single newlines as last resort
-      if (segments.some(seg => seg.length > 1500)) {
+      // Use manual splitting to preserve blank line information
+      let lastIndex = 0;
+      let match;
+      const regex = new RegExp(DOUBLE_NEWLINE_REGEX, 'g');
+
+      while ((match = regex.exec(originalText)) !== null) {
+        // Add the part before this delimiter
+        const beforeDelimiter = originalText.substring(lastIndex, match.index);
+        if (beforeDelimiter.trim().length > 0) {
+          parts.push(beforeDelimiter.trim());
+        }
+
+        // Add blank line marker
+        parts.push('\n\n');
+
+        lastIndex = match.index + match[0].length;
+      }
+
+      // Add remaining part
+      const remaining = originalText.substring(lastIndex);
+      if (remaining.trim().length > 0) {
+        parts.push(remaining.trim());
+      }
+
+      // If no delimiters found, use original as single segment
+      if (parts.length === 0) {
+        segments = [originalText];
+      } else {
+        segments = parts;
+      }
+
+      // If any segment is still too long (>1500 chars), split on sentence boundaries as last resort
+      if (segments.some(seg => seg !== '\n\n' && seg.length > 1500)) {
         const newSegments = [];
         segments.forEach(segment => {
-          if (segment.length > 1500) {
-            // Split on newlines but keep content meaningful
-            const subSegments = segment.split(/\n/);
-            subSegments.forEach(subSeg => {
-              if (subSeg.trim().length > 10) { // Only keep meaningful pieces
-                newSegments.push(subSeg);
-              }
-            });
+          if (segment === '\n\n') {
+            // Preserve blank line markers
+            newSegments.push(segment);
+          } else if (segment.length > 1500) {
+            // Split at sentence boundaries for long segments
+            const subSegments = splitAtSentenceBoundaries(segment, 1500);
+            newSegments.push(...subSegments);
           } else {
             newSegments.push(segment);
           }
@@ -223,19 +319,35 @@ function expandTextsLegacy(textsToTranslate) {
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
+      // CRITICAL FIX: Handle blank line markers
+      if (segment === '\n\n') {
+        expandedTexts.push('\n\n');
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: true, isEmptyLine: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
+
+      // Handle single newlines
+      if (segment === '\n') {
+        expandedTexts.push('\n');
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: false, isSingleNewline: true });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+        return;
+      }
+
       // ENHANCED: Better handling of empty/whitespace segments
       const trimmedSegment = segment.trim();
 
       // Only treat as empty line if it's truly just whitespace or very short
       if (trimmedSegment.length === 0 && segment.length < 10) {
-        // Add simple newline for structural breaks
-        expandedTexts.push('\n');
-        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: true });
+        // Add double newline for structural breaks (blank lines)
+        expandedTexts.push('\n\n');
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: true, isEmptyLine: true });
         currentExpandedIndices.push(expandedTexts.length - 1);
       } else {
         // Keep the segment as-is with its original structure
-        expandedTexts.push(segment);
-        originMapping.push({ originalIndex, segmentIndex, isEmptyLine: false });
+        expandedTexts.push(trimmedSegment);
+        originMapping.push({ originalIndex, segmentIndex, isBlankLine: false, isContent: true, isEmptyLine: false });
         currentExpandedIndices.push(expandedTexts.length - 1);
       }
     });
@@ -277,20 +389,26 @@ export function reassembleTranslations(
     const mappingInfo = originMapping[i];
 
     if (translatedItem && typeof translatedItem.text === "string" && mappingInfo) {
-      const { originalIndex, isEmptyLine } = mappingInfo;
+      const { originalIndex, isBlankLine, isSingleNewline, isContent } = mappingInfo;
       if (!translatedSegmentsMap.has(originalIndex)) {
         translatedSegmentsMap.set(originalIndex, []);
       }
 
-      // Handle empty line placeholders - preserve structure with simple newlines
-      if (isEmptyLine) {
-        // Use simple newline for empty lines
+      // CRITICAL FIX: Handle blank line markers - preserve structure with double newlines
+      if (isBlankLine) {
+        // Use double newline for blank lines (paragraph separation)
+        translatedSegmentsMap.get(originalIndex).push('\n\n');
+      } else if (isSingleNewline) {
+        // Use single newline for line breaks
         translatedSegmentsMap.get(originalIndex).push('\n');
-      } else {
-        // Check if the corresponding original text already ends with newline
-        // If so, don't add another newline to avoid double spacing
+      } else if (isContent) {
+        // Regular content segment
         const originalText = expandedTexts[i] || '';
         let processedTranslation = translatedItem.text;
+
+        // CRITICAL FIX: Strip leading/trailing newlines from translation to avoid duplication
+        // The blank line markers will be added separately
+        processedTranslation = processedTranslation.replace(/^\n+|\n+$/g, '');
 
         // Only add newline if original had newline AND translation doesn't already have it
         if (originalText.endsWith('\n') && !processedTranslation.endsWith('\n')) {
@@ -298,22 +416,48 @@ export function reassembleTranslations(
         }
 
         translatedSegmentsMap.get(originalIndex).push(processedTranslation);
+      } else {
+        // Legacy handling for isEmptyLine
+        const { isEmptyLine } = mappingInfo;
+        if (isEmptyLine) {
+          translatedSegmentsMap.get(originalIndex).push('\n\n'); // Use double newline
+        } else {
+          const originalText = expandedTexts[i] || '';
+          let processedTranslation = translatedItem.text;
+          // Strip leading/trailing newlines from translation
+          processedTranslation = processedTranslation.replace(/^\n+|\n+$/g, '');
+          if (originalText.endsWith('\n') && !processedTranslation.endsWith('\n')) {
+            processedTranslation += '\n';
+          }
+          translatedSegmentsMap.get(originalIndex).push(processedTranslation);
+        }
       }
     } else {
       logger.debug(`Invalid translation data at index ${i}, using fallback`);
 
       // Use original text as fallback
       if (mappingInfo) {
-        const { originalIndex, isEmptyLine } = mappingInfo;
+        const { originalIndex, isBlankLine, isSingleNewline, isContent, isEmptyLine } = mappingInfo;
         if (!translatedSegmentsMap.has(originalIndex)) {
           translatedSegmentsMap.set(originalIndex, []);
         }
 
-        if (isEmptyLine) {
-          translatedSegmentsMap.get(originalIndex).push('\n'); // Use simple newline for empty lines
+        if (isBlankLine) {
+          translatedSegmentsMap.get(originalIndex).push('\n\n'); // Double newline for blank lines
+        } else if (isSingleNewline) {
+          translatedSegmentsMap.get(originalIndex).push('\n'); // Single newline
+        } else if (isContent || isEmptyLine === false) {
+          // Use the original text from the expandedTexts array as fallback
+          const originalSegmentText = expandedTexts[i] || '';
+          translatedSegmentsMap.get(originalIndex).push(originalSegmentText);
         } else {
-          // Use fallback text as-is, preserving original structure
-          translatedSegmentsMap.get(originalIndex).push(expandedTexts[i] || '');
+          // Legacy fallback
+          if (isEmptyLine) {
+            translatedSegmentsMap.get(originalIndex).push('\n\n');
+          } else {
+            const originalSegmentText = expandedTexts[i] || '';
+            translatedSegmentsMap.get(originalIndex).push(originalSegmentText);
+          }
         }
       }
     }
@@ -341,13 +485,15 @@ export function reassembleTranslations(
             segmentLength: segment.length,
             trimmedLength: trimmedSegment.length,
             isNewline: segment === '\n',
+            isDoubleNewline: segment === '\n\n',
             hasContent: trimmedSegment.length > 0
           });
         }
 
         // VERY PERMISSIVE: Accept almost everything to prevent content loss
         const isValid = trimmedSegment.length > 0 ||  // Has actual content
-                       segment === '\n' ||  // Is newline
+                       segment === '\n' ||  // Is single newline
+                       segment === '\n\n' ||  // CRITICAL: Is double newline (blank line)
                        segment === '\r\n' ||  // Is Windows newline
                        (segment.length > 0 && /\s/.test(segment));  // Has any whitespace
 

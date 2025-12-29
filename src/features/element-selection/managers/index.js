@@ -13,6 +13,15 @@ export { ModeManager } from './services/ModeManager.js';
 export { ErrorHandlingService } from './services/ErrorHandlingService.js';
 export { StateManager } from './services/StateManager.js';
 
+// Translation UI Services (split from TranslationUIManager)
+export { TranslationUIManager } from './services/TranslationUIManager.js';
+export { NotificationService } from './services/NotificationService.js';
+export { StreamingUpdateService } from './services/StreamingUpdateService.js';
+export { StreamEndService } from './services/StreamEndService.js';
+export { DOMNodeMatcher } from './services/DOMNodeMatcher.js';
+export { TranslationApplier } from './services/TranslationApplier.js';
+export { DirectionManager } from './services/DirectionManager.js';
+
 // Export utilities and constants
 export * from './utils/elementValidation.js';
 export * from './utils/domHelpers.js';

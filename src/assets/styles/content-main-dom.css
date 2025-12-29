@@ -100,100 +100,91 @@ html body .translate-it-element-highlighted.translate-it-element-highlighted {
 }
 
 /* ==========================================================================
-   Text Direction Classes for Translations - Mixed Content Support
+   Translation Direction Support - Simplified (Immersive Translate Pattern)
    ========================================================================== */
 
-/* RTL text with proper bidirectional support */
-.aiwc-rtl-text {
-  direction: rtl;
-  text-align: right;
-  unicode-bidi: plaintext;
+/* Translation container styles - rely on dir attribute for direction */
+.aiwc-translation-final {
+  unicode-bidi: isolate;
 }
 
-/* LTR text (default behavior) */
-.aiwc-ltr-text {
-  direction: ltr;
-  text-align: left;
-  unicode-bidi: plaintext;
-}
-
-/* Mixed RTL/LTR content - Enhanced bidirectional support */
-.aiwc-mixed-text {
-  direction: rtl;
-  text-align: right;
-  unicode-bidi: plaintext;
-}
-
-/* Enhanced support for mixed content - translation inner */
-.aiwc-mixed-text .aiwc-translation-inner {
-  unicode-bidi: normal;
-  direction: rtl;
-  text-align: right;
-}
-
-/* Handle embedded LTR content properly in mixed text */
-.aiwc-mixed-text .aiwc-translation-inner * {
-  unicode-bidi: embed;
-}
-
-/* Special handling for technical terms and proper nouns in mixed text */
-.aiwc-mixed-text .aiwc-translation-inner [lang="en"],
-.aiwc-mixed-text .aiwc-translation-inner .latin-term,
-.aiwc-mixed-text .aiwc-translation-inner .technical-term {
-  unicode-bidi: embed;
-  direction: ltr;
-  text-align: left;
-}
-
-/* Translation wrapper with direction support */
+/* Translation wrapper for proper isolation */
 .aiwc-translation-wrapper {
   display: inline;
   unicode-bidi: isolate;
 }
 
-.aiwc-translation-wrapper.aiwc-rtl-text,
-.aiwc-translation-wrapper.aiwc-mixed-text {
+/* Immersive Translate compatibility classes */
+.immersive-translate-target-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+.immersive-translate-target-inner {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Immersive Translate wrapper pattern for proper text direction */
+font.immersive-translate-target-wrapper,
+.notranslate.immersive-translate-target-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+font.immersive-translate-target-inner,
+.notranslate.immersive-translate-target-inner {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Specific handling for segment translations */
+.immersive-translate-segment-wrapper {
+  unicode-bidi: isolate;
+  display: inline;
+}
+
+/* Ensure proper text alignment when dir attribute is set */
+[dir="rtl"] {
   text-align: right;
 }
 
-.aiwc-translation-wrapper.aiwc-ltr-text {
+[dir="ltr"] {
   text-align: left;
 }
 
-/* Enhanced mixed content support with auto-direction */
-.aiwc-mixed-text.aiwc-translation-wrapper {
+/* Override text alignment for Immersive Translate wrappers to preserve original layout */
+.immersive-translate-target-wrapper,
+.immersive-translate-target-inner,
+.immersive-translate-segment-wrapper {
+  text-align: inherit !important;
+}
+
+/* Ensure proper bidirectional text handling */
+.immersive-translate-target-wrapper[dir="rtl"],
+.immersive-translate-segment-wrapper[dir="rtl"] {
+  text-align: right;
   unicode-bidi: embed;
-  direction: rtl;
 }
 
-/* Ensure proper bidirectional algorithm for mixed content */
-.aiwc-translation-inner {
-  unicode-bidi: plaintext;
-}
-
-/* Handle English/technical terms in any context */
-.aiwc-translation-inner [lang="en"],
-.aiwc-translation-inner .latin-term,
-.aiwc-translation-inner .technical-term {
+.immersive-translate-target-wrapper[dir="ltr"],
+.immersive-translate-segment-wrapper[dir="ltr"] {
+  text-align: left;
   unicode-bidi: embed;
-  direction: ltr;
 }
 
-/* LTR terms in mixed content - enhanced bidirectional support */
-.ltr-term {
+/* Special handling for nested fonts to ensure inheritance */
+font.immersive-translate-target-wrapper font {
   unicode-bidi: isolate;
-  direction: ltr;
-  display: inline-block;
-  margin: 0 1px;
 }
 
-/* Ensure proper spacing around LTR terms in RTL context */
-.aiwc-rtl-text .ltr-term,
-.aiwc-mixed-text .ltr-term {
-  unicode-bidi: isolate;
-  direction: ltr;
-  display: inline-block;
-  margin: 0 2px;
-  padding: 0;
-  white-space: nowrap;
+/* Preserve font inheritance through wrapper hierarchy */
+.immersive-translate-target-wrapper,
+.immersive-translate-target-inner {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  color: inherit;
+  line-height: inherit;
 }

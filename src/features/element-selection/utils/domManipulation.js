@@ -5,7 +5,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Note: Cache system has been removed from Select Element feature
-import { correctTextDirection } from './textDirection.js';
+import { applyContainerDirection, isRTLLanguage } from './textDirection.js';
 
 // Inject translation styles
 let stylesInjected = false;
@@ -16,25 +16,46 @@ function injectTranslationStyles() {
     const styleElement = document.createElement('style');
     styleElement.id = 'aiwc-translation-styles';
     styleElement.textContent = `
-      /* Translation Styles - Minimal impact on original page styling */
+      /* Translation Styles - Matching Immersive Translate pattern */
+      /* Each segment wrapper has its own dir attribute (Immersive Translate pattern) */
       .aiwc-translation-wrapper {
         display: inline;
         unicode-bidi: isolate;
       }
-      .aiwc-rtl-text {
-        direction: rtl;
-        text-align: right;
+
+      .aiwc-translation-wrapper[dir="rtl"] {
+        unicode-bidi: embed;
       }
-      .aiwc-ltr-text {
-        direction: ltr;
-        text-align: left;
+
+      .aiwc-translation-wrapper[dir="ltr"] {
+        unicode-bidi: embed;
       }
+
+      .aiwc-translation-background {
+        display: inline;
+        unicode-bidi: embed;
+        direction: inherit;  /* Inherit from wrapper */
+      }
+
+      /* Inner translation content inherits direction from wrapper */
+      .aiwc-translation-inner {
+        display: inline;
+        unicode-bidi: embed;
+        direction: inherit;  /* Inherit from background/wrapper */
+        text-align: inherit;
+      }
+
       .aiwc-translated-text {
         unicode-bidi: isolate;
       }
+      .aiwc-translation-final {
+        unicode-bidi: isolate;
+      }
+
+      /* Inherit styling from parent elements */
       .aiwc-translation-wrapper *,
-      .aiwc-rtl-text *,
-      .aiwc-ltr-text * {
+      .aiwc-translated-text *,
+      .aiwc-translation-final * {
         font-family: inherit;
         font-size: inherit;
         font-weight: inherit;
@@ -43,48 +64,37 @@ function injectTranslationStyles() {
         letter-spacing: inherit;
         color: inherit;
       }
+
+      /* Code blocks should maintain their direction */
       .aiwc-translation-wrapper code,
-      .aiwc-translation-wrapper pre,
-      .aiwc-rtl-text code,
-      .aiwc-rtl-text pre,
-      .aiwc-ltr-text code,
-      .aiwc-ltr-text pre {
+      .aiwc-translation-wrapper pre {
         font-family: inherit;
         direction: inherit;
         text-align: inherit;
         unicode-bidi: plaintext;
       }
-      .aiwc-translation-wrapper table,
-      .aiwc-rtl-text table,
-      .aiwc-ltr-text table {
+
+      /* Table elements */
+      .aiwc-translation-wrapper table {
         border-collapse: inherit;
         border-spacing: inherit;
         width: inherit;
       }
+
       .aiwc-translation-wrapper td,
-      .aiwc-translation-wrapper th,
-      .aiwc-rtl-text td,
-      .aiwc-rtl-text th,
-      .aiwc-ltr-text td,
-      .aiwc-ltr-text th {
+      .aiwc-translation-wrapper th {
         text-align: inherit;
         vertical-align: inherit;
         padding: inherit;
         border: inherit;
       }
-      .aiwc-translation-wrapper li,
-      .aiwc-rtl-text li,
-      .aiwc-ltr-text li {
+
+      /* List elements */
+      .aiwc-translation-wrapper li {
         list-style-type: inherit;
         list-style-position: inherit;
         margin: inherit;
         padding: inherit;
-      }
-      .aiwc-translation-wrapper[data-aiwc-direction="rtl"] {
-        direction: rtl !important;
-      }
-      .aiwc-translation-wrapper[data-aiwc-direction="ltr"] {
-        direction: ltr !important;
       }
 
       /* Preserve spacing between chunks */
@@ -98,17 +108,81 @@ function injectTranslationStyles() {
         white-space: pre;
       }
 
-      /* Ensure proper spacing between adjacent translated spans */
-      .aiwc-translation-wrapper span[data-aiwc-original-id] + span[data-aiwc-original-id] {
+      /* Ensure proper spacing between adjacent translated elements */
+      .aiwc-translation-wrapper + .aiwc-translation-wrapper {
         margin-left: 0.25em;
       }
 
-      .aiwc-translation-wrapper .aiwc-rtl-text + .aiwc-ltr-text,
-      .aiwc-translation-wrapper .aiwc-ltr-text + .aiwc-rtl-text {
-        margin-left: 0.25em;
+      /* Immersive Translate pattern styles - parent text element wrappers */
+      .aiwc-immersive-translate-wrapper {
+        display: inline;
+        unicode-bidi: isolate;
       }
 
+      .aiwc-immersive-translate-wrapper[dir="rtl"] {
+        unicode-bidi: embed;
+      }
 
+      .aiwc-immersive-translate-wrapper[dir="ltr"] {
+        unicode-bidi: embed;
+      }
+
+      .aiwc-immersive-translate-background {
+        display: inline;
+        unicode-bidi: embed;
+        direction: inherit;
+      }
+
+      .aiwc-immersive-translate-inner {
+        display: inline;
+        unicode-bidi: embed;
+        direction: inherit;
+        text-align: inherit;
+      }
+
+      /* Inherit styling for Immersive Translate wrappers */
+      .aiwc-immersive-translate-wrapper *,
+      .aiwc-immersive-translate-background *,
+      .aiwc-immersive-translate-inner * {
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        font-style: inherit;
+        line-height: inherit;
+        letter-spacing: inherit;
+        color: inherit;
+      }
+
+      /* Segment translation wrapper - preserves spacing with inline display */
+      .aiwc-segment-translation {
+        display: inline;
+        unicode-bidi: embed;
+        direction: inherit;
+      }
+
+      /* CRITICAL FIX: Segment elements with RTL/LTR direction need isolate
+         to prevent parent dir="auto" from affecting their display */
+      [data-segment-id][dir="rtl"],
+      [data-segment-id][dir="ltr"] {
+        unicode-bidi: isolate;
+      }
+
+      /* CRITICAL: Preserve spacing between adjacent inline RTL elements */
+      /* Use word-spacing to ensure spaces between words are not collapsed */
+      [dir="rtl"] {
+        word-spacing: normal;
+      }
+
+      /* Ensure adjacent inline elements maintain spacing */
+      [dir="rtl"] > * {
+        display: inline;
+      }
+
+      /* CRITICAL: Add spacing between adjacent inline RTL segments */
+      [dir="rtl"] > [data-segment-id] + [data-segment-id],
+      [dir="rtl"] > [data-segment-id]:not(:last-child) {
+        margin-right: 0.25em;
+      }
     `;
     document.head.appendChild(styleElement);
     stylesInjected = true;
@@ -453,19 +527,25 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
   let processedCount = 0;
 
-  // Filter out undefined or null text nodes to prevent errors
-  const validTextNodes = textNodes.filter(node => node && node.nodeType === Node.TEXT_NODE);
+  // Filter out undefined or null nodes to prevent errors
+    // Accept both TEXT_NODE (legacy) and ELEMENT_NODE with segment-id (new approach)
+    const validTextNodes = textNodes.filter(node =>
+      node && (
+        node.nodeType === Node.TEXT_NODE ||
+        (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute && node.hasAttribute('data-segment-id'))
+      )
+    );
 
-  logger.debug('Filtered text nodes', {
-    originalCount: textNodes.length,
-    validCount: validTextNodes.length
-  });
+    logger.debug('Filtered text nodes', {
+      originalCount: textNodes.length,
+      validCount: validTextNodes.length
+    });
 
-  // Handle chunked translations by maintaining node order
-  validTextNodes.forEach((textNode, nodeIndex) => {
-    if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
-      return;
-    }
+    // Handle chunked translations by maintaining node order
+    validTextNodes.forEach((textNode, nodeIndex) => {
+      if (!textNode.parentNode) {
+        return;
+      }
 
     const originalText = textNode.textContent;
     const trimmedOriginalText = originalText.trim();
@@ -537,13 +617,28 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
           finalTranslatedText = finalTranslatedText + ' ';
         }
 
-        // Create outer wrapper (similar to working extension)
-        const wrapperSpan = document.createElement("span");
+        // Create outer wrapper (FONT tag to match structure)
+        const wrapperSpan = document.createElement("font");
         wrapperSpan.className = "aiwc-translation-wrapper";
         wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+        
+        // Apply direction to wrapper (matches reference pattern: outer AND inner have dir)
+        if (context.targetLanguage) {
+          wrapperSpan.setAttribute("dir", isRTLLanguage(context.targetLanguage) ? "rtl" : "ltr");
+          wrapperSpan.setAttribute("lang", context.targetLanguage);
+        }
+
+        // Add hidden BR
+        const br = document.createElement("br");
+        br.hidden = true;
+        wrapperSpan.appendChild(br);
+
+        // Create background wrapper
+        const bgFont = document.createElement("font");
+        bgFont.className = "aiwc-translation-background";
 
         // Create inner span for translated content
-        const translationSpan = document.createElement("span");
+        const translationSpan = document.createElement("font");
         translationSpan.className = "aiwc-translation-inner";
 
         // Preserve leading whitespace from original text
@@ -560,20 +655,14 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
         translationSpan.textContent = processedText;
 
-        // Apply text direction to the wrapper with target language if available
-        const detectOptions = context.targetLanguage ? {
-          targetLanguage: context.targetLanguage,
-          simpleDetection: true  // Use simple detection for RTL languages
-        } : {};
+        // Apply container-level direction following Immersive Translate pattern
+        if (context.targetLanguage) {
+          applyContainerDirection(translationSpan, context.targetLanguage, translatedText);
+        }
 
-        correctTextDirection(wrapperSpan, translatedText, {
-          useWrapperElement: false,
-          preserveExisting: true,
-          detectOptions: detectOptions
-        });
-
-        // Add the translation span to the wrapper
-        wrapperSpan.appendChild(translationSpan);
+        // Add the translation span to the background, then wrapper
+        bgFont.appendChild(translationSpan);
+        wrapperSpan.appendChild(bgFont);
 
         // Replace the original text node with the wrapper
         // This is more atomic and reduces the chance of DOM interference
@@ -637,10 +726,16 @@ export async function revertTranslations(context) {
   let successfulReverts = 0;
   let failedReverts = 0;
 
-  // Find all wrapper elements with translation data
-  const wrappers = document.querySelectorAll("span.aiwc-translation-wrapper");
+  // Find all wrapper elements with translation data (legacy system)
+  const wrappers = document.querySelectorAll(".aiwc-translation-wrapper");
 
-  logger.info(`Starting cleanup of ${wrappers.length} translated wrapper elements`);
+  // Find all Immersive Translate wrapper elements (new pattern)
+  const immersiveWrappers = document.querySelectorAll(".aiwc-immersive-translate-wrapper");
+
+  // Find all segment elements with translations (new system)
+  const segmentElements = document.querySelectorAll("span[data-segment-id]");
+
+  logger.info(`Starting cleanup of ${wrappers.length} legacy wrapper elements, ${immersiveWrappers.length} immersive wrappers, and ${segmentElements.length} segment elements`);
 
   wrappers.forEach((wrapper) => {
     const originalId = wrapper.getAttribute("data-aiwc-original-id");
@@ -712,7 +807,7 @@ export async function revertTranslations(context) {
   });
 
   // Also clean up any old-style translations for backward compatibility
-  const oldStyleContainers = document.querySelectorAll("span[data-aiwc-original-text]");
+  const oldStyleContainers = document.querySelectorAll("[data-aiwc-original-text]");
   oldStyleContainers.forEach((container) => {
     const originalText = container.getAttribute("data-aiwc-original-text");
 
@@ -736,6 +831,247 @@ export async function revertTranslations(context) {
       }
     }
   });
+
+  // Handle segment elements (new system)
+  segmentElements.forEach((segmentElement) => {
+    try {
+      const parentElement = segmentElement.parentNode;
+
+      if (!parentElement) {
+        logger.debug('Segment element has no parent, skipping');
+        failedReverts++;
+        return;
+      }
+
+      // Check if this element has been translated (has direction attributes or is marked as final)
+      const isTranslated = segmentElement.hasAttribute('dir') ||
+                           segmentElement.classList.contains('aiwc-translation-final') ||
+                           (segmentElement.textContent !== segmentElement.getAttribute('data-original-text'));
+
+      if (isTranslated) {
+        // Get the original text from the data-original-text attribute if it exists
+        const originalText = segmentElement.getAttribute('data-original-text');
+
+        // Create a new text node with the original content
+        const textNode = document.createTextNode(originalText || segmentElement.textContent);
+
+        // Replace the segment element with the text node
+        parentElement.replaceChild(textNode, segmentElement);
+
+        // CRITICAL FIX: Remove dir and lang attributes from parent element if they were
+        // added during RTL translation. Check if parent has these attributes and no other
+        // translated children remain.
+        if (parentElement.hasAttribute('dir')) {
+          // Check if parent still has any segment children that are translated
+          const remainingTranslatedSegments = parentElement.querySelectorAll(
+            '[data-segment-id][data-original-text], [data-segment-id][dir]'
+          );
+
+          // If no remaining translated segments, restore original dir/lang from parent
+          if (remainingTranslatedSegments.length === 0) {
+            // Restore original direction if it was stored, otherwise remove
+            const hasOriginalDir = parentElement.hasAttribute('data-original-direction');
+            const originalDir = parentElement.getAttribute('data-original-direction');
+
+            const dirBefore = parentElement.getAttribute('dir');
+            const hasDirBefore = parentElement.hasAttribute('dir');
+
+            logger.debug(`Restoring direction on parent`, {
+              tagName: parentElement.tagName,
+              hasOriginalDir,
+              originalDir: originalDir || '(empty)',
+              hasDirBefore,
+              dirBefore,
+              className: parentElement.className
+            });
+
+            // If there was an actual direction value stored (not empty), restore it
+            // Otherwise remove the dir attribute entirely
+            if (hasOriginalDir && originalDir && originalDir.trim() !== '') {
+              parentElement.setAttribute('dir', originalDir);
+              logger.debug(`Restored dir to: ${originalDir}`, {
+                dirAfter: parentElement.getAttribute('dir')
+              });
+            } else {
+              parentElement.removeAttribute('dir');
+              const hasDirAfter = parentElement.hasAttribute('dir');
+              const dirAfter = parentElement.getAttribute('dir');
+              logger.debug(`Removed dir attribute`, {
+                hasDirAfter,
+                dirAfter,
+                wasRemoved: !hasDirAfter
+              });
+            }
+            parentElement.removeAttribute('data-original-direction');
+            parentElement.removeAttribute('lang');
+          }
+        }
+
+        successfulReverts++;
+        logger.debug(`Reverted segment element to original text`);
+      } else {
+        // Not translated, just remove the segment ID attribute
+        segmentElement.removeAttribute('data-segment-id');
+        successfulReverts++;
+      }
+    } catch (error) {
+      failedReverts++;
+      logger.error('Failed to revert segment element:', error);
+    }
+  });
+
+  // Handle Immersive Translate wrappers (new pattern)
+  immersiveWrappers.forEach((immersiveWrapper) => {
+    try {
+      const parentElement = immersiveWrapper.parentNode;
+
+      if (!parentElement) {
+        logger.debug('Immersive wrapper has no parent, skipping');
+        failedReverts++;
+        return;
+      }
+
+      // The inner wrapper should contain the original translated content
+      // We need to restore the original text from segment elements
+      const innerWrapper = immersiveWrapper.querySelector('.aiwc-immersive-translate-inner');
+      if (innerWrapper) {
+        // Find all segments within and restore their original text
+        const segments = innerWrapper.querySelectorAll('[data-segment-id]');
+        let hasOriginalText = false;
+
+        segments.forEach((segment) => {
+          const originalText = segment.getAttribute('data-original-text');
+          if (originalText) {
+            segment.textContent = originalText;
+            segment.removeAttribute('dir');
+            segment.removeAttribute('lang');
+            hasOriginalText = true;
+          }
+        });
+
+        // Replace the immersive wrapper with the inner content
+        if (hasOriginalText || innerWrapper.childNodes.length > 0) {
+          // Move all children from innerWrapper to parentElement
+          while (innerWrapper.firstChild) {
+            parentElement.insertBefore(innerWrapper.firstChild, immersiveWrapper);
+          }
+          // Remove the immersive wrapper
+          parentElement.removeChild(immersiveWrapper);
+          successfulReverts++;
+          logger.debug('Reverted Immersive Translate wrapper');
+        }
+      } else {
+        // No inner wrapper, just remove the immersive wrapper
+        parentElement.removeChild(immersiveWrapper);
+        successfulReverts++;
+        logger.debug('Removed empty Immersive Translate wrapper');
+      }
+    } catch (error) {
+      failedReverts++;
+      logger.error('Failed to revert Immersive Translate wrapper:', error);
+    }
+  });
+
+  // CRITICAL FIX: Final cleanup pass - Remove dir/lang attributes from parent elements
+  // that no longer have any translated segments but still retain these attributes
+  try {
+    // Select elements that have our tracking attributes OR the standard dir/lang combo
+    // This ensures we catch block-level parents that we modified (which might not have lang set)
+    const elementsToCleanup = document.querySelectorAll(
+      '[dir][lang], [data-original-direction], [data-original-text-align], [data-original-unicode-bidi]'
+    );
+    let dirCleanupCount = 0;
+
+    elementsToCleanup.forEach((element) => {
+      // Skip if this is a wrapper element (will be handled separately)
+      if (element.classList.contains('aiwc-translation-wrapper') ||
+          element.classList.contains('aiwc-immersive-translate-wrapper')) {
+        return;
+      }
+
+      // Check if this element has any remaining translated segments
+      // We look for any indicators of active translation within this element
+      const remainingTranslatedSegments = element.querySelectorAll(
+        '[data-segment-id][data-original-text], [data-segment-id][dir], .aiwc-translation-wrapper, .aiwc-immersive-translate-wrapper'
+      );
+
+      // Also check if the element itself has segment-related attributes
+      const hasSegmentId = element.hasAttribute('data-segment-id');
+      const hasOriginalText = element.hasAttribute('data-original-text');
+      const isTranslationWrapper = element.classList.contains('aiwc-translation-wrapper') ||
+                                  element.classList.contains('aiwc-immersive-translate-wrapper');
+
+      // If no translated content remains and this isn't a translation wrapper itself, clean up details
+      if (remainingTranslatedSegments.length === 0 && !hasSegmentId && !hasOriginalText && !isTranslationWrapper) {
+        
+        // 1. Restore/Remove Direction
+        if (element.hasAttribute('data-original-direction')) {
+          const originalDir = element.getAttribute('data-original-direction');
+           // If there was an actual direction value stored (not empty), restore it
+           if (originalDir && originalDir.trim() !== '') {
+             element.setAttribute('dir', originalDir);
+           } else {
+             // If original was empty/null, remove the dir attribute entirely
+             element.removeAttribute('dir');
+           }
+           element.removeAttribute('data-original-direction');
+           
+           // Also remove lang if we are cleaning up direction and it looks like we added it
+           // (Simple heuristic: if we are stripping dir, we likely should strip lang if we tracked it, 
+           // but we didn't track lang explicitly. Safe to leave lang usually, but if it causes issues we might need to track it.)
+           // For now, only remove lang if we originally found it via [dir][lang] selector or if we want to be aggressive.
+           // Leaving lang is usually harmless compared to dir.
+           // However, if we found it via [dir][lang], we should probably remove it if we remove dir.
+           if (element.hasAttribute('lang') && !element.hasAttribute('data-original-lang')) { 
+               // We don't have data-original-lang logic yet, so let's be conservative and NOT remove lang unless we are sure.
+               // But the original code did: element.removeAttribute('lang');
+               // Let's stick to removing it if we are resetting direction, to matches previous behavior.
+               element.removeAttribute('lang');
+           }
+           dirCleanupCount++;
+        } else if (element.hasAttribute('dir') && element.hasAttribute('lang') && !element.hasAttribute('data-segment-id')) {
+            // Fallback for elements matched by [dir][lang] but missed above (legacy/other paths)
+            // If it has dir AND lang, and no segments, and no tracking attr (handled above), it might be a left-over.
+            // But without tracking attr, we can't be 100% sure we added it. 
+            // The previous logic was aggressive here. Let's keep it safe:
+            // Only touch if we have some evidence we touched it. 
+            // Actually, the previous logic blindly removed dir/lang from [dir][lang] elements.
+            // That's risky if the site had them. 
+            // BETTER: Only rely on our tracking attributes. 
+            // If we didn't track it, we shouldn't touch it. 
+            // Exception: The "legacy" cleanups might not have tracked attributes.
+        }
+
+        // 2. Restore/Remove Text Align
+        if (element.hasAttribute('data-original-text-align')) {
+             const originalAlign = element.getAttribute('data-original-text-align');
+             if (originalAlign && originalAlign.trim() !== '') {
+               element.style.textAlign = originalAlign;
+             } else {
+               element.style.textAlign = '';
+             }
+             element.removeAttribute('data-original-text-align');
+        }
+
+        // 3. Restore/Remove Unicode Bidi
+        if (element.hasAttribute('data-original-unicode-bidi')) {
+            const originalBidi = element.getAttribute('data-original-unicode-bidi');
+            if (originalBidi && originalBidi.trim() !== '') {
+                element.style.unicodeBidi = originalBidi;
+            } else {
+                element.style.unicodeBidi = '';
+            }
+            element.removeAttribute('data-original-unicode-bidi');
+        }
+      }
+    });
+
+    if (dirCleanupCount > 0) {
+      logger.info(`Cleaned up attributes from ${dirCleanupCount} parent elements`);
+    }
+  } catch (dirCleanupError) {
+    logger.debug('Failed to cleanup parent attributes:', dirCleanupError);
+  }
 
   // Note: Cache system has been removed - no cache to clear
 
@@ -806,6 +1142,35 @@ export async function revertTranslations(context) {
     }
   } catch (styleCleanupError) {
     logger.debug('Failed to cleanup translation styles:', styleCleanupError);
+  }
+
+  // CRITICAL FIX: Clean up text-align on target elements
+  // This ensures text alignment is restored to original after revert
+  const elementsWithAlign = document.querySelectorAll('[data-original-text-align]');
+  elementsWithAlign.forEach((element) => {
+    try {
+      const hasOriginalAlign = element.hasAttribute('data-original-text-align');
+      const originalAlign = element.getAttribute('data-original-text-align');
+
+      if (hasOriginalAlign) {
+        // Restore original text-align
+        if (originalAlign && originalAlign.trim() !== '') {
+          element.style.textAlign = originalAlign;
+        } else {
+          // If original was empty, remove the inline style
+          element.style.textAlign = '';
+        }
+
+        // Clean up the data attribute
+        element.removeAttribute('data-original-text-align');
+      }
+    } catch (error) {
+      logger.debug('Failed to cleanup text-align for element:', error);
+    }
+  });
+
+  if (elementsWithAlign.length > 0) {
+    logger.debug(`Cleaned up text-align from ${elementsWithAlign.length} elements`);
   }
 
   logger.info(`Cleanup completed: ${successfulReverts} successful, ${failedReverts} failed`);

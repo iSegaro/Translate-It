@@ -80,7 +80,7 @@ export class StateManager extends ResourceTracker {
    */
   async revertTranslations() {
     let revertedCount = 0;
-    
+
     for (const [elementId, translationData] of this.translatedElements) {
       try {
         // Hide translation overlay
