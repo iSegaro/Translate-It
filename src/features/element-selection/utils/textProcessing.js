@@ -134,7 +134,6 @@ function processTextIntoSegments(text, config) {
   // Create a regex with lastIndex tracking
   const regex = new RegExp(DOUBLE_NEWLINE_REGEX, 'g');
   const parts = [];
-  let matchIndex;
 
   // Split on double newlines, but preserve the segments and the delimiters
   while ((match = regex.exec(text)) !== null) {
