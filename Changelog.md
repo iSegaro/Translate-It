@@ -1,4 +1,4 @@
-#### v1.6.0 – Released on December 29, 2025
+#### v1.6.0 – Released on December 31, 2025
 
 ##### Fixed
 
