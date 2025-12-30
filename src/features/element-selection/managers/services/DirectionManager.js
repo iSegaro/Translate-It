@@ -58,7 +58,7 @@ export class DirectionManager {
     // CRITICAL FIX: Sample ALL translations, not just changed ones
     // This ensures accurate direction detection even when some content remains unchanged
     // Increased sample size to avoid bias from short initial segments (e.g. usernames)
-    for (const translated of translations.entries()) {
+    for (const translated of translations.values()) {
       if (samplesChecked >= 15) break;
       // Count all translations including unchanged ones for accurate direction detection
       if (translated) {
