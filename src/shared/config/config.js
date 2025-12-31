@@ -48,10 +48,24 @@ export const CONFIG = {
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
   GEMINI_MODELS: [
+    // Gemini 3 Series (NEW - Latest & Most Advanced)
+    { value: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
+    { value: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+
+    // Gemini 2.5 Series (Stable)
     { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: false } },
     { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+    { value: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+
+    // Gemini 2.5 Series (Preview Versions)
+    { value: "gemini-2.5-flash-preview-09-2025", name: "Gemini 2.5 Flash Preview (09-2025)", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+    { value: "gemini-2.5-flash-lite-preview-09-2025", name: "Gemini 2.5 Flash-Lite Preview (09-2025)", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+
+    // Gemini 2.0 Series (Second Generation)
+    { value: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash Exp", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
     { value: "gemini-2.0-flash", name: "Gemini 2.0 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
     { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+
     { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
