@@ -113,6 +113,22 @@ export class DirectionManager {
 
     this.logger.debug(`Found ${segmentElements.length} segment elements for RTL direction`);
 
+    // CRITICAL FIX: Clean up segments themselves to allow continuous flow
+    // Segments often come with dir="auto/rtl" and unicode-bidi: isolate which breaks the sentence flow
+    // We must neutralize them so they participate in the container's 'plaintext' flow
+    for (const segment of segmentElements) {
+       // Remove dir to allow inheritance
+       if (segment.hasAttribute('dir')) {
+         segment.removeAttribute('dir');
+       }
+       
+       // Reset isolation to normal
+       // We check style directly because it's usually set via style attribute on segments
+       if (segment.style.unicodeBidi) {
+         segment.style.unicodeBidi = 'normal';
+       }
+    }
+
     // Group segments by their parent element
     const parentToSegments = new Map();
     for (const segment of segmentElements) {
@@ -132,88 +148,47 @@ export class DirectionManager {
     const hasUnicodeBidiEmbed = targetElement.style.unicodeBidi === 'embed' ||
                                 getComputedStyle(targetElement).unicodeBidi === 'embed';
 
-    // CRITICAL FIX: Apply proper text alignment based on DETECTED direction from translated content
-    // RTL languages: align right, LTR languages: align left (or restore original)
-    // This aligns text WITHOUT changing the element's dir attribute
-    // (Changing dir would affect layout structure which is not desired)
-    if (isRTL) {
-      // CRITICAL FIX: If targetElement has unicode-bidi: embed, we need to also set dir
-      // on the targetElement itself for proper RTL display, as text-align alone is not enough
-      // IMPORTANT: We also need to change unicode-bidi to 'isolate' for proper RTL display
-      if (hasUnicodeBidiEmbed) {
-        // Store original unicode-bidi if not already stored
-        if (!targetElement.hasAttribute('data-original-unicode-bidi')) {
-          const originalBidi = targetElement.style.unicodeBidi || '';
-          targetElement.setAttribute('data-original-unicode-bidi', originalBidi);
-        }
-        // Override unicode-bidi to isolate for proper RTL display
-        targetElement.style.unicodeBidi = 'isolate';
-
-        if (!targetElement.hasAttribute('data-original-direction')) {
-          const currentDir = targetElement.getAttribute('dir');
-          if (currentDir) {
-            targetElement.setAttribute('data-original-direction', currentDir);
-          } else {
-            targetElement.setAttribute('data-original-direction', '');
-          }
-        }
-        targetElement.setAttribute('dir', 'rtl');
-        if (targetLanguage) {
-          targetElement.setAttribute('lang', targetLanguage);
-        }
-        this.logger.debug('Applied dir attribute and override unicode-bidi to targetElement', {
-          tagName: targetElement.tagName,
-          hasUnicodeBidiEmbed,
-          targetLanguage,
-          newUnicodeBidi: 'isolate'
-        });
-      }
-
-      this.logger.debug('Applied RTL text alignment to main text container', {
-        tagName: targetElement.tagName,
-        detectedDirection,
-        targetLanguage,
-        hasUnicodeBidiEmbed
-      });
-    } else {
-      // CRITICAL FIX: If targetElement has unicode-bidi: embed, also set ltr dir
-      // IMPORTANT: We also need to change unicode-bidi to 'isolate' for proper LTR display
-      if (hasUnicodeBidiEmbed) {
-        // Store original unicode-bidi if not already stored
-        if (!targetElement.hasAttribute('data-original-unicode-bidi')) {
-          const originalBidi = targetElement.style.unicodeBidi || '';
-          targetElement.setAttribute('data-original-unicode-bidi', originalBidi);
-        }
-        // Override unicode-bidi to isolate for proper LTR display
-        targetElement.style.unicodeBidi = 'isolate';
-
-        if (!targetElement.hasAttribute('data-original-direction')) {
-          const currentDir = targetElement.getAttribute('dir');
-          if (currentDir) {
-            targetElement.setAttribute('data-original-direction', currentDir);
-          } else {
-            targetElement.setAttribute('data-original-direction', '');
-          }
-        }
-        targetElement.setAttribute('dir', 'ltr');
-        if (targetLanguage) {
-          targetElement.setAttribute('lang', targetLanguage);
-        }
-        this.logger.debug('Applied dir attribute and override unicode-bidi to targetElement', {
-          tagName: targetElement.tagName,
-          hasUnicodeBidiEmbed,
-          targetLanguage,
-          newUnicodeBidi: 'isolate'
-        });
-      }
-
-      this.logger.debug('Applied LTR text alignment to main text container', {
-        tagName: targetElement.tagName,
-        detectedDirection,
-        targetLanguage,
-        hasUnicodeBidiEmbed
-      });
+    // CRITICAL FIX: Use 'unicode-bidi: plaintext' and 'text-align' instead of 'dir' attribute
+    // This decouples text direction from container layout.
+    // 'plaintext' calculates the base direction from the content (Strong characters).
+    // This allows English text (LTR) to flow correctly inside an RTL container WITHOUT flipping the container's UI/Layout.
+    
+    // Store original unicode-bidi if not already stored
+    if (!targetElement.hasAttribute('data-original-unicode-bidi')) {
+      const originalBidi = targetElement.style.unicodeBidi || '';
+      targetElement.setAttribute('data-original-unicode-bidi', originalBidi);
     }
+
+    // Set unicode-bidi to plaintext to auto-detect text direction based on content
+    // This handles the inline ordering of elements (e.g. Link + Strong) correctly
+    targetElement.style.unicodeBidi = 'plaintext';
+
+    // Store original text-align if not already stored
+    if (!targetElement.hasAttribute('data-original-text-align')) {
+      const originalTextAlign = targetElement.style.textAlign || '';
+      targetElement.setAttribute('data-original-text-align', originalTextAlign);
+    }
+
+    // Explicitly set text alignment based on detected direction
+    // For RTL languages (Persian) -> Right
+    // For LTR languages (English) -> Left
+    targetElement.style.textAlign = isRTL ? 'right' : 'left';
+    
+    // Only set lang attribute for accessibility/fonts, but DO NOT touch 'dir'
+    if (targetLanguage) {
+      if (!targetElement.hasAttribute('data-original-lang')) {
+         targetElement.setAttribute('data-original-lang', targetElement.getAttribute('lang') || '');
+      }
+      targetElement.setAttribute('lang', targetLanguage);
+    }
+
+    this.logger.debug('Applied text-only direction (plaintext + align) to targetElement', {
+      tagName: targetElement.tagName,
+      detectedDirection,
+      targetLanguage,
+      newUnicodeBidi: 'plaintext',
+      newTextAlign: isRTL ? 'right' : 'left'
+    });
 
     // For each parent, wrap its content with Immersive Translate pattern
     let parentIndex = 0;
@@ -262,42 +237,48 @@ export class DirectionManager {
         continue;
       }
 
-      // SIMPLIFIED: Just apply dir attribute directly to parent
-      // No wrapper structure - avoids double-wrapping and spacing collapse
+      // SIMPLIFIED: For inner parents (inline elements), we should NOT enforce isolation or direction.
+      // They should simply inherit the flow from the container (targetElement) which uses 'plaintext'.
+      // Enforcing 'plaintext' or 'dir' on inline elements breaks the sentence Bidi flow.
 
-      // CRITICAL: Store original direction before changing it (for proper revert)
-      if (!parent.hasAttribute('data-original-direction')) {
-        const currentDir = parent.getAttribute('dir');
-        if (currentDir) {
-          parent.setAttribute('data-original-direction', currentDir);
-        } else {
-          parent.setAttribute('data-original-direction', '');
+      // 1. Handle 'dir' attribute: Remove it so it inherits from container
+      if (parent.hasAttribute('dir')) {
+        // Store original if not already stored
+        if (!parent.hasAttribute('data-original-direction')) {
+          const currentDir = parent.getAttribute('dir');
+           parent.setAttribute('data-original-direction', currentDir || '');
         }
+        // Remove dir to allow flow inheritance
+        parent.removeAttribute('dir');
       }
 
-      parent.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+      // 2. Handle 'unicode-bidi': Reset if it enforces isolation
+      // If the parent had specific bidi override, we might need to clear it to allow natural flow
+      const currentBidi = parent.style.unicodeBidi;
+      const computedBidi = getComputedStyle(parent).unicodeBidi;
+      
+      if (currentBidi || computedBidi === 'isolate' || computedBidi === 'embed' || computedBidi === 'plaintext') {
+         if (!parent.hasAttribute('data-original-unicode-bidi')) {
+            parent.setAttribute('data-original-unicode-bidi', parent.style.unicodeBidi || '');
+         }
+         // Resetting to 'normal' usually restores natural flow
+         parent.style.unicodeBidi = 'normal';
+      }
+
+      // 3. Handle 'text-align' - Inline elements typically shouldn't have this, but clear if present to be safe
+      if (parent.style.textAlign) {
+        if (!parent.hasAttribute('data-original-text-align')) {
+          parent.setAttribute('data-original-text-align', parent.style.textAlign);
+        }
+        parent.style.textAlign = '';
+      }
+
+      // 4. Set lang if needed (harmless for layout, good for fonts)
       if (targetLanguage) {
-        parent.setAttribute('lang', targetLanguage);
-      }
-
-      // CRITICAL FIX: Check if parent has unicode-bidi: embed from the page
-      // This can prevent text-align from working properly
-      const parentHasUnicodeBidiEmbed = parent.style.unicodeBidi === 'embed' ||
-                                        getComputedStyle(parent).unicodeBidi === 'embed';
-
-      // CRITICAL FIX: Override unicode-bidi to isolate for proper text direction display
-      // This prevents parent dir="auto" interference and ensures proper RTL/LTR display
-      if (parentHasUnicodeBidiEmbed) {
-        // Store original unicode-bidi if not already stored
-        if (!parent.hasAttribute('data-original-unicode-bidi')) {
-          const originalBidi = parent.style.unicodeBidi || '';
-          parent.setAttribute('data-original-unicode-bidi', originalBidi);
+        if (!parent.hasAttribute('data-original-lang')) {
+          parent.setAttribute('data-original-lang', parent.getAttribute('lang') || '');
         }
-        // Override unicode-bidi to isolate for proper text direction display
-        parent.style.unicodeBidi = 'isolate';
-      } else if (isRTL) {
-        // For RTL parents without embed, still set isolate for consistency
-        parent.style.unicodeBidi = 'isolate';
+        parent.setAttribute('lang', targetLanguage);
       }
 
       this.logger.debug('Applied dir attribute to parent element', {

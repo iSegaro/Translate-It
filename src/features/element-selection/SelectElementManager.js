@@ -1122,41 +1122,32 @@ class SelectElementManager extends ResourceTracker {
       const elementsWithDirection = document.querySelectorAll('[data-original-direction]');
       // Clean up elements with text-align changes
       const elementsWithAlign = document.querySelectorAll('[data-original-text-align]');
+      // Clean up elements with unicode-bidi changes
+      const elementsWithBidi = document.querySelectorAll('[data-original-unicode-bidi]');
+      // Clean up elements with lang changes
+      const elementsWithLang = document.querySelectorAll('[data-original-lang]');
 
-      const totalElements = elementsWithDirection.length + elementsWithAlign.length;
+      const totalElements = elementsWithDirection.length + elementsWithAlign.length + elementsWithBidi.length + elementsWithLang.length;
 
       if (totalElements === 0) {
         return;
       }
 
-      this.logger.debug(`Cleaning up direction/align attributes from ${totalElements} elements`);
+      this.logger.debug(`Cleaning up direction/align/bidi/lang attributes from elements`);
 
       let cleanedCount = 0;
 
       // Clean up direction attributes
       elementsWithDirection.forEach(element => {
         try {
-          const hasOriginalDir = element.hasAttribute('data-original-direction');
           const originalDir = element.getAttribute('data-original-direction');
-
-          if (hasOriginalDir) {
-            // Restore original direction if it was stored (not empty)
+          if (originalDir !== null) {
             if (originalDir && originalDir.trim() !== '') {
               element.setAttribute('dir', originalDir);
             } else {
-              // If original direction was empty, remove the dir attribute
               element.removeAttribute('dir');
             }
-
-            // Clean up the data attribute
             element.removeAttribute('data-original-direction');
-
-            // Also remove lang attribute if it was added during translation
-            element.removeAttribute('lang');
-
-            // CRITICAL FIX: Also clean up unicode-bidi inline style
-            element.style.unicodeBidi = '';
-
             cleanedCount++;
           }
         } catch (error) {
@@ -1167,25 +1158,58 @@ class SelectElementManager extends ResourceTracker {
       // Clean up text-align attributes
       elementsWithAlign.forEach(element => {
         try {
-          const hasOriginalAlign = element.hasAttribute('data-original-text-align');
           const originalAlign = element.getAttribute('data-original-text-align');
-
-          if (hasOriginalAlign) {
-            // Restore original text-align
+          if (originalAlign !== null) {
             if (originalAlign && originalAlign.trim() !== '') {
               element.style.textAlign = originalAlign;
             } else {
-              // If original was empty, remove the inline style
               element.style.textAlign = '';
             }
-
-            // Clean up the data attribute
             element.removeAttribute('data-original-text-align');
-
             cleanedCount++;
           }
         } catch (error) {
           this.logger.debug('Failed to cleanup text-align for element:', error);
+        }
+      });
+
+      // Clean up unicode-bidi attributes
+      elementsWithBidi.forEach(element => {
+        try {
+          const originalBidi = element.getAttribute('data-original-unicode-bidi');
+          if (originalBidi !== null) {
+            if (originalBidi && originalBidi.trim() !== '') {
+              element.style.unicodeBidi = originalBidi;
+            } else {
+              element.style.unicodeBidi = '';
+            }
+            element.removeAttribute('data-original-unicode-bidi');
+            cleanedCount++;
+          }
+        } catch (error) {
+          this.logger.debug('Failed to cleanup unicode-bidi for element:', error);
+        }
+      });
+
+      // Clean up lang attributes
+      elementsWithLang.forEach(element => {
+        try {
+          const originalLang = element.getAttribute('data-original-lang');
+          if (originalLang !== null) {
+            if (originalLang && originalLang.trim() !== '') {
+              element.setAttribute('lang', originalLang);
+            } else {
+              element.removeAttribute('lang');
+            }
+            element.removeAttribute('data-original-lang');
+            cleanedCount++;
+          }
+          // Also fallback cleanup for lang if simply set without original (legacy)
+          else if (element.hasAttribute('lang') && !element.hasAttribute('data-original-lang')) {
+             element.removeAttribute('lang');
+          }
+        } catch (error) {
+          this.logger.debug('Failed to cleanup lang for element:', error);
         }
       });
 
