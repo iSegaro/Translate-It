@@ -129,166 +129,121 @@ export class DirectionManager {
        }
     }
 
-    // Group segments by their parent element
-    const parentToSegments = new Map();
+    // Identify all elements that need direction adjustments
+    // We separate them into 'Text Containers' (Block-like) and 'Inline Wrappers'
+    const textContainers = new Set();
+    const inlineWrappers = new Set();
+    
+    // Always include the main target element as a container (even if inline, plaintext works)
+    textContainers.add(targetElement);
+
+    // Traverse ancestors for each segment to categorize elements
     for (const segment of segmentElements) {
-      const parent = segment.parentNode;
-      if (parent && parent !== targetElement) {
-        if (!parentToSegments.has(parent)) {
-          parentToSegments.set(parent, []);
+      let current = segment.parentNode;
+      while (current && current !== document.body) {
+         // Stop if we go past the target element
+        if (!targetElement.contains(current) && targetElement !== current) break;
+        if (current === targetElement) {
+           break; // Already added
         }
-        parentToSegments.get(parent).push(segment);
+
+        const computedStyle = window.getComputedStyle(current);
+        const display = computedStyle.display;
+
+        // Check if strictly inline (transparent wrapper)
+        if (display === 'inline') {
+          inlineWrappers.add(current);
+        } else {
+          // It's a block, inline-block, list-item, etc. -> Text Container
+          // This governs the text flow/alignment
+          textContainers.add(current);
+        }
+        
+        current = current.parentNode;
       }
     }
 
-    this.logger.debug(`Grouped segments into ${parentToSegments.size} unique parents`);
-
-    // CRITICAL FIX: Check if targetElement has unicode-bidi: embed from the page
-    // This can prevent text-align from working properly
-    const hasUnicodeBidiEmbed = targetElement.style.unicodeBidi === 'embed' ||
-                                getComputedStyle(targetElement).unicodeBidi === 'embed';
-
-    // CRITICAL FIX: Use 'unicode-bidi: plaintext' and 'text-align' instead of 'dir' attribute
-    // This decouples text direction from container layout.
-    // 'plaintext' calculates the base direction from the content (Strong characters).
-    // This allows English text (LTR) to flow correctly inside an RTL container WITHOUT flipping the container's UI/Layout.
-    
-    // Store original unicode-bidi if not already stored
-    if (!targetElement.hasAttribute('data-original-unicode-bidi')) {
-      const originalBidi = targetElement.style.unicodeBidi || '';
-      targetElement.setAttribute('data-original-unicode-bidi', originalBidi);
-    }
-
-    // Set unicode-bidi to plaintext to auto-detect text direction based on content
-    // This handles the inline ordering of elements (e.g. Link + Strong) correctly
-    targetElement.style.unicodeBidi = 'plaintext';
-
-    // Store original text-align if not already stored
-    if (!targetElement.hasAttribute('data-original-text-align')) {
-      const originalTextAlign = targetElement.style.textAlign || '';
-      targetElement.setAttribute('data-original-text-align', originalTextAlign);
-    }
-
-    // Explicitly set text alignment based on detected direction
-    // For RTL languages (Persian) -> Right
-    // For LTR languages (English) -> Left
-    targetElement.style.textAlign = isRTL ? 'right' : 'left';
-    
-    // Only set lang attribute for accessibility/fonts, but DO NOT touch 'dir'
-    if (targetLanguage) {
-      if (!targetElement.hasAttribute('data-original-lang')) {
-         targetElement.setAttribute('data-original-lang', targetElement.getAttribute('lang') || '');
-      }
-      targetElement.setAttribute('lang', targetLanguage);
-    }
-
-    this.logger.debug('Applied text-only direction (plaintext + align) to targetElement', {
-      tagName: targetElement.tagName,
-      detectedDirection,
-      targetLanguage,
-      newUnicodeBidi: 'plaintext',
-      newTextAlign: isRTL ? 'right' : 'left'
-    });
-
-    // For each parent, wrap its content with Immersive Translate pattern
-    let parentIndex = 0;
-    for (const [parent, segments] of parentToSegments) {
-      // Skip if already processed
-      if (processedParents.has(parent)) continue;
-      processedParents.add(parent);
-
-      this.logger.debug(`Processing parent ${parentIndex}`, {
-        parentTag: parent.tagName,
-        parentClass: parent.className,
-        segmentsCount: segments.length,
-        firstSegmentId: segments[0]?.getAttribute('data-segment-id')
-      });
-
-      // Check if this parent has any translated segments
-      let hasTranslatedContent = false;
-      for (const segment of segments) {
-        const originalText = segment.getAttribute('data-original-text') || segment.textContent;
-        const trimmedOriginal = originalText.trim();
-        const segmentId = segment.getAttribute('data-segment-id');
-
-        // Look for translation using original text
-        let translatedText = null;
-        if (translations.has(trimmedOriginal)) {
-          translatedText = translations.get(trimmedOriginal);
-        } else if (translations.has(originalText)) {
-          translatedText = translations.get(originalText);
-        }
-
-        this.logger.debug(`Checking segment ${segmentId}`, {
-          originalText: originalText.substring(0, 30),
-          trimmedOriginal: trimmedOriginal.substring(0, 30),
-          foundTranslation: !!translatedText,
-          translatedPreview: translatedText ? translatedText.substring(0, 30) : 'NONE'
-        });
-
-        if (translatedText && translatedText !== trimmedOriginal) {
-          hasTranslatedContent = true;
-          break;
-        }
-      }
-
-      if (!hasTranslatedContent) {
-        this.logger.debug(`Skipping parent ${parentIndex} - no translated content found`);
-        continue;
-      }
-
-      // SIMPLIFIED: For inner parents (inline elements), we should NOT enforce isolation or direction.
-      // They should simply inherit the flow from the container (targetElement) which uses 'plaintext'.
-      // Enforcing 'plaintext' or 'dir' on inline elements breaks the sentence Bidi flow.
-
-      // 1. Handle 'dir' attribute: Remove it so it inherits from container
-      if (parent.hasAttribute('dir')) {
-        // Store original if not already stored
-        if (!parent.hasAttribute('data-original-direction')) {
-          const currentDir = parent.getAttribute('dir');
-           parent.setAttribute('data-original-direction', currentDir || '');
-        }
-        // Remove dir to allow flow inheritance
-        parent.removeAttribute('dir');
-      }
-
-      // 2. Handle 'unicode-bidi': Reset if it enforces isolation
-      // If the parent had specific bidi override, we might need to clear it to allow natural flow
-      const currentBidi = parent.style.unicodeBidi;
-      const computedBidi = getComputedStyle(parent).unicodeBidi;
-      
-      if (currentBidi || computedBidi === 'isolate' || computedBidi === 'embed' || computedBidi === 'plaintext') {
-         if (!parent.hasAttribute('data-original-unicode-bidi')) {
-            parent.setAttribute('data-original-unicode-bidi', parent.style.unicodeBidi || '');
+    // APPLY: Text Containers -> Plaintext + Text-Align
+    for (const container of textContainers) {
+       // 1. Remove dir attribute (Store original)
+       if (container.hasAttribute('dir')) {
+         if (!container.hasAttribute('data-original-direction')) {
+           container.setAttribute('data-original-direction', container.getAttribute('dir') || '');
          }
-         // Resetting to 'normal' usually restores natural flow
-         parent.style.unicodeBidi = 'normal';
-      }
+         container.removeAttribute('dir');
+       }
 
-      // 3. Handle 'text-align' - Inline elements typically shouldn't have this, but clear if present to be safe
-      if (parent.style.textAlign) {
-        if (!parent.hasAttribute('data-original-text-align')) {
-          parent.setAttribute('data-original-text-align', parent.style.textAlign);
-        }
-        parent.style.textAlign = '';
-      }
+       // 2. Set unicode-bidi: plaintext (Store original)
+       if (!container.hasAttribute('data-original-unicode-bidi')) {
+         container.setAttribute('data-original-unicode-bidi', container.style.unicodeBidi || '');
+       }
+       container.style.unicodeBidi = 'plaintext';
 
-      // 4. Set lang if needed (harmless for layout, good for fonts)
-      if (targetLanguage) {
-        if (!parent.hasAttribute('data-original-lang')) {
-          parent.setAttribute('data-original-lang', parent.getAttribute('lang') || '');
-        }
-        parent.setAttribute('lang', targetLanguage);
-      }
+       // 3. Set text-align (Store original)
+       // We assume textContainers (blocks) support text-align.
+       // Even if inline-block, it supports text-align (for its content? no, for itself relative to parent? No).
+       // Actually text-align on inline-block affects likely nothing inside unless specific?
+       // But safe to set.
+       if (!container.hasAttribute('data-original-text-align')) {
+         container.setAttribute('data-original-text-align', container.style.textAlign || '');
+       }
+       container.style.textAlign = isRTL ? 'right' : 'left';
 
-      this.logger.debug('Applied dir attribute to parent element', {
-        parentTag: parent.tagName,
-        parentClass: parent.className,
-        dir: isRTL ? 'rtl' : 'ltr',
-        targetLanguage
-      });
+       // 4. Lang
+       if (targetLanguage) {
+         if (!container.hasAttribute('data-original-lang')) {
+           container.setAttribute('data-original-lang', container.getAttribute('lang') || '');
+         }
+         container.setAttribute('lang', targetLanguage);
+       }
+       
+       this.logger.debug('Applied container direction settings', {
+         tagName: container.tagName,
+         type: 'Block/Container',
+         newAlign: isRTL ? 'right' : 'left'
+       });
+    }
 
-      parentIndex++;
+    // APPLY: Inline Wrappers -> Normal (Inherit)
+    for (const wrapper of inlineWrappers) {
+      // 1. Remove dir attribute (Store original)
+       if (wrapper.hasAttribute('dir')) {
+         if (!wrapper.hasAttribute('data-original-direction')) {
+           wrapper.setAttribute('data-original-direction', wrapper.getAttribute('dir') || '');
+         }
+         wrapper.removeAttribute('dir');
+       }
+
+       // 2. Reset unicode-bidi to normal (Store original)
+       // This removes isolation and allows text to flow with the container
+       const currentBidi = wrapper.style.unicodeBidi;
+       if (currentBidi || getComputedStyle(wrapper).unicodeBidi !== 'normal') {
+          if (!wrapper.hasAttribute('data-original-unicode-bidi')) {
+             wrapper.setAttribute('data-original-unicode-bidi', wrapper.style.unicodeBidi || '');
+          }
+          wrapper.style.unicodeBidi = 'normal';
+       }
+
+       // 3. Reset text-align (inline shouldn't have it, but clear just in case)
+       if (wrapper.style.textAlign) {
+         if (!wrapper.hasAttribute('data-original-text-align')) {
+           wrapper.setAttribute('data-original-text-align', wrapper.style.textAlign);
+         }
+         wrapper.style.textAlign = '';
+       }
+
+       // 4. Lang
+       if (targetLanguage) {
+          if (!wrapper.hasAttribute('data-original-lang')) {
+            wrapper.setAttribute('data-original-lang', wrapper.getAttribute('lang') || '');
+          }
+          wrapper.setAttribute('lang', targetLanguage);
+       }
+       
+       this.logger.debug('Applied inline direction settings (Inherit)', {
+         tagName: wrapper.tagName,
+         type: 'Inline'
+       });
     }
 
     this.logger.debug('RTL direction applied', {
