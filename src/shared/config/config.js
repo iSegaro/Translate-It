@@ -56,7 +56,7 @@ export const CONFIG = {
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
   WEBAI_API_URL: "http://localhost:6969/translate",
-  WEBAI_API_MODEL: "gemini-2.0-flash",
+  WEBAI_API_MODEL: "gemini-2.5-flash",
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   OPENAI_API_MODEL: "gpt-4o",
