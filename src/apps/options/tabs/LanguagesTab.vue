@@ -1,7 +1,7 @@
 <template>
   <section class="languages-tab">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
-    
+
     <div
       v-if="!isLoaded"
       class="loading-message"
@@ -17,7 +17,7 @@
           type="source"
         />
       </div>
-      
+
       <div class="setting-group">
         <label>{{ t('target_language_label') || 'Target Language' }}</label>
         <LanguageDropdown
@@ -27,7 +27,44 @@
         />
       </div>
     </template>
-    
+
+    <!-- Separator for API Settings section -->
+    <div class="section-separator" />
+
+    <!-- API Settings Section -->
+    <div class="api-settings-section">
+      <h3>{{ t('api_section_title') || 'Translation API' }}</h3>
+
+      <div class="setting-group">
+        <label>{{ t('translation_api_label') || 'API Choice' }}</label>
+        <ProviderSelector v-model="selectedProvider" />
+      </div>
+
+      <div class="provider-settings">
+        <div
+          v-if="selectedProvider === 'google'"
+          class="api-info"
+        >
+          <h3>{{ t('google_translate_settings_title') || 'Google Translate' }}</h3>
+          <p class="setting-description">
+            {{ t('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
+          </p>
+        </div>
+
+        <div
+          v-else-if="selectedProvider === 'bing'"
+          class="api-info"
+        >
+          <h3>{{ t('bing_translate_settings_title') || 'Microsoft Bing Translate' }}</h3>
+          <p class="setting-description">
+            {{ t('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}
+          </p>
+        </div>
+
+        <component :is="providerSettingsComponent" />
+      </div>
+    </div>
+
     <!-- Validation errors -->
     <div
       v-if="validationError"
@@ -39,12 +76,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
+import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import { useI18n } from 'vue-i18n'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
 const settingsStore = useSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
@@ -73,6 +115,43 @@ watch(targetLanguage, (value) => {
   validateLanguages()
 })
 
+// ========== API Settings ==========
+// Selected provider
+const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+
+// Dynamically load the settings component based on the selected provider
+const providerSettingsComponent = computed(() => {
+  const provider = selectedProvider.value;
+  switch (provider) {
+    case 'gemini':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/GeminiApiSettings.vue'));
+    case 'yandex':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/YandexApiSettings.vue'));
+    case 'deepl':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepLApiSettings.vue'));
+    case 'browser':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/BrowserApiSettings.vue'));
+    case 'webai':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/WebAIApiSettings.vue'));
+    case 'openai':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenAIApiSettings.vue'));
+    case 'openrouter':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenRouterApiSettings.vue'));
+    case 'deepseek':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepseekApiSettings.vue'));
+    case 'custom':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/CustomApiSettings.vue'));
+    default:
+      return null;
+  }
+});
+
+// Watch for changes in selectedProvider and update the store locally
+watch(selectedProvider, (newValue, oldValue) => {
+  logger.debug('🔧 API provider changed:', oldValue, '→', newValue)
+  settingsStore.updateSettingLocally('TRANSLATION_API', newValue)
+})
+
 // Validation
 const validationError = ref('')
 
@@ -99,7 +178,7 @@ defineExpose({
 @use "@/assets/styles/base/variables" as *;
 
 .languages-tab {
-  max-width: 600px;
+  max-width: 800px;
 }
 
 h2 {
@@ -110,6 +189,52 @@ h2 {
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
   color: var(--color-text);
+}
+
+// Separator between sections
+.section-separator {
+  border-top: 2px solid var(--color-border);
+  margin: $spacing-xl 0;
+}
+
+// API Settings Section
+.api-settings-section {
+  margin-top: $spacing-xl;
+
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    margin: 0 0 $spacing-base 0;
+    padding-bottom: $spacing-base;
+    border-bottom: $border-width $border-style var(--color-border);
+    color: var(--color-text);
+  }
+
+  .provider-settings {
+    margin-top: $spacing-lg;
+  }
+
+  .api-info {
+    padding: $spacing-md;
+    background-color: var(--color-background);
+    border-radius: $border-radius-base;
+    margin-bottom: $spacing-lg;
+
+    h3 {
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      margin: 0 0 $spacing-sm 0;
+      padding: 0;
+      border: none;
+      color: var(--color-text);
+    }
+
+    .setting-description {
+      font-size: $font-size-sm;
+      color: var(--color-text-secondary);
+      margin: 0;
+    }
+  }
 }
 
 .setting-group {

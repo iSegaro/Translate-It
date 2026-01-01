@@ -49,7 +49,6 @@ const navigationItems = ref([
   { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'prompt', labelKey: 'prompt_tab_title' },
-  { name: 'api', labelKey: 'api_tab_title' },
   { name: 'import-export', labelKey: 'import_export_tab_title' },
   { name: 'advance', labelKey: 'advance_tab_title' },
   { name: 'help', labelKey: 'help_tab_title' },
