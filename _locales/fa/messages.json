@@ -308,7 +308,7 @@
   "deepl_api_key_placeholder": { "message": "کلید API خود را اینجا وارد کنید" },
   "deepl_api_tier_label": { "message": "نسخه API" },
   "deepl_api_tier_free": { "message": "رایگان (api-free.deepl.com)" },
-  "deepl_api_tier_pro": { "message": "پرو (api.deepl.com)" },
+  "deepl_api_tier_pro": { "message": "پولی (api.deepl.com)" },
   "deepl_free_tier_description": {
     "message": "رایگان با محدودیت ۵۰۰,۰۰۰ کاراکتر در ماه. از api-free.deepl.com استفاده می‌کند"
   },
