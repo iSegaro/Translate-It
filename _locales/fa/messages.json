@@ -310,10 +310,10 @@
   "deepl_api_tier_free": { "message": "رایگان (api-free.deepl.com)" },
   "deepl_api_tier_pro": { "message": "پرو (api.deepl.com)" },
   "deepl_free_tier_description": {
-    "message": "نقطه پایانی رایگان با محدودیت ۵۰۰,۰۰۰ کاراکتر در ماه. از api-free.deepl.com استفاده می‌کند"
+    "message": "رایگان با محدودیت ۵۰۰,۰۰۰ کاراکتر در ماه. از api-free.deepl.com استفاده می‌کند"
   },
   "deepl_pro_tier_description": {
-    "message": "نقطه پایانی پرو با محدودیت بیشتر بر اساس اشتراک شما. از api.deepl.com استفاده می‌کند"
+    "message": "حرفه‌ای با محدودیت بیشتر بر اساس اشتراک شما. از api.deepl.com استفاده می‌کند"
   },
   "deepl_formality_label": { "message": "رسمی بودن ترجمه" },
   "deepl_formality_description": {
