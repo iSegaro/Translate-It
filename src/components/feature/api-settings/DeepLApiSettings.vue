@@ -8,7 +8,7 @@
       </span>
       <a
         class="api-link"
-        href="https://www.deepl.com/pro-api"
+        href="https://www.deepl.com/en/your-account/keys"
         target="_blank"
         rel="noopener noreferrer"
       >
