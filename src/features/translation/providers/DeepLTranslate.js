@@ -144,7 +144,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     }
 
     // Additional options
-    requestBody.append('split_sentences', '1'); // '1' = on (default)
+    requestBody.append('split_sentences', 'nonewlines'); // Preserve newlines in translation
     requestBody.append('preserve_formatting', '1'); // true
 
     // Debug log the request (without exposing full text content)
@@ -275,7 +275,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             if (betaLanguagesEnabled) {
               requestBody.append('enable_beta_languages', '1');
             }
-            requestBody.append('split_sentences', '1');
+            requestBody.append('split_sentences', 'nonewlines');
             requestBody.append('preserve_formatting', '1');
 
             const result = await this._executeWithErrorHandling({
