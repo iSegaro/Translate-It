@@ -21,13 +21,15 @@ export const TRANSLATION_CONSTANTS = {
     GOOGLE: 3900,
     BING: 800,
     YANDEX: 5000,
+    DEEPL: 10000,
   },
 
-  // Provider-specific batch sizes
+  // Provider-specific batch sizes (max segments per request)
   MAX_CHUNKS_PER_BATCH: {
     GOOGLE: 10,
     BING: 15,
     YANDEX: 25,
+    DEEPL: 5, // Very conservative for DeepL Free API with beta languages
   },
 
   // Dictionary support flags
@@ -35,6 +37,7 @@ export const TRANSLATION_CONSTANTS = {
     GOOGLE: true,
     BING: false,
     YANDEX: true,
+    DEEPL: false,
   },
 
   // Reliable mode flags
@@ -42,6 +45,7 @@ export const TRANSLATION_CONSTANTS = {
     GOOGLE: false,
     BING: false,
     YANDEX: false,
+    DEEPL: false,
   },
 
   // Streaming support flags
@@ -49,6 +53,7 @@ export const TRANSLATION_CONSTANTS = {
     GOOGLE: true,
     BING: true,
     YANDEX: true,
+    DEEPL: true,
   },
 
   // Chunking strategies
@@ -56,5 +61,6 @@ export const TRANSLATION_CONSTANTS = {
     GOOGLE: 'character_limit',
     BING: 'character_limit',
     YANDEX: 'segment_count',
+    DEEPL: 'character_limit',
   },
 };

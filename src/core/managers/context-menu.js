@@ -88,7 +88,7 @@ async function getApiProviders() {
 
       // Check against known provider IDs for extra validation
       const knownProviderIds = [
-        'google', 'yandex', 'gemini', 'openai', 'openrouter',
+        'google', 'yandex', 'deepl', 'gemini', 'openai', 'openrouter',
         'deepseek', 'webai', 'bing', 'browser', 'custom'
       ];
 
@@ -132,6 +132,7 @@ async function getApiProviders() {
     return [
       { id: "google", defaultTitle: "Google Translate" },
       { id: "yandex", defaultTitle: "Yandex Translate" },
+      { id: "deepl", defaultTitle: "DeepL Translate" },
       { id: "gemini", defaultTitle: "Google Gemini" },
       { id: "openai", defaultTitle: "OpenAI" },
       { id: "openrouter", defaultTitle: "OpenRouter" },

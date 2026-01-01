@@ -29,6 +29,7 @@
   "api_provider_yandex": { "message": "Yandex Translate" },
   "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "Custom (OpenAI)" },
+  "api_provider_deepl": { "message": "DeepL" },
 
   "google_translate_settings_title": { "message": "Google Translate" },
   "google_translate_description": {
@@ -39,7 +40,12 @@
   "yandex_translate_description": {
     "message": "Uses the free, public Yandex Translate endpoint. No API key is required."
   },
-  
+
+  "deepl_translate_settings_title": { "message": "DeepL Translate" },
+  "deepl_translate_description": {
+    "message": "AI-powered translation service by DeepL. Requires an API key."
+  },
+
   "bing_translate_settings_title": { "message": "Microsoft Bing Translator" },
   "bing_translate_description": {
     "message": "Uses the free, public Microsoft Bing Translator endpoint. No API key is required."
@@ -284,6 +290,40 @@
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model (e.g., deepseek-chat)"
   },
+
+  "deepl_api_settings_title": { "message": "DeepL API Settings" },
+  "deepl_api_key_info": {
+    "message": "You can get your DeepL API key from"
+  },
+  "deepl_api_key_link": { "message": "DeepL API" },
+  "deepl_free_api_info": {
+    "message": "Free tier available with 500,000 characters/month."
+  },
+  "deepl_api_key_label": { "message": "API Key" },
+  "deepl_api_key_placeholder": { "message": "Paste your DeepL API key here" },
+  "deepl_api_tier_label": { "message": "API Tier" },
+  "deepl_api_tier_free": { "message": "Free API (api-free.deepl.com)" },
+  "deepl_api_tier_pro": { "message": "Pro API (api.deepl.com)" },
+  "deepl_free_tier_description": {
+    "message": "Free API endpoint with 500,000 characters/month limit. Uses api-free.deepl.com"
+  },
+  "deepl_pro_tier_description": {
+    "message": "Pro API endpoint with higher limits based on your subscription. Uses api.deepl.com"
+  },
+  "deepl_formality_label": { "message": "Translation Formality" },
+  "deepl_formality_description": {
+    "message": "Control the formality level of translations. Some languages may not support all options."
+  },
+  "deepl_formality_default": { "message": "Default (Automatic)" },
+  "deepl_formality_more": { "message": "More Formal" },
+  "deepl_formality_less": { "message": "Less Formal" },
+  "deepl_formality_prefer_more": { "message": "Prefer More Formal" },
+  "deepl_formality_prefer_less": { "message": "Prefer Less Formal" },
+  "deepl_beta_languages_label": { "message": "Enable Beta Languages" },
+  "deepl_beta_languages_description": {
+    "message": "Enable support for beta languages. Beta languages do not support formality settings."
+  },
+
   "custom_api_settings_title": { "message": "Custom API Settings" },
   "custom_api_settings_description": {
     "message": "Use any service that is compatible with the OpenAI chat completions format."
@@ -550,6 +590,9 @@
   },
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "You have exceeded your quota for this API."
+  },
+  "ERRORS_DEEPL_QUOTA_EXCEEDED": {
+    "message": "DeepL character limit exceeded. Free tier: 500,000 chars/month. Check your DeepL account settings or upgrade your plan."
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "Gemini quota exceeded, which may be due to a region-specific limit."

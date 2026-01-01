@@ -59,6 +59,10 @@ export function matchErrorToType(rawOrError = "") {
         case 429:
           return ErrorTypes.RATE_LIMIT_REACHED;
 
+        // DeepL-specific quota exceeded (HTTP 456)
+        case 456:
+          return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
+
         // خطاهای عمومی سمت سرور
         case 500: // خطای داخلی سرور
         case 502: // Bad Gateway (مدل در دسترس نیست)
@@ -219,6 +223,16 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("too many requests")
   )
     return ErrorTypes.RATE_LIMIT_REACHED;
+
+  // DeepL-specific HTTP 456 (quota exceeded)
+  if (
+    msg.includes("http 456") ||
+    msg.includes("456 error") ||
+    msg.includes("status 456") ||
+    msg.includes("quota exceeded") ||
+    msg.includes("character limit")
+  )
+    return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
 
   if (
     msg.includes("http 500") ||

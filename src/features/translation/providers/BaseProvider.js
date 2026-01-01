@@ -254,6 +254,10 @@ export class BaseProvider {
           case 429:
             errorType = ErrorTypes.RATE_LIMIT_REACHED;
             break;
+          case 456:
+            // DeepL-specific: Quota exceeded (character limit)
+            errorType = ErrorTypes.DEEPL_QUOTA_EXCEEDED;
+            break;
           case 500:
           case 502:
           case 503:

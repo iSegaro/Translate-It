@@ -28,6 +28,7 @@
   "api_provider_yandex": { "message": "مترجم یاندکس" },
   "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "(OpenAI) سفارشی" },
+  "api_provider_deepl": { "message": "DeepL" },
 
   "google_translate_settings_title": { "message": "مترجم Google" },
   "google_translate_description": {
@@ -37,6 +38,11 @@
   "yandex_translate_settings_title": { "message": "مترجم Yandex" },
   "yandex_translate_description": {
     "message": "از سرویس رایگان و عمومی Yandex Translate استفاده می کند. کلید API لازم نیست."
+  },
+
+  "deepl_translate_settings_title": { "message": "مترجم DeepL" },
+  "deepl_translate_description": {
+    "message": "سرویس ترجمه هوشمند توسط DeepL. نیاز به کلید API دارد."
   },
 
   "bing_translate_settings_title": { "message": "مترجم Microsoft Bing" },
@@ -289,6 +295,40 @@
   "deepseek_api_model_placeholder": {
     "message": "مدل DeepSeek را وارد کنید (مثلا: deepseek-chat)"
   },
+
+  "deepl_api_settings_title": { "message": "تنظیمات API DeepL" },
+  "deepl_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از"
+  },
+  "deepl_api_key_link": { "message": "وبسایت DeepL API" },
+  "deepl_free_api_info": {
+    "message": "نسخه رایگان با ۵۰۰,۰۰۰ کاراکتر در ماه موجود است."
+  },
+  "deepl_api_key_label": { "message": "کلید API" },
+  "deepl_api_key_placeholder": { "message": "کلید API خود را اینجا وارد کنید" },
+  "deepl_api_tier_label": { "message": "نسخه API" },
+  "deepl_api_tier_free": { "message": "رایگان (api-free.deepl.com)" },
+  "deepl_api_tier_pro": { "message": "پولی (api.deepl.com)" },
+  "deepl_free_tier_description": {
+    "message": "رایگان با محدودیت ۵۰۰,۰۰۰ کاراکتر در ماه. از api-free.deepl.com استفاده می‌کند"
+  },
+  "deepl_pro_tier_description": {
+    "message": "حرفه‌ای با محدودیت بیشتر بر اساس اشتراک شما. از api.deepl.com استفاده می‌کند"
+  },
+  "deepl_formality_label": { "message": "رسمی بودن ترجمه" },
+  "deepl_formality_description": {
+    "message": "سطح رسمی بودن ترجمه را کنترل کنید. برخی زبان‌ها ممکن است همه گزینه‌ها را پشتیبانی نکنند."
+  },
+  "deepl_formality_default": { "message": "پیش‌فرض (خودکار)" },
+  "deepl_formality_more": { "message": "رسمی‌تر" },
+  "deepl_formality_less": { "message": "غیررسمی‌تر" },
+  "deepl_formality_prefer_more": { "message": "ترجیح رسمی" },
+  "deepl_formality_prefer_less": { "message": "ترجیح غیررسمی" },
+  "deepl_beta_languages_label": { "message": "فعال‌سازی زبان‌های بتا" },
+  "deepl_beta_languages_description": {
+    "message": "پشتیبانی از زبان‌های بتا را فعال کنید. زبان‌های بتا از تنظیمات رسمی بودن پشتیبانی نمی‌کنند."
+  },
+
   "custom_api_settings_title": { "message": "تنظیمات API سفارشی" },
   "custom_api_settings_description": {
     "message": "برای اتصال به هر سرویس دیگری که با فرمت OpenAI سازگار است، استفاده کنید."
@@ -552,6 +592,9 @@
   },
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "اعتبار مورد استفاده شما از این API به پایان رسیده است."
+  },
+  "ERRORS_DEEPL_QUOTA_EXCEEDED": {
+    "message": "محدودیت کاراکتر DeepL به پایان رسیده. نسخه رایگان: ۵۰۰,۰۰۰ کاراکتر در ماه. تنظیمات حساب DeepL خود را بررسی کنید یا طرح اشتراک خود را ارتقا دهید."
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "سهمیه Gemini به پایان رسیده است (احتمالاً به دلیل محدودیت منطقه‌ای)."

@@ -903,15 +903,30 @@ export async function revertTranslations(context) {
               });
             }
             parentElement.removeAttribute('data-original-direction');
-            parentElement.removeAttribute('lang');
+
+            // Restore original language if it was stored, otherwise remove
+            const hasOriginalLang = parentElement.hasAttribute('data-original-lang');
+            const originalLang = parentElement.getAttribute('data-original-lang');
+
+            if (hasOriginalLang && originalLang && originalLang.trim() !== '') {
+              parentElement.setAttribute('lang', originalLang);
+            } else {
+              parentElement.removeAttribute('lang');
+            }
+            parentElement.removeAttribute('data-original-lang');
           }
         }
 
         successfulReverts++;
         logger.debug(`Reverted segment element to original text`);
       } else {
-        // Not translated, just remove the segment ID attribute
+        // Not translated, just remove all translation-related attributes
         segmentElement.removeAttribute('data-segment-id');
+        segmentElement.removeAttribute('data-original-text');
+        segmentElement.removeAttribute('data-original-direction');
+        segmentElement.removeAttribute('data-original-lang');
+        segmentElement.removeAttribute('data-original-text-align');
+        segmentElement.removeAttribute('data-original-unicode-bidi');
         successfulReverts++;
       }
     } catch (error) {
@@ -945,6 +960,12 @@ export async function revertTranslations(context) {
             segment.textContent = originalText;
             segment.removeAttribute('dir');
             segment.removeAttribute('lang');
+            segment.removeAttribute('data-segment-id');
+            segment.removeAttribute('data-original-text');
+            segment.removeAttribute('data-original-direction');
+            segment.removeAttribute('data-original-lang');
+            segment.removeAttribute('data-original-text-align');
+            segment.removeAttribute('data-original-unicode-bidi');
             hasOriginalText = true;
           }
         });
@@ -978,7 +999,7 @@ export async function revertTranslations(context) {
     // Select elements that have our tracking attributes OR the standard dir/lang combo
     // This ensures we catch block-level parents that we modified (which might not have lang set)
     const elementsToCleanup = document.querySelectorAll(
-      '[dir][lang], [data-original-direction], [data-original-text-align], [data-original-unicode-bidi]'
+      '[dir][lang], [data-original-direction], [data-original-text-align], [data-original-unicode-bidi], [data-original-lang]'
     );
     let dirCleanupCount = 0;
 
@@ -1003,7 +1024,7 @@ export async function revertTranslations(context) {
 
       // If no translated content remains and this isn't a translation wrapper itself, clean up details
       if (remainingTranslatedSegments.length === 0 && !hasSegmentId && !hasOriginalText && !isTranslationWrapper) {
-        
+
         // 1. Restore/Remove Direction
         if (element.hasAttribute('data-original-direction')) {
           const originalDir = element.getAttribute('data-original-direction');
@@ -1015,34 +1036,28 @@ export async function revertTranslations(context) {
              element.removeAttribute('dir');
            }
            element.removeAttribute('data-original-direction');
-           
-           // Also remove lang if we are cleaning up direction and it looks like we added it
-           // (Simple heuristic: if we are stripping dir, we likely should strip lang if we tracked it, 
-           // but we didn't track lang explicitly. Safe to leave lang usually, but if it causes issues we might need to track it.)
-           // For now, only remove lang if we originally found it via [dir][lang] selector or if we want to be aggressive.
-           // Leaving lang is usually harmless compared to dir.
-           // However, if we found it via [dir][lang], we should probably remove it if we remove dir.
-           if (element.hasAttribute('lang') && !element.hasAttribute('data-original-lang')) { 
-               // We don't have data-original-lang logic yet, so let's be conservative and NOT remove lang unless we are sure.
-               // But the original code did: element.removeAttribute('lang');
-               // Let's stick to removing it if we are resetting direction, to matches previous behavior.
-               element.removeAttribute('lang');
-           }
            dirCleanupCount++;
-        } else if (element.hasAttribute('dir') && element.hasAttribute('lang') && !element.hasAttribute('data-segment-id')) {
-            // Fallback for elements matched by [dir][lang] but missed above (legacy/other paths)
-            // If it has dir AND lang, and no segments, and no tracking attr (handled above), it might be a left-over.
-            // But without tracking attr, we can't be 100% sure we added it. 
-            // The previous logic was aggressive here. Let's keep it safe:
-            // Only touch if we have some evidence we touched it. 
-            // Actually, the previous logic blindly removed dir/lang from [dir][lang] elements.
-            // That's risky if the site had them. 
-            // BETTER: Only rely on our tracking attributes. 
-            // If we didn't track it, we shouldn't touch it. 
-            // Exception: The "legacy" cleanups might not have tracked attributes.
         }
 
-        // 2. Restore/Remove Text Align
+        // 2. Restore/Remove Language Attribute
+        if (element.hasAttribute('data-original-lang')) {
+          const originalLang = element.getAttribute('data-original-lang');
+          // If there was an actual language value stored (not empty), restore it
+          if (originalLang && originalLang.trim() !== '') {
+            element.setAttribute('lang', originalLang);
+          } else {
+            // If original was empty/null, remove the lang attribute entirely
+            element.removeAttribute('lang');
+          }
+          element.removeAttribute('data-original-lang');
+          dirCleanupCount++;
+        } else if (element.hasAttribute('data-original-direction') && element.hasAttribute('lang')) {
+          // If we tracked direction but not language explicitly, and lang is present, remove it
+          // This handles cases where lang was added by translation but data-original-lang wasn't set
+          element.removeAttribute('lang');
+        }
+
+        // 3. Restore/Remove Text Align
         if (element.hasAttribute('data-original-text-align')) {
              const originalAlign = element.getAttribute('data-original-text-align');
              if (originalAlign && originalAlign.trim() !== '') {
@@ -1053,7 +1068,7 @@ export async function revertTranslations(context) {
              element.removeAttribute('data-original-text-align');
         }
 
-        // 3. Restore/Remove Unicode Bidi
+        // 4. Restore/Remove Unicode Bidi
         if (element.hasAttribute('data-original-unicode-bidi')) {
             const originalBidi = element.getAttribute('data-original-unicode-bidi');
             if (originalBidi && originalBidi.trim() !== '') {
@@ -1062,6 +1077,12 @@ export async function revertTranslations(context) {
                 element.style.unicodeBidi = '';
             }
             element.removeAttribute('data-original-unicode-bidi');
+        }
+
+        // 5. Clean up empty style attribute
+        // After clearing inline styles, remove the style attribute if it's empty
+        if (element.hasAttribute('style') && element.getAttribute('style').trim() === '') {
+          element.removeAttribute('style');
         }
       }
     });
@@ -1171,6 +1192,62 @@ export async function revertTranslations(context) {
 
   if (elementsWithAlign.length > 0) {
     logger.debug(`Cleaned up text-align from ${elementsWithAlign.length} elements`);
+  }
+
+  // FINAL AGGRESSIVE CLEANUP: Remove any remaining data-original-* attributes
+  // This catches any orphaned attributes that might have been missed by previous cleanup passes
+  try {
+    const allElementsWithOriginalAttrs = document.querySelectorAll(
+      '[data-original-text], [data-original-direction], [data-original-lang], [data-original-text-align], [data-original-unicode-bidi]'
+    );
+    let aggressiveCleanupCount = 0;
+
+    allElementsWithOriginalAttrs.forEach((element) => {
+      // Skip wrapper elements
+      if (element.classList.contains('aiwc-translation-wrapper') ||
+          element.classList.contains('aiwc-immersive-translate-wrapper')) {
+        return;
+      }
+
+      const hadOriginalLang = element.hasAttribute('data-original-lang');
+      const hadOriginalDir = element.hasAttribute('data-original-direction');
+
+      // Remove all data-original-* attributes
+      element.removeAttribute('data-original-text');
+      element.removeAttribute('data-original-direction');
+      element.removeAttribute('data-original-lang');
+      element.removeAttribute('data-original-text-align');
+      element.removeAttribute('data-original-unicode-bidi');
+
+      // Remove lang if we had data-original-lang (even if empty)
+      // This ensures lang attributes we added are always removed
+      if (hadOriginalLang) {
+        element.removeAttribute('lang');
+      }
+
+      // Also remove dir if it looks like it was added by us
+      // (heuristic: if we removed the tracking attribute, also remove the corresponding live attribute)
+      if (hadOriginalDir && element.hasAttribute('dir')) {
+        const dir = element.getAttribute('dir');
+        // Only remove if it's one of our common values
+        if (dir === 'rtl' || dir === 'ltr') {
+          element.removeAttribute('dir');
+        }
+      }
+
+      // Clean up empty style attribute
+      if (element.hasAttribute('style') && element.getAttribute('style').trim() === '') {
+        element.removeAttribute('style');
+      }
+
+      aggressiveCleanupCount++;
+    });
+
+    if (aggressiveCleanupCount > 0) {
+      logger.info(`Aggressive cleanup: removed attributes from ${aggressiveCleanupCount} elements`);
+    }
+  } catch (aggressiveCleanupError) {
+    logger.debug('Failed to perform aggressive cleanup:', aggressiveCleanupError);
   }
 
   logger.info(`Cleanup completed: ${successfulReverts} successful, ${failedReverts} failed`);

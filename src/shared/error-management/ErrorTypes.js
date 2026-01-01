@@ -58,6 +58,9 @@ export class ErrorTypes {
   static SERVER_ERROR = "SERVER_ERROR";
   static RATE_LIMIT_REACHED = "RATE_LIMIT_REACHED"; // برای خطای 429
 
+  // DeepL-specific errors
+  static DEEPL_QUOTA_EXCEEDED = "DEEPL_QUOTA_EXCEEDED"; // HTTP 456 - DeepL character limit
+
   // Import/Export password errors
   static IMPORT_PASSWORD_REQUIRED = "IMPORT_PASSWORD_REQUIRED";
   static IMPORT_PASSWORD_INCORRECT = "IMPORT_PASSWORD_INCORRECT";
