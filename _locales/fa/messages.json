@@ -300,7 +300,7 @@
   "deepl_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از"
   },
-  "deepl_api_key_link": { "message": "وبسایت DeepL Pro API" },
+  "deepl_api_key_link": { "message": "وبسایت DeepL API" },
   "deepl_free_api_info": {
     "message": "نسخه رایگان با ۵۰۰,۰۰۰ کاراکتر در ماه موجود است."
   },
@@ -324,6 +324,10 @@
   "deepl_formality_less": { "message": "غیررسمی‌تر" },
   "deepl_formality_prefer_more": { "message": "ترجیح رسمی" },
   "deepl_formality_prefer_less": { "message": "ترجیح غیررسمی" },
+  "deepl_beta_languages_label": { "message": "فعال‌سازی زبان‌های بتا" },
+  "deepl_beta_languages_description": {
+    "message": "پشتیبانی از زبان‌های بتا را فعال کنید. زبان‌های بتا از تنظیمات رسمی بودن پشتیبانی نمی‌کنند."
+  },
 
   "custom_api_settings_title": { "message": "تنظیمات API سفارشی" },
   "custom_api_settings_description": {

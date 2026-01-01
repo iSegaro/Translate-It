@@ -116,6 +116,7 @@ export const CONFIG = {
   DEEPL_API_KEY: "",
   DEEPL_API_TIER: "free", // 'free' or 'pro'
   DEEPL_FORMALITY: "default", // 'default', 'more', 'less', 'prefer_more', 'prefer_less'
+  DEEPL_BETA_LANGUAGES_ENABLED: true, // Enable beta languages support
   DEEPL_API_TIER_OPTIONS: [
     { value: "free", i18nKey: "deepl_api_tier_free" },
     { value: "pro", i18nKey: "deepl_api_tier_pro" }
@@ -620,6 +621,10 @@ export const getDeeplApiTierAsync = async () => {
 
 export const getDeeplFormalityAsync = async () => {
   return getSettingValueAsync("DEEPL_FORMALITY", CONFIG.DEEPL_FORMALITY);
+};
+
+export const getDeeplBetaLanguagesEnabledAsync = async () => {
+  return getSettingValueAsync("DEEPL_BETA_LANGUAGES_ENABLED", CONFIG.DEEPL_BETA_LANGUAGES_ENABLED);
 };
 
 // OpenAI Specific

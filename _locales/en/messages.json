@@ -295,7 +295,7 @@
   "deepl_api_key_info": {
     "message": "You can get your DeepL API key from"
   },
-  "deepl_api_key_link": { "message": "DeepL Pro API" },
+  "deepl_api_key_link": { "message": "DeepL API" },
   "deepl_free_api_info": {
     "message": "Free tier available with 500,000 characters/month."
   },
@@ -319,6 +319,10 @@
   "deepl_formality_less": { "message": "Less Formal" },
   "deepl_formality_prefer_more": { "message": "Prefer More Formal" },
   "deepl_formality_prefer_less": { "message": "Prefer Less Formal" },
+  "deepl_beta_languages_label": { "message": "Enable Beta Languages" },
+  "deepl_beta_languages_description": {
+    "message": "Enable support for beta languages. Beta languages do not support formality settings."
+  },
 
   "custom_api_settings_title": { "message": "Custom API Settings" },
   "custom_api_settings_description": {

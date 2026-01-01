@@ -163,6 +163,7 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
   YANDEX: LANGUAGE_NAME_TO_CODE_MAP,
 
   // DeepL Translate Language Codes (UPPERCASE)
+  // Standard languages
   DEEPL: {
     auto: '',
     'bg': 'BG',
@@ -196,6 +197,85 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'uk': 'UK',
     'zh': 'ZH',
     'zh-cn': 'ZH',
+  },
+
+  // DeepL Beta Languages (require enable_beta_languages parameter)
+  DEEPL_BETA: {
+    'ace': 'ACE',        // Acehnese
+    'af': 'AF',          // Afrikaans
+    'an': 'AN',          // Aragonese
+    'as': 'AS',          // Assamese
+    'ay': 'AY',          // Aymara
+    'az': 'AZ',          // Azerbaijani
+    'ba': 'BA',          // Bashkir
+    'be': 'BE',          // Belarusian
+    'bho': 'BHO',        // Bhojpuri
+    'bn': 'BN',          // Bengali
+    'br': 'BR',          // Breton
+    'bs': 'BS',          // Bosnian
+    'ca': 'CA',          // Catalan
+    'ceb': 'CEB',        // Cebuano
+    'ckb': 'CKB',        // Kurdish (Sorani)
+    'cy': 'CY',          // Welsh
+    'eo': 'EO',          // Esperanto
+    'eu': 'EU',          // Basque
+    'fa': 'FA',          // Persian (Farsi)
+    'ga': 'GA',          // Irish
+    'gl': 'GL',          // Galician
+    'gn': 'GN',          // Guarani
+    'gom': 'GOM',        // Konkani
+    'gu': 'GU',          // Gujarati
+    'ha': 'HA',          // Hausa
+    'hi': 'HI',          // Hindi
+    'hr': 'HR',          // Croatian
+    'ht': 'HT',          // Haitian Creole
+    'hy': 'HY',          // Armenian
+    'ig': 'IG',          // Igbo
+    'is': 'IS',          // Icelandic
+    'jv': 'JV',          // Javanese
+    'ka': 'KA',          // Georgian
+    'kk': 'KK',          // Kazakh
+    'kmr': 'KMR',        // Kurdish (Kurmanji)
+    'ky': 'KY',          // Kyrgyz
+    'la': 'LA',          // Latin
+    'lb': 'LB',          // Luxembourgish
+    'lmo': 'LMO',        // Lombard
+    'ln': 'LN',          // Lingala
+    'mai': 'MAI',        // Maithili
+    'mg': 'MG',          // Malagasy
+    'mi': 'MI',          // Maori
+    'mk': 'MK',          // Macedonian
+    'mn': 'MN',          // Mongolian
+    'mr': 'MR',          // Marathi
+    'ms': 'MS',          // Malay
+    'mt': 'MT',          // Maltese
+    'my': 'MY',          // Burmese
+    'ne': 'NE',          // Nepali
+    'oc': 'OC',          // Occitan
+    'pag': 'PAG',        // Pangasinan
+    'pam': 'PAM',        // Kapampangan
+    'prs': 'PRS',        // Dari
+    'ps': 'PS',          // Pashto
+    'qu': 'QU',          // Quechua
+    'sa': 'SA',          // Sanskrit
+    'scn': 'SCN',        // Sicilian
+    'sq': 'SQ',          // Albanian
+    'sr': 'SR',          // Serbian
+    'su': 'SU',          // Sundanese
+    'sw': 'SW',          // Swahili
+    'ta': 'TA',          // Tamil
+    'te': 'TE',          // Telugu
+    'tg': 'TG',          // Tajik
+    'tk': 'TK',          // Turkmen
+    'tl': 'TL',          // Tagalog
+    'tn': 'TN',          // Tswana
+    'ts': 'TS',          // Tsonga
+    'tt': 'TT',          // Tatar
+    'ur': 'UR',          // Urdu
+    'uz': 'UZ',          // Uzbek
+    'wo': 'WO',          // Wolof
+    'xh': 'XH',          // Xhosa
+    'yue': 'YUE',        // Cantonese
   },
 };
 

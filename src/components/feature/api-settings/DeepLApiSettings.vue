@@ -12,7 +12,7 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        {{ t('deepl_api_key_link') || 'DeepL Pro API' }}
+        {{ t('deepl_api_key_link') || 'DeepL API' }}
       </a>
       <span class="setting-description">
         {{ t('deepl_free_api_info') || 'Free tier available with 500,000 characters/month.' }}
@@ -41,12 +41,23 @@
     </div>
 
     <div class="setting-group">
+      <BaseCheckbox
+        v-model="deeplBetaLanguagesEnabled"
+        :label="t('deepl_beta_languages_label') || 'Enable Beta Languages'"
+      />
+      <span class="setting-description">
+        {{ t('deepl_beta_languages_description') || 'Enable support for beta languages. Beta languages do not support formality settings.' }}
+      </span>
+    </div>
+
+    <div class="setting-group">
       <label>{{ t('deepl_formality_label') || 'Translation Formality' }}</label>
       <BaseSelect
         v-model="deeplFormality"
         :options="deeplFormalityOptions"
         class="formality-select"
         :style="rtlSelectStyle"
+        :disabled="deeplBetaLanguagesEnabled"
       />
       <span class="setting-description">
         {{ t('deepl_formality_description') || 'Control the formality level of translations. Some languages may not support all options.' }}
@@ -62,6 +73,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 
 const { t } = useI18n()
@@ -82,6 +94,11 @@ const deeplApiTier = computed({
 const deeplFormality = computed({
   get: () => settingsStore.settings?.DEEPL_FORMALITY || 'default',
   set: (value) => settingsStore.updateSettingLocally('DEEPL_FORMALITY', value)
+})
+
+const deeplBetaLanguagesEnabled = computed({
+  get: () => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', value)
 })
 
 const deeplApiTierOptions = computed(() =>

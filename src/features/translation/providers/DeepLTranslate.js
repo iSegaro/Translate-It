@@ -3,50 +3,21 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import {
   getDeeplApiKeyAsync,
   getDeeplApiTierAsync,
-  getDeeplFormalityAsync
+  getDeeplFormalityAsync,
+  getDeeplBetaLanguagesEnabledAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 
-// DeepL uses UPPERCASE language codes
-const DEEPL_LANG_CODE_MAP = {
-  'en': 'EN',
-  'de': 'DE',
-  'fr': 'FR',
-  'es': 'ES',
-  'it': 'IT',
-  'ja': 'JA',
-  'zh': 'ZH',
-  'zh-cn': 'ZH',
-  'ru': 'RU',
-  'pt': 'PT',
-  'pt-br': 'PT-BR',
-  'nl': 'NL',
-  'pl': 'PL',
-  'tr': 'TR',
-  'bg': 'BG',
-  'cs': 'CS',
-  'da': 'DA',
-  'el': 'EL',
-  'et': 'ET',
-  'fi': 'FI',
-  'hu': 'HU',
-  'id': 'ID',
-  'ko': 'KO',
-  'lt': 'LT',
-  'lv': 'LV',
-  'nb': 'NB',
-  'ro': 'RO',
-  'sk': 'SK',
-  'sl': 'SL',
-  'sv': 'SV',
-  'uk': 'UK',
-};
+// Use mappings from languageConstants.js
+const DEEPL_LANG_CODE_MAP = PROVIDER_LANGUAGE_MAPPINGS.DEEPL;
+const DEEPL_BETA_LANG_CODE_MAP = PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA;
 
 export class DeepLTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -69,15 +40,21 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   /**
    * Convert language code to DeepL uppercase format
    * @param {string} lang - Language code or name
+   * @param {boolean} enableBetaLanguages - Whether beta languages are enabled
    * @returns {string} DeepL language code (uppercase)
    */
-  _getLangCode(lang) {
+  _getLangCode(lang, enableBetaLanguages = false) {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return ''; // DeepL auto-detect uses empty string
 
-    // Direct lookup in map
+    // Check standard languages first
     if (DEEPL_LANG_CODE_MAP[normalized]) {
       return DEEPL_LANG_CODE_MAP[normalized];
+    }
+
+    // Check beta languages if enabled
+    if (enableBetaLanguages && DEEPL_BETA_LANG_CODE_MAP[normalized]) {
+      return DEEPL_BETA_LANG_CODE_MAP[normalized];
     }
 
     // Convert to uppercase as fallback
@@ -107,8 +84,28 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
+    // Get beta languages setting
+    let betaLanguagesEnabled = await getDeeplBetaLanguagesEnabledAsync();
+
+    // Auto-detect: if source or target language is a beta language, enable beta languages
+    // Check if sourceLang is a beta language (not in standard map but in beta map)
+    const sourceIsBeta = sourceLang && sourceLang !== '' &&
+      !DEEPL_LANG_CODE_MAP[sourceLang.toLowerCase()] &&
+      DEEPL_BETA_LANG_CODE_MAP[sourceLang.toLowerCase()];
+
+    // Check if targetLang is a beta language
+    const targetIsBeta = targetLang &&
+      !DEEPL_LANG_CODE_MAP[targetLang.toLowerCase()] &&
+      DEEPL_BETA_LANG_CODE_MAP[targetLang.toLowerCase()];
+
+    // Auto-enable beta languages if needed
+    if (sourceIsBeta || targetIsBeta) {
+      betaLanguagesEnabled = true;
+      logger.info(`[DeepL] Auto-enabling beta languages for ${sourceIsBeta ? 'source' : ''}${sourceIsBeta && targetIsBeta ? ' and ' : ''}${targetIsBeta ? 'target' : ''} language`);
+    }
+
     // Add key info log for translation start
-    logger.info(`[DeepL] Starting translation: ${chunkTexts.join('').length} chars, ${chunkTexts.length} segments`);
+    logger.info(`[DeepL] Starting translation: ${chunkTexts.join('').length} chars, ${chunkTexts.length} segments, beta languages: ${betaLanguagesEnabled}`);
 
     // Build request body
     const requestBody = new URLSearchParams();
@@ -120,10 +117,15 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     }
     requestBody.append('target_lang', targetLang);
 
-    // Add formality parameter
+    // Add formality parameter (not supported for beta languages)
     const formality = await getDeeplFormalityAsync() || 'default';
-    if (formality !== 'default') {
+    if (formality !== 'default' && !betaLanguagesEnabled) {
       requestBody.append('formality', formality);
+    }
+
+    // Add beta languages parameter if enabled
+    if (betaLanguagesEnabled) {
+      requestBody.append('enable_beta_languages', '1');
     }
 
     // Additional options
