@@ -166,7 +166,10 @@ export class RequestHealthMonitor {
     // Check for alerts
     this._checkHealthAlerts(providerName, health);
     
-    logger.warn(`[RequestHealthMonitor] Recorded failure for ${providerName}: ${error.message || error}`);
+    // Use debug for user cancellations (not real errors)
+    const isUserCancelled = error.message?.includes('cancelled by user');
+    const logLevel = isUserCancelled ? 'debug' : 'warn';
+    logger[logLevel](`[RequestHealthMonitor] Recorded failure for ${providerName}: ${error.message || error}`);
   }
   
   /**

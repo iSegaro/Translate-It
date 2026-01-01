@@ -151,7 +151,9 @@ export class ErrorHandler {
       
       // Use instance debug mode instead of importing from config to avoid circular dependency
       if (this.debugMode && !SUPPRESS_CONSOLE.has(type)) {
-        logger.error(`[${type}] ${raw}`, err.stack);
+        // Use debug level for silent errors (like retryable DeepL 400)
+        const logLevel = enhancedMeta.showToast ? 'error' : 'debug';
+        logger[logLevel](`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
 

@@ -447,12 +447,17 @@ export class BaseTranslateProvider extends BaseProvider {
       // Import ErrorHandler for centralized error management
       const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
 
+      // For DeepL, HTTP 400 is a retryable error (too many segments), don't show error notification
+      const isRetryableDeepL400 = this.providerName === 'DeepLTranslate' &&
+                                   error.message?.includes('HTTP 400');
+
       // Let the centralized error handler manage the error
       const errorHandler = ErrorHandler.getInstance();
       await errorHandler.handle(error, {
         context: params.context,
         provider: this.providerName,
-        maxRetries: 2
+        maxRetries: 2,
+        isSilent: isRetryableDeepL400  // Don't show toast for retryable DeepL 400 errors
       });
 
       // If ErrorHandler returns, it means the error was handled (e.g., retried successfully)

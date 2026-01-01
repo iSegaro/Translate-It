@@ -227,14 +227,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
               logger.info(`[DeepL] Restored ${totalTags} blank lines from XML tags`);
               return restored;
             } else {
-              logger.warn('[DeepL] XML tags NOT preserved in translation, blank lines may be lost');
+              logger.debug('[DeepL] XML tags NOT preserved in translation, blank lines may be lost');
               return translation;
             }
           });
 
           // Validate segment count (should match valid texts, not original chunkTexts)
           if (restoredTranslations.length !== validTexts.length) {
-            logger.warn('[DeepL] Segment count mismatch:', {
+            logger.debug('[DeepL] Segment count mismatch:', {
               expected: validTexts.length,
               received: restoredTranslations.length
             });
@@ -274,7 +274,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     } catch (error) {
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
       if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 5) {
-        logger.warn(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/5)`);
+        logger.debug(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/5)`);
 
         // Split into smaller chunks and retry SEQUENTIALLY (not parallel)
         // DeepL Free API has issues with concurrent requests
@@ -287,14 +287,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         try {
           firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
         } catch (firstError) {
-          logger.warn(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
+          logger.debug(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
           firstResult = firstHalf;
         }
 
         try {
           secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
         } catch (secondError) {
-          logger.warn(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
+          logger.debug(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
           secondResult = secondHalf;
         }
 
@@ -304,7 +304,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // Final fallback for HTTP 400: translate each segment individually (sequential)
       // Only do this if we haven't already tried individual translation
       if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt >= 5) {
-        logger.warn(`[DeepL] Retry attempts exhausted, attempting sequential one-by-one translation for ${validTexts.length} segments`);
+        logger.debug(`[DeepL] Retry attempts exhausted, attempting sequential one-by-one translation for ${validTexts.length} segments`);
 
         const results = [];
         let successCount = 0;
