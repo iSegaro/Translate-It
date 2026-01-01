@@ -279,6 +279,69 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
   },
 };
 
+/**
+ * Provider-specific supported language codes
+ * Maps each provider to the list of language codes they support
+ */
+export const PROVIDER_SUPPORTED_LANGUAGES = {
+  // Google Translate - supports all standard languages (use values for codes)
+  google: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
+
+  // Bing Translate - languages from BING mapping (excluding aliases)
+  bing: [
+    'af', 'am', 'ar', 'az', 'bg', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'en',
+    'es', 'et', 'fa', 'fi', 'fr', 'ga', 'gu', 'he', 'hi', 'hr', 'ht', 'hu', 'hy',
+    'id', 'is', 'it', 'ja', 'kk', 'km', 'kn', 'ko', 'ku', 'lo', 'lt', 'lv', 'mg',
+    'mi', 'ml', 'mr', 'ms', 'mt', 'my', 'ne', 'nl', 'no', 'pa', 'pl', 'ps', 'pt',
+    'ro', 'ru', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr',
+    'uk', 'ur', 'vi', 'zh-CN', 'zh-TW'
+  ],
+
+  // Yandex Translate - same as Google
+  yandex: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
+
+  // Browser API - uses Chrome's built-in translation, supports most languages
+  browserapi: [
+    'af', 'am', 'ar', 'az', 'be', 'bg', 'bn', 'bs', 'ca', 'cs', 'cy', 'da', 'de',
+    'el', 'en', 'es', 'et', 'eu', 'fa', 'fi', 'fil', 'fr', 'gl', 'gu', 'he', 'hi',
+    'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'ka', 'kk', 'km', 'kn', 'ko', 'lt',
+    'lv', 'mk', 'ml', 'mr', 'ms', 'mt', 'ne', 'nl', 'no', 'pl', 'pt', 'ro', 'ru',
+    'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'uk', 'ur',
+    'vi', 'zh-CN', 'zh-TW'
+  ],
+
+  // DeepL - standard languages only (when beta is disabled)
+  deepl: [
+    'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
+    'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
+    'sv', 'tr', 'uk', 'zh', 'zh-cn'
+  ],
+
+  // DeepL with beta languages enabled
+  deepl_beta: [
+    // Standard languages
+    'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
+    'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
+    'sv', 'tr', 'uk', 'zh', 'zh-cn',
+    // Beta languages
+    'ace', 'af', 'an', 'as', 'ay', 'az', 'ba', 'be', 'bho', 'bn', 'br', 'bs', 'ca',
+    'ceb', 'ckb', 'cy', 'eo', 'eu', 'fa', 'ga', 'gl', 'gn', 'gom', 'gu', 'ha', 'hi',
+    'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ky', 'la', 'lb', 'lmo',
+    'ln', 'mai', 'mg', 'mi', 'mk', 'mn', 'mr', 'ms', 'mt', 'my', 'ne', 'oc', 'pag',
+    'pam', 'prs', 'ps', 'qu', 'sa', 'scn', 'sq', 'sr', 'su', 'sw', 'ta', 'te', 'tg',
+    'tk', 'tl', 'tn', 'ts', 'tt', 'ur', 'uz', 'wo', 'xh', 'yue'
+  ],
+
+  // AI Providers (Gemini, OpenAI, OpenRouter, DeepSeek, WebAI, Custom)
+  // These support virtually all languages through LLM capabilities
+  gemini: null, // null = supports all languages
+  openai: null,
+  openrouter: null,
+  deepseek: null,
+  webai: null,
+  custom: null
+};
+
 // Utility function to normalize language names
 export function normalizeLanguageName(lang) {
   if (!lang || typeof lang !== "string") return "";

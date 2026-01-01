@@ -13,7 +13,7 @@
         <label>{{ t('source_language_label') || 'Source Language' }}</label>
         <LanguageDropdown
           v-model="sourceLanguage"
-          :languages="sourceLanguages"
+          :languages="filteredSourceLanguages"
           type="source"
         />
       </div>
@@ -22,7 +22,7 @@
         <label>{{ t('target_language_label') || 'Target Language' }}</label>
         <LanguageDropdown
           v-model="targetLanguage"
-          :languages="targetLanguages"
+          :languages="filteredTargetLanguages"
           type="target"
         />
       </div>
@@ -80,23 +80,172 @@ import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
+import { useProviderLanguages } from '@/composables/shared/useProviderLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import { useI18n } from 'vue-i18n'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
 const settingsStore = useSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
-const { sourceLanguages, targetLanguages, loadLanguages, isLoaded } = useLanguages()
+const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
 
 // Form values as refs
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
+
+// ========== Provider-Specific Language Filtering ==========
+/**
+ * Filter languages based on the selected provider
+ * Handles DeepL beta languages toggle automatically
+ */
+const filteredSourceLanguages = computed(() => {
+  const provider = settingsStore.selectedProvider
+  const languages = allLanguages.value || []
+
+  // Auto-detect is always included for source
+  const autoOption = { code: 'auto', name: 'Auto-Detect', promptName: 'Auto Detect' }
+
+  // If languages not loaded yet, return auto only
+  if (!languages.length) {
+    return [autoOption]
+  }
+
+  // AI providers support all languages
+  if (['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(provider)) {
+    return [autoOption, ...languages]
+  }
+
+  // DeepL with beta toggle
+  if (provider === 'deepl') {
+    const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
+    const supportedCodes = betaEnabled
+      ? PROVIDER_SUPPORTED_LANGUAGES.deepl_beta
+      : PROVIDER_SUPPORTED_LANGUAGES.deepl
+
+    const normalizedSupportedCodes = new Set(
+      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+    )
+
+    const filtered = languages.filter(lang => {
+      const normalizedCode = lang.code.toLowerCase().replace('-', '')
+      return normalizedSupportedCodes.has(normalizedCode)
+    })
+
+    return [autoOption, ...filtered]
+  }
+
+  // Other providers with specific language support
+  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
+  if (supportedCodes && supportedCodes.length > 0) {
+    const normalizedSupportedCodes = new Set(
+      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+    )
+
+    const filtered = languages.filter(lang => {
+      const normalizedCode = lang.code.toLowerCase().replace('-', '')
+      return normalizedSupportedCodes.has(normalizedCode)
+    })
+
+    return [autoOption, ...filtered]
+  }
+
+  // Fallback: return all languages
+  return [autoOption, ...languages]
+})
+
+const filteredTargetLanguages = computed(() => {
+  const provider = settingsStore.selectedProvider
+  const languages = allLanguages.value || []
+
+  // If languages not loaded yet, return empty
+  if (!languages.length) {
+    return []
+  }
+
+  // AI providers support all languages
+  if (['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(provider)) {
+    return languages
+  }
+
+  // DeepL with beta toggle
+  if (provider === 'deepl') {
+    const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
+    const supportedCodes = betaEnabled
+      ? PROVIDER_SUPPORTED_LANGUAGES.deepl_beta
+      : PROVIDER_SUPPORTED_LANGUAGES.deepl
+
+    const normalizedSupportedCodes = new Set(
+      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+    )
+
+    return languages.filter(lang => {
+      const normalizedCode = lang.code.toLowerCase().replace('-', '')
+      return normalizedSupportedCodes.has(normalizedCode)
+    })
+  }
+
+  // Other providers with specific language support
+  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
+  if (supportedCodes && supportedCodes.length > 0) {
+    const normalizedSupportedCodes = new Set(
+      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+    )
+
+    return languages.filter(lang => {
+      const normalizedCode = lang.code.toLowerCase().replace('-', '')
+      return normalizedSupportedCodes.has(normalizedCode)
+    })
+  }
+
+  // Fallback: return all languages
+  return languages
+})
+
+// Watch for provider changes and validate selected languages
+watch(() => settingsStore.selectedProvider, (newProvider) => {
+  // Check if current source language is supported by new provider
+  const sourceSupported = filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)
+  if (!sourceSupported) {
+    // Fallback to auto or first available language
+    sourceLanguage.value = 'auto'
+    logger.debug(`Source language not supported by ${newProvider}, reset to auto`)
+  }
+
+  // Check if current target language is supported by new provider
+  const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
+  if (!targetSupported) {
+    // Fallback to English or first available language
+    const english = filteredTargetLanguages.value.find(l => l.code === 'en')
+    targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
+    logger.debug(`Target language not supported by ${newProvider}, reset to`, targetLanguage.value)
+  }
+})
+
+// Watch for DeepL beta toggle changes
+watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldBeta) => {
+  if (settingsStore.selectedProvider === 'deepl' && newBeta !== oldBeta) {
+    // Re-validate languages when beta toggle changes
+    const sourceSupported = filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)
+    if (!sourceSupported) {
+      sourceLanguage.value = 'auto'
+      logger.debug('Source language not supported with new beta setting, reset to auto')
+    }
+
+    const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
+    if (!targetSupported) {
+      const english = filteredTargetLanguages.value.find(l => l.code === 'en')
+      targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
+      logger.debug('Target language not supported with new beta setting, reset to', targetLanguage.value)
+    }
+  }
+})
 
 // Sync with settings on mount
 onMounted(async () => {
