@@ -260,15 +260,19 @@ export class BaseTranslateProvider extends BaseProvider {
    */
   _createChunks(texts) {
     const chunks = [];
-    
+
     if (this.constructor.chunkingStrategy === 'character_limit') {
-      // Character-based chunking (like Google Translate)
+      // Character-based chunking with segment limit (like Google Translate, DeepL)
       let currentChunk = [];
       let currentCharCount = 0;
-      
+
       for (const text of texts) {
-        if (currentChunk.length > 0 && 
-            currentCharCount + text.length > this.constructor.characterLimit) {
+        // Check if adding this text would exceed character limit OR segment limit
+        const wouldExceedCharLimit = currentChunk.length > 0 &&
+            currentCharCount + text.length > this.constructor.characterLimit;
+        const wouldExceedSegmentLimit = currentChunk.length >= this.constructor.maxChunksPerBatch;
+
+        if (wouldExceedCharLimit || wouldExceedSegmentLimit) {
           chunks.push({
             texts: currentChunk,
             charCount: currentCharCount
@@ -279,7 +283,7 @@ export class BaseTranslateProvider extends BaseProvider {
         currentChunk.push(text);
         currentCharCount += text.length;
       }
-      
+
       if (currentChunk.length > 0) {
         chunks.push({
           texts: currentChunk,

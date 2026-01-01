@@ -24,12 +24,12 @@ export const TRANSLATION_CONSTANTS = {
     DEEPL: 10000,
   },
 
-  // Provider-specific batch sizes
+  // Provider-specific batch sizes (max segments per request)
   MAX_CHUNKS_PER_BATCH: {
     GOOGLE: 10,
     BING: 15,
     YANDEX: 25,
-    DEEPL: 8,
+    DEEPL: 5, // Very conservative for DeepL Free API with beta languages
   },
 
   // Dictionary support flags
