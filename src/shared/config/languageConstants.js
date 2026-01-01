@@ -161,6 +161,42 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
 
   // Yandex Translate Language Codes
   YANDEX: LANGUAGE_NAME_TO_CODE_MAP,
+
+  // DeepL Translate Language Codes (UPPERCASE)
+  DEEPL: {
+    auto: '',
+    'bg': 'BG',
+    'cs': 'CS',
+    'da': 'DA',
+    'de': 'DE',
+    'el': 'EL',
+    'en': 'EN',
+    'es': 'ES',
+    'et': 'ET',
+    'fi': 'FI',
+    'fr': 'FR',
+    'hu': 'HU',
+    'id': 'ID',
+    'it': 'IT',
+    'ja': 'JA',
+    'ko': 'KO',
+    'lt': 'LT',
+    'lv': 'LV',
+    'nb': 'NB',
+    'nl': 'NL',
+    'pl': 'PL',
+    'pt': 'PT',
+    'pt-br': 'PT-BR',
+    'ro': 'RO',
+    'ru': 'RU',
+    'sk': 'SK',
+    'sl': 'SL',
+    'sv': 'SV',
+    'tr': 'TR',
+    'uk': 'UK',
+    'zh': 'ZH',
+    'zh-cn': 'ZH',
+  },
 };
 
 // Utility function to normalize language names

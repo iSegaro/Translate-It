@@ -112,6 +112,22 @@ export const CONFIG = {
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
 
+  // --- DeepL API Settings ---
+  DEEPL_API_KEY: "",
+  DEEPL_API_TIER: "free", // 'free' or 'pro'
+  DEEPL_FORMALITY: "default", // 'default', 'more', 'less', 'prefer_more', 'prefer_less'
+  DEEPL_API_TIER_OPTIONS: [
+    { value: "free", i18nKey: "deepl_api_tier_free" },
+    { value: "pro", i18nKey: "deepl_api_tier_pro" }
+  ],
+  DEEPL_FORMALITY_OPTIONS: [
+    { value: "default", i18nKey: "deepl_formality_default" },
+    { value: "more", i18nKey: "deepl_formality_more" },
+    { value: "less", i18nKey: "deepl_formality_less" },
+    { value: "prefer_more", i18nKey: "deepl_formality_prefer_more" },
+    { value: "prefer_less", i18nKey: "deepl_formality_prefer_less" }
+  ],
+
   // --- browser Translation API Settings (Chrome 138+) ---
   BROWSER_TRANSLATE_ENABLED: true, // Enable/disable browser Translation API
   BROWSER_TRANSLATE_AUTO_DOWNLOAD: true, // Automatically download language packs when needed
@@ -591,6 +607,19 @@ export const getCustomApiKeyAsync = async () => {
 
 export const getCustomApiModelAsync = async () => {
   return getSettingValueAsync("CUSTOM_API_MODEL", CONFIG.CUSTOM_API_MODEL);
+};
+
+// DeepL Specific
+export const getDeeplApiKeyAsync = async () => {
+  return getSettingValueAsync("DEEPL_API_KEY", CONFIG.DEEPL_API_KEY);
+};
+
+export const getDeeplApiTierAsync = async () => {
+  return getSettingValueAsync("DEEPL_API_TIER", CONFIG.DEEPL_API_TIER);
+};
+
+export const getDeeplFormalityAsync = async () => {
+  return getSettingValueAsync("DEEPL_FORMALITY", CONFIG.DEEPL_FORMALITY);
 };
 
 // OpenAI Specific
