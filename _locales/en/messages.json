@@ -591,6 +591,9 @@
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "You have exceeded your quota for this API."
   },
+  "ERRORS_DEEPL_QUOTA_EXCEEDED": {
+    "message": "DeepL character limit exceeded. Free tier: 500,000 chars/month. Check your DeepL account settings or upgrade your plan."
+  },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "Gemini quota exceeded, which may be due to a region-specific limit."
   },
