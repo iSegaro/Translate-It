@@ -80,13 +80,12 @@ import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
-import { useProviderLanguages } from '@/composables/shared/useProviderLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import { useI18n } from 'vue-i18n'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PROVIDER_SUPPORTED_LANGUAGES } from '@/shared/config/languageConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
@@ -104,6 +103,7 @@ const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
 /**
  * Filter languages based on the selected provider
  * Handles DeepL beta languages toggle automatically
+ * Uses canonical code matching for providers with different code formats
  */
 const filteredSourceLanguages = computed(() => {
   const provider = settingsStore.selectedProvider
@@ -130,12 +130,12 @@ const filteredSourceLanguages = computed(() => {
       : PROVIDER_SUPPORTED_LANGUAGES.deepl
 
     const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+      supportedCodes.map(code => getCanonicalCode(code))
     )
 
     const filtered = languages.filter(lang => {
-      const normalizedCode = lang.code.toLowerCase().replace('-', '')
-      return normalizedSupportedCodes.has(normalizedCode)
+      if (lang.code === 'auto') return true
+      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
     })
 
     return [autoOption, ...filtered]
@@ -145,12 +145,12 @@ const filteredSourceLanguages = computed(() => {
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
   if (supportedCodes && supportedCodes.length > 0) {
     const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+      supportedCodes.map(code => getCanonicalCode(code))
     )
 
     const filtered = languages.filter(lang => {
-      const normalizedCode = lang.code.toLowerCase().replace('-', '')
-      return normalizedSupportedCodes.has(normalizedCode)
+      if (lang.code === 'auto') return true
+      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
     })
 
     return [autoOption, ...filtered]
@@ -182,12 +182,11 @@ const filteredTargetLanguages = computed(() => {
       : PROVIDER_SUPPORTED_LANGUAGES.deepl
 
     const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+      supportedCodes.map(code => getCanonicalCode(code))
     )
 
     return languages.filter(lang => {
-      const normalizedCode = lang.code.toLowerCase().replace('-', '')
-      return normalizedSupportedCodes.has(normalizedCode)
+      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
     })
   }
 
@@ -195,12 +194,11 @@ const filteredTargetLanguages = computed(() => {
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
   if (supportedCodes && supportedCodes.length > 0) {
     const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => code.toLowerCase().replace('-', ''))
+      supportedCodes.map(code => getCanonicalCode(code))
     )
 
     return languages.filter(lang => {
-      const normalizedCode = lang.code.toLowerCase().replace('-', '')
-      return normalizedSupportedCodes.has(normalizedCode)
+      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
     })
   }
 
@@ -221,8 +219,10 @@ watch(() => settingsStore.selectedProvider, (newProvider) => {
   // Check if current target language is supported by new provider
   const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
   if (!targetSupported) {
-    // Fallback to English or first available language
-    const english = filteredTargetLanguages.value.find(l => l.code === 'en')
+    // Fallback to English or first available language (try different code variations)
+    const english = filteredTargetLanguages.value.find(l =>
+      l.code === 'en' || l.code === 'English' || getCanonicalCode(l.code) === 'en'
+    )
     targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
     logger.debug(`Target language not supported by ${newProvider}, reset to`, targetLanguage.value)
   }
@@ -240,7 +240,9 @@ watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldB
 
     const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
     if (!targetSupported) {
-      const english = filteredTargetLanguages.value.find(l => l.code === 'en')
+      const english = filteredTargetLanguages.value.find(l =>
+        l.code === 'en' || l.code === 'English' || getCanonicalCode(l.code) === 'en'
+      )
       targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
       logger.debug('Target language not supported with new beta setting, reset to', targetLanguage.value)
     }

@@ -282,7 +282,40 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
 /**
  * Provider-specific supported language codes
  * Maps each provider to the list of language codes they support
+ *
+ * IMPORTANT: For providers that use different codes (like browserapi using 'zh' instead of 'zh-CN'),
+ * we use canonical codes and a variation mapping to handle different code formats.
  */
+
+/**
+ * Canonical language code mapping
+ * Maps different code variations to a canonical form for matching
+ */
+const CANONICAL_CODE_MAP = {
+  // Chinese variations - all map to 'zh'
+  'zh': 'zh',
+  'zhcn': 'zh',     // zh-CN normalized
+  'zhtw': 'zh',     // zh-TW normalized
+  'zhans': 'zh',    // zh-Hans normalized
+  'zhant': 'zh',    // zh-Hant normalized
+
+  // Filipino/Tagalog variations
+  'fil': 'fil',
+  'tl': 'fil',
+};
+
+/**
+ * Get canonical code for a language code
+ * Handles variations like zh-CN -> zh, tl -> fil
+ * @param {string} code - Language code to canonicalize
+ * @returns {string} Canonical language code
+ */
+export function getCanonicalCode(code) {
+  if (!code) return code;
+  const normalized = code.toLowerCase().replace(/[-_]/g, '');
+  return CANONICAL_CODE_MAP[normalized] || normalized;
+}
+
 export const PROVIDER_SUPPORTED_LANGUAGES = {
   // Google Translate - supports all standard languages (use values for codes)
   google: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
@@ -300,14 +333,22 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
   // Yandex Translate - same as Google
   yandex: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
 
-  // Browser API - uses Chrome's built-in translation, supports most languages
+  // Browser API - uses Chrome's built-in translation (from BrowserAPI.js langNameToCodeMap)
+  // Using canonical codes for matching
+  // Note: Provider might be 'browser', 'browserapi', or 'BrowserAPI' depending on context
   browserapi: [
-    'af', 'am', 'ar', 'az', 'be', 'bg', 'bn', 'bs', 'ca', 'cs', 'cy', 'da', 'de',
-    'el', 'en', 'es', 'et', 'eu', 'fa', 'fi', 'fil', 'fr', 'gl', 'gu', 'he', 'hi',
-    'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'ka', 'kk', 'km', 'kn', 'ko', 'lt',
-    'lv', 'mk', 'ml', 'mr', 'ms', 'mt', 'ne', 'nl', 'no', 'pl', 'pt', 'ro', 'ru',
-    'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'uk', 'ur',
-    'vi', 'zh-CN', 'zh-TW'
+    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl',
+    'en', 'et', 'fa', 'fil', 'fi', 'fr', 'de', 'el', 'he', 'hi', 'hu', 'id', 'it',
+    'ja', 'ko', 'lv', 'lt', 'ms', 'no', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl',
+    'es', 'sv', 'th', 'tr', 'uk', 'vi'
+  ],
+
+  // Alias for 'browser' (in case provider name is different)
+  browser: [
+    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl',
+    'en', 'et', 'fa', 'fil', 'fi', 'fr', 'de', 'el', 'he', 'hi', 'hu', 'id', 'it',
+    'ja', 'ko', 'lv', 'lt', 'ms', 'no', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl',
+    'es', 'sv', 'th', 'tr', 'uk', 'vi'
   ],
 
   // DeepL - standard languages only (when beta is disabled)
