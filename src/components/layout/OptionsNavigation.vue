@@ -111,7 +111,7 @@ const saveAllSettings = async () => {
 // Disable prompt tab based on selected API (like original logic)
 const shouldDisablePromptTab = computed(() => {
   const provider = settingsStore.selectedProvider
-  return ['google', 'bing', 'browserapi', 'yandex'].includes(provider)
+  return ['google', 'bing', 'browserapi', 'yandex', 'deepl'].includes(provider)
 })
 
 // Apply disabled state to prompt tab
