@@ -28,6 +28,14 @@
       </div>
     </template>
 
+    <!-- Validation errors -->
+    <div
+      v-if="validationError"
+      class="validation-error"
+    >
+      {{ validationError }}
+    </div>
+
     <!-- Separator for API Settings section -->
     <div class="section-separator" />
 
@@ -63,14 +71,6 @@
 
         <component :is="providerSettingsComponent" />
       </div>
-    </div>
-
-    <!-- Validation errors -->
-    <div
-      v-if="validationError"
-      class="validation-error"
-    >
-      {{ validationError }}
     </div>
   </section>
 </template>
