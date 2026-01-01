@@ -254,6 +254,8 @@ onMounted(async () => {
   await loadLanguages();
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
   targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'English'
+  // Validate on mount to show error if languages are the same
+  await validateLanguages()
 })
 
 // Update settings when changed
