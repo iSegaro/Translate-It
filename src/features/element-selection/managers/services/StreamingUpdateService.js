@@ -4,6 +4,7 @@ import { findBestTranslationMatch } from "../../utils/textProcessing.js";
 import { generateUniqueId } from "../../utils/domManipulation.js";
 import { ensureSpacingBeforeInlineElements, preserveAdjacentSpacing } from "../../utils/spacingUtils.js";
 import { detectTextDirectionFromContent } from "../../utils/textDirection.js";
+import { getTargetLanguageAsync } from "@/shared/config/config.js";
 
 /**
  * Helper function to escape HTML special characters
@@ -355,7 +356,6 @@ export class StreamingUpdateService {
     this.logger.debug(`Applying ${newTranslations.size} streaming translations immediately`);
 
     // Get target language for better RTL detection
-    const { getTargetLanguageAsync } = await import("../../../../config.js");
     const targetLanguage = await getTargetLanguageAsync();
 
     const appliedNodes = new Set();

@@ -3,6 +3,7 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { reassembleTranslations } from "../../utils/textProcessing.js";
 import { unifiedTranslationCoordinator } from '@/shared/messaging/core/UnifiedTranslationCoordinator.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { getTargetLanguageAsync } from "@/shared/config/config.js";
 
 /**
  * StreamEndService - Handles stream completion and final result processing
@@ -96,6 +97,9 @@ export class StreamEndService {
     this.logger.debug(`Stream ended successfully for messageId: ${messageId}. Processing final result...`);
 
     const orchestrator = this.uiManager.orchestrator;
+
+    // Get target language once for direction detection
+    const targetLanguage = await getTargetLanguageAsync();
 
     try {
       // Create final translated data array that matches the full expandedTexts structure
@@ -214,8 +218,6 @@ export class StreamEndService {
 
       // CRITICAL: Apply RTL direction to parent elements for proper text display
       // Simplified approach - just applies dir attribute without wrapper structure
-      const { getTargetLanguageAsync } = await import("../../../../config.js");
-      const targetLanguage = await getTargetLanguageAsync();
       await this.uiManager.directionManager.applyImmersiveTranslatePattern(request.element, newTranslations, messageId, targetLanguage);
 
       // Mark request as completed to prevent further stream updates
@@ -274,8 +276,6 @@ export class StreamEndService {
           });
 
           // CRITICAL: Apply RTL direction to parent elements for proper text display (fallback case)
-          const { getTargetLanguageAsync } = await import("../../../../config.js");
-          const targetLanguage = await getTargetLanguageAsync();
           await this.uiManager.directionManager.applyImmersiveTranslatePattern(request.element, fallbackTranslations, messageId, targetLanguage);
 
           this.logger.debug(`Fallback translation processing completed: ${fallbackTranslations.size} translations applied`);
@@ -426,6 +426,9 @@ export class StreamEndService {
     const { translatedText } = data;
     const orchestrator = this.uiManager.orchestrator;
 
+    // Get target language once for direction detection
+    const targetLanguage = await getTargetLanguageAsync();
+
     // Handle JSON responses with markdown code blocks (similar to BaseAIProvider._parseBatchResult)
     let parsedData;
     try {
@@ -538,6 +541,9 @@ export class StreamEndService {
       isFinalResult: true,
       messageId: request.id
     });
+
+    // CRITICAL: Apply RTL direction to parent elements for proper text display
+    await this.uiManager.directionManager.applyImmersiveTranslatePattern(element, newTranslations, request.id, targetLanguage);
 
     orchestrator.requestManager.updateRequestStatus(request.id, 'completed', { result: data });
     this.logger.debug("Translation applied successfully to DOM elements (fallback)", { messageId: request.id });

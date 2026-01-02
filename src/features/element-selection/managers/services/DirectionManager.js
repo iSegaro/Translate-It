@@ -272,24 +272,66 @@ export class DirectionManager {
   /**
    * Apply direction correction during streaming translation
    * Optimized version that processes only currently translated segments.
-   * Uses targetLanguage for direction detection (simpler than content analysis).
+   * Uses actual translated content for direction detection (accurate).
    * @param {HTMLElement} targetElement - The element containing translated content
-   * @param {string} targetLanguage - Target language code for direction detection
+   * @param {string} targetLanguage - Target language code (used as fallback, not primary)
    */
   async applyStreamingDirection(targetElement, targetLanguage) {
     this.logger.debug('Applying streaming direction correction', {
       tagName: targetElement.tagName
     });
 
-    // Use targetLanguage for direction (simpler and faster than content analysis)
-    // At stream end, we'll do full content-based detection
-    const isRTL = isRTLLanguage(targetLanguage);
-
     // Find translated segments (single query)
     const segmentElements = targetElement.querySelectorAll('[data-segment-id]');
 
     if (segmentElements.length === 0) {
       return;
+    }
+
+    // CRITICAL: Detect direction from actual translated content, not just targetLanguage
+    // This ensures correct direction when translating to/from RTL languages
+    let rtlCount = 0;
+    let ltrCount = 0;
+    let samplesChecked = 0;
+    let hasRTLCharacters = false;
+
+    // Regex for Strong RTL characters
+    const rtlCharRegex = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0780-\u07BF\u07C0-\u07FF\u08A0-\u08FF\uFB1D-\uFB4F\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+    // Sample up to 15 translated segments to determine direction
+    for (const segment of segmentElements) {
+      if (samplesChecked >= 15) break;
+
+      const text = segment.textContent?.trim();
+      if (text) {
+        const dir = detectTextDirectionFromContent(text, null); // Don't pass targetLanguage - rely on content
+        if (dir === 'rtl') {
+          rtlCount++;
+        } else {
+          ltrCount++;
+        }
+
+        // Check for presence of RTL characters
+        if (!hasRTLCharacters && rtlCharRegex.test(text)) {
+          hasRTLCharacters = true;
+        }
+
+        samplesChecked++;
+      }
+    }
+
+    // Determine direction based on actual translated content
+    let isRTL = false;
+    if (samplesChecked > 0) {
+      // Use the same logic as applyImmersiveTranslatePattern
+      if (isRTLLanguage(targetLanguage) && hasRTLCharacters) {
+        isRTL = true;
+      } else {
+        isRTL = rtlCount > ltrCount;
+      }
+    } else {
+      // No content found, fall back to target language
+      isRTL = isRTLLanguage(targetLanguage);
     }
 
     // Clean up segments and collect containers in single pass
