@@ -337,6 +337,7 @@ export class TranslationRenderer {
 
     const marks = element.querySelectorAll('mark');
     marks.forEach(mark => {
+      // eslint-disable-next-line noUnsanitized/property -- Safe: using element's own innerHTML
       mark.outerHTML = mark.innerHTML;
     });
   }

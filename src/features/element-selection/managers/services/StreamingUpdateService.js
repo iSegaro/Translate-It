@@ -493,6 +493,7 @@ export class StreamingUpdateService {
             // This prevents repositioning issues like "X" moving in "40% off"
             if (detectedDir === 'rtl') {
               const processedHTML = wrapLTRPortions(processedText, detectedDir);
+              // eslint-disable-next-line noUnsanitized/property -- Content is escaped via escapeHtml() in wrapLTRPortions()
               translationSpan.innerHTML = processedHTML;
             } else {
               translationSpan.textContent = processedText;
@@ -536,6 +537,7 @@ export class StreamingUpdateService {
             // This prevents repositioning issues like "X" moving in "40% off"
             if (nodeDetectedDir === 'rtl') {
               const processedHTML = wrapLTRPortions(finalText, nodeDetectedDir);
+              // eslint-disable-next-line noUnsanitized/property -- Content is escaped via escapeHtml() in wrapLTRPortions()
               actualNode.innerHTML = processedHTML;
             } else {
               actualNode.textContent = finalText;
