@@ -640,7 +640,7 @@
   "SELECT_ELEMENT_TRANSLATING": { "message": "در حال ترجمه..." },
   "SELECT_ELEMENT_CANCEL": { "message": "کنسل" },
   "SELECT_ELEMENT_REVERT": { "message": "بازگشت" },
-  "SELECT_ELEMENT_BING_WARNING": { "message": "سرویس 'بینگ' ممکن است در متن‌های طولانی یا پیچیده دچار مشکل شود. در صورت بروز خطا، از یک سرویس دیگر استفاده کنید." },
+  "SELECT_ELEMENT_BING_WARNING": { "message": "سرویس Bing ممکن است در متن‌های طولانی یا پیچیده دچار مشکل شود. در صورت بروز خطا، از یک سرویس دیگر استفاده کنید." },
 
   "text_field_shortcut_label": { "message": "میانبر سفارشی:" },
   "click_to_set_shortcut": { "message": "برای تنظیم میانبر کلیک کنید" },
