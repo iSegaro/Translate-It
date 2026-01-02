@@ -1,3 +1,21 @@
+#### v1.7.0 – Released on Janurary 02, 2026
+
+##### Added
+
+- Added `DeepL` translation provider with support for Free/Pro API tiers
+- Updated providers for new models (Gemini 3, Gemini 2.5)
+
+##### Fixed
+
+- Fixed the `Revert` issue after using `Select Element`
+
+
+##### Changed
+
+- Merged `API Settings` tab into [Languages](#/languages) tab for better UX
+
+---
+
 #### v1.6.0 – Released on December 31, 2025
 
 ##### Fixed
@@ -79,7 +97,7 @@
 
 ##### Added
 
-- Added example URL text below the API URL field in [Options page > Custom API](#/api) settings for better user guidance
+- Added example URL text below the API URL field in [Options page > Custom API](#/languages) settings for better user guidance
 
 ---
 
