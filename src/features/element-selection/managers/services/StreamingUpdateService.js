@@ -602,6 +602,20 @@ export class StreamingUpdateService {
       appliedCount: appliedCount,
       uniqueTranslations: newTranslations.size
     });
+
+    // CRITICAL FIX: Apply direction correction immediately after streaming batch
+    // This ensures text flows correctly while more segments are being translated
+    if (appliedCount > 0 && request.element) {
+      try {
+        await this.uiManager.directionManager.applyStreamingDirection(
+          request.element,
+          targetLanguage
+        );
+      } catch (directionError) {
+        this.logger.warn('Failed to apply streaming direction correction:', directionError);
+        // Don't fail the translation if direction correction fails
+      }
+    }
   }
 
   /**

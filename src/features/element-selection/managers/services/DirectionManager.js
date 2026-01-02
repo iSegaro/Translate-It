@@ -176,7 +176,18 @@ export class DirectionManager {
        if (!container.hasAttribute('data-original-text-align')) {
          container.setAttribute('data-original-text-align', container.style.textAlign || '');
        }
-       container.style.textAlign = isRTL ? 'right' : 'left';
+
+       // CRITICAL: Respect original center/justify alignment
+       // Only swap left/right based on direction
+       const originalAlign = container.getAttribute('data-original-text-align') ||
+                            container.style.textAlign ||
+                            window.getComputedStyle(container).textAlign;
+
+       if (originalAlign === 'center' || originalAlign === 'justify') {
+         container.style.textAlign = originalAlign;
+       } else {
+         container.style.textAlign = isRTL ? 'right' : 'left';
+       }
 
        // 4. Lang
        if (targetLanguage) {
@@ -256,6 +267,83 @@ export class DirectionManager {
     }
 
     return null;
+  }
+
+  /**
+   * Apply direction correction during streaming translation
+   * Optimized version that processes only currently translated segments.
+   * Uses targetLanguage for direction detection (simpler than content analysis).
+   * @param {HTMLElement} targetElement - The element containing translated content
+   * @param {string} targetLanguage - Target language code for direction detection
+   */
+  async applyStreamingDirection(targetElement, targetLanguage) {
+    this.logger.debug('Applying streaming direction correction', {
+      tagName: targetElement.tagName
+    });
+
+    // Use targetLanguage for direction (simpler and faster than content analysis)
+    // At stream end, we'll do full content-based detection
+    const isRTL = isRTLLanguage(targetLanguage);
+
+    // Find translated segments (single query)
+    const segmentElements = targetElement.querySelectorAll('[data-segment-id]');
+
+    if (segmentElements.length === 0) {
+      return;
+    }
+
+    // Clean up segments and collect containers in single pass
+    const containers = new Set();
+    containers.add(targetElement);
+
+    // Single pass: clean segments + find containers
+    for (const segment of segmentElements) {
+      // Remove segment-level direction so they flow with container
+      if (segment.hasAttribute('dir')) {
+        segment.removeAttribute('dir');
+      }
+      if (segment.style.unicodeBidi) {
+        segment.style.unicodeBidi = 'normal';
+      }
+
+      // Find containers up to target element
+      let current = segment.parentNode;
+      while (current && current !== document.body && targetElement.contains(current)) {
+        if (current === targetElement) break;
+
+        const display = window.getComputedStyle(current).display;
+        if (display !== 'inline') {
+          containers.add(current);
+        }
+        current = current.parentNode;
+      }
+    }
+
+    // Apply direction to containers
+    for (const container of containers) {
+      if (!container.hasAttribute('data-original-unicode-bidi')) {
+        container.setAttribute('data-original-unicode-bidi', container.style.unicodeBidi || '');
+      }
+      if (!container.hasAttribute('data-original-text-align')) {
+        container.setAttribute('data-original-text-align', container.style.textAlign || '');
+      }
+
+      container.style.unicodeBidi = 'plaintext';
+
+      // CRITICAL: Respect original center/justify alignment
+      // Only swap left/right based on direction
+      const originalAlign = container.getAttribute('data-original-text-align') ||
+                           container.style.textAlign ||
+                           window.getComputedStyle(container).textAlign;
+
+      if (originalAlign === 'center' || originalAlign === 'justify') {
+        container.style.textAlign = originalAlign;
+      } else {
+        container.style.textAlign = isRTL ? 'right' : 'left';
+      }
+    }
+
+    this.logger.debug(`Streaming direction: ${containers.size} containers, ${segmentElements.length} segments`);
   }
 
   /**
