@@ -226,7 +226,11 @@ export class BaseProvider {
           // Ignore if body is not JSON
         }
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
-        logger.error(`[${this.providerName}] _executeApiCall HTTP error:`, {
+
+        // For DeepL, HTTP 400 is a retryable error (too many segments), use debug level
+        const isDeepL400 = this.providerName === 'DeepLTranslate' && response.status === 400;
+        const logLevel = isDeepL400 ? 'debug' : 'error';
+        logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           message: msg,
           url: url
@@ -253,6 +257,10 @@ export class BaseProvider {
             break;
           case 429:
             errorType = ErrorTypes.RATE_LIMIT_REACHED;
+            break;
+          case 456:
+            // DeepL-specific: Quota exceeded (character limit)
+            errorType = ErrorTypes.DEEPL_QUOTA_EXCEEDED;
             break;
           case 500:
           case 502:

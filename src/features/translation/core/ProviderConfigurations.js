@@ -370,6 +370,58 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // DeepL Translate - Premium translation service settings
+  DeepLTranslate: {
+    rateLimit: {
+      maxConcurrent: 5, // Higher for paid API
+      delayBetweenRequests: 0, // No delay for first request
+      initialDelay: 0,
+      subsequentDelay: 100, // Fast for paid service
+      burstLimit: 10,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 30000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit', // Use character-based chunking
+      characterLimit: 10000, // DeepL's character limit
+      maxChunksPerBatch: 8,
+      delimiter: null // DeepL uses array format
+    },
+    streaming: {
+      enabled: true, // Enable streaming for real-time chunk translation
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'character_limit',
+        'daily_quota',
+        'invalid_api_key'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'character_limit': { delay: 1000, temporary: true, retryWithSmallerChunk: true },
+        'daily_quota': { delay: 86400000, temporary: false },
+        'invalid_api_key': { delay: 0, temporary: false }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true, // DeepL supports batch requests
+      supportsThinking: false,
+      reliableJsonMode: false,
+      supportsDictionary: false, // DeepL doesn't support dictionary
+      supportsFormality: true // DeepL-specific feature
+    }
+  },
+
   // Bing Translate - Microsoft translation service settings
   BingTranslate: {
     rateLimit: {
@@ -517,6 +569,9 @@ function normalizeProviderName(providerName) {
     'yandextranslate': 'YandexTranslate',
     'yandex-translate': 'YandexTranslate',
     'yandex': 'YandexTranslate',
+    'deepl': 'DeepLTranslate',
+    'deepltranslate': 'DeepLTranslate',
+    'deep-l': 'DeepLTranslate',
     'custom': 'Custom',
     'custom-openai': 'Custom'
   };

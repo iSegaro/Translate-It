@@ -104,13 +104,7 @@ export class TranslationApplier {
    * @returns {Promise<Object>} Application result
    */
   async applyTranslationsToNodes(textNodes, translations, options = {}) {
-    this.logger.debug("DETERMINISTIC TRANSLATION APPLICATION", {
-      textNodesCount: textNodes.length,
-      translationsSize: translations.size,
-      skipStreamingUpdates: options.skipStreamingUpdates || false,
-      isFinalResult: options.isFinalResult || false,
-      messageId: options.messageId
-    });
+    this.logger.debug(`Applying ${translations.size} translations to ${textNodes.length} nodes`);
 
     // Get target language for better RTL detection
     const { getTargetLanguageAsync } = await import("../../../../config.js");
@@ -127,19 +121,7 @@ export class TranslationApplier {
         const segmentId = node.segmentId;
         const actualNode = document.querySelector(`[data-segment-id="${segmentId}"]`);
         if (actualNode && actualNode.parentNode) {
-          this.logger.debug(`Found segment element for ID ${segmentId}`, {
-            nodeName: actualNode.nodeName,
-            nodeType: actualNode.nodeType,
-            hasParent: !!actualNode.parentNode,
-            parentName: actualNode.parentNode?.nodeName
-          });
           return actualNode;
-        } else {
-          this.logger.debug(`Segment element not found or has no parent for ID ${segmentId}`, {
-            segmentId,
-            found: !!actualNode,
-            hasParent: actualNode?.parentNode
-          });
         }
       }
       return node;
@@ -150,33 +132,15 @@ export class TranslationApplier {
 
       // Check if node has parent (critical for DOM manipulation)
       if (!node.parentNode) {
-        this.logger.debug(`Filtering out node without parent`, {
-          nodeType: node.nodeType,
-          nodeName: node.nodeName,
-          hasSegmentId: node.hasAttribute?.('data-segment-id')
-        });
         return false;
       }
 
       // Accept both TEXT_NODE (legacy) and ELEMENT_NODE with segment-id (new approach)
-      const isValid = node.nodeType === Node.TEXT_NODE ||
+      return node.nodeType === Node.TEXT_NODE ||
         (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute && node.hasAttribute('data-segment-id'));
-
-      if (!isValid) {
-        this.logger.debug(`Filtering out invalid node type`, {
-          nodeType: node.nodeType,
-          nodeName: node.nodeName,
-          hasSegmentId: node.hasAttribute?.('data-segment-id')
-        });
-      }
-
-      return isValid;
     });
 
-    this.logger.debug('Filtered text nodes', {
-      originalCount: textNodes.length,
-      validCount: validTextNodes.length
-    });
+    this.logger.debug(`Filtered: ${validTextNodes.length}/${textNodes.length} valid nodes`);
 
     // CRITICAL: Create a comprehensive lookup table for DETERMINISTIC matching
     const translationLookup = new Map();
@@ -258,11 +222,7 @@ export class TranslationApplier {
       }
     }
 
-    this.logger.debug(`ENHANCED Translation lookup table created`, {
-      totalKeys: translationLookup.size,
-      originalKeys: translations.size,
-      lookupStrategies: ['exact', 'trimmed', 'normalized', 'no_whitespace', 'phone_variants', 'newline_variants']
-    });
+    this.logger.debug(`Translation lookup: ${translationLookup.size} keys from ${translations.size} originals`);
 
     // Apply translations using wrapper approach for Revert compatibility
     for (let nodeIndex = 0; nodeIndex < validTextNodes.length; nodeIndex++) {
@@ -270,11 +230,6 @@ export class TranslationApplier {
 
       // Enhanced null check for parentNode
       if (!textNode || !textNode.parentNode) {
-        this.logger.debug(`Skipping node ${nodeIndex}: no parent node`, {
-          nodeType: textNode?.nodeType,
-          hasSegmentId: textNode?.hasAttribute?.('data-segment-id'),
-          nodeName: textNode?.nodeName
-        });
         continue;
       }
 
@@ -317,23 +272,7 @@ export class TranslationApplier {
         // If content differs from original, it was translated in streaming phase
         if (originalTextAttr && currentContent && currentContent !== originalTextAttr && currentContent !== originalTextAttr.trim()) {
           isAlreadyTranslated = true;
-          this.logger.debug(`Segment has streaming translation (no wrapper)`, {
-            segmentId: textNode.getAttribute('data-segment-id'),
-            originalText: originalTextAttr.substring(0, 30),
-            currentContent: currentContent.substring(0, 30)
-          });
         }
-      }
-
-      // DEBUG: Enhanced logging for translation detection
-      if (textNode.textContent.trim().length > 5) {
-        this.logger.debug(`TRANSLATION DETECTION for node ${nodeIndex}`, {
-          nodeClasses: textNode.parentNode?.className || 'NO_CLASSES',
-          foundWrapper: !!translationWrapper,
-          foundInner: !!translationInner,
-          isAlreadyTranslated,
-          nodePreview: textNode.textContent.substring(0, 30) + '...'
-        });
       }
 
       // ENHANCED: Robust detection for text that needs complete final translation
@@ -342,34 +281,6 @@ export class TranslationApplier {
       const hasMeaningfulContent = originalText.trim().length > 0; // Basic content check
       const isOriginalLongText = originalText.length > 20; // More realistic threshold
       const isTranslationCandidate = isImportantLongText || containsComplexContent || hasMeaningfulContent || isOriginalLongText;
-
-      // ENHANCED: Comprehensive logging for debugging node candidacy issues
-      this.logger.debug(`ENHANCED NODE CANDIDACY CHECK for node ${nodeIndex}`, {
-        originalLength: originalText.length,
-        trimmedLength: trimmedOriginalText.length,
-        isAlreadyTranslated,
-        skipStreamingUpdates: options.skipStreamingUpdates,
-        isImportantLongText,
-        containsComplexContent,
-        hasMeaningfulContent,
-        isOriginalLongText,
-        isTranslationCandidate,
-        willProcessReplacement: options.skipStreamingUpdates && isAlreadyTranslated && isTranslationCandidate,
-        originalPreview: originalText.substring(0, 50) + '...',
-        trimmedPreview: trimmedOriginalText.substring(0, 30) + '...',
-        originalTextHash: originalText.length > 0 ? originalText.substring(0, 10).replace(/\s/g, '_') : 'empty',
-        trimmedTextHash: trimmedOriginalText.length > 0 ? trimmedOriginalText.substring(0, 10).replace(/\s/g, '_') : 'empty'
-      });
-
-      // CRITICAL FIX: For final results, ALWAYS process ALL nodes, not just already translated ones
-      if (options.isFinalResult && isTranslationCandidate) {
-        this.logger.debug(`FINAL RESULT PROCESSING for node ${nodeIndex}`, {
-          isAlreadyTranslated,
-          originalLength: originalText.length,
-          trimmedLength: trimmedOriginalText.length,
-          skipStreamingUpdates: options.skipStreamingUpdates
-        });
-      }
 
       // ENHANCED FIX: Process ALL nodes for final results, regardless of translation status
       // For non-final results, only process nodes that were already translated during streaming
@@ -608,33 +519,11 @@ export class TranslationApplier {
       }
     }
 
-    // DEBUG: Log translation lookup results
-    this.logger.debug(`TRANSLATION LOOKUP for node ${nodeIndex}`, {
-      isFinalResult: options.isFinalResult,
-      isAlreadyTranslated,
-      originalLength: originalText.length,
-      trimmedLength: trimmedOriginalText.length,
-      foundFinalTranslation: !!finalTranslation,
-      matchStrategy: matchStrategy,
-      finalTranslationLength: finalTranslation ? finalTranslation.length : 0,
-      currentTranslationLength: translationInner ? translationInner.textContent.length : 0,
-      originalPreview: originalText.substring(0, 50) + '...',
-      trimmedPreview: trimmedOriginalText.substring(0, 30) + '...',
-      finalPreview: finalTranslation ? finalTranslation.substring(0, 50) + '...' : 'NONE',
-      isRescueMode: matchStrategy.includes('rescue') || matchStrategy.includes('empty_node'),
-      isEmptyNode: trimmedOriginalText.length === 0
-    });
-
     // Handle empty lines and whitespace-only text
     const isPhoneLike = /[\d+\-()\s]/.test(originalText.trim()) && originalText.trim().length > 3;
     const hasActualContent = originalText.trim().length > 0 && !/^\s+$/.test(originalText);
 
     if ((originalText === '\n\n' || originalText === '\n' || /^\s*$/.test(originalText)) && !isPhoneLike && !hasActualContent) {
-      this.logger.debug('Preserving empty line or whitespace text node', {
-        originalText: JSON.stringify(originalText),
-        isPhoneLike,
-        hasActualContent
-      });
       return { applied: true };
     }
 
@@ -671,15 +560,6 @@ export class TranslationApplier {
     }
 
     if (!translatedText) {
-      this.logger.debug(`NO MATCH FOUND for node ${nodeIndex}`, {
-        originalText: JSON.stringify(originalText),
-        trimmedOriginalText: JSON.stringify(trimmedOriginalText),
-        normalizedOriginal: JSON.stringify(originalText.replace(/\s+/g, ' ').trim()),
-        noWhitespaceOriginal: JSON.stringify(originalText.replace(/\s+/g, '')),
-        lookupSize: translationLookup.size,
-        lookupKeys: Array.from(translationLookup.keys()).slice(0, 10).map(k => JSON.stringify(k))
-      });
-
       return {
         applied: false,
         unmatched: {

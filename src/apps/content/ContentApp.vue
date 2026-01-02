@@ -13,8 +13,7 @@
           pointerEvents: 'auto',
           cursor: 'auto',
           zIndex: 2147483647,
-          direction: 'ltr',
-          textAlign: 'left',
+          // direction and textAlign removed to allow CSS class-based RTL/LTR support
           unicodeBidi: 'plaintext',
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
@@ -86,6 +85,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
+import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
+import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import browser from 'webextension-polyfill';
 
 const pageEventBus = window.pageEventBus;
 
@@ -114,6 +116,39 @@ let selectElementNotificationManager = null;
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
 let cancelTimeout = null;
+
+// Reactive RTL value for toasts (sync access - optimal performance)
+const toastRTL = ref(false);
+
+// OPTIMIZED: Get RTL value by reading directly from storage (bypasses SettingsManager cache)
+// Uses getTranslationString with explicit lang code to avoid cache issues
+const getRTLFromStorage = async () => {
+  // Read locale directly from storage - bypass SettingsManager cache entirely
+  const storage = await browser.storage.local.get({ APPLICATION_LOCALIZE: 'English' });
+  const locale = storage.APPLICATION_LOCALIZE;
+
+  // Use centralized locale to language code mapping from languageConstants.js
+  let langCode = UI_LOCALE_TO_CODE_MAP[locale];
+
+  // Fallback: if not found, try to use locale directly if it's a 2-letter code
+  if (!langCode) {
+    langCode = locale.length === 2 ? locale : 'en';
+  }
+
+  // Clear cache and get RTL value with explicit language code
+  clearTranslationsCache();
+  const rtlValue = await getTranslationString('IsRTL', langCode);
+
+  const isRTL = rtlValue === 'true';
+  logger.debug('[Toast] RTL from storage:', { locale, langCode, isRTL });
+
+  return isRTL;
+};
+
+// Function to update RTL (no delay, direct storage read)
+const updateToastRTL = async () => {
+  toastRTL.value = await getRTLFromStorage();
+};
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
@@ -158,7 +193,7 @@ onMounted(async () => {
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
   logger.info(`ContentApp mounted in ${executionMode} mode`);
-  
+
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
 
@@ -212,6 +247,33 @@ onMounted(async () => {
     logger.warn('Failed to initialize SelectElementNotificationManager:', error);
   }
 
+  // CRITICAL: Initialize RTL for toasts + listen for storage changes
+  // Using storage.onChanged instead of runtime.onMessage because it fires AFTER storage is updated
+  // This ensures we get the fresh value, not the old one
+
+  // 1. Initialize on mount
+  await updateToastRTL();
+
+  // 2. Listen for storage changes directly (fires AFTER storage is updated)
+  if (browser.storage?.onChanged) {
+    const storageListener = (changes, areaName) => {
+      if (areaName === 'local' && changes.APPLICATION_LOCALIZE) {
+        const newLocale = changes.APPLICATION_LOCALIZE.newValue;
+        logger.info('[Toast] Language changed in storage:', newLocale);
+
+        // Update RTL immediately
+        updateToastRTL();
+      }
+    };
+
+    browser.storage.onChanged.addListener(storageListener);
+
+    // Cleanup on unmount
+    tracker._toastSettingsCleanup = () => {
+      browser.storage.onChanged.removeListener(storageListener);
+    };
+  }
+
   const toastMap = {
     error: toast.error,
     warning: toast.warning,
@@ -234,27 +296,27 @@ onMounted(async () => {
   
     
   
-  tracker.addEventListener(pageEventBus, 'show-notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'show-notification', async (detail) => {
     // Create a unique key for this notification
     const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
-    
+
     // Check if this notification was already shown recently (within 1 second)
     const recentKeys = Array.from(window.translateItShownNotifications).filter(key => {
       const timestamp = parseInt(key.split('-').pop());
       return Date.now() - timestamp < 1000; // 1 second window
     });
-    
-    const isDuplicate = recentKeys.some(key => 
+
+    const isDuplicate = recentKeys.some(key =>
       key.startsWith(`${detail.message}-${detail.type}`)
     );
-    
+
     if (isDuplicate) {
       return;
     }
-    
+
     // Add to set and show notification
     window.translateItShownNotifications.add(notificationKey);
-    
+
     // Clean up old entries (keep only last 10)
     if (window.translateItShownNotifications.size > 10) {
       const entries = Array.from(window.translateItShownNotifications);
@@ -262,17 +324,25 @@ onMounted(async () => {
         window.translateItShownNotifications.delete(key);
       });
     }
-    
-        
-        
+
+
+
     const { id, message, type, duration, actions, persistent } = detail;
     const toastFn = toastMap[type] || toast.info;
-    
-    const toastOptions = { 
-      id, 
-      duration: persistent ? Infinity : duration
+
+    // CRITICAL: Use reactive RTL value (SYNC - optimal performance)
+    const detectedDirection = toastRTL.value ? 'rtl' : 'ltr';
+
+    const toastOptions = {
+      id,
+      duration: persistent ? Infinity : duration,
+      // CRITICAL: Apply direction via style option (most reliable method)
+      style: {
+        direction: detectedDirection,
+        textAlign: toastRTL.value ? 'right' : 'left'
+      }
     };
-    
+
     // Add action buttons if provided
     if (actions && actions.length > 0) {
       // Create the action handler
@@ -465,13 +535,19 @@ onMounted(async () => {
 
 onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
-  
+
+  // Clean up settings listener
+  if (tracker._toastSettingsCleanup) {
+    tracker._toastSettingsCleanup();
+    delete tracker._toastSettingsCleanup;
+  }
+
   // Clear cancel timeout if exists
   if (cancelTimeout) {
     clearTimeout(cancelTimeout);
     cancelTimeout = null;
   }
-  
+
   // Shutdown toast integration if it was initialized
   try {
     if (toastIntegration) {
@@ -515,5 +591,17 @@ onUnmounted(async () => {
 /* Individual components inside will override this (e.g., toaster, toolbars) */
 .content-app-container > * {
   pointer-events: all !important; /* Re-enable pointer events for children */
+}
+
+/* CRITICAL: Toast text direction for RTL/LTR support */
+/* Direction is set based on extension locale (IsRTL from getTranslationString) via inline styles */
+/* Do NOT use !important rules that would override inline styles */
+[data-sonner-toast] {
+  /* direction and text-align removed to allow inline styles to work */
+}
+
+/* Also target the content div inside toast */
+[data-sonner-toast] > div[data-content] > div {
+  /* direction and text-align removed to allow inline styles to work */
 }
 </style>

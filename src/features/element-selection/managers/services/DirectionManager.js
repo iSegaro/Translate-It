@@ -97,21 +97,9 @@ export class DirectionManager {
     }
 
     const isRTL = detectedDirection === 'rtl';
-    const processedParents = new Set();
-
-    this.logger.debug('Text direction determined from actual translated content', {
-      detectedDirection,
-      targetLanguage,
-      isRTL,
-      samplesChecked,
-      rtlCount,
-      ltrCount
-    });
 
     // Find all segment elements
     const segmentElements = targetElement.querySelectorAll('[data-segment-id]');
-
-    this.logger.debug(`Found ${segmentElements.length} segment elements for RTL direction`);
 
     // CRITICAL FIX: Clean up segments themselves to allow continuous flow
     // Segments often come with dir="auto/rtl" and unicode-bidi: isolate which breaks the sentence flow
@@ -185,9 +173,21 @@ export class DirectionManager {
        // Actually text-align on inline-block affects likely nothing inside unless specific?
        // But safe to set.
        if (!container.hasAttribute('data-original-text-align')) {
-         container.setAttribute('data-original-text-align', container.style.textAlign || '');
+         // CRITICAL: Check both style and align attribute to capture center/justify alignment
+         container.setAttribute('data-original-text-align', container.style.textAlign || container.getAttribute('align') || '');
        }
-       container.style.textAlign = isRTL ? 'right' : 'left';
+
+       // CRITICAL: Respect original center/justify alignment
+       // Only swap left/right based on direction
+       const originalAlign = container.getAttribute('data-original-text-align') ||
+                            container.style.textAlign ||
+                            window.getComputedStyle(container).textAlign;
+
+       if (originalAlign === 'center' || originalAlign === 'justify') {
+         container.style.textAlign = originalAlign;
+       } else {
+         container.style.textAlign = isRTL ? 'right' : 'left';
+       }
 
        // 4. Lang
        if (targetLanguage) {
@@ -196,12 +196,6 @@ export class DirectionManager {
          }
          container.setAttribute('lang', targetLanguage);
        }
-       
-       this.logger.debug('Applied container direction settings', {
-         tagName: container.tagName,
-         type: 'Block/Container',
-         newAlign: isRTL ? 'right' : 'left'
-       });
     }
 
     // APPLY: Inline Wrappers -> Normal (Inherit)
@@ -225,9 +219,11 @@ export class DirectionManager {
        }
 
        // 3. Reset text-align (inline shouldn't have it, but clear just in case)
-       if (wrapper.style.textAlign) {
+       // CRITICAL: Also check align attribute to preserve center/justify alignment
+       const textAlignValue = wrapper.style.textAlign || wrapper.getAttribute('align');
+       if (textAlignValue) {
          if (!wrapper.hasAttribute('data-original-text-align')) {
-           wrapper.setAttribute('data-original-text-align', wrapper.style.textAlign);
+           wrapper.setAttribute('data-original-text-align', textAlignValue);
          }
          wrapper.style.textAlign = '';
        }
@@ -239,16 +235,9 @@ export class DirectionManager {
           }
           wrapper.setAttribute('lang', targetLanguage);
        }
-       
-       this.logger.debug('Applied inline direction settings (Inherit)', {
-         tagName: wrapper.tagName,
-         type: 'Inline'
-       });
     }
 
-    this.logger.debug('RTL direction applied', {
-      processedParentsCount: processedParents.size
-    });
+    this.logger.debug(`RTL direction applied to ${textContainers.size} containers, ${inlineWrappers.size} inline wrappers`);
   }
 
   /**
@@ -280,6 +269,126 @@ export class DirectionManager {
     }
 
     return null;
+  }
+
+  /**
+   * Apply direction correction during streaming translation
+   * Optimized version that processes only currently translated segments.
+   * Uses actual translated content for direction detection (accurate).
+   * @param {HTMLElement} targetElement - The element containing translated content
+   * @param {string} targetLanguage - Target language code (used as fallback, not primary)
+   */
+  async applyStreamingDirection(targetElement, targetLanguage) {
+    this.logger.debug('Applying streaming direction correction', {
+      tagName: targetElement.tagName
+    });
+
+    // Find translated segments (single query)
+    const segmentElements = targetElement.querySelectorAll('[data-segment-id]');
+
+    if (segmentElements.length === 0) {
+      return;
+    }
+
+    // CRITICAL: Detect direction from actual translated content, not just targetLanguage
+    // This ensures correct direction when translating to/from RTL languages
+    let rtlCount = 0;
+    let ltrCount = 0;
+    let samplesChecked = 0;
+    let hasRTLCharacters = false;
+
+    // Regex for Strong RTL characters
+    const rtlCharRegex = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0780-\u07BF\u07C0-\u07FF\u08A0-\u08FF\uFB1D-\uFB4F\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+    // Sample up to 15 translated segments to determine direction
+    for (const segment of segmentElements) {
+      if (samplesChecked >= 15) break;
+
+      const text = segment.textContent?.trim();
+      if (text) {
+        const dir = detectTextDirectionFromContent(text, null); // Don't pass targetLanguage - rely on content
+        if (dir === 'rtl') {
+          rtlCount++;
+        } else {
+          ltrCount++;
+        }
+
+        // Check for presence of RTL characters
+        if (!hasRTLCharacters && rtlCharRegex.test(text)) {
+          hasRTLCharacters = true;
+        }
+
+        samplesChecked++;
+      }
+    }
+
+    // Determine direction based on actual translated content
+    let isRTL = false;
+    if (samplesChecked > 0) {
+      // Use the same logic as applyImmersiveTranslatePattern
+      if (isRTLLanguage(targetLanguage) && hasRTLCharacters) {
+        isRTL = true;
+      } else {
+        isRTL = rtlCount > ltrCount;
+      }
+    } else {
+      // No content found, fall back to target language
+      isRTL = isRTLLanguage(targetLanguage);
+    }
+
+    // Clean up segments and collect containers in single pass
+    const containers = new Set();
+    containers.add(targetElement);
+
+    // Single pass: clean segments + find containers
+    for (const segment of segmentElements) {
+      // Remove segment-level direction so they flow with container
+      if (segment.hasAttribute('dir')) {
+        segment.removeAttribute('dir');
+      }
+      if (segment.style.unicodeBidi) {
+        segment.style.unicodeBidi = 'normal';
+      }
+
+      // Find containers up to target element
+      let current = segment.parentNode;
+      while (current && current !== document.body && targetElement.contains(current)) {
+        if (current === targetElement) break;
+
+        const display = window.getComputedStyle(current).display;
+        if (display !== 'inline') {
+          containers.add(current);
+        }
+        current = current.parentNode;
+      }
+    }
+
+    // Apply direction to containers
+    for (const container of containers) {
+      if (!container.hasAttribute('data-original-unicode-bidi')) {
+        container.setAttribute('data-original-unicode-bidi', container.style.unicodeBidi || '');
+      }
+      // CRITICAL: Check both style and align attribute to capture center/justify alignment
+      if (!container.hasAttribute('data-original-text-align')) {
+        container.setAttribute('data-original-text-align', container.style.textAlign || container.getAttribute('align') || '');
+      }
+
+      container.style.unicodeBidi = 'plaintext';
+
+      // CRITICAL: Respect original center/justify alignment
+      // Only swap left/right based on direction
+      const originalAlign = container.getAttribute('data-original-text-align') ||
+                           container.style.textAlign ||
+                           window.getComputedStyle(container).textAlign;
+
+      if (originalAlign === 'center' || originalAlign === 'justify') {
+        container.style.textAlign = originalAlign;
+      } else {
+        container.style.textAlign = isRTL ? 'right' : 'left';
+      }
+    }
+
+    this.logger.debug(`Streaming direction: ${containers.size} containers, ${segmentElements.length} segments`);
   }
 
   /**

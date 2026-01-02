@@ -160,10 +160,8 @@ export function detectTextDirectionFromContent(text = '', targetLanguage = null)
     // No strong directional characters - mostly numbers/symbols/punctuation
     // Use target language as hint if available
     if (targetLanguage && isRTLLanguage(targetLanguage)) {
-      logger.debug(`Direction determined by target language (no strong chars): RTL`);
       return 'rtl';
     }
-    logger.debug(`Direction detected: LTR (no strong characters, no target language)`);
     return 'ltr';
   }
 
@@ -175,7 +173,6 @@ export function detectTextDirectionFromContent(text = '', targetLanguage = null)
   // where translations contain many untranslated English terms but are primarily RTL.
   if (targetLanguage && isRTLLanguage(targetLanguage) && rtlRatio >= 0.2) {
     isRTL = true;
-    logger.debug(`Direction: RTL (target language is RTL with significant RTL content: ${Math.round(rtlRatio * 100)}%)`);
   }
   // Primary heuristic: Use majority with threshold
   // If one direction is 60% or more of strong characters, use that direction
@@ -188,23 +185,11 @@ export function detectTextDirectionFromContent(text = '', targetLanguage = null)
     // Balanced content (40%-60% range) - use target language as tiebreaker
     if (targetLanguage && isRTLLanguage(targetLanguage)) {
       isRTL = true;
-      logger.debug(`Direction: RTL (target language is RTL, content is balanced)`);
     } else {
       // Follow the Unicode Bidirectional Algorithm (P2, P3 rules)
       isRTL = firstRTLIndex < firstLTRIndex;
-      logger.debug(`Direction: balanced content, using first strong character`);
     }
   }
-
-  logger.debug(`Direction detected from content: ${isRTL ? 'RTL' : 'LTR'}`, {
-    rtlStrongCount,
-    ltrStrongCount,
-    rtlRatio: Math.round(rtlRatio * 100) + '%',
-    firstRTLIndex,
-    firstLTRIndex,
-    textLength: trimmedText.length,
-    textPreview: trimmedText.substring(0, 50)
-  });
 
   return isRTL ? 'rtl' : 'ltr';
 }

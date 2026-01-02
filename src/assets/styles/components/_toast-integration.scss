@@ -86,20 +86,32 @@ html[data-translate-it-select-mode="true"] {
   min-width: 280px;
   overflow: hidden;
 
+  // CRITICAL: Make the toast itself a flex container for proper RTL/LTR icon spacing
+  // This ensures the icon (div[data-icon]) and content (div[data-content])
+  // are properly spaced with gap in both LTR and RTL
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+
+  // CRITICAL: Icon alignment fix for RTL - ensure icon is properly aligned with text
+  > [data-icon] {
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+
   // Direct child content container
   > div[data-content] {
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
-    gap: 12px;
     width: 100%;
     overflow: hidden;
 
     // Text content (title/description) container
     > div {
       flex: 1;
-      text-align: left;
-      direction: ltr;
+      /* text-align and direction removed to allow inline styles to work */
       white-space: pre-wrap;
       word-wrap: break-word;
       overflow-wrap: break-word;
@@ -139,8 +151,17 @@ html[data-translate-it-select-mode="true"] {
   [data-button],
   > button {
     flex-shrink: 0;
-    margin-left: auto;
+    // Use logical property for RTL/LTR support - pushes button to the "end" in both directions
+    margin-inline-start: auto;
     white-space: nowrap;
     align-self: flex-start;
   }
 }
+
+/* ==========================================================================
+   RTL/LTR Toast Direction Support
+   ========================================================================== */
+
+// Direction is now applied via inline styles (style option in toastOptions)
+// Direction is set based on extension locale (IsRTL from getTranslationString, cached on first use)
+// No className-based rules needed

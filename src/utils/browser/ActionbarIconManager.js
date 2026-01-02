@@ -108,6 +108,7 @@ class ActionbarIconManager {
       'gemini': 'icons/providers/gemini.png',
       'bing': 'icons/providers/bing.png',
       'yandex': 'icons/providers/yandex.png',
+      'deepl': 'icons/providers/deepl.png',
       'openai': 'icons/providers/openai.png',
       'openrouter': 'icons/providers/openrouter.png',
       'deepseek': 'icons/providers/deepseek.png',

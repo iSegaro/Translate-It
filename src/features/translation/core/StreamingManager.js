@@ -45,7 +45,7 @@ export class StreamingManager extends ResourceTracker {
    */
   initializeStream(messageId, sender, provider, segments) {
     if (this.activeStreams.has(messageId)) {
-      logger.warn(`[StreamingManager] Stream already exists for messageId: ${messageId}`);
+      logger.debug(`[StreamingManager] Stream already exists for messageId: ${messageId}`);
       return this.activeStreams.get(messageId);
     }
 
