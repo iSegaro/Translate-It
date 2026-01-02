@@ -174,7 +174,8 @@ export class DirectionManager {
        // Actually text-align on inline-block affects likely nothing inside unless specific?
        // But safe to set.
        if (!container.hasAttribute('data-original-text-align')) {
-         container.setAttribute('data-original-text-align', container.style.textAlign || '');
+         // CRITICAL: Check both style and align attribute to capture center/justify alignment
+         container.setAttribute('data-original-text-align', container.style.textAlign || container.getAttribute('align') || '');
        }
 
        // CRITICAL: Respect original center/justify alignment
@@ -219,9 +220,11 @@ export class DirectionManager {
        }
 
        // 3. Reset text-align (inline shouldn't have it, but clear just in case)
-       if (wrapper.style.textAlign) {
+       // CRITICAL: Also check align attribute to preserve center/justify alignment
+       const textAlignValue = wrapper.style.textAlign || wrapper.getAttribute('align');
+       if (textAlignValue) {
          if (!wrapper.hasAttribute('data-original-text-align')) {
-           wrapper.setAttribute('data-original-text-align', wrapper.style.textAlign);
+           wrapper.setAttribute('data-original-text-align', textAlignValue);
          }
          wrapper.style.textAlign = '';
        }
@@ -366,8 +369,9 @@ export class DirectionManager {
       if (!container.hasAttribute('data-original-unicode-bidi')) {
         container.setAttribute('data-original-unicode-bidi', container.style.unicodeBidi || '');
       }
+      // CRITICAL: Check both style and align attribute to capture center/justify alignment
       if (!container.hasAttribute('data-original-text-align')) {
-        container.setAttribute('data-original-text-align', container.style.textAlign || '');
+        container.setAttribute('data-original-text-align', container.style.textAlign || container.getAttribute('align') || '');
       }
 
       container.style.unicodeBidi = 'plaintext';
