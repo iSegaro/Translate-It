@@ -5,6 +5,17 @@
 
 import { AUTO_DETECT_VALUE } from './constants.js';
 
+// UI Locale to Language Code Mapping
+// Maps the exact strings stored in APPLICATION_LOCALIZE setting to language codes
+// These match the UI language names shown in the settings page
+export const UI_LOCALE_TO_CODE_MAP = {
+  'English': 'en',
+  'Farsi': 'fa',
+  'فارسی': 'fa',  // Persian script
+  'en': 'en',    // Already a code
+  'fa': 'fa',    // Already a code
+};
+
 // Standard language name to code mapping
 export const LANGUAGE_NAME_TO_CODE_MAP = {
   afrikaans: "af",
