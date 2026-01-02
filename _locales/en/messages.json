@@ -642,6 +642,7 @@
   "SELECT_ELEMENT_TRANSLATING": { "message": "Translating..." },
   "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
   "SELECT_ELEMENT_REVERT": { "message": "Revert" },
+  "SELECT_ELEMENT_BING_WARNING": { "message": "Bing may have issues with long or complex texts. If you encounter errors, try using another provider." },
 
   "text_field_shortcut_label": { "message": "Custom Shortcut:" },
   "click_to_set_shortcut": { "message": "Click to set shortcut" },

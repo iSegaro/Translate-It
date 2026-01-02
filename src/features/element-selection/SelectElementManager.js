@@ -9,6 +9,8 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getSettingsAsync } from '@/shared/config/config.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 // Core services
 import { ElementHighlighter } from "./managers/services/ElementHighlighter.js";
@@ -197,6 +199,18 @@ class SelectElementManager extends ResourceTracker {
       // Show notification only in main frame to prevent duplicates in iframes
       if (window === window.top) {
         this.showNotification();
+
+        // CRITICAL: Show warning for Bing provider (known issues with Select Element)
+        const settings = await getSettingsAsync();
+        if (settings.TRANSLATION_API === 'bing') {
+          const warningMessage = await getTranslationString('SELECT_ELEMENT_BING_WARNING');
+          pageEventBus.emit('show-notification', {
+            type: 'warning',
+            message: warningMessage || 'Bing may have issues with Select Element. Try another provider.',
+            duration: 8000,
+            id: `bing-warning-${this.instanceId}`
+          });
+        }
       } else {
         this.logger.debug("Skipping notification in iframe - will be handled by main frame");
       }
