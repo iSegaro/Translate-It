@@ -170,13 +170,7 @@ class SelectElementManager extends ResourceTracker {
       return { isActive: this.isActive, instanceId: this.instanceId };
     }
     
-    this.logger.debug("SelectElementManager.activate() entry point", {
-      instanceId: this.instanceId,
-      isActive: this.isActive,
-      isProcessingClick: this.isProcessingClick,
-      isInIframe: this.isInIframe,
-      url: window.location.href
-    });
+    this.logger.debug(`SelectElementManager.activate() instanceId=${this.instanceId}`);
     
     try {
       // Reset state
@@ -414,19 +408,10 @@ class SelectElementManager extends ResourceTracker {
 
       const text = extractionResult.textsToTranslate.join('\n\n'); // Rejoin with newlines for display
 
-      this.logger.debug("Text extraction result:", {
-        textLength: text?.length || 0,
-        elementType: elementToTranslate.tagName,
-        hasText: !!(text && text.trim()),
-        textPreview: text ? text.substring(0, 100) + (text.length > 100 ? '...' : '') : null
-      });
+      this.logger.debug(`Text extraction result: length=${text?.length || 0}, element=${elementToTranslate.tagName}`);
 
       if (text && text.trim()) {
-        this.logger.debug("Text extracted from highlighted element", {
-          textLength: text.length,
-          elementType: elementToTranslate.tagName,
-          isTargetSameAsHighlighted: elementToTranslate === event.target
-        });
+        this.logger.debug(`Text extracted successfully: ${text.length} chars from ${elementToTranslate.tagName}`);
 
         // Clear all highlights and UI immediately after click
         this.elementHighlighter.clearAllHighlights();
@@ -591,14 +576,7 @@ class SelectElementManager extends ResourceTracker {
       }
 
       // Use extraction result from ElementTextExtraction
-      this.logger.debug("Prepared translation data:", {
-        targetElementTag: targetElement.tagName,
-        targetElementClass: targetElement.className,
-        targetInnerHTMLLength: targetElement.innerHTML.length,
-        textNodesCount: extractionResult.textNodes.length,
-        uniqueTextsCount: extractionResult.originalTextsMap.size,
-        sampleTexts: Array.from(extractionResult.originalTextsMap.keys()).slice(0, 3).map(text => text.substring(0, 50) + (text.length > 50 ? '...' : ''))
-      });
+      this.logger.debug(`Prepared translation: ${extractionResult.originalTextsMap.size} texts, ${extractionResult.textNodes.length} nodes`);
 
       // Update notification to show translation in progress before starting
       // This gives immediate feedback to the user when they click on an element
@@ -621,24 +599,7 @@ class SelectElementManager extends ResourceTracker {
 
       // Check if result is valid before accessing properties
       if (result && typeof result === 'object') {
-        this.logger.debug("Translation completed", {
-          hasResult: true,
-          success: result.success || false,
-          resultKeys: Object.keys(result),
-          hasTranslatedText: !!result.translatedText,
-          hasData: !!result.data,
-          streaming: result.streaming,
-          fromCache: result.fromCache
-        });
-
-        // For non-streaming translations or cached translations, we need to apply the result here
-        this.logger.debug("Checking translation result for application:", {
-          success: result.success,
-          hasTranslatedText: !!result.translatedText,
-          streaming: result.streaming,
-          fromCache: result.fromCache,
-          hasOriginalTextsMap: !!result.originalTextsMap
-        });
+        this.logger.debug(`Translation completed: success=${result.success}, streaming=${result.streaming}`);
 
         // Apply translation if:
         // 1. Success and has translatedText (regular non-streaming)

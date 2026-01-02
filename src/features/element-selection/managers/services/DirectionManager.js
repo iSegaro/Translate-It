@@ -99,19 +99,8 @@ export class DirectionManager {
     const isRTL = detectedDirection === 'rtl';
     const processedParents = new Set();
 
-    this.logger.debug('Text direction determined from actual translated content', {
-      detectedDirection,
-      targetLanguage,
-      isRTL,
-      samplesChecked,
-      rtlCount,
-      ltrCount
-    });
-
     // Find all segment elements
     const segmentElements = targetElement.querySelectorAll('[data-segment-id]');
-
-    this.logger.debug(`Found ${segmentElements.length} segment elements for RTL direction`);
 
     // CRITICAL FIX: Clean up segments themselves to allow continuous flow
     // Segments often come with dir="auto/rtl" and unicode-bidi: isolate which breaks the sentence flow
@@ -196,12 +185,6 @@ export class DirectionManager {
          }
          container.setAttribute('lang', targetLanguage);
        }
-       
-       this.logger.debug('Applied container direction settings', {
-         tagName: container.tagName,
-         type: 'Block/Container',
-         newAlign: isRTL ? 'right' : 'left'
-       });
     }
 
     // APPLY: Inline Wrappers -> Normal (Inherit)
@@ -239,16 +222,9 @@ export class DirectionManager {
           }
           wrapper.setAttribute('lang', targetLanguage);
        }
-       
-       this.logger.debug('Applied inline direction settings (Inherit)', {
-         tagName: wrapper.tagName,
-         type: 'Inline'
-       });
     }
 
-    this.logger.debug('RTL direction applied', {
-      processedParentsCount: processedParents.size
-    });
+    this.logger.debug(`RTL direction applied to ${textContainers.size} containers, ${inlineWrappers.size} inline wrappers`);
   }
 
   /**
