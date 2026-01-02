@@ -99,6 +99,7 @@ export async function loadTranslationLanguagePack(langCode) {
     }
 
     // Dynamically import the language chunk
+    // eslint-disable-next-line noUnsanitized/method -- Safe: normalizedCode is validated against TRANSLATION_LANGUAGE_CHUNKS
     const langModule = await import(
       /* webpackChunkName: "locales/[request]" */
       /* webpackMode: "lazy-once" */

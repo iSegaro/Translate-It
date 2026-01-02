@@ -1107,8 +1107,9 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
       default:
         strategyName = 'DefaultStrategy';
     }
-    
+
     logger.debug('Translation strategy selected', { strategy: strategyName, platform });
+    // eslint-disable-next-line noUnsanitized/method -- Safe: strategyName is validated from switch statement
     strategyModule = await import(`@/features/text-field-interaction/strategies/${strategyName}.js`);
     const strategy = new strategyModule.default();
     

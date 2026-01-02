@@ -141,6 +141,7 @@ export class MarkdownService {
   _decodeHtmlEntities(content) {
     // First decode using textarea method
     const textArea = document.createElement('textarea');
+    // eslint-disable-next-line noUnsanitized/property -- Safe: content is function parameter from markdown
     textArea.innerHTML = content;
     let decoded = textArea.value;
 
@@ -193,6 +194,7 @@ export class MarkdownService {
 
     const div = document.createElement('div');
     div.className = 'markdown-fallback';
+    // eslint-disable-next-line noUnsanitized/property -- Safe: content is sanitized with DOMPurify for 'html' target
     div.innerHTML = content.replace(/\n/g, '<br>');
     return div;
   }

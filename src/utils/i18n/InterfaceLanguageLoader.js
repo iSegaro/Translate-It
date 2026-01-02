@@ -41,6 +41,7 @@ export async function loadInterfaceLanguagePack(langCode) {
     }
 
     // Dynamically import the language chunk
+    // eslint-disable-next-line noUnsanitized/method -- Safe: normalizedCode is validated against INTERFACE_LANGUAGE_CHUNKS
     const langModule = await import(
       /* webpackChunkName: "locales/[request]" */
       /* webpackMode: "lazy-once" */

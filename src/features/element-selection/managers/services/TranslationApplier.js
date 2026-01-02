@@ -666,6 +666,7 @@ export class TranslationApplier {
           // This prevents repositioning issues like "X" moving in "40% off"
           if (fallbackDetectedDir === 'rtl') {
             const processedHTML = wrapLTRPortions(processedText, fallbackDetectedDir);
+            // eslint-disable-next-line noUnsanitized/property -- Content is escaped via escapeHtml() in wrapLTRPortions()
             textNode.innerHTML = processedHTML;
             
             // CRITICAL FIX: Ensure parent container alignment for RTL
@@ -784,6 +785,7 @@ export class TranslationApplier {
         // This prevents repositioning issues like "X" moving in "40% off"
         if (wrapperDetectedDir === 'rtl') {
           const processedHTML = wrapLTRPortions(processedText, wrapperDetectedDir);
+          // eslint-disable-next-line noUnsanitized/property -- Content is escaped via escapeHtml() in wrapLTRPortions()
           translationSpan.innerHTML = processedHTML;
         } else {
           translationSpan.textContent = processedText;
