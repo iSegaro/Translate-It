@@ -94,12 +94,17 @@ html[data-translate-it-select-mode="true"] {
   justify-content: flex-start !important;
   gap: 12px !important;
 
+  // CRITICAL: Icon alignment fix for RTL - ensure icon is properly aligned with text
+  > [data-icon] {
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+
   // Direct child content container
   > div[data-content] {
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
-    gap: 12px;
     width: 100%;
     overflow: hidden;
 
