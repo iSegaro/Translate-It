@@ -97,7 +97,6 @@ export class DirectionManager {
     }
 
     const isRTL = detectedDirection === 'rtl';
-    const processedParents = new Set();
 
     // Find all segment elements
     const segmentElements = targetElement.querySelectorAll('[data-segment-id]');

@@ -286,14 +286,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         try {
           firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
-        } catch (firstError) {
+        } catch {
           logger.debug(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
           firstResult = firstHalf;
         }
 
         try {
           secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
-        } catch (secondError) {
+        } catch {
           logger.debug(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
           secondResult = secondHalf;
         }
@@ -381,7 +381,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             results.push(result || text);
             successCount++;
             logger.debug(`[DeepL] Sequential fallback: segment ${i + 1}/${chunkTexts.length} translated`);
-          } catch (singleError) {
+          } catch {
             logger.debug(`[DeepL] Sequential fallback failed for segment ${i + 1}, using original`);
             results.push(text); // Return original text as fallback
           }
