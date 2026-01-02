@@ -13,8 +13,7 @@
           pointerEvents: 'auto',
           cursor: 'auto',
           zIndex: 2147483647,
-          direction: 'ltr',
-          textAlign: 'left',
+          // direction and textAlign removed to allow CSS class-based RTL/LTR support
           unicodeBidi: 'plaintext',
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
@@ -86,6 +85,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 const pageEventBus = window.pageEventBus;
 
@@ -114,6 +114,10 @@ let selectElementNotificationManager = null;
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
 let cancelTimeout = null;
+
+// Cached RTL setting for toast direction (optimized - single lookup)
+let isRTLSetting = false;
+let isRTLInitialized = false;
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
@@ -158,7 +162,7 @@ onMounted(async () => {
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
   logger.info(`ContentApp mounted in ${executionMode} mode`);
-  
+
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
 
@@ -234,27 +238,27 @@ onMounted(async () => {
   
     
   
-  tracker.addEventListener(pageEventBus, 'show-notification', (detail) => {
+  tracker.addEventListener(pageEventBus, 'show-notification', async (detail) => {
     // Create a unique key for this notification
     const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
-    
+
     // Check if this notification was already shown recently (within 1 second)
     const recentKeys = Array.from(window.translateItShownNotifications).filter(key => {
       const timestamp = parseInt(key.split('-').pop());
       return Date.now() - timestamp < 1000; // 1 second window
     });
-    
-    const isDuplicate = recentKeys.some(key => 
+
+    const isDuplicate = recentKeys.some(key =>
       key.startsWith(`${detail.message}-${detail.type}`)
     );
-    
+
     if (isDuplicate) {
       return;
     }
-    
+
     // Add to set and show notification
     window.translateItShownNotifications.add(notificationKey);
-    
+
     // Clean up old entries (keep only last 10)
     if (window.translateItShownNotifications.size > 10) {
       const entries = Array.from(window.translateItShownNotifications);
@@ -262,17 +266,33 @@ onMounted(async () => {
         window.translateItShownNotifications.delete(key);
       });
     }
-    
-        
-        
+
+
+
     const { id, message, type, duration, actions, persistent } = detail;
     const toastFn = toastMap[type] || toast.info;
-    
-    const toastOptions = { 
-      id, 
-      duration: persistent ? Infinity : duration
+
+    // CRITICAL: Get text direction from cached locale settings (optimized - single lookup on first use)
+    // Use getTranslationString which works properly in content scripts
+    if (!isRTLInitialized) {
+      const rtlValue = await getTranslationString('IsRTL');
+      isRTLSetting = rtlValue === 'true';
+      isRTLInitialized = true;
+      logger.debug('[Toast] RTL setting initialized:', { isRTLSetting, rtlValue });
+    }
+    const detectedDirection = isRTLSetting ? 'rtl' : 'ltr';
+
+    const toastOptions = {
+      id,
+      duration: persistent ? Infinity : duration,
+      // CRITICAL: Apply direction via style option (most reliable method)
+      // This directly applies inline styles to the toast element
+      style: {
+        direction: detectedDirection,
+        textAlign: isRTLSetting ? 'right' : 'left'
+      }
     };
-    
+
     // Add action buttons if provided
     if (actions && actions.length > 0) {
       // Create the action handler
@@ -515,5 +535,17 @@ onUnmounted(async () => {
 /* Individual components inside will override this (e.g., toaster, toolbars) */
 .content-app-container > * {
   pointer-events: all !important; /* Re-enable pointer events for children */
+}
+
+/* CRITICAL: Toast text direction for RTL/LTR support */
+/* Direction is set based on extension locale (IsRTL from getTranslationString) via inline styles */
+/* Do NOT use !important rules that would override inline styles */
+[data-sonner-toast] {
+  /* direction and text-align removed to allow inline styles to work */
+}
+
+/* Also target the content div inside toast */
+[data-sonner-toast] > div[data-content] > div {
+  /* direction and text-align removed to allow inline styles to work */
 }
 </style>

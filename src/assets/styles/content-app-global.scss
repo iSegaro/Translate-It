@@ -26,13 +26,16 @@
 .ti-field-icon,
 .translation-window,
 .translation-icon,
-.sonner-toaster,
-.sonner-toast,
 .ti-window-header {
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: plaintext !important;
 }
+
+/* CRITICAL: Toast direction support for RTL/LTR */
+/* Direction is now applied via inline styles (style option in toastOptions) */
+/* Direction is set based on extension locale (IsRTL from getTranslationString, cached) */
+/* No className-based rules needed */
 
 /* Ensure all interactive components have pointer-events enabled */
 .ti-field-icon,
