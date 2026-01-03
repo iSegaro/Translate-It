@@ -24,8 +24,6 @@ import ExtensionContextManager from "../core/extensionContext.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus } from './PageEventBus.js';
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 // Singleton instance
 let translationHandlerInstance = null;
