@@ -263,26 +263,64 @@ export class ContextMenuManager extends ResourceTracker {
    */
   // Prevent concurrent menu setup
   _menuSetupLock = false;
+  _pendingSetupPromise = null;
   async setupDefaultMenus(locale = null) {
     logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
 
     // Global lock to prevent any race conditions across the entire extension
     if (this._menuSetupLock) {
-      logger.debug("setupDefaultMenus called concurrently, skipping to prevent duplicate menus");
+      logger.debug("setupDefaultMenus called concurrently, waiting for existing setup to complete");
+      // If there's a pending setup, wait for it instead of skipping
+      if (this._pendingSetupPromise) {
+        await this._pendingSetupPromise;
+      }
       return;
     }
+
     this._menuSetupLock = true;
 
+    // Store the promise so concurrent calls can wait for it
+    this._pendingSetupPromise = this._setupMenusInternal(locale);
+
+    try {
+      await this._pendingSetupPromise;
+    } finally {
+      this._menuSetupLock = false;
+      this._pendingSetupPromise = null;
+    }
+  }
+
+  /**
+   * Internal implementation of menu setup (separated for proper locking)
+   * @private
+   */
+  async _setupMenusInternal(locale) {
     try {
       // Get i18n utility from factory
       const { getTranslationString } = await utilsFactory.getI18nUtils();
 
       // Clear existing menus first and wait for completion
-      // Add a small delay to ensure any pending operations complete
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Increase delay to ensure removeAll() fully completes before creating new menus
+      // This prevents "duplicate id" errors from Chrome
       await browser.contextMenus.removeAll();
+
+      // Verify menus are cleared by waiting longer
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Double-check that all menus are cleared
+      try {
+        const existingMenus = await browser.contextMenus.getAll();
+        if (existingMenus.length > 0) {
+          logger.warn(`Found ${existingMenus.length} menus still after removeAll(), clearing again`);
+          await browser.contextMenus.removeAll();
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (e) {
+        logger.debug("Could not verify menu removal:", e);
+      }
+
       this.createdMenus.clear();
-      logger.debug("[ContextMenuManager] Cleared existing menus");
+      logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
       // Get the currently active API to set the 'checked' state
       const currentApi = await getTranslationApiAsync();
@@ -394,8 +432,6 @@ export class ContextMenuManager extends ResourceTracker {
     } catch (error) {
       logger.error("❌ Failed to setup default menus:", error);
       throw error;
-    } finally {
-      this._menuSetupLock = false;
     }
   }
 
@@ -413,8 +449,25 @@ export class ContextMenuManager extends ResourceTracker {
     try {
       const menuId = await this.browser.contextMenus.create(menuConfig);
 
-      // IMPORTANT: Check and clear runtime.lastError to prevent console warnings
+      // IMPORTANT: Immediately check and clear runtime.lastError to prevent console warnings
       // In Chrome, some errors are stored in runtime.lastError instead of being thrown
+      // We must access chrome.runtime.lastError synchronously right after the async call
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.lastError) {
+        const lastError = chrome.runtime.lastError;
+
+        // Check if this is a duplicate ID error - log at debug level and don't fail
+        if (lastError.message && lastError.message.includes('duplicate id')) {
+          logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (chrome.runtime.lastError), skipping`);
+          // Accessing lastError clears it
+          return menuConfig.id; // Return the ID without failing
+        }
+
+        // For other errors, log them
+        logger.warn(`Context menu created but chrome.runtime.lastError was set:`, lastError);
+        // Accessing lastError clears it
+      }
+
+      // Also check browser runtime.lastError for polyfill scenarios
       if (this.browser.runtime && this.browser.runtime.lastError) {
         const lastError = this.browser.runtime.lastError;
 
