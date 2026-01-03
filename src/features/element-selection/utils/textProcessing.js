@@ -498,7 +498,7 @@ export function reassembleTranslations(
 
         // Log if a segment is being rejected (should be very rare)
         if (!isValid && originalText.length > 100) {
-          logger.warn(`⚠️ REASSEMBLY: Rejecting segment ${originalIndex}:${segmentIndex}`, {
+          logger.debug(`⚠️ REASSEMBLY: Rejecting segment ${originalIndex}:${segmentIndex}`, {
             segmentPreview: segment.substring(0, 50),
             segmentLength: segment.length,
             trimmedLength: trimmedSegment.length
@@ -510,7 +510,7 @@ export function reassembleTranslations(
 
       // Log if we lost any segments during validation
       if (validSegments.length !== segments.length) {
-        logger.warn(`⚠️ REASSEMBLY: Lost ${segments.length - validSegments.length} segments during validation`, {
+        logger.debug(`⚠️ REASSEMBLY: Lost ${segments.length - validSegments.length} segments during validation`, {
           originalSegments: segments.length,
           validSegments: validSegments.length,
           originalIndex

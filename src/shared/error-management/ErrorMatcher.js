@@ -33,6 +33,37 @@ export function matchErrorToType(rawOrError = "") {
   if (rawOrError && typeof rawOrError === "object" && rawOrError.statusCode) {
     const code = rawOrError.statusCode;
     if (typeof code === "number" && code >= 400 && code < 600) {
+      // For ambiguous status codes (400, 422), check message first for more specific error types
+      // This provides better error classification for providers that return these codes with specific messages
+      if ((code === 400 || code === 422) && rawOrError.message) {
+        const errorMsg = String(rawOrError.message).toLowerCase();
+
+        // Check if this is an API key error (even with 400/422 status)
+        if (errorMsg.includes("api key") ||
+            errorMsg.includes("auth") ||
+            errorMsg.includes("authentication") ||
+            errorMsg.includes("unauthorized") ||
+            errorMsg.includes("credentials") ||
+            errorMsg.includes("key not") ||
+            errorMsg.includes("invalid key")) {
+          return ErrorTypes.API_KEY_INVALID;
+        }
+
+        // Check if message is empty (TEXT_EMPTY)
+        if (errorMsg.includes("text is empty") || errorMsg.includes("empty text")) {
+          return ErrorTypes.TEXT_EMPTY;
+        }
+
+        // Check if text is too long (TEXT_TOO_LONG)
+        if (errorMsg.includes("text is too long") ||
+            errorMsg.includes("too long") ||
+            errorMsg.includes("exceeds limit") ||
+            errorMsg.includes("maximum length")) {
+          return ErrorTypes.TEXT_TOO_LONG;
+        }
+      }
+
+      // For specific, unambiguous status codes, use direct mapping
       switch (code) {
         // خطای مربوط به کلید API
         case 401:
@@ -51,6 +82,7 @@ export function matchErrorToType(rawOrError = "") {
           return ErrorTypes.MODEL_MISSING;
 
         // درخواست نامعتبر (پارامترها یا ساختار اشتباه)
+        // After message check above, fall back to INVALID_REQUEST
         case 400:
         case 422:
           return ErrorTypes.INVALID_REQUEST;

@@ -162,9 +162,14 @@ export class TranslationOrchestrator extends ResourceTracker {
       const isUserCancelled = this.requestManager.isUserCancelled(messageId) ||
                               matchErrorToType(error) === ErrorTypes.USER_CANCELLED;
 
+      // Check if the request was already marked as error (e.g., by StreamEndService)
+      // This prevents duplicate error notifications
+      const request = this.requestManager.getRequest(messageId);
+      const wasAlreadyHandledAsError = request?.status === 'error';
+
       if (isUserCancelled) {
         this.logger.info("Translation process cancelled by user", { messageId });
-      } else if (!error.alreadyHandled) {
+      } else if (!error.alreadyHandled && !wasAlreadyHandledAsError) {
         this.logger.error("Translation process failed", error);
 
         // Show error notification to user for direct translation failures
@@ -177,6 +182,8 @@ export class TranslationOrchestrator extends ResourceTracker {
 
         // Mark error as handled to prevent duplicate display in SelectElementManager
         error.alreadyHandled = true;
+      } else if (wasAlreadyHandledAsError) {
+        this.logger.debug("Translation error was already handled by StreamEndService, skipping duplicate notification");
       }
 
       // Clean up on error

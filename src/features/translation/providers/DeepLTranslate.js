@@ -38,6 +38,33 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
+   * Get configuration using project's existing config system
+   * Uses StorageManager's built-in caching and config.js helpers
+   */
+  async _getConfig() {
+    try {
+      // Use project's existing config system with built-in caching
+      const [apiKey, apiTier] = await Promise.all([
+        getDeeplApiKeyAsync(),
+        getDeeplApiTierAsync(),
+      ]);
+
+      // Get API endpoint based on tier
+      const apiUrl = apiTier === 'pro'
+        ? 'https://api.deepl.com/v2/translate'
+        : 'https://api-free.deepl.com/v2/translate';
+
+      // Configuration loaded successfully
+      logger.info(`[DeepL] Using tier: ${apiTier}`);
+
+      return { apiKey, apiTier, apiUrl };
+    } catch (error) {
+      logger.error(`[DeepL] Error loading configuration:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Convert language code to DeepL uppercase format
    * @param {string} lang - Language code or name
    * @param {boolean} enableBetaLanguages - Whether beta languages are enabled
@@ -62,17 +89,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Get API endpoint based on user's tier setting (Free/Pro)
-   * @returns {Promise<string>} API endpoint URL
-   */
-  async _getApiEndpoint() {
-    const tier = await getDeeplApiTierAsync();
-    return tier === 'pro'
-      ? 'https://api.deepl.com/v2/translate'
-      : 'https://api-free.deepl.com/v2/translate';
-  }
-
-  /**
    * Translate a single chunk of texts using DeepL API
    * @param {string[]} chunkTexts - Texts in this chunk
    * @param {string} sourceLang - Source language (DeepL code)
@@ -86,6 +102,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
+
+    // Get configuration and validate API key
+    const { apiKey, apiUrl } = await this._getConfig();
+
+    // Validate configuration
+    this._validateConfig(
+      { apiKey, apiUrl },
+      ["apiKey", "apiUrl"],
+      context
+    );
 
     // Filter out empty or whitespace-only texts (DeepL rejects them)
     const validTexts = chunkTexts.filter(text => text && text.trim().length > 0);
@@ -189,11 +215,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
     try {
       const result = await this._executeWithErrorHandling({
-        url: await this._getApiEndpoint(),
+        url: apiUrl,
         fetchOptions: {
           method: "POST",
           headers: {
-            "Authorization": `DeepL-Auth-Key ${await getDeeplApiKeyAsync()}`,
+            "Authorization": `DeepL-Auth-Key ${apiKey}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: requestBody,
@@ -346,11 +372,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             requestBody.append('preserve_formatting', '1');
 
             const result = await this._executeWithErrorHandling({
-              url: await this._getApiEndpoint(),
+              url: apiUrl,
               fetchOptions: {
                 method: "POST",
                 headers: {
-                  "Authorization": `DeepL-Auth-Key ${await getDeeplApiKeyAsync()}`,
+                  "Authorization": `DeepL-Auth-Key ${apiKey}`,
                   "Content-Type": "application/x-www-form-urlencoded",
                 },
                 body: requestBody,
