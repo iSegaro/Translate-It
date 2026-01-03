@@ -155,36 +155,47 @@ export function useUITransition(options = {}) {
       
       // Mid-transition: update display value
       setTimeout(async () => {
-        if (transitionId.value !== currentId) return // Prevent race conditions
-        
-        getLogger().debug(`Mid-transition: applying value change for ${transitionType}`)
-        displayValue.value = pendingValue.value
-        
-        await nextTick()
-        onTransitionMid(pendingValue.value)
+        try {
+          if (transitionId.value !== currentId) return // Prevent race conditions
+
+          getLogger().debug(`Mid-transition: applying value change for ${transitionType}`)
+          displayValue.value = pendingValue.value
+
+          await nextTick()
+          onTransitionMid(pendingValue.value)
+        } catch (error) {
+          getLogger().error(`Error in mid-transition for ${transitionType}:`, error)
+        }
       }, duration / 2)
-      
+
       // End transition
       setTimeout(async () => {
-        if (transitionId.value !== currentId) return // Prevent race conditions
-        
-        getLogger().debug(`Completed ${transitionType} transition`)
-        
-        // Reset state
-        isTransitioning.value = false
-        pendingValue.value = null
-        
-        // Remove CSS classes
-        applyTransitionClasses(container, false)
-        
-        // Additional cleanup: ensure no lingering transition classes
-        if (container) {
-          const typeClass = `${transitionType}-transition`
-          container.classList.remove(typeClass)
+        try {
+          if (transitionId.value !== currentId) return // Prevent race conditions
+
+          getLogger().debug(`Completed ${transitionType} transition`)
+
+          // Reset state
+          isTransitioning.value = false
+          pendingValue.value = null
+
+          // Remove CSS classes
+          applyTransitionClasses(container, false)
+
+          // Additional cleanup: ensure no lingering transition classes
+          if (container) {
+            const typeClass = `${transitionType}-transition`
+            container.classList.remove(typeClass)
+          }
+
+          await nextTick()
+          onTransitionEnd(displayValue.value)
+        } catch (error) {
+          getLogger().error(`Error in end transition for ${transitionType}:`, error)
+          // Ensure state is reset even on error
+          isTransitioning.value = false
+          pendingValue.value = null
         }
-        
-        await nextTick()
-        onTransitionEnd(displayValue.value)
       }, duration)
       
     } catch (error) {
