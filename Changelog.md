@@ -1,4 +1,4 @@
-#### v1.7.0 – Released on Janurary 02, 2026
+#### v1.7.0 – Released on Janurary 03, 2026
 
 ##### Added
 
