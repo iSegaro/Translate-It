@@ -172,10 +172,11 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 | Provider         | How to Get API Key                            | Cost |
 | ---------------- | --------------------------------------------- | ---- |
 | Google Translate | _Dont Need_                                   | Free |
+| Yandex Translate | _Dont Need_                                   | Free |
+| DeepL            | [DeepL API Keys][deepl-api-key-url]           | Free |
 | Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free |
 | WebAI to API     | _[Local Server][webai-to-api-url]_            | Free |
 | OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free |
-| DeepL            | [DeepL API Keys][deepl-api-key-url]           | Paid |
 | OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid |
 | DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid |
 | Custom OpenAI    | -                                             | -    |
@@ -244,6 +245,41 @@ You can modify the default shortcuts as needed:
   1. Right-click on the extension icon in the toolbar and choose `Manage Extension`.
   2. In the opened page, click the gear icon.
   3. Select `Manage Extension Shortcuts`.
+
+</details>
+
+<br>
+
+---
+
+<details id="known-issues">
+<summary>
+  <h2>⚠️ Known Issues</h2>
+</summary>
+
+This section documents known limitations and issues that users may encounter when using the extension.
+
+### Bing Translator - Select Element Mode Issues
+
+When using **Bing Translator** with the **Select Element** feature on complex or lengthy pages, the translated text may not maintain proper positioning and can appear in incorrect locations. This is a known limitation of the Bing service that doesn't align well with the extension's current architecture.
+
+**Workaround:** For best results with Select Element mode, consider using other providers like Google Translate, Gemini, or DeepL which handle complex page structures more reliably.
+
+---
+
+### Translation Quality in Select Element Mode on Complex Pages
+
+To maximize efficiency and minimize token usage/API requests from translation providers, the extension heavily optimizes text before sending it for translation. This optimization strategy, while necessary for cost and performance efficiency, can result in reduced translation quality when using **Select Element mode** on complex web pages.
+
+**Technical Details:** The extension groups and chunks text content to minimize the number of API calls. On pages with intricate layouts or mixed content types, this optimization may split contextual information in ways that affect translation accuracy.
+
+**Trade-off:** This is an intentional design decision to balance:
+- ✅ Reduced API costs (fewer tokens used)
+- ✅ Faster translation speed
+- ✅ Lower resource consumption
+- ❌ Potentially reduced translation quality in complex scenarios
+
+**Recommendation:** For critical content where translation quality is paramount, consider using `Popup/Sidepanel` or `Select Text` translation instead of Select Element mode, as it provides better context preservation.
 
 </details>
 
