@@ -179,7 +179,7 @@ export class StreamEndService {
             }
           } catch (parseError) {
             // If parsing fails, use as-is
-            this.logger.warn(`Failed to parse JSON array translation in streaming: ${parseError.message}`);
+            this.logger.debug(`Failed to parse JSON array translation in streaming: ${parseError.message}`);
             finalTranslatedData.push({ text: translatedText });
           }
         } else {

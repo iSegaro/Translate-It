@@ -270,7 +270,7 @@ export class StreamingUpdateService {
               this.logger.debug(`Streaming JSON array parsed: ${parsedArray.length} segments`);
             }
           } catch (parseError) {
-            this.logger.warn(`Failed to parse streaming JSON array: ${parseError.message}`);
+            this.logger.debug(`Failed to parse streaming JSON array: ${parseError.message}`);
             // Use original translatedText if parsing fails
           }
         }
