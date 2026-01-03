@@ -77,16 +77,17 @@ export class BaseProvider {
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // 1. Language swapping and normalization
+    // IMPORTANT: Set Field/Subtitle mode BEFORE language swapping
+    // 1. LanguageSwappingService needs sourceLang=AUTO_DETECT_VALUE to work properly
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // 2. Language swapping and normalization (after Field mode is set)
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: this.providerName, useRegexFallback: true }
     );
-
-    // 2. Adjust source language for specific modes after detection
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
 
     // 3. Convert to provider-specific language codes
     const sl = this._getLangCode(sourceLang);

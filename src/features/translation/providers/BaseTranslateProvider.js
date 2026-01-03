@@ -46,16 +46,17 @@ export class BaseTranslateProvider extends BaseProvider {
 
     logger.debug(`[${this.providerName}] Traditional provider translate call - bypassing JSON mode`);
 
-    // Language swapping and normalization
+    // IMPORTANT: Set Field/Subtitle mode BEFORE language swapping
+    // LanguageSwappingService needs sourceLang=AUTO_DETECT_VALUE to work properly
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // Language swapping and normalization (after Field mode is set)
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: this.providerName, useRegexFallback: true }
     );
-
-    // Field and subtitle modes
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
 
     // Convert to provider-specific language codes
     const sl = this._getLangCode(sourceLang);
