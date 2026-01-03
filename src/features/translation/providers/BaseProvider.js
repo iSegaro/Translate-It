@@ -246,14 +246,60 @@ export class BaseProvider {
             errorType = ErrorTypes.INSUFFICIENT_BALANCE;
             break;
           case 403:
-            errorType = ErrorTypes.FORBIDDEN_ERROR;
+            // For DeepL, 403 always means API key authentication failed
+            // See: https://support.deepl.com/hc/en-us/articles/9773964275868-DeepL-API-error-messages
+            // "Authorization failed. Please supply a valid auth_key parameter"
+            const isDeepLProvider = this.providerName === 'DeepLTranslate';
+
+            // For other providers, check the error message for auth-related keywords
+            const errorMsg = typeof body === 'string' ? body : (body?.message || body?.error || JSON.stringify(body));
+            const isAuthError = isDeepLProvider || (errorMsg &&
+              (errorMsg.toLowerCase().includes('authentication') ||
+               errorMsg.toLowerCase().includes('unauthorized') ||
+               errorMsg.toLowerCase().includes('invalid key') ||
+               errorMsg.toLowerCase().includes('auth key') ||
+               errorMsg.toLowerCase().includes('auth failed') ||
+               errorMsg.toLowerCase().includes('key not found')));
+
+            errorType = isAuthError ? ErrorTypes.API_KEY_INVALID : ErrorTypes.FORBIDDEN_ERROR;
             break;
           case 404:
             errorType = ErrorTypes.MODEL_MISSING;
             break;
           case 400:
           case 422:
-            errorType = ErrorTypes.INVALID_REQUEST;
+            // For ambiguous status codes, check message content for more specific error types
+            // This handles cases where providers return 400/422 with specific error messages
+            let errorMsgLower = '';
+            try {
+              if (typeof body === 'string') {
+                errorMsgLower = body.toLowerCase();
+              } else if (body?.message && typeof body.message === 'string') {
+                errorMsgLower = body.message.toLowerCase();
+              } else if (body?.error && typeof body.error === 'string') {
+                errorMsgLower = body.error.toLowerCase();
+              } else {
+                // For objects or other types, try to extract string message
+                const extracted = body?.message || body?.error || msg || '';
+                errorMsgLower = String(extracted).toLowerCase();
+              }
+            } catch {
+              // If all else fails, use the original msg
+              errorMsgLower = String(msg || '').toLowerCase();
+            }
+
+            // Check if this is an API key error (even with 400/422 status)
+            if (errorMsgLower.includes('api key') ||
+                errorMsgLower.includes('auth') ||
+                errorMsgLower.includes('authentication') ||
+                errorMsgLower.includes('unauthorized') ||
+                errorMsgLower.includes('credentials') ||
+                errorMsgLower.includes('key not') ||
+                errorMsgLower.includes('invalid key')) {
+              errorType = ErrorTypes.API_KEY_INVALID;
+            } else {
+              errorType = ErrorTypes.INVALID_REQUEST;
+            }
             break;
           case 429:
             errorType = ErrorTypes.RATE_LIMIT_REACHED;

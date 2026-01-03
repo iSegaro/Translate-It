@@ -98,23 +98,34 @@ export class ErrorHandler {
     this.handling = true;
     try {
       const raw = err instanceof Error ? err.message : String(err);
-      
+
       // Use ExtensionContextManager for unified context error detection
       if (ExtensionContextManager.isContextError(err)) {
         ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
         return err; // Handle silently
       }
-      
+
       // For non-context errors, continue with normal error handling
-      const type = matchErrorToType(raw);
-      
+      // Pass the full error object to matchErrorToType to preserve error.type
+      const type = matchErrorToType(err);
+
       // Use original error message if it's more specific than the generic one
       let msg;
       try {
         const genericMsg = await getErrorMessage(type);
 
+        // For API configuration errors, always use the localized generic message
+        // These errors have specific, user-friendly messages that should always be shown
+        const shouldUseGenericMessage = [
+          ErrorTypes.API_KEY_MISSING,
+          ErrorTypes.API_KEY_INVALID,
+          ErrorTypes.API_URL_MISSING,
+          ErrorTypes.MODEL_MISSING,
+          ErrorTypes.INSUFFICIENT_BALANCE,
+        ].includes(type);
+
         // Prefer the original message if it's informative and not generic
-        if (raw &&
+        if (!shouldUseGenericMessage && raw &&
             raw.length > 5 && // Must have meaningful content
             !raw.includes('[object Object]') && // Not just object string
             !raw.startsWith('Error:') && // Not generic error prefix
@@ -123,7 +134,7 @@ export class ErrorHandler {
             !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
           msg = raw;
         } else {
-          // Use generic message for generic errors
+          // Use generic message for generic errors or API configuration errors
           msg = genericMsg;
         }
       } catch {
