@@ -15,6 +15,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -449,7 +450,7 @@ export class BaseTranslateProvider extends BaseProvider {
       const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
 
       // For DeepL, HTTP 400 is a retryable error (too many segments), don't show error notification
-      const isRetryableDeepL400 = this.providerName === 'DeepLTranslate' &&
+      const isRetryableDeepL400 = this.providerName === ProviderNames.DEEPL_TRANSLATE &&
                                    error.message?.includes('HTTP 400');
 
       // Let the centralized error handler manage the error

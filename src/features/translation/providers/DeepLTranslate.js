@@ -12,6 +12,7 @@ import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 
@@ -34,7 +35,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.DEEPL;
 
   constructor() {
-    super("DeepLTranslate");
+    super(ProviderNames.DEEPL_TRANSLATE);
   }
 
   /**

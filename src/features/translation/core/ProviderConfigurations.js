@@ -5,6 +5,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderConfigurations');
 
@@ -548,35 +549,40 @@ export function getProviderConfiguration(providerName) {
  */
 function normalizeProviderName(providerName) {
   if (!providerName || typeof providerName !== 'string') {
-    return 'Custom';
+    return ProviderNames.CUSTOM;
   }
-  
+
   const name = providerName.toLowerCase();
-  
-  // Map common variations to standard names
+
+  // Map common variations to standard names using ProviderNames constants
   const nameMapping = {
-    'gemini': 'Gemini',
-    'google-gemini': 'Gemini',
-    'googlegemini': 'Gemini',
-    'openai': 'OpenAI',
-    'gpt': 'OpenAI',
-    'chatgpt': 'OpenAI',
-    'deepseek': 'DeepSeek',
-    'openrouter': 'OpenRouter',
-    'webai': 'WebAI',
-    'googletranslate': 'GoogleTranslate',
-    'google-translate': 'GoogleTranslate',
-    'yandextranslate': 'YandexTranslate',
-    'yandex-translate': 'YandexTranslate',
-    'yandex': 'YandexTranslate',
-    'deepl': 'DeepLTranslate',
-    'deepltranslate': 'DeepLTranslate',
-    'deep-l': 'DeepLTranslate',
-    'custom': 'Custom',
-    'custom-openai': 'Custom'
+    'gemini': ProviderNames.GEMINI,
+    'google-gemini': ProviderNames.GEMINI,
+    'googlegemini': ProviderNames.GEMINI,
+    'openai': ProviderNames.OPENAI,
+    'gpt': ProviderNames.OPENAI,
+    'chatgpt': ProviderNames.OPENAI,
+    'deepseek': ProviderNames.DEEPSEEK,
+    'openrouter': ProviderNames.OPENROUTER,
+    'webai': ProviderNames.WEBAI,
+    'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
+    'google-translate': ProviderNames.GOOGLE_TRANSLATE,
+    'yandextranslate': ProviderNames.YANDEX_TRANSLATE,
+    'yandex-translate': ProviderNames.YANDEX_TRANSLATE,
+    'yandex': ProviderNames.YANDEX_TRANSLATE,
+    'deepl': ProviderNames.DEEPL_TRANSLATE,
+    'deepltranslate': ProviderNames.DEEPL_TRANSLATE,
+    'deep-l': ProviderNames.DEEPL_TRANSLATE,
+    'bingtranslate': ProviderNames.BING_TRANSLATE,
+    'bing-translate': ProviderNames.BING_TRANSLATE,
+    'bing': ProviderNames.BING_TRANSLATE,
+    'browser': ProviderNames.BROWSER_API,
+    'browserranslate': ProviderNames.BROWSER_API,
+    'custom': ProviderNames.CUSTOM,
+    'custom-openai': ProviderNames.CUSTOM
   };
-  
-  return nameMapping[name] || 'Custom';
+
+  return nameMapping[name] || ProviderNames.CUSTOM;
 }
 
 /**

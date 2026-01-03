@@ -12,6 +12,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
@@ -33,7 +34,7 @@ export class OpenAIProvider extends BaseAIProvider {
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
-    super("OpenAI");
+    super(ProviderNames.OPENAI);
   }
 
   

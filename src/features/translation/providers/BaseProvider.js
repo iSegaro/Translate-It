@@ -7,6 +7,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -229,7 +230,7 @@ export class BaseProvider {
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
 
         // For DeepL, HTTP 400 is a retryable error (too many segments), use debug level
-        const isDeepL400 = this.providerName === 'DeepLTranslate' && response.status === 400;
+        const isDeepL400 = this.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
         // For server errors (502, 503, 524), use warn level instead of error - these are temporary server issues
         const isServerError = response.status >= 500 && response.status < 600;
         const logLevel = isDeepL400 || isServerError ? 'warn' : 'error';
@@ -252,7 +253,7 @@ export class BaseProvider {
             // For DeepL, 403 always means API key authentication failed
             // See: https://support.deepl.com/hc/en-us/articles/9773964275868-DeepL-API-error-messages
             // "Authorization failed. Please supply a valid auth_key parameter"
-            const isDeepLProvider = this.providerName === 'DeepLTranslate';
+            const isDeepLProvider = this.providerName === ProviderNames.DEEPL_TRANSLATE;
 
             // For other providers, check the error message for auth-related keywords
             const errorMsg = typeof body === 'string' ? body : (body?.message || body?.error || JSON.stringify(body));

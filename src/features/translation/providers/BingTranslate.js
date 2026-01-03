@@ -8,6 +8,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 
@@ -30,7 +31,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING; // Bing's chunk size - reduced for reliability
 
   constructor() {
-    super("BingTranslate");
+    super(ProviderNames.BING_TRANSLATE);
   }
 
   _getLangCode(lang) {

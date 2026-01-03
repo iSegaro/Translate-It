@@ -11,6 +11,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import browser from 'webextension-polyfill';
 
 
@@ -82,7 +83,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
   static translators = {};
 
   constructor() {
-    super("browserTranslate");
+    super(ProviderNames.BROWSER_API);
   }
 
   /**

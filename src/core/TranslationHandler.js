@@ -21,6 +21,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import FeatureManager from "@/core/managers/content/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import ExtensionContextManager from "../core/extensionContext.js";
+import { ProviderNames, ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -189,10 +190,10 @@ export default class TranslationHandler {
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
 
-      if (processed.type === 'QUOTA_EXCEEDED' && processed.provider === 'Gemini') {
+      if (processed.type === 'QUOTA_EXCEEDED' && processed.provider === ProviderNames.GEMINI) {
         const providerMap = {
-          'BingTranslate': 'bing',
-          'OpenAI': 'openai'
+          [ProviderNames.BING_TRANSLATE]: ProviderRegistryIds.BING,
+          [ProviderNames.OPENAI]: ProviderRegistryIds.OPENAI
         };
         const actions = processed.suggestedProviders.map(providerKey => {
             const providerValue = providerMap[providerKey];
