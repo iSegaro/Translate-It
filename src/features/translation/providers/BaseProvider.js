@@ -7,6 +7,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -77,16 +78,17 @@ export class BaseProvider {
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // 1. Language swapping and normalization
+    // IMPORTANT: Set Field/Subtitle mode BEFORE language swapping
+    // 1. LanguageSwappingService needs sourceLang=AUTO_DETECT_VALUE to work properly
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // 2. Language swapping and normalization (after Field mode is set)
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: this.providerName, useRegexFallback: true }
     );
-
-    // 2. Adjust source language for specific modes after detection
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
 
     // 3. Convert to provider-specific language codes
     const sl = this._getLangCode(sourceLang);
@@ -228,8 +230,10 @@ export class BaseProvider {
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
 
         // For DeepL, HTTP 400 is a retryable error (too many segments), use debug level
-        const isDeepL400 = this.providerName === 'DeepLTranslate' && response.status === 400;
-        const logLevel = isDeepL400 ? 'debug' : 'error';
+        const isDeepL400 = this.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
+        // For server errors (502, 503, 524), use warn level instead of error - these are temporary server issues
+        const isServerError = response.status >= 500 && response.status < 600;
+        const logLevel = isDeepL400 || isServerError ? 'warn' : 'error';
         logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           message: msg,
@@ -245,11 +249,11 @@ export class BaseProvider {
           case 402:
             errorType = ErrorTypes.INSUFFICIENT_BALANCE;
             break;
-          case 403:
+          case 403: {
             // For DeepL, 403 always means API key authentication failed
             // See: https://support.deepl.com/hc/en-us/articles/9773964275868-DeepL-API-error-messages
             // "Authorization failed. Please supply a valid auth_key parameter"
-            const isDeepLProvider = this.providerName === 'DeepLTranslate';
+            const isDeepLProvider = this.providerName === ProviderNames.DEEPL_TRANSLATE;
 
             // For other providers, check the error message for auth-related keywords
             const errorMsg = typeof body === 'string' ? body : (body?.message || body?.error || JSON.stringify(body));
@@ -263,11 +267,12 @@ export class BaseProvider {
 
             errorType = isAuthError ? ErrorTypes.API_KEY_INVALID : ErrorTypes.FORBIDDEN_ERROR;
             break;
+          }
           case 404:
             errorType = ErrorTypes.MODEL_MISSING;
             break;
           case 400:
-          case 422:
+          case 422: {
             // For ambiguous status codes, check message content for more specific error types
             // This handles cases where providers return 400/422 with specific error messages
             let errorMsgLower = '';
@@ -301,6 +306,7 @@ export class BaseProvider {
               errorType = ErrorTypes.INVALID_REQUEST;
             }
             break;
+          }
           case 429:
             errorType = ErrorTypes.RATE_LIMIT_REACHED;
             break;

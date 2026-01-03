@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { requestHealthMonitor } from './RequestHealthMonitor.js';
 import { getProviderRateLimit } from './ProviderConfigurations.js';
 import { ErrorClassifier } from './ErrorClassifier.js';
+import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -578,7 +579,7 @@ export class RateLimitManager {
     state.lastFailureTime = now;
     
     // Special handling for Gemini quota errors to open circuit breaker immediately
-    const isGeminiQuotaError = providerName === 'Gemini' && error.message && (
+    const isGeminiQuotaError = providerName === ProviderNames.GEMINI && error.message && (
       error.message.includes('quota') ||
       error.message.includes('RESOURCE_EXHAUSTED') ||
       error.message.includes('limit exceeded') ||

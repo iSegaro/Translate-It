@@ -379,6 +379,16 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
 
+  // Service Worker errors (No SW = No Service Worker)
+  // These occur during extension reload when service worker is transitioning
+  if (
+    msg.includes("no sw") ||
+    msg.includes("no service worker") ||
+    (msg.includes("service worker") && msg.includes("not available")) ||
+    (msg.includes("service worker") && msg.includes("invalid"))
+  )
+    return ErrorTypes.CONTEXT;
+
   // Tab Accessibility errors (specific to browser pages)
   if (
     msg.includes("feature not available on browser internal pages") ||

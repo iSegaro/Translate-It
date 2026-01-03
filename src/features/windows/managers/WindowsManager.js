@@ -888,8 +888,47 @@ export class WindowsManager extends ResourceTracker {
       this.state.setIconMode(false);
       this.state.setVisible(true);
       
-      // Start translation process
-      this._startTranslationProcess(windowId, data.selectedText);
+      // Start translation process (fire-and-forget with error handling)
+      this._startTranslationProcess(data.selectedText)
+        .then(result => {
+          // Update window with translation result
+          if (result) {
+            WindowsManagerEvents.updateWindow(windowId, {
+              initialSize: 'normal',
+              isLoading: false,
+              initialTranslatedText: result.translatedText
+            });
+          } else {
+            // Translation was cancelled
+            WindowsManagerEvents.updateWindow(windowId, {
+              initialSize: 'normal',
+              isLoading: false,
+              isError: true,
+              initialTranslatedText: 'Translation cancelled by user'
+            });
+          }
+        })
+        .catch(async (error) => {
+          this.logger.error('Translation process failed in cross-frame mode:', error);
+
+          // Use ErrorHandler to get user-friendly error message (consistent with normal mode)
+          let userFriendlyMessage;
+          try {
+            const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+            userFriendlyMessage = errorInfo.message;
+          } catch (handlerError) {
+            this.logger.warn('Failed to get user-friendly error message, using fallback:', handlerError);
+            userFriendlyMessage = error.message || 'Translation failed';
+          }
+
+          // Update window with error
+          WindowsManagerEvents.updateWindow(windowId, {
+            initialSize: 'normal',
+            isLoading: false,
+            isError: true,
+            initialTranslatedText: userFriendlyMessage
+          });
+        });
       
       // Notify success with the window ID
       this.crossFrameManager.notifyWindowCreated(data.frameId, true, windowId);

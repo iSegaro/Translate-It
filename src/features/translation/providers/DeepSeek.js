@@ -8,6 +8,7 @@ import {
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
@@ -29,7 +30,7 @@ export class DeepSeekProvider extends BaseAIProvider {
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
-    super("DeepSeek");
+    super(ProviderNames.DEEPSEEK);
   }
 
   

@@ -10,6 +10,7 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 
@@ -28,7 +29,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.GOOGLE;
 
   constructor() {
-    super("GoogleTranslate");
+    super(ProviderNames.GOOGLE_TRANSLATE);
   }
 
   _getLangCode(lang) {

@@ -13,7 +13,9 @@ import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
 
@@ -756,7 +758,7 @@ export class TranslationEngine {
     }
     
     // Add request throttling for Bing provider
-    if (provider === 'BingTranslate') {
+    if (provider === ProviderNames.BING_TRANSLATE) {
       await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between requests
     }
     
@@ -854,7 +856,7 @@ export class TranslationEngine {
         
         try {
           // Add throttling for Bing individual requests as well
-          if (config.provider === 'BingTranslate' && attempt > 0) {
+          if (config.provider === ProviderNames.BING_TRANSLATE && attempt > 0) {
             await new Promise(resolve => setTimeout(resolve, 300 * attempt)); // Increasing delay for retries
           }
           
@@ -1023,7 +1025,14 @@ export class TranslationEngine {
         this.history = []; // Ensure it's always an array
       }
     } catch (error) {
-      logger.error("[TranslationEngine] Failed to load history:", error);
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'translation-engine-history', {
+          fallbackAction: () => { this.history = []; }
+        });
+      } else {
+        logger.error("[TranslationEngine] Failed to load history:", error);
+      }
     }
   }
 

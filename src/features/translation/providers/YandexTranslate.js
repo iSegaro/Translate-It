@@ -4,6 +4,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 // import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
@@ -35,7 +36,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
   static maxChunksPerBatch = 8;
 
   constructor() {
-    super("YandexTranslate");
+    super(ProviderNames.YANDEX_TRANSLATE);
   }
 
   _getLangCode(lang) {

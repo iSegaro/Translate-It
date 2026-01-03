@@ -15,6 +15,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -46,16 +47,17 @@ export class BaseTranslateProvider extends BaseProvider {
 
     logger.debug(`[${this.providerName}] Traditional provider translate call - bypassing JSON mode`);
 
-    // Language swapping and normalization
+    // IMPORTANT: Set Field/Subtitle mode BEFORE language swapping
+    // LanguageSwappingService needs sourceLang=AUTO_DETECT_VALUE to work properly
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // Language swapping and normalization (after Field mode is set)
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: this.providerName, useRegexFallback: true }
     );
-
-    // Field and subtitle modes
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
 
     // Convert to provider-specific language codes
     const sl = this._getLangCode(sourceLang);
@@ -448,7 +450,7 @@ export class BaseTranslateProvider extends BaseProvider {
       const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
 
       // For DeepL, HTTP 400 is a retryable error (too many segments), don't show error notification
-      const isRetryableDeepL400 = this.providerName === 'DeepLTranslate' &&
+      const isRetryableDeepL400 = this.providerName === ProviderNames.DEEPL_TRANSLATE &&
                                    error.message?.includes('HTTP 400');
 
       // Let the centralized error handler manage the error

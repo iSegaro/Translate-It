@@ -5,6 +5,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleGetSelectedText');
 
@@ -30,12 +31,23 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
     }
     
     // Send message to content script to get selected text
-    const response = await browser.tabs.sendMessage(targetTabId, {
-      action: MessageActions.GET_SELECTED_TEXT,
-      data: {
-        timestamp: Date.now()
+    let response;
+    try {
+      response = await browser.tabs.sendMessage(targetTabId, {
+        action: MessageActions.GET_SELECTED_TEXT,
+        data: {
+          timestamp: Date.now()
+        }
+      });
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'text-selection-handler');
+      } else {
+        logger.warn(`Could not get selected text from tab ${targetTabId}:`, sendError);
       }
-    });
+      throw new Error('Content script not available');
+    }
     
     const selectedText = response?.selectedText || '';
     

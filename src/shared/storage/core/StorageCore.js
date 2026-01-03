@@ -15,6 +15,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import SmartCache from '@/core/memory/SmartCache.js';
 import { MEMORY_TIMING } from '@/core/memory/constants.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 class StorageCore extends ResourceTracker {
   constructor() {
@@ -42,29 +43,52 @@ class StorageCore extends ResourceTracker {
       return this._readyPromise;
     }
 
-    this._readyPromise = this._initialize();
+    this._readyPromise = this._initializeWithRetry();
     return this._readyPromise;
   }
 
-  async _initialize() {
-    try {
-      // Test browser storage availability
-      if (!browser?.storage?.local) {
-        throw new Error("Browser storage API not available");
+  async _initializeWithRetry(maxRetries = 5, delay = 100) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this._initialize();
+        return; // Success
+      } catch (error) {
+        // Use centralized context error detection
+        const isContextError = ExtensionContextManager.isContextError(error);
+
+        if (isContextError && attempt < maxRetries) {
+          // Context error during extension reload - retry with backoff
+          this.logger.debug(`Storage initialization attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+          continue;
+        }
+
+        // Final attempt or non-retryable error
+        if (isContextError) {
+          ExtensionContextManager.handleContextError(error, 'storage-core-init');
+        } else {
+          this.logger.error('Initialization failed', error);
+        }
+        throw error;
       }
-
-      // Test storage access
-      await browser.storage.local.get(["__storage_test__"]);
-
-      // Setup change listener for cache invalidation
-      this._setupChangeListener();
-
-      this._isReady = true;
-      this.logger.info('Storage core initialized successfully');
-    } catch (error) {
-      this.logger.error('Initialization failed', error);
-      throw error;
     }
+  }
+
+  async _initialize() {
+    // Test browser storage availability
+    if (!browser?.storage?.local) {
+      throw new Error("Browser storage API not available");
+    }
+
+    // Test storage access
+    await browser.storage.local.get(["__storage_test__"]);
+
+    // Setup change listener for cache invalidation
+    this._setupChangeListener();
+
+    this._isReady = true;
+    this.logger.info('Storage core initialized successfully');
   }
 
   /**

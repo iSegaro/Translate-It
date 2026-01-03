@@ -12,6 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
@@ -41,7 +42,7 @@ export class GeminiProvider extends BaseAIProvider {
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
-    super("Gemini");
+    super(ProviderNames.GEMINI);
   }
 
   
