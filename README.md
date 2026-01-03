@@ -88,6 +88,7 @@ When selecting a word, you'll not only get a translation but also helpful inform
 You can choose from several AI-powered translation providers:
 
 - [Google Translate][google-translate-url] (✔ Free)
+- [DeepL Translate][deepl-url] (✔ Free)
 - [Gemini][gemini-url] (✔ Free)
 - [Microsoft Bing Translator][bing-url] (✔ Free)
 - [Yandex Translate][yandex-url] (✔ Free)
@@ -174,6 +175,7 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 | Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free |
 | WebAI to API     | _[Local Server][webai-to-api-url]_            | Free |
 | OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free |
+| DeepL            | [DeepL API Keys][deepl-api-key-url]           | Paid |
 | OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid |
 | DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid |
 | Custom OpenAI    | -                                             | -    |
@@ -271,6 +273,10 @@ In the API Settings page of the extension, each provider has customizable option
 - **DeepSeek**
 
   You can also add the model in the settings on DeepSeek by referring to the [DeepSeek documentation][deepseek-url-docs].
+
+- **DeepL**
+
+  DeepL offers both Free and Pro API tiers. You can configure the API tier (Free or Pro) in settings. The Free tier has usage limits, while the Pro tier offers higher limits and additional features. DeepL also supports formality settings (default, more, less) for certain language pairs. See [DeepL documentation][deepl-url-docs] for more details.
 
 - **WebAI to API**
 
@@ -514,6 +520,7 @@ year 2025
 
 [google-translate-url]: https://translate.google.com/
 [gemini-url]: https://gemini.com/
+[deepl-url]: https://www.deepl.com/
 [openai-url]: https://chat.openai.com/
 [deepseek-url]: https://chat.deepseek.com/
 [openrouter-url]: https://openrouter.ai/
@@ -528,6 +535,7 @@ year 2025
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
+[deepl-api-key-url]: https://www.deepl.com/pro-api
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [deepseek-api-key-url]: https://platform.deepseek.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
@@ -537,6 +545,7 @@ year 2025
 [m-khani65-x-url]: https://x.com/M_Khani65/
 [flaticon-url]: https://www.flaticon.com/free-icons/translate/
 [gemini-url-docs]: https://ai.google.dev/api/all-methods/
+[deepl-url-docs]: https://www.deepl.com/docs-api/
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/

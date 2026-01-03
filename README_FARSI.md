@@ -90,6 +90,7 @@
 این افزونه از چندین سرویس ترجمه هوش مصنوعی پشتیبانی می‌کند تا بهترین گزینه را مطابق نیازهای خود انتخاب کنید:
 
 - [Google Translate][google-translate-url] (✔ رایگان)
+- [DeepL Translate][deepl-url] (✔ رایگان)
 - [Gemini][gemini-url] (✔ رایگان)
 - [Microsoft Bing Translator][bing-url] (✔ رایگان)
 - [Yandex Translate][yandex-url] (✔ رایگان)
@@ -176,6 +177,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 | Google Gemini    | [Google AI Studio][gemini-api-key-url]           | رایگان |
 | WebAI to API     | _[سرور محلی][webai-to-api-url]_                  | رایگان |
 | OpenRouter       | [کلیدهای API OpenRouter][openrouter-api-key-url] | رایگان |
+| DeepL            | [کلیدهای API DeepL][deepl-api-key-url]           | پولی   |
 | OpenAI           | [کلیدهای API OpenAI][openai-api-key-url]         | پولی   |
 | DeepSeek         | [کلیدهای API DeepSeek][deepseek-api-key-url]     | پولی   |
 | Custom OpenAI    | -                                                | -      |
@@ -271,6 +273,10 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 - **DeepSeek**
 
   در DeepSeek نیز می‌توانید با مراجعه به [مستندات DeepSeek][deepseek-url-docs]، مدل را در تنظیمات وارد کنید.
+
+- **DeepL**
+
+  DeepL هر دو نسخه رایگان (Free) و حرفه‌ای (Pro) را ارائه می‌دهد. می‌توانید نسخه API را در تنظیمات انتخاب کنید. نسخه رایگان محدودیت استفاده دارد، در حالی که نسخه Pro محدودیت‌های بیشتری و ویژگی‌های اضافی ارائه می‌دهد. DeepL همچنین از تنظیمات رسمی (پیش‌فرض، رسمی‌تر، کمتر رسمی) برای برخی زبان‌ها پشتیبانی می‌کند. برای اطلاعات بیشتر به [مستندات DeepL][deepl-url-docs] مراجعه کنید.
 
 - **WebAI to API**
 
@@ -562,6 +568,7 @@ pnpm run publish
 
 [google-translate-url]: https://translate.google.com/
 [gemini-url]: https://gemini.com/
+[deepl-url]: https://www.deepl.com/
 [openai-url]: https://chat.openai.com/
 [deepseek-url]: https://chat.deepseek.com/
 [openrouter-url]: https://openrouter.ai/
@@ -576,6 +583,7 @@ pnpm run publish
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
+[deepl-api-key-url]: https://www.deepl.com/pro-api
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [deepseek-api-key-url]: https://platform.deepseek.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
@@ -585,6 +593,7 @@ pnpm run publish
 [m-khani65-x-url]: https://x.com/M_Khani65/
 [flaticon-url]: https://www.flaticon.com/free-icons/translate/
 [gemini-url-docs]: https://ai.google.dev/api/all-methods/
+[deepl-url-docs]: https://www.deepl.com/docs-api/
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/
