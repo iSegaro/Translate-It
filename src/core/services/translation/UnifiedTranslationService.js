@@ -16,6 +16,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -261,8 +262,13 @@ class TranslationResultDispatcher {
       });
 
       // Field result handled silently
-    } catch (error) {
-      logger.warn(`[ResultDispatcher] Failed to dispatch field result:`, error);
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'unified-translation-service');
+      } else {
+        logger.warn(`[UnifiedTranslationService] Failed to dispatch field result:`, sendError);
+      }
     }
   }
 
@@ -296,8 +302,12 @@ class TranslationResultDispatcher {
             isBroadcast: true // Mark as broadcast to prevent duplicate processing
           }
         });
-      } catch {
-        // Tab might not have content script, ignore
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (!ExtensionContextManager.isContextError(sendError)) {
+          logger.debug(`Could not broadcast to tab ${tab.id}:`, sendError.message);
+        }
+        // Context errors are handled silently via ExtensionContextManager
       }
     }
   }
@@ -327,8 +337,13 @@ class TranslationResultDispatcher {
           action: MessageActions.TRANSLATION_CANCELLED,
           messageId
         });
-      } catch (error) {
-        logger.warn(`[ResultDispatcher] Failed to send cancellation:`, error);
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (ExtensionContextManager.isContextError(sendError)) {
+          ExtensionContextManager.handleContextError(sendError, 'unified-translation-service');
+        } else {
+          logger.warn(`[UnifiedTranslationService] Failed to send cancellation:`, sendError);
+        }
       }
     }
   }

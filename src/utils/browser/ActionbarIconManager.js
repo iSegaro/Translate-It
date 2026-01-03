@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Lazy logger initialization to avoid TDZ
 let logger = null;
@@ -43,12 +44,13 @@ class ActionbarIconManager {
     const { default: ResourceTracker } = await import('@/core/memory/ResourceTracker.js');
     this.resourceTracker = new ResourceTracker('actionbar-icon-manager');
 
+    const logger = getLogger();
+
     try {
       // Get current provider
       const storedProvider = await storageManager.get('TRANSLATION_API');
       this.currentProvider = storedProvider.TRANSLATION_API || 'google';
 
-      const logger = getLogger();
       logger.debug(`🎯 Simple icon manager initialized for: ${this.currentProvider}`);
 
       // Update icon immediately
@@ -64,10 +66,19 @@ class ActionbarIconManager {
       });
 
       this.isInitialized = true;
-      
+
     } catch (error) {
-      const logger = getLogger();
-      logger.error('❌ Failed to initialize ActionbarIconManager:', error);
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'actionbar-icon-manager', {
+          fallbackAction: () => {
+            this.currentProvider = 'google';
+            this.isInitialized = true;
+          }
+        });
+      } else {
+        logger.error('Failed to initialize ActionbarIconManager:', error);
+      }
     }
   }
 
@@ -77,7 +88,7 @@ class ActionbarIconManager {
   async updateIcon(provider) {
     try {
       const logger = getLogger();
-      logger.debug(`🎨 Updating icon for: ${provider}`);
+      logger.debug(`Updating icon for: ${provider}`);
 
       // Create composite icon with provider overlay
       const compositeImageData = await this.createCompositeIcon(provider);
@@ -85,10 +96,10 @@ class ActionbarIconManager {
       if (compositeImageData) {
         await this.setBrowserIconWithImageData(compositeImageData);
         const logger = getLogger();
-        logger.debug(`✅ Icon updated for: ${provider}`);
+        logger.debug(`Icon updated for: ${provider}`);
       } else {
         const logger = getLogger();
-        logger.warn(`⚠️ Failed to create composite icon for: ${provider}`);
+        logger.warn(`Failed to create composite icon for: ${provider}`);
       }
 
     } catch (error) {

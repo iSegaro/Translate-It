@@ -2,6 +2,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SELECTION, 'handleSelectElement');
 
@@ -37,8 +38,13 @@ export async function handleSelectElement(message) {
       // Forward the message to the content script
       const response = await browser.tabs.sendMessage(tab.id, message);
       return response || { success: true };
-    } catch (error) {
-      logger.error('Error sending message to content script:', error);
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'select-element-handler');
+      } else {
+        logger.warn('Error sending select element message to content script:', sendError);
+      }
       return { success: false, error: 'Content script not available' };
     }
   } catch (error) {

@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'handleVueBridge');
 
@@ -37,8 +38,13 @@ export async function handleVueBridge(message, sender) {
       // Forward the message to the content script
       const response = await browser.tabs.sendMessage(tabId, message);
       return response || { success: true };
-    } catch (error) {
-      logger.error('Error sending Vue Bridge message to content script:', error);
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'vue-bridge');
+      } else {
+        logger.warn('Error sending Vue Bridge message to content script:', sendError);
+      }
       return { success: false, error: 'Content script not available' };
     }
   } catch (error) {

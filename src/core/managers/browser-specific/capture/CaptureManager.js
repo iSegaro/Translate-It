@@ -13,6 +13,7 @@ import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 
 
@@ -189,15 +190,28 @@ export class CaptureManager extends ResourceTracker {
       }
 
       // Send preview data to content script
-      await getbrowser().tabs.sendMessage(activeTab.id, {
-        action: MessageActions.SHOW_CAPTURE_PREVIEW,
-        data: {
-          captureData,
-          captureType,
-          selectionData,
-          translationOptions: this.captureOptions,
-        },
-      });
+      try {
+        await getbrowser().tabs.sendMessage(activeTab.id, {
+          action: MessageActions.SHOW_CAPTURE_PREVIEW,
+          data: {
+            captureData,
+            captureType,
+            selectionData,
+            translationOptions: this.captureOptions,
+          },
+        });
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (ExtensionContextManager.isContextError(sendError)) {
+          ExtensionContextManager.handleContextError(sendError, 'capture-manager');
+        } else {
+          logger.warn(`Could not send preview to tab ${activeTab.id}:`, sendError);
+        }
+        throw this._createError(
+          ErrorTypes.TAB_AVAILABILITY,
+          "Content script not available on this tab",
+        );
+      }
 
   logger.debug('Preview request sent to content script');
     } catch (error) {
@@ -260,10 +274,23 @@ export class CaptureManager extends ResourceTracker {
         }
 
         // Send area selection start message to content script
-        await getbrowser().tabs.sendMessage(activeTab.id, {
-          action: MessageActions.START_SCREEN_AREA_SELECTION,
-          data: this.captureOptions,
-        });
+        try {
+          await getbrowser().tabs.sendMessage(activeTab.id, {
+            action: MessageActions.START_SCREEN_AREA_SELECTION,
+            data: this.captureOptions,
+          });
+        } catch (sendError) {
+          // Use centralized context error detection
+          if (ExtensionContextManager.isContextError(sendError)) {
+            ExtensionContextManager.handleContextError(sendError, 'capture-manager');
+          } else {
+            logger.warn(`Could not send area selection to tab ${activeTab.id}:`, sendError);
+          }
+          throw this._createError(
+            ErrorTypes.TAB_AVAILABILITY,
+            "Content script not available on this tab",
+          );
+        }
 
   logger.init('Area capture retry initiated successfully');
       } else {
@@ -371,14 +398,27 @@ export class CaptureManager extends ResourceTracker {
   logger.info('Using tab ID for result display:', targetTabId);
 
       // Send result data to content script
-      await getbrowser().tabs.sendMessage(targetTabId, {
-        action: MessageActions.SHOW_CAPTURE_RESULT,
-        data: {
-          originalCapture: captureData,
-          translationText: translationResult,
-          position: captureData.position || { x: 100, y: 100 },
-        },
-      });
+      try {
+        await getbrowser().tabs.sendMessage(targetTabId, {
+          action: MessageActions.SHOW_CAPTURE_RESULT,
+          data: {
+            originalCapture: captureData,
+            translationText: translationResult,
+            position: captureData.position || { x: 100, y: 100 },
+          },
+        });
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (ExtensionContextManager.isContextError(sendError)) {
+          ExtensionContextManager.handleContextError(sendError, 'capture-manager');
+        } else {
+          logger.warn(`Could not send result to tab ${targetTabId}:`, sendError);
+        }
+        throw this._createError(
+          ErrorTypes.TAB_AVAILABILITY,
+          "Content script not available on this tab",
+        );
+      }
 
   logger.info('Result display request sent to content script');
     } catch (error) {

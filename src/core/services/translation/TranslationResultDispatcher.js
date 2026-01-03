@@ -10,6 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationResultDispatcher');
 
@@ -161,8 +162,13 @@ export class TranslationResultDispatcher {
 
         // Mark as processed
         this.markResultCompleted(messageId);
-      } catch (error) {
-        logger.warn(`[ResultDispatcher] Failed to send cancellation:`, error);
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (ExtensionContextManager.isContextError(sendError)) {
+          ExtensionContextManager.handleContextError(sendError, 'translation-result-dispatcher');
+        } else {
+          logger.warn(`[ResultDispatcher] Failed to send cancellation:`, sendError);
+        }
       }
     }
   }
@@ -262,8 +268,13 @@ export class TranslationResultDispatcher {
         throw new Error('Tab did not handle the result');
       }
 
-    } catch (error) {
-      logger.warn(`[ResultDispatcher] Tab delivery failed: ${messageId}`, error);
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'translation-result-dispatcher');
+      } else {
+        logger.warn(`[ResultDispatcher] Tab delivery failed: ${messageId}`, sendError);
+      }
 
       // Queue for retry
       return this.handleQueuedDelivery({ messageId, result, request });
@@ -329,8 +340,12 @@ export class TranslationResultDispatcher {
       try {
         await browser.tabs.sendMessage(tab.id, message);
         delivered = true;
-      } catch {
-        // Tab might not have content script, ignore
+      } catch (sendError) {
+        // Use centralized context error detection
+        if (!ExtensionContextManager.isContextError(sendError)) {
+          logger.debug(`Could not broadcast to tab ${tab.id}:`, sendError.message);
+        }
+        // Context errors are handled silently via ExtensionContextManager
       }
     }
 
@@ -344,8 +359,13 @@ export class TranslationResultDispatcher {
     try {
       const response = await browser.tabs.sendMessage(tabId, message);
       return response?.handled || false;
-    } catch (error) {
-      logger.warn(`[ResultDispatcher] Failed to send to tab ${tabId}:`, error);
+    } catch (sendError) {
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(sendError)) {
+        ExtensionContextManager.handleContextError(sendError, 'translation-result-dispatcher');
+      } else {
+        logger.warn(`[ResultDispatcher] Failed to send to tab ${tabId}:`, sendError);
+      }
       return false;
     }
   }

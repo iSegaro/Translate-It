@@ -15,6 +15,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
 
@@ -1024,7 +1025,14 @@ export class TranslationEngine {
         this.history = []; // Ensure it's always an array
       }
     } catch (error) {
-      logger.error("[TranslationEngine] Failed to load history:", error);
+      // Use centralized context error detection
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'translation-engine-history', {
+          fallbackAction: () => { this.history = []; }
+        });
+      } else {
+        logger.error("[TranslationEngine] Failed to load history:", error);
+      }
     }
   }
 
