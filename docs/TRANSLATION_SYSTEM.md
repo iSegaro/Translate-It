@@ -124,11 +124,14 @@ Text Field → Direct Request → UnifiedTranslationService → Direct Response 
 
 ### Supported Providers
 - **Google Translate** (Free, default)
+- **DeepL** (AI-powered with formal/informal styles)
 - **Google Gemini** (AI-powered)
 - **OpenAI** (GPT models)
 - **Bing Translate** (Free tier)
 - **Yandex** (Free tier)
 - **DeepSeek** (AI service)
+- **OpenRouter** (AI aggregator)
+- **WebAI** (AI service)
 - **Browser API** (Chrome 138+)
 - **Custom APIs** (OpenAI-compatible)
 

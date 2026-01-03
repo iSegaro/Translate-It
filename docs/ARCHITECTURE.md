@@ -878,10 +878,11 @@ const result = await provider.translate(text, options)
 
 ### Available Providers
 - **Google Translate** - Free, fast
+- **DeepL** - AI-powered translation with formal/informal styles
 - **OpenAI** - GPT-powered translation
 - **DeepSeek** - AI translation service
 - **Local** - Browser built-in translation
-- **10+ more providers**
+- **10+ more providers** (Bing, Yandex, Gemini, OpenRouter, WebAI, Custom APIs)
 
 ### TranslationEngine
 Coordinates translation requests and provider selection:
