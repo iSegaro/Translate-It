@@ -249,7 +249,7 @@ export class BaseProvider {
           case 402:
             errorType = ErrorTypes.INSUFFICIENT_BALANCE;
             break;
-          case 403:
+          case 403: {
             // For DeepL, 403 always means API key authentication failed
             // See: https://support.deepl.com/hc/en-us/articles/9773964275868-DeepL-API-error-messages
             // "Authorization failed. Please supply a valid auth_key parameter"
@@ -267,11 +267,12 @@ export class BaseProvider {
 
             errorType = isAuthError ? ErrorTypes.API_KEY_INVALID : ErrorTypes.FORBIDDEN_ERROR;
             break;
+          }
           case 404:
             errorType = ErrorTypes.MODEL_MISSING;
             break;
           case 400:
-          case 422:
+          case 422: {
             // For ambiguous status codes, check message content for more specific error types
             // This handles cases where providers return 400/422 with specific error messages
             let errorMsgLower = '';
@@ -305,6 +306,7 @@ export class BaseProvider {
               errorType = ErrorTypes.INVALID_REQUEST;
             }
             break;
+          }
           case 429:
             errorType = ErrorTypes.RATE_LIMIT_REACHED;
             break;
