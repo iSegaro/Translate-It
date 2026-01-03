@@ -619,7 +619,7 @@ pnpm run publish
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
-[deepl-api-key-url]: https://www.deepl.com/pro-api
+[deepl-api-key-url]: https://www.deepl.com/en/your-account/keys/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [deepseek-api-key-url]: https://platform.deepseek.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
