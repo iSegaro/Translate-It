@@ -230,7 +230,9 @@ export class BaseProvider {
 
         // For DeepL, HTTP 400 is a retryable error (too many segments), use debug level
         const isDeepL400 = this.providerName === 'DeepLTranslate' && response.status === 400;
-        const logLevel = isDeepL400 ? 'debug' : 'error';
+        // For server errors (502, 503, 524), use warn level instead of error - these are temporary server issues
+        const isServerError = response.status >= 500 && response.status < 600;
+        const logLevel = isDeepL400 || isServerError ? 'warn' : 'error';
         logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           message: msg,
