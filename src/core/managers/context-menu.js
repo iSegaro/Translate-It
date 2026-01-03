@@ -412,6 +412,24 @@ export class ContextMenuManager extends ResourceTracker {
 
     try {
       const menuId = await this.browser.contextMenus.create(menuConfig);
+
+      // IMPORTANT: Check and clear runtime.lastError to prevent console warnings
+      // In Chrome, some errors are stored in runtime.lastError instead of being thrown
+      if (this.browser.runtime && this.browser.runtime.lastError) {
+        const lastError = this.browser.runtime.lastError;
+
+        // Check if this is a duplicate ID error - log at debug level and don't fail
+        if (lastError.message && lastError.message.includes('duplicate id')) {
+          logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (runtime.lastError), skipping`);
+          // lastError will be cleared automatically on next API call
+          return menuConfig.id; // Return the ID without failing
+        }
+
+        // For other errors, log them
+        logger.warn(`Context menu created but runtime.lastError was set:`, lastError);
+        // lastError will be cleared automatically on next API call
+      }
+
       this.createdMenus.add(menuConfig.id || menuId);
 
       logger.debug(
@@ -421,7 +439,7 @@ export class ContextMenuManager extends ResourceTracker {
     } catch (error) {
       // Check if this is a duplicate ID error - if so, log but don't fail
       if (error.message && error.message.includes('duplicate id')) {
-        logger.debug(`⚠️ Context menu with duplicate ID "${menuConfig.id}" already exists, skipping:`, error);
+        logger.debug(`⚠️ Context menu with duplicate ID "${menuConfig.id}" already exists (exception), skipping:`, error);
         return menuConfig.id; // Return the ID without failing
       }
 
