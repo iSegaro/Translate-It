@@ -311,17 +311,16 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
     this.lastDoubleClickTime = Date.now();
     this.doubleClickProcessing = true;
 
-    try {
-      // Process the double-click with delay for text selection
-      setTimeout(async () => {
+    // Process the double-click with delay for text selection
+    setTimeout(async () => {
+      try {
         await this.processTextFieldDoubleClick(event);
+      } catch (error) {
+        logger.error('Error processing text field double-click:', error);
+      } finally {
         this.doubleClickProcessing = false;
-      }, 150); // Give time for text selection to occur
-
-    } catch (error) {
-      this.doubleClickProcessing = false;
-      logger.error('Error processing text field double-click:', error);
-    }
+      }
+    }, 150); // Give time for text selection to occur
   }
 
   /**
