@@ -21,7 +21,6 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import FeatureManager from "@/core/managers/content/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import ExtensionContextManager from "../core/extensionContext.js";
-import { ProviderNames, ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -147,20 +146,6 @@ export default class TranslationHandler {
     await this.eventCoordinator.handleEditableElement(event);
   }
 
-  async switchProvider(newProvider) {
-    try {
-      await storageManager.set({ TRANSLATION_API: newProvider });
-      this.logger.info(`Switched translation provider to ${newProvider}`);
-      
-      const providerDisplayName = newProvider.charAt(0).toUpperCase() + newProvider.slice(1);
-      this.notifier.show(`Switched to ${providerDisplayName}`, 'success');
-
-    } catch (error) {
-      this.logger.error(`Failed to switch provider to ${newProvider}`, error);
-      this.handleError(error, { context: 'switchProvider' });
-    }
-  }
-
   @logMethod
   async processTranslation_with_CtrlSlash(params) {
     try {
@@ -189,31 +174,6 @@ export default class TranslationHandler {
       });
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
-
-      if (processed.type === 'QUOTA_EXCEEDED' && processed.provider === ProviderNames.GEMINI) {
-        const providerMap = {
-          [ProviderNames.BING_TRANSLATE]: ProviderRegistryIds.BING,
-          [ProviderNames.OPENAI]: ProviderRegistryIds.OPENAI
-        };
-        const actions = processed.suggestedProviders.map(providerKey => {
-            const providerValue = providerMap[providerKey];
-            if (!providerValue) return null;
-            let displayName = providerKey.replace('Translate', '');
-            return {
-                label: `Switch to ${displayName}`,
-                action: () => this.switchProvider(providerValue)
-            };
-        }).filter(Boolean);
-
-        pageEventBus.emit('show-notification', {
-          type: 'warning',
-          message: processed.userMessage,
-          duration: 10000,
-          actions: actions
-        });
-        
-          return;
-      }
 
       const handlerError = await this.errorHandler.handle(processed, {
         type: processed.type || ErrorTypes.CONTEXT,
