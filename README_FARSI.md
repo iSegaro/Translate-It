@@ -175,6 +175,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 | ---------------- | ------------------------------------------------ | ------ |
 | Google Translate | _نیازی نیست_                                     | رایگان |
 | Yandex Translate | _نیازی نیست_                                     | رایگان |
+| Bing Translate   | _نیازی نیست_                                     | رایگان |
 | DeepL            | [کلیدهای API DeepL][deepl-api-key-url]           | رایگان |
 | Google Gemini    | [Google AI Studio][gemini-api-key-url]           | رایگان |
 | WebAI to API     | _[سرور محلی][webai-to-api-url]_                  | رایگان |

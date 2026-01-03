@@ -173,6 +173,7 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 | ---------------- | --------------------------------------------- | ---- |
 | Google Translate | _Dont Need_                                   | Free |
 | Yandex Translate | _Dont Need_                                   | Free |
+| Bing Translate   | _Dont Need_                                   | Free |
 | DeepL            | [DeepL API Keys][deepl-api-key-url]           | Free |
 | Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free |
 | WebAI to API     | _[Local Server][webai-to-api-url]_            | Free |
