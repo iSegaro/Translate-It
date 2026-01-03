@@ -116,12 +116,14 @@ export class ErrorHandler {
 
         // For API configuration errors, always use the localized generic message
         // These errors have specific, user-friendly messages that should always be shown
+        // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
         const shouldUseGenericMessage = [
           ErrorTypes.API_KEY_MISSING,
           ErrorTypes.API_KEY_INVALID,
           ErrorTypes.API_URL_MISSING,
           ErrorTypes.MODEL_MISSING,
           ErrorTypes.INSUFFICIENT_BALANCE,
+          ErrorTypes.FORBIDDEN_ERROR, // 403 errors typically indicate auth/permission issues
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
@@ -233,15 +235,29 @@ export class ErrorHandler {
       }
 
       const raw = err instanceof Error ? err.message : String(err);
-      const type = matchErrorToType(raw);
+
+      // Pass the full error object to matchErrorToType to preserve error.type
+      const type = matchErrorToType(err);
+
       // Try to get localized message, but prefer specific original messages
       let msg;
       try {
         const localizedMsg = await getErrorMessage(type);
 
+        // For API configuration errors, always use the localized generic message
+        // These errors have specific, user-friendly messages that should always be shown
+        // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
+        const shouldUseGenericMessage = [
+          ErrorTypes.API_KEY_MISSING,
+          ErrorTypes.API_KEY_INVALID,
+          ErrorTypes.API_URL_MISSING,
+          ErrorTypes.MODEL_MISSING,
+          ErrorTypes.INSUFFICIENT_BALANCE,
+          ErrorTypes.FORBIDDEN_ERROR, // 403 errors typically indicate auth/permission issues
+        ].includes(type);
+
         // Prefer the original message if it's informative and not generic
-        // This ensures specific provider errors are shown to the user
-        if (raw &&
+        if (!shouldUseGenericMessage && raw &&
             raw.length > 5 && // Must have meaningful content
             !raw.includes('[object Object]') && // Not just object string
             !raw.startsWith('Error:') && // Not generic error prefix
@@ -250,7 +266,7 @@ export class ErrorHandler {
             !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
           msg = raw;
         } else {
-          // Use localized message for generic errors, but fall back to raw if no localized message
+          // Use localized message for generic errors or API configuration errors
           msg = localizedMsg || raw || 'An error occurred';
         }
       } catch (msgError) {
