@@ -762,6 +762,7 @@
   "action_copy_to_clipboard": { "message": "کپی متن به کلیپ‌بورد" },
   "action_paste_from_clipboard": { "message": "چسباندن از کلیپ‌بورد" },
   "action_speak_text": { "message": "خواندن متن" },
-  "action_stop_speaking": { "message": "توقف خواندن" }
+  "action_stop_speaking": { "message": "توقف خواندن" },
 
-  }
+  "translateSelectedText": { "message": "ترجمه متن انتخاب شده" }
+}

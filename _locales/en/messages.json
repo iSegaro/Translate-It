@@ -764,6 +764,7 @@
   "action_copy_to_clipboard": { "message": "Copy text to clipboard" },
   "action_paste_from_clipboard": { "message": "Paste from clipboard" },
   "action_speak_text": { "message": "Speak text" },
-  "action_stop_speaking": { "message": "Stop speaking" }
+  "action_stop_speaking": { "message": "Stop speaking" },
 
+  "translateSelectedText": { "message": "Translate selected text" }
 }
