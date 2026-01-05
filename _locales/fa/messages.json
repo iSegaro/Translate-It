@@ -665,6 +665,7 @@
   "api_test_result_all_invalid": { "message": "همه {count} کلید نامعتبر هستند" },
   "api_test_unknown_provider": { "message": "ارائه‌دهنده ناشناخته: {provider}" },
   "api_test_failed": { "message": "تست کلیدها با شکست مواجه شد: {error}" },
+  "api_key_tips": { "message": "💡 هر کلید API را در یک خط جداگانه وارد کنید" },
 
   "validation_source_language_empty": { "message": "زبان مبدا نمی‌تواند خالی باشد." },
   "validation_target_language_empty": { "message": "زبان مقصد نمی‌تواند خالی باشد." },

@@ -39,6 +39,9 @@
           :hide-toggle="true"
           dir="ltr"
         />
+        <div class="api-key-tips">
+          {{ t('api_key_tips') }}
+        </div>
         <div class="button-result-row">
           <div v-if="translatedTestResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
             {{ translatedTestResult }}
@@ -189,6 +192,16 @@ const handleTestKeys = () => {
 
   .api-key-textarea {
     width: 100%;
+  }
+
+  .api-key-tips {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    padding: $spacing-xs $spacing-sm;
+    background-color: var(--color-surface-alt, rgba(0, 0, 0, 0.02));
+    border-radius: $border-radius-sm;
+    border-inline-start: 3px solid var(--color-primary);
+    line-height: 1.5;
   }
 
   .button-result-row {
