@@ -89,13 +89,13 @@ const testKeys = async () => {
   testResult.value = null
 
   try {
-    const result = await ApiKeyManager.testAndReorderKeys('CUSTOM_API_KEY', 'Custom')
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(customApiKey.value, 'Custom')
     testResult.value = result
 
     // Update the local value with the reordered keys
-    if (!result.allInvalid) {
-      const reorderedKeys = [...result.valid, ...result.invalid].join('\n')
-      settingsStore.updateSettingLocally('CUSTOM_API_KEY', reorderedKeys)
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('CUSTOM_API_KEY', result.reorderedString)
     }
   } catch (error) {
     testResult.value = {

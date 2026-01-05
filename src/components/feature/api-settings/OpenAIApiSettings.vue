@@ -140,13 +140,13 @@ const testKeys = async () => {
   testResult.value = null
 
   try {
-    const result = await ApiKeyManager.testAndReorderKeys('OPENAI_API_KEY', 'OpenAI')
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(openaiApiKey.value, 'OpenAI')
     testResult.value = result
 
     // Update the local value with the reordered keys
-    if (!result.allInvalid) {
-      const reorderedKeys = [...result.valid, ...result.invalid].join('\n')
-      settingsStore.updateSettingLocally('OPENAI_API_KEY', reorderedKeys)
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('OPENAI_API_KEY', result.reorderedString)
     }
   } catch (error) {
     testResult.value = {

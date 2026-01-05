@@ -238,6 +238,73 @@ class ApiKeyManager {
   }
 
   /**
+   * Test keys directly from provided value (without reading from storage)
+   * @param {string} keysString - Keys string (one per line)
+   * @param {string} providerName - Provider name for testing
+   * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
+   */
+  static async testKeysDirect(keysString, providerName) {
+    // Parse keys from string
+    const keys = this.parseKeys(keysString);
+
+    if (keys.length === 0) {
+      return {
+        valid: [],
+        invalid: [],
+        allInvalid: true,
+        message: 'No keys to test'
+      };
+    }
+
+    // Import provider classes dynamically
+    const providerTests = {
+      'OpenAI': async (key) => await this._testOpenAIKey(key),
+      'Gemini': async (key) => await this._testGeminiKey(key),
+      'DeepSeek': async (key) => await this._testDeepSeekKey(key),
+      'OpenRouter': async (key) => await this._testOpenRouterKey(key),
+      'DeepL': async (key) => await this._testDeepLKey(key),
+      'Custom': async (key) => await this._testCustomKey(key)
+    };
+
+    const testFunc = providerTests[providerName];
+    if (!testFunc) {
+      return {
+        valid: [],
+        invalid: keys,
+        allInvalid: true,
+        message: `Unknown provider: ${providerName}`
+      };
+    }
+
+    // Test all keys in parallel
+    const testPromises = keys.map(async (key) => {
+      try {
+        const isValid = await testFunc(key);
+        return { key, isValid };
+      } catch (error) {
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerName}:`, error.message);
+        return { key, isValid: false };
+      }
+    });
+
+    const results = await Promise.all(testPromises);
+
+    // Separate valid and invalid keys
+    const valid = results.filter(r => r.isValid).map(r => r.key);
+    const invalid = results.filter(r => !r.isValid).map(r => r.key);
+
+    return {
+      valid,
+      invalid,
+      allInvalid: valid.length === 0,
+      message: valid.length > 0
+        ? `Found ${valid.length} valid key(s), ${invalid.length} invalid key(s)`
+        : `All ${invalid.length} key(s) are invalid`,
+      reorderedString: [...valid, ...invalid].join('\n')
+    };
+  }
+
+  /**
    * Test OpenAI API key
    * @param {string} key - API key to test
    * @returns {Promise<boolean>} - True if key is valid

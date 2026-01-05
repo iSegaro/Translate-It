@@ -162,13 +162,13 @@ const testKeys = async () => {
   testResult.value = null
 
   try {
-    const result = await ApiKeyManager.testAndReorderKeys('GEMINI_API_KEY', 'Gemini')
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(geminiApiKey.value, 'Gemini')
     testResult.value = result
 
     // Update the local value with the reordered keys
-    if (!result.allInvalid) {
-      const reorderedKeys = [...result.valid, ...result.invalid].join('\n')
-      settingsStore.updateSettingLocally('GEMINI_API_KEY', reorderedKeys)
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('GEMINI_API_KEY', result.reorderedString)
     }
   } catch (error) {
     testResult.value = {

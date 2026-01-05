@@ -132,13 +132,13 @@ const testKeys = async () => {
   testResult.value = null
 
   try {
-    const result = await ApiKeyManager.testAndReorderKeys('DEEPL_API_KEY', 'DeepL')
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(deeplApiKey.value, 'DeepL')
     testResult.value = result
 
     // Update the local value with the reordered keys
-    if (!result.allInvalid) {
-      const reorderedKeys = [...result.valid, ...result.invalid].join('\n')
-      settingsStore.updateSettingLocally('DEEPL_API_KEY', reorderedKeys)
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('DEEPL_API_KEY', result.reorderedString)
     }
   } catch (error) {
     testResult.value = {
