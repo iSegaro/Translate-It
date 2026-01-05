@@ -23,10 +23,10 @@
 
       <!-- Validation error -->
       <div
-        v-if="validationErrorKey"
+        v-if="validationError"
         class="validation-error"
       >
-        {{ t(validationErrorKey) }}
+        {{ validationError }}
       </div>
 
       <div class="prompt-template-help">
@@ -67,6 +67,12 @@ const { t } = useI18n()
 // Validation
 const validationErrorKey = ref('')
 
+// Reactive translated validation error
+const validationError = computed(() => {
+  if (!validationErrorKey.value) return ''
+  return getFirstErrorTranslated('promptTemplate', t) || ''
+})
+
 // Prompt template
 const promptTemplate = computed({
   get: () => settingsStore.settings?.PROMPT_TEMPLATE || DEFAULT_PROMPT,
@@ -86,7 +92,7 @@ const validatePrompt = async () => {
   const isValid = await validate(promptTemplate.value)
 
   if (!isValid) {
-    // Get the error key directly for reactive translation
+    // Get the error key (not translated) for reactive translation
     validationErrorKey.value = getFirstError('promptTemplate') || ''
   } else {
     validationErrorKey.value = ''

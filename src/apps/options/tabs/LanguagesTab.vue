@@ -30,10 +30,10 @@
 
     <!-- Validation errors -->
     <div
-      v-if="validationErrorKey"
+      v-if="validationError"
       class="validation-error"
     >
-      {{ t(validationErrorKey) }}
+      {{ validationError }}
     </div>
 
     <!-- Separator for API Settings section -->
@@ -308,12 +308,21 @@ watch(selectedProvider, (newValue, oldValue) => {
 // Validation
 const validationErrorKey = ref('')
 
+// Reactive translated validation error
+const validationError = computed(() => {
+  if (!validationErrorKey.value) return ''
+
+  const sourceError = getFirstErrorTranslated('sourceLanguage', t)
+  const targetError = getFirstErrorTranslated('targetLanguage', t)
+  return sourceError || targetError || ''
+})
+
 const validateLanguages = async () => {
   clearErrors()
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
 
   if (!isValid) {
-    // Get the error key directly for reactive translation
+    // Get the error key (not translated) for reactive translation
     const sourceError = getFirstError('sourceLanguage')
     const targetError = getFirstError('targetLanguage')
     validationErrorKey.value = sourceError || targetError || ''
