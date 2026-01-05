@@ -468,6 +468,9 @@
   "SIDEPANEL_COPY_TARGET_TITLE_ICON": { "message": "Copy" },
   "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": { "message": "Paste" },
 
+  "history_delete": { "message": "Delete" },
+  "history_delete_item": { "message": "Delete this item" },
+
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "translating..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "translating..." },
   "STATUS_TRANSLATING_ICON": { "message": "translating..." },

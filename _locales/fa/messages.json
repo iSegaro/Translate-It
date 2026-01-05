@@ -482,6 +482,9 @@
   "SIDEPANEL_COPY_TARGET_TITLE_ICON": { "message": "کپی" },
   "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": { "message": "چسباندن" },
 
+  "history_delete": { "message": "حذف" },
+  "history_delete_item": { "message": "حذف این مورد" },
+
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_ICON": { "message": "درحال ترجمه..." },

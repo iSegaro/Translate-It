@@ -50,12 +50,12 @@
               <span class="timestamp">{{ item.formattedTime }}</span>
               <button
                 class="delete-btn"
-                title="Delete this item"
+                :title="t('history_delete_item') || 'Delete this item'"
                 @click.stop="handleDeleteHistoryItem(item.index, $event)"
               >
                 <img
                   src="@/icons/ui/trash-small.svg"
-                  alt="Delete"
+                  :alt="t('history_delete') || 'Delete'"
                   class="delete-icon"
                 >
               </button>
@@ -85,7 +85,7 @@
       >
         <img
           src="@/icons/ui/trash.svg"
-          alt="Clear All"
+          :alt="t('history_delete') || 'Delete'"
           class="clear-all-icon"
         >
         <span>{{ t('SIDEPANEL_CLEAR_ALL_HISTORY') || 'Clear All History' }}</span>

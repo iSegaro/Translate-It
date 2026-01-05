@@ -9,12 +9,12 @@
       class="ti-textarea__toggle-visibility"
       @click="toggleVisibility"
       :tabindex="-1"
-      :title="visibilityVisible ? 'Hide' : 'Show'"
+      :title="toggleTitle || (visibilityVisible ? hideLabel : showLabel)"
     >
       <img
         v-if="!visibilityVisible"
         :src="eyeIcon"
-        alt="Show"
+        :alt="showLabel || 'Show'"
         class="toggle-visibility-icon"
         width="16"
         height="16"
@@ -22,7 +22,7 @@
       <img
         v-else
         :src="eyeHideIcon"
-        alt="Hide"
+        :alt="hideLabel || 'Hide'"
         class="toggle-visibility-icon"
         width="16"
         height="16"
@@ -92,6 +92,18 @@ const props = defineProps({
   hideToggle: {
     type: Boolean,
     default: false
+  },
+  showLabel: {
+    type: String,
+    default: 'Show'
+  },
+  hideLabel: {
+    type: String,
+    default: 'Hide'
+  },
+  toggleTitle: {
+    type: String,
+    default: null
   }
 })
 
