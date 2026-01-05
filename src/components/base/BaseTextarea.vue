@@ -30,13 +30,14 @@
     </button>
 
     <textarea
+      ref="textareaRef"
       :value="displayValue"
       :placeholder="placeholder"
       :rows="rows"
       :disabled="disabled || loading"
       :readonly="readonly"
       :class="textareaClasses"
-      @input="handleInput"
+      @beforeinput="handleBeforeInput"
       @focus="handleFocus"
       @blur="handleBlur"
     />
@@ -50,7 +51,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 import eyeIcon from '@/icons/ui/eye-open.svg?url'
 import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
@@ -112,18 +113,18 @@ const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'input'])
 const isFocused = ref(false)
 const visibilityVisible = ref(false)
 
-// For password masking, display bullets instead of actual text
+// Hybrid password masking approach:
+// 1. Use CSS -webkit-text-security when available (modern browsers)
+// 2. Fallback to bullet replacement for older browsers
 const displayValue = computed(() => {
-  if (!props.passwordMask) {
+  // When not password mode, or when visibility is toggled on, show actual value
+  if (!props.passwordMask || visibilityVisible.value) {
     return props.modelValue
   }
 
-  if (visibilityVisible.value) {
-    return props.modelValue
-  }
-
-  // Show bullet for each character
-  return props.modelValue ? '•'.repeat(Math.min(props.modelValue.length, 100)) : ''
+  // When masked, use bullet replacement as fallback
+  // CSS will also apply -webkit-text-security for double-protection
+  return props.modelValue ? '•'.repeat(Math.min(props.modelValue.length, 1000)) : ''
 })
 
 const toggleVisibility = () => {
@@ -135,14 +136,82 @@ const textareaClasses = computed(() => [
   {
     'ti-textarea--focused': isFocused.value,
     'ti-textarea--readonly': props.readonly,
-    'ti-textarea--password': props.passwordMask,
+    // Apply password masking class when masked (passwordMask on, visibilityVisible off)
+    'ti-textarea--password': props.passwordMask && !visibilityVisible.value,
     [`ti-textarea--resize-${props.resize}`]: true
   }
 ])
 
-const handleInput = (event) => {
-  emit('update:modelValue', event.target.value)
+// Ref to textarea element
+const textareaRef = ref(null)
+
+// Handle beforeinput when masked to prevent corruption
+const handleBeforeInput = (event) => {
+  // Only handle when masked (showing bullets)
+  if (!props.passwordMask || visibilityVisible.value) {
+    return // Let default behavior happen when unmasked
+  }
+
+  // Prevent default to avoid corruption when typing into bullets
+  event.preventDefault()
+
+  const target = event.target
+  const currentValue = props.modelValue || ''
+  const cursorStart = target.selectionStart
+  const cursorEnd = target.selectionEnd
+
+  let newValue = currentValue
+  let newCursorPos = cursorStart
+
+  // Handle main input types
+  const inputType = event.inputType
+
+  if (inputType === 'insertText' && event.data) {
+    // Character insertion
+    newValue = currentValue.slice(0, cursorStart) + event.data + currentValue.slice(cursorEnd)
+    newCursorPos = cursorStart + event.data.length
+  } else if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') {
+    // Enter key
+    newValue = currentValue.slice(0, cursorStart) + '\n' + currentValue.slice(cursorEnd)
+    newCursorPos = cursorStart + 1
+  } else if (inputType === 'deleteContentBackward') {
+    // Backspace
+    if (cursorStart === cursorEnd && cursorStart > 0) {
+      newValue = currentValue.slice(0, cursorStart - 1) + currentValue.slice(cursorEnd)
+      newCursorPos = cursorStart - 1
+    } else if (cursorStart !== cursorEnd) {
+      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd)
+      newCursorPos = cursorStart
+    }
+  } else if (inputType === 'deleteContentForward') {
+    // Delete key
+    if (cursorStart === cursorEnd && cursorStart < currentValue.length) {
+      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd + 1)
+      newCursorPos = cursorStart
+    } else if (cursorStart !== cursorEnd) {
+      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd)
+      newCursorPos = cursorStart
+    }
+  } else if (inputType === 'insertFromPaste') {
+    // Paste
+    const pastedText = event.data || ''
+    newValue = currentValue.slice(0, cursorStart) + pastedText + currentValue.slice(cursorEnd)
+    newCursorPos = cursorStart + pastedText.length
+  } else {
+    // For other input types, let it through
+    return
+  }
+
+  // Emit the new value
+  emit('update:modelValue', newValue)
   emit('input', event)
+
+  // Restore cursor position
+  nextTick(() => {
+    if (textareaRef.value) {
+      textareaRef.value.setSelectionRange(newCursorPos, newCursorPos)
+    }
+  })
 }
 
 const handleFocus = (event) => {
@@ -212,9 +281,11 @@ defineExpose({
   }
 
   &--password {
-    font-family: 'text-security-disc', sans-serif;
-    /* Fallback for browsers that don't support text-security-disc */
+    /* CSS-only password masking - supported in all modern browsers */
+    /* Chrome/Edge: native, Firefox 119+, Safari: native */
     -webkit-text-security: disc;
+    /* Standard property (future-proof when standardized) */
+    text-security: disc;
   }
 
   &--resize-none {
