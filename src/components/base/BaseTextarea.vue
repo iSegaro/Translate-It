@@ -38,6 +38,7 @@
       :readonly="readonly"
       :class="textareaClasses"
       @beforeinput="handleBeforeInput"
+      @input="handleInput"
       @focus="handleFocus"
       @blur="handleBlur"
     />
@@ -212,6 +213,16 @@ const handleBeforeInput = (event) => {
       textareaRef.value.setSelectionRange(newCursorPos, newCursorPos)
     }
   })
+}
+
+// Handle input event for cases where beforeinput didn't handle
+// (e.g., when unmasked or for edge cases)
+const handleInput = (event) => {
+  // Only emit when unmasked (when masked, beforeinput handles everything)
+  if (!props.passwordMask || visibilityVisible.value) {
+    emit('update:modelValue', event.target.value)
+    emit('input', event)
+  }
 }
 
 const handleFocus = (event) => {
