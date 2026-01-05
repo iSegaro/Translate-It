@@ -3,6 +3,32 @@
     class="ti-textarea-wrapper"
     :class="{ 'ti-textarea-wrapper--disabled': disabled, 'ti-textarea-wrapper--loading': loading }"
   >
+    <button
+      v-if="passwordMask && !hideToggle"
+      type="button"
+      class="ti-textarea__toggle-visibility"
+      @click="toggleVisibility"
+      :tabindex="-1"
+      :title="visibilityVisible ? 'Hide' : 'Show'"
+    >
+      <img
+        v-if="!visibilityVisible"
+        :src="eyeIcon"
+        alt="Show"
+        class="toggle-visibility-icon"
+        width="16"
+        height="16"
+      >
+      <img
+        v-else
+        :src="eyeHideIcon"
+        alt="Hide"
+        class="toggle-visibility-icon"
+        width="16"
+        height="16"
+      >
+    </button>
+
     <textarea
       :value="displayValue"
       :placeholder="placeholder"
@@ -15,23 +41,6 @@
       @blur="handleBlur"
     />
 
-    <button
-      v-if="passwordMask"
-      type="button"
-      class="ti-textarea__toggle-visibility"
-      @click="toggleVisibility"
-      :tabindex="-1"
-      :title="visibilityVisible ? 'Hide' : 'Show'"
-    >
-      <svg v-if="!visibilityVisible" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8 1a6 6 0 0 0-6 6c0 1.5.5 2.9 1.4 4.1l-2.6 2.6a.75.75 0 1 0 1.1 1.1l2.6-2.6a7 7 0 0 0 4.1 1.4 6 6 0 0 0 6-6c0-1.5-.5-2.9-1.4-4.1l2.6-2.6a.75.75 0 1 0-1.1-1.1l-2.6 2.6A7 7 0 0 0 8 1zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/>
-      </svg>
-      <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8 1a6 6 0 0 0-6 6c0 1.5.5 2.9 1.4 4.1l-2.6 2.6a.75.75 0 1 0 1.1 1.1l2.6-2.6a7 7 0 0 0 4.1 1.4 6 6 0 0 0 6-6c0-1.5-.5-2.9-1.4-4.1l2.6-2.6a.75.75 0 1 0-1.1-1.1l-2.6 2.6A7 7 0 0 0 8 1zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/>
-        <path d="M5.5 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5z"/>
-      </svg>
-    </button>
-
     <LoadingSpinner
       v-if="loading"
       size="sm"
@@ -43,6 +52,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
+import eyeIcon from '@/icons/ui/eye-open.svg?url'
+import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 
 const props = defineProps({
   modelValue: {
@@ -75,6 +86,10 @@ const props = defineProps({
     validator: (value) => ['none', 'both', 'horizontal', 'vertical'].includes(value)
   },
   passwordMask: {
+    type: Boolean,
+    default: false
+  },
+  hideToggle: {
     type: Boolean,
     default: false
   }
@@ -127,11 +142,19 @@ const handleBlur = (event) => {
   isFocused.value = false
   emit('blur', event)
 }
+
+// Expose for external access
+defineExpose({
+  visibilityVisible,
+  toggleVisibility
+})
 </script>
 
 <style scoped>
 .ti-textarea-wrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
 
   &--disabled {
     opacity: 0.6;
@@ -147,7 +170,6 @@ const handleBlur = (event) => {
 .ti-textarea {
   width: 100%;
   padding: 8px 12px;
-  padding-right: 40px; /* Space for toggle visibility button */
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-base);
   font-family: inherit;
@@ -201,9 +223,9 @@ const handleBlur = (event) => {
 }
 
 .ti-textarea__toggle-visibility {
-  position: absolute;
-  right: 8px;
-  top: 8px;
+  position: relative;
+  align-self: flex-end;
+  margin-bottom: 4px;
   background: none;
   border: none;
   cursor: pointer;
@@ -220,6 +242,14 @@ const handleBlur = (event) => {
 
   &:disabled {
     cursor: not-allowed;
+  }
+
+  .toggle-visibility-icon {
+    display: block;
+    pointer-events: none;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
   }
 }
 

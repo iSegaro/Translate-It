@@ -15,14 +15,41 @@
       </a>
     </div>
     <div class="setting-group">
-      <label>{{ t('custom_api_settings_api_key_label') || 'API Keys' }}</label>
+      <div class="label-with-toggle">
+        <label>{{ t('custom_api_settings_api_key_label') || 'API Keys' }}</label>
+        <button
+          type="button"
+          class="toggle-visibility-button"
+          @click="togglePasswordVisibility"
+          :title="passwordVisible ? 'Hide' : 'Show'"
+        >
+          <img
+            v-if="!passwordVisible"
+            :src="eyeIcon"
+            alt="Show"
+            class="toggle-icon"
+            width="16"
+            height="16"
+          >
+          <img
+            v-else
+            :src="eyeHideIcon"
+            alt="Hide"
+            class="toggle-icon"
+            width="16"
+            height="16"
+          >
+        </button>
+      </div>
       <div class="api-key-input-wrapper">
         <BaseTextarea
+          ref="textareaRef"
           v-model="deepseekApiKey"
           :placeholder="t('deepseek_api_key_placeholder') || 'Enter your API keys (one per line)'"
           :rows="3"
           class="api-key-textarea"
           :password-mask="true"
+          :hide-toggle="true"
         />
         <button
           @click="testKeys"
@@ -68,11 +95,15 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import eyeIcon from '@/icons/ui/eye-open.svg?url'
+import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
 
 const settingsStore = useSettingsStore()
+const textareaRef = ref(null)
+const passwordVisible = ref(false)
 
 const deepseekApiKey = computed({
   get: () => settingsStore.settings?.DEEPSEEK_API_KEY || '',
@@ -159,6 +190,14 @@ const testKeys = async () => {
   }
 }
 
+// Toggle password visibility
+const togglePasswordVisibility = () => {
+  if (textareaRef.value) {
+    textareaRef.value.toggleVisibility()
+    passwordVisible.value = textareaRef.value.visibilityVisible
+  }
+}
+
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
@@ -168,16 +207,55 @@ onMounted(() => {
 <style lang="scss" scoped>
 @use "@/assets/styles/components/api-settings-common" as *;
 
-.api-key-input-wrapper {
+.label-with-toggle {
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+  gap: $spacing-sm;
 
-  .api-key-textarea {
+  label {
+    margin-bottom: 0;
     flex: 1;
   }
 
+  .toggle-visibility-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity var(--transition-base, 0.2s);
+    flex-shrink: 0;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    .toggle-icon {
+      display: block;
+      pointer-events: none;
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+    }
+  }
+}
+
+.api-key-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .api-key-textarea {
+    width: 100%;
+  }
+
   .test-keys-button {
+    align-self: flex-end;
     padding: 8px 16px;
     background-color: var(--color-primary, #1976d2);
     color: white;
