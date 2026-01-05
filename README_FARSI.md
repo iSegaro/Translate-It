@@ -334,7 +334,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 _نکته:_ برای `OpenAI` و `OpenRouter` بصورت پیش‌فرض از `gpt-3.5-turbo` استفاده می‌شود.
 
-_نکته:_ برای `Google Gemini` و `WebAI to API` بصورت پیش‌فرض از `gemini-2.0-flash` استفاده می شود.
+_نکته:_ برای `Google Gemini` و `WebAI to API` بصورت پیش‌فرض از `gemini-2.5-flash` استفاده می شود.
 
 _نکته:_ برای `DeepSeek` مدل پیش‌فرض `deepseek-chat` است.
 

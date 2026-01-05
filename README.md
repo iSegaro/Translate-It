@@ -329,7 +329,7 @@ In the API Settings page of the extension, each provider has customizable option
 **Default models used:**
 
 - For `OpenAI` and `OpenRouter`: `gpt-3.5-turbo`
-- For `Google Gemini` and `WebAI to API`: `gemini-2.0-flash`
+- For `Google Gemini` and `WebAI to API`: `gemini-2.5-flash`
 - For `DeepSeek`: `deepseek-chat`
 
 </details>
