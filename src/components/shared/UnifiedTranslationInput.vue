@@ -61,7 +61,7 @@
           variant="secondary"
           :auto-translate-on-paste="autoTranslateOnPaste"
           :copy-title="copySourceTitle"
-          :paste-title="pasteTitle"
+          :paste-title="computedPasteTitle"
           :tts-title="ttsSourceTitle"
           @text-copied="handleSourceTextCopied"
           @text-pasted="handleSourceTextPasted"
@@ -109,6 +109,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch, defineAsyncComponent } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 
 // Components - Lazy loaded for performance
@@ -131,6 +132,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'UnifiedTranslationInput')
+
+// i18n
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -238,7 +242,7 @@ const props = defineProps({
   },
   pasteTitle: {
     type: String,
-    default: 'Paste from clipboard'
+    default: undefined
   },
   ttsSourceTitle: {
     type: String,
@@ -255,6 +259,9 @@ const props = defineProps({
     default: 'split'
   }
 })
+
+// Computed for i18n defaults
+const computedPasteTitle = computed(() => props.pasteTitle || t('action_paste_from_clipboard'))
 
 // Emits
 const emit = defineEmits([

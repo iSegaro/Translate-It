@@ -35,12 +35,16 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
+
+// i18n
+const { t } = useI18n()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
 
 
@@ -73,7 +77,7 @@ const props = defineProps({
   // i18n titles
   copyTitle: {
     type: String,
-    default: 'Copy text'
+    default: undefined
   },
   copyAlt: {
     type: String,
@@ -81,7 +85,7 @@ const props = defineProps({
   },
   ttsTitle: {
     type: String,
-    default: 'Play text'
+    default: undefined
   },
   ttsAlt: {
     type: String,
@@ -89,7 +93,7 @@ const props = defineProps({
   },
   pasteTitle: {
     type: String,
-    default: 'Paste from clipboard'
+    default: undefined
   },
   pasteAlt: {
     type: String,
@@ -106,6 +110,11 @@ const props = defineProps({
     default: false
   }
 })
+
+// Computed for i18n defaults
+const computedCopyTitle = computed(() => props.copyTitle || t('action_copy_text'))
+const computedTtsTitle = computed(() => props.ttsTitle || t('action_speak_text'))
+const computedPasteTitle = computed(() => props.pasteTitle || t('action_paste_from_clipboard'))
 
 // Emits
 const emit = defineEmits([

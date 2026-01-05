@@ -744,6 +744,23 @@
   "history_cleared_feedback": { "message": "تاریخچه پاک شد" },
   "history_deleted_feedback": { "message": "{count} ترجمه حذف شد" },
   "history_delete_confirm_message": { "message": "آیا مطمئن هستید که می‌خواهید این ترجمه را حذف کنید؟" },
-  "history_bulk_delete_confirm_message": { "message": "آیا مطمئن هستید که می‌خواهید {count} ترجمه را حذف کنید؟" }
+  "history_bulk_delete_confirm_message": { "message": "آیا مطمئن هستید که می‌خواهید {count} ترجمه را حذف کنید؟" },
+
+  "window_copy_translation": { "message": "کپی ترجمه" },
+  "window_close": { "message": "بستن" },
+  "window_tts_no_text": { "message": "متنی برای خواندن موجود نیست" },
+  "window_tts_stop": { "message": "توقف خواندن (برای توقف کلیک کنید)" },
+  "window_tts_speak_original": { "message": "🔊 خواندن متن اصلی (ابتدا متن اصلی را نمایش دهید، سپس این دکمه را کلیک کنید)" },
+  "window_tts_speak_translation": { "message": "🔊 خواندن ترجمه (حالت فعلی: ترجمه)" },
+  "window_show_original": { "message": "نمایش متن اصلی (سپس از دکمه بلندگو برای گوش دادن به متن اصلی استفاده کنید)" },
+  "window_hide_original": { "message": "مخفی کردن متن اصلی (دکمه TTS متن اصلی را می‌خواند)" },
+  "window_loading_alt": { "message": "در حال بارگذاری..." },
+  "window_translation_placeholder": { "message": "ترجمه اینجا نمایش داده می‌شود..." },
+
+  "action_copy_text": { "message": "کپی متن" },
+  "action_copy_to_clipboard": { "message": "کپی متن به کلیپ‌بورد" },
+  "action_paste_from_clipboard": { "message": "چسباندن از کلیپ‌بورد" },
+  "action_speak_text": { "message": "خواندن متن" },
+  "action_stop_speaking": { "message": "توقف خواندن" }
 
   }

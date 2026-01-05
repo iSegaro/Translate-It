@@ -746,6 +746,23 @@
   "history_cleared_feedback": { "message": "History cleared" },
   "history_deleted_feedback": { "message": "Deleted {count} translations" },
   "history_delete_confirm_message": { "message": "Are you sure you want to delete this translation?" },
-  "history_bulk_delete_confirm_message": { "message": "Are you sure you want to delete {count} translations?" }
+  "history_bulk_delete_confirm_message": { "message": "Are you sure you want to delete {count} translations?" },
+
+  "window_copy_translation": { "message": "Copy translation" },
+  "window_close": { "message": "Close" },
+  "window_tts_no_text": { "message": "No text available for speech" },
+  "window_tts_stop": { "message": "Stop speaking (Click to stop)" },
+  "window_tts_speak_original": { "message": "🔊 Speak ORIGINAL text (Show original first, then click this button)" },
+  "window_tts_speak_translation": { "message": "🔊 Speak TRANSLATION (Current mode: translation)" },
+  "window_show_original": { "message": "Show Original Text (Then use speaker button to listen to original)" },
+  "window_hide_original": { "message": "Hide Original Text (TTS button now speaks original text)" },
+  "window_loading_alt": { "message": "Loading..." },
+  "window_translation_placeholder": { "message": "Translation will appear here..." },
+
+  "action_copy_text": { "message": "Copy text" },
+  "action_copy_to_clipboard": { "message": "Copy text to clipboard" },
+  "action_paste_from_clipboard": { "message": "Paste from clipboard" },
+  "action_speak_text": { "message": "Speak text" },
+  "action_stop_speaking": { "message": "Stop speaking" }
 
 }

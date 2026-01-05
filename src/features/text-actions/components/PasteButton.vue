@@ -3,8 +3,8 @@
     :size="size"
     :variant="variant"
     :disabled="!canPaste"
-    :title="title"
-    :aria-label="ariaLabel"
+    :title="computedTitle"
+    :aria-label="computedAriaLabel"
     :label="label"
     :show-label="showLabel"
     :custom-classes="['ti-paste-button', { 'ti-pasting': isPasting }]"
@@ -35,11 +35,15 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
 import { usePasteAction } from '@/features/text-actions/composables/usePasteAction.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PasteButton')
+
+// i18n
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -55,11 +59,11 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: 'Paste from clipboard'
+    default: undefined
   },
   ariaLabel: {
     type: String,
-    default: 'Paste text from clipboard'
+    default: undefined
   },
   iconAlt: {
     type: String,
@@ -86,6 +90,10 @@ const props = defineProps({
     default: false
   }
 })
+
+// Computed for i18n defaults
+const computedTitle = computed(() => props.title || t('action_paste_from_clipboard'))
+const computedAriaLabel = computed(() => props.ariaLabel || t('action_paste_from_clipboard'))
 
 // Emits
 const emit = defineEmits(['pasted', 'paste-failed'])
