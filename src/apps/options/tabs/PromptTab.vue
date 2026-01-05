@@ -58,7 +58,7 @@ import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
-const { validatePromptTemplate: validate, getFirstError, clearErrors } = useValidation()
+const { validatePromptTemplate: validate, getFirstErrorTranslated, clearErrors } = useValidation()
 
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
@@ -84,13 +84,13 @@ const targetLanguageName = computed(() => settingsStore.settings?.TARGET_LANGUAG
 const validatePrompt = async () => {
   clearErrors()
   const isValid = await validate(promptTemplate.value)
-  
+
   if (!isValid) {
-    validationError.value = getFirstError('promptTemplate')
+    validationError.value = getFirstErrorTranslated('promptTemplate', t)
   } else {
     validationError.value = ''
   }
-  
+
   return isValid
 }
 

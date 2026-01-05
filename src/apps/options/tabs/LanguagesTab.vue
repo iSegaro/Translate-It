@@ -90,7 +90,7 @@ import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode } from '@/shared/config/
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
 const settingsStore = useSettingsStore()
-const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
+const { validateLanguages: validate, getFirstErrorTranslated, clearErrors } = useValidation()
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
@@ -313,7 +313,7 @@ const validateLanguages = async () => {
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
 
   if (!isValid) {
-    validationError.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage')
+    validationError.value = getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t)
   } else {
     validationError.value = ''
   }

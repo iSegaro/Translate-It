@@ -656,6 +656,24 @@
   "api_test_result_partial": { "message": "{valid} کلید معتبر و {invalid} کلید نامعتبر یافت شد" },
   "api_test_result_all_invalid": { "message": "همه {count} کلید نامعتبر هستند" },
   "api_test_unknown_provider": { "message": "ارائه‌دهنده ناشناخته: {provider}" },
-  "api_test_failed": { "message": "تست کلیدها با شکست مواجه شد: {error}" }
+  "api_test_failed": { "message": "تست کلیدها با شکست مواجه شد: {error}" },
+
+  "validation_source_language_empty": { "message": "زبان مبدا نمی‌تواند خالی باشد." },
+  "validation_target_language_empty": { "message": "زبان مقصد نمی‌تواند خالی باشد." },
+  "validation_same_languages": { "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند." },
+  "validation_api_key_empty": { "message": "کلید API برای {provider} نمی‌تواند خالی باشد." },
+  "validation_api_key_too_short": { "message": "کلید API به نظر خیلی کوتاه می‌آید." },
+  "validation_api_key_invalid": { "message": "کلید API باید حداقل ۱۰ کاراکتر باشد و بدون فاصله" },
+  "validation_prompt_template_empty": { "message": "الگوی پرامپت نمی‌تواند خالی باشد." },
+  "validation_prompt_template_missing_placeholders": { "message": "الگوی پرامپت باید شامل موارد زیر باشد: {placeholders}" },
+  "validation_invalid_domains": { "message": "دامینه‌های نامعتبر: {domains}" },
+  "validation_import_file_required": { "message": "لطفاً یک فایل برای وارد کردن انتخاب کنید." },
+  "validation_import_file_json_only": { "message": "فقط فایل‌های JSON پشتیبانی می‌شوند." },
+  "validation_import_file_too_large": { "message": "حجم فایل باید کمتر از ۵ مگابایت باشد." },
+  "validation_field_required": { "message": "این فیلد الزامی است" },
+  "validation_min_length": { "message": "باید حداقل {min} کاراکتر باشد" },
+  "validation_max_length": { "message": "باید حداکثر {max} کاراکتر باشد" },
+  "validation_invalid_email": { "message": "یک آدرس ایمیل معتبر وارد کنید" },
+  "validation_invalid_url": { "message": "یک URL معتبر وارد کنید" }
 
   }

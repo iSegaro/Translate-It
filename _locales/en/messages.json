@@ -658,6 +658,24 @@
   "api_test_result_partial": { "message": "Found {valid} valid key(s), {invalid} invalid key(s)" },
   "api_test_result_all_invalid": { "message": "All {count} key(s) are invalid" },
   "api_test_unknown_provider": { "message": "Unknown provider: {provider}" },
-  "api_test_failed": { "message": "Failed to test keys: {error}" }
+  "api_test_failed": { "message": "Failed to test keys: {error}" },
+
+  "validation_source_language_empty": { "message": "Source language cannot be empty." },
+  "validation_target_language_empty": { "message": "Target language cannot be empty." },
+  "validation_same_languages": { "message": "Source and target languages cannot be the same." },
+  "validation_api_key_empty": { "message": "API key for {provider} cannot be empty." },
+  "validation_api_key_too_short": { "message": "API key appears to be too short." },
+  "validation_api_key_invalid": { "message": "API key must be at least 10 characters with no spaces" },
+  "validation_prompt_template_empty": { "message": "Prompt template cannot be empty." },
+  "validation_prompt_template_missing_placeholders": { "message": "Prompt template must include: {placeholders}" },
+  "validation_invalid_domains": { "message": "Invalid domain(s): {domains}" },
+  "validation_import_file_required": { "message": "Please select a file to import." },
+  "validation_import_file_json_only": { "message": "Only JSON files are supported." },
+  "validation_import_file_too_large": { "message": "File size must be less than 5MB." },
+  "validation_field_required": { "message": "This field is required" },
+  "validation_min_length": { "message": "Must be at least {min} characters" },
+  "validation_max_length": { "message": "Must be no more than {max} characters" },
+  "validation_invalid_email": { "message": "Must be a valid email address" },
+  "validation_invalid_url": { "message": "Must be a valid URL" }
 
 }
