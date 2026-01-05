@@ -652,6 +652,12 @@
   "shortcut_waiting": { "message": "Waiting for keys..." },
   "cancel": { "message": "Cancel" },
   "clear": { "message": "Clear" },
-  "confirm": { "message": "Confirm" }
+  "confirm": { "message": "Confirm" },
 
-  }
+  "api_test_no_keys": { "message": "No keys to test" },
+  "api_test_result_partial": { "message": "Found {valid} valid key(s), {invalid} invalid key(s)" },
+  "api_test_result_all_invalid": { "message": "All {count} key(s) are invalid" },
+  "api_test_unknown_provider": { "message": "Unknown provider: {provider}" },
+  "api_test_failed": { "message": "Failed to test keys: {error}" }
+
+}

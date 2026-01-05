@@ -650,6 +650,12 @@
   "shortcut_waiting": { "message": "منتظر فشردن کلیدها..." },
   "cancel": { "message": "انصراف" },
   "clear": { "message": "پاک کردن" },
-  "confirm": { "message": "تأیید" }
+  "confirm": { "message": "تایید" },
+
+  "api_test_no_keys": { "message": "هیچ کلیدی برای تست وجود ندارد" },
+  "api_test_result_partial": { "message": "{valid} کلید معتبر و {invalid} کلید نامعتبر یافت شد" },
+  "api_test_result_all_invalid": { "message": "همه {count} کلید نامعتبر هستند" },
+  "api_test_unknown_provider": { "message": "ارائه‌دهنده ناشناخته: {provider}" },
+  "api_test_failed": { "message": "تست کلیدها با شکست مواجه شد: {error}" }
 
   }

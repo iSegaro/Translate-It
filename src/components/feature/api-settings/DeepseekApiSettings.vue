@@ -134,7 +134,16 @@ const testKeys = async () => {
   try {
     // Test keys directly from textbox value (not from storage)
     const result = await ApiKeyManager.testKeysDirect(deepseekApiKey.value, 'DeepSeek')
-    testResult.value = result
+
+    // Build translated message from messageKey and params
+    const message = result.messageKey
+      ? (result.params ? t(result.messageKey, result.params) : t(result.messageKey))
+      : null
+
+    testResult.value = {
+      ...result,
+      message
+    }
 
     // Update the local value with the reordered keys
     if (!result.allInvalid && result.reorderedString) {
@@ -142,7 +151,7 @@ const testKeys = async () => {
     }
   } catch (error) {
     testResult.value = {
-      message: 'Failed to test keys: ' + error.message,
+      message: t('api_test_failed', { error: error.message }),
       allInvalid: true
     }
   } finally {

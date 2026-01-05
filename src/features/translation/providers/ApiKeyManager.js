@@ -181,7 +181,7 @@ class ApiKeyManager {
         valid: [],
         invalid: [],
         allInvalid: true,
-        message: 'No keys to test'
+        messageKey: 'api_test_no_keys'
       };
     }
 
@@ -201,7 +201,8 @@ class ApiKeyManager {
         valid: [],
         invalid: keys,
         allInvalid: true,
-        message: `Unknown provider: ${providerName}`
+        messageKey: 'api_test_unknown_provider',
+        params: { provider: providerName }
       };
     }
 
@@ -227,13 +228,18 @@ class ApiKeyManager {
     const keyString = this.stringifyKeys(reorderedKeys);
     await storageManager.set({ [providerSettingKey]: keyString });
 
+    // Return message key and params for Vue component to translate
+    const messageKey = valid.length > 0 ? 'api_test_result_partial' : 'api_test_result_all_invalid';
+    const params = valid.length > 0
+      ? { valid: valid.length, invalid: invalid.length }
+      : { count: invalid.length };
+
     return {
       valid,
       invalid,
       allInvalid: valid.length === 0,
-      message: valid.length > 0
-        ? `Found ${valid.length} valid key(s), ${invalid.length} invalid key(s)`
-        : `All ${invalid.length} key(s) are invalid`
+      messageKey,
+      params
     };
   }
 
@@ -252,7 +258,7 @@ class ApiKeyManager {
         valid: [],
         invalid: [],
         allInvalid: true,
-        message: 'No keys to test'
+        messageKey: 'api_test_no_keys'
       };
     }
 
@@ -272,7 +278,8 @@ class ApiKeyManager {
         valid: [],
         invalid: keys,
         allInvalid: true,
-        message: `Unknown provider: ${providerName}`
+        messageKey: 'api_test_unknown_provider',
+        params: { provider: providerName }
       };
     }
 
@@ -293,13 +300,18 @@ class ApiKeyManager {
     const valid = results.filter(r => r.isValid).map(r => r.key);
     const invalid = results.filter(r => !r.isValid).map(r => r.key);
 
+    // Return message key and params for Vue component to translate
+    const messageKey = valid.length > 0 ? 'api_test_result_partial' : 'api_test_result_all_invalid';
+    const params = valid.length > 0
+      ? { valid: valid.length, invalid: invalid.length }
+      : { count: invalid.length };
+
     return {
       valid,
       invalid,
       allInvalid: valid.length === 0,
-      message: valid.length > 0
-        ? `Found ${valid.length} valid key(s), ${invalid.length} invalid key(s)`
-        : `All ${invalid.length} key(s) are invalid`,
+      messageKey,
+      params,
       reorderedString: [...valid, ...invalid].join('\n')
     };
   }
