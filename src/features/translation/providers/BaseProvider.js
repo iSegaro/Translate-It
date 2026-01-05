@@ -8,6 +8,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -19,6 +20,7 @@ export class BaseProvider {
   constructor(providerName) {
     this.providerName = providerName;
     this.sessionContext = null;
+    this.providerSettingKey = null; // To be set by subclasses that use API keys
     this._initializeProxy();
   }
 
@@ -193,6 +195,101 @@ export class BaseProvider {
   }
 
   /**
+   * Executes a fetch call with automatic failover to next API key on key-related errors.
+   * This method wraps _executeApiCall with retry logic for API key failover.
+   * @param {Object} params
+   * @param {string} params.url - The endpoint URL
+   * @param {RequestInit} params.fetchOptions - Fetch options
+   * @param {Function} params.extractResponse - Function to extract/transform JSON + status
+   * @param {string} params.context - Context for error reporting
+   * @param {AbortController} params.abortController - Optional abort controller for cancellation
+   * @param {Function} params.updateApiKey - Optional callback to update API key in fetchOptions
+   * @returns {Promise<any>} - Transformed result
+   * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
+   */
+  async _executeApiCallWithFailover({ url, fetchOptions, extractResponse, context, abortController, updateApiKey }) {
+    // If provider doesn't have API key support or no update function, use regular call
+    if (!this.providerSettingKey || typeof updateApiKey !== 'function') {
+      return this._executeApiCall({ url, fetchOptions, extractResponse, context, abortController });
+    }
+
+    const maxRetries = 3;
+    let lastError = null;
+    let currentUrl = url;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await this._executeApiCall({ url: currentUrl, fetchOptions, extractResponse, context, abortController });
+
+        // Success! Promote the used key to front of list
+        if (attempt > 0) {
+          logger.info(`[${this.providerName}] API call succeeded on attempt ${attempt + 1}, promoting key`);
+          // Extract the current API key from fetchOptions or URL
+          let currentKey = '';
+          const authHeader = fetchOptions.headers?.Authorization || fetchOptions.headers?.authorization;
+          if (authHeader) {
+            currentKey = authHeader.replace(/^(Bearer |DeepL-Auth-Key )/i, '');
+          } else {
+            // Try to extract from URL (for Gemini)
+            try {
+              const urlObj = new URL(currentUrl);
+              const keyParam = urlObj.searchParams.get('key');
+              if (keyParam) {
+                currentKey = keyParam;
+              }
+            } catch {
+              // URL parsing failed, skip
+            }
+          }
+
+          if (currentKey) {
+            await ApiKeyManager.promoteKey(this.providerSettingKey, currentKey);
+          }
+        }
+
+        return result;
+      } catch (error) {
+        lastError = error;
+
+        // Check if this error should trigger failover
+        if (!ApiKeyManager.shouldFailover(error)) {
+          // Not a failover error, throw immediately
+          throw error;
+        }
+
+        // Check if we should try next key
+        if (attempt < maxRetries - 1) {
+          logger.warn(`[${this.providerName}] API key error (${error.type}), attempting failover (${attempt + 1}/${maxRetries})`);
+
+          // Get next key and update fetchOptions
+          const keys = await ApiKeyManager.getKeys(this.providerSettingKey);
+          logger.info(`[${this.providerName}] Failover check: providerSettingKey=${this.providerSettingKey}, keys.length=${keys.length}, currentAttempt=${attempt}`);
+
+          if (keys.length > attempt + 1) {
+            const nextKey = keys[attempt + 1];
+            await updateApiKey(nextKey, fetchOptions);
+            // Check if the updateApiKey function modified the URL (for Gemini)
+            if (fetchOptions.url && fetchOptions.url !== currentUrl) {
+              currentUrl = fetchOptions.url;
+            }
+            logger.debug(`[${this.providerName}] Trying next API key (${attempt + 2}/${keys.length})`);
+          } else {
+            // No more keys to try
+            logger.error(`[${this.providerName}] All API keys exhausted (total: ${keys.length}, tried: ${attempt + 1})`);
+            throw error;
+          }
+        } else {
+          // Max retries reached
+          throw error;
+        }
+      }
+    }
+
+    // Should never reach here, but just in case
+    throw lastError;
+  }
+
+  /**
    * Executes a fetch call and normalizes HTTP, API-response-invalid, and network errors.
    * @param {Object} params
    * @param {string} params.url - The endpoint URL
@@ -279,19 +376,43 @@ export class BaseProvider {
             try {
               if (typeof body === 'string') {
                 errorMsgLower = body.toLowerCase();
+              } else if (Array.isArray(body)) {
+                // Handle Gemini error format: array of error objects
+                if (body.length > 0 && body[0]) {
+                  const firstError = body[0];
+                  errorMsgLower = (firstError?.message || firstError?.description || firstError?.detail || firstError?.reason || JSON.stringify(firstError)).toLowerCase();
+                }
               } else if (body?.message && typeof body.message === 'string') {
                 errorMsgLower = body.message.toLowerCase();
               } else if (body?.error && typeof body.error === 'string') {
                 errorMsgLower = body.error.toLowerCase();
+              } else if (body?.error?.message && typeof body.error.message === 'string') {
+                // Handle nested error.message structure
+                errorMsgLower = body.error.message.toLowerCase();
               } else {
                 // For objects or other types, try to extract string message
-                const extracted = body?.message || body?.error || msg || '';
+                const extracted = body?.message || body?.error || body?.detail || msg || '';
                 errorMsgLower = String(extracted).toLowerCase();
               }
             } catch {
               // If all else fails, use the original msg
               errorMsgLower = String(msg || '').toLowerCase();
             }
+
+            // Final fallback: if errorMsgLower is still empty, use msg
+            if (!errorMsgLower && msg) {
+              errorMsgLower = String(msg).toLowerCase();
+            }
+
+            // Debug logging to diagnose error type detection
+            logger.debug(`[${this.providerName}] 400/422 error analysis:`, {
+              body: body,
+              msg: msg,
+              errorMsgLower: errorMsgLower,
+              hasApiKey: errorMsgLower.includes('api key'),
+              hasKeyNot: errorMsgLower.includes('key not'),
+              hasAuth: errorMsgLower.includes('auth')
+            });
 
             // Check if this is an API key error (even with 400/422 status)
             if (errorMsgLower.includes('api key') ||

@@ -4,7 +4,7 @@
     :class="{ 'ti-textarea-wrapper--disabled': disabled, 'ti-textarea-wrapper--loading': loading }"
   >
     <textarea
-      :value="modelValue"
+      :value="displayValue"
       :placeholder="placeholder"
       :rows="rows"
       :disabled="disabled || loading"
@@ -14,7 +14,24 @@
       @focus="handleFocus"
       @blur="handleBlur"
     />
-    
+
+    <button
+      v-if="passwordMask"
+      type="button"
+      class="ti-textarea__toggle-visibility"
+      @click="toggleVisibility"
+      :tabindex="-1"
+      :title="visibilityVisible ? 'Hide' : 'Show'"
+    >
+      <svg v-if="!visibilityVisible" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a6 6 0 0 0-6 6c0 1.5.5 2.9 1.4 4.1l-2.6 2.6a.75.75 0 1 0 1.1 1.1l2.6-2.6a7 7 0 0 0 4.1 1.4 6 6 0 0 0 6-6c0-1.5-.5-2.9-1.4-4.1l2.6-2.6a.75.75 0 1 0-1.1-1.1l-2.6 2.6A7 7 0 0 0 8 1zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/>
+      </svg>
+      <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a6 6 0 0 0-6 6c0 1.5.5 2.9 1.4 4.1l-2.6 2.6a.75.75 0 1 0 1.1 1.1l2.6-2.6a7 7 0 0 0 4.1 1.4 6 6 0 0 0 6-6c0-1.5-.5-2.9-1.4-4.1l2.6-2.6a.75.75 0 1 0-1.1-1.1l-2.6 2.6A7 7 0 0 0 8 1zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/>
+        <path d="M5.5 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5z"/>
+      </svg>
+    </button>
+
     <LoadingSpinner
       v-if="loading"
       size="sm"
@@ -24,7 +41,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 
 const props = defineProps({
@@ -56,18 +73,42 @@ const props = defineProps({
     type: String,
     default: 'vertical',
     validator: (value) => ['none', 'both', 'horizontal', 'vertical'].includes(value)
+  },
+  passwordMask: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'input'])
 
 const isFocused = ref(false)
+const visibilityVisible = ref(false)
+
+// For password masking, display bullets instead of actual text
+const displayValue = computed(() => {
+  if (!props.passwordMask) {
+    return props.modelValue
+  }
+
+  if (visibilityVisible.value) {
+    return props.modelValue
+  }
+
+  // Show bullet for each character
+  return props.modelValue ? '•'.repeat(Math.min(props.modelValue.length, 100)) : ''
+})
+
+const toggleVisibility = () => {
+  visibilityVisible.value = !visibilityVisible.value
+}
 
 const textareaClasses = computed(() => [
   'ti-textarea',
   {
     'ti-textarea--focused': isFocused.value,
     'ti-textarea--readonly': props.readonly,
+    'ti-textarea--password': props.passwordMask,
     [`ti-textarea--resize-${props.resize}`]: true
   }
 ])
@@ -91,11 +132,11 @@ const handleBlur = (event) => {
 <style scoped>
 .ti-textarea-wrapper {
   position: relative;
-  
+
   &--disabled {
     opacity: 0.6;
   }
-  
+
   &--loading {
     .ti-textarea {
       color: transparent;
@@ -106,6 +147,7 @@ const handleBlur = (event) => {
 .ti-textarea {
   width: 100%;
   padding: 8px 12px;
+  padding-right: 40px; /* Space for toggle visibility button */
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-base);
   font-family: inherit;
@@ -114,41 +156,70 @@ const handleBlur = (event) => {
   color: var(--color-text);
   background-color: var(--color-background);
   transition: all var(--transition-base);
-  
+
   &::placeholder {
     color: var(--color-text-disabled);
   }
-  
+
   &:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
   }
-  
+
   &:disabled {
     background-color: var(--color-surface);
     cursor: not-allowed;
   }
-  
+
   &--readonly {
     background-color: var(--color-surface);
     cursor: default;
   }
-  
+
+  &--password {
+    font-family: 'text-security-disc', sans-serif;
+    /* Fallback for browsers that don't support text-security-disc */
+    -webkit-text-security: disc;
+  }
+
   &--resize-none {
     resize: none;
   }
-  
+
   &--resize-both {
     resize: both;
   }
-  
+
   &--resize-horizontal {
     resize: horizontal;
   }
-  
+
   &--resize-vertical {
     resize: vertical;
+  }
+}
+
+.ti-textarea__toggle-visibility {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity var(--transition-base);
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
   }
 }
 

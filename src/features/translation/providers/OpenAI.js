@@ -1,7 +1,7 @@
 // src/core/providers/OpenAIProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
-  getOpenAIApiKeyAsync,
+  getOpenAIApiKeysAsync,
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
 } from "@/shared/config/config.js";
@@ -13,6 +13,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
@@ -22,28 +23,32 @@ export class OpenAIProvider extends BaseAIProvider {
   static displayName = "OpenAI";
   static reliableJsonMode = true;
   static supportsDictionary = true;
-  
+
   // AI Provider capabilities
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
   static supportsImageTranslation = true;
-  
+
   // Batch processing strategy
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super(ProviderNames.OPENAI);
+    this.providerSettingKey = 'OPENAI_API_KEY';
   }
 
-  
+
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const [apiKey, apiUrl, model] = await Promise.all([
-      getOpenAIApiKeyAsync(),
+    const [apiKeys, apiUrl, model] = await Promise.all([
+      getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
     ]);
+
+    // Get first available key
+    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
     logger.info(`[OpenAI] Using model: ${model || 'gpt-3.5-turbo'}`);
     logger.info(`[OpenAI] Starting translation: ${text.length} chars`);
@@ -56,8 +61,8 @@ export class OpenAIProvider extends BaseAIProvider {
     );
 
     // Check if this is a batch prompt (starts with specific pattern)
-    const prompt = text.startsWith('Translate the following JSON array') 
-      ? text 
+    const prompt = text.startsWith('Translate the following JSON array')
+      ? text
       : await buildPrompt(
           text,
           sourceLang,
@@ -78,12 +83,16 @@ export class OpenAIProvider extends BaseAIProvider {
       }),
     };
 
-    const result = await this._executeApiCall({
+    // Use failover-enabled API call with updateApiKey callback
+    const result = await this._executeApiCallWithFailover({
       url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
+      }
     });
 
     // CRITICAL FIX: Handle single segment JSON arrays properly
