@@ -438,6 +438,9 @@
     "message": "Sidepanel"
   },
 
+  "api_key_show": { "message": "Show" },
+  "api_key_hide": { "message": "Hide" },
+
   "SIDEPANEL_SOURCE_TEXT_LABEL": { "message": "Source Text" },
   "SIDEPANEL_TARGET_TEXT_LABEL": { "message": "Translation" },
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Enter..." },

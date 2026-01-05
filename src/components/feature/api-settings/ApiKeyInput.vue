@@ -7,12 +7,12 @@
           type="button"
           class="toggle-visibility-button"
           @click="togglePasswordVisibility"
-          :title="passwordVisible ? 'Hide' : 'Show'"
+          :title="passwordVisible ? t('api_key_hide') : t('api_key_show')"
         >
           <img
             v-if="!passwordVisible"
             :src="eyeIcon"
-            alt="Show"
+            :alt="t('api_key_show')"
             class="toggle-icon"
             width="16"
             height="16"
@@ -20,7 +20,7 @@
           <img
             v-else
             :src="eyeHideIcon"
-            alt="Hide"
+            :alt="t('api_key_hide')"
             class="toggle-icon"
             width="16"
             height="16"

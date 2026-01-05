@@ -451,6 +451,9 @@
     "message": "پنل کناری"
   },
 
+  "api_key_show": { "message": "نمایش" },
+  "api_key_hide": { "message": "مخفی" },
+
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
     "message": "اینجا بنویسید..."
   },
