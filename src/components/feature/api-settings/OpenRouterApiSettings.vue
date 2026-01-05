@@ -126,14 +126,12 @@ const testKeys = async (providerName) => {
     // Test keys directly from textbox value (not from storage)
     const result = await ApiKeyManager.testKeysDirect(openrouterApiKey.value, providerName)
 
-    // Build translated message from messageKey and params
-    const message = result.messageKey
-      ? (result.params ? t(result.messageKey, result.params) : t(result.messageKey))
-      : null
-
+    // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {
-      ...result,
-      message
+      allInvalid: result.allInvalid,
+      messageKey: result.messageKey,
+      params: result.params,
+      reorderedString: result.reorderedString
     }
 
     // Update the local value with the reordered keys
@@ -142,8 +140,9 @@ const testKeys = async (providerName) => {
     }
   } catch (error) {
     testResult.value = {
-      message: t('api_test_failed', { error: error.message }),
-      allInvalid: true
+      allInvalid: true,
+      messageKey: 'api_test_failed',
+      params: { error: error.message }
     }
   } finally {
     testingKeys.value = false

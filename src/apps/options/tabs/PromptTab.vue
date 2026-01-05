@@ -23,10 +23,10 @@
 
       <!-- Validation error -->
       <div
-        v-if="validationError"
+        v-if="validationErrorKey"
         class="validation-error"
       >
-        {{ validationError }}
+        {{ t(validationErrorKey) }}
       </div>
 
       <div class="prompt-template-help">
@@ -58,14 +58,14 @@ import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
-const { validatePromptTemplate: validate, getFirstErrorTranslated, clearErrors } = useValidation()
+const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
 const { t } = useI18n()
 
 // Validation
-const validationError = ref('')
+const validationErrorKey = ref('')
 
 // Prompt template
 const promptTemplate = computed({
@@ -86,9 +86,10 @@ const validatePrompt = async () => {
   const isValid = await validate(promptTemplate.value)
 
   if (!isValid) {
-    validationError.value = getFirstErrorTranslated('promptTemplate', t)
+    // Get the error key directly for reactive translation
+    validationErrorKey.value = getFirstError('promptTemplate') || ''
   } else {
-    validationError.value = ''
+    validationErrorKey.value = ''
   }
 
   return isValid

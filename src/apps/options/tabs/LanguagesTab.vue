@@ -30,10 +30,10 @@
 
     <!-- Validation errors -->
     <div
-      v-if="validationError"
+      v-if="validationErrorKey"
       class="validation-error"
     >
-      {{ validationError }}
+      {{ t(validationErrorKey) }}
     </div>
 
     <!-- Separator for API Settings section -->
@@ -90,7 +90,7 @@ import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode } from '@/shared/config/
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
 const settingsStore = useSettingsStore()
-const { validateLanguages: validate, getFirstErrorTranslated, clearErrors } = useValidation()
+const { validateLanguages: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
@@ -306,16 +306,19 @@ watch(selectedProvider, (newValue, oldValue) => {
 })
 
 // Validation
-const validationError = ref('')
+const validationErrorKey = ref('')
 
 const validateLanguages = async () => {
   clearErrors()
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
 
   if (!isValid) {
-    validationError.value = getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t)
+    // Get the error key directly for reactive translation
+    const sourceError = getFirstError('sourceLanguage')
+    const targetError = getFirstError('targetLanguage')
+    validationErrorKey.value = sourceError || targetError || ''
   } else {
-    validationError.value = ''
+    validationErrorKey.value = ''
   }
 
   return isValid

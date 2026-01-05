@@ -39,8 +39,8 @@
           :hide-toggle="true"
         />
         <div class="button-result-row">
-          <div v-if="testResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
-            {{ testResult.message }}
+          <div v-if="translatedTestResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
+            {{ translatedTestResult }}
           </div>
           <button
             @click="handleTestKeys"
@@ -103,6 +103,13 @@ const passwordVisible = ref(false)
 
 const hasKeys = computed(() => {
   return props.modelValue?.trim().length > 0
+})
+
+const translatedTestResult = computed(() => {
+  if (!props.testResult?.messageKey) return null
+
+  const { messageKey, params } = props.testResult
+  return params ? t(messageKey, params) : t(messageKey)
 })
 
 const togglePasswordVisibility = () => {
