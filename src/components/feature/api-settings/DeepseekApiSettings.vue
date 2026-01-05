@@ -14,56 +14,15 @@
         {{ t('deepseek_api_key_link') || 'Get DeepSeek API Key' }}
       </a>
     </div>
-    <div class="setting-group">
-      <div class="label-with-toggle">
-        <label>{{ t('custom_api_settings_api_key_label') || 'API Keys' }}</label>
-        <button
-          type="button"
-          class="toggle-visibility-button"
-          @click="togglePasswordVisibility"
-          :title="passwordVisible ? 'Hide' : 'Show'"
-        >
-          <img
-            v-if="!passwordVisible"
-            :src="eyeIcon"
-            alt="Show"
-            class="toggle-icon"
-            width="16"
-            height="16"
-          >
-          <img
-            v-else
-            :src="eyeHideIcon"
-            alt="Hide"
-            class="toggle-icon"
-            width="16"
-            height="16"
-          >
-        </button>
-      </div>
-      <div class="api-key-input-wrapper">
-        <BaseTextarea
-          ref="textareaRef"
-          v-model="deepseekApiKey"
-          :placeholder="t('deepseek_api_key_placeholder') || 'Enter your API keys (one per line)'"
-          :rows="3"
-          class="api-key-textarea"
-          :password-mask="true"
-          :hide-toggle="true"
-        />
-        <button
-          @click="testKeys"
-          :disabled="testingKeys || !hasKeys"
-          class="test-keys-button"
-          :class="{ 'testing-keys': testingKeys }"
-        >
-          {{ testingKeys ? 'Testing...' : 'Test Keys' }}
-        </button>
-      </div>
-      <div v-if="testResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
-        {{ testResult.message }}
-      </div>
-    </div>
+    <ApiKeyInput
+      v-model="deepseekApiKey"
+      :label="t('custom_api_settings_api_key_label') || 'API Keys'"
+      :placeholder="t('deepseek_api_key_placeholder') || 'Enter your API keys (one per line)'"
+      provider-name="DeepSeek"
+      :testing="testingKeys"
+      :test-result="testResult"
+      @test="testKeys"
+    />
     <div class="setting-group">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
@@ -92,26 +51,18 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
-import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
-import eyeIcon from '@/icons/ui/eye-open.svg?url'
-import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
 
 const settingsStore = useSettingsStore()
-const textareaRef = ref(null)
-const passwordVisible = ref(false)
 
 const deepseekApiKey = computed({
   get: () => settingsStore.settings?.DEEPSEEK_API_KEY || '',
   set: (value) => settingsStore.updateSettingLocally('DEEPSEEK_API_KEY', value)
-})
-
-const hasKeys = computed(() => {
-  return deepseekApiKey.value.trim().length > 0
 })
 
 // Track dropdown selection separately from stored value
@@ -156,15 +107,13 @@ const deepseekApiModelOptions = ref([
 const testingKeys = ref(false)
 const testResult = ref(null)
 
-const testKeys = async () => {
-  if (!hasKeys.value) return
-
+const testKeys = async (providerName) => {
   testingKeys.value = true
   testResult.value = null
 
   try {
     // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(deepseekApiKey.value, 'DeepSeek')
+    const result = await ApiKeyManager.testKeysDirect(deepseekApiKey.value, providerName)
 
     // Build translated message from messageKey and params
     const message = result.messageKey
@@ -190,14 +139,6 @@ const testKeys = async () => {
   }
 }
 
-// Toggle password visibility
-const togglePasswordVisibility = () => {
-  if (textareaRef.value) {
-    textareaRef.value.toggleVisibility()
-    passwordVisible.value = textareaRef.value.visibilityVisible
-  }
-}
-
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
@@ -206,95 +147,4 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 @use "@/assets/styles/components/api-settings-common" as *;
-
-.label-with-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: $spacing-sm;
-  gap: $spacing-sm;
-
-  label {
-    margin-bottom: 0;
-    flex: 1;
-  }
-
-  .toggle-visibility-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.6;
-    transition: opacity var(--transition-base, 0.2s);
-    flex-shrink: 0;
-
-    &:hover {
-      opacity: 1;
-    }
-
-    .toggle-icon {
-      display: block;
-      pointer-events: none;
-      width: 16px;
-      height: 16px;
-      object-fit: contain;
-    }
-  }
-}
-
-.api-key-input-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .api-key-textarea {
-    width: 100%;
-  }
-
-  .test-keys-button {
-    align-self: flex-end;
-    padding: 8px 16px;
-    background-color: var(--color-primary, #1976d2);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius-base, 4px);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color var(--transition-base, 0.2s);
-
-    &:hover:not(:disabled) {
-      background-color: var(--color-primary-dark, #1565c0);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    &.testing-keys {
-      opacity: 0.8;
-      cursor: wait;
-    }
-  }
-}
-
-.test-result {
-  margin-top: 8px;
-  padding: 8px 12px;
-  border-radius: var(--border-radius-base, 4px);
-  font-size: 14px;
-
-  &.success {
-    background-color: var(--color-success-bg, #e8f5e9);
-    color: var(--color-success-text, #2e7d32);
-  }
-
-  &.error {
-    background-color: var(--color-error-bg, #ffebee);
-    color: var(--color-error-text, #c62828);
-  }
-}
 </style>
