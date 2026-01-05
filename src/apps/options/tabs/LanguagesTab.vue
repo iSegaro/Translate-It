@@ -388,6 +388,15 @@ h2 {
       margin: 0;
     }
   }
+
+  // Make all API settings inputs align with language dropdowns
+  // Language dropdowns are flex: 0 0 250px, so we limit API inputs similarly
+  :deep(.api-key-section) .ti-textarea,
+  :deep(.setting-group) .ti-select,
+  :deep(.setting-group) .ti-input,
+  :deep(.setting-group) .ti-provider-select {
+    max-width: var(--input-max-width, 620px);
+  }
 }
 
 .setting-group {

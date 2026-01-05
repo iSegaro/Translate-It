@@ -5,6 +5,11 @@
 
 // Common styles for API Settings components
 
+// CSS variable for input max-width - can be overridden in specific contexts
+:root {
+  --input-max-width: 620px;
+}
+
 .api-info {
   margin-bottom: $spacing-lg;
 

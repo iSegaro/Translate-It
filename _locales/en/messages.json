@@ -654,6 +654,8 @@
   "clear": { "message": "Clear" },
   "confirm": { "message": "Confirm" },
 
+  "api_test_button": { "message": "Test Keys" },
+  "api_test_testing": { "message": "Testing..." },
   "api_test_no_keys": { "message": "No keys to test" },
   "api_test_result_partial": { "message": "Found {valid} valid key(s), {invalid} invalid key(s)" },
   "api_test_result_all_invalid": { "message": "All {count} key(s) are invalid" },

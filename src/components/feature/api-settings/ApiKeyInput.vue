@@ -38,17 +38,19 @@
           :password-mask="true"
           :hide-toggle="true"
         />
-        <button
-          @click="handleTestKeys"
-          :disabled="testing || !hasKeys"
-          class="test-keys-button"
-          :class="{ 'testing-keys': testing }"
-        >
-          {{ testing ? testingLabel : defaultTestLabel }}
-        </button>
-      </div>
-      <div v-if="testResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
-        {{ testResult.message }}
+        <div class="button-result-row">
+          <div v-if="testResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
+            {{ testResult.message }}
+          </div>
+          <button
+            @click="handleTestKeys"
+            :disabled="testing || !hasKeys"
+            class="test-keys-button"
+            :class="{ 'testing-keys': testing }"
+          >
+            {{ testing ? t('api_test_testing') : t('api_test_button') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -56,9 +58,12 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import eyeIcon from '@/icons/ui/eye-open.svg?url'
 import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -88,14 +93,6 @@ const props = defineProps({
   testResult: {
     type: Object,
     default: null
-  },
-  testingLabel: {
-    type: String,
-    default: 'Testing...'
-  },
-  testButtonLabel: {
-    type: String,
-    default: 'Test Keys'
   }
 })
 
@@ -106,10 +103,6 @@ const passwordVisible = ref(false)
 
 const hasKeys = computed(() => {
   return props.modelValue?.trim().length > 0
-})
-
-const defaultTestLabel = computed(() => {
-  return props.testing ? props.testingLabel : props.testButtonLabel
 })
 
 const togglePasswordVisibility = () => {
@@ -129,6 +122,7 @@ const handleTestKeys = () => {
 
 .api-key-section {
   width: 100%;
+  margin-bottom: $spacing-lg;
 }
 
 .setting-group {
@@ -189,8 +183,14 @@ const handleTestKeys = () => {
     width: 100%;
   }
 
+  .button-result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .test-keys-button {
-    align-self: flex-end;
+    margin-inline-start: auto;
     padding: 8px 16px;
     background-color: var(--color-primary, #1976d2);
     color: white;
@@ -214,22 +214,21 @@ const handleTestKeys = () => {
       cursor: wait;
     }
   }
-}
 
-.test-result {
-  margin-top: 8px;
-  padding: 8px 12px;
-  border-radius: var(--border-radius-base, 4px);
-  font-size: 14px;
+  .test-result {
+    padding: 8px 12px;
+    border-radius: var(--border-radius-base, 4px);
+    font-size: 14px;
 
-  &.success {
-    background-color: var(--color-success-bg, #e8f5e9);
-    color: var(--color-success-text, #2e7d32);
-  }
+    &.success {
+      background-color: var(--color-success-bg, #e8f5e9);
+      color: var(--color-success-text, #2e7d32);
+    }
 
-  &.error {
-    background-color: var(--color-error-bg, #ffebee);
-    color: var(--color-error-text, #c62828);
+    &.error {
+      background-color: var(--color-error-bg, #ffebee);
+      color: var(--color-error-text, #c62828);
+    }
   }
 }
 </style>
