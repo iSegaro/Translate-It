@@ -45,7 +45,7 @@ export const CONFIG = {
 
   API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
-  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Default Gemini API URL
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
   GEMINI_MODELS: [
