@@ -19,6 +19,7 @@
         :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
         :rows="5"
         class="prompt-template-input"
+        dir="ltr"
       />
 
       <!-- Validation error -->
@@ -33,15 +34,15 @@
         <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
         <ul>
           <li>
-            <code>${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
+            <code dir="ltr">${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
             <span class="lang-name">({{ sourceLanguageName }})</span>
           </li>
           <li>
-            <code>${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
+            <code dir="ltr">${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
             <span class="lang-name">({{ targetLanguageName }})</span>
           </li>
           <li>
-            <code>${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
+            <code dir="ltr">${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
           </li>
         </ul>
       </div>

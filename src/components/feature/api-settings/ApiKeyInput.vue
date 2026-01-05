@@ -37,6 +37,7 @@
           class="api-key-textarea"
           :password-mask="true"
           :hide-toggle="true"
+          dir="ltr"
         />
         <div class="button-result-row">
           <div v-if="translatedTestResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
