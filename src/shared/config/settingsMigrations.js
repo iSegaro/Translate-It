@@ -25,14 +25,16 @@ function runMainMigration(currentSettings) {
   const migrationLog = [];
 
   // List of settings that should NOT be auto-migrated
+  // Note: API_KEY is intentionally NOT in this list to allow migration to GEMINI_API_KEY
   const DO_NOT_MIGRATE = [
     'translationHistory',    // User data
     'EXCLUDED_SITES',        // User's custom exclusions
-    'API_KEY',               // User's API keys (security)
     'OPENAI_API_KEY',
     'OPENROUTER_API_KEY',
     'DEEPSEEK_API_KEY',
+    'DEEPL_API_KEY',
     'CUSTOM_API_KEY',
+    'GEMINI_API_KEY',        // New multi-key setting
     'PROXY_USERNAME',        // Credentials
     'PROXY_PASSWORD'
   ];
@@ -120,6 +122,22 @@ function runMainMigration(currentSettings) {
       }
     }
   });
+
+  // 5. Handle legacy API_KEY migration to GEMINI_API_KEY
+  // This migrates single API_KEY to new GEMINI_API_KEY (multi-key support)
+  // Note: This is now handled by import-export.js during import, so this only runs
+  // for extension updates, not for file imports
+  if ('API_KEY' in currentSettings && currentSettings.API_KEY && currentSettings.API_KEY.trim() !== '') {
+    // Only migrate if GEMINI_API_KEY doesn't exist or is empty
+    if (!currentSettings.GEMINI_API_KEY || currentSettings.GEMINI_API_KEY.trim() === '') {
+      updates.GEMINI_API_KEY = currentSettings.API_KEY;
+      migrationLog.push(`Migrated API_KEY to GEMINI_API_KEY (multi-key support)`);
+    }
+
+    // Remove the old API_KEY setting
+    updates.API_KEY = '';
+    migrationLog.push(`Removed deprecated API_KEY setting`);
+  }
 
   if (migrationLog.length > 0) {
     logger.debug('Auto-migration completed', {

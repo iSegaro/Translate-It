@@ -176,10 +176,12 @@ class SecureStorage {
   extractApiKeys(settings) {
     const apiKeys = {};
     const keyFields = [
-      "API_KEY",
+      "API_KEY", // Legacy Gemini Key
+      "GEMINI_API_KEY",
       "OPENAI_API_KEY",
       "OPENROUTER_API_KEY",
       "DEEPSEEK_API_KEY",
+      "DEEPL_API_KEY",
       "CUSTOM_API_KEY",
     ];
 
@@ -200,10 +202,12 @@ class SecureStorage {
   removeApiKeys(settings) {
     const cleanSettings = { ...settings };
     const keyFields = [
-      "API_KEY",
+      "API_KEY", // Legacy Gemini Key
+      "GEMINI_API_KEY",
       "OPENAI_API_KEY",
       "OPENROUTER_API_KEY",
       "DEEPSEEK_API_KEY",
+      "DEEPL_API_KEY",
       "CUSTOM_API_KEY",
     ];
 

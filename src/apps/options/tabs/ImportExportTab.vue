@@ -242,15 +242,9 @@ const importSettings = async () => {
     const fileContent = await selectedFile.value.text()
     const importedSettings = JSON.parse(fileContent)
     const importPasswordValue = importPassword.value.trim() || null
-    
-    // Process imported settings using secureStorage (handles both encrypted and plain)
-    const processedSettings = await secureStorage.processImportedSettings(
-      importedSettings,
-      importPasswordValue
-    )
-    
-    // Save to storage using settings store
-    await settingsStore.importSettings(processedSettings, importPasswordValue) // Call the store action
+
+    // Pass raw imported settings to settings store (it will handle processing and migration)
+    await settingsStore.importSettings(importedSettings, importPasswordValue)
     
     // Clear form only on successful import
     if (importFileInput.value) importFileInput.value.value = ''
@@ -262,9 +256,9 @@ const importSettings = async () => {
     statusMessage.value = t('import_success') || 'Settings imported successfully! Reloading...'
     
     // Reload page after 1.5 seconds
-    setTimeout(() => {
-      window.location.reload()
-    }, 1500)
+    // setTimeout(() => {
+    //   window.location.reload()
+    // }, 1500)
     
   } catch (error) {
     statusType.value = 'error'
