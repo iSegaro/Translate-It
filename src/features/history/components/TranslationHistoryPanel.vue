@@ -3,14 +3,14 @@
     <!-- Header -->
     <div class="history-header">
       <div class="header-title">
-        <h3>Translation History</h3>
-        <span class="history-count">{{ filteredHistory.length }} items</span>
+        <h3>{{ t('history_title') }}</h3>
+        <span class="history-count">{{ t('history_items_count', { count: filteredHistory.length }) }}</span>
       </div>
-      
+
       <div class="header-actions">
         <BaseInput
           v-model="searchQuery"
-          placeholder="Search history..."
+          :placeholder="t('history_search_placeholder')"
           size="sm"
           clearable
           class="search-input"
@@ -19,161 +19,161 @@
             <span class="search-icon">🔍</span>
           </template>
         </BaseInput>
-        
+
         <BaseDropdown position="bottom-end">
           <template #trigger="{ toggle, open }">
-            <button 
+            <button
               class="filter-btn"
               :class="{ active: open }"
-              title="Filter options"
+              :title="t('history_filter_tooltip')"
               @click="toggle"
             >
               <span class="filter-icon">⚙️</span>
-              <span class="filter-text">Filter</span>
+              <span class="filter-text">{{ t('history_filter') }}</span>
             </button>
           </template>
-          
+
           <div class="filter-dropdown">
             <div class="filter-section">
-              <h4>Filter by Provider</h4>
+              <h4>{{ t('history_filter_by_provider') }}</h4>
               <div class="filter-options">
                 <label class="filter-option">
-                  <input 
-                    v-model="filters.providers" 
-                    type="checkbox" 
+                  <input
+                    v-model="filters.providers"
+                    type="checkbox"
                     value="all"
                     @change="handleProviderFilter('all')"
                   >
-                  <span>All Providers</span>
+                  <span>{{ t('history_all_providers') }}</span>
                 </label>
-                <label 
-                  v-for="provider in availableProviders" 
+                <label
+                  v-for="provider in availableProviders"
                   :key="provider"
                   class="filter-option"
                 >
-                  <input 
-                    v-model="filters.providers" 
-                    type="checkbox" 
+                  <input
+                    v-model="filters.providers"
+                    type="checkbox"
                     :value="provider"
                   >
                   <span>{{ getProviderName(provider) }}</span>
                 </label>
               </div>
             </div>
-            
+
             <div class="filter-section">
-              <h4>Filter by Type</h4>
+              <h4>{{ t('history_filter_by_type') }}</h4>
               <div class="filter-options">
                 <label class="filter-option">
-                  <input 
-                    v-model="filters.showTextTranslations" 
-                    type="checkbox" 
+                  <input
+                    v-model="filters.showTextTranslations"
+                    type="checkbox"
                   >
-                  <span>Text Translations</span>
+                  <span>{{ t('history_text_translations') }}</span>
                 </label>
                 <label class="filter-option">
-                  <input 
-                    v-model="filters.showImageTranslations" 
-                    type="checkbox" 
+                  <input
+                    v-model="filters.showImageTranslations"
+                    type="checkbox"
                   >
-                  <span>Image Translations</span>
+                  <span>{{ t('history_image_translations') }}</span>
                 </label>
               </div>
             </div>
-            
+
             <div class="filter-section">
-              <h4>Time Period</h4>
+              <h4>{{ t('history_time_period') }}</h4>
               <select
                 v-model="filters.timePeriod"
                 class="time-select"
               >
                 <option value="all">
-                  All Time
+                  {{ t('history_time_all') }}
                 </option>
                 <option value="today">
-                  Today
+                  {{ t('history_time_today') }}
                 </option>
                 <option value="week">
-                  This Week
+                  {{ t('history_time_week') }}
                 </option>
                 <option value="month">
-                  This Month
+                  {{ t('history_time_month') }}
                 </option>
               </select>
             </div>
           </div>
         </BaseDropdown>
-        
+
         <BaseDropdown position="bottom-end">
           <template #trigger="{ toggle, open }">
-            <button 
+            <button
               class="sort-btn"
               :class="{ active: open }"
-              title="Sort options"
+              :title="t('history_sort_tooltip')"
               @click="toggle"
             >
               <span class="sort-icon">📊</span>
-              <span class="sort-text">Sort</span>
+              <span class="sort-text">{{ t('history_sort') }}</span>
             </button>
           </template>
-          
+
           <div class="sort-dropdown">
             <div class="sort-options">
               <label class="sort-option">
-                <input 
-                  v-model="sortBy" 
-                  type="radio" 
+                <input
+                  v-model="sortBy"
+                  type="radio"
                   value="timestamp"
                 >
-                <span>By Date</span>
+                <span>{{ t('history_sort_by_date') }}</span>
               </label>
               <label class="sort-option">
-                <input 
-                  v-model="sortBy" 
-                  type="radio" 
+                <input
+                  v-model="sortBy"
+                  type="radio"
                   value="provider"
                 >
-                <span>By Provider</span>
+                <span>{{ t('history_sort_by_provider') }}</span>
               </label>
               <label class="sort-option">
-                <input 
-                  v-model="sortBy" 
-                  type="radio" 
+                <input
+                  v-model="sortBy"
+                  type="radio"
                   value="length"
                 >
-                <span>By Text Length</span>
+                <span>{{ t('history_sort_by_length') }}</span>
               </label>
             </div>
-            
+
             <div class="sort-order">
               <label class="sort-option">
-                <input 
-                  v-model="sortOrder" 
-                  type="radio" 
+                <input
+                  v-model="sortOrder"
+                  type="radio"
                   value="desc"
                 >
-                <span>Newest First</span>
+                <span>{{ t('history_sort_newest') }}</span>
               </label>
               <label class="sort-option">
-                <input 
-                  v-model="sortOrder" 
-                  type="radio" 
+                <input
+                  v-model="sortOrder"
+                  type="radio"
                   value="asc"
                 >
-                <span>Oldest First</span>
+                <span>{{ t('history_sort_oldest') }}</span>
               </label>
             </div>
           </div>
         </BaseDropdown>
-        
-        <button 
+
+        <button
           class="clear-btn"
           :disabled="history.length === 0"
-          title="Clear all history"
+          :title="t('history_clear_all_tooltip')"
           @click="showClearConfirm = true"
         >
           <span class="clear-icon">🗑️</span>
-          <span class="clear-text">Clear All</span>
+          <span class="clear-text">{{ t('history_clear_all') }}</span>
         </button>
       </div>
     </div>
@@ -185,9 +185,9 @@
         class="loading-state"
       >
         <LoadingSpinner size="md" />
-        <p>Loading history...</p>
+        <p>{{ t('history_loading') }}</p>
       </div>
-      
+
       <div
         v-else-if="filteredHistory.length === 0"
         class="empty-state"
@@ -195,8 +195,8 @@
         <div class="empty-icon">
           📝
         </div>
-        <h4>{{ searchQuery ? 'No results found' : 'No translation history yet' }}</h4>
-        <p>{{ searchQuery ? 'Try adjusting your search or filters' : 'Your translations will appear here' }}</p>
+        <h4>{{ searchQuery ? t('history_no_results') : t('history_no_history') }}</h4>
+        <p>{{ searchQuery ? t('history_no_results_hint') : t('history_no_history_hint') }}</p>
       </div>
       
       <div
@@ -238,10 +238,10 @@
                     {{ item.isImageTranslation ? '🖼️' : '📝' }}
                   </span>
                   <span class="type-text">
-                    {{ item.isImageTranslation ? 'Image' : 'Text' }}
+                    {{ item.isImageTranslation ? t('history_type_image') : t('history_type_text') }}
                   </span>
                 </div>
-                
+
                 <div class="item-meta">
                   <span class="language-pair">
                     {{ getLanguageName(item.fromLanguage) }} → {{ getLanguageName(item.toLanguage) }}
@@ -254,28 +254,28 @@
                   </span>
                 </div>
               </div>
-              
+
               <div class="item-text">
                 <div class="source-text">
-                  <span class="text-label">Source:</span>
+                  <span class="text-label">{{ t('history_label_source') }}</span>
                   <span class="text-content">{{ truncateText(item.sourceText, 100) }}</span>
                 </div>
                 <div class="translated-text">
-                  <span class="text-label">Translation:</span>
+                  <span class="text-label">{{ t('history_label_translation') }}</span>
                   <span class="text-content">{{ truncateText(item.text, 100) }}</span>
                 </div>
               </div>
-              
+
               <div class="item-footer">
                 <span class="timestamp">{{ formatTime(item.timestamp) }}</span>
                 <div
                   v-if="item.confidence"
                   class="confidence-indicator"
                 >
-                  <span class="confidence-label">Confidence:</span>
+                  <span class="confidence-label">{{ t('history_label_confidence') }}</span>
                   <div class="confidence-bar">
-                    <div 
-                      class="confidence-fill" 
+                    <div
+                      class="confidence-fill"
                       :style="{ width: `${item.confidence * 100}%` }"
                       :class="getConfidenceClass(item.confidence)"
                     />
@@ -284,7 +284,7 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- Item actions -->
             <div class="item-actions">
               <!-- Enhanced Text Actions -->
@@ -296,57 +296,57 @@
                 :show-paste="false"
                 class="history-actions"
               />
-              
-              <button 
+
+              <button
                 class="action-btn retranslate-btn"
-                title="Retranslate"
+                :title="t('history_retranslate_tooltip')"
                 @click.stop="retranslate(item)"
               >
                 <span class="action-icon">🔄</span>
               </button>
-              
+
               <BaseDropdown
                 position="bottom-end"
                 size="sm"
               >
                 <template #trigger="{ toggle }">
-                  <button 
+                  <button
                     class="action-btn more-btn"
-                    title="More actions"
+                    :title="t('history_more_actions_tooltip')"
                     @click.stop="toggle"
                   >
                     <span class="action-icon">⋮</span>
                   </button>
                 </template>
-                
+
                 <div class="more-actions">
                   <button
                     class="more-action"
                     @click="editTranslation(item)"
                   >
                     <span class="more-icon">✏️</span>
-                    <span>Edit</span>
+                    <span>{{ t('history_action_edit') }}</span>
                   </button>
                   <button
                     class="more-action"
                     @click="favoriteItem(item)"
                   >
                     <span class="more-icon">{{ item.isFavorite ? '💔' : '❤️' }}</span>
-                    <span>{{ item.isFavorite ? 'Unfavorite' : 'Favorite' }}</span>
+                    <span>{{ item.isFavorite ? t('history_action_unfavorite') : t('history_action_favorite') }}</span>
                   </button>
                   <button
                     class="more-action"
                     @click="exportItem(item)"
                   >
                     <span class="more-icon">📤</span>
-                    <span>Export</span>
+                    <span>{{ t('history_action_export') }}</span>
                   </button>
                   <button
                     class="more-action danger"
                     @click="removeItem(item)"
                   >
                     <span class="more-icon">🗑️</span>
-                    <span>Delete</span>
+                    <span>{{ t('history_action_delete') }}</span>
                   </button>
                 </div>
               </BaseDropdown>
@@ -360,41 +360,41 @@
         v-if="totalPages > 1"
         class="pagination"
       >
-        <button 
+        <button
           class="page-btn"
           :disabled="currentPage === 1"
-          title="First page"
+          :title="t('history_page_first')"
           @click="currentPage = 1"
         >
           ⏮️
         </button>
-        
-        <button 
+
+        <button
           class="page-btn"
           :disabled="currentPage === 1"
-          title="Previous page"
+          :title="t('history_page_previous')"
           @click="currentPage = Math.max(1, currentPage - 1)"
         >
           ◀️
         </button>
-        
+
         <span class="page-info">
-          Page {{ currentPage }} of {{ totalPages }}
+          {{ t('history_page_info', { current: currentPage, total: totalPages }) }}
         </span>
-        
-        <button 
+
+        <button
           class="page-btn"
           :disabled="currentPage === totalPages"
-          title="Next page"
+          :title="t('history_page_next')"
           @click="currentPage = Math.min(totalPages, currentPage + 1)"
         >
           ▶️
         </button>
-        
-        <button 
+
+        <button
           class="page-btn"
           :disabled="currentPage === totalPages"
-          title="Last page"
+          :title="t('history_page_last')"
           @click="currentPage = totalPages"
         >
           ⏭️
@@ -408,39 +408,41 @@
       class="bulk-actions"
     >
       <div class="bulk-info">
-        {{ selectedItems.length }} item{{ selectedItems.length === 1 ? '' : 's' }} selected
+        {{ selectedItems.length === 1
+          ? t('history_items_selected', { count: selectedItems.length })
+          : t('history_items_selected_plural', { count: selectedItems.length }) }}
       </div>
-      
+
       <div class="bulk-buttons">
         <!-- Enhanced Bulk Copy -->
         <CopyButton
           :text="bulkSelectedText"
           class="bulk-copy-btn"
-          title="Copy all selected"
+          :title="t('history_copy_all_selected_tooltip')"
           @copied="onBulkCopied"
         />
-        
+
         <button
           class="bulk-btn"
           @click="bulkExport"
         >
           <span class="bulk-icon">📤</span>
-          Export
+          {{ t('history_bulk_export') }}
         </button>
-        
+
         <button
           class="bulk-btn danger"
           @click="bulkDelete"
         >
           <span class="bulk-icon">🗑️</span>
-          Delete
+          {{ t('history_bulk_delete') }}
         </button>
-        
+
         <button
           class="bulk-btn secondary"
           @click="clearSelection"
         >
-          Cancel
+          {{ t('history_bulk_cancel') }}
         </button>
       </div>
     </div>
@@ -448,28 +450,28 @@
     <!-- Clear confirmation modal -->
     <BaseModal
       v-model="showClearConfirm"
-      title="Clear History"
+      :title="t('history_clear_confirm_title')"
       size="sm"
     >
       <div class="clear-confirm">
-        <p>Are you sure you want to clear all translation history?</p>
+        <p>{{ t('history_clear_confirm_message') }}</p>
         <p class="warning-text">
-          This action cannot be undone.
+          {{ t('history_clear_confirm_warning') }}
         </p>
       </div>
-      
+
       <template #footer>
         <button
           class="confirm-btn secondary"
           @click="showClearConfirm = false"
         >
-          Cancel
+          {{ t('cancel') }}
         </button>
         <button
           class="confirm-btn danger"
           @click="confirmClearHistory"
         >
-          Clear All
+          {{ t('history_clear_confirm_button') }}
         </button>
       </template>
     </BaseModal>
@@ -479,6 +481,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
+import { useI18n } from 'vue-i18n'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -491,6 +494,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');
 
+// i18n
+const { t } = useI18n()
 
 const emit = defineEmits(['retranslate', 'copy', 'tts', 'export'])
 
@@ -702,7 +707,7 @@ const retranslate = (item) => {
 }
 
 const onBulkCopied = () => {
-  showFeedback(`${selectedItems.value.length} items copied to clipboard!`)
+  showFeedback(t('history_copied_feedback', { count: selectedItems.value.length }))
   logger.debug('[TranslationHistoryPanel] Bulk copy completed')
 }
 
@@ -722,7 +727,7 @@ const exportItem = (item) => {
 }
 
 const removeItem = (item) => {
-  if (confirm('Are you sure you want to delete this translation?')) {
+  if (confirm(t('history_delete_confirm_message'))) {
     const index = history.value.findIndex(h => h.id === item.id)
     if (index !== -1) {
       history.value.splice(index, 1)
@@ -745,7 +750,7 @@ const confirmClearHistory = () => {
   translationStore.clearHistory()
   selectedItems.value = []
   showClearConfirm.value = false
-  showFeedback('History cleared')
+  showFeedback(t('history_cleared_feedback'))
 }
 
 const bulkExport = () => {
@@ -759,15 +764,16 @@ const bulkExport = () => {
 
 
 const bulkDelete = () => {
-  if (confirm(`Are you sure you want to delete ${selectedItems.value.length} translations?`)) {
+  if (confirm(t('history_bulk_delete_confirm_message', { count: selectedItems.value.length }))) {
     selectedItems.value.forEach(id => {
       const index = history.value.findIndex(item => item.id === id)
       if (index !== -1) {
         history.value.splice(index, 1)
       }
     })
+    const deletedCount = selectedItems.value.length
     clearSelection()
-    showFeedback(`Deleted ${selectedItems.value.length} translations`)
+    showFeedback(t('history_deleted_feedback', { count: deletedCount }))
   }
 }
 
