@@ -10,6 +10,8 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -167,7 +169,22 @@ export class TranslationHandler {
       // Set timeout
       const timeout = setTimeout(() => {
         this.activeRequests.delete(messageId);
-        reject(new Error('Translation timeout'));
+
+        // Create timeout error
+        const timeoutError = new Error('Translation timeout');
+
+        // Handle through ErrorHandler for proper error management
+        if (ExtensionContextManager.isValidSync()) {
+          ErrorHandler.getInstance().handle(timeoutError, {
+            context: 'translation-handler-timeout',
+            messageId: messageId,
+            showToast: false // WindowsManager will handle UI feedback
+          }).catch(handlerError => {
+            this.logger.warn('ErrorHandler failed to handle timeout:', handlerError);
+          });
+        }
+
+        reject(timeoutError);
       }, WindowsConfig.TIMEOUTS.TRANSLATION_TIMEOUT);
 
       // Store request info for central handler to find
@@ -204,7 +221,7 @@ export class TranslationHandler {
   handleTranslationResult(message) {
     const { messageId } = message;
     const request = this.activeRequests.get(messageId);
-    
+
     if (!request) {
       this.logger.debug(`No active request found for messageId: ${messageId}`);
       return false;
@@ -213,23 +230,49 @@ export class TranslationHandler {
     this.logger.operation("Message matched! Processing translation result");
     clearTimeout(request.timeout);
     this.activeRequests.delete(messageId);
-    
+
     // Check for error first - error can be in data.error or directly in data
     if (message.data?.error || (message.data?.type && message.data?.message)) {
       this.logger.debug("Error detected in central handler, rejecting promise with error");
       const errorMessage = message.data?.error?.message || message.data?.message || 'Translation failed';
-      request.reject(new Error(errorMessage));
+      const error = new Error(errorMessage);
+
+      // Handle through ErrorHandler for proper error management
+      if (ExtensionContextManager.isValidSync()) {
+        ErrorHandler.getInstance().handle(error, {
+          context: 'translation-handler-result-error',
+          messageId: messageId,
+          showToast: false // WindowsManager will handle UI feedback
+        }).catch(handlerError => {
+          this.logger.warn('ErrorHandler failed to handle translation error:', handlerError);
+        });
+      }
+
+      request.reject(error);
       return true;
     } else if (message.data?.translatedText) {
       this.logger.operation("Translation success received");
-      request.resolve({ 
+      request.resolve({
         translatedText: message.data.translatedText,
-        targetLanguage: message.data.targetLanguage 
+        targetLanguage: message.data.targetLanguage
       });
       return true;
     } else {
       this.logger.error("Unexpected message data - no error and no translatedText", message.data);
-      request.reject(new Error('No translated text in result'));
+      const error = new Error('No translated text in result');
+
+      // Handle through ErrorHandler for proper error management
+      if (ExtensionContextManager.isValidSync()) {
+        ErrorHandler.getInstance().handle(error, {
+          context: 'translation-handler-invalid-result',
+          messageId: messageId,
+          showToast: false
+        }).catch(handlerError => {
+          this.logger.warn('ErrorHandler failed to handle invalid result:', handlerError);
+        });
+      }
+
+      request.reject(error);
       return true;
     }
   }
