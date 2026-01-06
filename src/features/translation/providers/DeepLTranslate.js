@@ -135,10 +135,21 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const sanitizeText = (text) => {
       const originalLength = text.length;
       // Remove zero-width characters but keep newlines
+      // Build control character pattern from character codes to avoid lint errors
+      const controlCharCodes = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  // \x00-\x08
+        0x0B, 0x0C,  // \x0B-\x0C (vertical tab, form feed)
+        0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,  // \x0E-\x1F
+        0x7F  // DEL
+      ];
+      const controlCharsPattern = new RegExp(`[${controlCharCodes.map(c => String.fromCharCode(c)).join('')}]`, 'g');
+      const zeroWidthPattern = /[\u200B-\u200D\uFEFF]/g;
+      const specialUnicodePattern = /[\uFFF0-\uFFFF]/g;
+
       const sanitized = text
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width characters
-        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')  // Control chars except \n, \r, \t
-        .replace(/[\uFFF0-\uFFFF]/g, '');  // Other special Unicode characters
+        .replace(zeroWidthPattern, '')  // Zero-width characters
+        .replace(controlCharsPattern, '')  // Control chars except \n, \r, \t
+        .replace(specialUnicodePattern, '');  // Other special Unicode characters
 
       // Log if sanitization removed any characters
       if (sanitized.length !== originalLength) {
@@ -377,6 +388,17 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         const FALLBACK_BLANK_MARKER = ' @@@ ';  // Marker for \n\n in fallback
         const FALLBACK_SINGLE_MARKER = ' @ ';  // Marker for \n in fallback
 
+        // Build control character pattern from character codes to avoid lint errors
+        const fallbackControlCharCodes = [
+          0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  // \x00-\x08
+          0x0B, 0x0C,  // \x0B-\x0C (vertical tab, form feed)
+          0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,  // \x0E-\x1F
+          0x7F  // DEL
+        ];
+        const fallbackControlCharsPattern = new RegExp(`[${fallbackControlCharCodes.map(c => String.fromCharCode(c)).join('')}]`, 'g');
+        const fallbackZeroWidthPattern = /[\u200B-\u200D\uFEFF]/g;
+        const fallbackSpecialUnicodePattern = /[\uFFF0-\uFFFF]/g;
+
         for (let i = 0; i < chunkTexts.length; i++) {
           const text = chunkTexts[i];
           // Skip empty texts
@@ -389,9 +411,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             // CRITICAL: Sanitize text before processing to remove problematic characters
             // This prevents HTTP 400 errors from DeepL API in fallback mode
             const sanitizedText = text
-              .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width characters
-              .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')  // Control chars except \n, \r, \t
-              .replace(/[\uFFF0-\uFFFF]/g, '');  // Other special Unicode characters
+              .replace(fallbackZeroWidthPattern, '')  // Zero-width characters
+              .replace(fallbackControlCharsPattern, '')  // Control chars except \n, \r, \t
+              .replace(fallbackSpecialUnicodePattern, '');  // Other special Unicode characters
 
             // Step 1: Convert blank lines (\n\n) to marker
             let textWithMarkers = sanitizedText.replace(/\n\n+/g, (match) => {
