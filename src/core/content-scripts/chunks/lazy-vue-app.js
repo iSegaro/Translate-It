@@ -4,6 +4,7 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { utilsFactory } from '@/utils/UtilsFactory.js';
 
 // Import Vue and dependencies (these will be chunked separately by Vite)
 import { createApp } from 'vue';
@@ -119,6 +120,14 @@ export async function loadVueApp(contentCore) {
     // Note: pinia-plugin-persistedstate removed as it's not used in the codebase
 
     app.use(pinia);
+
+    // Load i18n plugin asynchronously to prevent TDZ
+    try {
+      const { i18nPlugin } = await utilsFactory.getI18nUtils();
+      app.use(i18nPlugin);
+    } catch (error) {
+      logger.warn('Failed to load i18n plugin in content app:', error);
+    }
 
     // Mount the app
     const mountPoint = await createMountPoint();

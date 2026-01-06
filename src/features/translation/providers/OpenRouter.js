@@ -3,13 +3,14 @@ import browser from 'webextension-polyfill';
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   CONFIG,
-  getOpenRouterApiKeyAsync,
+  getOpenRouterApiKeysAsync,
   getOpenRouterApiModelAsync,
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenRouter');
 
@@ -19,27 +20,31 @@ export class OpenRouterProvider extends BaseAIProvider {
   static displayName = "OpenRouter";
   static reliableJsonMode = true;
   static supportsDictionary = true;
-  
+
   // AI Provider capabilities - Flexible settings for multi-model support
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
   static supportsImageTranslation = true; // Depends on selected model
-  
+
   // Batch processing strategy
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super(ProviderNames.OPENROUTER);
+    this.providerSettingKey = 'OPENROUTER_API_KEY';
   }
 
-  
+
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const [apiKey, model] = await Promise.all([
-      getOpenRouterApiKeyAsync(),
+    const [apiKeys, model] = await Promise.all([
+      getOpenRouterApiKeysAsync(),
       getOpenRouterApiModelAsync(),
     ]);
+
+    // Get first available key
+    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
     logger.info(`[OpenRouter] Using model: ${model || 'openai/gpt-3.5-turbo'}`);
     logger.info(`[OpenRouter] Starting translation: ${text.length} chars`);
@@ -73,12 +78,16 @@ export class OpenRouterProvider extends BaseAIProvider {
       }),
     };
 
-    const result = await this._executeApiCall({
+    // Use failover-enabled API call with updateApiKey callback
+    const result = await this._executeApiCallWithFailover({
       url: CONFIG.OPENROUTER_API_URL,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
+      }
     });
 
     // CRITICAL FIX: Handle single segment JSON arrays properly

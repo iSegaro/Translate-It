@@ -22,6 +22,7 @@ function getDefaultSettings() {
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
     API_KEY: CONFIG.API_KEY || '',
+    GEMINI_API_KEY: CONFIG.GEMINI_API_KEY || '',
     GEMINI_API_URL: CONFIG.GEMINI_API_URL || '',
     GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
     GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? true,
@@ -239,7 +240,27 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       logger.info('[Import] Starting');
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
+
+      // Handle legacy API_KEY → GEMINI_API_KEY migration
+      if ('API_KEY' in processedSettings && processedSettings.API_KEY && processedSettings.API_KEY.trim() !== '') {
+        // Only migrate if GEMINI_API_KEY doesn't exist or is empty
+        if (!processedSettings.GEMINI_API_KEY || processedSettings.GEMINI_API_KEY.trim() === '') {
+          processedSettings.GEMINI_API_KEY = processedSettings.API_KEY
+          logger.info('[Import] Migrated API_KEY to GEMINI_API_KEY')
+        }
+
+        // Always remove the old API_KEY
+        delete processedSettings.API_KEY
+      }
+
+      // Temporarily remove storage listener to prevent interference during import
+      if (storageListener) {
+        storageManager.off('change', storageListener);
+        storageListener = null;
+      }
+
       Object.assign(settings.value, processedSettings);
+
       // Normalize possible empty regex placeholders
       if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
         settings.value.RTL_REGEX = CONFIG.RTL_REGEX;
@@ -247,14 +268,23 @@ export const useSettingsStore = defineStore('settings', () => {
       if (typeof settings.value.PERSIAN_REGEX === 'object' && settings.value.PERSIAN_REGEX !== null && Object.keys(settings.value.PERSIAN_REGEX).length === 0) {
         settings.value.PERSIAN_REGEX = CONFIG.PERSIAN_REGEX;
       }
+
       await saveAllSettings();
-      logger.info('[Import] Completed – reloading UI');
+
+      // Re-setup storage listener after import is complete
+      await setupStorageListener();
+
+      logger.info('[Import] Completed');
+
+      // Reload page to apply new settings
       if (typeof window !== 'undefined') {
         window.location.reload();
       }
       return true;
     } catch (error) {
       logger.error('[Import] Failed:', error);
+      // Re-setup storage listener on error
+      await setupStorageListener();
       throw error;
     }
   }

@@ -1,69 +1,6 @@
-# translation-providers Specification
+# translation-providers Specification Delta
 
-## Purpose
-TBD - created by archiving change add-zai-glm-provider. Update Purpose after archive.
-## Requirements
-### Requirement: Z.AI GLM Provider Integration
-The translation system SHALL support Z.AI GLM models as an AI translation provider using OpenAI-compatible API format.
-
-#### Scenario: Successful translation with ChatGLM3-6B
-- **WHEN** user selects Z.AI provider with ChatGLM3-6B model
-- **AND** provides valid API key and text to translate
-- **THEN** system shall translate text using ZAI API with OpenAI-compatible format
-- **AND** return accurate translation results
-
-#### Scenario: Model selection
-- **WHEN** user configures Z.AI provider settings
-- **THEN** system shall offer selection between ChatGLM3-6B and ChatGLM4 models
-- **AND** save selected model preference for future translations
-
-#### Scenario: Rate limiting compliance
-- **WHEN** multiple translation requests are made to Z.AI API
-- **THEN** system shall use Gemini-like rate limiting configuration
-- **AND** implement circuit breaker pattern for API protection
-
-#### Scenario: Chunk-based streaming translation
-- **WHEN** translating large text with Z.AI provider
-- **THEN** system shall support chunk-based streaming like Gemini
-- **AND** process text segments efficiently for optimal performance
-
-### Requirement: Z.AI API Configuration Management
-The system SHALL provide configuration management for Z.AI API credentials and settings.
-
-#### Scenario: Multiple API keys configuration
-- **WHEN** user configures Z.AI provider settings
-- **THEN** system SHALL support multiple API keys via multiline textarea
-- **AND** system SHALL allow entering one API key per line
-- **AND** system SHALL automatically failover to next key on authentication errors
-
-#### Scenario: API key validation with multiple keys
-- **WHEN** user enters multiple Z.AI API keys in settings
-- **THEN** system SHALL validate key format for all non-empty keys
-- **AND** system SHALL show appropriate error messages for invalid keys
-- **AND** first valid key SHALL be used as primary
-
-#### Scenario: Endpoint configuration with multiple keys
-- **WHEN** configuring Z.AI provider with multiple API keys
-- **THEN** system SHALL allow custom API endpoint URL (shared across all keys)
-- **AND** system SHALL use default Z.AI endpoint when custom URL not provided
-
-### Requirement: Z.AI Provider Registration
-The system SHALL register Z.AI provider in the provider registry for discovery and initialization.
-
-#### Scenario: Provider discovery
-- **WHEN** application loads available translation providers
-- **THEN** Z.AI GLM provider shall appear in provider selection UI
-- **AND** be properly categorized as an AI provider type
-
-#### Scenario: Lazy loading initialization
-- **WHEN** Z.AI provider is selected for first use
-- **THEN** system shall load provider implementation on-demand
-- **AND** initialize with user configuration settings
-
-#### Scenario: Options page integration
-- **WHEN** user opens Options page for translation providers
-- **THEN** Z.AI GLM provider shall appear with configuration fields
-- **AND** allow API key and model selection like other AI providers
+## ADDED Requirements
 
 ### Requirement: Multiple API Keys Configuration
 The translation system SHALL support configuration of multiple API keys per provider through a multiline input interface.
@@ -171,3 +108,24 @@ The translation system SHALL provide a "Test Keys" button in API settings to val
 - **AND** system SHALL show success message if at least one key is valid
 - **AND** for invalid keys, system SHALL display the error reason (invalid, quota exceeded, etc.)
 
+## MODIFIED Requirements
+
+### Requirement: Z.AI API Configuration Management
+The system SHALL provide configuration management for Z.AI API credentials and settings.
+
+#### Scenario: Multiple API keys configuration
+- **WHEN** user configures Z.AI provider settings
+- **THEN** system SHALL support multiple API keys via multiline textarea
+- **AND** system SHALL allow entering one API key per line
+- **AND** system SHALL automatically failover to next key on authentication errors
+
+#### Scenario: API key validation with multiple keys
+- **WHEN** user enters multiple Z.AI API keys in settings
+- **THEN** system SHALL validate key format for all non-empty keys
+- **AND** system SHALL show appropriate error messages for invalid keys
+- **AND** first valid key SHALL be used as primary
+
+#### Scenario: Endpoint configuration with multiple keys
+- **WHEN** configuring Z.AI provider with multiple API keys
+- **THEN** system SHALL allow custom API endpoint URL (shared across all keys)
+- **AND** system SHALL use default Z.AI endpoint when custom URL not provided

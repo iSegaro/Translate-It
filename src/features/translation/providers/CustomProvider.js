@@ -2,13 +2,14 @@
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   getCustomApiUrlAsync,
-  getCustomApiKeyAsync,
+  getCustomApiKeysAsync,
   getCustomApiModelAsync,
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'CustomProvider');
 
@@ -31,15 +32,19 @@ export class CustomProvider extends BaseAIProvider {
 
   constructor() {
     super(ProviderNames.CUSTOM);
+    this.providerSettingKey = 'CUSTOM_API_KEY';
   }
 
-  
+
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const [apiUrl, apiKey, model] = await Promise.all([
+    const [apiUrl, apiKeys, model] = await Promise.all([
       getCustomApiUrlAsync(),
-      getCustomApiKeyAsync(),
+      getCustomApiKeysAsync(),
       getCustomApiModelAsync(),
     ]);
+
+    // Get first available key
+    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
     logger.info(`[Custom] Using model: ${model}`);
     logger.info(`[Custom] Starting translation: ${text.length} chars`);
@@ -74,12 +79,16 @@ export class CustomProvider extends BaseAIProvider {
       }),
     };
 
-    const result = await this._executeApiCall({
+    // Use failover-enabled API call with updateApiKey callback
+    const result = await this._executeApiCallWithFailover({
       url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
+      }
     });
 
     // CRITICAL FIX: Handle single segment JSON arrays properly

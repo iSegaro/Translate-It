@@ -85,12 +85,16 @@
 
 <script setup>
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BaseActionButton from '@/features/text-actions/components/BaseActionButton.vue'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSButton')
+
+// i18n
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -146,11 +150,11 @@ const ttsButtonClasses = computed(() => [
 const buttonTitle = computed(() => {
   switch (tts.ttsState.value) {
     case 'idle':
-      return 'Speak text'
+      return t('action_speak_text')
     case 'loading':
-      return 'Loading...'
+      return t('window_loading_alt')
     case 'playing':
-      return 'Stop speech'
+      return t('action_stop_speaking')
     case 'error':
       return `Error: ${tts.errorMessage.value || 'Click to retry'}`
     default:

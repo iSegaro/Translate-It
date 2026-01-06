@@ -95,6 +95,19 @@ function timeout(ms, action) {
     setTimeout(() => {
       const timeoutError = new Error(`Operation '${action}' timed out after ${ms}ms`);
       timeoutError.type = 'OPERATION_TIMEOUT';
+
+      // Handle through ErrorHandler for proper error management (silent for messaging timeouts)
+      if (ExtensionContextManager.isValidSync()) {
+        ErrorHandler.getInstance().handle(timeoutError, {
+          context: 'unified-messaging-timeout',
+          action: action,
+          showToast: false, // Caller will handle UI feedback
+          metadata: { timeoutMs: ms }
+        }).catch(handlerError => {
+          getLogger().warn('ErrorHandler failed to handle timeout:', handlerError);
+        });
+      }
+
       reject(timeoutError);
     }, ms);
   });
@@ -166,11 +179,37 @@ export async function sendMessage(message, options = {}) {
         // For streaming timeouts, we should not fallback as the user likely cancelled
         if (message.context === 'select-element' || (message.data && message.data.mode === 'select_element')) {
           getLogger().debug('Streaming timeout detected for select element, not attempting fallback');
-          throw new Error('Streaming translation timed out - user likely cancelled');
+          const timeoutError = new Error('Streaming translation timed out - user likely cancelled');
+
+          // Handle through ErrorHandler before throwing
+          if (ExtensionContextManager.isValidSync()) {
+            ErrorHandler.getInstance().handle(timeoutError, {
+              context: 'unified-messaging-streaming-timeout',
+              messageId: message.messageId,
+              showToast: false
+            }).catch(handlerError => {
+              getLogger().warn('ErrorHandler failed to handle streaming timeout:', handlerError);
+            });
+          }
+
+          throw timeoutError;
         }
 
         getLogger().debug('Timeout detected, not attempting fallback as operation is likely cancelled');
-        throw new Error('Translation timed out - operation cancelled');
+        const timeoutError = new Error('Translation timed out - operation cancelled');
+
+        // Handle through ErrorHandler before throwing
+        if (ExtensionContextManager.isValidSync()) {
+          ErrorHandler.getInstance().handle(timeoutError, {
+            context: 'unified-messaging-timeout-fallback',
+            messageId: message.messageId,
+            showToast: false
+          }).catch(handlerError => {
+            getLogger().warn('ErrorHandler failed to handle timeout:', handlerError);
+          });
+        }
+
+        throw timeoutError;
       }
 
       // Create a new message with a fresh messageId to avoid duplicate detection

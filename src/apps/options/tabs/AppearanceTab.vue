@@ -93,74 +93,71 @@ const validateFonts = () => {
 @use "@/assets/styles/base/variables" as *;
 
 .appearance-tab {
-  padding: $spacing-lg;
-  
-  h2 {
-    font-size: $font-size-xl;
-    font-weight: $font-weight-bold;
-    color: var(--color-text);
-    margin-bottom: $spacing-lg;
-    border-bottom: 2px solid var(--color-primary);
-    padding-bottom: $spacing-base;
+  max-width: 800px;
+}
+
+h2 {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-medium;
+  margin-top: 0;
+  margin-bottom: $spacing-lg;
+  padding-bottom: $spacing-base;
+  border-bottom: $border-width $border-style var(--color-border);
+  color: var(--color-text);
+}
+
+.setting-group {
+  margin-bottom: $spacing-lg;
+
+  &:last-child {
+    margin-bottom: 0;
   }
 
-  .setting-group {
-    margin-bottom: $spacing-xl;
-    
-    h3 {
-      font-size: $font-size-lg;
-      font-weight: $font-weight-medium;
-      color: var(--color-text);
-      margin-bottom: $spacing-sm;
-    }
-    
-    .setting-description {
-      font-size: $font-size-sm;
-      color: var(--color-text-secondary);
-      margin-bottom: $spacing-lg;
-      line-height: 1.5;
-    }
-  }
-
-  .font-settings {
-    background-color: var(--color-background-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: $border-radius-lg;
-    padding: $spacing-lg;
-    
-    h3 {
-      margin-top: 0;
-      color: var(--color-primary);
-    }
-  }
-
-  .validation-error {
-    background-color: var(--color-error);
-    color: white;
-    padding: $spacing-base;
-    border-radius: $border-radius-base;
-    margin-top: $spacing-base;
-    font-size: $font-size-sm;
+  h3 {
+    font-size: $font-size-lg;
     font-weight: $font-weight-medium;
+    margin: 0 0 $spacing-base 0;
+    padding-bottom: $spacing-base;
+    border-bottom: $border-width $border-style var(--color-border);
+    color: var(--color-text);
   }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0 0 $spacing-lg 0;
+  }
+}
+
+.font-settings {
+  background-color: var(--color-surface);
+  border: $border-width $border-style var(--color-border);
+  border-radius: $border-radius-base;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  h3 {
+    margin: 0 0 $spacing-sm 0;
+    padding: 0;
+    border: none;
+    color: var(--color-text);
+  }
+}
+
+.validation-error {
+  background-color: var(--color-error);
+  color: white;
+  padding: $spacing-base;
+  border-radius: $border-radius-base;
+  margin-top: $spacing-base;
+  font-size: $font-size-sm;
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .appearance-tab {
-    padding: $spacing-base;
-    
-    h2 {
-      font-size: $font-size-lg;
-    }
-    
-    .setting-group {
-      margin-bottom: $spacing-lg;
-    }
-    
-    .font-settings {
-      padding: $spacing-base;
-    }
+  .font-settings {
+    padding: $spacing-sm;
   }
 }
 </style>

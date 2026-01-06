@@ -14,15 +14,15 @@
         {{ t('gemini_api_key_link') || 'Get Your Free API Key' }}
       </a>
     </div>
-    <div class="setting-group">
-      <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
-      <BaseInput
-        v-model="geminiApiKey"
-        type="password"
-        :placeholder="t('gemini_api_key_placeholder') || 'Paste your API key here'"
-        class="api-key-input"
-      />
-    </div>
+    <ApiKeyInput
+      v-model="geminiApiKey"
+      :label="t('custom_api_settings_api_key_label') || 'API Keys'"
+      :placeholder="t('gemini_api_key_placeholder') || 'Enter your API keys (one per line)'"
+      provider-name="Gemini"
+      :testing="testingKeys"
+      :test-result="testResult"
+      @test="testKeys"
+    />
     <div class="setting-group">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
@@ -70,7 +70,9 @@ import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
+import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -78,8 +80,8 @@ const { rtlSelectStyle } = useRTLSelect()
 const settingsStore = useSettingsStore()
 
 const geminiApiKey = computed({
-  get: () => settingsStore.settings?.API_KEY || '',
-  set: (value) => settingsStore.updateSettingLocally('API_KEY', value)
+  get: () => settingsStore.settings?.GEMINI_API_KEY || '',
+  set: (value) => settingsStore.updateSettingLocally('GEMINI_API_KEY', value)
 })
 
 const geminiApiUrl = computed({
@@ -130,6 +132,41 @@ const geminiModelOptions = ref(
 const isThinkingSupported = ref(false)
 const isThinkingControllable = ref(true)
 const thinkingDescription = ref('Allow the model to think step-by-step before responding.')
+
+// Test keys functionality
+const testingKeys = ref(false)
+const testResult = ref(null)
+
+const testKeys = async (providerName) => {
+  testingKeys.value = true
+  testResult.value = null
+
+  try {
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(geminiApiKey.value, providerName)
+
+    // Store messageKey and params for reactive translation in ApiKeyInput
+    testResult.value = {
+      allInvalid: result.allInvalid,
+      messageKey: result.messageKey,
+      params: result.params,
+      reorderedString: result.reorderedString
+    }
+
+    // Update the local value with the reordered keys
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('GEMINI_API_KEY', result.reorderedString)
+    }
+  } catch (error) {
+    testResult.value = {
+      allInvalid: true,
+      messageKey: 'api_test_failed',
+      params: { error: error.message }
+    }
+  } finally {
+    testingKeys.value = false
+  }
+}
 
 // Watch for model changes to update thinking mode availability
 const updateThinkingModeAvailability = (newModel) => {

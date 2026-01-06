@@ -49,11 +49,11 @@ export class OptionsValidator {
 
     // Check for empty languages
     if (!sourceLanguage || !sourceLanguage.trim()) {
-      this.addError("sourceLanguage", "Source language cannot be empty.");
+      this.addError("sourceLanguage", "validation_source_language_empty");
     }
 
     if (!targetLanguage || !targetLanguage.trim()) {
-      this.addError("targetLanguage", "Target language cannot be empty.");
+      this.addError("targetLanguage", "validation_target_language_empty");
     }
 
     // Check if languages are the same (only if both are provided)
@@ -63,14 +63,8 @@ export class OptionsValidator {
       sourceLanguage.trim().toLowerCase() ===
         targetLanguage.trim().toLowerCase()
     ) {
-      this.addError(
-        "sourceLanguage",
-        "Source and target languages cannot be the same.",
-      );
-      this.addError(
-        "targetLanguage",
-        "Source and target languages cannot be the same.",
-      );
+      this.addError("sourceLanguage", "validation_same_languages");
+      this.addError("targetLanguage", "validation_same_languages");
     }
 
     return !this.hasErrors();
@@ -79,14 +73,17 @@ export class OptionsValidator {
   // Validate API key
   async validateApiKey(apiKey, providerName) {
     if (!apiKey || !apiKey.trim()) {
-      this.addError("apiKey", `API key for ${providerName} cannot be empty.`);
+      this.addError("apiKey", {
+        key: "validation_api_key_empty",
+        params: { provider: providerName }
+      });
       return false;
     }
 
     // Basic API key format validation
     const trimmedKey = apiKey.trim();
     if (trimmedKey.length < 10) {
-      this.addError("apiKey", "API key appears to be too short.");
+      this.addError("apiKey", "validation_api_key_too_short");
       return false;
     }
 
@@ -96,7 +93,7 @@ export class OptionsValidator {
   // Validate prompt template
   async validatePromptTemplate(template) {
     if (!template || !template.trim()) {
-      this.addError("promptTemplate", "Prompt template cannot be empty.");
+      this.addError("promptTemplate", "validation_prompt_template_empty");
       return false;
     }
 
@@ -112,10 +109,10 @@ export class OptionsValidator {
     });
 
     if (missingPlaceholders.length > 0) {
-      this.addError(
-        "promptTemplate",
-        `Prompt template must include: ${missingPlaceholders.join(", ")}`,
-      );
+      this.addError("promptTemplate", {
+        key: "validation_prompt_template_missing_placeholders",
+        params: { placeholders: missingPlaceholders.join(", ") }
+      });
       return false;
     }
 
@@ -142,10 +139,10 @@ export class OptionsValidator {
     });
 
     if (invalidSites.length > 0) {
-      this.addError(
-        "excludedSites",
-        `Invalid domain(s): ${invalidSites.join(", ")}`,
-      );
+      this.addError("excludedSites", {
+        key: "validation_invalid_domains",
+        params: { domains: invalidSites.join(", ") }
+      });
       return false;
     }
 
@@ -155,18 +152,18 @@ export class OptionsValidator {
   // Validate import file
   async validateImportFile(file) {
     if (!file) {
-      this.addError("importFile", "Please select a file to import.");
+      this.addError("importFile", "validation_import_file_required");
       return false;
     }
 
     if (!file.name.endsWith(".json")) {
-      this.addError("importFile", "Only JSON files are supported.");
+      this.addError("importFile", "validation_import_file_json_only");
       return false;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       // 5MB limit
-      this.addError("importFile", "File size must be less than 5MB.");
+      this.addError("importFile", "validation_import_file_too_large");
       return false;
     }
 
@@ -195,6 +192,41 @@ export class OptionsValidator {
 export function useValidation() {
   const validator = new OptionsValidator();
 
+  // Helper to translate error object or string to message
+  // This should be called from Vue components with access to i18n
+  const translateError = (error, t) => {
+    if (!error) return null;
+    if (typeof error === 'string') {
+      // String is a translation key
+      return t(error);
+    }
+    if (error.key && error.params) {
+      return t(error.key, error.params);
+    }
+    if (error.key) {
+      return t(error.key);
+    }
+    return error.message || error;
+  };
+
+  // Get first translated error for a field
+  const getFirstErrorTranslated = (field, t) => {
+    const error = validator.getFirstError(field);
+    return error ? translateError(error, t) : null;
+  };
+
+  // Get all translated errors for a field
+  const getFieldErrorsTranslated = (field, t) => {
+    const errors = validator.getFieldErrors(field);
+    return errors.map(error => translateError(error, t));
+  };
+
+  // Get all translated errors as flat array
+  const getAllErrorsTranslated = (t) => {
+    const errors = validator.getAllErrors();
+    return errors.map(error => translateError(error, t));
+  };
+
   return {
     validator,
     validateLanguages: validator.validateLanguages.bind(validator),
@@ -207,39 +239,45 @@ export function useValidation() {
     getFieldErrors: validator.getFieldErrors.bind(validator),
     getFirstError: validator.getFirstError.bind(validator),
     getAllErrors: validator.getAllErrors.bind(validator),
+    translateError,
+    getFirstErrorTranslated,
+    getFieldErrorsTranslated,
+    getAllErrorsTranslated,
   };
 }
 
 // Field validation rules
 export const validationRules = {
   required: {
+    key: "validation_field_required",
     test: (value) => Boolean(value && value.toString().trim()),
-    message: "This field is required",
   },
 
   minLength: (min) => ({
+    key: "validation_min_length",
+    params: { min },
     test: (value) => !value || value.toString().length >= min,
-    message: `Must be at least ${min} characters`,
   }),
 
   maxLength: (max) => ({
+    key: "validation_max_length",
+    params: { max },
     test: (value) => !value || value.toString().length <= max,
-    message: `Must be no more than ${max} characters`,
   }),
 
   email: {
+    key: "validation_invalid_email",
     test: (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-    message: "Must be a valid email address",
   },
 
   url: {
+    key: "validation_invalid_url",
     test: (value) => !value || /^https?:\/\/.+$/.test(value),
-    message: "Must be a valid URL",
   },
 
   apiKey: {
+    key: "validation_api_key_invalid",
     test: (value) => !value || (value.trim().length >= 10 && !/\s/.test(value)),
-    message: "API key must be at least 10 characters with no spaces",
   },
 };
 
@@ -249,7 +287,17 @@ export async function validateField(value, rules) {
 
   for (const rule of rules) {
     if (!rule.test(value)) {
-      errors.push(rule.message);
+      // Support both old format (message string) and new format (key + params)
+      if (typeof rule === 'string' || (typeof rule === 'object' && rule.message)) {
+        // Legacy format - return as is
+        errors.push(typeof rule === 'string' ? rule : rule.message);
+      } else {
+        // New format - return object with key and optional params
+        errors.push({
+          key: rule.key,
+          params: rule.params || {}
+        });
+      }
     }
   }
 

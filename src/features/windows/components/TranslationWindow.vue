@@ -10,9 +10,9 @@
     @mousedown.stop
     @click.stop
   >
-    <img 
+    <img
       :src="loadingGifUrl"
-      alt="Loading..."
+      :alt="t('window_loading_alt')"
       class="loading-gif"
       style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
     >
@@ -36,7 +36,7 @@
       <div class="ti-header-actions">
         <button
           class="ti-action-btn"
-          title="Copy translation"
+          :title="t('window_copy_translation')"
           @click.stop="handleCopy"
         >
           <svg
@@ -97,7 +97,7 @@
       <div class="ti-header-close">
         <button
           class="ti-action-btn"
-          title="Close"
+          :title="t('window_close')"
           @click.stop="handleClose"
         >
           <svg
@@ -136,7 +136,7 @@
         :is-loading="isLoading"
         :error="errorMessage"
         :mode="'compact'"
-        :placeholder="'Translation will appear here...'"
+        :placeholder="t('window_translation_placeholder')"
         :target-language="props.targetLanguage"
         :show-fade-in-animation="true"
         :enable-markdown="true"
@@ -153,6 +153,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
@@ -161,6 +162,9 @@ import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+
+// i18n
+const { t } = useI18n();
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -226,26 +230,26 @@ const currentTTSText = computed(() => {
 // Enhanced TTS button title with more detailed guidance
 const getEnhancedTTSButtonTitle = computed(() => {
   if (!hasTTSContent.value) {
-    return 'No text available for speech';
+    return t('window_tts_no_text');
   }
 
   if (tts.ttsState.value === 'playing') {
-    return 'Stop speaking (Click to stop)';
+    return t('window_tts_stop');
   }
 
   if (ttsMode.value === 'original') {
-    return '🔊 Speak ORIGINAL text (Show original first, then click this button)';
+    return t('window_tts_speak_original');
   }
 
-  return '🔊 Speak TRANSLATION (Current mode: translation)';
+  return t('window_tts_speak_translation');
 });
 
 // Enhanced original button title with TTS hint
 const getOriginalButtonTitle = computed(() => {
   if (showOriginal.value) {
-    return 'Hide Original Text (TTS button now speaks original text)';
+    return t('window_hide_original');
   }
-  return 'Show Original Text (Then use speaker button to listen to original)';
+  return t('window_show_original');
 });
 
 // TTS icon paths for different modes

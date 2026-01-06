@@ -11,12 +11,12 @@
         <span class="timestamp">{{ item.formattedTime }}</span>
         <button
           class="delete-btn"
-          title="Delete this item"
+          :title="t('history_delete_item') || 'Delete this item'"
           @click.stop="handleDelete"
         >
           <img
             src="@/icons/ui/trash-small.svg"
-            alt="Delete"
+            :alt="t('history_delete') || 'Delete'"
             class="delete-icon"
           >
         </button>
@@ -37,6 +37,9 @@
 </template>
 
 <script setup>
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+
+const { t } = useUnifiedI18n()
 
 const props = defineProps({
   item: {

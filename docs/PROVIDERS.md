@@ -676,7 +676,7 @@ const result = await rateLimitManager.executeWithRateLimit(
 
 The system automatically handles:
 - **Rate limit errors** (HTTP 429, quota exceeded)
-- **Network errors** 
+- **Network errors**
 - **API failures**
 - **Cancellation** (user or system initiated)
 
@@ -684,6 +684,410 @@ Circuit breaker triggers on:
 - Consecutive rate limit violations
 - Network timeouts
 - Persistent API failures
+
+## Multi-API Key Failover System (2026)
+
+### Overview
+
+The system supports multiple API keys per provider with automatic failover when authentication errors occur. This increases reliability by allowing backup keys when primary keys fail due to quota limits, invalid credentials, or other authentication issues.
+
+### Architecture
+
+**ApiKeyManager** (`src/features/translation/providers/ApiKeyManager.js`) provides centralized key management:
+
+```javascript
+import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
+
+// Parse newline-separated keys into array
+const keys = ApiKeyManager.parseKeys('key1\nkey2\nkey3');
+// Returns: ['key1', 'key2', 'key3']
+
+// Convert array back to newline-separated string
+const keyString = ApiKeyManager.stringifyKeys(['key1', 'key2', 'key3']);
+// Returns: 'key1\nkey2\nkey3'
+
+// Get all keys for a provider from storage
+const keys = await ApiKeyManager.getKeys('OPENAI_API_KEY');
+
+// Get primary (first) key
+const primaryKey = await ApiKeyManager.getPrimaryKey('OPENAI_API_KEY');
+
+// Check if error should trigger failover
+if (ApiKeyManager.shouldFailover(error)) {
+  // Move to next key
+}
+
+// Promote successful key to front of list
+await ApiKeyManager.promoteKey('OPENAI_API_KEY', successfulKey);
+
+// Get provider display name from code
+const providerName = ApiKeyManager.getProviderName('OPENAI');
+// Returns: 'OpenAI'
+
+// Get settings key from provider code
+const settingsKey = ApiKeyManager.getSettingsKey('OPENAI');
+// Returns: 'OPENAI_API_KEY'
+```
+
+### Constants
+
+ApiKeyManager defines these internal constants for provider mapping:
+
+```javascript
+// Settings key mapping for each provider
+const PROVIDER_SETTINGS_KEYS = {
+  OPENAI: 'OPENAI_API_KEY',
+  GEMINI: 'API_KEY',           // Note: Uses legacy 'API_KEY' not 'GEMINI_API_KEY'
+  DEEPSEEK: 'DEEPSEEK_API_KEY',
+  OPENROUTER: 'OPENROUTER_API_KEY',
+  DEEPL: 'DEEPL_API_KEY',
+  CUSTOM: 'CUSTOM_API_KEY'
+};
+
+// Provider names for API testing
+const PROVIDER_NAMES = {
+  OPENAI: 'OpenAI',
+  GEMINI: 'Gemini',
+  DEEPSEEK: 'DeepSeek',
+  OPENROUTER: 'OpenRouter',
+  DEEPL: 'DeepL',
+  CUSTOM: 'Custom'
+};
+```
+
+### API Methods
+
+#### `parseKeys(keyString)`
+Parse newline-separated API key string into array of keys.
+- **Input**: `string` - Newline-separated keys
+- **Returns**: `string[]` - Array of trimmed, non-empty keys
+- **Example**: `ApiKeyManager.parseKeys('key1\nkey2\nkey3')` → `['key1', 'key2', 'key3']`
+
+#### `stringifyKeys(keys)`
+Convert array of keys back to newline-separated string.
+- **Input**: `string[]` - Array of keys
+- **Returns**: `string` - Newline-separated keys
+- **Example**: `ApiKeyManager.stringifyKeys(['key1', 'key2'])` → `'key1\nkey2'`
+
+#### `getKeys(providerSettingKey)`
+Get all keys for a provider from storage.
+- **Input**: `string` - Settings key (e.g., `'OPENAI_API_KEY'`)
+- **Returns**: `Promise<string[]>` - Array of keys
+
+#### `getPrimaryKey(providerSettingKey)`
+Get primary (first) key from storage.
+- **Input**: `string` - Settings key
+- **Returns**: `Promise<string>` - First key or empty string
+
+#### `promoteKey(providerSettingKey, key)`
+Move key to front of list and save to storage.
+- **Input**: `providerSettingKey` (string), `key` (string)
+- **Returns**: `Promise<void>`
+
+#### `shouldFailover(error)`
+Check if error should trigger failover to next key.
+- **Input**: `Error` - Error object
+- **Returns**: `boolean` - True if error should trigger failover
+
+#### `testAndReorderKeys(providerSettingKey, providerName)`
+Test all keys for validity and reorder them in storage (valid keys first).
+- **Input**: `providerSettingKey` (string), `providerName` (string)
+- **Returns**: `Promise<Object>` - Test result with:
+  - `valid`: `string[]` - Array of valid keys
+  - `invalid`: `string[]` - Array of invalid keys
+  - `allInvalid`: `boolean` - True if no valid keys found
+  - `messageKey`: `string` - i18n message key for display
+  - `params`: `Object` - Parameters for message translation
+
+#### `testKeysDirect(keysString, providerName)`
+Test keys directly without reading from storage.
+- **Input**: `keysString` (string), `providerName` (string)
+- **Returns**: `Promise<Object>` - Test result with:
+  - `valid`: `string[]` - Array of valid keys
+  - `invalid`: `string[]` - Array of invalid keys
+  - `allInvalid`: `boolean` - True if no valid keys found
+  - `messageKey`: `string` - i18n message key for display
+  - `params`: `Object` - Parameters for message translation
+  - `reorderedString`: `string` - Reordered keys as newline-separated string
+
+#### `getProviderName(providerCode)`
+Get provider display name from provider code.
+- **Input**: `string` - Provider code (e.g., `'OPENAI'`)
+- **Returns**: `string` - Provider display name (e.g., `'OpenAI'`)
+
+#### `getSettingsKey(providerCode)`
+Get settings key from provider code.
+- **Input**: `string` - Provider code (e.g., `'OPENAI'`)
+- **Returns**: `string` - Settings key (e.g., `'OPENAI_API_KEY'`)
+
+### Failover Error Types
+
+These errors trigger automatic key rotation:
+
+```javascript
+const FAILOVER_ERROR_TYPES = new Set([
+  ErrorTypes.API_KEY_INVALID,      // 401, 403 with auth errors
+  ErrorTypes.INSUFFICIENT_BALANCE, // Quota/balance issues
+  ErrorTypes.QUOTA_EXCEEDED,        // Rate limit/quota exceeded
+  ErrorTypes.RATE_LIMIT_REACHED,    // 429 rate limit
+  ErrorTypes.DEEPL_QUOTA_EXCEEDED   // DeepL-specific quota errors
+]);
+```
+
+### Provider Implementation
+
+To enable multi-key failover in your provider:
+
+#### 1. Set `providerSettingKey` in Constructor
+
+```javascript
+export class YourProvider extends BaseAIProvider {
+  constructor() {
+    super(ProviderNames.YOUR_PROVIDER);
+    this.providerSettingKey = 'YOUR_API_KEY'; // ✅ MANDATORY for failover
+  }
+}
+```
+
+#### 2. Use Multi-Key Getter in `_getConfig()`
+
+```javascript
+async _getConfig() {
+  // Use multi-key getter instead of single-key getter
+  const apiKeys = await getYourProviderApiKeysAsync();
+  const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
+
+  return { apiKey, apiKeys };
+}
+```
+
+#### 3. Call `_executeApiCallWithFailover()` Instead of `_executeApiCall()`
+
+```javascript
+async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  const { apiKey, apiKeys } = await this._getConfig();
+
+  const url = `https://api.example.com/translate`;
+  const fetchOptions = {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ text, sourceLang, targetLang })
+  };
+
+  // ✅ Use failover-enabled API call
+  const result = await this._executeApiCallWithFailover({
+    url,
+    fetchOptions,
+    extractResponse: (data) => data?.translation,
+    context: 'your-provider-translation',
+    abortController,
+    updateApiKey: (newKey, options) => {
+      // Update the Authorization header with new key
+      options.headers.Authorization = `Bearer ${newKey}`;
+    }
+  });
+
+  return result;
+}
+```
+
+### Provider-Specific Auth Patterns
+
+Different providers use different authentication methods. Update `updateApiKey` accordingly:
+
+#### Bearer Token (OpenAI, DeepSeek, OpenRouter)
+
+```javascript
+updateApiKey: (newKey, options) => {
+  options.headers.Authorization = `Bearer ${newKey}`;
+}
+```
+
+#### DeepL-Auth-Key (DeepL)
+
+```javascript
+updateApiKey: (newKey, options) => {
+  options.headers['DeepL-Auth-Key'] = newKey;
+}
+```
+
+#### URL Query Parameter (Gemini)
+
+```javascript
+updateApiKey: (newKey, options) => {
+  const urlObj = new URL(options.url);
+  urlObj.searchParams.set('key', newKey);
+  options.url = urlObj.toString();
+}
+```
+
+### Key Promotion on Success
+
+When a translation succeeds after a failover, the successful key is automatically promoted to the front of the list:
+
+```javascript
+// In BaseProvider._executeApiCallWithFailover()
+if (attempt > 0) {
+  logger.info(`[${this.providerName}] API call succeeded on attempt ${attempt + 1}, promoting key`);
+  await ApiKeyManager.promoteKey(this.providerSettingKey, currentKey);
+}
+```
+
+This ensures subsequent requests use the working key first, minimizing failover attempts.
+
+### UI Components
+
+All API settings components now support multiple keys:
+
+```vue
+<template>
+  <div class="setting-group">
+    <label>API Keys</label>
+    <BaseTextarea
+      v-model="providerApiKey"
+      :placeholder="'Enter your API keys (one per line)'"
+      :rows="3"
+      :password-mask="true"
+    />
+    <button @click="testKeys">
+      Test Keys
+    </button>
+    <div v-if="testResult" :class="testResult.allInvalid ? 'error' : 'success'">
+      {{ testResult.message }}
+    </div>
+  </div>
+</template>
+```
+
+Features:
+- **Multi-line textarea**: Enter one key per line
+- **Password masking**: Keys are hidden with bullet characters
+- **Test Keys button**: Validates all keys and reorders them (valid keys first)
+- **Visual feedback**: Shows count of valid/invalid keys
+
+### Testing API Keys
+
+The `testAndReorderKeys()` method validates all keys from storage and reorders them:
+
+```javascript
+const result = await ApiKeyManager.testAndReorderKeys('OPENAI_API_KEY', 'OpenAI');
+
+// Result structure:
+{
+  valid: ['sk-valid1...', 'sk-valid2...'],
+  invalid: ['sk-invalid1...', 'sk-invalid2...'],
+  allInvalid: false,
+  messageKey: 'api_test_result_partial',  // i18n message key
+  params: { valid: 2, invalid: 2 }         // Parameters for message
+}
+
+// For Vue components, use messageKey with i18n:
+// $t(messageKey, params) → "Found 2 valid key(s), 2 invalid key(s)"
+```
+
+The `testKeysDirect()` method tests keys without reading from storage:
+
+```javascript
+const keysString = 'key1\nkey2\nkey3';
+const result = await ApiKeyManager.testKeysDirect(keysString, 'OpenAI');
+
+// Result structure:
+{
+  valid: ['sk-valid1...'],
+  invalid: ['sk-invalid1...', 'sk-invalid2...'],
+  allInvalid: false,
+  messageKey: 'api_test_result_partial',
+  params: { valid: 1, invalid: 2 },
+  reorderedString: 'sk-valid1...\nsk-invalid1...\nsk-invalid2...'  // Reordered keys
+}
+```
+
+After testing with `testAndReorderKeys()`, keys are automatically reordered:
+- Valid keys first
+- Invalid keys last
+- Storage updated with new order
+
+### Configuration
+
+Add multi-key settings to `CONFIG`:
+
+```javascript
+export const CONFIG = {
+  YOUR_API_KEY: "", // Newline-separated keys
+  // Other settings...
+};
+```
+
+Create multi-key getter in `config.js`:
+
+```javascript
+export const getYourProviderApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('YOUR_API_KEY');
+};
+```
+
+### Enhanced Error Detection
+
+The system intelligently detects API key errors from various response formats:
+
+```javascript
+// In BaseProvider._executeApiCall()
+case 400:
+case 422: {
+  // Check response body for auth-related keywords
+  if (errorMsgLower.includes('api key') ||
+      errorMsgLower.includes('auth') ||
+      errorMsgLower.includes('unauthorized') ||
+      errorMsgLower.includes('invalid key')) {
+    errorType = ErrorTypes.API_KEY_INVALID; // ✅ Triggers failover
+  } else {
+    errorType = ErrorTypes.INVALID_REQUEST; // ❌ Does not trigger failover
+  }
+  break;
+}
+```
+
+### Logging and Debugging
+
+Enable debug logging to track failover behavior:
+
+```
+[Gemini] Raw storage value: { value: 'test1\ntest2\nvalidkey', length: 30, lineCount: 3 }
+[Gemini] Parsed 3 keys for GEMINI_API_KEY
+[Gemini] API key error (API_KEY_INVALID), attempting failover (1/3)
+[Gemini] Failover check: providerSettingKey=GEMINI_API_KEY, keys.length=3, currentAttempt=1
+[Gemini] Trying next API key (2/3)
+[Gemini] API key error (API_KEY_INVALID), attempting failover (2/3)
+[Gemini] Trying next API key (3/3)
+[Gemini] API call succeeded on attempt 3, promoting key
+```
+
+### Supported Providers
+
+All 6 providers support multi-API key failover:
+
+| Provider | Setting Key | Auth Method | Note |
+|----------|-------------|-------------|------|
+| OpenAI | `OPENAI_API_KEY` | Bearer token | Standard OpenAI API |
+| Gemini | `API_KEY` | URL query param | Uses legacy `API_KEY` (not `GEMINI_API_KEY`) |
+| DeepSeek | `DEEPSEEK_API_KEY` | Bearer token | DeepSeek API |
+| OpenRouter | `OPENROUTER_API_KEY` | Bearer token | OpenRouter API |
+| DeepL | `DEEPL_API_KEY` | DeepL-Auth-Key | DeepL API (Free & Pro tiers) |
+| Custom | `CUSTOM_API_KEY` | Bearer token | Custom provider |
+
+**Important Notes:**
+- **Gemini** uses the legacy setting key `API_KEY` (not `GEMINI_API_KEY`) for backward compatibility
+- DeepL supports both Free and Pro API tiers; the key format automatically determines the tier
+
+### Best Practices
+
+1. **Key Rotation**: Periodically test keys to ensure validity
+2. **Quota Management**: Use multiple keys to distribute load
+3. **Error Handling**: Non-auth errors don't trigger failover
+4. **Key Promotion**: Successful keys automatically move to front
+5. **Storage Format**: Keys stored as newline-separated string
+6. **Testing**: Use "Test Keys" button after adding/updating keys
 
 ## Testing Your Provider
 

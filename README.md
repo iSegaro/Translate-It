@@ -75,7 +75,7 @@ This extension is developed solely for personal use and keeps smart and fast tra
 
 ## ✨ Key Features
 
-💸 **Free & Open Source:**  
+💸 **Free & Open Source:**
 Always free, powered by open-source code.
 
 🔊 **Word and Sentence Pronunciation:**  
@@ -98,6 +98,9 @@ You can choose from several AI-powered translation providers:
 - [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
 - Custom OpenAI Compatible (refrence to [Advanced Settings](#advanced-settings))
+
+🔑 **Multiple API Keys with Automatic Failover:**
+Enter multiple API keys per provider. If one key reaches its quota or fails, the extension automatically switches to the next working key. Successful keys are prioritized for future requests.
 
 <br>
 
@@ -185,6 +188,13 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
 **Important:** If you're in Iran, you may need a VPN to access and register for free API keys.
+
+### Multiple API Keys Support
+
+You can enter **multiple API keys** for each provider (one per line). The extension will:
+
+- ✅ Automatically try the next key if the current one fails
+- ✅ Promote working keys to the top for better performance
 
 <br>
 
@@ -323,13 +333,17 @@ In the API Settings page of the extension, each provider has customizable option
 
   For maximum flexibility, this option lets you connect to any API service that uses the OpenAI chat completions format. Simply enter the custom `API URL`, `API Key`, and `Model Name` in the settings. This is ideal for using self-hosted models, local LLMs (e.g., through Ollama), or other compatible third-party providers. For the required format, see the [OpenAI API reference][openai-url-docs].
 
+- **Multi-API Key Support**
+
+  All providers support entering multiple API keys (one per line in the API key field). Use the "Test Keys" button to validate all keys and automatically reorder them (valid keys first). The extension will automatically failover to the next key if one fails due to quota limits or invalid credentials.
+
 > These options let you balance between cost, quality, and speed.  
 > The extension uses default models with minimum setup required — but upgrading the model will improve translation results.
 
 **Default models used:**
 
 - For `OpenAI` and `OpenRouter`: `gpt-3.5-turbo`
-- For `Google Gemini` and `WebAI to API`: `gemini-2.0-flash`
+- For `Google Gemini` and `WebAI to API`: `gemini-2.5-flash`
 - For `DeepSeek`: `deepseek-chat`
 
 </details>

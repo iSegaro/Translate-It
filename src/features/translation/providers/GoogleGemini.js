@@ -2,7 +2,7 @@
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   CONFIG,
-  getApiKeyAsync,
+  getGeminiApiKeysAsync,
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
   getGeminiApiUrlAsync,
@@ -13,6 +13,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
@@ -30,22 +31,23 @@ export class GeminiProvider extends BaseAIProvider {
   static reliableJsonMode = false;
 
   static supportsDictionary = true;
-  
+
   // AI Provider capabilities - Current optimized settings
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
   static supportsImageTranslation = true;
-  
+
   // Batch processing strategy
   static batchStrategy = 'json'; // Uses JSON format for batch translation
 
   constructor() {
     super(ProviderNames.GEMINI);
+    this.providerSettingKey = 'GEMINI_API_KEY';
   }
 
-  
+
   /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers
@@ -53,12 +55,15 @@ export class GeminiProvider extends BaseAIProvider {
   async _getConfig() {
     try {
       // Use project's existing config system with built-in caching
-      const [apiKey, geminiModel, thinkingEnabled, geminiApiUrl] = await Promise.all([
-        getApiKeyAsync(),
+      const [apiKeys, geminiModel, thinkingEnabled, geminiApiUrl] = await Promise.all([
+        getGeminiApiKeysAsync(),
         getGeminiModelAsync(),
         getGeminiThinkingEnabledAsync(),
         getGeminiApiUrlAsync(),
       ]);
+
+      // Get first available key
+      const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
       // Check if the model is a custom model ("custom" means custom in UI)
       const isCustomModel = geminiModel === 'custom';
@@ -67,7 +72,7 @@ export class GeminiProvider extends BaseAIProvider {
       // Configuration loaded successfully
       logger.info(`[Gemini] Using model: ${actualModel || 'custom'}${thinkingEnabled && !isCustomModel ? ' with thinking' : ''}${isCustomModel ? ' (custom API URL)' : ''}`);
 
-      return { apiKey, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
+      return { apiKey, apiKeys, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
     } catch (error) {
       logger.error(`[Gemini] Error loading configuration:`, error);
       throw error;
@@ -78,7 +83,7 @@ export class GeminiProvider extends BaseAIProvider {
    * Single text translation - extracted from original translate method
    */
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const { apiKey, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
+    const { apiKey, apiKeys, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
 
     // Configuration applied for translation
     logger.info(`[Gemini] Starting translation: ${text.length} chars`);
@@ -103,8 +108,8 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const prompt = text.startsWith('Translate the following JSON array') 
-      ? text 
+    const prompt = text.startsWith('Translate the following JSON array')
+      ? text
       : await buildPrompt(
           text,
           sourceLang,
@@ -140,6 +145,7 @@ export class GeminiProvider extends BaseAIProvider {
       }
     }
 
+    // Use first key for initial URL
     const url = `${apiUrl}?key=${apiKey}`;
     const fetchOptions = {
       method: "POST",
@@ -151,13 +157,21 @@ export class GeminiProvider extends BaseAIProvider {
     // About to call API (logged at TRACE level)
 
     try {
-      const result = await this._executeApiCall({
+      // Use failover-enabled API call with updateApiKey callback
+      const result = await this._executeApiCallWithFailover({
         url,
         fetchOptions,
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: context,
-        abortController: abortController
+        abortController: abortController,
+        updateApiKey: (newKey, options) => {
+          // For Gemini, the key is in the URL query parameter
+          // We need to update the URL with the new key
+          const urlObj = new URL(url);
+          urlObj.searchParams.set('key', newKey);
+          options.url = urlObj.toString();
+        }
       });
 
       // CRITICAL FIX: Handle single segment JSON arrays properly

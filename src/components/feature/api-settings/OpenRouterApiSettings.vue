@@ -14,15 +14,15 @@
         {{ t('openrouter_api_key_link') || 'Get OpenRouter API Key' }}
       </a>
     </div>
-    <div class="setting-group">
-      <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
-      <BaseInput
-        v-model="openrouterApiKey"
-        type="password"
-        :placeholder="t('openrouter_api_key_placeholder') || 'Paste your OpenRouter API key here'"
-        class="api-key-input"
-      />
-    </div>
+    <ApiKeyInput
+      v-model="openrouterApiKey"
+      :label="t('custom_api_settings_api_key_label') || 'API Keys'"
+      :placeholder="t('openrouter_api_key_placeholder') || 'Enter your API keys (one per line)'"
+      provider-name="OpenRouter"
+      :testing="testingKeys"
+      :test-result="testResult"
+      @test="testKeys"
+    />
     <div class="setting-group">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
@@ -51,7 +51,9 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
+import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -111,6 +113,41 @@ const openrouterApiModelOptions = ref([
   { value: 'mistralai/mistral-large', label: 'Mistral Large' },
   { value: 'custom', label: 'Custom Model' }
 ])
+
+// Test keys functionality
+const testingKeys = ref(false)
+const testResult = ref(null)
+
+const testKeys = async (providerName) => {
+  testingKeys.value = true
+  testResult.value = null
+
+  try {
+    // Test keys directly from textbox value (not from storage)
+    const result = await ApiKeyManager.testKeysDirect(openrouterApiKey.value, providerName)
+
+    // Store messageKey and params for reactive translation in ApiKeyInput
+    testResult.value = {
+      allInvalid: result.allInvalid,
+      messageKey: result.messageKey,
+      params: result.params,
+      reorderedString: result.reorderedString
+    }
+
+    // Update the local value with the reordered keys
+    if (!result.allInvalid && result.reorderedString) {
+      settingsStore.updateSettingLocally('OPENROUTER_API_KEY', result.reorderedString)
+    }
+  } catch (error) {
+    testResult.value = {
+      allInvalid: true,
+      messageKey: 'api_test_failed',
+      params: { error: error.message }
+    }
+  } finally {
+    testingKeys.value = false
+  }
+}
 
 // Initialize model selection on mount
 onMounted(() => {

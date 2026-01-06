@@ -15,13 +15,13 @@
         :text="text"
         :size="buttonSize"
         :variant="buttonVariant"
-        :title="copyTitle"
-        :aria-label="copyAriaLabel"
+        :title="computedCopyTitle"
+        :aria-label="computedCopyAriaLabel"
         :disabled="copyDisabled"
         @copied="handleCopied"
         @copy-failed="handleCopyFailed"
       />
-      
+
       <TTSButton
         v-if="showTTS"
         :text="text"
@@ -35,15 +35,15 @@
         @state-changed="handleTTSStateChanged"
       />
     </div>
-    
+
     <!-- Right group: Paste -->
     <div class="ti-toolbar-right">
       <PasteButton
         v-if="showPaste"
         :size="buttonSize"
         :variant="buttonVariant"
-        :title="pasteTitle"
-        :aria-label="pasteAriaLabel"
+        :title="computedPasteTitle"
+        :aria-label="computedPasteAriaLabel"
         :disabled="pasteDisabled"
         :auto-translate="autoTranslateOnPaste"
         @pasted="handlePasted"
@@ -58,6 +58,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CopyButton from './CopyButton.vue'
 import PasteButton from './PasteButton.vue'
 import TTSButton from '@/components/shared/TTSButton.vue' // Updated to use the new enhanced TTSButton
@@ -65,6 +66,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActionToolbar')
+
+// i18n
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -148,29 +152,35 @@ const props = defineProps({
   // i18n titles
   copyTitle: {
     type: String,
-    default: 'Copy text'
+    default: undefined
   },
   copyAriaLabel: {
     type: String,
-    default: 'Copy text to clipboard'
+    default: undefined
   },
   pasteTitle: {
     type: String,
-    default: 'Paste from clipboard'
+    default: undefined
   },
   pasteAriaLabel: {
     type: String,
-    default: 'Paste text from clipboard'
+    default: undefined
   },
   ttsTitle: {
     type: String,
-    default: 'Play text'
+    default: undefined
   },
   ttsAriaLabel: {
     type: String,
-    default: 'Play text to speech'
+    default: undefined
   }
 })
+
+// Computed for i18n defaults
+const computedCopyTitle = computed(() => props.copyTitle || t('action_copy_text'))
+const computedCopyAriaLabel = computed(() => props.copyAriaLabel || t('action_copy_to_clipboard'))
+const computedPasteTitle = computed(() => props.pasteTitle || t('action_paste_from_clipboard'))
+const computedPasteAriaLabel = computed(() => props.pasteAriaLabel || t('action_paste_from_clipboard'))
 
 // Emits
 const emit = defineEmits([

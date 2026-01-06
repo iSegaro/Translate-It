@@ -1,7 +1,7 @@
 // src/features/translation/providers/DeepLTranslate.js
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import {
-  getDeeplApiKeyAsync,
+  getDeeplApiKeysAsync,
   getDeeplApiTierAsync,
   getDeeplFormalityAsync,
   getDeeplBetaLanguagesEnabledAsync
@@ -13,6 +13,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 
@@ -36,6 +37,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
   constructor() {
     super(ProviderNames.DEEPL_TRANSLATE);
+    this.providerSettingKey = 'DEEPL_API_KEY';
   }
 
   /**
@@ -45,10 +47,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   async _getConfig() {
     try {
       // Use project's existing config system with built-in caching
-      const [apiKey, apiTier] = await Promise.all([
-        getDeeplApiKeyAsync(),
+      const [apiKeys, apiTier] = await Promise.all([
+        getDeeplApiKeysAsync(),
         getDeeplApiTierAsync(),
       ]);
+
+      // Get first available key
+      const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
       // Get API endpoint based on tier
       const apiUrl = apiTier === 'pro'

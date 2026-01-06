@@ -203,6 +203,19 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("api key is missing") || msg.includes("key missing"))
     return ErrorTypes.API_KEY_MISSING;
 
+  // API key validation errors - should trigger failover
+  // Check these BEFORE generic INVALID_REQUEST to catch specific API key errors
+  if (
+    msg.includes("api key not valid") ||
+    msg.includes("api key is invalid") ||
+    msg.includes("invalid api key") ||
+    msg.includes("invalid api key") ||
+    msg.includes("api key invalid") ||
+    msg.includes("pass a valid api key") ||
+    msg.includes("api key has expired")
+  )
+    return ErrorTypes.API_KEY_INVALID;
+
   // Specific HTTP status code matching for string-based errors
   if (
     msg.includes("http 400") ||

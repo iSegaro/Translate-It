@@ -90,7 +90,7 @@ import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode } from '@/shared/config/
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
 const settingsStore = useSettingsStore()
-const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
+const { validateLanguages: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
@@ -306,16 +306,28 @@ watch(selectedProvider, (newValue, oldValue) => {
 })
 
 // Validation
-const validationError = ref('')
+const validationErrorKey = ref('')
+
+// Reactive translated validation error
+const validationError = computed(() => {
+  if (!validationErrorKey.value) return ''
+
+  const sourceError = getFirstErrorTranslated('sourceLanguage', t)
+  const targetError = getFirstErrorTranslated('targetLanguage', t)
+  return sourceError || targetError || ''
+})
 
 const validateLanguages = async () => {
   clearErrors()
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
 
   if (!isValid) {
-    validationError.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage')
+    // Get the error key (not translated) for reactive translation
+    const sourceError = getFirstError('sourceLanguage')
+    const targetError = getFirstError('targetLanguage')
+    validationErrorKey.value = sourceError || targetError || ''
   } else {
-    validationError.value = ''
+    validationErrorKey.value = ''
   }
 
   return isValid
@@ -387,6 +399,15 @@ h2 {
       color: var(--color-text-secondary);
       margin: 0;
     }
+  }
+
+  // Make all API settings inputs align with language dropdowns
+  // Language dropdowns are flex: 0 0 250px, so we limit API inputs similarly
+  :deep(.api-key-section) .ti-textarea,
+  :deep(.setting-group) .ti-select,
+  :deep(.setting-group) .ti-input,
+  :deep(.setting-group) .ti-provider-select {
+    max-width: var(--input-max-width, 620px);
   }
 }
 

@@ -43,8 +43,9 @@ export const CONFIG = {
   // --- API Settings ---
   TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
-  API_KEY: "", // Gemini specific
-  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Default Gemini API URL
+  API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
+  GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
   GEMINI_THINKING_ENABLED: false, // Enable/disable thinking for supported models
   GEMINI_MODELS: [
@@ -757,4 +758,62 @@ export const getTranslationFontFamilyAsync = async () => {
 
 export const getTranslationFontSizeAsync = async () => {
   return getSettingValueAsync("TRANSLATION_FONT_SIZE", CONFIG.TRANSLATION_FONT_SIZE);
+};
+
+// --- Multi-API Key Support (2025) ---
+// Import ApiKeyManager for multi-key support
+// Using dynamic import to avoid circular dependencies
+
+/**
+ * Get all OpenAI API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getOpenAIApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('OPENAI_API_KEY');
+};
+
+/**
+ * Get all Gemini API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getGeminiApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('GEMINI_API_KEY');
+};
+
+/**
+ * Get all DeepSeek API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getDeepSeekApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('DEEPSEEK_API_KEY');
+};
+
+/**
+ * Get all OpenRouter API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getOpenRouterApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('OPENROUTER_API_KEY');
+};
+
+/**
+ * Get all DeepL API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getDeeplApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('DEEPL_API_KEY');
+};
+
+/**
+ * Get all Custom API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getCustomApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('CUSTOM_API_KEY');
 };

@@ -436,6 +436,31 @@ export class BaseTranslateProvider extends BaseProvider {
    */
   async _executeWithErrorHandling(params) {
     try {
+      // Use failover-enabled API call if provider supports it
+      if (this.providerSettingKey && params.fetchOptions) {
+        // Create updateApiKey callback based on provider type
+        const updateApiKey = (newKey, options) => {
+          // Handle different authentication formats per provider
+          if (this.providerName === ProviderNames.GEMINI) {
+            // Gemini uses URL query parameter - update params.url
+            const urlObj = new URL(params.url);
+            urlObj.searchParams.set('key', newKey);
+            params.url = urlObj.toString();
+          } else if (this.providerName === ProviderNames.DEEPL_TRANSLATE) {
+            // DeepL uses custom authorization header format
+            options.headers.Authorization = `DeepL-Auth-Key ${newKey}`;
+          } else {
+            // Most providers use Bearer token
+            options.headers.Authorization = `Bearer ${newKey}`;
+          }
+        };
+
+        return await this._executeApiCallWithFailover({
+          ...params,
+          updateApiKey
+        });
+      }
+
       return await this._executeApiCall(params);
     } catch (error) {
       // Check if this is a user cancellation (should be handled silently)

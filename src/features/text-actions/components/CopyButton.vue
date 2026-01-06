@@ -3,8 +3,8 @@
     :size="size"
     :variant="variant"
     :disabled="!canCopy"
-    :title="title"
-    :aria-label="ariaLabel"
+    :title="computedTitle"
+    :aria-label="computedAriaLabel"
     :label="label"
     :show-label="showLabel"
     :custom-classes="['ti-copy-button', { 'ti-copying': isCopying }]"
@@ -35,11 +35,15 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
 import { useCopyAction } from '@/features/text-actions/composables/useCopyAction.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'CopyButton')
+
+// i18n
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -59,11 +63,11 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: 'Copy text'
+    default: undefined
   },
   ariaLabel: {
     type: String,
-    default: 'Copy text to clipboard'
+    default: undefined
   },
   iconAlt: {
     type: String,
@@ -86,6 +90,10 @@ const props = defineProps({
     default: false
   }
 })
+
+// Computed for i18n defaults
+const computedTitle = computed(() => props.title || t('action_copy_text'))
+const computedAriaLabel = computed(() => props.ariaLabel || t('action_copy_to_clipboard'))
 
 // Emits
 const emit = defineEmits(['copied', 'copy-failed'])
