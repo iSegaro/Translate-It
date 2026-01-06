@@ -1,3 +1,15 @@
+#### v1.8.0 – Released on Janurary 06, 2026
+
+##### Added
+
+- Added [**Multiple API Keys Support**](#/languages) for all API-based providers. You can now enter multiple API keys per provider (one per line), and the extension will automatically failover to the next key if one reaches its quota limit or becomes invalid. Working keys are automatically promoted to the top for better performance. Use the "Test Keys" button to validate all keys at once.
+
+##### Fixed
+
+- Fixed several minor issues
+
+---
+
 #### v1.7.0 – Released on Janurary 03, 2026
 
 ##### Added
