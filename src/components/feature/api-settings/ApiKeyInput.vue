@@ -6,8 +6,8 @@
         <button
           type="button"
           class="toggle-visibility-button"
-          @click="togglePasswordVisibility"
           :title="passwordVisible ? t('api_key_hide') : t('api_key_show')"
+          @click="togglePasswordVisibility"
         >
           <img
             v-if="!passwordVisible"
@@ -31,26 +31,30 @@
         <BaseTextarea
           ref="textareaRef"
           :model-value="modelValue"
-          @update:model-value="$emit('update:modelValue', $event)"
           :placeholder="placeholder"
           :rows="rows"
           class="api-key-textarea"
           :password-mask="true"
           :hide-toggle="true"
           dir="ltr"
+          @update:model-value="$emit('update:modelValue', $event)"
         />
         <div class="api-key-tips">
           {{ t('api_key_tips') }}
         </div>
         <div class="button-result-row">
-          <div v-if="translatedTestResult" class="test-result" :class="testResult.allInvalid ? 'error' : 'success'">
+          <div
+            v-if="translatedTestResult"
+            class="test-result"
+            :class="testResult.allInvalid ? 'error' : 'success'"
+          >
             {{ translatedTestResult }}
           </div>
           <button
-            @click="handleTestKeys"
             :disabled="testing || !hasKeys"
             class="test-keys-button"
             :class="{ 'testing-keys': testing }"
+            @click="handleTestKeys"
           >
             {{ testing ? t('api_test_testing') : t('api_test_button') }}
           </button>

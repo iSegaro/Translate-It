@@ -13,7 +13,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
+
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
@@ -72,7 +72,7 @@ export class GeminiProvider extends BaseAIProvider {
       // Configuration loaded successfully
       logger.info(`[Gemini] Using model: ${actualModel || 'custom'}${thinkingEnabled && !isCustomModel ? ' with thinking' : ''}${isCustomModel ? ' (custom API URL)' : ''}`);
 
-      return { apiKey, apiKeys, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
+      return { apiKey, geminiModel: actualModel, thinkingEnabled, geminiApiUrl, isCustomModel };
     } catch (error) {
       logger.error(`[Gemini] Error loading configuration:`, error);
       throw error;
@@ -83,7 +83,7 @@ export class GeminiProvider extends BaseAIProvider {
    * Single text translation - extracted from original translate method
    */
   async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
-    const { apiKey, apiKeys, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
+    const { apiKey, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
 
     // Configuration applied for translation
     logger.info(`[Gemini] Starting translation: ${text.length} chars`);

@@ -7,9 +7,9 @@
       v-if="passwordMask && !hideToggle"
       type="button"
       class="ti-textarea__toggle-visibility"
-      @click="toggleVisibility"
       :tabindex="-1"
       :title="toggleTitle || (visibilityVisible ? hideLabel : showLabel)"
+      @click="toggleVisibility"
     >
       <img
         v-if="!visibilityVisible"

@@ -13,7 +13,6 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
@@ -144,11 +143,14 @@ export class OpenAIProvider extends BaseAIProvider {
   async translateImage(imageData, sourceLang, targetLang) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    const [apiKey, apiUrl, model] = await Promise.all([
-      getOpenAIApiKeyAsync(),
+    const [apiKeys, apiUrl, model] = await Promise.all([
+      getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
     ]);
+
+    // Get first available key
+    const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
     // Validate configuration
     this._validateConfig(

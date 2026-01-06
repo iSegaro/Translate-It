@@ -13,7 +13,6 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 

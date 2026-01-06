@@ -9,7 +9,6 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
