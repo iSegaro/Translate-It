@@ -130,28 +130,56 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
 
-    // Preserve blank lines using XML tags (officially supported by DeepL)
-    // Using <blank-line/> tags with XML tag handling enabled
-    // See: https://developers.deepl.com/api-reference/translate#in-text-markup
-    const BLANK_LINE_TAG = '<blank-line/>';
+    // Sanitize texts: Remove problematic characters that DeepL might reject
+    // This includes zero-width characters and other control characters (except newlines)
+    const sanitizeText = (text) => {
+      const originalLength = text.length;
+      // Remove zero-width characters but keep newlines
+      const sanitized = text
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width characters
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')  // Control chars except \n, \r, \t
+        .replace(/[\uFFF0-\uFFFF]/g, '');  // Other special Unicode characters
+
+      // Log if sanitization removed any characters
+      if (sanitized.length !== originalLength) {
+        logger.debug(`[DeepL] Sanitization removed ${originalLength - sanitized.length} chars from ${originalLength} char text`);
+      }
+
+      return sanitized;
+    };
+
+    // CRITICAL FIX: Use text-based markers to preserve ALL newlines (both single and blank lines)
+    // This avoids XML parsing issues and ensures line structure is maintained
+    // Using " @@@ " for blank lines (\n\n) and " @ " for single newlines (\n)
+    // After translation, convert markers back to their original newline format
+    const BLANK_LINE_MARKER = ' @@@ ';  // Marker for \n\n (blank lines)
+    const SINGLE_NEWLINE_MARKER = ' @ ';  // Marker for \n (single newlines)
 
     const textsToTranslate = validTexts.map(text => {
-      // Check if text has blank lines before processing
-      const hasBlankLines = text.includes('\n\n');
+      // CRITICAL: Sanitize text before processing to remove problematic characters
+      // This prevents HTTP 400 errors from DeepL API
+      const sanitizedText = sanitizeText(text);
 
-      // Replace double newlines (blank lines) with XML tags
-      const processed = text.replace(/\n\n+/g, (match) => {
-        const blankLineCount = match.length; // Total count of newlines
-        const blankLinePairs = Math.floor(blankLineCount / 2);
-        const hasOddNewline = blankLineCount % 2 === 1;
-        // Each \n\n becomes <blank-line/>
-        // If odd count (e.g., \n\n\n), preserve trailing \n
-        return BLANK_LINE_TAG.repeat(blankLinePairs) + (hasOddNewline ? '\n' : '');
+      // Check if text has newlines before processing
+      const hasBlankLines = sanitizedText.includes('\n\n');
+      const hasSingleNewlines = sanitizedText.includes('\n');
+
+      // Step 1: First replace blank lines (\n\n) with their marker
+      // We must do this BEFORE replacing single newlines to avoid conflicts
+      let processed = sanitizedText.replace(/\n\n+/g, (match) => {
+        const blankLineCount = Math.floor(match.length / 2);
+        // Each \n\n becomes  @@@
+        return BLANK_LINE_MARKER.repeat(blankLineCount);
       });
 
-      if (hasBlankLines) {
-        const blankLineCount = (text.match(/\n\n+/g) || []).reduce((sum, match) => sum + Math.floor(match.length / 2), 0);
-        logger.info(`[DeepL] Preserving ${blankLineCount} blank lines using XML tags`);
+      // Step 2: Then replace remaining single newlines (\n) with their marker
+      // These are newlines that weren't part of a blank line
+      processed = processed.replace(/\n/g, SINGLE_NEWLINE_MARKER);
+
+      if (hasBlankLines || hasSingleNewlines) {
+        const blankLineCount = (sanitizedText.match(/\n\n+/g) || []).reduce((sum, match) => sum + Math.floor(match.length / 2), 0);
+        const singleNewlineCount = (sanitizedText.match(/\n/g) || []).length - (blankLineCount * 2);
+        logger.info(`[DeepL] Preserving ${blankLineCount} blank lines and ${singleNewlineCount} single newlines`);
       }
 
       return processed;
@@ -180,7 +208,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // Add key info log for translation start
     logger.info(`[DeepL] Starting translation: ${validTexts.join('').length} chars, ${validTexts.length} segments (filtered from ${chunkTexts.length}), beta languages: ${betaLanguagesEnabled}`);
 
-    // Build request body with valid texts only (with blank line markers)
+    // Build request body with valid texts only (with text markers for newlines)
     const requestBody = new URLSearchParams();
     textsToTranslate.forEach(text => requestBody.append('text', text));
 
@@ -201,8 +229,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       requestBody.append('enable_beta_languages', '1');
     }
 
-    // Enable XML tag handling to preserve <blank-line/> tags
-    requestBody.append('tag_handling', 'xml');
+    // Note: No XML tag handling - using Unicode marker instead
+    // This avoids XML parsing issues entirely
 
     // Additional options
     requestBody.append('split_sentences', 'nonewlines'); // Preserve newlines in translation
@@ -238,37 +266,44 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           // DeepL returns array of translation objects for valid texts only
           const validTranslations = data.translations.map(t => t.text || '');
 
-          // Restore blank lines by replacing XML tags with \n\n
+          // Restore ALL newlines by replacing text markers with their original format
           const restoredTranslations = validTranslations.map(translation => {
-            // Check if XML tags exist in translation
-            const hasTags = translation.includes('<blank-line/>');
+            // Check if markers exist in translation
+            const hasBlankMarkers = translation.includes(' @@@ ');
+            const hasSingleMarkers = translation.includes(' @ ');
 
-            if (hasTags) {
-              // Replace XML tags with actual blank lines
-              const restored = translation.replace(
-                /<blank-line\/>(\n)?/g,
-                (match, trailingNewline) => {
-                  // Count how many tags in this match
-                  const tagCount = (match.match(/<blank-line\/>/g) || []).length;
-                  // Return corresponding number of \n\n plus trailing \n if present
-                  return '\n\n'.repeat(tagCount) + (trailingNewline || '');
-                }
-              );
-              const totalTags = (translation.match(/<blank-line\/>/g) || []).length;
-              logger.info(`[DeepL] Restored ${totalTags} blank lines from XML tags`);
-              return restored;
-            } else {
-              logger.debug('[DeepL] XML tags NOT preserved in translation, blank lines may be lost');
+            if (!hasBlankMarkers && !hasSingleMarkers) {
               return translation;
             }
+
+            let restored = translation;
+
+            // Step 1: Restore blank lines first (@@@ → \n\n)
+            if (hasBlankMarkers) {
+              restored = restored.replace(
+                / @@@ /g,
+                () => '\n\n'  // Each  @@@  becomes \n\n
+              );
+              const totalBlankMarkers = (translation.match(/ @@@ /g) || []).length;
+              logger.info(`[DeepL] Restored ${totalBlankMarkers} blank lines from " @@@"`);
+            }
+
+            // Step 2: Then restore single newlines (@ → \n)
+            if (hasSingleMarkers) {
+              restored = restored.replace(
+                / @ /g,
+                () => '\n'  // Each  @  becomes \n
+              );
+              const totalSingleMarkers = (translation.match(/ @ /g) || []).length;
+              logger.info(`[DeepL] Restored ${totalSingleMarkers} single newlines from " @"`);
+            }
+
+            return restored;
           });
 
           // Validate segment count (should match valid texts, not original chunkTexts)
           if (restoredTranslations.length !== validTexts.length) {
-            logger.debug('[DeepL] Segment count mismatch:', {
-              expected: validTexts.length,
-              received: restoredTranslations.length
-            });
+            logger.debug('[DeepL] Segment count mismatch');
           }
 
           // Map translations back to original chunkTexts order
@@ -339,7 +374,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         const results = [];
         let successCount = 0;
-        const FALLBACK_TAG = '<blank-line/>';
+        const FALLBACK_BLANK_MARKER = ' @@@ ';  // Marker for \n\n in fallback
+        const FALLBACK_SINGLE_MARKER = ' @ ';  // Marker for \n in fallback
 
         for (let i = 0; i < chunkTexts.length; i++) {
           const text = chunkTexts[i];
@@ -350,19 +386,26 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           }
 
           try {
-            // Convert blank lines to XML tags before translation
-            const textWithTags = text.replace(/\n\n+/g, (match) => {
-              const blankLineCount = match.length;
-              const blankLinePairs = Math.floor(blankLineCount / 2);
-              const hasOddNewline = blankLineCount % 2 === 1;
-              // Each \n\n becomes <blank-line/>
-              // If odd count (e.g., \n\n\n), preserve trailing \n
-              return FALLBACK_TAG.repeat(blankLinePairs) + (hasOddNewline ? '\n' : '');
+            // CRITICAL: Sanitize text before processing to remove problematic characters
+            // This prevents HTTP 400 errors from DeepL API in fallback mode
+            const sanitizedText = text
+              .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width characters
+              .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')  // Control chars except \n, \r, \t
+              .replace(/[\uFFF0-\uFFFF]/g, '');  // Other special Unicode characters
+
+            // Step 1: Convert blank lines (\n\n) to marker
+            let textWithMarkers = sanitizedText.replace(/\n\n+/g, (match) => {
+              const blankLineCount = Math.floor(match.length / 2);
+              // Each \n\n becomes  @@@
+              return FALLBACK_BLANK_MARKER.repeat(blankLineCount);
             });
+
+            // Step 2: Convert single newlines (\n) to marker
+            textWithMarkers = textWithMarkers.replace(/\n/g, FALLBACK_SINGLE_MARKER);
 
             // Translate single segment WITHOUT retry (to avoid infinite recursion)
             const requestBody = new URLSearchParams();
-            requestBody.append('text', textWithTags);
+            requestBody.append('text', textWithMarkers);
 
             if (sourceLang && sourceLang !== '') {
               requestBody.append('source_lang', sourceLang);
@@ -372,7 +415,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             if (betaLanguagesEnabled) {
               requestBody.append('enable_beta_languages', '1');
             }
-            requestBody.append('tag_handling', 'xml');
+            // No XML tag handling - using text markers instead
             requestBody.append('split_sentences', 'nonewlines');
             requestBody.append('preserve_formatting', '1');
 
@@ -392,14 +435,19 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
                 }
                 let translated = data.translations[0]?.text || text;
 
-                // Restore XML tags to blank lines
-                if (translated.includes(FALLBACK_TAG)) {
+                // Step 1: Restore blank lines (@@@ → \n\n)
+                if (translated.includes(' @@@ ')) {
                   translated = translated.replace(
-                    /<blank-line\/>(\n)?/g,
-                    (match, trailingNewline) => {
-                      const tagCount = (match.match(/<blank-line\/>/g) || []).length;
-                      return '\n\n'.repeat(tagCount) + (trailingNewline || '');
-                    }
+                    / @@@ /g,
+                    () => '\n\n'
+                  );
+                }
+
+                // Step 2: Restore single newlines (@ → \n)
+                if (translated.includes(' @ ')) {
+                  translated = translated.replace(
+                    / @ /g,
+                    () => '\n'
                   );
                 }
 
