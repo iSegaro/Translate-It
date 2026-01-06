@@ -334,7 +334,9 @@ export class BaseProvider {
         logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           message: msg,
-          url: url
+          url: url,
+          // Log full error body for DeepL 400 errors to diagnose the issue
+          ...(isDeepL400 && { errorBody: body })
         });
 
         // Determine error type based on status code
