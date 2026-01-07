@@ -331,61 +331,76 @@ The system supports 100+ languages including:
 4. **Segment Integrity with Smart Chunking**: When character_limit batching is unavoidable (very long texts), the chunking logic in `BaseTranslateProvider` must:
    - **First priority**: Break at natural boundaries (`\n`, `. `, `! `, `? `)
    - **Second priority**: Break at sentence boundaries, not mid-sentence
-   - **Never**: Break in the middle of a placeholder marker (`[0]` → `[` and `0]` in different chunks)
+   - **Never**: Break in the middle of a placeholder marker
 
 5. **DOM Reference Resilience with Unique Identifiers**: In `PlaceholderRegistry`, add a unique identifier to each element before storing:
    ```javascript
-   // Add unique ID to element at registration time
    const uniqueId = `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
    element.setAttribute('data-aiwc-original-id', uniqueId);
    this.placeholders.set(id, { root: element, html: outerHTML, uniqueId });
    ```
-   This allows recovery even if the original DOM reference is invalidated by partial DOM updates.
 
-6. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
-
-7. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers (`[0]`, `[1]` or `<span translate="no">`) - only the text between them.
-
-8. **Whitespace-Tolerant Placeholder Detection**: AI providers may add whitespace inside brackets. Use fuzzy matching regex:
+6. **Unique Placeholder Format to Avoid Regex Collisions**: CRITICAL - The simple `[0]` format will collide with code snippets on sites like GitHub. Use a more distinctive format:
    ```javascript
-   // Matches: [0], [ 0 ], [  0  ], etc.
-   const PLACEHOLDER_REGEX_AI = /\[\s*(\d+)\s*\]/g;
+   // WRONG: Collides with code like "array[0]"
+   format: "[0]"
+
+   // CORRECT: Distinctive format that won't occur naturally
+   AI Format: "[[AIWC-0]]" or "{aiwc-0}" or "«AIWC-0»"
+   Traditional Format: `<span translate="no" data-aiwc-ph-id="0" class="aiwc-placeholder">0</span>`
+   ```
+   This prevents false positives when translating technical documentation or code.
+
+7. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
+
+8. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers - only the text between them.
+
+9. **Whitespace-Tolerant Placeholder Detection**: AI providers may add whitespace. Use appropriate regex for your chosen format:
+   ```javascript
+   // For [[AIWC-0]] format:
+   const PLACEHOLDER_REGEX_AI = /\[\[AIWC-(\d+)\]\]/g;
+
+   // For {aiwc-0} format:
+   const PLACEHOLDER_REGEX_AI = /\{aiwc-(\d+)\}/g;
    ```
 
-9. **Unified Format Detection**: The placeholder reassembly logic must detect both formats:
-   - AI: `/\[\s*(\d+)\s*\]/g` (whitespace-tolerant)
-   - Traditional: `/<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>/g`
+10. **Unified Format Detection**: The placeholder reassembly logic must detect both formats based on chosen pattern.
 
-10. **Granular Fallback at Translation Unit Level**: If placeholder validation fails, fall back at the **block level** (Translation Unit), not globally:
+11. **Orphan Segment Timeout Handling**: Implement per-block timeout to prevent partial translation states:
+    - Each block has a timeout (e.g., 60 seconds) from first segment arrival
+    - If timeout expires before all segments complete, revert block to original state
+    - Clear partial translations and registry to prevent inconsistent UI
+    - Log timeout for debugging and retry consideration
+
+12. **Granular Fallback at Translation Unit Level**: If placeholder validation fails, fall back at the **block level** (Translation Unit), not globally:
     - Each block container is an independent Translation Unit
     - If block A fails validation, only block A falls back to atomic
     - Blocks B, C, D continue with placeholder-based translation
     - This prevents one bad segment from ruining the entire page translation
 
-11. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+13. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
 
-12. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+14. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
 
-13. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+15. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
 
-14. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed (no orphaned `[0]` without matching context).
+16. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed.
 
-15. **Recovery by Query Selector**: When element references are lost, recover using the unique identifier:
+17. **Recovery by Query Selector**: When element references are lost, recover using the unique identifier:
     ```javascript
     getPlaceholderOrRecover(id) {
       let entry = this.placeholders.get(id);
       if (entry && document.contains(entry.root)) {
-        return entry.root; // Reference still valid
+        return entry.root;
       }
-      // Try to recover by unique ID
       if (entry && entry.uniqueId) {
         const recovered = document.querySelector(`[data-aiwc-original-id="${entry.uniqueId}"]`);
         if (recovered) {
-          entry.root = recovered; // Update reference
+          entry.root = recovered;
           return recovered;
         }
       }
-      return null; // Permanently lost
+      return null;
     }
     ```
 
@@ -513,3 +528,31 @@ The system supports 100+ languages including:
     - Chunking Strategy: Break at `.` or `\n`, not mid-sentence
     - Verify: No placeholder markers split across chunks
     - Verify: Each chunk contains complete sentences
+
+**Edge Case & Resilience Tests (Continued):**
+
+22. **Regex Collision Avoidance - Code Snippets**:
+    - Input: `<p>The array[0] contains value and data[index]</p>`
+    - Placeholders: `[[AIWC-0]]`, `[[AIWC-1]]` (distinctive format)
+    - Verify: Code `[0]` and `[index]` NOT mistaken for placeholders
+    - Verify: Only AIWC-prefixed placeholders are extracted
+
+23. **Orphan Segment Timeout Recovery**:
+    - Input: Block with 3 expected segments
+    - Scenario: Segment 1 and 3 arrive, Segment 2 never arrives (network error)
+    - After 60 seconds: Timeout triggers
+    - Expected: Block reverts to original untranslated state
+    - Verify: No partial/corrupted translation remains visible
+    - Verify: Registry cleared, cleanup performed
+
+24. **Partial Segment Recovery with Retransmission**:
+    - Input: Block with missing Segment 2, timeout approaching
+    - Scenario: Automatic retry triggered before timeout
+    - Expected: Segment 2 successfully re-fetched
+    - Verify: All segments combined correctly, translation completed
+
+25. **Multiple Block Independent Timeouts**:
+    - Input: 3 blocks (A, B, C) with placeholder translations
+    - Scenario: Block A timeout, Blocks B and C complete normally
+    - Expected: Block A reverted to original, B and C translated with placeholders
+    - Verify: Blocks processed independently, no cross-block interference

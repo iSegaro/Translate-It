@@ -131,22 +131,29 @@ if (request.placeholderRegistry) {
 }
 ```
 
-**Consideration 3: Unified Placeholder Format**
+**Consideration 3: Unified Placeholder Format with Collision Avoidance**
 
-To avoid "double logic" for AI vs traditional providers, use a **unified extraction/reassembly** approach with provider-specific placeholder formats:
+To avoid "double logic" for AI vs traditional providers AND prevent regex collisions with code snippets:
 
 ```
 ┌─────────────────────┬──────────────────────────┬─────────────────────────┐
 │ Provider Type       │ Placeholder Format       │ Reassembly Regex        │
 ├─────────────────────┼──────────────────────────┼─────────────────────────┤
-│ AI (Gemini, GPT)    │ [0], [1], [2]            │ /\[\s*(\d+)\s*\]/g      │
+│ AI (Gemini, GPT)    │ [[AIWC-0]], [[AIWC-1]]   │ /\[\[AIWC-(\d+)\]\]/g  │
 │ Traditional (Google)│ <span translate="no"     │ /<span[^>]*translate=   │
-│                     │ data-id="0">0</span>    │ "no"[^>]*data-id="(\d+)"│
+│                     │ data-aiwc-ph-id="0">0</span>│ "no"[^>]*data-aiwc-ph-│
+│                     │                           │ id="(\d+)"[^>]*>/g     │
 └─────────────────────┴──────────────────────────┴─────────────────────────┘
 ```
 
-**Benefits**:
+**CRITICAL: Why NOT simple [0] format:**
+- Collides with code: `array[0]`, `data[index]`, `items[i]`
+- False positives on GitHub, Stack Overflow, technical docs
+- Causes extraction of actual code as placeholders
+
+**Benefits of [[AIWC-0]] format:**
 - **Single code path** for extraction and reassembly
+- **Collision-free**: Won't occur naturally in code or documentation
 - **Provider-specific markers** optimized for each provider's behavior
 - **No double logic** - unified processing with format-specific rendering
 
@@ -155,23 +162,114 @@ To avoid "double logic" for AI vs traditional providers, use a **unified extract
 // PlaceholderRegistry generates format based on provider
 generatePlaceholder(id, providerType) {
   if (providerType === 'AI') {
-    return `[${id}]`;  // Simple numeric
+    return `[[AIWC-${id}]]`;  // Distinctive, collision-free format
   } else {
-    return `<span translate="no" class="aiwc-ph" data-id="${id}">${id}</span>`;
+    return `<span translate="no" class="aiwc-placeholder" data-aiwc-ph-id="${id}">${id}</span>`;
   }
 }
 
 // Reassembly detects and handles both formats
 extractPlaceholders(translatedText) {
   // Try AI format first
-  const aiMatches = translatedText.match(/\[\s*(\d+)\s*\]/g);
+  const aiMatches = translatedText.match(/\[\[AIWC-(\d+)\]\]/g);
   if (aiMatches) return { format: 'AI', ids: aiMatches };
 
   // Try traditional format
-  const tradMatches = translatedText.match(/<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>/g);
+  const tradMatches = translatedText.match(/<span[^>]*translate="no"[^>]*data-aiwc-ph-id="(\d+)"[^>]*>/g);
   if (tradMatches) return { format: 'TRADITIONAL', ids: tradMatches };
 
   return { format: 'NONE', ids: [] };
+}
+```
+
+**Consideration 4: Orphan Segment Timeout Handling**
+
+When segment-based translation is used, network errors may leave blocks in incomplete states:
+
+```
+Scenario: Block with 3 segments expected
+├── Segment 1: "Hello [[AIWC-0]] world" ✓ Arrives
+├── Segment 2: "Hello [[AIWC-0]] world" ✗ Network error, never arrives
+└── Segment 3: "Hello [[AIWC-0]] world!" ✓ Arrives
+
+Problem: Block is stuck with partial segments
+Solution: Per-block timeout with automatic reversion
+```
+
+**Timeout Strategy**:
+```javascript
+// In TranslationOrchestrator or StreamingTranslationEngine
+class BlockTranslationState {
+  constructor(blockContainer) {
+    this.blockContainer = blockContainer;
+    this.expectedSegments = 0;
+    this.receivedSegments = 0;
+    this.segments = [];
+    this.startTime = null;
+    this.timeoutMs = 60000; // 60 seconds
+    this.timer = null;
+  }
+
+  startSegmentTranslation(expectedCount) {
+    this.expectedSegments = expectedCount;
+    this.startTime = Date.now();
+    this.segments = [];
+    this.receivedSegments = 0;
+
+    // Start timeout timer
+    this.timer = setTimeout(() => {
+      this._handleTimeout();
+    }, this.timeoutMs);
+
+    // Store original HTML for potential reversion
+    this.originalHTML = this.blockContainer.innerHTML;
+  }
+
+  addSegment(segment) {
+    this.segments.push(segment);
+    this.receivedSegments++;
+
+    // Check if all segments received
+    if (this.receivedSegments >= this.expectedSegments) {
+      this._completeSuccessfully();
+    }
+  }
+
+  _handleTimeout() {
+    // Check if we received any segments but didn't complete
+    if (this.receivedSegments > 0 && this.receivedSegments < this.expectedSegments) {
+      this.logger.warn(`Block timeout: received ${this.receivedSegments}/${this.expectedSegments} segments`, {
+        blockId: this.blockId,
+        duration: Date.now() - this.startTime
+      });
+
+      // Revert block to original state
+      this._revertToOriginal();
+    }
+  }
+
+  _revertToOriginal() {
+    // Restore original HTML
+    this.blockContainer.innerHTML = this.originalHTML;
+
+    // Clear placeholder registry
+    if (this.placeholderRegistry) {
+      this.placeholderRegistry.clear();
+    }
+
+    // Mark as failed
+    this.status = 'timeout-reverted';
+
+    this.logger.info(`Block reverted to original due to timeout`, {
+      blockId: this.blockId
+    });
+  }
+
+  _completeSuccessfully() {
+    clearTimeout(this.timer);
+    this.status = 'completed';
+    // Proceed with reassembly...
+  }
 }
 ```
 
