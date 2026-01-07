@@ -224,6 +224,20 @@ Your task:
   5. Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
   6. Prioritize meaning and readability over strict word-for-word translation.
 
+CRITICAL - Placeholder Preservation Instructions:
+  If the text contains special placeholders in the format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]], etc.:
+  1. These placeholders represent inline elements (links, emphasis, code) that MUST be preserved exactly
+  2. Copy these placeholders to your translation WITHOUT any changes
+  3. DO NOT translate the numbers inside the placeholders
+  4. DO NOT renumber, modify, or reformat the placeholders
+  5. DO NOT add spaces inside or around the placeholders
+  6. Ensure each placeholder appears exactly once in your translation
+
+Examples:
+  - Input: "Click [[AIWC-0]] to learn more"
+  - Correct: "روی [[AIWC-0]] کلیک کنید تا بیشتر بدانید"
+  - Wrong: "روی [0] کلیک کنید" or "روی [[AIWC-1]] کلیک کنید"
+
 Return **only** the translated JSON array. Do not include explanations, markdown, or any extra content.
 
 $_{TEXT}
@@ -278,9 +292,23 @@ $_{TEXT}
 /*--- End PROMPT_BASE_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_BATCH ---*/
-  PROMPT_BASE_AI_BATCH: `Your are an exper translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON array of texts from $_{SOURCE} to $_{TARGET}.
-  Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text. 
+  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON array of texts from $_{SOURCE} to $_{TARGET}.
+  Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text.
   Maintain the original JSON structure.
+
+CRITICAL - Placeholder Preservation Instructions:
+  If the text contains special placeholders in the format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]], etc.:
+  1. These placeholders represent inline elements (links, emphasis, code) that MUST be preserved exactly
+  2. Copy these placeholders to your translation WITHOUT any changes
+  3. DO NOT translate the numbers inside the placeholders
+  4. DO NOT renumber, modify, or reformat the placeholders
+  5. DO NOT add spaces inside or around the placeholders
+  6. Ensure each placeholder appears exactly once in your translation
+
+Examples:
+  - Input: "Click [[AIWC-0]] to learn more"
+  - Correct: "روی [[AIWC-0]] کلیک کنید تا بیشتر بدانید"
+  - Wrong: "روی [0] کلیک کنید" or "روی [[AIWC-1]] کلیک کنید"
 
 Important: Return only the JSON array with translated texts, no additional text or explanations.
 

@@ -119,15 +119,14 @@
     - [ ] German: "z.B. und Dr. Müller" → Knows German abbreviations
     - [ ] Spanish: "p.ej. y sr." → Handles Spanish abbreviations
 
-- [ ] 8.3 Update AI Provider Prompts
-  - [ ] Modify `GoogleGemini.js` prompt builder with placeholder instructions
-  - [ ] Modify `OpenAI.js` prompt builder with placeholder instructions
-  - [ ] Modify `ClaudeProvider.js` prompt builder with placeholder instructions (if exists)
-  - [ ] Modify `DeepLTranslate.js` prompt builder with placeholder instructions
-  - [ ] Add prompt template with placeholder preservation rules:
-    - [ ] Instruct to preserve `[[AIWC-0]]` format exactly
-    - [ ] Provide examples of correct placeholder handling
-    - [ ] Warn against renumbering or modifying placeholders
+- [x] 8.3 Update AI Provider Prompts
+  - [x] Modified `PROMPT_BASE_AI_BATCH` in config.js with placeholder instructions
+  - [x] Modified `PROMPT_BASE_SELECT` in config.js with placeholder instructions
+  - [x] Add prompt template with placeholder preservation rules:
+    - [x] Instruct to preserve `[[AIWC-0]]` format exactly
+    - [x] Provide examples of correct placeholder handling
+    - [x] Warn against renumbering or modifying placeholders
+  - [ ] Test prompts with actual AI providers
 
 ## 9. Testing & Validation
 - [ ] 9.1 Unit Tests
