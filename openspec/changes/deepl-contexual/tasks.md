@@ -353,7 +353,70 @@ This document outlines the implementation tasks for upgrading DeepL provider fro
 
 ---
 
-### Task 3.3: Implement XML Tag Validation
+### Task 3.3: Implement Context Parameter Extraction
+**File**: `src/features/translation/providers/DeepLTranslateProvider.js`
+
+**Changes**:
+- [ ] Add `_extractTranslationContext(blockContainer)` method
+- [ ] Extract page title from `document.title`
+- [ ] Extract block container tagName and map to semantic description
+- [ ] Extract parent context (NAV, ARTICLE, SECTION, ASIDE, HEADER, FOOTER, MAIN)
+- [ ] Combine into formatted string: `"Source Page: [Title] | Content Area: [TagName] | Location: [Parent]"`
+- [ ] Sanitize context to remove XML tags and @@@ markers
+- [ ] Limit context to 1000 characters maximum
+- [ ] Add context parameter to API request in `_translateChunk`:
+  ```javascript
+  const context = this._extractTranslationContext(blockContainer);
+  if (context) {
+    requestBody.append('context', context);
+  }
+  ```
+- [ ] Update `_translateChunk` signature to accept `blockContainer` parameter
+
+**Semantic Tag Mapping**:
+```javascript
+const semanticNames = {
+  'P': 'paragraph',
+  'H1': 'main heading',
+  'H2': 'subheading',
+  'H3': 'section heading',
+  'LI': 'list item',
+  'DIV': 'content section',
+  'ARTICLE': 'article',
+  'SECTION': 'section',
+  'BLOCKQUOTE': 'blockquote',
+  'TD': 'table cell',
+  'TH': 'table header',
+  'CAPTION': 'caption',
+  'FIGCAPTION': 'figure caption'
+};
+```
+
+**Context Examples**:
+- Blog post: `"Source Page: Getting Started with Vue.js 3 | Content Area: paragraph | Location: article"`
+- Navigation: `"Source Page: My Website - Home | Content Area: anchor | Location: navigation"`
+
+**Validation**:
+- [ ] Unit test: Context extracted correctly from block container
+- [ ] Unit test: Page title extracted and sanitized
+- [ ] Unit test: Tag name mapped to semantic description
+- [ ] Unit test: Parent context extracted for semantic parents
+- [ ] Unit test: XML tags removed from context
+- [ ] Unit test: @@@ markers removed from context
+- [ ] Unit test: Context limited to 1000 characters
+- [ ] Unit test: `null` returned when no context available
+- [ ] Integration test: Context parameter sent to DeepL API
+- [ ] Integration test: Context doesn't interfere with XML tag handling
+
+**Success Criteria**:
+- Context extracted from page title and block container structure
+- Context sanitized to avoid XML tag interference
+- Context parameter improves translation quality (especially for ambiguous terms)
+- No regressions in XML placeholder handling
+
+---
+
+### Task 3.4: Implement XML Tag Validation
 **File**: `src/features/translation/providers/DeepLTranslateProvider.js`
 
 **Changes**:
@@ -389,7 +452,7 @@ This document outlines the implementation tasks for upgrading DeepL provider fro
 
 ---
 
-### Task 3.4: Implement Fallback Trigger
+### Task 3.5: Implement Fallback Trigger
 **File**: `src/features/translation/providers/DeepLTranslateProvider.js`
 
 **Changes**:
@@ -414,7 +477,7 @@ This document outlines the implementation tasks for upgrading DeepL provider fro
 
 ---
 
-### Task 3.5: Implement Atomic Fallback in SelectElementManager
+### Task 3.6: Implement Atomic Fallback in SelectElementManager
 **File**: `src/features/element-selection/managers/SelectElementManager.js`
 
 **Changes**:
@@ -447,7 +510,7 @@ This document outlines the implementation tasks for upgrading DeepL provider fro
 
 ---
 
-### Task 3.6: Ensure @@@ Newline System Compatibility
+### Task 3.7: Ensure @@@ Newline System Compatibility
 **File**: `src/features/element-selection/managers/SelectElementManager.js`
 
 **Changes**:
@@ -612,9 +675,18 @@ This document outlines the implementation tasks for upgrading DeepL provider fro
    - Test with Google provider (should use atomic extraction)
    - Expected: No regression in existing providers
 
+8. [ ] **Context parameter integration**
+   - Test on page with title: "Getting Started with Vue.js 3"
+   - Test paragraph inside `<article>` tag
+   - Expected: Context parameter sent to DeepL: `"Source Page: Getting Started with Vue.js 3 | Content Area: paragraph | Location: article"`
+   - Verify context doesn't interfere with XML tag handling
+   - Verify context doesn't interfere with placeholder reassembly
+   - Verify translation quality improved for ambiguous terms (e.g., "bank", "run")
+
 **Success Criteria**:
 - All manual test scenarios pass
 - DeepL translation quality improved with contextual extraction
+- Context parameter properly sent to DeepL API
 - No regressions in existing providers
 
 ---
@@ -799,13 +871,15 @@ Phase 3 (DeepL Provider)
   │   └─ Required by: Task 3.2
   ├─ Task 3.2: API Parameters
   │   └─ Required by: Task 3.3
-  ├─ Task 3.3: XML Validation
+  ├─ Task 3.3: Context Parameter Extraction
   │   └─ Required by: Task 3.4
-  ├─ Task 3.4: Fallback Trigger
+  ├─ Task 3.4: XML Validation
   │   └─ Required by: Task 3.5
-  ├─ Task 3.5: Fallback Implementation
+  ├─ Task 3.5: Fallback Trigger
+  │   └─ Required by: Task 3.6
+  ├─ Task 3.6: Fallback Implementation
   │   └─ Required by: Task 5.2
-  └─ Task 3.6: Newline Compatibility
+  └─ Task 3.7: Newline Compatibility
       └─ Required by: Task 5.2
 
 Phase 4 (DOM & Text Processing)
@@ -846,7 +920,7 @@ Phase 7 (Validation)
 1. Task 1.1 → Task 1.2 → Task 1.3 (Foundation)
 2. Task 1.4 → Task 1.5 → Task 1.6 (Critical Implementation Details)
 3. Task 2.1 (Service routing)
-4. Task 3.1 → Task 3.2 → Task 3.3 → Task 3.4 → Task 3.5 (Core DeepL integration)
+4. Task 3.1 → Task 3.2 → Task 3.3 → Task 3.4 → Task 3.5 → Task 3.6 (Core DeepL integration)
 5. Task 4.1 → Task 4.2 (Supporting updates)
 6. Task 5.1 → Task 5.2 (Testing)
 7. Task 7.1 → Task 7.2 → Task 7.3 (Validation)
@@ -863,14 +937,16 @@ Phase 7 (Validation)
 |-------|-------|------------------|
 | Phase 1: Infrastructure | 6 | 6-10 hours |
 | Phase 2: Service Layer | 1 | 1-2 hours |
-| Phase 3: DeepL Provider | 6 | 8-12 hours |
+| Phase 3: DeepL Provider | 7 | 10-15 hours |
 | Phase 4: DOM & Text | 2 | 2-3 hours |
 | Phase 5: Testing | 4 | 6-10 hours |
 | Phase 6: Documentation | 2 | 2-3 hours |
 | Phase 7: Validation | 4 | 4-6 hours |
-| **Total** | **25** | **29-46 hours** |
+| **Total** | **26** | **31-49 hours** |
 
-**Note**: Effort estimates assume familiarity with codebase. May vary based on complexity encountered during implementation. 3 additional tasks (1.4, 1.5, 1.6) added for critical implementation details including lowercase tag enforcement, ignore_tags validation, and nested elements testing.
+**Note**: Effort estimates assume familiarity with codebase. May vary based on complexity encountered during implementation. 4 additional tasks added:
+- Tasks 1.4, 1.5, 1.6 for critical implementation details (lowercase tags, ignore_tags, nested elements)
+- Task 3.3 for context parameter extraction to improve translation quality
 
 ---
 

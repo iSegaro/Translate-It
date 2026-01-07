@@ -299,3 +299,52 @@ The system SHALL maintain compatibility with DeepL's existing @@@ newline marker
 - **THEN** XML parsing may break on @@@ markers
 - **AND** correct order prevents this edge case
 - **AND** system enforces proper order automatically
+
+---
+
+### Requirement: DeepL Context Parameter Integration
+
+The system SHALL enhance DeepL translation quality by providing contextual metadata through the native `context` API parameter.
+
+#### Scenario: Context extraction from page metadata
+- **WHEN** DeepL translation is requested with block container
+- **THEN** system extracts page title from `document.title`
+- **AND** system extracts block container tagName
+- **AND** system maps tagName to semantic description (P → paragraph, H1 → main heading, etc.)
+- **AND** system extracts parent context for semantic containers (NAV, ARTICLE, SECTION, etc.)
+
+#### Scenario: Context string formatting
+- **WHEN** contextual metadata is extracted
+- **THEN** components are combined with separator: `"Source Page: [Title] | Content Area: [SemanticName] | Location: [ParentContext]"`
+- **AND** XML tags are removed from context string
+- **AND** @@@ newline markers are removed from context string
+- **AND** context is limited to maximum 1000 characters
+
+#### Scenario: Context parameter API integration
+- **WHEN** DeepL API request is constructed
+- **THEN** context parameter is added to FormData if available
+- **AND** context is sent as plain text (no XML tags, no @@@ markers)
+- **AND** context parameter does not interfere with `tag_handling="xml"`
+- **AND** context parameter does not interfere with placeholder reassembly
+
+#### Scenario: Context parameter examples
+- **GIVEN** page title: "Getting Started with Vue.js 3"
+- **AND** block container: `<p>` inside `<article>`
+- **WHEN** context is extracted
+- **THEN** context string: `"Source Page: Getting Started with Vue.js 3 | Content Area: paragraph | Location: article"`
+- **AND** context sent to DeepL API as `context` parameter
+
+#### Scenario: Context improves translation disambiguation
+- **GIVEN** ambiguous term: "bank"
+- **AND** page title: "River Guide"
+- **AND** context indicates: outdoor/nature content
+- **WHEN** translated to language with different words for river bank vs financial bank
+- **THEN** DeepL uses context to select correct translation
+- **AND** translation reflects outdoor/nature domain
+
+#### Scenario: Context sanitization
+- **WHEN** page title contains HTML tags or special markers
+- **THEN** all `<...>` tags are removed from context
+- **AND** all `@@@` newline markers are removed from context
+- **AND** whitespace is normalized to single spaces
+- **AND** context is safe to send as plain text parameter

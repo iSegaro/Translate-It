@@ -266,7 +266,7 @@ extractText(element, providerType, options = {}) {
 
 **Translation Request Flow**:
 ```javascript
-async _translateChunk(texts, sourceLang, targetLang) {
+async _translateChunk(texts, sourceLang, targetLang, blockContainer) {
   // Step 1: Detect XML placeholders
   const hasXMLPlaceholders = validTexts.some(text =>
     /<x\s+id\s*=\s*["']\d+["']\s*\/?>/i.test(text)
@@ -292,7 +292,13 @@ async _translateChunk(texts, sourceLang, targetLang) {
     requestBody.append('ignore_tags', 'x');
   }
 
-  // Step 5: API call
+  // Step 5: Add contextual metadata for better translation
+  const context = this._extractTranslationContext(blockContainer);
+  if (context) {
+    requestBody.append('context', context);
+  }
+
+  // Step 6: API call
   const response = await fetch(this.apiURL, {
     method: 'POST',
     body: requestBody
@@ -300,7 +306,7 @@ async _translateChunk(texts, sourceLang, targetLang) {
 
   const result = await response.json();
 
-  // Step 6: Validate XML tag preservation
+  // Step 7: Validate XML tag preservation
   if (hasXMLPlaceholders) {
     const validation = this._validateXMLTags(
       result.translations,
@@ -378,6 +384,128 @@ _validateXMLTags(translations, requestTagCounts) {
   };
 }
 ```
+
+**Context Parameter Extraction**:
+```javascript
+/**
+ * Extracts contextual metadata to improve DeepL translation quality.
+ * Provides domain and semantic information to help disambiguate terms.
+ *
+ * @param {Element} blockContainer - The block container being translated
+ * @returns {string|null} Context string or null if not available
+ */
+_extractTranslationContext(blockContainer) {
+  if (!blockContainer) return null;
+
+  const contextParts = [];
+
+  // 1. Extract page title (source domain context)
+  if (typeof document !== 'undefined' && document.title) {
+    const title = document.title.trim();
+    if (title) {
+      contextParts.push(`Source Page: ${title}`);
+    }
+  }
+
+  // 2. Extract block container type (structural context)
+  const tagName = blockContainer.tagName;
+  if (tagName) {
+    // Map common tag names to semantic descriptions
+    const semanticNames = {
+      'P': 'paragraph',
+      'H1': 'main heading',
+      'H2': 'subheading',
+      'H3': 'section heading',
+      'LI': 'list item',
+      'DIV': 'content section',
+      'ARTICLE': 'article',
+      'SECTION': 'section',
+      'BLOCKQUOTE': 'blockquote',
+      'TD': 'table cell',
+      'TH': 'table header',
+      'CAPTION': 'caption',
+      'FIGCAPTION': 'figure caption'
+    };
+
+    const semanticName = semanticNames[tagName] || tagName.toLowerCase();
+    contextParts.push(`Content Area: ${semanticName}`);
+  }
+
+  // 3. Add parent context for better disambiguation
+  const parent = blockContainer.parentElement;
+  if (parent) {
+    const parentTag = parent.tagName;
+    const parentSemantic = {
+      'NAV': 'navigation',
+      'ARTICLE': 'article',
+      'SECTION': 'section',
+      'ASIDE': 'sidebar',
+      'HEADER': 'header',
+      'FOOTER': 'footer',
+      'MAIN': 'main content'
+    }[parentTag];
+
+    if (parentSemantic) {
+      contextParts.push(`Location: ${parentSemantic}`);
+    }
+  }
+
+  if (contextParts.length === 0) return null;
+
+  // Combine with separator, limit to 1000 characters
+  let context = contextParts.join(' | ');
+
+  // Sanitize: Remove any XML tags or @@@ markers
+  context = context
+    .replace(/<[^>]+>/g, '')  // Remove XML tags
+    .replace(/@@@/g, '')       // Remove newline markers
+    .replace(/\s+/g, ' ')      // Normalize whitespace
+    .trim();
+
+  // Limit length to avoid API overhead
+  const MAX_CONTEXT_LENGTH = 1000;
+  if (context.length > MAX_CONTEXT_LENGTH) {
+    context = context.substring(0, MAX_CONTEXT_LENGTH - 3) + '...';
+  }
+
+  return context;
+}
+```
+
+**Context Examples**:
+
+```javascript
+// Example 1: Blog post paragraph
+// Page: "Getting Started with Vue.js 3"
+// Container: <p> inside <article>
+// Context: "Source Page: Getting Started with Vue.js 3 | Content Area: paragraph | Location: article"
+
+// Example 2: Navigation link
+// Page: "My Website - Home"
+// Container: <a> inside <nav>
+// Context: "Source Page: My Website - Home | Content Area: anchor | Location: navigation"
+
+// Example 3: Product description
+// Page: "Product Catalog - Electronics"
+// Container: <div> with class "product-description"
+// Context: "Source Page: Product Catalog - Electronics | Content Area: content section"
+```
+
+**Benefits of Context Parameter**:
+
+1. **Domain Disambiguation**: Helps DeepL understand the subject matter
+   - "bank" → financial context vs river context
+   - "run" → software context vs sports context
+
+2. **Tone Adaptation**: Adjusts formality based on content type
+   - Heading → more concise
+   - Article → more descriptive
+
+3. **Consistency**: Ensures terminology consistency across the page
+
+4. **Better Quality**: Especially helpful for short fragments without much context
+
+**Design Decision**: Context is optional and only sent when available. The context string is sanitized to avoid interfering with XML tag handling and limited to 1000 characters to minimize overhead.
 
 ---
 
