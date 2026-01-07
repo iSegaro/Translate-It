@@ -69,19 +69,21 @@
   - [ ] Add integration tests
 
 ## 5. Integration - DOM Manipulation
-- [ ] 5.1 Modify `domManipulation.js`
-  - [ ] Add `collectTextNodesWithPlaceholders(targetElement)` function
-  - [ ] Modify `collectTextNodes()` to accept `usePlaceholders` parameter
-  - [ ] Route AI providers to placeholder-based extraction
-  - [ ] Maintain backward compatibility for traditional providers
+- [x] 5.1 Modify `domManipulation.js`
+  - [x] Add `collectTextNodesWithPlaceholders(targetElement, placeholderRegistry)` function
+  - [x] Add `applyTranslationsToNodesWithPlaceholders()` for placeholder routing
+  - [x] Import placeholder utilities from blockLevelExtraction
+  - [x] Maintain backward compatibility for traditional providers
   - [ ] Add tests for routing logic
 
 ## 6. Integration - Text Processing
-- [ ] 6.1 Modify `textProcessing.js`
-  - [ ] Update `processTextIntoSegments()` to preserve placeholder markers
-  - [ ] Add placeholder detection regex: `/\[\[AIWC-(\d+)\]\]/g`
-  - [ ] Skip splitting segments that contain placeholders
-  - [ ] Modify `reassembleTranslations()` to handle placeholder units
+- [x] 6.1 Modify `textProcessing.js`
+  - [x] Add placeholder detection pattern: `/\[\[AIWC-(\d+)\]\]/g`
+  - [x] Add `hasPlaceholders()` function to detect placeholders
+  - [x] Add `countPlaceholders()` function
+  - [x] Add `extractPlaceholderIds()` function
+  - [x] Add `isInsidePlaceholder()` function for boundary protection
+  - [x] Modify `expandTextsForTranslation()` to skip splitting placeholder texts
   - [ ] Add tests for placeholder preservation
 
 ## 7. Integration - DOM Node Matcher

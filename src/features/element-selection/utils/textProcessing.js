@@ -7,6 +7,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'textProcessing');
 
+// Placeholder detection pattern: [[AIWC-0]], [[AIWC-1]], etc.
+const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/g;
+
 /**
  * Default configuration for text processing
  */
@@ -18,6 +21,89 @@ const DEFAULT_CONFIG = {
   splitOnDoubleNewlines: true,
   preserveShortSegments: false
 };
+
+/**
+ * Check if text contains placeholder markers
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains placeholders
+ */
+export function hasPlaceholders(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  return PLACEHOLDER_PATTERN.test(text);
+}
+
+/**
+ * Count placeholders in text
+ * @param {string} text - Text to check
+ * @returns {number} Number of placeholders found
+ */
+export function countPlaceholders(text) {
+  if (!text || typeof text !== 'string') {
+    return 0;
+  }
+  const matches = text.match(PLACEHOLDER_PATTERN);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Extract all placeholder IDs from text
+ * @param {string} text - Text to extract from
+ * @returns {number[]} Array of placeholder IDs
+ */
+export function extractPlaceholderIds(text) {
+  if (!text || typeof text !== 'string') {
+    return [];
+  }
+
+  const ids = [];
+  let match;
+
+  // Reset regex state
+  PLACEHOLDER_PATTERN.lastIndex = 0;
+
+  while ((match = PLACEHOLDER_PATTERN.exec(text)) !== null) {
+    const idMatch = match[0].match(/\[\[AIWC-(\d+)\]\]/);
+    if (idMatch) {
+      ids.push(parseInt(idMatch[1], 10));
+    }
+  }
+
+  return ids;
+}
+
+/**
+ * Check if a position is inside or adjacent to a placeholder
+ * CRITICAL: Never split text inside or near placeholders
+ * @param {string} text - Text to check
+ * @param {number} position - Position to check
+ * @returns {boolean} True if position is protected
+ */
+export function isInsidePlaceholder(text, position) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+
+  const matches = [...text.matchAll(PLACEHOLDER_PATTERN)];
+
+  for (const match of matches) {
+    const startIndex = match.index;
+    const endIndex = match.index + match[0].length;
+
+    // Check if position is inside placeholder
+    if (position >= startIndex && position < endIndex) {
+      return true;
+    }
+
+    // Also protect 3 characters before and after placeholders
+    if (Math.abs(position - startIndex) <= 3 || Math.abs(position - endIndex) <= 3) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Expand texts for translation by splitting into manageable segments
@@ -45,6 +131,25 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
+    // CRITICAL: Check for placeholders - never split texts with placeholders
+    if (hasPlaceholders(originalText)) {
+      logger.debug(`Text ${originalIndex} contains placeholders, keeping as single segment`, {
+        placeholderCount: countPlaceholders(originalText)
+      });
+
+      // Add the entire text as a single segment to preserve placeholder integrity
+      expandedTexts.push(originalText);
+      originMapping.push({
+        originalIndex,
+        segmentIndex: 0,
+        isBlankLine: false,
+        isContent: true,
+        hasPlaceholders: true
+      });
+      originalToExpandedIndices.set(originalIndex, [expandedTexts.length - 1]);
+      return;
+    }
+
     const segments = processTextIntoSegments(originalText, config);
 
     // Only log detailed info for longer texts that are actually being segmented

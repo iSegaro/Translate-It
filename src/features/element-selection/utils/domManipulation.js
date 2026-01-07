@@ -6,6 +6,10 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // Note: Cache system has been removed from Select Element feature
 import { applyContainerDirection, isRTLLanguage } from './textDirection.js';
+import {
+  findBlockContainer,
+  extractBlockWithPlaceholders
+} from './blockLevelExtraction.js';
 
 // Inject translation styles
 let stylesInjected = false;
@@ -508,6 +512,96 @@ function checkForEmptyTextNodeBetween(prevElement, nextElement) {
   }
 
   return false;
+}
+
+/**
+ * Collect text nodes using placeholder-based extraction for AI providers
+ * This function is used for contextual sentence translation with inline elements
+ * @param {HTMLElement} targetElement - Element to collect from
+ * @param {PlaceholderRegistry} placeholderRegistry - The placeholder registry
+ * @returns {Object} Collection result with block container and extracted text
+ */
+export function collectTextNodesWithPlaceholders(targetElement, placeholderRegistry) {
+  if (!targetElement || !placeholderRegistry) {
+    logger.error('collectTextNodesWithPlaceholders: Missing required parameters');
+    return {
+      textNodes: [],
+      originalTextsMap: new Map(),
+      blockContainer: null,
+      extractedText: '',
+      hasPlaceholders: false
+    };
+  }
+
+  logger.debug('Starting placeholder-based text node collection', {
+    element: targetElement.tagName
+  });
+
+  // Find the block container for this element
+  const blockContainer = findBlockContainer(targetElement);
+
+  // Extract text with placeholders
+  const extractionResult = extractBlockWithPlaceholders(blockContainer, placeholderRegistry);
+
+  logger.debug('Placeholder-based extraction complete', {
+    textLength: extractionResult.text.length,
+    placeholderCount: extractionResult.placeholderCount,
+    blockTag: extractionResult.blockContainer.tagName
+  });
+
+  // Return a structure compatible with the rest of the system
+  return {
+    textNodes: [blockContainer], // Single block container instead of multiple text nodes
+    originalTextsMap: new Map([
+      [extractionResult.text, blockContainer]
+    ]),
+    blockContainer: extractionResult.blockContainer,
+    extractedText: extractionResult.text,
+    placeholderCount: extractionResult.placeholderCount,
+    hasPlaceholders: extractionResult.hasPlaceholders
+  };
+}
+
+/**
+ * Apply translations with placeholder reassembly support
+ * Detects if the translation contains placeholders and routes appropriately
+ * @param {Node[]} textNodes - Array of text nodes to replace
+ * @param {Map} translations - Map of original text to translated text
+ * @param {Object} context - Context object with state, error handling, and placeholder info
+ */
+export function applyTranslationsToNodesWithPlaceholders(textNodes, translations, context) {
+  if (!textNodes || !translations || !context) {
+    logger.error('applyTranslationsToNodesWithPlaceholders: Missing required parameters');
+    return;
+  }
+
+  // Check if this is a placeholder-based translation
+  const isPlaceholderTranslation = context.placeholderRegistry &&
+    context.placeholderRegistry.size > 0 &&
+    context.extractedText &&
+    /\[\[AIWC-\d+\]\]/.test(context.extractedText);
+
+  if (isPlaceholderTranslation && context.blockContainer) {
+    logger.debug('Applying placeholder-based translation', {
+      placeholderCount: context.placeholderRegistry.size,
+      blockContainer: context.blockContainer.tagName
+    });
+
+    // Placeholder-based translation will be handled by DOMNodeMatcher
+    // through the completeReassemblyWorkflow function
+    // We just need to set the flag and return
+    context.isPlaceholderTranslation = true;
+    return {
+      success: true,
+      mode: 'placeholder',
+      blockContainer: context.blockContainer,
+      placeholderRegistry: context.placeholderRegistry
+    };
+  }
+
+  // Fall back to standard translation application
+  logger.debug('Applying standard translation (no placeholders)');
+  return applyTranslationsToNodes(textNodes, translations, context);
 }
 
 /**
