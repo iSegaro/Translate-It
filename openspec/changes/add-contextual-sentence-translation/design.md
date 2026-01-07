@@ -197,6 +197,100 @@ cleanupPlaceholderIds(blockContainer);
 - After fallback to atomic extraction
 - On PlaceholderRegistry cleanup/clear
 
+### Decision 8: Revert System Integration
+
+**Problem**: The placeholder system replaces the entire `blockContainer.innerHTML` to apply translations, which breaks the existing StateManager revert mechanism. StateManager currently captures `element.innerHTML` **after** translation (which is already translated), and the `hide-translation` event mechanism expects the original content to be preserved.
+
+**Root Cause Analysis**:
+```javascript
+// Current StateManager.addTranslatedElement() - WRONG for placeholders
+addTranslatedElement(element, translations = new Map()) {
+  this.translatedElements.set(elementId, {
+    element,
+    originalContent: element.innerHTML,  // ← Already translated!
+    translations
+  });
+}
+
+// streaming-placeholder-integration.md spec tries this:
+orchestrator.stateManager.addTranslatedElement(
+  blockContainer,
+  new Map([[blockContainer.textContent, reassembledHTML]]),
+  originalInnerHTML  // ← Parameter doesn't exist!
+);
+```
+
+**Solution**: Modify StateManager to accept optional pre-translation snapshot:
+
+1. **Update StateManager signature**:
+   ```javascript
+   addTranslatedElement(element, translations, originalHTML = null) {
+     const elementId = this._generateElementId();
+     this.translatedElements.set(elementId, {
+       element,
+       // Use provided originalHTML or fall back to current innerHTML
+       originalContent: originalHTML || element.innerHTML,
+       translations
+     });
+   }
+   ```
+
+2. **Capture pre-translation snapshot** in StreamEndService:
+   ```javascript
+   // BEFORE applying translation
+   const originalInnerHTML = blockContainer.innerHTML;
+
+   // Apply placeholder reassembly
+   await applyReassembledHTML(blockContainer, reassembledHTML);
+
+   // Store with snapshot for revert
+   orchestrator.stateManager.addTranslatedElement(
+     blockContainer,
+     new Map([[blockContainer.textContent, reassembledHTML]]),
+     originalInnerHTML  // Pre-translation snapshot
+   );
+   ```
+
+3. **Separate cleanup scopes**:
+   - `data-aiwc-original-id`: Temporary marker for placeholder recovery
+     - Cleaned immediately after translation (Implementation Note #13)
+     - Not needed after reassembly complete
+   - `data-original-html`: Optional attribute for emergency recovery
+     - Can be added as fallback if StateManager memory is lost
+     - Cleaned only after successful revert
+     - NOT affected by `cleanupPlaceholderIds()`
+
+**Trade-offs**:
+- ✅ **Preserves existing revert functionality**: No breaking changes to revert system
+- ✅ **Backward compatible**: Optional parameter, existing code continues to work
+- ⚠️ **Adds complexity to cleanup**: Must distinguish temporary vs persistent attributes
+- ⚠️ **Memory overhead**: Stores full HTML snapshot in StateManager Map
+
+**Performance Impact**: Negligible - HTML snapshot already stored in current StateManager, just captured at correct time now.
+
+**Alternatives Considered**:
+1. **Store in data attribute**: `blockContainer.setAttribute('data-original-html', originalHTML)`
+   - Pros: Survives StateManager clear, accessible from DOM
+   - Cons: Pollutes DOM with large HTML strings, harder to cleanup, security risk
+
+2. **Separate RevertManager**: New service just for placeholder translations
+   - Pros: Clean separation, no StateManager changes
+   - Cons: Duplicates logic, two revert systems to maintain, confusing
+
+3. **Disable revert for placeholders**: Only support revert for atomic extraction
+   - Pros: Simplest implementation
+   - Cons: Broken feature, poor UX, users expect revert to work
+
+**Decision**: Modify StateManager with optional parameter (Solution 1)
+
+**Risk**: Medium - Changes to StateManager affect all translation paths, not just placeholders
+
+**Mitigation**:
+- Make parameter optional with fallback to current behavior
+- Add comprehensive unit tests for both paths
+- Test atomic extraction revert still works
+- Feature flag for placeholder system (allows rollback)
+
 ## Risks / Trade-offs
 
 ### Risk 1: AI Providers Remove Placeholders

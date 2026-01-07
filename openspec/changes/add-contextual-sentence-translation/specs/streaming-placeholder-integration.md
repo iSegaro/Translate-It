@@ -656,11 +656,13 @@ async _handlePlaceholderTranslation(request, data, targetLanguage) {
     );
 
     // Add translated element with ORIGINAL content (before translation)
+    // NOTE: This requires StateManager.addTranslatedElement() to be updated to accept
+    // optional third parameter `originalHTML`. See design.md Decision 8 and tasks.md section 3.3
     const orchestrator = this.uiManager.orchestrator;
     orchestrator.stateManager.addTranslatedElement(
       blockContainer,
       new Map([[blockContainer.textContent, reassembledHTML]]),
-      originalInnerHTML
+      originalInnerHTML  // Pre-translation snapshot for revert support
     );
 
     // Mark request as completed

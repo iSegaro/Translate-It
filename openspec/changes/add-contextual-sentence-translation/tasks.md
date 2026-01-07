@@ -40,6 +40,25 @@
   - [ ] Test cleanup is called after successful translation
   - [ ] Test cleanup is called after timeout/fallback
   - [ ] Test cleanup is called on PlaceholderRegistry.clear()
+  - [ ] Ensure cleanup does NOT remove `data-original-html` (for revert persistence)
+
+- [ ] 3.3 Update StateManager for Placeholder Revert Support
+  - [ ] Modify `StateManager.addTranslatedElement()` signature:
+    - [ ] Add optional third parameter: `originalHTML`
+    - [ ] Update function signature: `addTranslatedElement(element, translations, originalHTML = null)`
+    - [ ] Store `originalHTML` if provided, otherwise use `element.innerHTML`
+  - [ ] Update stored data structure:
+    - [ ] Use `originalContent: originalHTML || element.innerHTML`
+    - [ ] Ensure backward compatibility with existing callers
+  - [ ] Update `revertTranslations()` method:
+    - [ ] Restore from stored `originalContent` (now contains pre-translation snapshot)
+    - [ ] Emit `hide-translation` event as before
+    - [ ] Clear translated element from map after successful revert
+  - [ ] Add cleanup for `data-original-html` attribute:
+    - [ ] After successful revert, remove `data-original-html` if present
+    - [ ] Ensure this cleanup is separate from `cleanupPlaceholderIds()`
+    - [ ] Test that revert works correctly with placeholder translations
+    - [ ] Test that atomic extraction revert still works (backward compatibility)
 
 ## 4. Integration - Text Extraction Service
 - [ ] 4.1 Modify `TextExtractionService.js`
@@ -178,6 +197,26 @@
   - [ ] Test cleanup with multiple block containers
     - [ ] Verify all blocks cleaned independently
     - [ ] Verify no cross-block contamination
+
+- [ ] 9.8 Revert Functionality Tests
+  - [ ] Test revert with placeholder translations
+    - [ ] Verify `StateManager.addTranslatedElement()` receives `originalHTML` parameter
+    - [ ] Verify pre-translation HTML captured correctly
+    - [ ] Verify `revertTranslations()` restores from stored `originalContent`
+    - [ ] Verify inline elements (`<em>`, `<strong>`, `<a>`) preserved in revert
+    - [ ] Verify `hide-translation` event emitted correctly
+    - [ ] Verify block returns to exact pre-translation state
+    - [ ] Verify no placeholder artifacts remain after revert
+  - [ ] Test revert backward compatibility with atomic extraction
+    - [ ] Verify optional third parameter works (null/undefined)
+    - [ ] Verify atomic extraction revert still works with 2 parameters
+    - [ ] Verify Google Translate revert unchanged
+    - [ ] Verify Yandex Translate revert unchanged
+    - [ ] Verify no breaking changes to existing code paths
+  - [ ] Test StateManager signature update
+    - [ ] Verify `addTranslatedElement(element, translations, originalHTML = null)` works
+    - [ ] Verify fallback to `element.innerHTML` when `originalHTML` not provided
+    - [ ] Verify backward compatibility with existing callers
 
 ## 10. Documentation
 - [ ] 10.1 Update System Documentation

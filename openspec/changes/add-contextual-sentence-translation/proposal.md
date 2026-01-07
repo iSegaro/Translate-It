@@ -545,6 +545,37 @@ The system supports 100+ languages including:
     }
     ```
 
+19. **Revert Functionality Integration**: CRITICAL - The placeholder system must integrate with the existing StateManager revert mechanism:
+    ```javascript
+    // BEFORE modifying blockContainer.innerHTML:
+    const originalInnerHTML = blockContainer.innerHTML;
+
+    // Apply translation with placeholders
+    await applyReassembledHTML(blockContainer, reassembledHTML);
+
+    // Store with original HTML for revert
+    orchestrator.stateManager.addTranslatedElement(
+      blockContainer,
+      new Map([[blockContainer.textContent, reassembledHTML]]),
+      originalInnerHTML  // CRITICAL: Pre-translation snapshot
+    );
+    ```
+
+    **Why this matters**:
+    - **Existing revert system**: StateManager.revertTranslations() emits `hide-translation` event
+    - **Conflict**: Placeholder system replaces entire innerHTML, losing original structure
+    - **Solution**: Capture pre-translation HTML and pass to StateManager
+    - **StateManager update**: Modify signature to accept optional third parameter `originalHTML?`
+    - **Cleanup scope separation**:
+      - `data-aiwc-original-id`: Temporary, cleaned after translation ✅
+      - `data-original-html`: Persistent until user revert, cleaned separately ❌
+
+    **Implementation requirements**:
+    1. Modify `StateManager.addTranslatedElement(element, translations, originalHTML?)` to accept optional third parameter
+    2. Store `originalHTML` if provided, otherwise fall back to `element.innerHTML`
+    3. Update `revertTranslations()` to restore from stored `originalHTML` instead of `originalContent`
+    4. Add cleanup for `data-original-html` after successful revert
+
 ## Testing Strategy
 
 ### Test Cases
@@ -742,3 +773,25 @@ The system supports 100+ languages including:
     - Verify: Registry cleared
     - Verify: No orphaned attributes remain in DOM
     - Verify: Block returned to clean original state
+
+28. **Revert Functionality with Placeholder Translations**:
+    - Input: `<p>Agent <em>Zero</em> AI <strong>rocks</strong>!</p>`
+    - Translation Applied: `<p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!</p>`
+    - Original HTML Stored: `<p>Agent <em>Zero</em> AI <strong>rocks</strong>!</p>`
+    - User Triggers Revert: Presses revert shortcut or clicks revert button
+    - Expected: Block restored to original HTML exactly
+    - Verify: `StateManager.addTranslatedElement()` received `originalHTML` parameter
+    - Verify: `revertTranslations()` restores from stored `originalContent`
+    - Verify: Inline elements (`<em>`, `<strong>`) preserved correctly in revert
+    - Verify: `hide-translation` event emitted correctly
+    - Verify: Block returns to exact pre-translation state
+    - Verify: No placeholder artifacts remain after revert
+
+29. **Revert Backward Compatibility with Atomic Extraction**:
+    - Input: Traditional provider (Google, Yandex) translation without placeholders
+    - StateManager Called: `addTranslatedElement(element, translations)` (2 parameters)
+    - Expected: Falls back to capturing `element.innerHTML` after translation
+    - Verify: Optional third parameter works correctly (null/undefined)
+    - Verify: Backward compatibility maintained for existing code paths
+    - Verify: Atomic extraction revert still works as before
+    - Verify: No breaking changes to non-placeholder translations
