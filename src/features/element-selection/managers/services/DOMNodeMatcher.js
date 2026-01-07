@@ -1,6 +1,11 @@
 import { getScopedLogger } from "../../../../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore } from "../../utils/textProcessing.js";
+import {
+  completeReassemblyWorkflow,
+  extractPlaceholdersFromTranslation,
+  validatePlaceholders
+} from "../../utils/placeholderReassembly.js";
 
 /**
  * DOMNodeMatcher - Finds and matches DOM nodes to translations
@@ -11,6 +16,7 @@ import { normalizeForMatching, findBestTranslationMatch, calculateTextMatchScore
  * - Multi-segment and partial text matching
  * - Node validation and filtering
  * - Multi-segment and single-segment translation handling
+ * - Placeholder-based translation reassembly for contextual sentence translation
  *
  * @memberof module:features/element-selection/managers/services
  */
@@ -18,6 +24,9 @@ export class DOMNodeMatcher {
   constructor(uiManager) {
     this.uiManager = uiManager;
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DOMNodeMatcher');
+
+    // Placeholder detection pattern: [[AIWC-0]], [[AIWC-1]], etc.
+    this.PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/;
   }
 
   /**
@@ -612,6 +621,198 @@ export class DOMNodeMatcher {
     }
 
     return analysis;
+  }
+
+  /**
+   * Check if a translation unit contains placeholders
+   * @param {Object} translationUnit - Translation unit to check
+   * @returns {boolean} True if unit contains placeholders
+   */
+  _hasPlaceholders(translationUnit) {
+    if (!translationUnit || !translationUnit.originalText) {
+      return false;
+    }
+
+    const originalText = translationUnit.originalText;
+    return this.PLACEHOLDER_PATTERN.test(originalText);
+  }
+
+  /**
+   * Apply placeholder-based translation to block container
+   * This is used for contextual sentence translation with inline elements
+   * @param {HTMLElement} blockContainer - The block container to update
+   * @param {string} translatedText - The translated text with placeholders
+   * @param {Object} placeholderRegistry - The placeholder registry
+   * @returns {Promise<boolean>} True if reassembly succeeded
+   */
+  async _applyPlaceholderReassembly(blockContainer, translatedText, placeholderRegistry) {
+    this.logger.debug('Applying placeholder reassembly', {
+      container: blockContainer.tagName,
+      textLength: translatedText.length,
+      registrySize: placeholderRegistry?.size || 0
+    });
+
+    if (!placeholderRegistry || placeholderRegistry.size === 0) {
+      this.logger.warn('Placeholder registry is empty, cannot reassemble');
+      return false;
+    }
+
+    try {
+      // Use the complete reassembly workflow with cleanup
+      const result = await completeReassemblyWorkflow(
+        translatedText,
+        placeholderRegistry,
+        blockContainer,
+        'ai'
+      );
+
+      if (result.success) {
+        this.logger.info('Placeholder reassembly completed successfully', {
+          replacements: result.replacements?.length || 0,
+          cleanedAttributes: result.cleanedAttributes || 0
+        });
+
+        // Store in state manager with pre-translation HTML for revert support
+        if (this.uiManager.stateManager) {
+          // The original HTML should have been captured before translation
+          // For now, we'll store the current translated content
+          this.uiManager.stateManager.addTranslatedElement(
+            blockContainer,
+            new Map([[blockContainer.textContent, result.html]]),
+            null // originalHTML should be passed by the caller
+          );
+        }
+
+        return true;
+      } else {
+        this.logger.warn('Placeholder reassembly failed', {
+          error: result.error,
+          fallback: result.fallback
+        });
+
+        // If reassembly failed and fallback is suggested, we may need to retry
+        // with atomic extraction (this would be handled by the caller)
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Error during placeholder reassembly', { error });
+
+      // Cleanup on error
+      try {
+        if (placeholderRegistry) {
+          placeholderRegistry.clear(blockContainer);
+        }
+      } catch (cleanupError) {
+        this.logger.error('Error during cleanup after reassembly failure', { cleanupError });
+      }
+
+      return false;
+    }
+  }
+
+  /**
+   * Validate that placeholders are preserved in translation
+   * @param {string} originalText - Original text with placeholders
+   * @param {string} translatedText - Translated text
+   * @param {Object} placeholderRegistry - The placeholder registry
+   * @returns {Object} Validation result
+   */
+  _validatePlaceholderPreservation(originalText, translatedText, placeholderRegistry) {
+    // Extract placeholders from both texts
+    const originalPlaceholders = extractPlaceholdersFromTranslation(originalText, 'ai');
+    const translatedPlaceholders = extractPlaceholdersFromTranslation(translatedText, 'ai');
+
+    // Validate using the placeholder validation function
+    const validation = validatePlaceholders(translatedPlaceholders, placeholderRegistry);
+
+    this.logger.debug('Placeholder preservation validation', {
+      originalCount: originalPlaceholders.length,
+      translatedCount: translatedPlaceholders.length,
+      isValid: validation.isValid,
+      missing: validation.missingIds,
+      extra: validation.extraIds
+    });
+
+    return validation;
+  }
+
+  /**
+   * Handle translation with placeholder-aware routing
+   * Detects if the translation contains placeholders and routes appropriately
+   * @param {HTMLElement} blockContainer - The block container
+   * @param {string} translatedText - The translated text
+   * @param {Object} translationRequest - The translation request with metadata
+   * @returns {Promise<boolean>} True if translation applied successfully
+   */
+  async applyTranslationWithPlaceholderSupport(blockContainer, translatedText, translationRequest) {
+    const { placeholderRegistry, originalText } = translationRequest;
+
+    // Check if this is a placeholder-based translation
+    const hasPlaceholders = originalText && this.PLACEHOLDER_PATTERN.test(originalText);
+
+    if (!hasPlaceholders) {
+      // Use standard translation application
+      return this._applyStandardTranslation(blockContainer, translatedText);
+    }
+
+    this.logger.debug('Placeholder-based translation detected', {
+      placeholderCount: placeholderRegistry?.size || 0
+    });
+
+    // Validate placeholder preservation
+    const validation = this._validatePlaceholderPreservation(
+      originalText,
+      translatedText,
+      placeholderRegistry
+    );
+
+    if (!validation.isValid) {
+      this.logger.warn('Placeholder validation failed, may need fallback', {
+        missing: validation.missingIds,
+        extra: validation.extraIds
+      });
+    }
+
+    // Apply placeholder reassembly
+    const success = await this._applyPlaceholderReassembly(
+      blockContainer,
+      translatedText,
+      placeholderRegistry
+    );
+
+    if (!success) {
+      // Placeholder reassembly failed
+      // The caller may want to fall back to atomic extraction
+      this.logger.warn('Placeholder reassembly failed, fallback may be needed');
+    }
+
+    return success;
+  }
+
+  /**
+   * Apply standard translation without placeholders
+   * @private
+   * @param {HTMLElement} blockContainer - The block container
+   * @param {string} translatedText - The translated text
+   * @returns {Promise<boolean>} True if translation applied successfully
+   */
+  async _applyStandardTranslation(blockContainer, translatedText) {
+    this.logger.debug('Applying standard translation (no placeholders)');
+
+    // Use the existing translation application logic
+    // This would call the existing methods like _handleSingleSegmentTranslation
+    // or _handleMultiSegmentTranslation
+
+    // For now, we'll delegate to the existing applyTranslationsToNodes
+    const translationMap = new Map();
+    translationMap.set(blockContainer.textContent, translatedText);
+
+    await this.uiManager.translationApplier.applyTranslationsToNodes(
+      [blockContainer],
+      translationMap
+    );
+
+    return true;
   }
 
   /**

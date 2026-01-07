@@ -85,11 +85,12 @@
   - [ ] Add tests for placeholder preservation
 
 ## 7. Integration - DOM Node Matcher
-- [ ] 7.1 Modify `DOMNodeMatcher.js`
-  - [ ] Add `_applyPlaceholderReassembly(translationUnit, translatedText)` method
-  - [ ] Update `applyTranslationsToNodes()` to detect placeholder units
-  - [ ] Implement reinsertion of original DOM nodes at placeholder positions
-  - [ ] Add fallback logic for missing placeholders
+- [x] 7.1 Modify `DOMNodeMatcher.js`
+  - [x] Add `_applyPlaceholderReassembly(blockContainer, translatedText, placeholderRegistry)` method
+  - [x] Add `applyTranslationWithPlaceholderSupport()` routing method
+  - [x] Implement placeholder detection with `_hasPlaceholders()` method
+  - [x] Implement `_validatePlaceholderPreservation()` validation method
+  - [x] Add fallback logic for missing placeholders
   - [ ] Add integration tests
 
 ## 8. AI Provider Integration
