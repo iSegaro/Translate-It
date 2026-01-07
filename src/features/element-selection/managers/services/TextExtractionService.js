@@ -4,6 +4,10 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG, CACHE_CONFIG } from "../constants/selectElementConstants.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import {
+  findBlockContainer,
+  extractBlockWithPlaceholders
+} from '../../utils/blockLevelExtraction.js';
 
 export class TextExtractionService extends ResourceTracker {
   constructor() {
@@ -12,6 +16,22 @@ export class TextExtractionService extends ResourceTracker {
     this.config = { ...CONFIG };
     this.elementValidationCache = CACHE_CONFIG.ELEMENT_VALIDATION;
     this.textContentCache = CACHE_CONFIG.TEXT_CONTENT;
+
+    // AI providers that support placeholder-based extraction
+    this.AI_PROVIDERS = new Set([
+      'gemini', 'openai', 'claude', 'deep', 'chatgpt', 'gpt'
+    ]);
+  }
+
+  /**
+   * Check if a provider is an AI provider (supports placeholders)
+   * @param {string} providerType - The provider type identifier
+   * @returns {boolean} True if provider is an AI provider
+   */
+  isAIProvider(providerType) {
+    if (!providerType) return false;
+    const type = providerType.toLowerCase();
+    return this.AI_PROVIDERS.some(p => type.includes(p));
   }
 
   /**
@@ -497,11 +517,74 @@ export class TextExtractionService extends ResourceTracker {
   async cleanup() {
     this.elementValidationCache = new WeakMap();
     this.textContentCache = new WeakMap();
-    
+
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
-    
+
     this.logger.debug('TextExtractionService cleanup completed');
+  }
+
+  /**
+   * Extract text with placeholder-based extraction for AI providers
+   * @param {HTMLElement} element - The element to extract from
+   * @param {PlaceholderRegistry} registry - The placeholder registry
+   * @returns {Object} Extraction result with text and metadata
+   */
+  extractWithPlaceholders(element, registry /*: PlaceholderRegistry */) {
+    this.logger.debug('[extractWithPlaceholders] Starting placeholder-based extraction');
+
+    // Find block container
+    const blockContainer = findBlockContainer(element);
+
+    // Extract with placeholders
+    const result = extractBlockWithPlaceholders(blockContainer, registry);
+
+    this.logger.debug('[extractWithPlaceholders] Extraction complete', {
+      textLength: result.text.length,
+      placeholderCount: result.placeholderCount,
+      blockTag: result.blockContainer.tagName
+    });
+
+    return result;
+  }
+
+  /**
+   * Main extraction method with provider-aware routing
+   * @param {HTMLElement} element - The element to extract from
+   * @param {Object} options - Extraction options
+   * @returns {Object|string} Extraction result
+   */
+  extractText(element, options = {}) {
+    const {
+      providerType = null,
+      usePlaceholders = false,
+      registry = null
+    } = options;
+
+    this.logger.debug('[extractText] Starting extraction', {
+      providerType,
+      usePlaceholders,
+      hasRegistry: !!registry
+    });
+
+    // Route to placeholder-based extraction for AI providers
+    if (usePlaceholders && registry && this.isAIProvider(providerType)) {
+      return this.extractWithPlaceholders(element, registry);
+    }
+
+    // Default to standard extraction
+    const text = this.extractTextFromElement(element);
+
+    this.logger.debug('[extractText] Standard extraction complete', {
+      textLength: text.length
+    });
+
+    return {
+      text,
+      placeholderCount: 0,
+      hasPlaceholders: false,
+      blockContainer: element
+    };
   }
 
   /**
@@ -514,7 +597,8 @@ export class TextExtractionService extends ResourceTracker {
       cacheSizes: {
         elementValidation: 'WeakMap (size not available)',
         textContent: 'WeakMap (size not available)'
-      }
+      },
+      aiProviders: Array.from(this.AI_PROVIDERS)
     };
   }
 }

@@ -60,3 +60,31 @@ export {
   applyContainerDirection as applyContainerDirectionExtraction,
   restoreOriginalDirection as restoreOriginalDirectionExtraction
 } from './textExtraction.js';
+
+// Contextual Sentence Translation System (Placeholder Support)
+export {
+  PlaceholderRegistry,
+  placeholderRegistry,
+  cleanupPlaceholderIds
+} from './PlaceholderRegistry.js';
+
+export {
+  isBlockElement,
+  isInlineElement,
+  findBlockContainer,
+  extractBlockWithPlaceholders,
+  extractTextWithInlinePlaceholders,
+  extractMultipleBlocksWithPlaceholders,
+  getBlockStatistics
+} from './blockLevelExtraction.js';
+
+export {
+  extractPlaceholdersFromTranslation,
+  validatePlaceholders,
+  isInsidePlaceholder,
+  reassembleTranslationWithPlaceholders,
+  handleMissingPlaceholders,
+  applyReassembledHTML,
+  completeReassemblyWorkflow,
+  validatePlaceholderBoundaries
+} from './placeholderReassembly.js';

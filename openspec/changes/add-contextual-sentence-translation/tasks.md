@@ -1,71 +1,71 @@
 # Implementation Tasks
 
 ## 1. Foundation - Placeholder Registry
-- [ ] 1.1 Create `PlaceholderRegistry.js` class in `src/features/element-selection/utils/`
-  - [ ] Implement `register(inlineElement)` method
-  - [ ] Add unique identifier generation: `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  - [ ] Set `data-aiwc-original-id` attribute on element before storing
-  - [ ] Store complete subtree HTML for nested elements
-  - [ ] Implement `getPlaceholder(id)` method
-  - [ ] Implement `getPlaceholderOrRecover(id)` method with querySelector fallback
-  - [ ] Implement `clear()` method that also calls cleanupPlaceholderIds
+- [x] 1.1 Create `PlaceholderRegistry.js` class in `src/features/element-selection/utils/`
+  - [x] Implement `register(inlineElement)` method
+  - [x] Add unique identifier generation: `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  - [x] Set `data-aiwc-original-id` attribute on element before storing
+  - [x] Store complete subtree HTML for nested elements
+  - [x] Implement `getPlaceholder(id)` method
+  - [x] Implement `getPlaceholderOrRecover(id)` method with querySelector fallback
+  - [x] Implement `clear()` method that also calls cleanupPlaceholderIds
   - [ ] Add unit tests for registry operations
 
 ## 2. Foundation - Block-Level Extraction
-- [ ] 2.1 Create `blockLevelExtraction.js` in `src/features/element-selection/utils/`
-  - [ ] Implement `findBlockContainer(startElement)` function
-  - [ ] Implement `isInlineElement(element)` function
-  - [ ] Implement `isBlockElement(element)` function
-  - [ ] Implement `extractBlockWithPlaceholders(blockContainer, registry)` function
-  - [ ] Use `[[AIWC-0]]` format for placeholder markers
-  - [ ] Implement recursive `extractTextWithInlinePlaceholders(node, registry)` function
-  - [ ] Capture complete subtree for nested inline elements (e.g., `<a>text <em>more</em></a>`)
+- [x] 2.1 Create `blockLevelExtraction.js` in `src/features/element-selection/utils/`
+  - [x] Implement `findBlockContainer(startElement)` function
+  - [x] Implement `isInlineElement(element)` function
+  - [x] Implement `isBlockElement(element)` function
+  - [x] Implement `extractBlockWithPlaceholders(blockContainer, registry)` function
+  - [x] Use `[[AIWC-0]]` format for placeholder markers
+  - [x] Implement recursive `extractTextWithInlinePlaceholders(node, registry)` function
+  - [x] Capture complete subtree for nested inline elements (e.g., `<a>text <em>more</em></a>`)
   - [ ] Add unit tests for DOM traversal logic
   - [ ] Test nested element subtree extraction
 
 ## 3. Foundation - Placeholder Reassembly
-- [ ] 3.1 Create `placeholderReassembly.js` in `src/features/element-selection/utils/`
-  - [ ] Implement `extractPlaceholdersFromTranslation(translatedText)` with regex pattern
-  - [ ] Use whitespace-tolerant regex: `/\[\[\s*AIWC-(\d+)\s*\]\]/g`
-  - [ ] Implement `reassembleTranslationWithPlaceholders(translatedText, registry, blockContainer)` function
-  - [ ] Implement `handleMissingPlaceholders(translatedText, foundPlaceholders, registry)` fallback
+- [x] 3.1 Create `placeholderReassembly.js` in `src/features/element-selection/utils/`
+  - [x] Implement `extractPlaceholdersFromTranslation(translatedText)` with regex pattern
+  - [x] Use whitespace-tolerant regex: `/\[\[\s*AIWC-(\d+)\s*\]\]/g`
+  - [x] Implement `reassembleTranslationWithPlaceholders(translatedText, registry, blockContainer)` function
+  - [x] Implement `handleMissingPlaceholders(translatedText, foundPlaceholders, registry)` fallback
   - [ ] Add unit tests for reassembly logic
 
-- [ ] 3.2 Implement Cleanup Functionality in `placeholderReassembly.js`
-  - [ ] Add `cleanupPlaceholderIds(blockContainer)` function
-  - [ ] Query all elements with `[data-aiwc-original-id]` attribute
-  - [ ] Remove `data-aiwc-original-id` attribute from each element
-  - [ ] Log count of cleaned elements for debugging
+- [x] 3.2 Implement Cleanup Functionality in `placeholderReassembly.js`
+  - [x] Add `cleanupPlaceholderIds(blockContainer)` function
+  - [x] Query all elements with `[data-aiwc-original-id]` attribute
+  - [x] Remove `data-aiwc-original-id` attribute from each element
+  - [x] Log count of cleaned elements for debugging
   - [ ] Add unit tests for cleanup functionality
   - [ ] Test cleanup is called after successful translation
   - [ ] Test cleanup is called after timeout/fallback
   - [ ] Test cleanup is called on PlaceholderRegistry.clear()
-  - [ ] Ensure cleanup does NOT remove `data-original-html` (for revert persistence)
+  - [x] Ensure cleanup does NOT remove `data-original-html` (for revert persistence)
 
-- [ ] 3.3 Update StateManager for Placeholder Revert Support
-  - [ ] Modify `StateManager.addTranslatedElement()` signature:
-    - [ ] Add optional third parameter: `originalHTML`
-    - [ ] Update function signature: `addTranslatedElement(element, translations, originalHTML = null)`
-    - [ ] Store `originalHTML` if provided, otherwise use `element.innerHTML`
-  - [ ] Update stored data structure:
-    - [ ] Use `originalContent: originalHTML || element.innerHTML`
-    - [ ] Ensure backward compatibility with existing callers
-  - [ ] Update `revertTranslations()` method:
-    - [ ] Restore from stored `originalContent` (now contains pre-translation snapshot)
-    - [ ] Emit `hide-translation` event as before
-    - [ ] Clear translated element from map after successful revert
-  - [ ] Add cleanup for `data-original-html` attribute:
-    - [ ] After successful revert, remove `data-original-html` if present
-    - [ ] Ensure this cleanup is separate from `cleanupPlaceholderIds()`
+- [x] 3.3 Update StateManager for Placeholder Revert Support
+  - [x] Modify `StateManager.addTranslatedElement()` signature:
+    - [x] Add optional third parameter: `originalHTML`
+    - [x] Update function signature: `addTranslatedElement(element, translations, originalHTML = null)`
+    - [x] Store `originalHTML` if provided, otherwise use `element.innerHTML`
+  - [x] Update stored data structure:
+    - [x] Use `originalContent: originalHTML || element.innerHTML`
+    - [x] Ensure backward compatibility with existing callers
+  - [x] Update `revertTranslations()` method:
+    - [x] Restore from stored `originalContent` (now contains pre-translation snapshot)
+    - [x] Emit `hide-translation` event as before
+    - [x] Clear translated element from map after successful revert
+  - [x] Add cleanup for `data-original-html` attribute:
+    - [x] After successful revert, remove `data-original-html` if present
+    - [x] Ensure this cleanup is separate from `cleanupPlaceholderIds()`
     - [ ] Test that revert works correctly with placeholder translations
     - [ ] Test that atomic extraction revert still works (backward compatibility)
 
 ## 4. Integration - Text Extraction Service
-- [ ] 4.1 Modify `TextExtractionService.js`
-  - [ ] Add `isAIProvider(providerType)` method
-  - [ ] Add `usePlaceholders` parameter to `extractText()` method
-  - [ ] Create `extractWithPlaceholders(element, registry)` method
-  - [ ] Update provider detection logic
+- [x] 4.1 Modify `TextExtractionService.js`
+  - [x] Add `isAIProvider(providerType)` method
+  - [x] Add `usePlaceholders` parameter to `extractText()` method
+  - [x] Create `extractWithPlaceholders(element, registry)` method
+  - [x] Update provider detection logic
   - [ ] Add integration tests
 
 ## 5. Integration - DOM Manipulation
@@ -93,22 +93,22 @@
   - [ ] Add integration tests
 
 ## 8. AI Provider Integration
-- [ ] 8.1 Modify `BaseAIProvider.js`
-  - [ ] Update batching logic to prevent splitting placeholder-containing texts
-  - [ ] Add placeholder preservation check: `if (/\[\[AIWC-\d+\]\]/.test(text))`
-  - [ ] Force placeholder texts into single-item batches
+- [x] 8.1 Modify `BaseAIProvider.js`
+  - [x] Update batching logic to prevent splitting placeholder-containing texts
+  - [x] Add placeholder preservation check: `if (/\[\[AIWC-\d+\]\]/.test(text))`
+  - [x] Force placeholder texts into single-item batches
   - [ ] Add tests for batching protection
 
-- [ ] 8.2 Implement Multi-Language Smart Chunking with Intl.Segmenter
-  - [ ] Add `splitIntoSentences(text, sourceLanguage)` using `Intl.Segmenter` API
-  - [ ] Implement hierarchical chunking strategy:
-    - [ ] Layer 1: Placeholder boundary protection (NEVER split inside `[[AIWC-0]]`)
-    - [ ] Layer 2: Paragraph boundaries (double newlines `\n\n`)
-    - [ ] Layer 3: Sentence boundaries using `Intl.Segmenter` with `granularity: 'sentence'`
-    - [ ] Layer 4: Character limit fallback (last resort, warn in logs)
-  - [ ] Add `validatePlaceholderBoundaries(chunks, originalText)` function
-  - [ ] Implement `isInsidePlaceholder(text, position)` for boundary detection
-  - [ ] Add `groupSentencesIntoChunks(sentences, limit)` helper function
+- [x] 8.2 Implement Multi-Language Smart Chunking with Intl.Segmenter
+  - [x] Add `splitIntoSentences(text, sourceLanguage)` using `Intl.Segmenter` API
+  - [x] Implement hierarchical chunking strategy:
+    - [x] Layer 1: Placeholder boundary protection (NEVER split inside `[[AIWC-0]]`)
+    - [x] Layer 2: Paragraph boundaries (double newlines `\n\n`)
+    - [x] Layer 3: Sentence boundaries using `Intl.Segmenter` with `granularity: 'sentence'`
+    - [x] Layer 4: Character limit fallback (last resort, warn in logs)
+  - [x] Add `validatePlaceholderBoundaries(chunks, originalText)` function
+  - [x] Implement `isInsidePlaceholder(text, position)` for boundary detection
+  - [x] Add `groupSentencesIntoChunks(sentences, limit)` helper function
   - [ ] Add unit tests for 100+ languages:
     - [ ] English: "Dr. Smith lives in the U.S.A." → Correctly detects abbreviations
     - [ ] Chinese: "你好。世界！" → Splits at Chinese punctuation

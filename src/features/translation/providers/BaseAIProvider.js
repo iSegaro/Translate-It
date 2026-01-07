@@ -256,6 +256,13 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {string[][]} - Array of batches
    */
   _createOptimalBatches(texts, translateMode = null) {
+    // CRITICAL: Check for placeholders and use atomic batching
+    // When placeholders are present, NEVER split texts across batches
+    if (this._hasPlaceholders(texts)) {
+      logger.debug(`[${this.providerName}] Placeholders detected in ${texts.length} texts, using atomic batching`);
+      return [texts]; // Single batch to preserve placeholder integrity
+    }
+
     // Get mode-specific batching configuration
     const batchingConfig = this._getBatchingConfig(translateMode);
     const strategy = batchingConfig.strategy || this.constructor.preferredBatchStrategy;
@@ -277,6 +284,16 @@ export class BaseAIProvider extends BaseProvider {
       default:
         return this._createFixedBatches(texts, optimalSize);
     }
+  }
+
+  /**
+   * Check if any text contains placeholder markers
+   * @param {string[]} texts - Texts to check
+   * @returns {boolean} - True if placeholders found
+   */
+  _hasPlaceholders(texts) {
+    const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/;
+    return texts.some(text => PLACEHOLDER_PATTERN.test(text));
   }
 
   /**
@@ -880,5 +897,191 @@ export class BaseAIProvider extends BaseProvider {
     logger.debug(`[${this.providerName}] Created ${batches.length} ${balancedBatching ? 'balanced' : ''}character-based batches for ${texts.length} segments (${totalChars} chars, target: ${targetBatchChars} chars/batch)`);
 
     return batches;
+  }
+
+  /**
+   * Split text into sentences using Intl.Segmenter API (100+ language support)
+   * This is the GOLD STANDARD for sentence boundary detection across all languages
+   * @param {string} text - Text to split
+   * @param {string} sourceLanguage - Source language code
+   * @returns {string[]} - Array of sentences
+   */
+  splitIntoSentences(text, sourceLanguage = 'en') {
+    // Use Intl.Segmenter for culture-aware sentence splitting
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      try {
+        const segmenter = new Intl.Segmenter(sourceLanguage, { granularity: 'sentence' });
+        const segments = segmenter.segment(text);
+        return Array.from(segments).map(s => s.segment);
+      } catch (error) {
+        logger.debug(`[${this.providerName}] Intl.Segmenter failed for ${sourceLanguage}, falling back to regex:`, error.message);
+      }
+    }
+
+    // Fallback to regex-based splitting for older browsers
+    return this._fallbackSentenceSplitting(text);
+  }
+
+  /**
+   * Fallback sentence splitting using regex
+   * @param {string} text - Text to split
+   * @returns {string[]} - Array of sentences
+   */
+  _fallbackSentenceSplitting(text) {
+    // Simple regex fallback - not as accurate as Intl.Segmenter
+    const sentences = text.split(/(?<=[.!?。！？])\s+/);
+    return sentences.filter(s => s.trim().length > 0);
+  }
+
+  /**
+   * Smart chunking with placeholder boundary protection
+   * Uses hierarchical chunking strategy for 100+ languages
+   * @param {string} text - Text to chunk
+   * @param {number} limit - Character limit per chunk
+   * @param {string} sourceLanguage - Source language code
+   * @returns {string[]} - Array of text chunks
+   */
+  smartChunkWithPlaceholders(text, limit, sourceLanguage = 'en') {
+    if (text.length <= limit) {
+      return [text];
+    }
+
+    // Layer 1: Paragraph boundaries (double newlines)
+    let chunks = this._splitAtParagraphBoundaries(text, limit);
+    if (chunks.length > 1 && this._validatePlaceholderBoundaries(chunks, text)) {
+      return chunks;
+    }
+
+    // Layer 2: Sentence boundaries using Intl.Segmenter
+    const sentences = this.splitIntoSentences(text, sourceLanguage);
+    chunks = this._groupSentencesIntoChunks(sentences, limit);
+
+    // Layer 3: Validate placeholder boundaries
+    if (!this._validatePlaceholderBoundaries(chunks, text)) {
+      // Fallback to single chunk if placeholders would be split
+      logger.warn(`[${this.providerName}] Cannot chunk without splitting placeholders, using single batch`);
+      return [text];
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Split text at paragraph boundaries
+   * @param {string} text - Text to split
+   * @param {number} limit - Character limit
+   * @returns {string[]} - Array of chunks
+   */
+  _splitAtParagraphBoundaries(text, limit) {
+    const paragraphs = text.split(/\n\n+/);
+    const chunks = [];
+    let currentChunk = '';
+
+    for (const paragraph of paragraphs) {
+      if ((currentChunk + paragraph).length > limit && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = paragraph;
+      } else {
+        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Group sentences into chunks respecting character limit
+   * @param {string[]} sentences - Array of sentences
+   * @param {number} limit - Character limit per chunk
+   * @returns {string[]} - Array of chunks
+   */
+  _groupSentencesIntoChunks(sentences, limit) {
+    const chunks = [];
+    let currentChunk = '';
+    let currentLength = 0;
+
+    for (const sentence of sentences) {
+      const sentenceLength = sentence.length;
+
+      // If adding this sentence would exceed limit
+      if (currentLength + sentenceLength > limit && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+        currentLength = sentenceLength;
+      } else {
+        currentChunk += sentence;
+        currentLength += sentenceLength;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Validate that placeholder boundaries are preserved
+   * @param {string[]} chunks - Array of text chunks
+   * @param {string} originalText - Original text
+   * @returns {boolean} - True if placeholders are intact
+   */
+  _validatePlaceholderBoundaries(chunks, originalText) {
+    const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/g;
+
+    // Count placeholders in original text
+    const originalMatches = originalText.match(PLACEHOLDER_PATTERN);
+    const originalCount = originalMatches ? originalMatches.length : 0;
+
+    // Count placeholders in all chunks
+    let chunkCount = 0;
+    for (const chunk of chunks) {
+      const matches = chunk.match(PLACEHOLDER_PATTERN);
+      if (matches) {
+        chunkCount += matches.length;
+      }
+
+      // Check for broken placeholders
+      const brokenPattern = /\[\[AIWC-\d+$|^\d+\]\]|\[\[AIWC-|AIWC-\d+\]\]/;
+      if (brokenPattern.test(chunk)) {
+        logger.error(`[${this.providerName}] Found broken placeholder in chunk`);
+        return false;
+      }
+    }
+
+    return chunkCount === originalCount;
+  }
+
+  /**
+   * Check if a position is inside a placeholder marker
+   * @param {string} text - Text to check
+   * @param {number} position - Position to check
+   * @returns {boolean} - True if inside placeholder
+   */
+  _isInsidePlaceholder(text, position) {
+    const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/g;
+    const matches = [...text.matchAll(PLACEHOLDER_PATTERN)];
+
+    for (const match of matches) {
+      const startIndex = match.index;
+      const endIndex = match.index + match[0].length;
+
+      // Check if position is inside placeholder
+      if (position >= startIndex && position < endIndex) {
+        return true;
+      }
+
+      // Protect 2 characters before and after
+      if (Math.abs(position - startIndex) <= 2 || Math.abs(position - endIndex) <= 2) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

@@ -45,16 +45,23 @@ export class StateManager extends ResourceTracker {
    * Add a translated element to the state
    * @param {HTMLElement} element - The translated element
    * @param {Map} translations - Map of translations for revert functionality
+   * @param {string} originalHTML - Optional pre-translation HTML snapshot (for placeholder system)
    */
-  addTranslatedElement(element, translations = new Map()) {
+  addTranslatedElement(element, translations = new Map(), originalHTML = null) {
     const elementId = this._generateElementId();
     this.translatedElements.set(elementId, {
       element,
       timestamp: Date.now(),
-      originalContent: element.innerHTML,
-      translations: translations
+      // Use provided originalHTML (pre-translation snapshot) or fall back to current innerHTML
+      originalContent: originalHTML || element.innerHTML,
+      translations: translations,
+      hasPlaceholderSnapshot: originalHTML !== null
     });
-    this.logger.debug("Added translated element to state", { elementId, translationCount: translations.size });
+    this.logger.debug("Added translated element to state", {
+      elementId,
+      translationCount: translations.size,
+      hasPlaceholderSnapshot: originalHTML !== null
+    });
   }
 
   /**
@@ -82,6 +89,18 @@ export class StateManager extends ResourceTracker {
 
     for (const [elementId, translationData] of this.translatedElements) {
       try {
+        // Restore original content from stored snapshot
+        if (translationData.element && translationData.originalContent) {
+          // eslint-disable-next-line noUnsanitized/property -- Restoring original HTML from translation
+          translationData.element.innerHTML = translationData.originalContent;
+
+          // Cleanup data-original-html attribute if present (persistent until revert)
+          const restoredElement = translationData.element.querySelector('[data-original-html]');
+          if (restoredElement) {
+            restoredElement.removeAttribute('data-original-html');
+          }
+        }
+
         // Hide translation overlay
         pageEventBus.emit('hide-translation', { element: translationData.element });
         revertedCount++;
@@ -89,7 +108,7 @@ export class StateManager extends ResourceTracker {
         this.logger.error("Failed to revert translation", { elementId, error });
       }
     }
-    
+
     this.translatedElements.clear();
     this.logger.info(`Reverted ${revertedCount} translations`);
     return revertedCount;
