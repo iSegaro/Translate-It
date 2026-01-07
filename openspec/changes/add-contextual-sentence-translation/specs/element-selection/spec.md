@@ -18,15 +18,15 @@ The system SHALL extract text content from selected DOM elements while preservin
 #### Scenario: Contextual sentence extraction for AI providers
 - **WHEN** an element with inline tags is selected for AI provider translation
 - **THEN** the block-level container is identified
-- **AND** inline elements (<em>, <strong>, <a>, <code>, etc.) are replaced with placeholder markers ([0], [1], [2])
+- **AND** inline elements (<em>, <strong>, <a>, <code>, etc.) are replaced with placeholder markers ([[AIWC-0]], [[AIWC-1]], [[AIWC-2]])
 - **AND** placeholder mappings to original DOM nodes are preserved
 - **AND** complete sentences with grammatical context are sent to translation provider
 
 #### Scenario: Placeholder-based extraction example
 - **GIVEN** element: `<p>Agent <em>Zero</em> AI <strong>rocks</strong>!</p>`
 - **WHEN** extracted for AI provider
-- **THEN** extracted text is: `"Agent [0] AI [1]!"`
-- **AND** mapping contains: `[0] → <em>Zero</em>`, `[1] → <strong>rocks</strong>`
+- **THEN** extracted text is: `"Agent [[AIWC-0]] AI [[AIWC-1]]!"`
+- **AND** mapping contains: `[[AIWC-0]] → <em>Zero</em>`, `[[AIWC-1]] → <strong>rocks</strong>`
 
 #### Scenario: Atomic extraction for traditional providers
 - **WHEN** an element is selected for traditional provider (Google, Yandex) translation
@@ -72,14 +72,14 @@ The system SHALL apply translations back to the original DOM elements. For AI pr
 
 #### Scenario: Placeholder reassembly for AI providers
 - **WHEN** translated text contains placeholder markers from extraction
-- **THEN** placeholder markers are extracted using regex pattern: `/\[\s*(\d+)\s*\]/g`
+- **THEN** placeholder markers are extracted using regex pattern: `/\[\[\s*AIWC-(\d+)\s*\]\]/g`
 - **AND** original DOM nodes are retrieved from placeholder registry
 - **AND** placeholder markers are replaced with original inline elements
 - **AND** translated text with reinserted elements is applied to DOM
 
 #### Scenario: Placeholder reassembly example
-- **GIVEN** extracted: `"Agent [0] AI [1]!"` with mappings to <em> and <strong>
-- **WHEN** translated to Persian: `"عامل [0] هوش مصنوعی [1] عالی است!"`
+- **GIVEN** extracted: `"Agent [[AIWC-0]] AI [[AIWC-1]]!"` with mappings to <em> and <strong>
+- **WHEN** translated to Persian: `"عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]] عالی است!"`
 - **THEN** reassembled DOM: `<p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!</p>`
 
 #### Scenario: Fallback for missing placeholders
@@ -89,7 +89,7 @@ The system SHALL apply translations back to the original DOM elements. For AI pr
 - **AND** translation is reattempted without placeholder system
 
 #### Scenario: Robust placeholder format parsing
-- **WHEN** AI provider modifies placeholder format (e.g., adds spaces: `[ 0 ]`)
+- **WHEN** AI provider modifies placeholder format (e.g., adds spaces: `[[ AIWC-0 ]]`)
 - **THEN** fuzzy regex matching identifies placeholder IDs
 - **AND** reassembly proceeds with modified format
 
@@ -119,8 +119,9 @@ The system SHALL maintain a registry of placeholder markers mapped to original D
 #### Scenario: Placeholder registration
 - **WHEN** inline element is encountered during extraction
 - **THEN** unique numeric placeholder ID is assigned
+- **AND** `data-aiwc-original-id` attribute is set on element with unique identifier
 - **AND** placeholder ID to DOM element mapping is stored
-- **AND** formatted placeholder marker `[ID]` is returned
+- **AND** formatted placeholder marker `[[AIWC-ID]]` is returned
 
 #### Scenario: Placeholder retrieval
 - **WHEN** placeholder ID is provided to registry
@@ -130,6 +131,7 @@ The system SHALL maintain a registry of placeholder markers mapped to original D
 #### Scenario: Registry cleanup
 - **WHEN** translation is completed or cancelled
 - **THEN** placeholder registry is cleared
+- **AND** all `data-aiwc-original-id` attributes are removed from DOM elements
 - **AND** all DOM element references are released
 
 ### Requirement: Block-Level Container Detection
@@ -175,13 +177,13 @@ The system SHALL replace inline elements with placeholder markers during extract
 The system SHALL extract and parse placeholder markers from translated text returned by AI providers.
 
 #### Scenario: Standard placeholder extraction
-- **WHEN** translated text contains placeholder markers in format [0], [1], [2]
+- **WHEN** translated text contains placeholder markers in format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]]
 - **THEN** all placeholder markers are extracted with positions
 - **AND** placeholder IDs are parsed from marker text
 - **AND** extraction order is preserved for reassembly
 
 #### Scenario: Fuzzy placeholder format matching
-- **WHEN** AI provider adds spaces around placeholder IDs ([ 0 ], [ 1 ])
+- **WHEN** AI provider adds spaces around placeholder IDs ([[ AIWC-0 ]], [[ AIWC-1 ]])
 - **THEN** regex pattern extracts placeholders despite whitespace
 - **AND** correct IDs are parsed from modified format
 
@@ -211,3 +213,62 @@ The system SHALL gracefully handle placeholder system failures by falling back t
 - **THEN** system falls back to atomic extraction
 - **AND** registry is cleared and reinitialized
 - **AND** translation is reattempted
+
+### Requirement: Multi-Language Smart Chunking with Intl.Segmenter
+The system SHALL use browser-standard `Intl.Segmenter` API for intelligent sentence boundary detection across 100+ languages when chunking long texts with placeholders.
+
+#### Scenario: Hierarchical chunking strategy
+- **WHEN** text with placeholders exceeds character limit and must be chunked
+- **THEN** system applies hierarchical chunking in order:
+  - Layer 1: Never split inside or adjacent to placeholder markers `[[AIWC-0]]`
+  - Layer 2: Break at paragraph boundaries (double newlines `\n\n`)
+  - Layer 3: Use `Intl.Segmenter` with `granularity: 'sentence'` for language-aware boundaries
+  - Layer 4: Character limit fallback (last resort, warn in logs)
+
+#### Scenario: Intl.Segmenter English abbreviation handling
+- **WHEN** chunking English text: "Dr. Smith lives in the U.S.A. He is happy."
+- **THEN** sentence boundaries are detected at: `["Dr. Smith lives in the U.S.A. ", "He is happy."]`
+- **AND** abbreviations like "Dr." and "U.S.A." are NOT treated as sentence endings
+
+#### Scenario: Intl.Segmenter Chinese punctuation handling
+- **WHEN** chunking Chinese text: "你好。世界！你好吗？"
+- **THEN** sentence boundaries are detected at: `["你好。", "世界！", "你好吗？"]`
+- **AND** Chinese punctuation `。`, `！`, `？` are correctly identified as sentence endings
+
+#### Scenario: Placeholder boundary validation
+- **WHEN** chunking would split a placeholder marker
+- **THEN** chunking is aborted and text is sent as single batch
+- **AND** warning is logged indicating placeholder protection prevented chunking
+
+#### Scenario: Multi-language chunking accuracy
+- **WHEN** chunking text in any of 100+ supported languages
+- **THEN** `Intl.Segmenter` correctly identifies sentence boundaries for that language
+- **AND** placeholder markers are never split across chunks
+- **AND** chunking accuracy exceeds 95% across all tested languages
+
+### Requirement: Extension Attribute Cleanup
+The system SHALL remove all extension-added attributes from DOM elements after translation completion to prevent addon trace pollution.
+
+#### Scenario: Cleanup after successful translation
+- **WHEN** placeholder translation is successfully applied to DOM
+- **THEN** `cleanupPlaceholderIds(blockContainer)` is called
+- **AND** all `data-aiwc-original-id` attributes are removed from elements
+- **AND** no extension traces remain in website DOM
+
+#### Scenario: Cleanup after timeout or failure
+- **WHEN** translation times out or fails and reverts to original HTML
+- **THEN** `cleanupPlaceholderIds(blockContainer)` is called before revert
+- **AND** all `data-aiwc-original-id` attributes are removed
+- **AND** DOM is clean even after failed translation
+
+#### Scenario: Cleanup on registry clear
+- **WHEN** `PlaceholderRegistry.clear()` is called
+- **THEN** cleanup is triggered for all tracked elements
+- **AND** all `data-aiwc-original-id` attributes are removed
+- **AND** memory is freed from element references
+
+#### Scenario: Multiple block container cleanup
+- **WHEN** multiple blocks have been translated independently
+- **THEN** each block's attributes are cleaned independently
+- **AND** no cross-block contamination occurs
+- **AND** cleanup success rate is 100%

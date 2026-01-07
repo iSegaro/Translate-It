@@ -39,15 +39,26 @@ Each fragment is translated independently, losing grammatical context. This caus
 ## Decisions
 
 ### Decision 1: Placeholder Format
-**Choice**: Simple numeric markers in square brackets: `[0]`, `[1]`, `[2]`
+**Choice**: Distinctive markers to avoid regex collisions with code snippets
 
-**Rationale**:
-- Unambiguous - won't conflict with natural text
-- AI providers (LLMs) understand this pattern well
-- Easy to parse with regex: `/\[\s*(\d+)\s*\]/g`
+**AI Providers**: `[[AIWC-0]]`, `[[AIWC-1]]`, `[[AIWC-2]]` format
+- Easy to parse: `/\[\[AIWC-(\d+)\]\]/g`
+- Won't occur naturally in technical content (avoids collisions with `array[0]`)
 - Compact format minimizes token usage
 
+**Traditional Providers**: `<span translate="no" data-aiwc-ph-id="0" class="aiwc-placeholder">0</span>`
+- Uses HTML5 `translate="no"` attribute for native placeholder preservation
+- Easy to parse: `/<span[^>]*translate="no"[^>]*data-aiwc-ph-id="(\d+)"[^>]*>/g`
+- Provides fallback if placeholder markers are stripped
+
+**Rationale**:
+- The simple `[0]` format collides with code like "array[0]" on GitHub
+- `[[AIWC-0]]` format (AIWC = AI Web Context) is distinctive and won't occur naturally
+- Unified extraction/reassembly logic for all providers
+- Easy to detect and parse with regex
+
 **Alternatives Considered**:
+- Simple `[0]` format - Collides with code like "array[0]" on GitHub
 - XML-style tags: `<inline id="0">` - Too verbose, AI may try to interpret as HTML
 - UUID markers: `[a1b2c3d4]` - Unnecessarily complex, wastes tokens
 - Unicode markers: `[①]`, `[②]` - May not display correctly in all contexts
@@ -110,10 +121,81 @@ isAIProvider(providerType) {
 
 **Implementation**:
 ```javascript
-if (/\[\d+\]/.test(text)) {
+// For AI providers with [[AIWC-0]] format:
+if (/\[\[AIWC-\d+\]\]/.test(text)) {
+  batches.push([text]); // Single-item batch
+}
+
+// For traditional providers with HTML span format:
+if (/<span[^>]*translate="no"[^>]*data-aiwc-ph-id/.test(text)) {
   batches.push([text]); // Single-item batch
 }
 ```
+
+### Decision 6: Multi-Language Smart Chunking
+**Choice**: Use `Intl.Segmenter` API with hierarchical chunking strategy
+
+**Rationale**:
+- Browser standard API supporting 100+ languages (Chrome 87+, Firefox 125+, Safari 14.1+)
+- Zero maintenance - no abbreviation lists to update
+- Culture-aware: Knows "Mr." in English, "Dr." in German, "p.ej." in Spanish are abbreviations
+- Script-aware: Handles Chinese/Japanese (no sentence dots), Thai, Arabic, Hindi correctly
+- Single API call works for all supported languages
+
+**Implementation Strategy** (Hierarchical):
+1. **Layer 1**: Placeholder boundary protection (NEVER split inside `[[AIWC-0]]`)
+2. **Layer 2**: Universal boundaries (double newlines `\n\n`, single newlines `\n`)
+3. **Layer 3**: Language-aware sentence boundaries using `Intl.Segmenter` with `granularity: 'sentence'`
+4. **Layer 4**: Character limit fallback (last resort, warn in logs)
+
+**Example**:
+```javascript
+// Intl.Segmenter works for ALL languages:
+const segmenter = new Intl.Segmenter(sourceLanguage, { granularity: 'sentence' });
+const segments = segmenter.segment(text);
+// English: "Dr. Smith lives in the U.S.A. He is happy."
+//   → ["Dr. Smith lives in the U.S.A. ", "He is happy."]
+// Chinese: "你好。世界！你好吗？"
+//   → ["你好。", "世界！", "你好吗？"]
+```
+
+**Alternatives Considered**:
+- Manual regex abbreviation lists - Too complex, unmaintainable for 100+ languages
+- Character-only chunking - Breaks sentences mid-thought, poor translation quality
+- Language-specific rules - Impractical to maintain for 100+ languages
+
+### Decision 7: Extension Attribute Cleanup
+**Choice**: Always remove `data-aiwc-original-id` attributes after translation completion
+
+**Rationale**:
+- Prevents addon trace pollution in website code
+- Avoids conflicts with site scripts that might query attributes
+- Cleaner debugging experience for web developers
+- Reduces attack surface for attribute-based extension detection
+- Ensures DOM is clean after translation completes
+
+**Implementation**:
+```javascript
+function cleanupPlaceholderIds(blockContainer) {
+  const markedElements = blockContainer.querySelectorAll('[data-aiwc-original-id]');
+  for (const element of markedElements) {
+    element.removeAttribute('data-aiwc-original-id');
+  }
+}
+
+// Call after successful translation:
+await applyReassembledHTML(blockContainer, reassembledHTML);
+cleanupPlaceholderIds(blockContainer);
+
+// Also call after timeout/failure:
+cleanupPlaceholderIds(blockContainer);
+```
+
+**Cleanup Triggers**:
+- After successful translation application
+- After timeout reverts to original HTML
+- After fallback to atomic extraction
+- On PlaceholderRegistry cleanup/clear
 
 ## Risks / Trade-offs
 
@@ -132,7 +214,8 @@ if (/\[\d+\]/.test(text)) {
 **Impact**: Medium (reassembly fails)
 
 **Mitigation**:
-- Fuzzy regex matching: `/\[\s*(\d+)\s*\]/g` handles `[0]`, `[ 0 ]`, `[0 ]`
+- Fuzzy regex matching: `/\[\[\s*AIWC-(\d+)\s*\]\]/g` handles `[[AIWC-0]]`, `[[ AIWC-0 ]]`, `[[AIWC-0 ]]`
+- Whitespace-tolerant parsing for robustness
 - Multiple parsing strategies before falling back
 - Log all format modifications for monitoring
 
@@ -268,9 +351,9 @@ TextExtractionService.extractText()
        │         │                   ▼
        │         │          blockLevelExtraction.extractBlockWithPlaceholders()
        │         │                   │
-       │         │                   ├──► "Agent [0] AI [1]!"
+       │         │                   ├──► "Agent [[AIWC-0]] AI [[AIWC-1]]!"
        │         │                   │
-       │         │                   └──► Mapping: [0] → <em>, [1] → <strong>
+       │         │                   └──► Mapping: [[AIWC-0]] → <em>, [[AIWC-1]] → <strong>
        │         │
        │         └──► NO ───► collectTextNodesOptimized() (existing)
        │                              │
@@ -280,21 +363,26 @@ TextExtractionService.extractText()
 Translation Request (with placeholders for AI)
        │
        ▼
-AI Provider (preserves [0], [1])
+AI Provider (preserves [[AIWC-0]], [[AIWC-1]])
        │
        ▼
-Translated: "عامل [0] هوش مصنوعی [1] عالی است!"
+Translated: "عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]] عالی است!"
        │
        ▼
 placeholderReassembly.extractPlaceholdersFromTranslation()
        │
-       ├──► Found: [0] at position 4, [1] at position 25
+       ├──► Found: [[AIWC-0]] at position 4, [[AIWC-1]] at position 30
        │
        ▼
 placeholderReassembly.reassembleTranslationWithPlaceholders()
        │
-       ├──► Replace [0] with <em>Zero</em>
-       ├──► Replace [1] with <strong>rocks</strong>
+       ├──► Replace [[AIWC-0]] with <em>Zero</em>
+       ├──► Replace [[AIWC-1]] with <strong>rocks</strong>
+       │
+       ▼
+cleanupPlaceholderIds(blockContainer)
+       │
+       ├──► Remove data-aiwc-original-id attributes
        │
        ▼
 DOM Applied: <p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!</p>
@@ -328,3 +416,6 @@ DOM Applied: <p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong
 | Placeholder preservation rate | >95% | Automated test results |
 | Fallback trigger rate | <5% | Error tracking logs |
 | CPU usage | <2% increase | Chrome DevTools Performance profiler |
+| Intl.Segmenter compatibility | Chrome 87+, Firefox 125+, Safari 14.1+ | Feature detection |
+| Cleanup success rate | 100% | All `data-aiwc-original-id` removed |
+| Multi-language chunking accuracy | >95% | Sentence boundary detection across 100+ languages |
