@@ -31,21 +31,21 @@ The placeholder system and segment-based translation system were fundamentally i
 ### Current State (Problematic)
 
 ```
-1. Extraction: "Hello [0] world [1]" with registry [0]→<em>, [1]→<strong>
+1. Extraction: "Hello [[AIWC-0]] world [[AIWC-1]]" with registry [[AIWC-0]]→<em>, [[AIWC-1]]→<strong>
 2. API Request: Long text divided into 3 segments:
-   - Segment 1: "Hello [0] world [1]" (part 1)
-   - Segment 2: "Hello [0] world [1]" (part 2)
-   - Segment 3: "Hello [0] world [1]" (part 3)
+   - Segment 1: "Hello [[AIWC-0]] world [[AIWC-1]]" (part 1)
+   - Segment 2: "Hello [[AIWC-0]] world [[AIWC-1]]" (part 2)
+   - Segment 3: "Hello [[AIWC-0]] world [[AIWC-1]]" (part 3)
 
 3. SEGMENT-BASED TRANSLATION STARTS:
-   Segment 1 arrives: "سلام [0] جهان [1]" (partial translation)
+   Segment 1 arrives: "سلام [[AIWC-0]] جهان [[AIWC-1]]" (partial translation)
    → StreamingUpdateService applies to TEXT_NODES immediately
    → Creates wrappers, modifies DOM, LOSES registry references
 
-   Segment 2 arrives: "عامل [0] هوش مصنوعی [1]" (more complete)
+   Segment 2 arrives: "عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]]" (more complete)
    → Tries to update DOM but references are already corrupted
 
-   Segment 3 arrives: "عامل [0] هوش مصنوعی [1] عالی است!" (complete)
+   Segment 3 arrives: "عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]] عالی است!" (complete)
    → Final update but structure is GONE
 
 4. ALL SEGMENTS COMPLETE:
@@ -79,7 +79,7 @@ if (request.placeholderRegistry && request.blockContainer) {
 
 1. **DOM Structure Preservation**: Never replace block container innerHTML during segment translation (wait until ALL segments complete)
 2. **Text-Only Segment Updates**: For placeholder translations, track segment progress but DON'T modify DOM until final reassembly
-3. **Placeholder Marker Protection**: Never modify `[0]`, `[1]` markers during individual segment processing
+3. **Placeholder Marker Protection**: Never modify `[[AIWC-0]]`, `[[AIWC-1]]` markers during individual segment processing
 4. **Final Reassembly Authority**: Only perform DOM modification after ALL segments are complete
 5. **Segment Accumulation**: Collect all translated segments, then perform single reassembly operation
 6. **Graceful Fallback**: Detect placeholder loss and fall back to atomic extraction
@@ -92,8 +92,8 @@ When inline elements contain nested inline elements, the placeholder system must
 
 ```
 Input: <a href="#">Link with <em>emphasis</em></a>
-├── WRONG: [0] → <a> element only (loses <em>)
-└── CORRECT: [0] → <a href="#">Link with <em>emphasis</em></a> (complete subtree)
+├── WRONG: [[AIWC-0]] → <a> element only (loses <em>)
+└── CORRECT: [[AIWC-0]] → <a href="#">Link with <em>emphasis</em></a> (complete subtree)
 
 Implementation:
 - PlaceholderRegistry.registerSubtree(element, outerHTML)
@@ -109,16 +109,16 @@ The provider batching system must **never split text with placeholders** across 
 
 ```
 Scenario: Text with placeholders exceeds character_limit
-Input: "Hello [0] wonderful [1] world!" (2000 chars)
+Input: "Hello [[AIWC-0]] wonderful [[AIWC-1]] world!" (2000 chars)
 
 Normal Batching (WRONG):
-├── Batch 1: "Hello [0] wonderful"  ← Placeholder [0] opened but not closed!
-├── Batch 2: "[1] world!"           ← Placeholder [1] orphaned!
+├── Batch 1: "Hello [[AIWC-0]] wonderful"  ← Placeholder [[AIWC-0]] opened but not closed!
+├── Batch 2: "[[AIWC-1]] world!"           ← Placeholder [[AIWC-1]] orphaned!
 └── Result: REASSEMBLY FAILS!
 
 Placeholder-Aware Batching (CORRECT):
 ├── Override: character_limit = Infinity
-├── Single Batch: "Hello [0] wonderful [1] world!"
+├── Single Batch: "Hello [[AIWC-0]] wonderful [[AIWC-1]] world!"
 └── Result: All placeholders intact, reassembly succeeds
 ```
 
@@ -280,8 +280,8 @@ class BlockTranslationState {
 │ PHASE 1: EXTRACTION                                             │
 ├─────────────────────────────────────────────────────────────────┤
 │ 1. Detect block container: <p>Agent <em>Zero</em> AI</p>       │
-│ 2. Extract text with placeholders: "Agent [0] AI"              │
-│ 3. Build PlaceholderRegistry: [0] → <em>Zero</em>              │
+│ 2. Extract text with placeholders: "Agent [[AIWC-0]] AI"       │
+│ 3. Build PlaceholderRegistry: [[AIWC-0]] → <em>Zero</em>       │
 │ 4. Mark request: request.placeholderRegistry = registry        │
 │ 5. Mark request: request.blockContainer = pElement              │
 └─────────────────────────────────────────────────────────────────┘
@@ -294,7 +294,7 @@ class BlockTranslationState {
 │ For EACH segment that completes:                                 │
 │   1. Check if request.placeholderRegistry exists                │
 │   2. If YES → Use placeholder-aware handling:                   │
-│      - Parse translated segment for placeholders: "سلام [0]"    │
+│      - Parse translated segment for placeholders: "سلام [[AIWC-0]]" │
 │      - Track segment progress in registry (NO DOM updates!)     │
 │      - Store segment result for later accumulation              │
 │      - NEVER modify block container innerHTML yet               │
@@ -357,8 +357,8 @@ export class PlaceholderRegistry {
   // NEW: Generate placeholder based on provider type (unified format)
   _generatePlaceholder(id) {
     if (this.providerType === 'AI') {
-      // AI providers: simple numeric marker
-      return `[${id}]`;
+      // AI providers: distinctive marker to avoid collisions
+      return `[[AIWC-${id}]]`;
     } else {
       // Traditional providers: HTML marker with translate="no"
       return `<span translate="no" class="aiwc-placeholder" data-id="${id}">${id}</span>`;
@@ -515,12 +515,12 @@ async _applyPlaceholderAwareSegmentUpdate(textNodes, newTranslations, request) {
 /**
  * Extract text portions between placeholder markers
  * @private
- * @param {string} text - Text with placeholders: "Hello [0] world [1]"
+ * @param {string} text - Text with placeholders: "Hello [[AIWC-0]] world [[AIWC-1]]"
  * @returns {Array<string>} Text portions between placeholders
  */
 _extractTextBetweenPlaceholders(text) {
   const portions = [];
-  const regex = /\[\s*\d+\s*\]/g;
+  const regex = /\[\[AIWC-\d+\]\]/g;
   let lastIndex = 0;
   let match;
 
@@ -779,7 +779,7 @@ shouldUseStreaming(request) {
   element: <HTMLElement>,
   blockContainer: <HTMLElement>, // For placeholder translations
   placeholderRegistry: PlaceholderRegistry, // For placeholder translations
-  textsToTranslate: ["Agent [0] AI [1]!"],
+  textsToTranslate: ["Agent [[AIWC-0]] AI [[AIWC-1]]!"],
   expandedTexts: [...],
   translatedSegments: Map, // Accumulates translated segments
   currentSegment: 0, // Which segment is currently being processed
@@ -819,7 +819,7 @@ function validatePlaceholders(translatedText, registry) {
 ### Fallback Triggers
 
 1. **Missing Placeholders**: `missingIds.length > 0`
-2. **Modified Placeholders**: `[0]` → `[ 0 ]` (with spaces) - **Note**: Use whitespace-tolerant regex to handle this
+2. **Modified Placeholders**: `[[AIWC-0]]` → `[[ AIWC-0 ]]` (with spaces) - **Note**: Use whitespace-tolerant regex to handle this
 3. **Invalid Registry**: Registry references point to missing elements
 4. **Provider Stripped Placeholders**: No placeholders found in translation
 5. **Granular Block-Level Failure**: One block fails while others succeed (handle independently)
@@ -876,8 +876,8 @@ if (!validatePlaceholders(translatedText, placeholderRegistry).valid) {
 
 **Extraction**:
 ```
-Text: "Agent [0] AI [1]!"
-Registry: [0] → <em>Zero</em>, [1] → <strong>rocks</strong>
+Text: "Agent [[AIWC-0]] AI [[AIWC-1]]!"
+Registry: [[AIWC-0]] → <em>Zero</em>, [[AIWC-1]] → <strong>rocks</strong>
 ```
 
 **Segment Division**:
@@ -887,9 +887,9 @@ Long text divided into 3 segments for translation
 
 **Segment Updates**:
 ```
-Segment 1: "عامل [0] هوش" → Tracked in registry (NO DOM update)
-Segment 2: "عامل [0] هوش مصنوعی [1]" → Tracked in registry (NO DOM update)
-Segment 3: "عامل [0] هوش مصنوعی [1] عالی است!" → Tracked in registry
+Segment 1: "عامل [[AIWC-0]] هوش" → Tracked in registry (NO DOM update)
+Segment 2: "عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]]" → Tracked in registry (NO DOM update)
+Segment 3: "عامل [[AIWC-0]] هوش مصنوعی [[AIWC-1]] عالی است!" → Tracked in registry
 ```
 
 **All Segments Complete → Final Reassembly**:
@@ -912,8 +912,8 @@ Segment 3: "عامل [0] هوش مصنوعی [1] عالی است!" → Tracked i
 
 **Extraction**:
 ```
-Text: "Click [0] to continue"
-Registry: [0] → <a href="#">here</a>
+Text: "Click [[AIWC-0]] to continue"
+Registry: [[AIWC-0]] → <a href="#">here</a>
 ```
 
 **Segment 1**:
@@ -942,13 +942,13 @@ Registry: [0] → <a href="#">here</a>
 
 **Extraction**:
 ```
-Text: "Get [0] today"
-Registry: [0] → <strong>40% off</strong>
+Text: "Get [[AIWC-0]] today"
+Registry: [[AIWC-0]] → <strong>40% off</strong>
 ```
 
 **Segment 1**:
 ```
-"دریافت [0] تخفیف امروز"
+"دریافت [[AIWC-0]] تخفیف امروز"
 ```
 
 **Expected Result**:
@@ -970,15 +970,15 @@ Registry: [0] → <strong>40% off</strong>
 
 **Extraction**:
 ```
-Text: "Text [0] more text"
-Registry: [0] → <a href="#">link <em>with</em> emphasis</a> (complete subtree)
+Text: "Text [[AIWC-0]] more text"
+Registry: [[AIWC-0]] → <a href="#">link <em>with</em> emphasis</a> (complete subtree)
 ```
 
 **Segments 1-3**:
 ```
-Segment 1: "متن [0]" → Accumulated
-Segment 2: "متن [0] متن" → Accumulated
-Segment 3: "متن [0] متن بیشتر" → Final
+Segment 1: "متن [[AIWC-0]]" → Accumulated
+Segment 2: "متن [[AIWC-0]] متن" → Accumulated
+Segment 3: "متن [[AIWC-0]] متن بیشتر" → Final
 ```
 
 **Expected Result**:
