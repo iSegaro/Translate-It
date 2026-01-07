@@ -721,9 +721,41 @@ function validatePlaceholders(translatedText, registry) {
 ### Fallback Triggers
 
 1. **Missing Placeholders**: `missingIds.length > 0`
-2. **Modified Placeholders**: `[0]` → `[ 0 ]` (with spaces)
+2. **Modified Placeholders**: `[0]` → `[ 0 ]` (with spaces) - **Note**: Use whitespace-tolerant regex to handle this
 3. **Invalid Registry**: Registry references point to missing elements
 4. **Provider Stripped Placeholders**: No placeholders found in translation
+5. **Granular Block-Level Failure**: One block fails while others succeed (handle independently)
+
+### Granular Fallback Strategy
+
+**Principle**: Fallback at Translation Unit (block) level, NOT globally.
+
+```
+Page with 3 blocks:
+├── Block A (has placeholders) → Validation FAILS → Fall back to atomic
+├── Block B (has placeholders) → Validation SUCCEEDS → Use placeholders
+└── Block C (has placeholders) → Validation SUCCEEDS → Use placeholders
+
+Result: Only Block A uses atomic extraction, B and C use placeholders
+```
+
+**Implementation**:
+```javascript
+// Process each block independently
+for (const blockContainer of blockContainers) {
+  const result = await this._processBlockWithPlaceholders(blockContainer);
+
+  if (!result.success) {
+    // THIS block falls back to atomic
+    this.logger.warn(`Block ${blockId} failed placeholder validation, using atomic`, {
+      blockId,
+      reason: result.failureReason
+    });
+    await this._processBlockAtomic(blockContainer);
+  }
+  // Other blocks continue normally
+}
+```
 
 ### Fallback Implementation
 
@@ -927,6 +959,155 @@ if (!originalElement || !document.contains(originalElement)) {
   });
   // Fall back to atomic extraction
   return await this._fallbackToAtomicExtraction(request, translatedText);
+}
+```
+
+## Smart Chunking for Placeholder Integrity
+
+**Problem**: Character-limit batching may split text with placeholders, breaking reassembly.
+
+**Solution**: Smart boundary detection before chunking.
+
+```javascript
+/**
+ * Smart chunking that respects placeholder boundaries
+ * @param {string} text - Text with placeholders that may exceed limit
+ * @param {number} limit - Character limit per chunk
+ * @returns {Array<string>} Chunks that don't break placeholders
+ */
+function smartChunkWithPlaceholders(text, limit) {
+  if (text.length <= limit) {
+    return [text]; // No chunking needed
+  }
+
+  const chunks = [];
+  let currentIndex = 0;
+
+  while (currentIndex < text.length) {
+    let endIndex = Math.min(currentIndex + limit, text.length);
+
+    // Don't split in the middle of a placeholder
+    if (endIndex < text.length) {
+      // Check if we're in a placeholder: "[0]"
+      const lastOpenBracket = text.lastIndexOf('[', endIndex);
+      const lastCloseBracket = text.lastIndexOf(']', endIndex);
+
+      if (lastOpenBracket > lastCloseBracket) {
+        // We're inside "[0]", extend to closing bracket
+        const closingBracket = text.indexOf(']', endIndex);
+        if (closingBracket !== -1) {
+          endIndex = closingBracket + 1;
+        }
+      }
+    }
+
+    // Prefer breaking at natural boundaries if possible
+    if (endIndex < text.length) {
+      // Look backward for sentence boundaries
+      const sentenceEnd = text.lastIndexOf('. ', endIndex);
+      const newline = text.lastIndexOf('\n', endIndex);
+      const exclamation = text.lastIndexOf('! ', endIndex);
+      const question = text.lastIndexOf('? ', endIndex);
+
+      const bestBoundary = Math.max(sentenceEnd, newline, exclamation, question);
+      if (bestBoundary > currentIndex && bestBoundary > currentIndex + limit * 0.5) {
+        endIndex = bestBoundary + 1; // Include the boundary character
+      }
+    }
+
+    chunks.push(text.substring(currentIndex, endIndex));
+    currentIndex = endIndex;
+  }
+
+  return chunks;
+}
+```
+
+## DOM Reference Recovery
+
+**Problem**: Element references in PlaceholderRegistry may be invalidated if DOM is partially modified.
+
+**Solution**: Unique identifier attribute + recovery by query selector.
+
+### Registration Phase
+
+```javascript
+// In PlaceholderRegistry.registerSubtree()
+registerSubtree(inlineElement) {
+  const id = this.counter++;
+  const html = inlineElement.outerHTML;
+  const depth = this._calculateDepth(inlineElement);
+
+  // CRITICAL: Add unique identifier BEFORE storing reference
+  const uniqueId = `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  inlineElement.setAttribute('data-aiwc-original-id', uniqueId);
+
+  this.placeholders.set(id, {
+    root: inlineElement,
+    html: html,
+    depth: depth,
+    uniqueId: uniqueId  // NEW: Store for recovery
+  });
+
+  return this._generatePlaceholder(id);
+}
+```
+
+### Recovery Phase
+
+```javascript
+// In PlaceholderRegistry.getPlaceholderOrRecover()
+getPlaceholderOrRecover(id) {
+  const entry = this.placeholders.get(id);
+  if (!entry) {
+    this.logger.warn(`Placeholder ${id} not found in registry`);
+    return null;
+  }
+
+  // Check if reference is still valid
+  if (entry.root && document.contains(entry.root)) {
+    return entry.root; // Reference still valid, use it
+  }
+
+  // Reference invalid, try to recover by unique ID
+  if (entry.uniqueId) {
+    this.logger.debug(`Attempting to recover placeholder ${id} by unique ID`, {
+      uniqueId: entry.uniqueId
+    });
+
+    const recovered = document.querySelector(`[data-aiwc-original-id="${entry.uniqueId}"]`);
+
+    if (recovered) {
+      this.logger.info(`Successfully recovered placeholder ${id} by unique ID`);
+      // Update the reference
+      entry.root = recovered;
+      return recovered;
+    }
+
+    this.logger.warn(`Could not recover placeholder ${id} - element removed from DOM`);
+  }
+
+  // Permanent failure - element is gone
+  return null;
+}
+```
+
+### Usage in Reassembly
+
+```javascript
+// In placeholderReassembly.js
+for (const placeholderId of placeholderIds) {
+  // Use recovery-aware getter
+  const originalElement = placeholderRegistry.getPlaceholderOrRecover(placeholderId);
+
+  if (!originalElement) {
+    logger.error(`Failed to recover placeholder ${placeholderId}`);
+    // Trigger fallback for this block only
+    return { success: false, missingIds: [placeholderId] };
+  }
+
+  // Continue with reassembly using recovered element
+  // ...
 }
 ```
 

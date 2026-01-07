@@ -328,21 +328,66 @@ The system supports 100+ languages including:
 
 3. **Atomic Batching Enforcement**: When `placeholderRegistry` is present, **override character_limit batching** and send the entire text as a single batch. Never split text with placeholders across multiple API calls.
 
-4. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
+4. **Segment Integrity with Smart Chunking**: When character_limit batching is unavoidable (very long texts), the chunking logic in `BaseTranslateProvider` must:
+   - **First priority**: Break at natural boundaries (`\n`, `. `, `! `, `? `)
+   - **Second priority**: Break at sentence boundaries, not mid-sentence
+   - **Never**: Break in the middle of a placeholder marker (`[0]` → `[` and `0]` in different chunks)
 
-5. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers (`[0]`, `[1]` or `<span translate="no">`) - only the text between them.
+5. **DOM Reference Resilience with Unique Identifiers**: In `PlaceholderRegistry`, add a unique identifier to each element before storing:
+   ```javascript
+   // Add unique ID to element at registration time
+   const uniqueId = `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+   element.setAttribute('data-aiwc-original-id', uniqueId);
+   this.placeholders.set(id, { root: element, html: outerHTML, uniqueId });
+   ```
+   This allows recovery even if the original DOM reference is invalidated by partial DOM updates.
 
-6. **Unified Format Detection**: The placeholder reassembly logic must detect both formats:
-   - AI: `[\s*(\d+)\s*]`
-   - Traditional: `<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>`
+6. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
 
-7. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+7. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers (`[0]`, `[1]` or `<span translate="no">`) - only the text between them.
 
-8. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+8. **Whitespace-Tolerant Placeholder Detection**: AI providers may add whitespace inside brackets. Use fuzzy matching regex:
+   ```javascript
+   // Matches: [0], [ 0 ], [  0  ], etc.
+   const PLACEHOLDER_REGEX_AI = /\[\s*(\d+)\s*\]/g;
+   ```
 
-9. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+9. **Unified Format Detection**: The placeholder reassembly logic must detect both formats:
+   - AI: `/\[\s*(\d+)\s*\]/g` (whitespace-tolerant)
+   - Traditional: `/<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>/g`
 
-10. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed (no orphaned `[0]` without matching context).
+10. **Granular Fallback at Translation Unit Level**: If placeholder validation fails, fall back at the **block level** (Translation Unit), not globally:
+    - Each block container is an independent Translation Unit
+    - If block A fails validation, only block A falls back to atomic
+    - Blocks B, C, D continue with placeholder-based translation
+    - This prevents one bad segment from ruining the entire page translation
+
+11. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+
+12. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+
+13. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+
+14. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed (no orphaned `[0]` without matching context).
+
+15. **Recovery by Query Selector**: When element references are lost, recover using the unique identifier:
+    ```javascript
+    getPlaceholderOrRecover(id) {
+      let entry = this.placeholders.get(id);
+      if (entry && document.contains(entry.root)) {
+        return entry.root; // Reference still valid
+      }
+      // Try to recover by unique ID
+      if (entry && entry.uniqueId) {
+        const recovered = document.querySelector(`[data-aiwc-original-id="${entry.uniqueId}"]`);
+        if (recovered) {
+          entry.root = recovered; // Update reference
+          return recovered;
+        }
+      }
+      return null; // Permanently lost
+    }
+    ```
 
 ## Testing Strategy
 
@@ -441,3 +486,30 @@ The system supports 100+ languages including:
     - Format: `<span translate="no" data-id="0">0</span>`
     - Verify: HTML markers generated, `translate="no"` prevents Google from translating placeholder
     - Verify: Reassembly correctly parses HTML markers
+
+**Edge Case & Resilience Tests:**
+
+18. **Granular Fallback - Partial Failure**:
+    - Input: 3 block containers on page: Block A, Block B, Block C
+    - Scenario: Block A has placeholders that get corrupted by provider
+    - Expected: Only Block A falls back to atomic extraction
+    - Verify: Blocks B and C continue with placeholder-based translation
+    - Verify: Page not completely ruined by one bad block
+
+19. **AI Whitespace Variation**:
+    - Input: `Click [0] to continue`
+    - AI Output: `اینجا [ 0 ] کلیک کنید برای ادامه` (spaces inside brackets)
+    - Verify: Whitespace-tolerant regex correctly extracts placeholder ID
+    - Verify: Reassembly succeeds despite irregular spacing
+
+20. **DOM Reference Loss Recovery**:
+    - Input: `<a href="#">link</a>` with `data-aiwc-original-id="aiwc-12345"`
+    - Scenario: Original DOM reference invalidated by partial update
+    - Recovery: Query by `[data-aiwc-original-id="aiwc-12345"]` finds element again
+    - Verify: Element recovered and reassembly succeeds
+
+21. **Smart Chunking at Sentence Boundaries**:
+    - Input: Long text exceeding character_limit with placeholders
+    - Chunking Strategy: Break at `.` or `\n`, not mid-sentence
+    - Verify: No placeholder markers split across chunks
+    - Verify: Each chunk contains complete sentences
