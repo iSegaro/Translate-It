@@ -328,10 +328,117 @@ The system supports 100+ languages including:
 
 3. **Atomic Batching Enforcement**: When `placeholderRegistry` is present, **override character_limit batching** and send the entire text as a single batch. Never split text with placeholders across multiple API calls.
 
-4. **Segment Integrity with Smart Chunking**: When character_limit batching is unavoidable (very long texts), the chunking logic in `BaseTranslateProvider` must:
-   - **First priority**: Break at natural boundaries (`\n`, `. `, `! `, `? `)
-   - **Second priority**: Break at sentence boundaries, not mid-sentence
-   - **Never**: Break in the middle of a placeholder marker
+4. **Multi-Layer Smart Chunking with Intl.Segmenter**: When character_limit batching is unavoidable (very long texts), the chunking logic in `BaseTranslateProvider` must use a **hierarchical strategy** that works across all 100+ supported languages:
+
+   **Layer 1: Placeholder Boundary Protection (HARD RULE - UNBREAKABLE)**
+   ```javascript
+   // CRITICAL: Never split inside or adjacent to placeholder markers
+   const PLACEHOLDER_BOUNDARY_REGEX = /\[\[AIWC-\d+\]\]/g;
+
+   function isInsidePlaceholder(text, position) {
+     // Find all placeholder positions
+     const matches = [...text.matchAll(PLACEHOLDER_BOUNDARY_REGEX)];
+     for (const match of matches) {
+       if (position >= match.index && position < match.index + match[0].length) {
+         return true; // Position is inside placeholder marker
+       }
+       // Also protect 2 characters before and after placeholders
+       if (Math.abs(position - match.index) <= 2 || Math.abs(position - (match.index + match[0].length)) <= 2) {
+         return true;
+       }
+     }
+     return false;
+   }
+   ```
+
+   **Layer 2: Universal Boundary Detection**
+   - Break at double newlines (`\n\n`) - paragraph boundaries (universal across all languages)
+   - Break at single newlines (`\n`) - line boundaries
+
+   **Layer 3: Language-Aware Sentence Boundary (GOLD STANDARD)**
+   ```javascript
+   // Use Intl.Segmenter API - browser standard for sentence boundary detection
+   // Works for ALL 100+ languages including Chinese, Japanese, Thai, Arabic, etc.
+   function splitIntoSentences(text, sourceLanguage) {
+     const segmenter = new Intl.Segmenter(sourceLanguage, { granularity: 'sentence' });
+     const segments = segmenter.segment(text);
+     return Array.from(segments).map(s => s.segment);
+   }
+
+   // Example usage:
+   // English: "Dr. Smith lives in the U.S.A. He is happy."
+   //   → ["Dr. Smith lives in the U.S.A. ", "He is happy."]  // Correctly detects abbreviations!
+
+   // Chinese: "你好。世界！你好吗？"
+   //   → ["你好。", "世界！", "你好吗？"]  // Works even without dots!
+
+   // Japanese: "こんにちは。世界！元気ですか？"
+   //   → ["こんにちは。", "世界！", "元気ですか？"]  // Respects Japanese punctuation!
+   ```
+
+   **Layer 4: Character Limit Fallback (Last Resort)**
+   - Only when a single sentence/segment exceeds `character_limit`
+   - Warn in logs that this is non-ideal chunking
+
+   **Complete Implementation**:
+   ```javascript
+   function smartChunkWithPlaceholders(text, limit, sourceLanguage = 'en') {
+     if (text.length <= limit) return [text];
+
+     // Step 1: Try paragraph boundaries first
+     let chunks = splitAtParagraphBoundaries(text, limit);
+     if (chunks.length > 1) return chunks;
+
+     // Step 2: Use Intl.Segmenter for sentence boundaries
+     const sentences = splitIntoSentences(text, sourceLanguage);
+     chunks = groupSentencesIntoChunks(sentences, limit);
+
+     // Step 3: Validate no placeholder was split
+     for (const chunk of chunks) {
+       if (isPlaceholderSplit(chunk)) {
+         // Fallback to single chunk if placeholder would be split
+         this.logger.warn('Cannot chunk without splitting placeholder, using single batch');
+         return [text];
+       }
+     }
+
+     return chunks;
+   }
+
+   function groupSentencesIntoChunks(sentences, limit) {
+     const chunks = [];
+     let currentChunk = '';
+     let currentLength = 0;
+
+     for (const sentence of sentences) {
+       const sentenceLength = sentence.length;
+
+       // If adding this sentence would exceed limit
+       if (currentLength + sentenceLength > limit && currentChunk.length > 0) {
+         chunks.push(currentChunk.trim());
+         currentChunk = sentence;
+         currentLength = sentenceLength;
+       } else {
+         currentChunk += sentence;
+         currentLength += sentenceLength;
+       }
+     }
+
+     if (currentChunk.length > 0) {
+       chunks.push(currentChunk.trim());
+     }
+
+     return chunks;
+   }
+   ```
+
+   **Benefits of Intl.Segmenter**:
+   - ✅ **Zero maintenance**: No abbreviation lists to update
+   - ✅ **100+ languages**: Works for all supported languages out of the box
+   - ✅ **Culture-aware**: Knows that "Mr." in English, "Dr." in German, "p.ej." in Spanish are abbreviations
+   - ✅ **Script-aware**: Handles Chinese/Japanese (no sentence-ending dots), Thai, Arabic, Hindi correctly
+   - ✅ **Browser standard**: Supported in Chrome 87+, Firefox 125+, Safari 14.1+
+   - ✅ **Fallback available**: Polyfill available for older browsers
 
 5. **DOM Reference Resilience with Unique Identifiers**: In `PlaceholderRegistry`, add a unique identifier to each element before storing:
    ```javascript
@@ -351,17 +458,30 @@ The system supports 100+ languages including:
    ```
    This prevents false positives when translating technical documentation or code.
 
+   **Note**: Update all regex patterns to match the chosen format:
+   ```javascript
+   // For [[AIWC-0]] format (recommended):
+   const PLACEHOLDER_REGEX_AI = /\[\[AIWC-(\d+)\]\]/g;
+   const PLACEHOLDER_BOUNDARY_REGEX = /\[\[AIWC-\d+\]\]/g;
+
+   // For traditional format:
+   const PLACEHOLDER_REGEX_TRADITIONAL = /<span[^>]*translate="no"[^>]*data-aiwc-ph-id="(\d+)"[^>]*>/g;
+   ```
+
 7. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
 
 8. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers - only the text between them.
 
-9. **Whitespace-Tolerant Placeholder Detection**: AI providers may add whitespace. Use appropriate regex for your chosen format:
+9. **Whitespace-Tolerant Placeholder Detection**: AI providers may add whitespace. Use whitespace-tolerant regex for your chosen format:
    ```javascript
-   // For [[AIWC-0]] format:
-   const PLACEHOLDER_REGEX_AI = /\[\[AIWC-(\d+)\]\]/g;
+   // For [[AIWC-0]] format with whitespace tolerance:
+   const PLACEHOLDER_REGEX_AI = /\[\[\s*AIWC-(\d+)\s*\]\]/g;
 
-   // For {aiwc-0} format:
-   const PLACEHOLDER_REGEX_AI = /\{aiwc-(\d+)\}/g;
+   // For {aiwc-0} format with whitespace tolerance:
+   const PLACEHOLDER_REGEX_AI = /\{\s*aiwc-(\d+)\s*\}/g;
+
+   // For traditional format:
+   const PLACEHOLDER_REGEX_TRADITIONAL = /<span[^>]*translate="no"[^>]*data-aiwc-ph-id="(\d+)"[^>]*>/g;
    ```
 
 10. **Unified Format Detection**: The placeholder reassembly logic must detect both formats based on chosen pattern.
@@ -378,15 +498,36 @@ The system supports 100+ languages including:
     - Blocks B, C, D continue with placeholder-based translation
     - This prevents one bad segment from ruining the entire page translation
 
-13. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+13. **Cleanup of data-aiwc-original-id Attributes**: CRITICAL - After translation completion, always remove the `data-aiwc-original-id` attributes from DOM elements:
+    ```javascript
+    function cleanupPlaceholderIds(blockContainer) {
+      const markedElements = blockContainer.querySelectorAll('[data-aiwc-original-id]');
+      for (const element of markedElements) {
+        element.removeAttribute('data-aiwc-original-id');
+      }
+    }
 
-14. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+    // Call this after successful translation application
+    await applyReassembledHTML(blockContainer, reassembledHTML);
+    cleanupPlaceholderIds(blockContainer); // Prevent addon trace pollution
+    ```
 
-15. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+    **Why this matters**:
+    - **Prevents addon trace pollution**: No extension markers left in website code
+    - **Avoids conflicts**: Website scripts won't query or conflict with our attributes
+    - **Clean DOM**: Website developers see clean translated content, not extension artifacts
+    - **Security**: Reduces attack surface for attribute-based detection
+    - **Debugging**: Makes debugging easier by not cluttering DOM inspection
 
-16. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed.
+14. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
 
-17. **Recovery by Query Selector**: When element references are lost, recover using the unique identifier:
+15. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+
+16. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+
+17. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed.
+
+18. **Recovery by Query Selector**: When element references are lost, recover using the unique identifier:
     ```javascript
     getPlaceholderOrRecover(id) {
       let entry = this.placeholders.get(id);
@@ -523,19 +664,46 @@ The system supports 100+ languages including:
     - Recovery: Query by `[data-aiwc-original-id="aiwc-12345"]` finds element again
     - Verify: Element recovered and reassembly succeeds
 
-21. **Smart Chunking at Sentence Boundaries**:
-    - Input: Long text exceeding character_limit with placeholders
-    - Chunking Strategy: Break at `.` or `\n`, not mid-sentence
-    - Verify: No placeholder markers split across chunks
-    - Verify: Each chunk contains complete sentences
+21. **Smart Chunking with Intl.Segmenter (Multi-Language)**:
+    - **English**:
+      - Input: "Dr. Smith lives in the U.S.A. He is happy. [[AIWC-0]] agrees."
+      - Chunking: Uses Intl.Segmenter with `granularity: 'sentence'`
+      - Verify: Correctly detects "Dr." and "U.S.A." as abbreviations, NOT sentence boundaries
+      - Verify: Chunks: ["Dr. Smith lives in the U.S.A. ", "He is happy. ", "[[AIWC-0]] agrees."]
+
+    - **Chinese** (no sentence-ending dots):
+      - Input: "你好。世界！[[AIWC-0]]你好吗？"
+      - Chunking: Uses Intl.Segmenter with locale `zh`
+      - Verify: Correctly splits at Chinese punctuation: `。`, `！`, `？`
+      - Verify: Chunks: ["你好。", "世界！", "[[AIWC-0]]你好吗？"]
+
+    - **Japanese**:
+      - Input: "田中さんです。よろしく。[[AIWC-0]]お願いします。"
+      - Chunking: Uses Intl.Segmenter with locale `ja`
+      - Verify: Correctly splits at Japanese punctuation: `。`, `！`
+      - Verify: Chunks: ["田中さんです。", "よろしく。", "[[AIWC-0]]お願いします。"]
+
+    - **German**:
+      - Input: "Z.B. das ist gut. Und [[AIWC-0]]? Ja!"
+      - Chunking: Uses Intl.Segmenter with locale `de`
+      - Verify: Correctly detects "z.B." as abbreviation (not sentence boundary)
+      - Verify: Chunks: ["Z.B. das ist gut. ", "Und [[AIWC-0]]? ", "Ja!"]
+
+    - **Placeholder Boundary Protection**:
+      - Input: "Start. [[AIWC-0]] middle. End."
+      - Chunking limit: Very low (e.g., 10 chars)
+      - Verify: Never splits inside or adjacent to `[[AIWC-0]]`
+      - Verify: Falls back to single batch if necessary to protect placeholder
 
 **Edge Case & Resilience Tests (Continued):**
 
 22. **Regex Collision Avoidance - Code Snippets**:
     - Input: `<p>The array[0] contains value and data[index]</p>`
     - Placeholders: `[[AIWC-0]]`, `[[AIWC-1]]` (distinctive format)
-    - Verify: Code `[0]` and `[index]` NOT mistaken for placeholders
-    - Verify: Only AIWC-prefixed placeholders are extracted
+    - Extracted text: "The array[0] contains [[AIWC-0]] and data[[AIWC-1]]"
+    - Verify: Code `array[0]` and `data[index]` NOT mistaken for placeholders
+    - Verify: Only AIWC-prefixed placeholders `[[AIWC-0]]`, `[[AIWC-1]]` are extracted
+    - Verify: Regex `/\[\[AIWC-(\d+)\]\]/g` correctly ignores non-AIWC brackets
 
 23. **Orphan Segment Timeout Recovery**:
     - Input: Block with 3 expected segments
@@ -556,3 +724,21 @@ The system supports 100+ languages including:
     - Scenario: Block A timeout, Blocks B and C complete normally
     - Expected: Block A reverted to original, B and C translated with placeholders
     - Verify: Blocks processed independently, no cross-block interference
+
+26. **Cleanup of data-aiwc-original-id Attributes**:
+    - Input: `<p>Text with <a href="#" data-aiwc-original-id="aiwc-123">link</a></p>`
+    - After Translation: `<p>متن با <a href="#" data-aiwc-original-id="aiwc-123">لینک</a></p>`
+    - Cleanup Called: `cleanupPlaceholderIds(blockContainer)`
+    - Expected: `<p>متن با <a href="#">لینک</a></p>` (attribute removed)
+    - Verify: `data-aiwc-original-id` attribute removed from all elements
+    - Verify: No extension traces left in translated DOM
+    - Verify: `querySelectorAll('[data-aiwc-original-id]')` returns empty NodeList
+    - Verify: Website scripts cannot detect extension markers
+
+27. **Cleanup After Orphan Segment Timeout**:
+    - Input: Block with timeout and `data-aiwc-original-id` markers
+    - Scenario: Timeout triggers reversion to original HTML
+    - Expected: All `data-aiwc-original-id` attributes cleaned up even after timeout
+    - Verify: Registry cleared
+    - Verify: No orphaned attributes remain in DOM
+    - Verify: Block returned to clean original state

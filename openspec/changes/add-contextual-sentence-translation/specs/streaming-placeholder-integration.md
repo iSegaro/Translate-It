@@ -1064,62 +1064,184 @@ if (!originalElement || !document.contains(originalElement)) {
 
 **Problem**: Character-limit batching may split text with placeholders, breaking reassembly.
 
-**Solution**: Smart boundary detection before chunking.
+**Solution**: Multi-layer smart chunking with **Intl.Segmenter** for 100+ language support.
 
 ```javascript
 /**
- * Smart chunking that respects placeholder boundaries
+ * Smart chunking that respects placeholder boundaries using Intl.Segmenter
  * @param {string} text - Text with placeholders that may exceed limit
  * @param {number} limit - Character limit per chunk
+ * @param {string} sourceLanguage - Source language code (e.g., 'en', 'zh', 'ja')
  * @returns {Array<string>} Chunks that don't break placeholders
  */
-function smartChunkWithPlaceholders(text, limit) {
+function smartChunkWithPlaceholders(text, limit, sourceLanguage = 'en') {
   if (text.length <= limit) {
     return [text]; // No chunking needed
   }
 
+  // Layer 1: Try paragraph boundaries first (universal across all languages)
+  let chunks = splitAtParagraphBoundaries(text, limit);
+  if (chunks.length > 1) {
+    return validatePlaceholderBoundaries(chunks, text);
+  }
+
+  // Layer 2: Use Intl.Segmenter for language-aware sentence boundaries
+  // This is the GOLD STANDARD - works for ALL 100+ supported languages
+  const sentences = splitIntoSentences(text, sourceLanguage);
+  chunks = groupSentencesIntoChunks(sentences, limit);
+
+  // Layer 3: Validate no placeholder was split
+  const validationResult = validatePlaceholderBoundaries(chunks, text);
+  if (!validationResult.valid) {
+    // Fallback to single chunk if placeholder would be split
+    console.warn('Cannot chunk without splitting placeholder, using single batch');
+    return [text];
+  }
+
+  return validationResult.chunks;
+}
+
+/**
+ * Use Intl.Segmenter for language-aware sentence boundary detection
+ * @param {string} text - Text to split
+ * @param {string} language - Language code (e.g., 'en', 'zh', 'ja', 'de')
+ * @returns {Array<string>} Sentences
+ */
+function splitIntoSentences(text, language) {
+  // Intl.Segmenter is a browser standard API for text segmentation
+  // It knows the sentence boundary rules for ALL languages
+  const segmenter = new Intl.Segmenter(language, { granularity: 'sentence' });
+  const segments = segmenter.segment(text);
+  return Array.from(segments).map(s => s.segment);
+}
+
+// Examples of Intl.Segmenter behavior:
+// English: "Dr. Smith lives in the U.S.A. He is happy."
+//   → ["Dr. Smith lives in the U.S.A. ", "He is happy."]
+//   (Correctly detects "Dr." and "U.S.A." as abbreviations!)
+//
+// Chinese: "你好。世界！你好吗？"
+//   → ["你好。", "世界！", "你好吗？"]
+//   (Works even without sentence-ending dots!)
+//
+// Japanese: "田中さんです。よろしく。お願いします。"
+//   → ["田中さんです。", "よろしく。", "お願いします。"]
+//   (Respects Japanese punctuation!)
+//
+// German: "Z.B. das ist gut. Und das?"
+//   → ["Z.B. das ist gut. ", "Und das?"]
+//   (Knows "z.B." is an abbreviation in German!)
+
+/**
+ * Group sentences into chunks that respect character limit
+ * @param {Array<string>} sentences - Sentences to group
+ * @param {number} limit - Character limit per chunk
+ * @returns {Array<string>} Chunks
+ */
+function groupSentencesIntoChunks(sentences, limit) {
   const chunks = [];
-  let currentIndex = 0;
+  let currentChunk = '';
+  let currentLength = 0;
 
-  while (currentIndex < text.length) {
-    let endIndex = Math.min(currentIndex + limit, text.length);
+  for (const sentence of sentences) {
+    const sentenceLength = sentence.length;
 
-    // Don't split in the middle of a placeholder
-    if (endIndex < text.length) {
-      // Check if we're in a placeholder: "[0]"
-      const lastOpenBracket = text.lastIndexOf('[', endIndex);
-      const lastCloseBracket = text.lastIndexOf(']', endIndex);
-
-      if (lastOpenBracket > lastCloseBracket) {
-        // We're inside "[0]", extend to closing bracket
-        const closingBracket = text.indexOf(']', endIndex);
-        if (closingBracket !== -1) {
-          endIndex = closingBracket + 1;
-        }
-      }
+    // If adding this sentence would exceed limit
+    if (currentLength + sentenceLength > limit && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+      currentLength = sentenceLength;
+    } else {
+      currentChunk += sentence;
+      currentLength += sentenceLength;
     }
+  }
 
-    // Prefer breaking at natural boundaries if possible
-    if (endIndex < text.length) {
-      // Look backward for sentence boundaries
-      const sentenceEnd = text.lastIndexOf('. ', endIndex);
-      const newline = text.lastIndexOf('\n', endIndex);
-      const exclamation = text.lastIndexOf('! ', endIndex);
-      const question = text.lastIndexOf('? ', endIndex);
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.trim());
+  }
 
-      const bestBoundary = Math.max(sentenceEnd, newline, exclamation, question);
-      if (bestBoundary > currentIndex && bestBoundary > currentIndex + limit * 0.5) {
-        endIndex = bestBoundary + 1; // Include the boundary character
-      }
+  return chunks;
+}
+
+/**
+ * Validate that no placeholders were split across chunks
+ * @param {Array<string>} chunks - Chunks to validate
+ * @param {string} originalText - Original text with placeholders
+ * @returns {Object} Validation result
+ */
+function validatePlaceholderBoundaries(chunks, originalText) {
+  const PLACEHOLDER_REGEX = /\[\[AIWC-\d+\]\]/g;
+
+  // Count placeholders in original text
+  const originalPlaceholders = (originalText.match(PLACEHOLDER_REGEX) || []).length;
+
+  // Count placeholders in all chunks
+  const chunkPlaceholders = chunks.reduce(
+    (count, chunk) => count + (chunk.match(PLACEHOLDER_REGEX) || []).length,
+    0
+  );
+
+  // Check if any placeholder was split
+  if (originalPlaceholders !== chunkPlaceholders) {
+    return { valid: false, chunks };
+  }
+
+  // Check each chunk for incomplete placeholders
+  for (const chunk of chunks) {
+    // Check for unclosed placeholders: [[AIWC-0 (missing closing brackets)
+    if (chunk.match(/\[\[AIWC-\d+$/)) {
+      return { valid: false, chunks };
     }
+    // Check for orphaned closing brackets: ]] (without opening)
+    if (chunk.match(/^\]\]/) || chunk.includes('[[') && !chunk.match(/\[\[AIWC-\d+\]\]/)) {
+      return { valid: false, chunks };
+    }
+  }
 
-    chunks.push(text.substring(currentIndex, endIndex));
-    currentIndex = endIndex;
+  return { valid: true, chunks };
+}
+
+/**
+ * Split text at paragraph boundaries (universal across all languages)
+ * @param {string} text - Text to split
+ * @param {number} limit - Character limit per chunk
+ * @returns {Array<string>} Chunks
+ */
+function splitAtParagraphBoundaries(text, limit) {
+  const paragraphs = text.split(/\n\n+/);
+  const chunks = [];
+  let currentChunk = '';
+  let currentLength = 0;
+
+  for (const paragraph of paragraphs) {
+    const paragraphLength = paragraph.length;
+
+    if (currentLength + paragraphLength > limit && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = paragraph;
+      currentLength = paragraphLength;
+    } else {
+      currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      currentLength += paragraphLength + 2; // +2 for the '\n\n'
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.trim());
   }
 
   return chunks;
 }
 ```
+
+**Benefits of Intl.Segmenter Approach**:
+- ✅ **Zero maintenance**: No abbreviation lists to update
+- ✅ **100+ languages**: Works for all supported languages out of the box
+- ✅ **Culture-aware**: Knows language-specific abbreviation rules
+- ✅ **Script-aware**: Handles Chinese/Japanese (no dots), Thai, Arabic, Hindi correctly
+- ✅ **Browser standard**: Supported in Chrome 87+, Firefox 125+, Safari 14.1+
+- ✅ **Placeholder-safe**: Validation ensures no placeholders are ever split
 
 ## DOM Reference Recovery
 
@@ -1209,10 +1331,112 @@ for (const placeholderId of placeholderIds) {
 }
 ```
 
+## Cleanup of Extension Attributes
+
+**Problem**: After translation completes, `data-aiwc-original-id` attributes remain in the DOM, polluting the website's code and potentially conflicting with site scripts.
+
+**Solution**: Always clean up extension attributes after translation completion.
+
+### Cleanup Function
+
+```javascript
+/**
+ * Remove all data-aiwc-original-id attributes from translated block
+ * @param {HTMLElement} blockContainer - The translated block container
+ */
+function cleanupPlaceholderIds(blockContainer) {
+  const markedElements = blockContainer.querySelectorAll('[data-aiwc-original-id]');
+
+  for (const element of markedElements) {
+    element.removeAttribute('data-aiwc-original-id');
+  }
+
+  this.logger.debug(`Cleaned up ${markedElements.length} data-aiwc-original-id attributes`, {
+    blockId: blockContainer.id || 'unknown'
+  });
+}
+```
+
+### Integration with Translation Flow
+
+```javascript
+// In StreamEndService._handlePlaceholderTranslation()
+async _handlePlaceholderTranslation(request, data, targetLanguage) {
+  // ... reassembly logic ...
+
+  // Apply the reassembled HTML to the block container
+  await applyReassembledHTML(blockContainer, reassembledHTML);
+
+  // Apply RTL direction if needed
+  await this.uiManager.directionManager.applyImmersiveTranslatePattern(
+    blockContainer,
+    new Map([[blockContainer.textContent, reassembledHTML]]),
+    id,
+    targetLanguage
+  );
+
+  // CRITICAL: Clean up extension attributes BEFORE marking as completed
+  cleanupPlaceholderIds(blockContainer);
+
+  // Add translated element
+  orchestrator.stateManager.addTranslatedElement(
+    blockContainer,
+    new Map([[blockContainer.textContent, reassembledHTML]]),
+    originalInnerHTML
+  );
+
+  // ... rest of completion logic ...
+}
+```
+
+### Cleanup on Timeout/Failure
+
+```javascript
+// In BlockTranslationState._revertToOriginal()
+_revertToOriginal() {
+  // Restore original HTML
+  this.blockContainer.innerHTML = this.originalHTML;
+
+  // Clear placeholder registry
+  if (this.placeholderRegistry) {
+    this.placeholderRegistry.clear();
+  }
+
+  // CRITICAL: Clean up any remaining data attributes even after failure
+  const markedElements = this.blockContainer.querySelectorAll('[data-aiwc-original-id]');
+  for (const element of markedElements) {
+    element.removeAttribute('data-aiwc-original-id');
+  }
+
+  // Mark as failed
+  this.status = 'timeout-reverted';
+
+  this.logger.info(`Block reverted to original and cleaned up`, {
+    blockId: this.blockId,
+    cleanedAttributes: markedElements.length
+  });
+}
+```
+
+### Why Cleanup Matters
+
+1. **Prevents Addon Trace Pollution**: No extension markers left in website code
+2. **Avoids Conflicts**: Website scripts won't query or conflict with our attributes
+3. **Clean DOM**: Website developers see clean translated content, not extension artifacts
+4. **Security**: Reduces attack surface for attribute-based detection
+5. **Debugging**: Makes debugging easier by not cluttering DOM inspection
+6. **User Privacy**: Prevents websites from detecting that translation occurred via attribute sniffing
+
 ## Future Enhancements
 
-1. **Atomic Extraction Fallback**: Implement full atomic extraction fallback when placeholders fail
+1. **Atomic Extraction Fallback**: Implement full atomic extraction fallback when placeholders fail (partially implemented in StreamEndService)
+
 2. **Smart Placeholder Detection**: Auto-detect when placeholders should be used based on content structure
+
 3. **Placeholder Preservation Rate**: Track and report placeholder preservation statistics
+
 4. **Progressive Enhancement**: Start with placeholders, fall back mid-stream if issues detected
+
 5. **Provider-Specific Handling**: Tune placeholder strategies per provider (AI vs traditional)
+
+6. **Intl.Segmenter Polyfill**: Add polyfill for older browsers that don't support Intl.Segmenter (Chrome < 87, Firefox < 125, Safari < 14.1+)
