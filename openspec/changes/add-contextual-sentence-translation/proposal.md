@@ -4,10 +4,17 @@
 
 The Select Element system currently extracts text at the node level (atomic extraction), breaking sentences into fragments when inline elements are present. For example, `Agent <em>Zero</em> AI` is extracted as three separate fragments: `["Agent ", "Zero", " AI"]`.
 
-This causes poor translation quality for RTL languages (Persian) because:
+This causes poor translation quality for **ALL languages** because:
 1. Translation providers receive fragments without grammatical context
-2. Word order and verb conjugation depend on full sentence structure
+2. Word order, verb conjugation, and sentence structure depend on complete context
 3. Inline tags (<em>, <strong>, <a>, <code>) break technical sentences into 10+ fragments on sites like GitHub
+
+**Impact by Language Family**:
+- **RTL Languages** (Persian, Arabic, Hebrew): Word order reversed, verb position changes
+- **Inflected Languages** (Russian, German, Latin, Eastern European): Case endings, gender agreement, sentence structure
+- **Analytic Languages** (English, Chinese): Fragment context still critical for accurate meaning
+- **Agglutinative Languages** (Turkish, Finnish, Korean): Morpheme boundaries depend on context
+- **All Languages**: Any translation benefits from full sentence grammatical context
 
 ### The Streaming Problem
 
@@ -28,6 +35,49 @@ Recent commits detect placeholder translations and skip streaming for them, but 
 
 **Goal**: Transition from "Atomic Node Translation" to "Contextual Sentence Translation with Streaming Support" for **ALL providers** while maintaining real-time streaming feedback.
 
+### Critical Technical Challenges
+
+**Challenge 1: Nested Elements (Subtree Extraction)**
+
+When inline elements are nested, the placeholder system must capture the **entire subtree**, not just the outer element:
+
+```
+Input: <a href="#">Link with <em>emphasis</em></a>
+WRONG: [0] → <a> only (loses <em>)
+CORRECT: [0] → <a href="#">Link with <em>emphasis</em></a> (complete subtree)
+```
+
+The `PlaceholderRegistry` must store the complete HTML subtree for nested elements to preserve the internal structure during reassembly.
+
+**Challenge 2: Atomic Batching for Placeholders**
+
+The provider batching system must **never split text with placeholders** across multiple batches:
+
+```
+Input: "Hello [0] wonderful [1] world!"
+DANGEROUS: Batch 1: "Hello [0] wonderful"  ← placeholder open!
+           Batch 2: "[1] world!"           ← placeholder closed!
+REASSEMBLY FAILS!
+
+REQUIRED: Single batch: "Hello [0] wonderful [1] world!"
+```
+
+**Rule**: When `placeholderRegistry` is present, disable character_limit batching and send the entire text as a single atomic unit.
+
+**Challenge 3: Unified Placeholder Format**
+
+To avoid "double logic" for AI vs traditional providers, use a **unified placeholder format**:
+
+```
+AI Providers:        [0], [1], [2]           (simple numeric markers)
+Traditional Providers: <span translate="no" data-id="0">0</span>  (HTML markers)
+```
+
+This approach:
+- **Unifies code paths** - single extraction/reassembly logic for all providers
+- **Preserves placeholders** in traditional providers using `translate="no"`
+- **Eliminates double logic** - no separate code paths for AI vs traditional
+
 ## What Changes
 
 - **ADDED**: Placeholder-based text extraction system with streaming awareness
@@ -42,23 +92,32 @@ Recent commits detect placeholder translations and skip streaming for them, but 
 
 1. **Block-Level Extraction**: Group text by block-level containers (P, DIV, LI, H1-H6)
 
-2. **Placeholder System**: Replace inline elements with `[0]`, `[1]`, `[2]` markers
+2. **Placeholder System with Subtree Support**:
+   - Replace inline elements with `[0]`, `[1]`, `[2]` markers (AI) or `<span translate="no">` (Traditional)
+   - **Nested element handling**: Captures complete subtrees (e.g., `<a>link <em>with</em> emphasis</a>` as one unit)
+   - Stores HTML subtree in registry for accurate reassembly
 
-3. **Streaming-Aware Placeholders**: Real-time streaming updates that preserve placeholder structure:
+3. **Atomic Batching Protection**: When placeholders detected, disables character_limit batching to prevent placeholder splitting
+
+4. **Unified Placeholder Format**: Single extraction/reassembly logic for all providers using provider-specific marker formats
+
+5. **Streaming-Aware Placeholders**: Real-time streaming updates that preserve placeholder structure:
    - During streaming: Apply text translations only, preserve placeholder markers
    - At completion: Perform final reassembly with original inline elements
 
-4. **Provider-Aware Routing**:
-   - **AI providers** (Gemini, OpenAI, Claude, DeepL): Use placeholders with prompt instructions
-   - **Traditional providers** (Google, Yandex, Bing, DeepL-free): Use placeholders with literal text preservation
+6. **Provider-Aware Marker Format**:
+   - **AI providers** (Gemini, OpenAI, Claude, DeepL): Use `[0]`, `[1]` numeric markers
+   - **Traditional providers** (Google, Yandex, Bing): Use `<span translate="no" data-id="0">0</span>` HTML markers
 
-5. **Robust Reassembly**: Parse translated text and reinsert original DOM nodes at placeholder positions
+7. **Robust Reassembly**: Parse translated text and reinsert original DOM subtrees at placeholder positions
 
-6. **Fallback Mechanism**: Gracefully degrade to atomic extraction if streaming breaks placeholders
+8. **Fallback Mechanism**: Gracefully degrade to atomic extraction if streaming breaks placeholders
 
 ### Example Transformation
 
 ```
+Example 1: Simple Inline Elements
+─────────────────────────────────────────────────────────────────────────
 Original: <p>Agent <em>Zero</em> AI <strong>rocks</strong>!</p>
 Extracted: "Agent [0] AI [1]!"
 Mapping: [0] → <em>Zero</em>, [1] → <strong>rocks</strong>
@@ -67,6 +126,23 @@ Streaming Update 1: "عامل [0] هوش"
 Streaming Update 2: "عامل [0] هوش مصنوعی [1]!"
 Final Translated: "عامل [0] هوش مصنوعی [1] عالی است!"
 Reassembled: <p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!</p>
+
+Example 2: Nested Elements (Subtree Extraction)
+─────────────────────────────────────────────────────────────────────────
+Original: <p>Click <a href="#">here <em>now</em></a> to continue</p>
+Extracted: "Click [0] to continue"
+Mapping: [0] → <a href="#">here <em>now</em></a>  (Complete subtree!)
+
+Translated: "روی [0] کلیک کنید برای ادامه"
+Reassembled: <p>روی <a href="#">here <em>now</em></a> کلیک کنید برای ادامه</p>
+NOTE: The nested <em> is preserved inside the <a> element
+
+Example 3: Atomic Batching Protection
+─────────────────────────────────────────────────────────────────────────
+Input: "Hello [0] wonderful [1] world!" (2000 characters, exceeds limits)
+Normal Batching: Would split at character limit → BREAKS PLACEHOLDERS!
+Placeholder Batching: SINGLE BATCH → Preserves placeholder integrity
+Batch 1: "Hello [0] wonderful [1] world!"  (Complete text, unsplit)
 ```
 
 ### Streaming Workflow
@@ -110,22 +186,24 @@ Reassembled: <p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong
 
 ### Affected Code
 
-**New Files** (4):
-- `src/features/element-selection/utils/PlaceholderRegistry.js` - Placeholder mapping system with streaming state tracking
-- `src/features/element-selection/utils/blockLevelExtraction.js` - Block-level container detection
-- `src/features/element-selection/utils/placeholderReassembly.js` - Reassembly logic with streaming awareness
-- `src/features/element-selection/utils/streamingPlaceholderHandler.js` - Streaming coordination for placeholders
+**New Files** (5):
+- `src/features/element-selection/utils/PlaceholderRegistry.js` - Placeholder mapping with subtree storage, streaming state, and unified format support
+- `src/features/element-selection/utils/blockLevelExtraction.js` - Block-level detection with nested element subtree extraction
+- `src/features/element-selection/utils/placeholderReassembly.js` - Reassembly logic with nested subtree support and unified format parsing
+- `src/features/element-selection/utils/streamingPlaceholderHandler.js` - Streaming coordination for placeholder translations
+- `src/features/translation/providers/batchingProtection.js` - **NEW**: Atomic batching enforcement for placeholder translations
 
-**Modified Files** (9):
-- `src/features/element-selection/utils/domManipulation.js` - Add placeholder-based extraction routing
-- `src/features/element-selection/managers/services/TextExtractionService.js` - Provider detection and placeholder flag
-- `src/features/element-selection/managers/services/DOMNodeMatcher.js` - Placeholder-aware reassembly
-- `src/features/element-selection/utils/textProcessing.js` - Preserve placeholders during processing
+**Modified Files** (10):
+- `src/features/element-selection/utils/domManipulation.js` - Add placeholder-based extraction routing with subtree support
+- `src/features/element-selection/managers/services/TextExtractionService.js` - Provider detection and placeholder flag with unified format
+- `src/features/element-selection/managers/services/DOMNodeMatcher.js` - Placeholder-aware reassembly with nested elements
+- `src/features/element-selection/utils/textProcessing.js` - Preserve placeholders during processing with format detection
 - `src/features/element-selection/managers/services/StreamingUpdateService.js` - **NEW**: Placeholder-aware streaming application
 - `src/features/element-selection/managers/services/StreamEndService.js` - **NEW**: Enhanced streaming-to-placeholder coordination
-- `src/features/element-selection/managers/services/TranslationOrchestrator.js` - **NEW**: Route to placeholder streaming
+- `src/features/element-selection/managers/services/TranslationOrchestrator.js` - **NEW**: Route to placeholder streaming with atomic batching
 - `src/shared/messaging/core/StreamingResponseHandler.js` - **NEW**: Streaming coordination for placeholder translations
-- `src/features/translation/providers/BaseAIProvider.js` - Batching protection and placeholder prompts
+- `src/features/translation/providers/BaseAIProvider.js` - Atomic batching protection and placeholder prompts
+- `src/features/translation/providers/BaseTranslateProvider.js` - **NEW**: Atomic batching for traditional providers with placeholders
 
 ### Scope Limitations
 
@@ -153,20 +231,33 @@ This eliminates the need for provider-specific prompt modifications for traditio
 
 **Translation Quality:**
 - 90%+ reduction in sentence fragmentation for AI providers
-- 80%+ improvement in Persian translation quality (user surveys)
+- 70%+ improvement in translation quality across all supported languages (user surveys)
+  - RTL languages (Persian, Arabic): 80%+ improvement (word order restoration)
+  - Inflected languages (Russian, German): 75%+ improvement (case/agreement context)
+  - Asian languages (Chinese, Japanese, Korean): 70%+ improvement (sentence structure)
+  - Analytic languages (English, Chinese): 65%+ improvement (context preservation)
 - 95%+ placeholder preservation rate
 
+**Broad Language Support:**
+The system supports 100+ languages including:
+- **RTL**: Persian, Arabic, Hebrew, Urdu, Kurdish
+- **European**: English, Spanish, French, German, Italian, Portuguese, Russian, Polish, Dutch
+- **Asian**: Chinese (Simplified/Traditional), Japanese, Korean, Vietnamese, Thai, Indonesian
+- **Middle Eastern**: Turkish, Arabic, Hebrew, Persian, Urdu
+- **Others**: Hindi, Bengali, Tamil, Telugu, and 80+ more
+
 **Streaming Performance:**
-- Real-time streaming feedback for placeholder translations
-- No page corruption or sentence misplacement during streaming
+- Real-time segment-based feedback for placeholder translations
+- No page corruption or sentence misplacement during translation
 - Graceful fallback when placeholders cannot be preserved
-- <10% increase in streaming processing time
+- <10% increase in translation processing time
 - Progressive text updates showing translation in real-time
 
 **Compatibility:**
-- No regression for traditional providers
-- Full support for all translation providers
+- No regression for traditional providers (Google, Yandex, Bing, DeepL-free)
+- Full support for all translation providers (10+ providers)
 - Backward compatibility with atomic extraction fallback
+- Works seamlessly across all language pairs
 
 ## Implementation Phases
 
@@ -233,45 +324,120 @@ This eliminates the need for provider-specific prompt modifications for traditio
 
 1. **DOM Structure Preservation**: During streaming, NEVER replace the block container's innerHTML until stream completion.
 
-2. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
+2. **Subtree Extraction for Nested Elements**: When extracting placeholders for nested inline elements (e.g., `<a>text <em>more</em></a>`), capture the **complete HTML subtree** including all descendants, not just the outer element.
 
-3. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers (`[0]`, `[1]`) - only the text between them.
+3. **Atomic Batching Enforcement**: When `placeholderRegistry` is present, **override character_limit batching** and send the entire text as a single batch. Never split text with placeholders across multiple API calls.
 
-4. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+4. **Text-Only Streaming**: When placeholders are present, only stream and update the text portions, not the entire DOM structure.
 
-5. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+5. **Placeholder Marker Protection**: Ensure streaming doesn't modify placeholder markers (`[0]`, `[1]` or `<span translate="no">`) - only the text between them.
 
-6. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+6. **Unified Format Detection**: The placeholder reassembly logic must detect both formats:
+   - AI: `[\s*(\d+)\s*]`
+   - Traditional: `<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>`
+
+7. **Final Reassembly Authority**: The `_handlePlaceholderTranslation` method at stream end is the ONLY place that should modify DOM structure for placeholder translations.
+
+8. **Fallback Detection**: If streaming produces results without placeholders (provider stripped them), immediately fall back to atomic extraction.
+
+9. **Registry Lifecycle**: PlaceholderRegistry must be cleared after translation completion or cancellation to prevent memory leaks.
+
+10. **Placeholder Boundary Validation**: Before sending to API, validate that all placeholder markers are properly opened and closed (no orphaned `[0]` without matching context).
 
 ## Testing Strategy
 
 ### Test Cases
 
-1. **Streaming with Placeholders (Success)**:
+**Core Functionality Tests:**
+
+1. **Multi-Language with Placeholders (Success)**:
    - Input: `<p>Agent <em>Zero</em> AI <strong>rocks</strong>!</p>`
-   - Streaming Update 1: "عامل [0] هوش"
-   - Streaming Update 2: "عامل [0] هوش مصنوعی [1]"
-   - Final: "عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!"
-   - Verify: No page corruption, inline elements preserved
+   - Persian Translation: "عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!"
+   - German Translation: "Agent <em>Zero</em> KI <strong>rockt</strong>!"
+   - Russian Translation: "Агент <em>Zero</em> ИИ <strong>просто отличная</strong>!"
+   - Verify: No page corruption, inline elements preserved across all languages
 
 2. **Placeholder Loss Fallback**:
    - Input: `<p>Click <a href="#">here</a> to continue</p>`
-   - Streaming: "اینجا کلیک کنید برای ادامه" (placeholders stripped)
+   - Translation: "اینجا کلیک کنید برای ادامه" (placeholders stripped)
    - Expected: Fall back to atomic extraction
 
-3. **RTL Streaming with LTR**:
+3. **RTL with Embedded LTR**:
    - Input: `<p>Get <strong>40% off</strong> today</p>`
-   - Streaming: "دریافت [0] تخفیف امروز"
+   - Translation: "دریافت <strong>40% off</strong> تخفیف امروز"
    - Verify: LTR portions wrapped correctly, no repositioning
 
-4. **Complex Nested Elements**:
+4. **Nested Elements - Simple Nesting**:
    - Input: `<p>Text <a href="#">link <em>with</em> emphasis</a> more text</p>`
-   - Verify: Nested inline elements preserved correctly
+   - Extracted: "Text [0] more text"
+   - Registry: [0] → `<a href="#">link <em>with</em> emphasis</a>` (complete subtree)
+   - Verify: Nested `<em>` preserved inside `<a>`, structure intact
 
-5. **Multiple Block Containers**:
+5. **Nested Elements - Deep Nesting**:
+   - Input: `<p>Click <a href="#"><strong>link</strong> with <em>emphasis</em> and <code>code</code></a></p>`
+   - Extracted: "Click [0]"
+   - Registry: [0] → Complete `<a>` subtree with all descendants
+   - Verify: All nested elements (`<strong>`, `<em>`, `<code>`) preserved in correct positions
+
+6. **Atomic Batching - Long Text with Placeholders**:
+   - Input: Text with placeholders that exceeds character_limit (e.g., 5000 chars)
+   - Normal batching: Would split at character limit
+   - Placeholder batching: Must NOT split, send as single batch
+   - Verify: No placeholder splitting, all markers remain intact
+
+7. **Atomic Batching - Multiple Placeholders Near Limit**:
+   - Input: "Start [0] middle [1] middle [2] end" (exactly at character limit boundary)
+   - Verify: Entire text sent as one batch, placeholders not split across batches
+
+8. **Multiple Block Containers**:
    - Input: `<div><p>Para 1 with <strong>emphasis</strong></p><p>Para 2</p></div>`
-   - Verify: Each paragraph processed independently
+   - Verify: Each paragraph processed independently with separate placeholder registries
 
-6. **Streaming Interruption**:
-   - Scenario: User cancels during streaming
+9. **Segment Interruption**:
+   - Scenario: User cancels during segment-based translation
    - Verify: Cleanup happens, registry cleared, no DOM corruption
+
+**Language-Specific Tests:**
+
+10. **Inflected Language (Russian) - Case Agreement**:
+    - Input: `<p>I see the <strong>big red</strong> car</p>`
+    - Translation: "Я вижу <strong>большую красную</strong> машину"
+    - Verify: Adjectives agree with nouns in case/gender/number
+
+11. **Agglutinative Language (Turkish) - Morpheme Boundaries**:
+    - Input: `<p>My <strong>blue</strong> house</p>`
+    - Translation: "Benim <strong>mavi</strong> evim"
+    - Verify: Suffixes correctly applied to all words
+
+12. **Asian Language (Chinese) - Sentence Structure**:
+    - Input: `<p>I <strong>yesterday</strong> went to school</p>`
+    - Translation: "我<strong>昨天</strong>去了学校"
+    - Verify: Time word placement preserved correctly
+
+13. **Language with Special Characters (German)**:
+    - Input: `<p>Get <strong>ä</strong> and <strong>ü</strong> and <strong>ß</strong></p>`
+    - Translation: "Holen Sie <strong>ä</strong> und <strong>ü</strong> und <strong>ß</strong>"
+    - Verify: Special characters preserved correctly
+
+14. **Bidirectional Text (Hebrew)**:
+    - Input: `<p>The word <strong>שלום</strong> means peace</p>`
+    - Translation: "המילה <strong>שלום</strong> פירושה שלום"
+    - Verify: RTL and LTR portions correctly positioned
+
+15. **Complex Script (Thai)**:
+    - Input: `<p>Hello <strong>สวัสดี</strong> world</p>`
+    - Translation: "สวัสดี <strong>Hello</strong> โลก"
+    - Verify: Thai script preserved, tone marks intact
+
+**Unified Placeholder Format Tests:**
+
+16. **AI Provider Placeholder Format**:
+    - Provider: Gemini
+    - Format: `[0]`, `[1]`, `[2]`
+    - Verify: Numeric markers generated and correctly reassembled
+
+17. **Traditional Provider Placeholder Format**:
+    - Provider: Google Translate
+    - Format: `<span translate="no" data-id="0">0</span>`
+    - Verify: HTML markers generated, `translate="no"` prevents Google from translating placeholder
+    - Verify: Reassembly correctly parses HTML markers

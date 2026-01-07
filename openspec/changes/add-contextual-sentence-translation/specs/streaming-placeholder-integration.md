@@ -1,37 +1,62 @@
-# Streaming + Placeholder Integration Specification
+# Segment-Based Translation + Placeholder Integration Specification
 
 ## Overview
 
-This specification defines how the streaming translation workflow integrates with the placeholder-based extraction system. The goal is to enable real-time streaming feedback while preserving inline elements during translation.
+This specification defines how **segment-based translation** (referred to as "streaming" in this project) integrates with the placeholder-based extraction system.
+
+**Important Clarification**: In this project, "streaming" refers to **segment/chunk-based translation**, NOT AI token streaming. When long text needs translation, it is divided into smaller segments (3-5 segments per batch), and each segment is translated and applied progressively to provide real-time feedback to the user.
+
+**Example**:
+- Long text: "This is paragraph one. This is paragraph two. This is paragraph three..."
+- Split into segments: `["This is paragraph one.", "This is paragraph two.", "This is paragraph three..."]`
+- Segment 1 translates → Updates DOM immediately
+- Segment 2 translates → Updates DOM immediately
+- Segment 3 translates → Updates DOM immediately
+
+**Goal**: Enable real-time segment-based feedback while preserving inline elements during translation.
 
 ## Problem Statement
 
 ### Original Conflict
 
-The placeholder system and streaming system were fundamentally incompatible:
+The placeholder system and segment-based translation system were fundamentally incompatible:
 
-| Aspect | Placeholder System | Streaming System |
-|--------|-------------------|------------------|
-| **DOM Modification** | Single complete update at end | Progressive updates during translation |
-| **Element Preservation** | Expects original structure intact | Replaces nodes immediately |
-| **Timing** | After translation completes | During translation |
-| **Reassembly** | Uses registry references | Uses node matching |
+| Aspect | Placeholder System | Segment-Based Translation |
+|--------|-------------------|---------------------------|
+| **DOM Modification** | Single complete update at end | Progressive updates as each segment translates |
+| **Element Preservation** | Expects original structure intact | Replaces nodes immediately as segments complete |
+| **Timing** | After all segments complete | During segment-by-segment translation |
+| **Reassembly** | Uses registry references at end | Uses node matching per segment |
 
 ### Current State (Problematic)
 
 ```
 1. Extraction: "Hello [0] world [1]" with registry [0]→<em>, [1]→<strong>
-2. API Request: Send to provider with placeholders
-3. STREAMING STARTS:
-   - Update 1 arrives: "سلام [0] جهان [1]"
-   - StreamingUpdateService applies directly to TEXT_NODES
-   - Creates wrappers, modifies DOM, LOSES registry references
-4. STREAMING ENDS:
-   - _handlePlaceholderTranslation tries to reassemble
-   - But original structure is GONE (modified by streaming)
-   - Registry references point to missing elements
+2. API Request: Long text divided into 3 segments:
+   - Segment 1: "Hello [0] world [1]" (part 1)
+   - Segment 2: "Hello [0] world [1]" (part 2)
+   - Segment 3: "Hello [0] world [1]" (part 3)
+
+3. SEGMENT-BASED TRANSLATION STARTS:
+   Segment 1 arrives: "سلام [0] جهان [1]" (partial translation)
+   → StreamingUpdateService applies to TEXT_NODES immediately
+   → Creates wrappers, modifies DOM, LOSES registry references
+
+   Segment 2 arrives: "عامل [0] هوش مصنوعی [1]" (more complete)
+   → Tries to update DOM but references are already corrupted
+
+   Segment 3 arrives: "عامل [0] هوش مصنوعی [1] عالی است!" (complete)
+   → Final update but structure is GONE
+
+4. ALL SEGMENTS COMPLETE:
+   → _handlePlaceholderTranslation tries to reassemble
+   → But original structure was modified by segment 1 & 2
+   → Registry references point to missing/modified elements
+
 5. RESULT: Broken page, misplaced content
 ```
+
+**Key Issue**: Each segment triggers immediate DOM updates, destroying the placeholder registry before all segments complete.
 
 ### Current Workaround
 
@@ -52,11 +77,103 @@ if (request.placeholderRegistry && request.blockContainer) {
 
 ### Design Principles
 
-1. **DOM Structure Preservation**: Never replace block container innerHTML during streaming
-2. **Text-Only Streaming**: Only update text portions between placeholders, preserve placeholder markers
-3. **Placeholder Marker Protection**: Never modify `[0]`, `[1]` markers during streaming
-4. **Final Reassembly Authority**: Only perform DOM modification at stream completion
-5. **Graceful Fallback**: Detect placeholder loss and fall back to atomic extraction
+1. **DOM Structure Preservation**: Never replace block container innerHTML during segment translation (wait until ALL segments complete)
+2. **Text-Only Segment Updates**: For placeholder translations, track segment progress but DON'T modify DOM until final reassembly
+3. **Placeholder Marker Protection**: Never modify `[0]`, `[1]` markers during individual segment processing
+4. **Final Reassembly Authority**: Only perform DOM modification after ALL segments are complete
+5. **Segment Accumulation**: Collect all translated segments, then perform single reassembly operation
+6. **Graceful Fallback**: Detect placeholder loss and fall back to atomic extraction
+
+### Critical Technical Considerations
+
+**Consideration 1: Nested Elements (Subtree Extraction)**
+
+When inline elements contain nested inline elements, the placeholder system must capture the **complete HTML subtree**, not just the outer element:
+
+```
+Input: <a href="#">Link with <em>emphasis</em></a>
+├── WRONG: [0] → <a> element only (loses <em>)
+└── CORRECT: [0] → <a href="#">Link with <em>emphasis</em></a> (complete subtree)
+
+Implementation:
+- PlaceholderRegistry.registerSubtree(element, outerHTML)
+- Stores: root element reference + complete HTML string
+- Reassembly: Uses outerHTML to restore complete structure
+```
+
+**Why this matters**: If we only store the `<a>` element without its children, the nested `<em>` element is lost during reassembly, breaking the internal structure of links and other inline containers.
+
+**Consideration 2: Atomic Batching Protection**
+
+The provider batching system must **never split text with placeholders** across multiple batches:
+
+```
+Scenario: Text with placeholders exceeds character_limit
+Input: "Hello [0] wonderful [1] world!" (2000 chars)
+
+Normal Batching (WRONG):
+├── Batch 1: "Hello [0] wonderful"  ← Placeholder [0] opened but not closed!
+├── Batch 2: "[1] world!"           ← Placeholder [1] orphaned!
+└── Result: REASSEMBLY FAILS!
+
+Placeholder-Aware Batching (CORRECT):
+├── Override: character_limit = Infinity
+├── Single Batch: "Hello [0] wonderful [1] world!"
+└── Result: All placeholders intact, reassembly succeeds
+```
+
+**Implementation**:
+```javascript
+// In TranslationOrchestrator or before Provider call
+if (request.placeholderRegistry) {
+  options.atomicBatching = true;  // Disable character_limit
+  options.reason = 'PLACEHOLDER_BOUNDARY_PROTECTION';
+}
+```
+
+**Consideration 3: Unified Placeholder Format**
+
+To avoid "double logic" for AI vs traditional providers, use a **unified extraction/reassembly** approach with provider-specific placeholder formats:
+
+```
+┌─────────────────────┬──────────────────────────┬─────────────────────────┐
+│ Provider Type       │ Placeholder Format       │ Reassembly Regex        │
+├─────────────────────┼──────────────────────────┼─────────────────────────┤
+│ AI (Gemini, GPT)    │ [0], [1], [2]            │ /\[\s*(\d+)\s*\]/g      │
+│ Traditional (Google)│ <span translate="no"     │ /<span[^>]*translate=   │
+│                     │ data-id="0">0</span>    │ "no"[^>]*data-id="(\d+)"│
+└─────────────────────┴──────────────────────────┴─────────────────────────┘
+```
+
+**Benefits**:
+- **Single code path** for extraction and reassembly
+- **Provider-specific markers** optimized for each provider's behavior
+- **No double logic** - unified processing with format-specific rendering
+
+**Implementation**:
+```javascript
+// PlaceholderRegistry generates format based on provider
+generatePlaceholder(id, providerType) {
+  if (providerType === 'AI') {
+    return `[${id}]`;  // Simple numeric
+  } else {
+    return `<span translate="no" class="aiwc-ph" data-id="${id}">${id}</span>`;
+  }
+}
+
+// Reassembly detects and handles both formats
+extractPlaceholders(translatedText) {
+  // Try AI format first
+  const aiMatches = translatedText.match(/\[\s*(\d+)\s*\]/g);
+  if (aiMatches) return { format: 'AI', ids: aiMatches };
+
+  // Try traditional format
+  const tradMatches = translatedText.match(/<span[^>]*translate="no"[^>]*data-id="(\d+)"[^>]*>/g);
+  if (tradMatches) return { format: 'TRADITIONAL', ids: tradMatches };
+
+  return { format: 'NONE', ids: [] };
+}
+```
 
 ### Integration Flow
 
@@ -72,32 +189,37 @@ if (request.placeholderRegistry && request.blockContainer) {
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 2: STREAMING (Placeholder-Aware)                         │
+│ PHASE 2: SEGMENT-BASED TRANSLATION (Placeholder-Aware)         │
 ├─────────────────────────────────────────────────────────────────┤
-│ For each streaming update:                                       │
+│ Long text divided into segments (e.g., 3-5 segments):           │
+│                                                                  │
+│ For EACH segment that completes:                                 │
 │   1. Check if request.placeholderRegistry exists                │
-│   2. If YES → Use placeholder-aware streaming:                  │
-│      - Parse translated text for placeholders: "سلام [0] هوش"  │
-│      - Extract text portions between placeholders               │
-│      - Update text content ONLY, preserve placeholder markers   │
-│      - NEVER modify block container innerHTML                   │
-│   3. If NO → Use regular streaming:                             │
-│      - Apply translations to individual text nodes              │
-│      - Create wrappers as needed                                │
+│   2. If YES → Use placeholder-aware handling:                   │
+│      - Parse translated segment for placeholders: "سلام [0]"    │
+│      - Track segment progress in registry (NO DOM updates!)     │
+│      - Store segment result for later accumulation              │
+│      - NEVER modify block container innerHTML yet               │
+│   3. If NO → Use regular segment handling:                      │
+│      - Apply translation to individual text nodes immediately   │
+│      - Create wrappers as needed for real-time feedback         │
+│                                                                  │
+│ User sees: Progress indicator or partial updates                │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 3: STREAM END (Reassembly)                               │
+│ PHASE 3: ALL SEGMENTS COMPLETE → FINAL REASSEMBLY              │
 ├─────────────────────────────────────────────────────────────────┤
 │ If request.placeholderRegistry exists:                          │
-│   1. Collect all streaming results                             │
-│   2. Parse final translation for placeholder markers           │
-│   3. Validate all placeholders present                         │
-│   4. Replace placeholders with original DOM elements           │
-│   5. Apply complete HTML to block container (ONCE)             │
-│   6. Clear placeholder registry                                │
+│   1. Collect ALL translated segments                          │
+│   2. Combine segments into final translation                   │
+│   3. Parse final translation for placeholder markers            │
+│   4. Validate all placeholders present                          │
+│   5. Replace placeholders with original DOM subtrees           │
+│   6. Apply complete HTML to block container (ONCE)             │
+│   7. Clear placeholder registry                                │
 │ Else:                                                           │
-│   - Use regular streaming result handling                      │
+│   - All segments were already applied individually              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,109 +229,185 @@ if (request.placeholderRegistry && request.blockContainer) {
 
 **File**: `src/features/element-selection/utils/PlaceholderRegistry.js`
 
-**New Properties**:
+**Enhanced Properties**:
 ```javascript
 export class PlaceholderRegistry {
-  constructor() {
-    this.placeholders = new Map(); // Map<number, HTMLElement>
+  constructor(providerType = 'AI') {
+    this.placeholders = new Map(); // Map<number, {root: HTMLElement, html: string, depth: number}>
     this.counter = 0;
-    this.isStreaming = false; // NEW: Track streaming state
-    this.streamingUpdates = []; // NEW: Track streaming update history
+    this.isSegmentBased = false; // Track segment-based translation state
+    this.segmentUpdates = []; // Track segment update history
+    this.providerType = providerType; // 'AI' or 'TRADITIONAL'
   }
 
-  // NEW: Mark registry as active for streaming
-  startStreaming() {
-    this.isStreaming = true;
-    this.streamingUpdates = [];
+  // NEW: Register inline element with subtree support
+  registerSubtree(inlineElement) {
+    const id = this.counter++;
+    const html = inlineElement.outerHTML;  // Complete subtree HTML
+    const depth = this._calculateDepth(inlineElement);
+
+    this.placeholders.set(id, {
+      root: inlineElement,
+      html: html,              // Complete subtree for nested elements
+      depth: depth             // For validation
+    });
+
+    // Generate placeholder based on provider type
+    return this._generatePlaceholder(id);
   }
 
-  // NEW: Store streaming update
-  addStreamingUpdate(update) {
-    if (!this.isStreaming) return;
-    this.streamingUpdates.push({
+  // NEW: Generate placeholder based on provider type (unified format)
+  _generatePlaceholder(id) {
+    if (this.providerType === 'AI') {
+      // AI providers: simple numeric marker
+      return `[${id}]`;
+    } else {
+      // Traditional providers: HTML marker with translate="no"
+      return `<span translate="no" class="aiwc-placeholder" data-id="${id}">${id}</span>`;
+    }
+  }
+
+  // NEW: Calculate nesting depth for validation
+  _calculateDepth(element) {
+    let maxDepth = 0;
+    for (const child of element.children) {
+      if (this._isInlineElement(child)) {
+        maxDepth = Math.max(maxDepth, 1 + this._calculateDepth(child));
+      }
+    }
+    return maxDepth;
+  }
+
+  // NEW: Check if element is inline
+  _isInlineElement(element) {
+    const inlineTags = ['A', 'STRONG', 'EM', 'B', 'I', 'CODE', 'SPAN', 'MARK', 'S', 'U', 'SMALL'];
+    return inlineTags.includes(element.tagName);
+  }
+
+  // NEW: Get complete subtree HTML for reassembly
+  getSubtreeHTML(id) {
+    const entry = this.placeholders.get(id);
+    return entry ? entry.html : null;
+  }
+
+  // NEW: Mark registry as active for segment-based translation
+  startSegmentTranslation() {
+    this.isSegmentBased = true;
+    this.segmentUpdates = [];
+  }
+
+  // NEW: Store segment update (alias for backward compatibility)
+  addSegmentUpdate(update) {
+    if (!this.isSegmentBased) return;
+    this.segmentUpdates.push({
       timestamp: Date.now(),
       ...update
     });
   }
 
-  // NEW: Complete streaming and return history
-  endStreaming() {
-    this.isStreaming = false;
-    const history = [...this.streamingUpdates];
-    this.streamingUpdates = [];
+  // Alias for backward compatibility with existing code
+  addStreamingUpdate(update) {
+    return this.addSegmentUpdate(update);
+  }
+
+  // NEW: Complete segment translation and return history
+  endSegmentTranslation() {
+    this.isSegmentBased = false;
+    const history = [...this.segmentUpdates];
+    this.segmentUpdates = [];
     return history;
   }
+
+  // Alias for backward compatibility with existing code
+  endStreaming() {
+    return this.endSegmentTranslation();
+  }
+
+  // Alias for backward compatibility
+  startStreaming() {
+    return this.startSegmentTranslation();
+  }
+
+  // EXISTING: Get placeholder by ID (updated for subtree)
+  getPlaceholder(id) {
+    const entry = this.placeholders.get(id);
+    return entry ? entry.root : null;
+  }
+
+  // EXISTING methods...
 }
 ```
+
+**Key Changes**:
+1. **Subtree Support**: `registerSubtree()` stores complete `outerHTML` for nested elements
+2. **Unified Format**: `_generatePlaceholder()` creates provider-specific markers
+3. **Depth Tracking**: `_calculateDepth()` validates nesting depth
+4. **HTML Retrieval**: `getSubtreeHTML()` returns complete subtree for reassembly
+5. **Segment Tracking**: Renamed from "streaming" to "segment-based" with aliases for backward compatibility
 
 ### 2. StreamingUpdateService (Modified)
 
 **File**: `src/features/element-selection/managers/services/StreamingUpdateService.js`
 
-**New Method**: `_applyPlaceholderAwareStreaming`
+**Note**: The name "StreamingUpdateService" refers to **segment-based translation updates**, not AI token streaming. Long text is divided into segments, and this service handles each segment as it completes.
+
+**New Method**: `_applyPlaceholderAwareSegmentUpdate`
 
 ```javascript
 /**
- * Apply streaming translations while preserving placeholder structure
+ * Apply segment-based translation updates while preserving placeholder structure
  * @private
  * @param {Array} textNodes - Text nodes to update
  * @param {Map} newTranslations - New translations to apply
  * @param {Object} request - Translation request with placeholderRegistry
  */
-async _applyPlaceholderAwareStreaming(textNodes, newTranslations, request) {
+async _applyPlaceholderAwareSegmentUpdate(textNodes, newTranslations, request) {
   const { placeholderRegistry, blockContainer } = request;
 
-  this.logger.debug('Applying placeholder-aware streaming updates', {
+  this.logger.debug('Applying placeholder-aware segment updates', {
     registrySize: placeholderRegistry.size,
-    textNodesCount: textNodes.length
+    textNodesCount: textNodes.length,
+    segmentIndex: request.currentSegment || 0,
+    totalSegments: request.totalSegments || 1
   });
 
-  // Notify registry of streaming start
+  // Notify registry of segment-based translation start
   if (!placeholderRegistry.isStreaming) {
     placeholderRegistry.startStreaming();
   }
 
-  // CRITICAL: Find the text node within block container that matches original text
-  // DO NOT modify block container innerHTML during streaming
+  // CRITICAL: For placeholder translations, DON'T modify DOM yet
+  // Just track the segment progress for final reassembly
   for (const [originalText, translationData] of newTranslations.entries()) {
-    // Find text node in block container
-    const textNode = this._findTextNodeInBlock(blockContainer, originalText);
-
-    if (!textNode) {
-      this.logger.debug('Text node not found in block container', { originalText });
-      continue;
-    }
-
     // Check if translation contains placeholders
     const translatedText = typeof translationData === 'object'
       ? translationData.text
       : translationData;
 
     if (!containsPlaceholders(translatedText)) {
-      this.logger.debug('Translation has no placeholders, skipping streaming update');
+      this.logger.debug('Translation has no placeholders, skipping placeholder tracking');
+      // For non-placeholder translations, apply immediately as usual
       continue;
     }
 
-    // Extract text portions between placeholders
-    const textPortions = this._extractTextBetweenPlaceholders(translatedText);
-
-    // Update text node content while preserving placeholders in display
-    // Note: We don't actually update DOM during streaming for placeholder translations
-    // We just track the streaming progress for UI feedback
-    placeholderRegistry.addStreamingUpdate({
+    // CRITICAL: For placeholder translations, track segment but DON'T apply to DOM
+    // The DOM will be updated once ALL segments complete
+    placeholderRegistry.addSegmentUpdate({
+      segmentIndex: request.currentSegment,
       originalText,
       translatedText,
-      textPortions
+      timestamp: Date.now()
     });
 
-    this.logger.debug('Recorded streaming update for placeholder translation', {
+    this.logger.debug('Recorded segment update for placeholder translation', {
+      segmentIndex: request.currentSegment,
       originalPreview: originalText.substring(0, 30),
       translatedPreview: translatedText.substring(0, 30)
     });
   }
 
-  // Trigger UI update to show streaming progress
-  this._showStreamingProgress(placeholderRegistry);
+  // Trigger UI progress indicator (not DOM update)
+  this._showSegmentProgress(placeholderRegistry, request.currentSegment, request.totalSegments);
 }
 ```
 
@@ -247,30 +445,33 @@ _extractTextBetweenPlaceholders(text) {
 
 **File**: `src/features/element-selection/managers/services/StreamEndService.js`
 
-**Modified Method**: `_handleStreamEndSuccess`
+**Note**: "StreamEndService" handles completion of **all translation segments**, not token streams. This service is called when ALL segments of a long text have completed translation.
 
-The existing placeholder handling at lines 112-124 is enhanced to work with streaming results:
+**Modified Method**: `_handleAllSegmentsComplete`
+
+The existing placeholder handling is enhanced to work with segment-based results:
 
 ```javascript
-async _handleStreamEndSuccess(messageId, request) {
+async _handleAllSegmentsComplete(messageId, request) {
   // CRITICAL: Check if this is a placeholder-based translation
   if (request.placeholderRegistry && request.blockContainer) {
-    this.logger.debug('Detected placeholder-based translation with streaming');
+    this.logger.debug('All segments complete - placeholder-based translation');
 
-    // Notify registry of streaming end
-    const streamingHistory = request.placeholderRegistry.endStreaming();
+    // Notify registry that all segments are complete
+    const segmentHistory = request.placeholderRegistry.endStreaming();
 
-    // Build data object from streaming segments
+    // Build final translation from all segments
     const data = {
-      translatedText: this._extractTranslationFromSegments(request),
-      streamingHistory // Include streaming history for debugging
+      translatedText: this._combineSegmentsIntoFinalTranslation(request),
+      segmentHistory // Include segment history for debugging
     };
 
     await this._handlePlaceholderTranslation(request, data, targetLanguage);
     return;
   }
 
-  // Regular streaming translation processing (non-placeholder)
+  // Regular segment-based translation processing (non-placeholder)
+  // For non-placeholder, each segment was already applied individually
   // ... existing code ...
 }
 ```
@@ -450,17 +651,25 @@ shouldUseStreaming(request) {
 ```
 1. EXTRACTION PHASE:
    placeholderRegistry = new PlaceholderRegistry()
-   placeholderRegistry.startStreaming()
+   placeholderRegistry.startSegmentTranslation()
 
-2. STREAMING PHASE:
-   For each update:
-     placeholderRegistry.addStreamingUpdate(update)
+2. SEGMENT-BASED TRANSLATION PHASE:
+   For each segment that completes:
+     placeholderRegistry.addSegmentUpdate({
+       segmentIndex: 0, 1, 2, ...
+       translatedText: "...",
+       timestamp: ...
+     })
 
-3. REASSEMBLY PHASE:
-   streamingHistory = placeholderRegistry.endStreaming()
-   // Use streamingHistory for debugging if needed
+3. ALL SEGMENTS COMPLETE PHASE:
+   segmentHistory = placeholderRegistry.endSegmentTranslation()
+   // Use segmentHistory for debugging if needed
 
-4. CLEANUP PHASE:
+4. FINAL REASSEMBLY PHASE:
+   // Combine all segments into final translation
+   // Replace placeholders with original DOM elements
+
+5. CLEANUP PHASE:
    placeholderRegistry.clear()
 ```
 
@@ -474,9 +683,11 @@ shouldUseStreaming(request) {
   placeholderRegistry: PlaceholderRegistry, // For placeholder translations
   textsToTranslate: ["Agent [0] AI [1]!"],
   expandedTexts: [...],
-  translatedSegments: Map,
+  translatedSegments: Map, // Accumulates translated segments
+  currentSegment: 0, // Which segment is currently being processed
+  totalSegments: 3, // Total number of segments for this text
   originMapping: [...],
-  status: "pending" | "streaming" | "completed" | "error",
+  status: "pending" | "translating" | "completed" | "error",
   hasErrors: false
 }
 ```
@@ -526,7 +737,7 @@ if (!validatePlaceholders(translatedText, placeholderRegistry).valid) {
 
 ## Testing Scenarios
 
-### Scenario 1: Successful Streaming with Placeholders
+### Scenario 1: Successful Segment-Based Translation with Placeholders
 
 **Input**:
 ```html
@@ -539,23 +750,28 @@ Text: "Agent [0] AI [1]!"
 Registry: [0] → <em>Zero</em>, [1] → <strong>rocks</strong>
 ```
 
-**Streaming Updates**:
+**Segment Division**:
 ```
-Update 1: "عامل [0] هوش"
-Update 2: "عامل [0] هوش مصنوعی [1]"
-Update 3: "عامل [0] هوش مصنوعی [1] عالی است!"
+Long text divided into 3 segments for translation
 ```
 
-**Expected Result**:
+**Segment Updates**:
+```
+Segment 1: "عامل [0] هوش" → Tracked in registry (NO DOM update)
+Segment 2: "عامل [0] هوش مصنوعی [1]" → Tracked in registry (NO DOM update)
+Segment 3: "عامل [0] هوش مصنوعی [1] عالی است!" → Tracked in registry
+```
+
+**All Segments Complete → Final Reassembly**:
 ```html
 <p>عامل <em>Zero</em> هوش مصنوعی <strong>rocks</strong> عالی است!</p>
 ```
 
 **Verification**:
-- [ ] No page corruption
-- [ ] Inline elements preserved
-- [ ] Streaming updates recorded in registry
-- [ ] Final reassembly successful
+- [ ] No page corruption during segment accumulation
+- [ ] Inline elements preserved in final reassembly
+- [ ] All segment updates recorded in registry
+- [ ] DOM updated only once at completion
 
 ### Scenario 2: Placeholder Loss Fallback
 
@@ -570,9 +786,9 @@ Text: "Click [0] to continue"
 Registry: [0] → <a href="#">here</a>
 ```
 
-**Streaming Update**:
+**Segment 1**:
 ```
-Update 1: "اینجا کلیک کنید برای ادامه"
+"اینجا کلیک کنید برای ادامه"
 (Placeholders stripped by provider)
 ```
 
@@ -587,7 +803,7 @@ Update 1: "اینجا کلیک کنید برای ادامه"
 - [ ] No page corruption
 - [ ] Warning logged
 
-### Scenario 3: RTL with LTR Portions
+### Scenario 3: RTL with LTR Portions (Segment-Based)
 
 **Input**:
 ```html
@@ -600,9 +816,9 @@ Text: "Get [0] today"
 Registry: [0] → <strong>40% off</strong>
 ```
 
-**Streaming Update**:
+**Segment 1**:
 ```
-Update 1: "دریافت [0] تخفیف امروز"
+"دریافت [0] تخفیف امروز"
 ```
 
 **Expected Result**:
@@ -615,7 +831,7 @@ Update 1: "دریافت [0] تخفیف امروز"
 - [ ] No repositioning of "40% off"
 - [ ] Direction attribute applied
 
-### Scenario 4: Nested Inline Elements
+### Scenario 4: Nested Inline Elements (Segment-Based)
 
 **Input**:
 ```html
@@ -625,12 +841,14 @@ Update 1: "دریافت [0] تخفیف امروز"
 **Extraction**:
 ```
 Text: "Text [0] more text"
-Registry: [0] → <a href="#">link <em>with</em> emphasis</a>
+Registry: [0] → <a href="#">link <em>with</em> emphasis</a> (complete subtree)
 ```
 
-**Streaming Update**:
+**Segments 1-3**:
 ```
-Update 1: "متن [0] متن بیشتر"
+Segment 1: "متن [0]" → Accumulated
+Segment 2: "متن [0] متن" → Accumulated
+Segment 3: "متن [0] متن بیشتر" → Final
 ```
 
 **Expected Result**:
@@ -639,29 +857,33 @@ Update 1: "متن [0] متن بیشتر"
 ```
 
 **Verification**:
-- [ ] Nested structure preserved
+- [ ] Nested subtree preserved (link with emphasis inside)
 - [ ] All inline elements intact
 - [ ] No DOM corruption
+- [ ] Segment progress shown to user
 
 ## Performance Considerations
 
 ### Memory Management
 
-1. **Registry Lifecycle**: Always clear `PlaceholderRegistry` after translation completion
-2. **Streaming History**: Limit streaming history size (max 100 updates)
+1. **Registry Lifecycle**: Always clear `PlaceholderRegistry` after all segments complete
+2. **Segment History**: Limit segment history size (max 100 updates)
 3. **DOM References**: Remove event listeners and references on cleanup
+4. **Segment Accumulation**: Store only final combined translation, not all intermediate segments
 
 ### Processing Time
 
 1. **Placeholder Detection**: O(n) where n = text length
 2. **Reassembly**: O(m) where m = number of placeholders
 3. **Validation**: O(m) for placeholder count check
+4. **Segment Combination**: O(s) where s = number of segments
 
-### Streaming Latency
+### Segment Latency
 
-1. **Progress Updates**: Show progress every 2-3 streaming updates
-2. **UI Throttling**: Throttle UI updates to prevent layout thrashing
-3. **Batch Processing**: Process multiple streaming updates in single render frame
+1. **Progress Updates**: Show progress indicator as each segment completes
+2. **UI Throttling**: Throttle progress updates to prevent layout thrashing (every 2-3 segments)
+3. **Segment Batching**: Process multiple segments in single render frame when possible
+4. **Placeholder Deferred DOM**: For placeholder translations, don't update DOM until all segments complete
 
 ## Error Handling
 
