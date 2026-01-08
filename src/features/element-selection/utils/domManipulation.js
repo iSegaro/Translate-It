@@ -575,15 +575,18 @@ export function applyTranslationsToNodesWithPlaceholders(textNodes, translations
     return;
   }
 
-  // Check if this is a placeholder-based translation
+  // Check if this is a placeholder-based translation (AI or XML format)
+  const hasAIPlaceholders = context.extractedText && /\[\[AIWC-\d+\]\]/.test(context.extractedText);
+  const hasXMLPlaceholders = context.extractedText && /<x\s+id\s*=\s*["']\d+["']\s*\/?>/.test(context.extractedText);
   const isPlaceholderTranslation = context.placeholderRegistry &&
     context.placeholderRegistry.size > 0 &&
     context.extractedText &&
-    /\[\[AIWC-\d+\]\]/.test(context.extractedText);
+    (hasAIPlaceholders || hasXMLPlaceholders);
 
   if (isPlaceholderTranslation && context.blockContainer) {
     logger.debug('Applying placeholder-based translation', {
       placeholderCount: context.placeholderRegistry.size,
+      format: hasXMLPlaceholders ? 'xml' : 'ai',
       blockContainer: context.blockContainer.tagName
     });
 
@@ -594,6 +597,7 @@ export function applyTranslationsToNodesWithPlaceholders(textNodes, translations
     return {
       success: true,
       mode: 'placeholder',
+      format: hasXMLPlaceholders ? 'xml' : 'ai',
       blockContainer: context.blockContainer,
       placeholderRegistry: context.placeholderRegistry
     };

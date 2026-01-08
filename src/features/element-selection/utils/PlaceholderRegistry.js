@@ -24,9 +24,10 @@ export class PlaceholderRegistry {
   /**
    * Register an inline element as a placeholder
    * @param {HTMLElement} element - The inline element to register
+   * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
    * @returns {number} The placeholder ID
    */
-  register(element) {
+  register(element, format = 'ai') {
     const id = this.#nextId++;
     const uniqueId = `aiwc-orig-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -40,13 +41,15 @@ export class PlaceholderRegistry {
       html: element.outerHTML, // Complete subtree including nested elements
       uniqueId,
       tagName: element.tagName,
-      textContent: element.textContent
+      textContent: element.textContent,
+      format // Store format for this placeholder
     };
 
     this.#registry.set(id, entry);
     this.logger.debug(`Registered placeholder [${id}]`, {
       tagName: element.tagName,
       uniqueId,
+      format,
       htmlLength: entry.html.length
     });
 
@@ -117,6 +120,16 @@ export class PlaceholderRegistry {
   }
 
   /**
+   * Get the format for a placeholder
+   * @param {number} id - The placeholder ID
+   * @returns {string|null} The format ('ai', 'xml', 'traditional') or null if not found
+   */
+  getFormat(id) {
+    const entry = this.#registry.get(id);
+    return entry ? entry.format : null;
+  }
+
+  /**
    * Get all placeholder IDs
    * @returns {number[]} Array of placeholder IDs
    */
@@ -168,6 +181,7 @@ export class PlaceholderRegistry {
         id,
         tagName: entry.tagName,
         uniqueId: entry.uniqueId,
+        format: entry.format,
         htmlLength: entry.html.length,
         inDOM: entry.root && document.contains(entry.root)
       });

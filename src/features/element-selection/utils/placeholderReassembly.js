@@ -15,6 +15,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'placeholderRea
 const PLACEHOLDER_REGEX_AI = /\[\[\s*AIWC-(\d+)\s*\]\]/g;
 
 /**
+ * Regex pattern for XML placeholders (DeepL format)
+ * Format: <x id="0"/>, <x id='0'/>, <x id = "0" >, etc.
+ * Whitespace-tolerant, RTL-safe, quote-agnostic
+ * CRITICAL: Always use lowercase 'x' and 'id' for case-sensitivity
+ */
+const PLACEHOLDER_REGEX_XML = /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi;
+
+/**
  * Regex pattern for traditional provider placeholders (HTML span format)
  * Format: <span translate="no" data-aiwc-ph-id="0">0</span>
  */
@@ -23,16 +31,31 @@ const PLACEHOLDER_REGEX_TRADITIONAL = /<span[^>]*translate="no"[^>]*data-aiwc-ph
 /**
  * Placeholder boundary regex for validation (AI format)
  */
-const PLACEHOLDER_BOUNDARY_REGEX = /\[\[AIWC-\d+\]\]/g;
+const PLACEHOLDER_BOUNDARY_REGEX_AI = /\[\[AIWC-\d+\]\]/g;
+
+/**
+ * Placeholder boundary regex for validation (XML format)
+ * Whitespace-tolerant pattern for boundary detection
+ */
+const PLACEHOLDER_BOUNDARY_REGEX_XML = /<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi;
 
 /**
  * Extract placeholder IDs from translated text
  * @param {string} translatedText - The translated text containing placeholders
- * @param {string} format - The placeholder format ('ai' or 'traditional')
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {Array} Array of found placeholder objects with id and position
  */
 export function extractPlaceholdersFromTranslation(translatedText, format = 'ai') {
-  const regex = format === 'traditional' ? PLACEHOLDER_REGEX_TRADITIONAL : PLACEHOLDER_REGEX_AI;
+  // Select regex based on format
+  let regex;
+  if (format === 'xml') {
+    regex = PLACEHOLDER_REGEX_XML;
+  } else if (format === 'traditional') {
+    regex = PLACEHOLDER_REGEX_TRADITIONAL;
+  } else {
+    regex = PLACEHOLDER_REGEX_AI;
+  }
+
   const placeholders = [];
   let match;
 
@@ -85,10 +108,21 @@ export function validatePlaceholders(foundPlaceholders, registry) {
  * CRITICAL: Never split inside or adjacent to placeholder markers
  * @param {string} text - The text to check
  * @param {number} position - The position to check
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {boolean} True if position is inside a placeholder
  */
-export function isInsidePlaceholder(text, position) {
-  const matches = [...text.matchAll(PLACEHOLDER_BOUNDARY_REGEX)];
+export function isInsidePlaceholder(text, position, format = 'ai') {
+  // Select regex based on format
+  let regex;
+  if (format === 'xml') {
+    regex = PLACEHOLDER_BOUNDARY_REGEX_XML;
+  } else if (format === 'traditional') {
+    regex = PLACEHOLDER_REGEX_TRADITIONAL;
+  } else {
+    regex = PLACEHOLDER_BOUNDARY_REGEX_AI;
+  }
+
+  const matches = [...text.matchAll(regex)];
 
   for (const match of matches) {
     const startIndex = match.index;
@@ -99,8 +133,8 @@ export function isInsidePlaceholder(text, position) {
       return true;
     }
 
-    // Also protect 2 characters before and after placeholders
-    if (Math.abs(position - startIndex) <= 2 || Math.abs(position - endIndex) <= 2) {
+    // Also protect 2-3 characters before and after placeholders
+    if (Math.abs(position - startIndex) <= 3 || Math.abs(position - endIndex) <= 3) {
       return true;
     }
   }
@@ -312,25 +346,45 @@ export async function completeReassemblyWorkflow(
  * Used for batching protection to ensure placeholders aren't split
  * @param {Array} chunks - Array of text chunks
  * @param {string} originalText - Original text before chunking
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {boolean} True if no placeholders were split
  */
-export function validatePlaceholderBoundaries(chunks, originalText) {
+export function validatePlaceholderBoundaries(chunks, originalText, format = 'ai') {
+  // Select regex based on format
+  let regex;
+  let brokenPattern;
+
+  if (format === 'xml') {
+    regex = PLACEHOLDER_BOUNDARY_REGEX_XML;
+    // Check for broken XML placeholders
+    brokenPattern = /<x\s+id[^>]*[^\/]>|<x\s+[^i]|<\s*x|<x\s+id=\s*[^"']/gi;
+  } else if (format === 'traditional') {
+    regex = PLACEHOLDER_REGEX_TRADITIONAL;
+    brokenPattern = null; // Traditional format doesn't have broken markers
+  } else {
+    regex = PLACEHOLDER_BOUNDARY_REGEX_AI;
+    // Check for broken AI placeholders
+    brokenPattern = /\[\[AIWC-\d+$|^\d+\]\]|\[\[AIWC-|AIWC-\d+\]\]/;
+  }
+
   // Count placeholders in original text
-  const originalMatches = originalText.match(PLACEHOLDER_BOUNDARY_REGEX);
+  const originalMatches = originalText.match(regex);
   const originalCount = originalMatches ? originalMatches.length : 0;
 
   // Count placeholders in all chunks
   let chunkCount = 0;
   for (const chunk of chunks) {
-    const matches = chunk.match(PLACEHOLDER_BOUNDARY_REGEX);
+    const matches = chunk.match(regex);
     if (matches) {
       chunkCount += matches.length;
     }
 
     // Also check for broken placeholders (incomplete markers)
-    const brokenPattern = /\[\[AIWC-\d+$|^\d+\]\]|\[\[AIWC-|AIWC-\d+\]\]/;
-    if (brokenPattern.test(chunk)) {
-      logger.error('Found broken placeholder in chunk', { chunk: chunk.substring(0, 100) });
+    if (brokenPattern && brokenPattern.test(chunk)) {
+      logger.error('Found broken placeholder in chunk', {
+        chunk: chunk.substring(0, 100),
+        format
+      });
       return false;
     }
   }
@@ -340,7 +394,8 @@ export function validatePlaceholderBoundaries(chunks, originalText) {
   if (!isValid) {
     logger.warn('Placeholder boundary validation failed', {
       originalCount,
-      chunkCount
+      chunkCount,
+      format
     });
   }
 
@@ -352,8 +407,10 @@ export function validatePlaceholderBoundaries(chunks, originalText) {
  */
 export const __testing__ = {
   PLACEHOLDER_REGEX_AI,
+  PLACEHOLDER_REGEX_XML,
   PLACEHOLDER_REGEX_TRADITIONAL,
-  PLACEHOLDER_BOUNDARY_REGEX,
+  PLACEHOLDER_BOUNDARY_REGEX_AI,
+  PLACEHOLDER_BOUNDARY_REGEX_XML,
   extractPlaceholdersFromTranslation,
   validatePlaceholders,
   isInsidePlaceholder,

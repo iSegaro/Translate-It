@@ -98,20 +98,23 @@ export function findBlockContainer(startElement) {
  * Extract text from a block container with inline elements replaced by placeholders
  * @param {HTMLElement} blockContainer - The block container to extract from
  * @param {PlaceholderRegistry} registry - The placeholder registry
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {Object} Object containing extracted text and metadata
  */
-export function extractBlockWithPlaceholders(blockContainer, registry) {
+export function extractBlockWithPlaceholders(blockContainer, registry, format = 'ai') {
   logger.debug('Starting block-level extraction with placeholders', {
     tagName: blockContainer.tagName,
-    className: blockContainer.className
+    className: blockContainer.className,
+    format
   });
 
-  const result = extractTextWithInlinePlaceholders(blockContainer, registry);
+  const result = extractTextWithInlinePlaceholders(blockContainer, registry, format);
   const placeholderCount = registry.size;
 
   logger.debug('Block-level extraction complete', {
     textLength: result.text.length,
     placeholderCount,
+    format,
     textPreview: result.text.substring(0, 100)
   });
 
@@ -119,7 +122,8 @@ export function extractBlockWithPlaceholders(blockContainer, registry) {
     text: result.text,
     placeholderCount,
     blockContainer,
-    hasPlaceholders: placeholderCount > 0
+    hasPlaceholders: placeholderCount > 0,
+    format
   };
 }
 
@@ -127,9 +131,10 @@ export function extractBlockWithPlaceholders(blockContainer, registry) {
  * Recursively extract text from a node, replacing inline elements with placeholders
  * @param {Node} node - The node to extract from
  * @param {PlaceholderRegistry} registry - The placeholder registry
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {string} The extracted text with placeholders
  */
-export function extractTextWithInlinePlaceholders(node, registry) {
+export function extractTextWithInlinePlaceholders(node, registry, format = 'ai') {
   let result = '';
 
   for (const child of node.childNodes) {
@@ -145,15 +150,23 @@ export function extractTextWithInlinePlaceholders(node, registry) {
       }
 
       if (isInlineElement(element)) {
-        // Register inline element as placeholder
-        const placeholderId = registry.register(element);
-        result += `[[AIWC-${placeholderId}]]`;
+        // Register inline element as placeholder with format
+        const placeholderId = registry.register(element, format);
+
+        // Generate format-aware placeholder
+        if (format === 'xml') {
+          // CRITICAL: Always use lowercase 'x' and 'id' for XML
+          result += `<x id="${placeholderId}"/>`;
+        } else {
+          // AI format (default, existing behavior)
+          result += `[[AIWC-${placeholderId}]]`;
+        }
       } else if (isBlockElement(element)) {
         // For nested block elements, extract recursively but add space
-        result += extractTextWithInlinePlaceholders(element, registry) + ' ';
+        result += extractTextWithInlinePlaceholders(element, registry, format) + ' ';
       } else {
         // For other elements, recurse into children
-        result += extractTextWithInlinePlaceholders(element, registry);
+        result += extractTextWithInlinePlaceholders(element, registry, format);
       }
     }
   }
@@ -166,13 +179,14 @@ export function extractTextWithInlinePlaceholders(node, registry) {
  * Useful for handling complex layouts with multiple block-level elements
  * @param {HTMLElement} container - The container to extract from
  * @param {PlaceholderRegistry} registry - The placeholder registry
+ * @param {string} format - The placeholder format ('ai', 'xml', or 'traditional')
  * @returns {Array} Array of extraction results
  */
-export function extractMultipleBlocksWithPlaceholders(container, registry) {
+export function extractMultipleBlocksWithPlaceholders(container, registry, format = 'ai') {
   const results = [];
   const blocks = container.querySelectorAll(Array.from(BLOCK_ELEMENTS).join(','));
 
-  logger.debug(`Found ${blocks.length} block elements to extract`);
+  logger.debug(`Found ${blocks.length} block elements to extract`, { format });
 
   for (const block of blocks) {
     // Skip if block is nested inside another block we've already processed
@@ -185,7 +199,7 @@ export function extractMultipleBlocksWithPlaceholders(container, registry) {
     }
 
     if (!isNested) {
-      const result = extractBlockWithPlaceholders(block, registry);
+      const result = extractBlockWithPlaceholders(block, registry, format);
       results.push(result);
     }
   }

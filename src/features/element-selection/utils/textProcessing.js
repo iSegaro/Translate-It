@@ -7,8 +7,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'textProcessing');
 
-// Placeholder detection pattern: [[AIWC-0]], [[AIWC-1]], etc.
-const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/g;
+// Placeholder detection patterns
+const PLACEHOLDER_PATTERN_AI = /\[\[AIWC-\d+\]\]/g;
+const PLACEHOLDER_PATTERN_XML = /<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi;
 
 /**
  * Default configuration for text processing
@@ -23,50 +24,84 @@ const DEFAULT_CONFIG = {
 };
 
 /**
- * Check if text contains placeholder markers
+ * Check if text contains placeholder markers (AI or XML format)
  * @param {string} text - Text to check
+ * @param {string} format - Format to check ('ai', 'xml', or 'any')
  * @returns {boolean} True if text contains placeholders
  */
-export function hasPlaceholders(text) {
+export function hasPlaceholders(text, format = 'any') {
   if (!text || typeof text !== 'string') {
     return false;
   }
-  return PLACEHOLDER_PATTERN.test(text);
+
+  if (format === 'xml') {
+    return PLACEHOLDER_PATTERN_XML.test(text);
+  } else if (format === 'ai') {
+    return PLACEHOLDER_PATTERN_AI.test(text);
+  } else {
+    // Check for any format
+    return PLACEHOLDER_PATTERN_AI.test(text) || PLACEHOLDER_PATTERN_XML.test(text);
+  }
 }
 
 /**
- * Count placeholders in text
+ * Count placeholders in text (AI or XML format)
  * @param {string} text - Text to check
+ * @param {string} format - Format to count ('ai', 'xml', or 'any')
  * @returns {number} Number of placeholders found
  */
-export function countPlaceholders(text) {
+export function countPlaceholders(text, format = 'any') {
   if (!text || typeof text !== 'string') {
     return 0;
   }
-  const matches = text.match(PLACEHOLDER_PATTERN);
-  return matches ? matches.length : 0;
+
+  let count = 0;
+
+  if (format === 'xml') {
+    const matches = text.match(PLACEHOLDER_PATTERN_XML);
+    count = matches ? matches.length : 0;
+  } else if (format === 'ai') {
+    const matches = text.match(PLACEHOLDER_PATTERN_AI);
+    count = matches ? matches.length : 0;
+  } else {
+    // Count all formats
+    const aiMatches = text.match(PLACEHOLDER_PATTERN_AI);
+    const xmlMatches = text.match(PLACEHOLDER_PATTERN_XML);
+    count = (aiMatches ? aiMatches.length : 0) + (xmlMatches ? xmlMatches.length : 0);
+  }
+
+  return count;
 }
 
 /**
- * Extract all placeholder IDs from text
+ * Extract all placeholder IDs from text (AI or XML format)
  * @param {string} text - Text to extract from
+ * @param {string} format - Format to extract ('ai', 'xml', or 'any')
  * @returns {number[]} Array of placeholder IDs
  */
-export function extractPlaceholderIds(text) {
+export function extractPlaceholderIds(text, format = 'any') {
   if (!text || typeof text !== 'string') {
     return [];
   }
 
   const ids = [];
-  let match;
+  const patterns = [];
 
-  // Reset regex state
-  PLACEHOLDER_PATTERN.lastIndex = 0;
+  if (format === 'xml' || format === 'any') {
+    patterns.push({ pattern: PLACEHOLDER_PATTERN_XML, regex: /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi });
+  }
 
-  while ((match = PLACEHOLDER_PATTERN.exec(text)) !== null) {
-    const idMatch = match[0].match(/\[\[AIWC-(\d+)\]\]/);
-    if (idMatch) {
-      ids.push(parseInt(idMatch[1], 10));
+  if (format === 'ai' || format === 'any') {
+    patterns.push({ pattern: PLACEHOLDER_PATTERN_AI, regex: /\[\[AIWC-(\d+)\]\]/g });
+  }
+
+  for (const { regex } of patterns) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match[1]) {
+        ids.push(parseInt(match[1], 10));
+      }
     }
   }
 
@@ -78,27 +113,40 @@ export function extractPlaceholderIds(text) {
  * CRITICAL: Never split text inside or near placeholders
  * @param {string} text - Text to check
  * @param {number} position - Position to check
+ * @param {string} format - Format to check ('ai', 'xml', or 'any')
  * @returns {boolean} True if position is protected
  */
-export function isInsidePlaceholder(text, position) {
+export function isInsidePlaceholder(text, position, format = 'any') {
   if (!text || typeof text !== 'string') {
     return false;
   }
 
-  const matches = [...text.matchAll(PLACEHOLDER_PATTERN)];
+  const patterns = [];
 
-  for (const match of matches) {
-    const startIndex = match.index;
-    const endIndex = match.index + match[0].length;
+  if (format === 'xml' || format === 'any') {
+    patterns.push(PLACEHOLDER_PATTERN_XML);
+  }
 
-    // Check if position is inside placeholder
-    if (position >= startIndex && position < endIndex) {
-      return true;
-    }
+  if (format === 'ai' || format === 'any') {
+    patterns.push(PLACEHOLDER_PATTERN_AI);
+  }
 
-    // Also protect 3 characters before and after placeholders
-    if (Math.abs(position - startIndex) <= 3 || Math.abs(position - endIndex) <= 3) {
-      return true;
+  for (const pattern of patterns) {
+    const matches = [...text.matchAll(pattern)];
+
+    for (const match of matches) {
+      const startIndex = match.index;
+      const endIndex = match.index + match[0].length;
+
+      // Check if position is inside placeholder
+      if (position >= startIndex && position < endIndex) {
+        return true;
+      }
+
+      // Also protect 3 characters before and after placeholders
+      if (Math.abs(position - startIndex) <= 3 || Math.abs(position - endIndex) <= 3) {
+        return true;
+      }
     }
   }
 
@@ -131,10 +179,10 @@ export function expandTextsForTranslation(textsToTranslate, options = {}) {
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
-    // CRITICAL: Check for placeholders - never split texts with placeholders
-    if (hasPlaceholders(originalText)) {
+    // CRITICAL: Check for placeholders (AI or XML) - never split texts with placeholders
+    if (hasPlaceholders(originalText, 'any')) {
       logger.debug(`Text ${originalIndex} contains placeholders, keeping as single segment`, {
-        placeholderCount: countPlaceholders(originalText)
+        placeholderCount: countPlaceholders(originalText, 'any')
       });
 
       // Add the entire text as a single segment to preserve placeholder integrity

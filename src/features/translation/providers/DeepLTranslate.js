@@ -94,6 +94,183 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
+   * Extract contextual metadata to improve DeepL translation quality
+   * Provides domain and semantic information to help disambiguate terms
+   * @param {HTMLElement} blockContainer - The block container being translated
+   * @returns {string|null} Context string or null if not available
+   */
+  _extractTranslationContext(blockContainer) {
+    if (!blockContainer) return null;
+
+    const contextParts = [];
+
+    // 1. Extract page title (source domain context)
+    if (typeof document !== 'undefined' && document.title) {
+      const title = document.title.trim();
+      if (title) {
+        contextParts.push(`Source Page: ${title}`);
+      }
+    }
+
+    // 2. Extract block container type (structural context)
+    const tagName = blockContainer.tagName;
+    if (tagName) {
+      // Map common tag names to semantic descriptions
+      const semanticNames = {
+        'P': 'paragraph',
+        'H1': 'main heading',
+        'H2': 'subheading',
+        'H3': 'section heading',
+        'LI': 'list item',
+        'DIV': 'content section',
+        'ARTICLE': 'article',
+        'SECTION': 'section',
+        'BLOCKQUOTE': 'blockquote',
+        'TD': 'table cell',
+        'TH': 'table header',
+        'CAPTION': 'caption',
+        'FIGCAPTION': 'figure caption'
+      };
+
+      const semanticName = semanticNames[tagName] || tagName.toLowerCase();
+      contextParts.push(`Content Area: ${semanticName}`);
+    }
+
+    // 3. Add parent context for better disambiguation
+    const parent = blockContainer.parentElement;
+    if (parent) {
+      const parentTag = parent.tagName;
+      const parentSemantic = {
+        'NAV': 'navigation',
+        'ARTICLE': 'article',
+        'SECTION': 'section',
+        'ASIDE': 'sidebar',
+        'HEADER': 'header',
+        'FOOTER': 'footer',
+        'MAIN': 'main content'
+      }[parentTag];
+
+      if (parentSemantic) {
+        contextParts.push(`Location: ${parentSemantic}`);
+      }
+    }
+
+    if (contextParts.length === 0) return null;
+
+    // Combine with separator, limit to 1000 characters
+    let context = contextParts.join(' | ');
+
+    // Sanitize: Remove any XML tags or @@@ markers
+    context = context
+      .replace(/<[^>]+>/g, '')  // Remove XML tags
+      .replace(/@@@/g, '')       // Remove newline markers
+      .replace(/\s+/g, ' ')      // Normalize whitespace
+      .trim();
+
+    // Limit length to avoid API overhead
+    const MAX_CONTEXT_LENGTH = 1000;
+    if (context.length > MAX_CONTEXT_LENGTH) {
+      context = context.substring(0, MAX_CONTEXT_LENGTH - 3) + '...';
+    }
+
+    return context;
+  }
+
+  /**
+   * Validate XML placeholder integrity in DeepL response
+   * @param {string} requestText - Original text sent to DeepL
+   * @param {string} responseText - Translated text received from DeepL
+   * @returns {Object} Validation result with isValid flag and error details
+   */
+  _validateXMLPlaceholders(requestText, responseText) {
+    // Extract XML tags from request
+    const requestTags = requestText.match(/<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi);
+    const requestTagCount = requestTags ? requestTags.length : 0;
+
+    // Extract XML tags from response
+    const responseTags = responseText.match(/<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi);
+    const responseTagCount = responseTags ? responseTags.length : 0;
+
+    // Check 1: Tag count mismatch
+    if (requestTagCount !== responseTagCount) {
+      return {
+        isValid: false,
+        error: 'tag_count_mismatch',
+        details: {
+          requestTagCount,
+          responseTagCount
+        }
+      };
+    }
+
+    // Check 2: Validate tag syntax integrity
+    const malformedPatterns = [
+      /<x\s+id[^>]*[^\/]>/gi,      // Missing closing slash: <x id="0">
+      /<x\s+id=\s*[^"'][^>]*>/gi,  // Missing quotes: <x id=0/>
+      /<x\s+[^i]/gi,                // Missing id attribute: <x/>
+      /<\s*x/gi                     // Space after <: < x>
+    ];
+
+    for (const pattern of malformedPatterns) {
+      if (pattern.test(responseText)) {
+        return {
+          isValid: false,
+          error: 'malformed_tags',
+          details: {
+            pattern: pattern.source
+          }
+        };
+      }
+    }
+
+    // Check 3: Verify all placeholder IDs are unique and present
+    const requestIds = new Set();
+    const requestIdMatch = /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi;
+    let match;
+    while ((match = requestIdMatch.exec(requestText)) !== null) {
+      requestIds.add(parseInt(match[1], 10));
+    }
+
+    const responseIds = new Set();
+    const responseIdMatch = /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi;
+    while ((match = responseIdMatch.exec(responseText)) !== null) {
+      const id = parseInt(match[1], 10);
+      if (responseIds.has(id)) {
+        // Duplicate ID found
+        return {
+          isValid: false,
+          error: 'duplicate_ids',
+          details: {
+            duplicateId: id
+          }
+        };
+      }
+      responseIds.add(id);
+    }
+
+    // Check 4: All request IDs present in response
+    for (const id of requestIds) {
+      if (!responseIds.has(id)) {
+        return {
+          isValid: false,
+          error: 'missing_ids',
+          details: {
+            missingId: id
+          }
+        };
+      }
+    }
+
+    return {
+      isValid: true,
+      details: {
+        requestTagCount,
+        responseTagCount
+      }
+    };
+  }
+
+  /**
    * Translate a single chunk of texts using DeepL API
    * @param {string[]} chunkTexts - Texts in this chunk
    * @param {string} sourceLang - Source language (DeepL code)
@@ -103,9 +280,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @param {number} retryAttempt - Current retry attempt
    * @param {number} chunkIndex - Current chunk index
    * @param {number} totalChunks - Total number of chunks
+   * @param {HTMLElement} blockContainer - Block container for context extraction
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1, blockContainer = null) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
     // Get configuration and validate API key
@@ -130,8 +308,15 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
 
-    // Sanitize texts: Remove problematic characters that DeepL might reject
-    // This includes zero-width characters and other control characters (except newlines)
+    // Step 1: Detect XML placeholders in request
+    const hasXMLPlaceholders = validTexts.some(text =>
+      /<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi.test(text)
+    );
+
+    logger.debug('[DeepL] XML placeholder detection:', {
+      hasXMLPlaceholders,
+      textCount: validTexts.length
+    });
 
     // Pre-compile regex patterns once for better performance
     // Build control character pattern from character codes to avoid lint errors
@@ -160,12 +345,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       return sanitized;
     };
 
-    // CRITICAL FIX: Use text-based markers to preserve ALL newlines (both single and blank lines)
+    // CRITICAL: Use text-based markers to preserve ALL newlines (both single and blank lines)
     // This avoids XML parsing issues and ensures line structure is maintained
     // Using " @@@ " for blank lines (\n\n) and " @ " for single newlines (\n)
-    // After translation, convert markers back to their original newline format
+    // CRITICAL: When using XML placeholders, apply newline markers BEFORE placeholder replacement
+    // Order: sanitize → @@@ markers → XML placeholders → translation → restore @@@ → reassemble XML
     const BLANK_LINE_MARKER = ' @@@ ';  // Marker for \n\n (blank lines)
     const SINGLE_NEWLINE_MARKER = ' @ ';  // Marker for \n (single newlines)
+
+    // Store original texts for XML validation
+    const originalTextsForValidation = [...validTexts];
 
     const textsToTranslate = validTexts.map(text => {
       // CRITICAL: Sanitize text before processing to remove problematic characters
@@ -241,8 +430,33 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       requestBody.append('enable_beta_languages', '1');
     }
 
-    // Note: No XML tag handling - using Unicode marker instead
-    // This avoids XML parsing issues entirely
+    // CRITICAL: Add XML tag handling parameters when XML placeholders detected
+    // This enables DeepL's native XML tag preservation
+    if (hasXMLPlaceholders) {
+      requestBody.append('tag_handling', 'xml');
+      // CRITICAL: Use lowercase 'x' to match placeholder format
+      // This ensures DeepL ignores the content of <x/> tags
+      requestBody.append('ignore_tags', 'x');
+
+      logger.debug('[DeepL] XML tag handling enabled', {
+        tag_handling: 'xml',
+        ignore_tags: 'x'
+      });
+    }
+
+    // CRITICAL: Add contextual metadata for better translation quality
+    // Extract context from block container if available
+    if (blockContainer) {
+      const translationContext = this._extractTranslationContext(blockContainer);
+      if (translationContext) {
+        requestBody.append('context', translationContext);
+
+        logger.debug('[DeepL] Context parameter added', {
+          contextLength: translationContext.length,
+          contextPreview: translationContext.substring(0, 100) + '...'
+        });
+      }
+    }
 
     // Additional options
     requestBody.append('split_sentences', 'nonewlines'); // Preserve newlines in translation
@@ -255,7 +469,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       sourceLang: sourceLang || 'auto',
       targetLang,
       betaLanguages: betaLanguagesEnabled,
-      formality: betaLanguagesEnabled ? 'N/A (beta)' : (await getDeeplFormalityAsync() || 'default')
+      formality: betaLanguagesEnabled ? 'N/A (beta)' : (await getDeeplFormalityAsync() || 'default'),
+      hasXMLPlaceholders,
+      hasContext: blockContainer && this._extractTranslationContext(blockContainer) !== null
     });
 
     try {
@@ -278,7 +494,35 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           // DeepL returns array of translation objects for valid texts only
           const validTranslations = data.translations.map(t => t.text || '');
 
+          // CRITICAL: Validate XML placeholders if present in request
+          if (hasXMLPlaceholders) {
+            for (let i = 0; i < validTranslations.length; i++) {
+              const requestText = textsToTranslate[i];
+              const responseText = validTranslations[i];
+
+              const validation = this._validateXMLPlaceholders(requestText, responseText);
+
+              if (!validation.isValid) {
+                logger.error('[DeepL] XML placeholder validation failed', {
+                  index: i,
+                  error: validation.error,
+                  details: validation.details
+                });
+
+                // Throw special error with XML corruption flag to trigger fallback
+                const error = new Error(`XML placeholder validation failed: ${validation.error}`);
+                error.isXMLCorruptionError = true;
+                error.validationDetails = validation.details;
+                error.errorIndex = i;
+                throw error;
+              }
+            }
+
+            logger.debug('[DeepL] XML placeholder validation passed for all translations');
+          }
+
           // Restore ALL newlines by replacing text markers with their original format
+          // CRITICAL: Restore @@@ markers FIRST, then XML placeholders will be reassembled later
           const restoredTranslations = validTranslations.map(translation => {
             // Check if markers exist in translation
             const hasBlankMarkers = translation.includes(' @@@ ');
@@ -350,6 +594,19 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
       return finalResult;
     } catch (error) {
+      // CRITICAL: Check if this is an XML corruption error and trigger fallback
+      if (error.isXMLCorruptionError) {
+        logger.error('[DeepL] XML corruption detected, triggering fallback to atomic extraction', {
+          error: error.error,
+          details: error.validationDetails,
+          index: error.errorIndex
+        });
+
+        // Return original texts to trigger atomic extraction fallback in SelectElementManager
+        // This preserves backward compatibility and allows translation to continue
+        return chunkTexts;
+      }
+
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
       if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 5) {
         logger.debug(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/5)`);

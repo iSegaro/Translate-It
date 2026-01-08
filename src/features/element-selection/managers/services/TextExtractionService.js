@@ -21,6 +21,11 @@ export class TextExtractionService extends ResourceTracker {
     this.AI_PROVIDERS = new Set([
       'gemini', 'openai', 'claude', 'deep', 'chatgpt', 'gpt'
     ]);
+
+    // XML providers that use XML tag placeholders (DeepL)
+    this.XML_PROVIDERS = new Set([
+      'deepl'
+    ]);
   }
 
   /**
@@ -32,6 +37,17 @@ export class TextExtractionService extends ResourceTracker {
     if (!providerType) return false;
     const type = providerType.toLowerCase();
     return this.AI_PROVIDERS.some(p => type.includes(p));
+  }
+
+  /**
+   * Check if a provider is an XML provider (uses XML tag placeholders)
+   * @param {string} providerType - The provider type identifier
+   * @returns {boolean} True if provider is an XML provider
+   */
+  isXMLProvider(providerType) {
+    if (!providerType) return false;
+    const type = providerType.toLowerCase();
+    return this.XML_PROVIDERS.some(p => type.includes(p));
   }
 
   /**
@@ -525,23 +541,30 @@ export class TextExtractionService extends ResourceTracker {
   }
 
   /**
-   * Extract text with placeholder-based extraction for AI providers
+   * Extract text with placeholder-based extraction for AI and XML providers
    * @param {HTMLElement} element - The element to extract from
    * @param {PlaceholderRegistry} registry - The placeholder registry
+   * @param {string} providerType - The provider type (for format detection)
    * @returns {Object} Extraction result with text and metadata
    */
-  extractWithPlaceholders(element, registry /*: PlaceholderRegistry */) {
-    this.logger.debug('[extractWithPlaceholders] Starting placeholder-based extraction');
+  extractWithPlaceholders(element, registry /*: PlaceholderRegistry */, providerType = null) {
+    this.logger.debug('[extractWithPlaceholders] Starting placeholder-based extraction', {
+      providerType
+    });
 
     // Find block container
     const blockContainer = findBlockContainer(element);
 
+    // Auto-detect format based on provider type
+    const format = this.isXMLProvider(providerType) ? 'xml' : 'ai';
+
     // Extract with placeholders
-    const result = extractBlockWithPlaceholders(blockContainer, registry);
+    const result = extractBlockWithPlaceholders(blockContainer, registry, format);
 
     this.logger.debug('[extractWithPlaceholders] Extraction complete', {
       textLength: result.text.length,
       placeholderCount: result.placeholderCount,
+      format,
       blockTag: result.blockContainer.tagName
     });
 
@@ -567,9 +590,10 @@ export class TextExtractionService extends ResourceTracker {
       hasRegistry: !!registry
     });
 
-    // Route to placeholder-based extraction for AI providers
-    if (usePlaceholders && registry && this.isAIProvider(providerType)) {
-      return this.extractWithPlaceholders(element, registry);
+    // Route to placeholder-based extraction for AI and XML providers
+    if (usePlaceholders && registry &&
+        (this.isAIProvider(providerType) || this.isXMLProvider(providerType))) {
+      return this.extractWithPlaceholders(element, registry, providerType);
     }
 
     // Default to standard extraction
@@ -598,7 +622,8 @@ export class TextExtractionService extends ResourceTracker {
         elementValidation: 'WeakMap (size not available)',
         textContent: 'WeakMap (size not available)'
       },
-      aiProviders: Array.from(this.AI_PROVIDERS)
+      aiProviders: Array.from(this.AI_PROVIDERS),
+      xmlProviders: Array.from(this.XML_PROVIDERS)
     };
   }
 }
