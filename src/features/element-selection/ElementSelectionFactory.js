@@ -1,6 +1,6 @@
 /**
  * Element Selection Factory - Dynamic Loading and Caching
- * Manages lazy loading and caching of Element Selection modules for optimal performance
+ * Simplified for the new domtranslator-based architecture
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -31,7 +31,7 @@ class ElementSelectionFactory {
     logger.debug('[ElementSelectionFactory] Loading SelectElementManager...');
 
     const loadingPromise = import('./SelectElementManager.js').then(module => {
-      const manager = module.default || module.SelectElementManager;
+      const manager = module.SelectElementManager;
       this.cache.set(cacheKey, manager);
       this.loadingPromises.delete(cacheKey);
       logger.debug('[ElementSelectionFactory] SelectElementManager loaded and cached');
@@ -89,10 +89,10 @@ class ElementSelectionFactory {
   }
 
   /**
-   * Get Element Selection Services
+   * Get Element Selector (new simplified service)
    */
-  async getElementSelectionServices() {
-    const cacheKey = 'ElementSelectionServices';
+  async getElementSelector() {
+    const cacheKey = 'ElementSelector';
 
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
@@ -102,30 +102,16 @@ class ElementSelectionFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[ElementSelectionFactory] Loading Element Selection services...');
+    logger.debug('[ElementSelectionFactory] Loading ElementSelector...');
 
-    const loadingPromise = Promise.all([
-      import('./managers/services/ElementHighlighter.js'),
-      import('./managers/services/TextExtractionService.js'),
-      import('./managers/services/TranslationOrchestrator.js'),
-      import('./managers/services/ModeManager.js'),
-      import('./managers/services/StateManager.js'),
-      import('./managers/services/ErrorHandlingService.js')
-    ]).then(([highlighter, extractor, orchestrator, modeManager, stateManager, errorHandler]) => {
-      const result = {
-        ElementHighlighter: highlighter.ElementHighlighter,
-        TextExtractionService: extractor.TextExtractionService,
-        TranslationOrchestrator: orchestrator.TranslationOrchestrator,
-        ModeManager: modeManager.ModeManager,
-        StateManager: stateManager.StateManager,
-        ErrorHandlingService: errorHandler.ErrorHandlingService
-      };
-      this.cache.set(cacheKey, result);
+    const loadingPromise = import('./core/ElementSelector.js').then(module => {
+      const selector = module.ElementSelector;
+      this.cache.set(cacheKey, selector);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[ElementSelectionFactory] Element Selection services loaded and cached');
-      return result;
+      logger.debug('[ElementSelectionFactory] ElementSelector loaded and cached');
+      return selector;
     }).catch(error => {
-      logger.error('[ElementSelectionFactory] Failed to load Element Selection services:', error);
+      logger.error('[ElementSelectionFactory] Failed to load ElementSelector:', error);
       this.loadingPromises.delete(cacheKey);
       throw error;
     });
@@ -135,10 +121,10 @@ class ElementSelectionFactory {
   }
 
   /**
-   * Get Element Highlighter specifically (commonly used standalone)
+   * Get DomTranslator Adapter (new simplified service)
    */
-  async getElementHighlighter() {
-    const cacheKey = 'ElementHighlighter';
+  async getDomTranslatorAdapter() {
+    const cacheKey = 'DomTranslatorAdapter';
 
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
@@ -148,16 +134,16 @@ class ElementSelectionFactory {
       return this.loadingPromises.get(cacheKey);
     }
 
-    logger.debug('[ElementSelectionFactory] Loading ElementHighlighter...');
+    logger.debug('[ElementSelectionFactory] Loading DomTranslatorAdapter...');
 
-    const loadingPromise = import('./managers/services/ElementHighlighter.js').then(module => {
-      const highlighter = module.ElementHighlighter;
-      this.cache.set(cacheKey, highlighter);
+    const loadingPromise = import('./core/DomTranslatorAdapter.js').then(module => {
+      const adapter = module.DomTranslatorAdapter;
+      this.cache.set(cacheKey, adapter);
       this.loadingPromises.delete(cacheKey);
-      logger.debug('[ElementSelectionFactory] ElementHighlighter loaded and cached');
-      return highlighter;
+      logger.debug('[ElementSelectionFactory] DomTranslatorAdapter loaded and cached');
+      return adapter;
     }).catch(error => {
-      logger.error('[ElementSelectionFactory] Failed to load ElementHighlighter:', error);
+      logger.error('[ElementSelectionFactory] Failed to load DomTranslatorAdapter:', error);
       this.loadingPromises.delete(cacheKey);
       throw error;
     });

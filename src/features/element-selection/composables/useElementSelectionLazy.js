@@ -1,6 +1,6 @@
 /**
  * Lazy Loading Element Selection Composable
- * Provides lazy-loaded Element Selection functionality with caching
+ * Simplified for the new domtranslator-based architecture
  */
 
 import { ref, computed } from 'vue';
@@ -18,8 +18,8 @@ export function useElementSelectionLazy() {
   // Track what's loaded
   const isManagerLoaded = computed(() => loadedModules.value.has('SelectElementManager'));
   const isHandlersLoaded = computed(() => loadedModules.value.has('ElementSelectionHandlers'));
-  const isServicesLoaded = computed(() => loadedModules.value.has('ElementSelectionServices'));
-  const isHighlighterLoaded = computed(() => loadedModules.value.has('ElementHighlighter'));
+  const isSelectorLoaded = computed(() => loadedModules.value.has('ElementSelector'));
+  const isAdapterLoaded = computed(() => loadedModules.value.has('DomTranslatorAdapter'));
 
   /**
    * Load Element Selection Manager
@@ -76,25 +76,25 @@ export function useElementSelectionLazy() {
   };
 
   /**
-   * Load Element Selection Services
+   * Load Element Selector
    */
-  const loadElementSelectionServices = async () => {
-    if (isServicesLoaded.value) {
-      logger.debug('[useElementSelectionLazy] Element Selection services already loaded');
-      return ElementSelectionFactory.cache.get('ElementSelectionServices');
+  const loadElementSelector = async () => {
+    if (isSelectorLoaded.value) {
+      logger.debug('[useElementSelectionLazy] ElementSelector already loaded');
+      return ElementSelectionFactory.cache.get('ElementSelector');
     }
 
     isLoading.value = true;
     loadError.value = null;
 
     try {
-      logger.debug('[useElementSelectionLazy] Loading Element Selection services...');
-      const services = await ElementSelectionFactory.getElementSelectionServices();
-      loadedModules.value.add('ElementSelectionServices');
-      logger.debug('[useElementSelectionLazy] Element Selection services loaded successfully');
-      return services;
+      logger.debug('[useElementSelectionLazy] Loading ElementSelector...');
+      const selector = await ElementSelectionFactory.getElementSelector();
+      loadedModules.value.add('ElementSelector');
+      logger.debug('[useElementSelectionLazy] ElementSelector loaded successfully');
+      return selector;
     } catch (error) {
-      logger.error('[useElementSelectionLazy] Failed to load Element Selection services:', error);
+      logger.error('[useElementSelectionLazy] Failed to load ElementSelector:', error);
       loadError.value = error;
       throw error;
     } finally {
@@ -103,25 +103,25 @@ export function useElementSelectionLazy() {
   };
 
   /**
-   * Load Element Highlighter specifically
+   * Load DomTranslator Adapter
    */
-  const loadElementHighlighter = async () => {
-    if (isHighlighterLoaded.value) {
-      logger.debug('[useElementSelectionLazy] ElementHighlighter already loaded');
-      return ElementSelectionFactory.cache.get('ElementHighlighter');
+  const loadDomTranslatorAdapter = async () => {
+    if (isAdapterLoaded.value) {
+      logger.debug('[useElementSelectionLazy] DomTranslatorAdapter already loaded');
+      return ElementSelectionFactory.cache.get('DomTranslatorAdapter');
     }
 
     isLoading.value = true;
     loadError.value = null;
 
     try {
-      logger.debug('[useElementSelectionLazy] Loading ElementHighlighter...');
-      const highlighter = await ElementSelectionFactory.getElementHighlighter();
-      loadedModules.value.add('ElementHighlighter');
-      logger.debug('[useElementSelectionLazy] ElementHighlighter loaded successfully');
-      return highlighter;
+      logger.debug('[useElementSelectionLazy] Loading DomTranslatorAdapter...');
+      const adapter = await ElementSelectionFactory.getDomTranslatorAdapter();
+      loadedModules.value.add('DomTranslatorAdapter');
+      logger.debug('[useElementSelectionLazy] DomTranslatorAdapter loaded successfully');
+      return adapter;
     } catch (error) {
-      logger.error('[useElementSelectionLazy] Failed to load ElementHighlighter:', error);
+      logger.error('[useElementSelectionLazy] Failed to load DomTranslatorAdapter:', error);
       loadError.value = error;
       throw error;
     } finally {
@@ -135,16 +135,16 @@ export function useElementSelectionLazy() {
   const loadElementSelectionCore = async () => {
     logger.debug('[useElementSelectionLazy] Loading core Element Selection modules...');
 
-    const [manager, services, highlighter] = await Promise.all([
+    const [manager, selector, adapter] = await Promise.all([
       loadSelectElementManager(),
-      loadElementSelectionServices(),
-      loadElementHighlighter()
+      loadElementSelector(),
+      loadDomTranslatorAdapter()
     ]);
 
     return {
       SelectElementManager: manager,
-      services,
-      ElementHighlighter: highlighter
+      ElementSelector: selector,
+      DomTranslatorAdapter: adapter
     };
   };
 
@@ -157,11 +157,11 @@ export function useElementSelectionLazy() {
   };
 
   /**
-   * Create an Element Highlighter instance with lazy loading
+   * Create an Element Selector instance with lazy loading
    */
-  const createElementHighlighter = async () => {
-    const HighlighterClass = await loadElementHighlighter();
-    return new HighlighterClass();
+  const createElementSelector = async () => {
+    const SelectorClass = await loadElementSelector();
+    return new SelectorClass();
   };
 
   /**
@@ -194,19 +194,19 @@ export function useElementSelectionLazy() {
     // Module status
     isManagerLoaded,
     isHandlersLoaded,
-    isServicesLoaded,
-    isHighlighterLoaded,
+    isSelectorLoaded,
+    isAdapterLoaded,
 
     // Loading functions
     loadSelectElementManager,
     loadElementSelectionHandlers,
-    loadElementSelectionServices,
-    loadElementHighlighter,
+    loadElementSelector,
+    loadDomTranslatorAdapter,
     loadElementSelectionCore,
 
     // Instance creation
     createSelectElementManager,
-    createElementHighlighter,
+    createElementSelector,
 
     // Maintenance
     clearCache,

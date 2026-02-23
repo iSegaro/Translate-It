@@ -38,17 +38,8 @@ export function clearAllCaches(context) {
     logger.warn('Context or state.originalTexts not available');
   }
 
-  // Clear Element Selection caches if available
-  try {
-    import('@/features/element-selection/utils/textExtraction.js').then(({ clearAllCaches: clearElementSelectionCaches }) => {
-      clearElementSelectionCaches(context);
-      logger.debug('Element Selection caches cleared successfully');
-    }).catch(() => {
-      // Element Selection module not available, skip
-    });
-  } catch {
-    // Dynamic import not supported or module not available, skip
-  }
+  // Note: Element Selection cache clearing removed during simplification (2026)
+  // The new domtranslator-based architecture doesn't use complex caching
 }
 
 /**

@@ -2,553 +2,275 @@
 
 ## 🎯 Overview
 
-The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content. The system has been completely refactored to integrate with the modern toast notification system and follows a unified, service-oriented architecture.
+The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content.
 
-## 🔓 Module Independence (2025 Update)
+**Major Update (2026)**: The system has been significantly simplified by integrating the [domtranslator](https://github.com/translate-tools/domtranslator) library - a battle-tested solution used in the Linguist Translate extension (200k+ users). This migration reduced the codebase by **~70%** while maintaining all core functionality.
 
-The Select Element system is now fully independent with no external dependencies to other feature modules:
+## 🎉 Migration to domtranslator (2026)
 
-- ✅ **Self-Contained**: All required utilities are localized within `src/features/element-selection/`
-- ✅ **No Cross-Feature Dependencies**: Eliminated all `@/features/` imports
-- ✅ **Isolated Functionality**: Can be developed, tested, and deployed independently
-- ✅ **Simplified Integration**: Easy to integrate into any project without pulling unrelated features
+### What Changed
 
-## 🏗️ Architecture
+| Aspect | Before | After | Reduction |
+|--------|--------|-------|-----------|
+| SelectElementManager | ~1,265 lines | ~300 lines | **76%** |
+| Total services | 13+ specialized services | 2 core services | **85%** |
+| Architecture layers | 5+ layers | 2 layers | **60%** |
+| External deps | 0 | 1 (domtranslator) | +1 small dep |
+| Streaming support | Yes (complex) | No (simplified) | Removed |
 
-The system is built on a unified manager pattern with integrated toast notifications and decoupled services.
+### What Was Removed
+
+- **Streaming translation system** - Simplified to one-shot translation
+- **Multi-segment processing** - Replaced by simple text extraction
+- **Placeholder system** - Not needed for simple case
+- **Complex node matching** - domtranslator handles this
+- **Mode management** - Simple mode only
+- **Direction manager** - Simplified to language-based detection
+
+### What Was Preserved
+
+✅ Element selection and highlighting
+✅ Click-to-translate functionality
+✅ Navigation prevention on interactive elements
+✅ Toast notifications with actionable buttons
+✅ Revert functionality
+✅ Cross-frame communication
+✅ ESC key deactivation
+✅ RTL/LTR direction handling
+
+## 🏗️ Simplified Architecture
+
+The new architecture uses domtranslator for DOM manipulation and translation:
 
 ```
-+-------------------------+
-|   Browser UI (Popup)    |
-+-------------------------+
-           |
-           ▼ (Message: ACTIVATE_SELECT_ELEMENT_MODE)
-+-------------------------+
-|   Background Script     |
-+-------------------------+
-           |
-           ▼ (Message to Content Script)
-+--------------------------------------------------------------------+
-|                          Content Script                           |
-|                                                                    |
-| +--------------------------+      (Events)     +----------------+ |
-| |  SelectElementManager.js | ◀──────────────▶ |  Toast System  | |
-| |   (Unified Manager)      |    (Event Bus)    | (Notifications)| |
-| +--------------------------+                  +----------------+ |
-|           |                                              |       |
-|           ▼ (DOM Operations)                             ▼ (Shows) |
-| +--------------------------------------------------------------------+ |
-| |                            Webpage DOM                           | |
-| +--------------------------------------------------------------------+ |
-+--------------------------------------------------------------------+
+User Click → SelectElementManager (~300 lines)
+     ↓
+     ├─→ ElementSelector (highlight, extract, prevent nav)
+     ├─→ DomTranslatorAdapter
+     │       ↓
+     │   domtranslator (NodesTranslator + DOMTranslator)
+     │       ↓
+     │   Translation via Provider System
+     └─→ SelectElementNotificationManager (toast)
 ```
 
 ### Core Components
 
-#### 1. **SelectElementManager.js** (Unified Manager)
+#### 1. **SelectElementManager.js** (~300 lines)
 The central controller that manages the entire Select Element lifecycle:
-- **Singleton Pattern**: Single instance across the application
-- **Service Orchestration**: Manages all specialized services
-- **Resource Management**: Extends ResourceTracker for automatic cleanup with Critical Protection
-- **Event Handling**: Coordinates mouse events and toast interactions
+- **Mode Management**: Activate/deactivate Select Element mode
+- **Event Coordination**: Mouse events, keyboard events, click handling
 - **Cross-Frame Support**: Works in both main page and iframes
-- **FeatureManager Integration**: Integrated with smart feature management system
-- **Separate Activation Methods**: `activate()` for FeatureManager initialization, `activateSelectElementMode()` for actual functionality
+- **FeatureManager Integration**: Integrated with smart feature management
+- **Resource Management**: Extends ResourceTracker for automatic cleanup
 
-#### 2. **Service Layer** (Decoupled Services)
-Each service has a single responsibility:
+#### 2. **DomTranslatorAdapter.js** (~200 lines)
+Wrapper around domtranslator library:
+- **Translation Function**: Bridges domtranslator with extension's provider system
+- **Direction Handling**: Applies RTL/LTR attributes based on target language
+- **State Tracking**: Manages translation state for revert functionality
+- **Progress Callbacks**: Optional callbacks for translation progress
 
-**Core Services:**
-- **ElementHighlighter**: Visual feedback and highlighting
-- **TextExtractionService**: Text content extraction and validation
-- **TranslationOrchestrator**: Translation process coordination
-- **StreamingTranslationEngine**: Streaming translation support
-- **TranslationRequestManager**: Request lifecycle management
-- **ModeManager**: Selection mode management (Simple/Smart)
-- **StateManager**: Translation state tracking and reverts
-- **ErrorHandlingService**: Centralized error management
+#### 3. **ElementSelector.js** (~200 lines)
+Handles element selection and highlighting:
+- **Mouse Events**: Hover highlighting with visual feedback
+- **Click Prevention**: Stops navigation on interactive elements
+- **Element Validation**: Smart detection of valid text elements
+- **Cursor Management**: Crosshair cursor during activation
 
-**UI Services (split from TranslationUIManager):**
-- **TranslationUIManager**: Main coordinator for UI operations (~190 lines)
-- **NotificationService**: Status and toast notifications
-- **StreamingUpdateService**: Real-time streaming updates
-- **StreamEndService**: Stream completion handling
-- **DOMNodeMatcher**: Node finding and text matching
-- **TranslationApplier**: Core DOM manipulation
-- **DirectionManager**: RTL/LTR direction handling
+#### 4. **elementHelpers.js** (~150 lines)
+Utility functions for text extraction and validation:
+- `extractTextFromElement()` - Simple text extraction
+- `isValidTextElement()` - Element validation
+- `hasValidTextContent()` - Text content validation
+- `getDirectionFromLanguage()` - RTL/LTR detection
 
-#### 3. **Toast Integration System** (New)
-Integrated notification system for user feedback:
-- **ToastIntegration**: Central toast management
-- **ToastEventHandler**: Event handling for toast interactions
-- **ToastElementDetector**: Element detection for toast exclusion
-- **SelectElementNotificationManager**: Specialized notification handling
+#### 5. **SelectElementNotificationManager.js** (Unchanged)
+Manages toast notifications:
+- **Singleton Pattern**: Single notification manager instance
+- **Event Integration**: pageEventBus for communication
+- **Actionable Buttons**: Cancel and Revert buttons
+- **Cross-Context Support**: Works across frames
 
-## ✨ Key Features (2025 Update)
+## 🔧 Usage
 
-### 🎉 Toast Integration
-- **Real-time Notifications**: Users receive immediate feedback via toast notifications
-- **Actionable Toasts**: Toast notifications include cancel buttons for mode deactivation
-- **Cross-Context Support**: Works seamlessly across different browsing contexts
-- **Event-Driven**: Toast interactions trigger appropriate system responses
+### Activating Select Element Mode
 
-### 🔄 Unified Manager Architecture
-- **Single Responsibility**: One manager to rule all Select Element operations
-- **Service Composition**: Built from specialized, testable services
-- **Resource Tracking**: Automatic cleanup with ResourceTracker integration
-- **Singleton Pattern**: Ensures consistency across the application
-
-### 🚀 Advanced Multi-Segment Translation
-- **Smart Text Segmentation**: Automatically splits complex content at optimal boundaries
-- **Paragraph Preservation**: Maintains original structure with empty lines and formatting
-- **Streaming Support**: Real-time translation of large content with progress updates
-- **Mixed Content Handling**: Seamlessly processes text, hashtags, links, and emojis
-- **Zero-Width Characters**: Uses \u200B for preserving visual spacing in translations
-
-### 🛡️ Navigation Prevention
-- **Smart Blocking**: Prevents navigation on interactive elements during selection
-- **Content-Aware**: Allows translation of elements with text content
-- **Cross-Site**: Works consistently across all websites (Twitter, GitHub, LinkedIn, etc.)
-- **Modern Web App Support**: Optimized for complex single-page applications
-
-### 🎨 Enhanced Visual Feedback
-- **Direct CSS Highlighting**: Maximum performance with direct DOM manipulation
-- **Global Styles**: Main DOM injection for crosshair cursor and link disabling
-- **Toast Styling**: Integrated toast styles with the main application
-- **Responsive Design**: Adapts to different element sizes and screen resolutions
-
-## 🔄 Event Flow
-
-### Activation Flow
-1. User clicks "Select Element" in extension popup
-2. Background script sends activation message to content script
-3. FeatureManager calls `activate()` on SelectElementManager for initialization
-4. When actual functionality is needed, ContentMessageHandler calls `activateSelectElementMode()`
-5. Manager activates services and attaches event listeners
-6. Toast notification appears with activation confirmation and cancel option
-7. UI behaviors activate (crosshair cursor, link disabling)
-
-### Selection Flow
-1. User hovers over elements → `ElementHighlighter` provides visual feedback
-2. User clicks on highlighted element
-3. `handleClick()` processes the selection:
-   - Prevents default navigation behavior
-   - Extracts text via `TextExtractionService`
-   - Initiates translation via `TranslationOrchestrator`
-   - Deactivates UI immediately
-4. Toast notification shows translation progress/completion
-5. Translation applied to DOM with state tracking for reverts
-
-### Deactivation Flow
-1. User clicks cancel button in Select Element notification OR
-2. User translates an element OR
-3. User presses Escape key (with proper event propagation prevention)
-4. `SelectElementManager.deactivate()` cleans up:
-   - Removes event listeners
-   - Clears highlights
-   - Dismisses Select Element notification via `dismiss-select-element-notification` event
-   - Resets UI behaviors
-   - Prevents interference with other shortcut handlers (e.g., RevertShortcut)
-5. System returns to normal state
-
-## 🔧 Service Details
-
-### ElementHighlighter Service
 ```javascript
-// Visual feedback management
-class ElementHighlighter {
-  addGlobalStyles()           // Crosshair cursor and link disabling
-  handleMouseOver(element)    // Smart element highlighting
-  handleMouseOut(element)     // Highlight removal with timeout
-  findBestTextElement(start)  // Intelligent element selection
-  clearAllHighlights()        // Complete highlight cleanup
-}
+// From content script (via FeatureManager)
+const manager = window.featureManager.getFeatureHandler('selectElement');
+await manager.activateSelectElementMode();
+
+// From background script
+await sendMessage({
+  action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE
+});
 ```
 
-### TextExtraction Service
+### Deactivating Select Element Mode
+
 ```javascript
-// Content extraction and validation
-class TextExtractionService {
-  extractText(element)        // Extract meaningful text content
-  validateText(text)          // Validate for translation
-  findBestContainer(element)  // Find optimal translation target
-}
+// Via ESC key (automatic)
+// Or programmatically:
+await manager.deactivate();
 ```
 
-### TranslationOrchestrator
+### Reverting Translations
+
 ```javascript
-// Translation coordination with streaming support
-class TranslationOrchestrator {
-  translateElement(element, text)           // Execute translation
-  applyTranslation(element, result)          // Apply to DOM
-  handleTranslationError(error)              // Error management
-  calculateDynamicTimeout(segments)          // Local timeout calculation
-  handleStreamTranslation(data)              // Stream processing
-  processMultiSegmentTranslation(segments)   // Multi-segment coordination
-}
+const manager = window.featureManager.getFeatureHandler('selectElement');
+await manager.revertTranslations();
 ```
 
-### StateManager
-```javascript
-// State tracking and reverts
-class StateManager {
-  trackTranslation(element, original, translated)  // Track changes
-  revertElement(element)                          // Revert to original
-  getTranslationHistory()                         // History management
-}
-```
+## 🔗 Message Handling
 
-### TranslationUIManager (Coordinator)
-```javascript
-// Main coordinator for UI operations - delegates to specialized services
-class TranslationUIManager {
-  showStatusNotification(messageId, context)     // Show progress notification
-  processStreamUpdate(message)                   // Process streaming updates
-  processStreamEnd(message)                      // Handle stream completion
-  applyTranslationsToNodes(nodes, translations)  // Apply to DOM
-  cleanup()                                      // Cleanup all services
-}
-```
+### Background Script Messages
 
-### NotificationService
-```javascript
-// UI notification management
-class NotificationService {
-  showStatusNotification(messageId, context)     // Status notifications
-  dismissStatusNotification()                    // Dismiss active notification
-  showTimeoutNotification(messageId)             // Timeout warnings
-}
-```
+- **ACTIVATE_SELECT_ELEMENT_MODE**: Activate Select Element mode
+- **DEACTIVATE_SELECT_ELEMENT_MODE**: Deactivate Select Element mode
+- **GET_SELECT_ELEMENT_STATE**: Get current mode state
+- **SET_SELECT_ELEMENT_STATE**: Set mode state (internal)
 
-### StreamingUpdateService
-```javascript
-// Real-time streaming translation processing
-class StreamingUpdateService {
-  processStreamUpdate(message)                   // Main streaming entry
-  _processStreamTranslationData(request, data)   // Process translation data
-  _applyStreamingTranslationsImmediately(...)    // Real-time DOM updates
-}
-```
+### pageEventBus Events
 
-### StreamEndService
-```javascript
-// Stream completion and result processing
-class StreamEndService {
-  processStreamEnd(message)                      // Handle stream end
-  handleTranslationResult(message)               // Non-streaming results
-  _handleStreamEndSuccess(messageId, request)    // Success handling
-  _handleStreamEndError(messageId, request, data)// Error handling
-}
-```
+- **show-select-element-notification**: Show activation notification
+- **update-select-element-notification**: Update notification status
+- **dismiss-select-element-notification**: Dismiss notification
+- **cancel-select-element-mode**: Cancel from toast button
+- **revert-translations**: Revert from toast button
+- **hide-translation**: Hide translation overlay
 
-### DOMNodeMatcher
-```javascript
-// Node finding and text matching
-class DOMNodeMatcher {
-  _findNodesToUpdate(textNodes, originalText)    // Find nodes to update
-  _findNodesForMultiSegmentText(...)             // Multi-segment matching
-  _filterValidNodesForTranslation(...)           // Validation
-  debugTextMatching(textNodes, translations)     // Debug utility
-}
-```
-
-### TranslationApplier
-```javascript
-// Core DOM manipulation for applying translations
-class TranslationApplier {
-  applyTranslationsToNodes(textNodes, translations) // Main application
-  // Creates wrappers and replaces TEXT_NODE/ELEMENT_NODE
-  // Handles multiple matching strategies for translation lookup
-}
-```
-
-### DirectionManager
-```javascript
-// RTL/LTR direction management
-class DirectionManager {
-  applyImmersiveTranslatePattern(element, translations, targetLanguage)
-  _findTextContainerParent(segment)              // Find text container
-  // Detects direction from translated content, not just target language
-}
-```
-
-## 🛠️ Technical Implementation
-
-### Resource Management
-```javascript
-// Automatic cleanup with ResourceTracker and Critical Protection
-class SelectElementManager extends ResourceTracker {
-  constructor() {
-    super('select-element-manager');
-    // Track essential services with Critical Protection
-    this.trackResource('element-highlighter', () => this.elementHighlighter?.cleanup(), { isCritical: true });
-    this.trackResource('text-extraction-service', () => this.textExtractionService?.cleanup(), { isCritical: true });
-    this.trackResource('toast-integration', () => this.toastIntegration?.cleanup(), { isCritical: true });
-    // Track other services normally
-    this.trackResource('translation-orchestrator', () => this.translationOrchestrator?.cleanup());
-    this.trackResource('state-manager', () => this.stateManager?.cleanup());
-  }
-}
-```
-
-### Toast Integration
-```javascript
-// Toast notification management
-class ToastIntegration {
-  showNotification(type, message, options = {}) {
-    // Display actionable toast notifications
-    return this.showToast(type, message, {
-      duration: options.persistent ? 0 : 5000,
-      actions: options.actions || [],
-      ...options
-    });
-  }
-}
-```
-
-### Navigation Prevention & Event Handling
-```javascript
-// Smart navigation blocking
-preventNavigationHandler(event) {
-  if (!this.isActive || this.isProcessingClick) return;
-
-  const target = event.target;
-  const isInteractiveElement = this.isInteractiveElement(target);
-
-  if (isInteractiveElement) {
-    const hasTextContent = this.hasTextContent(target);
-
-    if (hasTextContent) {
-      // Allow elements with text content to be translated
-      return;
-    }
-
-    // Block navigation on other interactive elements
-    event.preventDefault();
-    event.stopPropagation();
-    return false;
-  }
-}
-
-// ESC key handling with event propagation prevention
-setupKeyboardListeners() {
-  document.addEventListener('keydown', (event) => {
-    if (event.key === KEY_CODES.ESCAPE && this.isActive) {
-      // Prevent other handlers (like RevertShortcut) from processing ESC
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      // Set flag to prevent race conditions
-      window.selectElementHandlingESC = true;
-      setTimeout(() => { window.selectElementHandlingESC = false; }, 100);
-
-      this.deactivate({ fromCancel: true });
-    }
-  });
-}
-```
-
-## 📁 Module Structure
+## 📁 File Structure
 
 ```
 src/features/element-selection/
-├── SelectElementManager.js                    # Unified manager
-├── SelectElementNotificationManager.js         # Notification handling
-├── utils/
-│   └── timeoutCalculator.js                   # Local timeout utilities
-├── managers/
-│   ├── services/
-│   │   ├── ElementHighlighter.js              # Visual feedback
-│   │   ├── TextExtractionService.js          # Text extraction
-│   │   ├── TranslationOrchestrator.js         # Translation coordination
-│   │   ├── StreamingTranslationEngine.js      # Streaming translation support
-│   │   ├── TranslationRequestManager.js       # Request lifecycle management
-│   │   ├── TranslationUIManager.js            # UI coordinator (~190 lines)
-│   │   ├── NotificationService.js            # Status notifications
-│   │   ├── StreamingUpdateService.js         # Real-time streaming updates
-│   │   ├── StreamEndService.js               # Stream completion handling
-│   │   ├── DOMNodeMatcher.js                 # Node finding & matching
-│   │   ├── TranslationApplier.js             # DOM manipulation
-│   │   ├── DirectionManager.js               # RTL/LTR direction
-│   │   ├── ModeManager.js                    # Mode management
-│   │   ├── StateManager.js                   # State tracking
-│   │   └── ErrorHandlingService.js           # Error management
-│   └── constants/
-│       └── selectElementConstants.js          # Configuration constants
-├── handlers/
-│   ├── handleActivateSelectElementMode.js     # Activation handler
-│   ├── handleDeactivateSelectElementMode.js   # Deactivation handler
-│   ├── handleSetSelectElementState.js         # State setting handler
-│   └── selectElementStateManager.js          # State management
-└── constants/
-    └── SelectElementModes.js                  # Mode definitions
+├── SelectElementManager.js              # Main manager (~300 lines)
+├── SelectElementNotificationManager.js  # Notification manager (unchanged)
+├── ElementSelectionFactory.js           # Lazy loading factory
+├── index.js                             # Feature entry point
+│
+├── core/                                # New core services
+│   ├── DomTranslatorAdapter.js          # domtranslator wrapper
+│   └── ElementSelector.js               # Selection & highlighting
+│
+├── utils/                               # Simplified utilities
+│   ├── elementHelpers.js                # Main helpers
+│   ├── textDirection.js                 # RTL/LTR utilities
+│   ├── timeoutCalculator.js             # Dynamic timeouts
+│   └── cleanupSelectionWindows.js       # Window cleanup
+│
+├── constants/                           # Configuration
+│   └── SelectElementModes.js            # Mode definitions
+│
+├── handlers/                            # Message handlers (unchanged)
+│   ├── handleActivateSelectElementMode.js
+│   ├── handleDeactivateSelectElementMode.js
+│   ├── handleGetSelectElementState.js
+│   ├── handleSetSelectElementState.js
+│   └── selectElementStateManager.js
+│
+└── composables/                         # Vue composables
+    └── useElementSelectionLazy.js       # Lazy loading
 ```
 
-## 🎯 Usage Patterns
+## 🎨 UI/UX Features
 
-### Basic Element Translation
-1. Activate Select Element mode
-2. Hover over desired element (visual highlight appears)
-3. Click element (immediate translation)
-4. View result with toast confirmation
+### Visual Feedback
+- **Hover Highlighting**: Blue outline on hoverable elements
+- **Crosshair Cursor**: Indicates selection mode is active
+- **Navigation Prevention**: Clicks on links/buttons don't navigate
 
-### Complex Content Translation
-1. Activate Select Element mode
-2. Hold Ctrl for Smart Mode (selects optimal container)
-3. Click on complex element (intelligent container selection)
-4. System handles nested content and styling
+### Toast Notifications
+- **Activation Notice**: Shows when mode is activated
+- **Translation Progress**: Updates during translation
+- **Action Buttons**: Cancel and Revert buttons
+- **Cross-Context**: Works in all contexts and iframes
 
-### Mode Deactivation
-- **Method 1**: Click cancel button in Select Element notification
-- **Method 2**: Press Escape key (with event propagation prevention to avoid conflicts)
-- **Method 3**: Translate any element (auto-deactivation)
-- **Method 4**: Background script deactivation (system-level cleanup)
+## 🧩 Integration Points
 
-## 🔧 Configuration
-
-### Mode Types
-- **Simple Mode**: Direct element selection
-- **Smart Mode**: Intelligent container selection (Ctrl toggle)
-
-### Toast Options
-- **Activation Notifications**: Confirm mode activation
-- **Progress Notifications**: Translation status updates
-- **Error Notifications**: User-friendly error messages
-- **Completion Notifications**: Translation result confirmations
-
-## 📊 Performance Optimizations
-
-### Resource Efficiency
-- **Lazy Loading**: Services initialized on demand
-- **Automatic Cleanup**: ResourceTracker prevents memory leaks
-- **Event Debouncing**: Optimized mouse event handling
-- **CSS Caching**: Reused style calculations
-
-### User Experience
-- **Immediate Feedback**: Instant visual highlighting
-- **Non-Blocking**: Translation runs in background
-- **Smart Cancellation**: Multiple deactivation methods
-- **Cross-Site Consistency**: Works everywhere
-
-## 🔄 Integration Points
-
-### With Select Element Notification System
+### FeatureManager Integration
 ```javascript
-// Specialized notification management for Select Element
-pageEventBus.emit('show-select-element-notification', {
-  managerId: this.instanceId,
-  actions: {
-    cancel: () => this.deactivate({ fromNotification: true }),
-    revert: () => this.performRevert()
-  }
-});
-
-// Update notification during translation
-pageEventBus.emit('update-select-element-notification', {
-  status: 'translating'
-});
-
-// Dismiss notification on completion/cancellation
-pageEventBus.emit('dismiss-select-element-notification', {
-  managerId: this.instanceId
-});
+// FeatureManager loads SelectElementManager as ESSENTIAL feature
+// Access via:
+const manager = window.featureManager.getFeatureHandler('selectElement');
 ```
 
-### With Translation System & Streaming Support
+### Provider System Integration
 ```javascript
-// Integration with translation providers and streaming support
-this.translationOrchestrator.translateElement(element, text)
-  .then(result => {
-    this.applyTranslation(element, result);
-    // Notification dismissed automatically in streaming completion handler
-  })
-  .catch(error => {
-    this.errorHandlingService.handleError(error);
-    // Notification dismissed automatically in error handler
-  });
-
-// Enhanced streaming translation coordination for complex content
-// - Multi-segment text processing (handles tweets, articles with multiple lines)
-// - Preserves empty lines and paragraph structure
-// - Automatic notification updates during streaming
-// - Smart timeout management based on content size and segment count
-// - Progress reporting through UnifiedTranslationCoordinator
-// - Advanced handling of complex DOM structures (Twitter, LinkedIn, etc.)
-
-// Multi-Segment Translation Processing
-// - Splits long texts into manageable segments at sentence boundaries
-// - Preserves empty lines as structural markers using \u200B\n\u200B
-// - Reassembles translations maintaining original paragraph structure
-// - Handles mixed content (text, hashtags, links) in single elements
+// DomTranslatorAdapter uses extension's provider system
+// Supports all translation providers (Google, DeepL, OpenAI, etc.)
 ```
 
-### With State Management
+### Toast System Integration
 ```javascript
-// State tracking for reverts
-this.stateManager.trackTranslation(element, originalText, translatedText);
+// Uses centralized toast notification system
+// Actionable buttons trigger pageEventBus events
 ```
 
-## 🛡️ Error Handling
+## ⚙️ Configuration
 
-### Comprehensive Error Management
-- **Validation Errors**: Invalid element or content detection
-- **Translation Errors**: Provider failures and rate limits
-- **DOM Errors**: Element manipulation issues
-- **Network Errors**: Extension context validation
+### Mode Settings
+- **Simple Mode**: Direct element selection (default)
+- **Validation**: Minimum text length, element size checks
 
-### User-Friendly Messages
-- **Toast Notifications**: Clear error communication
-- **Visual Feedback**: Highlight state management
-- **Graceful Degradation**: System remains functional on errors
+### Timeouts
+- **Dynamic Timeout**: Based on text length
+- **Base Timeout**: 30 seconds
+- **Max Timeout**: 5 minutes
 
-## 📈 Metrics and Monitoring
+### Direction Handling
+- **RTL Languages**: Auto-detected from target language
+- **Language List**: ar, he, fa, ur, yi, ps, sd, ckb, dv, ug
 
-### Debug Information
+## 🔍 Debugging
+
+### Get Manager Status
 ```javascript
-getStatus() {
-  return {
-    isActive: this.isActive,
-    isProcessingClick: this.isProcessingClick,
-    hasHighlight: this.elementHighlighter?.currentHighlighted,
-    serviceStates: this.getServiceStates(),
-    notificationState: this.currentNotification?.getState(),
-    featureManagement: this.featureManager?.isFeatureActive('selectElement') || false,
-    resourceTracking: this.getStats()
-  };
-}
+const manager = window.featureManager.getFeatureHandler('selectElement');
+console.log(manager.getStatus());
+// { serviceActive, isProcessingClick, isInitialized, instanceId, isInIframe }
 ```
 
-### Performance Tracking
-- **Activation Time**: Mode initialization speed
-- **Selection Accuracy**: Element detection success rate
-- **Translation Time**: Provider response metrics
-- **Error Rate**: System reliability metrics
+### Check Translation State
+```javascript
+const adapter = manager.domTranslatorAdapter;
+console.log(adapter.getCurrentTranslation());
+// { elementId, element, originalHTML, translatedHTML, targetLanguage, timestamp }
+```
+
+## 📊 Performance
+
+### Memory Usage
+- **Improved**: ~70% reduction in code size
+- **Simplified**: Fewer objects to track
+- **Efficient**: domtranslator uses WeakMap for storage
+
+### Translation Speed
+- **One-Shot**: No streaming overhead for simple translations
+- **Direct**: Single provider call per translation
+- **Optimized**: domtranslator is highly optimized
 
 ## 🚀 Future Enhancements
 
-### Recently Implemented (2025)
-- ✅ **Service Refactoring**: TranslationUIManager split into 6 focused services (3,016 → 190 lines coordinator)
-- ✅ **Service Composition Pattern**: UI operations delegated to specialized, testable services
-- ✅ **Multi-Segment Translation**: Advanced processing of complex content with multiple lines
-- ✅ **Streaming Translation Engine**: Real-time translation for large content
-- ✅ **Paragraph Structure Preservation**: Maintains original formatting and empty lines
-- ✅ **Complex DOM Handling**: Optimized for Twitter, LinkedIn, and modern web apps
-- ✅ **Enhanced Text Processing**: Smart segmentation at sentence boundaries
-- ✅ **Zero-Width Character Preservation**: Uses \u200B for visual spacing integrity
+### Potential Additions
+- **Smart Mode**: Re-add Ctrl+click for intelligent container selection
+- **Batch Translation**: Translate multiple elements at once
+- **Cache System**: Cache translation results (previously removed)
 
-### Planned Features
-- **Multi-Element Selection**: Batch translation capabilities
-- **Visual Translation**: Image and SVG content support
-- **Advanced AI Context**: Smart content understanding
-- **Collaborative Translation**: Multi-user features
-- **Adaptive Translation**: Context-aware translation based on content type
-- **Real-time Translation**: Live translation as user types or scrolls
+### Known Limitations
+- **No Streaming**: Large content may take longer to translate
+- **Simple Mode Only**: No intelligent container detection
+- **Single Element**: One element per translation (no batch)
 
-### Technical Improvements
-- **WebAssembly Integration**: Performance-critical operations
-- **Service Worker Support**: Background processing
-- **Advanced Caching**: Intelligent content caching with multi-segment awareness
-- **Progressive Enhancement**: Graceful feature degradation
-- **Memory Optimization**: Enhanced ResourceTracker integration for streaming
-- **Cross-Frame Translation**: Improved iframe and shadow DOM support
+## 📝 References
+
+- [domtranslator Library](https://github.com/translate-tools/domtranslator)
+- [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
+- [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
+- [Translation Provider System](./PROVIDERS.md)
+
+## 🔄 Migration History
+
+- **2026-02**: Migrated to domtranslator library (~70% code reduction)
+- **2025**: Previous architecture with 13+ specialized services
+- **2024**: Initial implementation with streaming and placeholder support

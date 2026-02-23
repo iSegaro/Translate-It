@@ -1,90 +1,27 @@
 // Element Selection Utilities Index
-// Centralized exports for all Element Selection utilities
+// Simplified for the new domtranslator-based architecture
 
-// Note: Cache system has been removed from Select Element feature
+// Simple helpers (new)
+export * from './elementHelpers.js';
 
-// Text direction utilities
+// Text direction utilities (still useful for RTL/LTR handling)
 export {
   isRTLLanguage,
   getTextDirection,
-  applyContainerDirection,
-  restoreOriginalDirection,
-  createDirectionAwareContainer,
-  ElementDirectionUtils,
-  RTL_LANGUAGES,
-  RTL_CHARACTER_PATTERN
+  RTL_LANGUAGES
 } from './textDirection.js';
 
-// DOM manipulation utilities
-export {
-  generateUniqueId,
-  collectTextNodes,
-  applyTranslationsToNodes,
-  revertTranslations,
-  findBestTextContainer,
-  isValidTextElement,
-  extractElementText,
-  ElementDOMUtils
-} from './domManipulation.js';
+// Cleanup utilities (useful for window management)
+export { cleanupAllSelectionWindows } from './cleanupSelectionWindows.js';
 
-// Text processing utilities
-export {
-  expandTextsForTranslation,
-  reassembleTranslations,
-  handleTranslationLengthMismatch,
-  parseAndCleanTranslationResponse,
-  isValidTextContent,
-  cleanText,
-  ElementTextProcessingUtils
-} from './textProcessing.js';
+// Timeout calculator (useful for dynamic timeouts)
+export { calculateDynamicTimeout } from './timeoutCalculator.js';
 
-// Main text extraction system
-export {
-  ElementTextExtraction,
-  getElementTextExtraction,
-  initializeTextExtraction,
-
-  // Re-exported functions for compatibility
-  collectTextNodes as collectTextNodesExtraction,
-  applyTranslationsToNodes as applyTranslationsToNodesExtraction,
-  revertTranslations as revertTranslationsExtraction,
-  generateUniqueId as generateUniqueIdExtraction,
-  extractElementText as extractElementTextExtraction,
-  isValidTextElement as isValidTextElementExtraction,
-  expandTextsForTranslation as expandTextsForTranslationExtraction,
-  reassembleTranslations as reassembleTranslationsExtraction,
-  parseAndCleanTranslationResponse as parseAndCleanTranslationResponseExtraction,
-  handleTranslationLengthMismatch as handleTranslationLengthMismatchExtraction,
-  isValidTextContent as isValidTextContentExtraction,
-  cleanText as cleanTextExtraction,
-  applyContainerDirection as applyContainerDirectionExtraction,
-  restoreOriginalDirection as restoreOriginalDirectionExtraction
-} from './textExtraction.js';
-
-// Contextual Sentence Translation System (Placeholder Support)
-export {
-  PlaceholderRegistry,
-  placeholderRegistry,
-  cleanupPlaceholderIds
-} from './PlaceholderRegistry.js';
-
-export {
-  isBlockElement,
-  isInlineElement,
-  findBlockContainer,
-  extractBlockWithPlaceholders,
-  extractTextWithInlinePlaceholders,
-  extractMultipleBlocksWithPlaceholders,
-  getBlockStatistics
-} from './blockLevelExtraction.js';
-
-export {
-  extractPlaceholdersFromTranslation,
-  validatePlaceholders,
-  isInsidePlaceholder,
-  reassembleTranslationWithPlaceholders,
-  handleMissingPlaceholders,
-  applyReassembledHTML,
-  completeReassemblyWorkflow,
-  validatePlaceholderBoundaries
-} from './placeholderReassembly.js';
+// Note: The following complex utilities have been removed as part of the simplification:
+// - blockLevelExtraction.js (placeholder system - replaced by domtranslator)
+// - placeholderReassembly.js (placeholder system - replaced by domtranslator)
+// - PlaceholderRegistry.js (placeholder system - replaced by domtranslator)
+// - textProcessing.js (streaming support - removed)
+// - textExtraction.js (complex extraction - replaced by simple elementHelpers)
+// - domManipulation.js (complex manipulation - replaced by domtranslator)
+// - spacingUtils.js (not used in simplified architecture)

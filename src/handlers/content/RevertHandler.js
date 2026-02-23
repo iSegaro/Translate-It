@@ -160,19 +160,13 @@ export class RevertHandler extends ResourceTracker {
         // IconManager removed as it doesn't exist in the current architecture
       };
 
-      // Try to use Element Selection revert system first, fallback to legacy
-      try {
-        const { revertTranslations } = await import("../../features/element-selection/utils/textExtraction.js");
-        const elementSelectionResult = await revertTranslations(context);
-        logger.debug('Used Element Selection revert system');
-        return elementSelectionResult;
-      } catch {
-        logger.debug('Element Selection revert not available, using legacy system');
+      // Element Selection revert system is now handled by SelectElementManager
+      // Skip the old import since textExtraction.js was removed in simplification
+      logger.debug('Element Selection revert handled by SelectElementManager in vue revert');
 
-        // Fallback to legacy system
-        const { revertTranslations } = await import("@/shared/utils/text/extraction.js");
-        return await revertTranslations(context);
-      }
+      // Fallback to legacy system
+      const { revertTranslations } = await import("@/shared/utils/text/extraction.js");
+      return await revertTranslations(context);
     } catch (error) {
       logger.error('Error in legacy revert:', error);
       throw error;
