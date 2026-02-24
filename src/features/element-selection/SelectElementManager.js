@@ -304,20 +304,21 @@ class SelectElementManager extends ResourceTracker {
   /**
    * Setup event listeners for mouse and keyboard
    */
+  /**
+   * Setup event listeners for mouse and keyboard
+   */
   setupEventListeners() {
     if (this.isActive) {
       // Use window instead of document and capture phase to ensure we intercept events before any other listeners
       window.addEventListener('mouseover', this.handleMouseOver, true);
       window.addEventListener('mouseout', this.handleMouseOut, true);
       window.addEventListener('click', this.handleClick, true);
-      window.addEventListener('mousedown', this.handleClick, true);
-      window.addEventListener('mouseup', this.handleClick, true);
+      
+      // Global navigation prevention in capture phase
+      window.addEventListener('click', this.preventNavigationHandler, true);
       window.addEventListener('mousedown', this.preventNavigationHandler, true);
       window.addEventListener('mouseup', this.preventNavigationHandler, true);
       window.addEventListener('dragstart', this.preventNavigationHandler, true);
-
-      // Add global click prevention for navigation
-      window.addEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
 
       // Listen for deactivation requests from iframes (only in main frame)
       if (window === window.top) {
@@ -345,12 +346,11 @@ class SelectElementManager extends ResourceTracker {
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
     window.removeEventListener('click', this.handleClick, true);
-    window.removeEventListener('mousedown', this.handleClick, true);
-    window.removeEventListener('mouseup', this.handleClick, true);
+    
+    window.removeEventListener('click', this.preventNavigationHandler, true);
     window.removeEventListener('mousedown', this.preventNavigationHandler, true);
     window.removeEventListener('mouseup', this.preventNavigationHandler, true);
     window.removeEventListener('dragstart', this.preventNavigationHandler, true);
-    window.removeEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
 
     // Remove iframe message listener
     if (window === window.top && this.iframeMessageHandler) {
@@ -398,26 +398,19 @@ class SelectElementManager extends ResourceTracker {
 
     // Check if click is on our own elements (Toast, etc.)
     if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
-      this.logger.debug('Click on our own element, ignoring');
+      this.logger.debug('Click on our own element, letting it pass');
       return;
     }
 
     // IMPORTANT: Prevent default and stop propagation for EVERYTHING else early
-    // this ensures other managers (like WindowsManager) don't dismiss things they shouldn't
-    // and sites like Twitter don't navigate
+    // This ensures other managers don't dismiss things and sites don't navigate
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    // Only proceed with translation logic for 'click' events
-    // mousedown/mouseup are just blocked to prevent site logic
-    if (event.type !== 'click') {
-      return;
-    }
-
     // If already processing, don't start new translation
     if (this.isProcessingClick) {
-      this.logger.debug('Already processing a click, ignoring new one but prevented navigation');
+      this.logger.debug('Already processing a click, ignoring new one');
       return;
     }
 
