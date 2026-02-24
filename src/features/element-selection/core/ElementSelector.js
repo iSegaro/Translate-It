@@ -70,12 +70,6 @@ export class ElementSelector extends ResourceTracker {
       .translate-it-element-highlighted {
         outline: 2px solid #4a90d9 !important;
         outline-offset: -2px !important;
-        background-color: rgba(74, 144, 217, 0.1) !important;
-        pointer-events: auto !important;
-      }
-
-      .translate-it-element-highlighted * {
-        pointer-events: none !important;
       }
     `;
     document.head.appendChild(style);
@@ -177,61 +171,40 @@ export class ElementSelector extends ResourceTracker {
    */
   findBestTextElement(startElement) {
     let element = startElement;
-    let bestCandidate = null;
-    let maxAncestors = this.config.maxAncestors;
+    let maxAncestors = 15; // Increased depth for modern deep DOMs
 
-    // Check if current element meets conditions
-    while (element && element !== document.body && maxAncestors-- > 0) {
+    // We want the DEEPEST element that satisfies the minimum requirements.
+    // This makes the selection much more surgical and responsive.
+    while (element && element !== document.body && element !== document.documentElement && maxAncestors-- > 0) {
       if (this.isValidTextElement(element)) {
         const area = element.offsetWidth * element.offsetHeight;
         const text = element.textContent?.trim() || '';
         const wordCount = text.split(/\s+/).length;
 
-        // Only if appropriate size and sufficient text
+        // Check if this element is a good candidate
+        // We prioritize smaller, more specific elements by stopping at the first valid one we hit while going UP.
         if (
           area >= this.config.minArea &&
           area <= this.config.maxArea &&
           text.length >= this.config.minTextLength &&
           wordCount >= this.config.minWordCount
         ) {
-          bestCandidate = element;
-
-          // Don't go higher if we found a good candidate
-          // unless parent is significantly better
-          const parent = element.parentElement;
-          if (!parent || parent === document.body) {
-            break;
-          }
-
-          const parentArea = parent.offsetWidth * parent.offsetHeight;
-          const parentText = parent.textContent?.trim() || '';
-          const parentWordCount = parentText.split(/\s+/).length;
-
-          // Only prefer parent if it's not too large and has reasonable text density
-          if (
-            parentArea <= this.config.maxArea * 1.5 &&
-            parentWordCount >= wordCount * 0.8
-          ) {
-            element = parent;
-            continue;
-          }
-
-          break;
+          return element; // Stop here! Don't climb to large parents.
         }
       }
 
       element = element.parentElement;
     }
 
-    // Fallback: if no good candidate found, use original element if it has text
-    if (!bestCandidate && startElement) {
+    // Fallback: if no good candidate found via area, use startElement if it has meaningful text
+    if (startElement) {
       const text = startElement.textContent?.trim() || '';
       if (text.length >= this.config.minTextLength) {
-        bestCandidate = startElement;
+        return startElement;
       }
     }
 
-    return bestCandidate;
+    return null;
   }
 
   /**
