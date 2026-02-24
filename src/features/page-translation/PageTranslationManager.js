@@ -28,6 +28,16 @@ const RTL_LANGUAGES = new Set([
 ]);
 
 /**
+ * Tags that are safe to apply RTL direction without breaking layout
+ */
+const TEXT_TAGS = new Set([
+  'P', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'A', 
+  'TD', 'TH', 'DT', 'DD', 'LABEL', 'CAPTION', 'Q', 'CITE', 
+  'SMALL', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'BUTTON',
+  'INPUT', 'TEXTAREA'
+]);
+
+/**
  * PageTranslationManager - Manages whole page translation
  * Uses domtranslator library for recursive DOM traversal and translation
  */
@@ -134,11 +144,23 @@ export class PageTranslationManager extends ResourceTracker {
       currentBatch.forEach((item, index) => {
         const translated = translatedTexts[index]?.text || translatedTexts[index] || item.text;
         
-        // Handle RTL direction
+        // Handle RTL direction carefully to preserve layout
         if (item.node && RTL_LANGUAGES.has(this.targetLanguage)) {
           const element = item.node.nodeType === Node.TEXT_NODE ? item.node.parentElement : item.node.ownerElement;
+          
           if (element && !element.hasAttribute('data-page-translated')) {
-            element.setAttribute('dir', 'rtl');
+            // Apply RTL ONLY to leaf text elements (no other element children)
+            // This prevents flipping the order of icons/images and their text
+            const isLeaf = element.children.length === 0;
+            
+            if (isLeaf && TEXT_TAGS.has(element.tagName)) {
+              element.setAttribute('dir', 'rtl');
+              // Note: We intentionally avoid setting textAlign: right here
+              // to keep the element in its original layout position.
+            } else if (item.node.nodeType === Node.ATTRIBUTE_NODE && (item.node.name === 'placeholder' || item.node.name === 'title')) {
+              element.setAttribute('dir', 'rtl');
+            }
+            
             element.setAttribute('data-page-translated', 'true');
           }
         }
