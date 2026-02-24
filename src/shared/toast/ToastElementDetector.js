@@ -109,11 +109,22 @@ export class ToastElementDetector {
   static isExtensionElement(element) {
     if (!element || typeof element.hasAttribute !== 'function') return false;
     
-    // Check if element has our internal classes
-    if (element.classList && (
-      element.classList.contains(EXTENSION_SELECTORS.HIGHLIGHTED_CLASS) ||
-      element.classList.contains(EXTENSION_SELECTORS.CONTAINER_CLASS)
-    )) {
+    // Check if element is our UI Host
+    if (element.id === 'translate-it-host-main' || element.id === 'translate-it-host-iframe') {
+      return true;
+    }
+
+    // Check if element is currently highlighted by us
+    // IMPORTANT: We should NOT exclude highlighted elements from selection, 
+    // because that's exactly what the user wants to click on!
+    // But we SHOULD exclude other extension elements like the popup container.
+    if (element.classList && element.classList.contains(EXTENSION_SELECTORS.HIGHLIGHTED_CLASS)) {
+      // Don't exclude the highlighted element itself, as it's the target
+      return false;
+    }
+
+    // Check if element is our UI container
+    if (element.classList && element.classList.contains(EXTENSION_SELECTORS.CONTAINER_CLASS)) {
       return true;
     }
     
@@ -127,20 +138,29 @@ export class ToastElementDetector {
     // Check if element is inside our Shadow DOM
     let currentElement = element;
     while (currentElement) {
+      if (currentElement.id === 'translate-it-host-main' || currentElement.id === 'translate-it-host-iframe') {
+        return true;
+      }
+
       if (currentElement.classList && 
           currentElement.classList.contains(EXTENSION_SELECTORS.CONTAINER_CLASS)) {
         return true;
       }
       
       // Check if we've reached the shadow root host
-      if (currentElement.host) {
-        if (currentElement.host.id && currentElement.host.id.includes('translate-it')) {
+      const root = currentElement.getRootNode();
+      if (root instanceof ShadowRoot) {
+        const host = root.host;
+        if (host && (host.id === 'translate-it-host-main' || host.id === 'translate-it-host-iframe')) {
           return true;
         }
       }
       
       // Move up to parent, but handle Shadow DOM boundary
-      currentElement = currentElement.parentElement || currentElement.parentNode?.host;
+      currentElement = currentElement.parentElement || currentElement.parentNode;
+      
+      // Safety break for extremely deep DOMs
+      if (!currentElement || currentElement === document.body) break;
     }
     
     return false;

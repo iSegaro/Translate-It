@@ -43,9 +43,14 @@ export function hasValidTextContent(element, options = {}) {
   const onlyNumbersSymbols = /^[\d\s\p{P}\p{S}]+$/u;
   if (onlyNumbersSymbols.test(text)) return false;
 
-  // Skip URLs and email addresses
-  const urlPattern = /^https?:\/\/|www\.|@.*\./;
-  if (urlPattern.test(text)) return false;
+  // Skip if the entire text is a URL or email address
+  // Improved pattern to only match if it looks like a standalone URL or email
+  const standaloneUrlPattern = /^(https?:\/\/|www\.)\S+$/i;
+  const standaloneEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (standaloneUrlPattern.test(text) || standaloneEmailPattern.test(text)) {
+    return false;
+  }
 
   return true;
 }

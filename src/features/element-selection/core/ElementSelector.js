@@ -60,11 +60,17 @@ export class ElementSelector extends ResourceTracker {
     const style = document.createElement('style');
     style.id = 'translate-it-select-styles';
     style.textContent = `
+      .translate-it-cursor-select, 
+      .translate-it-cursor-select * {
+        cursor: crosshair !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+      
       .translate-it-element-highlighted {
         outline: 2px solid #4a90d9 !important;
         outline-offset: -2px !important;
         background-color: rgba(74, 144, 217, 0.1) !important;
-        cursor: crosshair !important;
       }
     `;
     document.head.appendChild(style);
@@ -255,20 +261,40 @@ export class ElementSelector extends ResourceTracker {
 
   /**
    * Prevent navigation on interactive elements
-   * @param {Event} event - Click event
+   * @param {Event} event - Event to check
    * @returns {boolean} Whether navigation was prevented
    */
   preventNavigation(event) {
     if (!event || !event.target) return false;
 
-    const target = event.target;
+    // Skip our own elements
+    if (this.isOurElement(event.target)) {
+      return false;
+    }
 
-    // Check if target is an interactive element
+    let target = event.target;
     const interactiveTags = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
-    const isInteractive = interactiveTags.includes(target.tagName) ||
-                         target.getAttribute('role') === 'button' ||
-                         target.getAttribute('role') === 'link' ||
-                         target.onclick !== null;
+    
+    // Check target and its ancestors for interactivity
+    let isInteractive = false;
+    let current = target;
+    let depth = 0;
+    
+    while (current && current !== document.body && depth < 5) {
+      if (
+        interactiveTags.includes(current.tagName) ||
+        current.getAttribute('role') === 'button' ||
+        current.getAttribute('role') === 'link' ||
+        current.onclick !== null ||
+        current.style?.cursor === 'pointer'
+      ) {
+        isInteractive = true;
+        target = current;
+        break;
+      }
+      current = current.parentElement;
+      depth++;
+    }
 
     if (isInteractive) {
       event.preventDefault();
@@ -277,7 +303,6 @@ export class ElementSelector extends ResourceTracker {
 
       this.logger.debug('Navigation prevented', {
         tag: target.tagName,
-        type: target.type,
         role: target.getAttribute('role'),
       });
 
@@ -314,10 +339,11 @@ export class ElementSelector extends ResourceTracker {
    * @private
    */
   _setCursor(enabled) {
+    const root = document.documentElement;
     if (enabled) {
-      document.body.classList.add('translate-it-cursor-select');
+      root.classList.add('translate-it-cursor-select');
     } else {
-      document.body.classList.remove('translate-it-cursor-select');
+      root.classList.remove('translate-it-cursor-select');
     }
   }
 

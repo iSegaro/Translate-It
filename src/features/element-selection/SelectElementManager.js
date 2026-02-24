@@ -306,12 +306,16 @@ class SelectElementManager extends ResourceTracker {
    */
   setupEventListeners() {
     if (this.isActive) {
-      document.addEventListener('mouseover', this.handleMouseOver, true);
-      document.addEventListener('mouseout', this.handleMouseOut, true);
-      document.addEventListener('click', this.handleClick, true);
+      // Use window instead of document and capture phase to ensure we intercept events before any other listeners
+      window.addEventListener('mouseover', this.handleMouseOver, true);
+      window.addEventListener('mouseout', this.handleMouseOut, true);
+      window.addEventListener('click', this.handleClick, true);
+      window.addEventListener('mousedown', this.preventNavigationHandler, true);
+      window.addEventListener('mouseup', this.preventNavigationHandler, true);
+      window.addEventListener('dragstart', this.preventNavigationHandler, true);
 
       // Add global click prevention for navigation
-      document.addEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
+      window.addEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
 
       // Listen for deactivation requests from iframes (only in main frame)
       if (window === window.top) {
@@ -328,7 +332,7 @@ class SelectElementManager extends ResourceTracker {
         this.logger.debug('Added iframe message listener in main frame');
       }
 
-      this.logger.debug('Event listeners setup for SelectElementManager');
+      this.logger.debug('Event listeners setup for SelectElementManager (window level)');
     }
   }
 
@@ -336,10 +340,13 @@ class SelectElementManager extends ResourceTracker {
    * Remove event listeners
    */
   removeEventListeners() {
-    document.removeEventListener('mouseover', this.handleMouseOver, true);
-    document.removeEventListener('mouseout', this.handleMouseOut, true);
-    document.removeEventListener('click', this.handleClick, true);
-    document.removeEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
+    window.removeEventListener('mouseover', this.handleMouseOver, true);
+    window.removeEventListener('mouseout', this.handleMouseOut, true);
+    window.removeEventListener('click', this.handleClick, true);
+    window.removeEventListener('mousedown', this.preventNavigationHandler, true);
+    window.removeEventListener('mouseup', this.preventNavigationHandler, true);
+    window.removeEventListener('dragstart', this.preventNavigationHandler, true);
+    window.removeEventListener('click', this.preventNavigationHandler, { capture: true, passive: false });
 
     // Remove iframe message listener
     if (window === window.top && this.iframeMessageHandler) {
@@ -357,6 +364,11 @@ class SelectElementManager extends ResourceTracker {
   handleMouseOver(event) {
     if (!this.isActive || this.isProcessingClick) return;
 
+    // Skip our own elements
+    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
+      return;
+    }
+
     this.elementSelector.handleMouseOver(event.target);
   }
 
@@ -366,6 +378,11 @@ class SelectElementManager extends ResourceTracker {
   handleMouseOut(event) {
     if (!this.isActive || this.isProcessingClick) return;
 
+    // Skip our own elements
+    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
+      return;
+    }
+
     this.elementSelector.handleMouseOut(event.target);
   }
 
@@ -373,17 +390,30 @@ class SelectElementManager extends ResourceTracker {
    * Handle element click - trigger translation
    */
   async handleClick(event) {
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive) return;
+
+    // Check if click is on our own elements (Toast, etc.)
+    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
+      this.logger.debug('Click on our own element, ignoring');
+      return;
+    }
+
+    // IMPORTANT: Prevent default and stop propagation for EVERYTHING else early
+    // this ensures other managers (like WindowsManager) don't dismiss things they shouldn't
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    // If already processing, don't start new translation
+    if (this.isProcessingClick) {
+      this.logger.debug('Already processing a click, ignoring new one but prevented navigation');
+      return;
+    }
 
     this.logger.debug('Element clicked in SelectElement mode');
 
     try {
       this.isProcessingClick = true;
-
-      // Prevent navigation
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
 
       // Get the highlighted element
       const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
@@ -426,7 +456,7 @@ class SelectElementManager extends ResourceTracker {
    * Prevent navigation on interactive elements
    */
   preventNavigationHandler(event) {
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive) return;
 
     const prevented = this.elementSelector.preventNavigation(event);
 
