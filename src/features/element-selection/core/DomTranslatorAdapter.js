@@ -154,6 +154,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Get provider and target language
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
+      const isTargetRTL = RTL_LANGUAGES.has(targetLanguage.toLowerCase().split('-')[0]);
 
       // Generate message ID for this request
       const messageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -209,6 +210,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   if (hasTrailingSpace) finalText = finalText + ' ';
 
                   textNode.nodeValue = finalText;
+
+                  // Apply RTL IMMEDIATELY to this specific node's parent if it's a text tag
+                  // This prevents flicker without affecting the main container structure
+                  if (isTargetRTL) {
+                    const parent = textNode.parentElement;
+                    if (parent && TEXT_TAGS.has(parent.tagName) && parent.children.length === 0) {
+                      parent.setAttribute('dir', 'rtl');
+                    }
+                  }
                 }
 
                 translatedNodeCount++;
@@ -422,6 +432,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
               if (hasTrailingSpace) finalText = finalText + ' ';
 
               textNode.nodeValue = finalText;
+
+              // Apply RTL to this specific node's parent if it's a text tag
+              if (RTL_LANGUAGES.has(targetLanguage.toLowerCase().split('-')[0])) {
+                const parent = textNode.parentElement;
+                if (parent && TEXT_TAGS.has(parent.tagName) && parent.children.length === 0) {
+                  parent.setAttribute('dir', 'rtl');
+                }
+              }
             }
           }
         });
@@ -562,8 +580,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       return;
     }
 
-    // Surgical RTL application:
-    // 1. Apply to the root element ONLY if it's a safe text tag and a leaf (no other element children)
+    // Surgical RTL application ONLY:
+    // 1. Apply to the root element ONLY if it's a safe text tag and a leaf
     const isLeaf = element.children.length === 0;
     if (isLeaf && TEXT_TAGS.has(element.tagName)) {
       element.setAttribute('dir', 'rtl');
