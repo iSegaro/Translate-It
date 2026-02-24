@@ -71,6 +71,11 @@ export class ElementSelector extends ResourceTracker {
         outline: 2px solid #4a90d9 !important;
         outline-offset: -2px !important;
         background-color: rgba(74, 144, 217, 0.1) !important;
+        pointer-events: auto !important;
+      }
+
+      .translate-it-element-highlighted * {
+        pointer-events: none !important;
       }
     `;
     document.head.appendChild(style);

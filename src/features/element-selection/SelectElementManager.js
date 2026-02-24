@@ -310,6 +310,8 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('mouseover', this.handleMouseOver, true);
       window.addEventListener('mouseout', this.handleMouseOut, true);
       window.addEventListener('click', this.handleClick, true);
+      window.addEventListener('mousedown', this.handleClick, true);
+      window.addEventListener('mouseup', this.handleClick, true);
       window.addEventListener('mousedown', this.preventNavigationHandler, true);
       window.addEventListener('mouseup', this.preventNavigationHandler, true);
       window.addEventListener('dragstart', this.preventNavigationHandler, true);
@@ -343,6 +345,8 @@ class SelectElementManager extends ResourceTracker {
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
     window.removeEventListener('click', this.handleClick, true);
+    window.removeEventListener('mousedown', this.handleClick, true);
+    window.removeEventListener('mouseup', this.handleClick, true);
     window.removeEventListener('mousedown', this.preventNavigationHandler, true);
     window.removeEventListener('mouseup', this.preventNavigationHandler, true);
     window.removeEventListener('dragstart', this.preventNavigationHandler, true);
@@ -400,9 +404,16 @@ class SelectElementManager extends ResourceTracker {
 
     // IMPORTANT: Prevent default and stop propagation for EVERYTHING else early
     // this ensures other managers (like WindowsManager) don't dismiss things they shouldn't
+    // and sites like Twitter don't navigate
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+
+    // Only proceed with translation logic for 'click' events
+    // mousedown/mouseup are just blocked to prevent site logic
+    if (event.type !== 'click') {
+      return;
+    }
 
     // If already processing, don't start new translation
     if (this.isProcessingClick) {
