@@ -32,6 +32,9 @@ export * from "./text-selection/handleGetSelectedText.js";
 export * from "./page-exclusion/handleIsCurrentPageExcluded.js";
 export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 
+// Page translation handlers
+export * from "./page-translation/handlePageTranslation.js";
+
 // Sidepanel handlers
 export * from "./sidepanel/handleOpenSidePanel.js";
 

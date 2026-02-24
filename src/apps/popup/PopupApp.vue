@@ -53,6 +53,9 @@
             :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
             :auto-detect-label="'Auto-Detect'"
           />
+
+          <!-- Page Translation Button -->
+          <PageTranslationButton :compact="true" />
         </div>
       </div>
       
@@ -107,6 +110,7 @@ import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
 import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
 import { Icon } from '@iconify/vue'
+import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
 import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'

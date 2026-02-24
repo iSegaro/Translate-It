@@ -28,6 +28,14 @@ export class MessageActions {
   static SELECT_ELEMENT_STATE_CHANGED = 'selectElementStateChanged';
   static PROCESS_SELECTED_ELEMENT = 'PROCESS_SELECTED_ELEMENT';
 
+  // Whole Page Translation (NEW)
+  static PAGE_TRANSLATE = 'page-translate';
+  static PAGE_TRANSLATE_BATCH = 'page-translate-batch'; // For actual translation request
+  static PAGE_TRANSLATE_PROGRESS = 'page-translate-progress';
+  static PAGE_TRANSLATE_COMPLETE = 'page-translate-complete';
+  static PAGE_RESTORE = 'page-restore';
+  static PAGE_RESTORE_COMPLETE = 'page-restore-complete';
+
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';
   static IFRAME_TRANSLATE_SELECTION = 'IFRAME_TRANSLATE_SELECTION';

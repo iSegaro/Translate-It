@@ -160,7 +160,12 @@ class LifecycleManager {
       // Page exclusion handlers
       'isCurrentPageExcluded': Handlers.handleIsCurrentPageExcluded,
       'setExcludeCurrentPage': Handlers.handleSetExcludeCurrentPage,
-      
+
+      // Page translation handlers
+      [MessageActions.PAGE_TRANSLATE]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_BATCH]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_RESTORE]: Handlers.handlePageTranslation,
+
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,
       

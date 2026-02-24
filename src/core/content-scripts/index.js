@@ -33,7 +33,7 @@ const LOAD_STRATEGIES = {
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
   ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core translation features
-  INTERACTIVE: [], // UI interaction features
+  INTERACTIVE: ['pageTranslation'], // UI interaction features
   ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 

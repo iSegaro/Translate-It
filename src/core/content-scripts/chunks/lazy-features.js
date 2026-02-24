@@ -58,7 +58,8 @@ const CORE_FEATURES = new Set([
   'textSelection',
   'windowsManager',
   'shortcut',
-  'textFieldIcon'
+  'textFieldIcon',
+  'pageTranslation'
 ]);
 
 // On-demand features
@@ -114,6 +115,10 @@ export async function loadFeature(featureName) {
 
       case 'shortcut':
         loadingPromise = loadShortcutFeature();
+        break;
+
+      case 'pageTranslation':
+        loadingPromise = loadPageTranslationFeature();
         break;
 
       default:
@@ -380,6 +385,35 @@ async function loadShortcutFeature() {
   }
 }
 
+async function loadPageTranslationFeature() {
+  const logger = getLogger();
+  try {
+    // Import PageTranslationManager
+    const { pageTranslationManager } = await import('@/features/page-translation/PageTranslationManager.js');
+
+    // Initialize if not already active
+    if (!pageTranslationManager.isActive) {
+      await pageTranslationManager.initialize();
+    }
+
+    logger.info('PageTranslationManager loaded and initialized');
+    return pageTranslationManager;
+  } catch (error) {
+    try {
+      const handler = await getErrorHandler();
+      if (handler) {
+        throw handler.handle(error, {
+          type: 'FEATURE',
+          context: 'loadPageTranslationFeature'
+        });
+      }
+    } catch {
+      logger.error('Failed to load page translation feature:', error);
+    }
+    throw error;
+  }
+}
+
 // Smart feature loading handlers
 function handleTextSelection() {
   // Load text selection feature on demand when user selects text
@@ -553,6 +587,7 @@ const FEATURE_MAPPING = {
   // Interactive features
   windowsManager: async () => await loadFeature('windowsManager'),
   selectElement: async () => await loadFeature('selectElement'),
+  pageTranslation: async () => await loadFeature('pageTranslation'),
 
   // On-demand features
   shortcut: async () => await loadFeature('shortcut'),
@@ -589,7 +624,7 @@ export async function loadFeatureOnDemand(featureName) {
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'],
   ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'],
-  INTERACTIVE: [],
+  INTERACTIVE: ['pageTranslation'],
   ON_DEMAND: ['shortcut', 'textFieldIcon']
 };
 

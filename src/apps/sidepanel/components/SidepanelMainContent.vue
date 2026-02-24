@@ -44,6 +44,11 @@
           @provider-change="handleProviderChange"
         />
       </div>
+
+      <!-- Page Translation Button -->
+      <div class="page-translation-row">
+        <PageTranslationButton :compact="true" />
+      </div>
     </div>
 
 
@@ -105,6 +110,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -400,6 +406,16 @@ onUnmounted(() => {
   min-width: auto;
 }
 
+.page-translation-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 5;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+}
 
 @keyframes spin {
   0% { transform: rotate(0deg); }

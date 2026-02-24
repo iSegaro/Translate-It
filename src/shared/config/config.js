@@ -147,6 +147,17 @@ export const CONFIG = {
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
 
+  // --- Whole Page Translation Settings (NEW) ---
+  WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
+  WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه
+  WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: false, // ترجمه خودکار وقتی صفحه تغییر می‌کند
+  WHOLE_PAGE_EXCLUDED_SELECTORS: ["script", "style", "code", "pre", "noscript", "iframe", "[data-translate-ignore]"], // المنت‌هایی که ترجمه نمی‌شوند
+  WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label"], // Attributeهایی که ترجمه می‌شوند
+  WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
+  WHOLE_PAGE_CHUNK_SIZE: 50, // تعداد nodeها در هر batch request
+  WHOLE_PAGE_DEBOUNCE_DELAY: 1000, // تاخیر برای DOM change debouncing (ms)
+  WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
+
   // --- Proxy Settings ---
   PROXY_ENABLED: false, // فعال بودن proxy
   PROXY_TYPE: "http", // نوع proxy: http, https, socks
@@ -407,6 +418,7 @@ export const TranslationMode = {
   Popup_Translate: "popup_translate",
   Sidepanel_Translate: "sidepanel_translate",
   ScreenCapture: "screen_capture",
+  Page: "page",  // Whole page translation (NEW)
 };
 
 export const state = {
@@ -844,4 +856,68 @@ export const getDeeplApiKeysAsync = async () => {
 export const getCustomApiKeysAsync = async () => {
   const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
   return ApiKeyManager.getKeys('CUSTOM_API_KEY');
+};
+
+// --- Whole Page Translation Settings Getters (NEW) ---
+export const getWholePageTranslationEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_TRANSLATION_ENABLED",
+    CONFIG.WHOLE_PAGE_TRANSLATION_ENABLED
+  );
+};
+
+export const getWholePageLazyLoadingAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_LAZY_LOADING",
+    CONFIG.WHOLE_PAGE_LAZY_LOADING
+  );
+};
+
+export const getWholePageAutoTranslateOnDOMChangesAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES",
+    CONFIG.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES
+  );
+};
+
+export const getWholePageExcludedSelectorsAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_EXCLUDED_SELECTORS",
+    CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS
+  );
+};
+
+export const getWholePageAttributesToTranslateAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE",
+    CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE
+  );
+};
+
+export const getWholePageMaxElementsAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_MAX_ELEMENTS",
+    CONFIG.WHOLE_PAGE_MAX_ELEMENTS
+  );
+};
+
+export const getWholePageChunkSizeAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_CHUNK_SIZE",
+    CONFIG.WHOLE_PAGE_CHUNK_SIZE
+  );
+};
+
+export const getWholePageDebounceDelayAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_DEBOUNCE_DELAY",
+    CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY
+  );
+};
+
+export const getWholePageProgressUpdateIntervalAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL",
+    CONFIG.WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL
+  );
 };

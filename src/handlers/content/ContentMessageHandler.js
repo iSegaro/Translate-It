@@ -30,6 +30,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
     this.iFrameManager = null;
+    this.pageTranslationManager = null;
 
     // Initialize error handler lazily when needed
     this._errorHandler = null;
@@ -77,6 +78,10 @@ export class ContentMessageHandler extends ResourceTracker {
 
   setIFrameManager(manager) {
     this.iFrameManager = manager;
+  }
+
+  setPageTranslationManager(manager) {
+    this.pageTranslationManager = manager;
   }
 
   /**
@@ -224,6 +229,10 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.IFRAME_INSERT_TEXT, this.handleIFrameInsertText.bind(this));
     this.registerHandler(MessageActions.IFRAME_SYNC_REQUEST, this.handleIFrameSyncRequest.bind(this));
     this.registerHandler(MessageActions.IFRAME_SYNC_RESPONSE, this.handleIFrameSyncResponse.bind(this));
+
+    // Page translation handlers
+    this.registerHandler(MessageActions.PAGE_TRANSLATE, this.handlePageTranslate.bind(this));
+    this.registerHandler(MessageActions.PAGE_RESTORE, this.handlePageRestore.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -616,10 +625,101 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: true };
   }
 
+  async handlePageTranslate(message) {
+    this.logger.info('Page translation request received');
+
+    // Check for cancel flag
+    if (message.data?.cancel) {
+      if (this.pageTranslationManager) {
+        this.pageTranslationManager.cancelTranslation();
+        return { success: true, cancelled: true };
+      }
+      return { success: false, error: 'PageTranslationManager not available' };
+    }
+
+    try {
+      // If PageTranslationManager is not available, try to load the feature on-demand
+      if (!this.pageTranslationManager) {
+        try {
+          const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+          const manager = await loadFeature('pageTranslation');
+
+          if (manager) {
+            this.setPageTranslationManager(manager);
+          } else {
+            throw new Error('pageTranslation feature failed to load');
+          }
+        } catch (loadError) {
+          throw new Error(`PageTranslationManager not available: ${loadError.message}`);
+        }
+      }
+
+      // Ensure manager is initialized
+      if (!this.pageTranslationManager.isActive) {
+        await this.pageTranslationManager.initialize();
+      }
+
+      // Execute page translation
+      const result = await this.pageTranslationManager.translatePage();
+
+      this.logger.info('Page translation completed', {
+        translatedCount: result.translatedCount,
+        totalNodes: result.totalNodes
+      });
+
+      return result;
+
+    } catch (error) {
+      this.logger.error('Page translation failed:', error);
+
+      // Use centralized error handling
+      const errorHandler = await this.errorHandler;
+      await errorHandler.handle(error, {
+        type: ErrorTypes.TRANSLATION_FAILED,
+        context: 'page-translation',
+        showToast: true
+      });
+
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handlePageRestore() {
+    this.logger.info('Page restore request received');
+
+    if (!this.pageTranslationManager) {
+      return { success: false, error: 'PageTranslationManager not available' };
+    }
+
+    try {
+      const result = await this.pageTranslationManager.restorePage();
+
+      this.logger.info('Page restore completed', {
+        restoredCount: result.restoredCount
+      });
+
+      return result;
+
+    } catch (error) {
+      this.logger.error('Page restore failed:', error);
+
+      // Use centralized error handling
+      const errorHandler = await this.errorHandler;
+      await errorHandler.handle(error, {
+        type: ErrorTypes.TRANSLATION_FAILED,
+        context: 'page-restore',
+        showToast: true
+      });
+
+      return { success: false, error: error.message };
+    }
+  }
+
   async cleanup() {
     this.handlers.clear();
     this.selectElementManager = null;
     this.iFrameManager = null;
+    this.pageTranslationManager = null;
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
