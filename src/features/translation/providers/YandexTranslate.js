@@ -66,8 +66,13 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
-    const lang = sourceLang === "auto" ? targetLang : `${sourceLang}-${targetLang}`;
-    logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sourceLang}' target='${targetLang}'`);
+    
+    const sl = this._getLangCode(sourceLang);
+    const tl = this._getLangCode(targetLang);
+    
+    // Yandex expects 'target' or 'source-target'
+    const lang = sl === "auto" ? tl : `${sl}-${tl}`;
+    logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
 
     // Add key info log for translation start
     logger.info(`[Yandex] Starting translation: ${chunkTexts.join('').length} chars`);

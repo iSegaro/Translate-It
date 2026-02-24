@@ -286,6 +286,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1, blockContainer = null) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
+    // Normalize language codes
+    const sl = this._getLangCode(sourceLang, true); // Enable beta for normalization
+    const tl = this._getLangCode(targetLang, true);
+
     // Get configuration and validate API key
     const { apiKey, apiUrl } = await this._getConfig();
 
@@ -390,13 +394,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     let betaLanguagesEnabled = await getDeeplBetaLanguagesEnabledAsync();
 
     // Auto-detect: if source or target language is a beta language, enable beta languages
-    // Check if sourceLang is a beta language (not in standard map but in beta map)
-    const sourceIsBeta = sourceLang && sourceLang !== '' &&
+    // Check if sl is a beta language
+    const sourceIsBeta = sl && sl !== '' &&
       !DEEPL_LANG_CODE_MAP[sourceLang.toLowerCase()] &&
       DEEPL_BETA_LANG_CODE_MAP[sourceLang.toLowerCase()];
 
-    // Check if targetLang is a beta language
-    const targetIsBeta = targetLang &&
+    // Check if tl is a beta language
+    const targetIsBeta = tl &&
       !DEEPL_LANG_CODE_MAP[targetLang.toLowerCase()] &&
       DEEPL_BETA_LANG_CODE_MAP[targetLang.toLowerCase()];
 
@@ -414,10 +418,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     textsToTranslate.forEach(text => requestBody.append('text', text));
 
     // DeepL uses empty source_lang for auto-detection
-    if (sourceLang && sourceLang !== '') {
-      requestBody.append('source_lang', sourceLang);
+    if (sl && sl !== '') {
+      requestBody.append('source_lang', sl);
     }
-    requestBody.append('target_lang', targetLang);
+    requestBody.append('target_lang', tl);
 
     // Add formality parameter (not supported for beta languages)
     const formality = await getDeeplFormalityAsync() || 'default';
@@ -466,8 +470,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     logger.debug('[DeepL] Request details:', {
       textCount: validTexts.length,
       totalChars: validTexts.join('').length,
-      sourceLang: sourceLang || 'auto',
-      targetLang,
+      sourceLang: sl || 'auto',
+      targetLang: tl,
       betaLanguages: betaLanguagesEnabled,
       formality: betaLanguagesEnabled ? 'N/A (beta)' : (await getDeeplFormalityAsync() || 'default'),
       hasXMLPlaceholders,

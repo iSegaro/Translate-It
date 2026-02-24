@@ -14,6 +14,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 // Import domtranslator library
 import {
   DOMTranslator,
+  NodesTranslator,
   PersistentDOMTranslator,
   IntersectionScheduler
 } from 'domtranslator';
@@ -41,7 +42,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.isTranslating = false;
     this.isTranslated = false;
     this.currentUrl = null;
-    this.translatedNodes = new Map(); // Track translated nodes (Map allows iteration)
+    this.translatedNodes = new WeakSet(); // Track translated nodes using WeakSet for better memory management
     this.abortController = null;
 
     // domtranslator instances
@@ -50,17 +51,126 @@ export class PageTranslationManager extends ResourceTracker {
     this.intersectionScheduler = null;
 
     // Batching state
-    this.nodeQueue = [];
-    this.batchSize = 50;
-    this.batchPromises = [];
+    this.queue = [];
+    this.batchTimer = null;
+    this.translatedCount = 0;
+    this.isFlushing = false;
+    this.targetLanguage = 'fa';
 
     // Settings
     this.settings = {
       lazyLoading: true,
       autoTranslateOnDOMChanges: false,
+      chunkSize: 50,
+      debounceDelay: 1000, // Increase delay for better batching
     };
 
     this.logger.debug('PageTranslationManager created');
+  }
+
+  /**
+   * Enqueue a text for batch translation
+   */
+  async _enqueueTranslation(text, node) {
+    if (!text || !text.trim()) return text;
+
+    return new Promise((resolve, reject) => {
+      this.queue.push({ text: text.trim(), node, resolve, reject });
+
+      // If we're already flushing, don't start another timer, 
+      // the current flush will pick up new items if they arrive before it starts,
+      // or the next flush will handle them.
+      if (this.isFlushing) return;
+
+      if (this.queue.length >= this.settings.chunkSize) {
+        this._flushBatch();
+      } else {
+        if (this.batchTimer) clearTimeout(this.batchTimer);
+        this.batchTimer = setTimeout(() => this._flushBatch(), this.settings.debounceDelay);
+      }
+    });
+  }
+
+  /**
+   * Flush the current translation queue
+   */
+  async _flushBatch() {
+    if (this.queue.length === 0 || this.isFlushing) return;
+    if (this.batchTimer) clearTimeout(this.batchTimer);
+
+    this.isFlushing = true;
+    
+    // Take a chunk of texts
+    const currentBatch = this.queue.splice(0, this.settings.chunkSize);
+
+    try {
+      this.logger.debug(`Flushing batch of ${currentBatch.length} texts. Remaining in queue: ${this.queue.length}`);
+
+      const provider = await getTranslationApiAsync();
+      const targetLanguage = await getTargetLanguageAsync();
+      this.targetLanguage = targetLanguage;
+
+      const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
+
+      const result = await sendRegularMessage({
+        action: MessageActions.PAGE_TRANSLATE_BATCH,
+        data: {
+          text: JSON.stringify(textsToTranslate),
+          provider,
+          sourceLanguage: AUTO_DETECT_VALUE, 
+          targetLanguage,
+          mode: TranslationMode.Page,
+          options: { rawJsonPayload: true },
+        },
+        context: 'page-translation',
+      }, { timeout: 60000 });
+
+      if (!result?.success || !result?.translatedText) {
+        throw new Error(result?.error || 'Batch translation failed');
+      }
+
+      const translatedTexts = JSON.parse(result.translatedText);
+
+      currentBatch.forEach((item, index) => {
+        const translated = translatedTexts[index]?.text || translatedTexts[index] || item.text;
+        
+        // Handle RTL direction
+        if (item.node && RTL_LANGUAGES.has(this.targetLanguage)) {
+          const element = item.node.nodeType === Node.TEXT_NODE ? item.node.parentElement : item.node.ownerElement;
+          if (element && !element.hasAttribute('data-page-translated')) {
+            element.setAttribute('dir', 'rtl');
+            element.setAttribute('data-page-translated', 'true');
+          }
+        }
+        
+        item.resolve(translated);
+        this.translatedCount++;
+      });
+
+      this._reportProgress();
+    } catch (error) {
+      this.logger.error('Batch translation failed', error);
+      currentBatch.forEach(item => item.resolve(item.text));
+    } finally {
+      this.isFlushing = false;
+      
+      // If there are still items in queue, schedule another flush with a small delay
+      // to avoid overwhelming the provider/background
+      if (this.queue.length > 0) {
+        if (this.batchTimer) clearTimeout(this.batchTimer);
+        this.batchTimer = setTimeout(() => this._flushBatch(), 200);
+      }
+    }
+  }
+
+  /**
+   * Report translation progress
+   */
+  _reportProgress() {
+    pageEventBus.emit('page-translation-progress', {
+      translated: this.translatedCount,
+      progress: -1, // Indeterminate since total nodes can change in dynamic pages
+    });
   }
 
   /**
@@ -103,8 +213,8 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.currentUrl !== window.location.href) {
       // URL changed, reset translation state
-      this.translatedNodes = new Map();
       this.isTranslated = false;
+      this.translatedCount = 0;
       this.currentUrl = window.location.href;
     }
 
@@ -122,141 +232,27 @@ export class PageTranslationManager extends ResourceTracker {
         await this.initialize();
       }
 
-      // Collect all translatable nodes
-      const nodes = this._collectTranslatableNodes();
-      const totalNodes = nodes.length;
+      // Start translation using domtranslator
+      this.domTranslator.translate(document.documentElement);
 
-      this.logger.debug(`Found ${totalNodes} translatable nodes`);
-
-      if (totalNodes === 0) {
-        throw new Error('No translatable content found on this page');
+      // If persistent translator is active, it's already observing
+      if (this.persistentTranslator) {
+        this.logger.debug('Persistent translation is active');
       }
-
-      // Check for maximum elements limit
-      const maxElements = this.settings.maxElements || 1000;
-      if (totalNodes > maxElements) {
-        throw new Error(
-          `Page has too many translatable elements (${totalNodes}). ` +
-          `Maximum is ${maxElements}. Try selecting a specific section instead.`
-        );
-      }
-
-      // Prepare batch texts
-      const textsToTranslate = [];
-      const nodeData = [];
-
-      for (const node of nodes) {
-        const text = node.nodeValue || node.value;
-        if (text && text.trim()) {
-          textsToTranslate.push({ text: text.trim() });
-          nodeData.push({ node, originalText: text });
-
-          // Store original for revert
-          if (!this.translatedNodes.has(node)) {
-            this.translatedNodes.set(node, text);
-          }
-        }
-      }
-
-      this.logger.debug('Prepared texts for translation', {
-        count: textsToTranslate.length,
-      });
-
-      // Get translation settings
-      const provider = await getTranslationApiAsync();
-      const targetLanguage = await getTargetLanguageAsync();
-
-      // Calculate appropriate timeout based on number of segments
-      // Average: ~1 second per batch of 20 segments
-      const estimatedTimeout = Math.max(60000, Math.ceil(textsToTranslate.length / 20) * 1500);
-
-      this.logger.debug('Using extended timeout for page translation:', {
-        segmentsCount: textsToTranslate.length,
-        timeout: `${estimatedTimeout}ms`
-      });
-
-      // Send batch translation request - use PAGE_TRANSLATE_BATCH for actual translation
-      const result = await sendRegularMessage({
-        action: MessageActions.PAGE_TRANSLATE_BATCH,
-        data: {
-          text: JSON.stringify(textsToTranslate),
-          provider,
-          sourceLanguage: AUTO_DETECT_VALUE,
-          targetLanguage,
-          mode: TranslationMode.Page,
-          options: { rawJsonPayload: true },
-        },
-        context: 'page-translation',
-      }, { timeout: estimatedTimeout });
-
-      if (!result?.success || !result?.translatedText) {
-        throw new Error(result?.error || 'Translation failed');
-      }
-
-      // Parse translated texts
-      const translatedTexts = JSON.parse(result.translatedText);
-
-      this.logger.debug(`Received ${translatedTexts.length} translations`);
-      this.logger.debug('Sample translations:', {
-        original: nodeData[0]?.originalText,
-        translated: translatedTexts[0]?.text || translatedTexts[0],
-        total: translatedTexts.length
-      });
-
-      // Apply translations to DOM
-      let translatedCount = 0;
-      nodeData.forEach((data, index) => {
-        if (index < translatedTexts.length) {
-          const translatedItem = translatedTexts[index];
-          const translatedText = translatedItem?.text || translatedItem || data.originalText;
-
-          // Apply translation
-          if (data.node.nodeType === Node.TEXT_NODE) {
-            data.node.nodeValue = translatedText;
-          } else if (data.node.nodeType === Node.ATTRIBUTE_NODE) {
-            data.node.value = translatedText;
-          }
-
-          translatedCount++;
-
-          // Debug first few translations
-          if (index < 3) {
-            this.logger.debug(`Applied translation ${index + 1}:`, {
-              original: data.originalText?.substring(0, 50),
-              translated: translatedText?.substring(0, 50),
-              nodeType: data.node.nodeType
-            });
-          }
-
-          // Emit progress events periodically
-          if (translatedCount % 50 === 0 || translatedCount === nodeData.length) {
-            pageEventBus.emit('page-translation-progress', {
-              translated: translatedCount,
-              total: nodeData.length,
-              progress: Math.round((translatedCount / nodeData.length) * 100),
-            });
-          }
-        }
-      });
 
       this.isTranslated = true;
+      this.logger.info('Page translation initiated');
 
-      this.logger.info(`Page translation completed: ${translatedCount} nodes translated`);
-
-      // Emit complete event
+      // Emit complete event (initiated)
       pageEventBus.emit('page-translation-complete', {
-        translatedCount,
-        totalNodes,
         url: this.currentUrl,
       });
 
       return {
         success: true,
-        translatedCount,
-        totalNodes,
       };
     } catch (error) {
-      this.logger.error('Page translation failed', error);
+      this.logger.error('Page translation failed to start', error);
 
       // Emit error event
       pageEventBus.emit('page-translation-error', { error });
@@ -272,31 +268,16 @@ export class PageTranslationManager extends ResourceTracker {
    * Restore original page content
    */
   async restorePage() {
-    if (this.translatedNodes.size === 0) {
-      this.logger.warn('No translated content to restore');
-      return { success: false, reason: 'no_translation' };
-    }
-
     this.logger.info('Restoring original page content');
 
     try {
-      let restoredCount = 0;
+      if (this.domTranslator) {
+        this.domTranslator.restore(document.documentElement);
+      }
 
-      // Restore all translated nodes
-      this.translatedNodes.forEach((originalText, node) => {
-        if (node.parentNode) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            node.nodeValue = originalText;
-          } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
-            node.value = originalText;
-          }
-          restoredCount++;
-        }
-      });
-
-      // Clear translated nodes
-      this.translatedNodes = new Map();
+      // Clear state
       this.isTranslated = false;
+      this.translatedCount = 0;
 
       // Remove direction attributes
       const translatedElements = document.querySelectorAll('[data-page-translated]');
@@ -306,17 +287,15 @@ export class PageTranslationManager extends ResourceTracker {
         el.removeAttribute('data-translate-dir');
       });
 
-      this.logger.info(`Page content restored: ${restoredCount} nodes restored`);
+      this.logger.info('Page content restored');
 
       // Emit complete event
       pageEventBus.emit('page-restore-complete', {
-        restoredCount,
         url: this.currentUrl,
       });
 
       return {
         success: true,
-        restoredCount,
       };
     } catch (error) {
       this.logger.error('Failed to restore page content', error);
@@ -369,8 +348,26 @@ export class PageTranslationManager extends ResourceTracker {
         this.intersectionScheduler = new IntersectionScheduler();
       }
 
-      // Create translator callback that batches requests
-      const translatorCallback = this._createTranslatorCallback();
+      // Create NodesTranslator with batching callback
+      // NodesTranslator expects (text, score) => Promise<string>
+      const nodesTranslator = new NodesTranslator(async (text) => {
+        // Find the node being translated. This is a bit tricky with the basic NodesTranslator API.
+        // But we can override NodesTranslator.translate below to capture the node.
+        return await this._enqueueTranslation(text, this._lastNodeBeingTranslated);
+      });
+
+      // Wrap translate to capture the current node
+      const originalTranslate = nodesTranslator.translate.bind(nodesTranslator);
+      nodesTranslator.translate = (node, callback) => {
+        this._lastNodeBeingTranslated = node;
+        return originalTranslate(node, callback);
+      };
+      
+      const originalUpdate = nodesTranslator.update.bind(nodesTranslator);
+      nodesTranslator.update = (node, callback) => {
+        this._lastNodeBeingTranslated = node;
+        return originalUpdate(node, callback);
+      };
 
       // Create DOMTranslator
       const config = {
@@ -381,23 +378,6 @@ export class PageTranslationManager extends ResourceTracker {
       if (this.intersectionScheduler) {
         config.scheduler = this.intersectionScheduler;
       }
-
-      // Create NodesTranslator wrapper
-      const nodesTranslator = {
-        translate: async (node, callback) => {
-          // This will be called by domtranslator for each node
-          // We'll handle this differently for whole page translation
-          return callback?.(node);
-        },
-        restore: (node) => {
-          // Restore original text
-          const originalText = this.translatedNodes.get(node);
-          if (originalText && node.parentNode) {
-            node.nodeValue = originalText;
-          }
-          this.translatedNodes.delete(node);
-        },
-      };
 
       this.domTranslator = new DOMTranslator(nodesTranslator, config);
 
@@ -414,19 +394,6 @@ export class PageTranslationManager extends ResourceTracker {
       this.logger.error('Error initializing domtranslator components:', error);
       throw error;
     }
-  }
-
-  /**
-   * Create translator callback (not used in current implementation)
-   * We use batch translation instead
-   */
-  _createTranslatorCallback() {
-    // Placeholder for future per-node translation
-    return async (text, score) => {
-      // This would be called for each node individually
-      // But we use batch translation instead
-      return text;
-    };
   }
 
   /**
@@ -450,46 +417,6 @@ export class PageTranslationManager extends ResourceTracker {
         'aria-label'
       ],
     });
-  }
-
-  /**
-   * Collect all translatable nodes from page
-   */
-  _collectTranslatableNodes() {
-    const nodes = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ATTRIBUTE, {
-      acceptNode: (node) => {
-        const parent = node.parentElement || node.ownerElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-
-        // Check if parent is excluded
-        const tagName = parent.tagName;
-        if (this.nodeFilter && !this.nodeFilter(node)) {
-          return NodeFilter.FILTER_REJECT;
-        }
-
-        // Check visibility
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
-            return NodeFilter.FILTER_REJECT;
-          }
-        } catch {
-          // Accept if getComputedStyle fails
-        }
-
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-
-    let node;
-    while ((node = walker.nextNode())) {
-      nodes.push(node);
-    }
-
-    this.logger.debug(`Collected ${nodes.length} translatable nodes`);
-
-    return nodes;
   }
 
   /**
@@ -549,8 +476,14 @@ export class PageTranslationManager extends ResourceTracker {
     // Cancel ongoing translation
     this.cancelTranslation();
 
+    // Clear timers
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
     // Restore translated content
-    if (this.translatedNodes.size > 0) {
+    if (this.isTranslated) {
       await this.restorePage();
     }
 
@@ -561,8 +494,8 @@ export class PageTranslationManager extends ResourceTracker {
 
     // Clear state
     this.translatedNodes = new Map();
-    this.nodeQueue = [];
-    this.batchPromises = [];
+    this.queue = [];
+    this.translatedCount = 0;
 
     // Use ResourceTracker cleanup
     super.cleanup();

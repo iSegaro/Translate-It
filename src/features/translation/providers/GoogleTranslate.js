@@ -57,10 +57,14 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
 
     const apiUrl = await getGoogleTranslateUrlAsync();
+    
+    const sl = this._getLangCode(sourceLang);
+    const tl = this._getLangCode(targetLang);
+
     const queryParams = new URLSearchParams({
       client: 'gtx',
-      sl: sourceLang,
-      tl: targetLang,
+      sl: sl,
+      tl: tl,
       dt: 't',
     });
 

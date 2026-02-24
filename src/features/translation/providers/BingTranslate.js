@@ -96,8 +96,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         throw new Error('Translation cancelled by user');
       }
 
-      const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
       
+      const sl = this._getLangCode(sourceLang);
+      const tl = this._getLangCode(targetLang);
+
       // Additional size validation
       if (textToTranslate.length > this.constructor.characterLimit * 2) {
         logger.info(`[Bing] Text too long (${textToTranslate.length} chars), may cause API error`);
@@ -116,8 +119,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       
       const formData = new URLSearchParams({
         text: textToTranslate, 
-        fromLang: sourceLang, 
-        to: targetLang, 
+        fromLang: sl, 
+        to: tl, 
         token: tokenData.token, 
         key: tokenData.key,
       });
