@@ -169,10 +169,15 @@ export class BaseAIProvider extends BaseProvider {
         
         // Send error stream message to content script
         await this._streamErrorResults(error, batchIndex, messageId, engine);
-        
-        // Send streaming end notification with error status
-        await this._sendStreamEnd(messageId, engine, { error: true });
-        
+
+        // Send streaming end notification with error details
+        await this._sendStreamEnd(messageId, engine, {
+          error: {
+            message: error.message,
+            type: errorType
+          }
+        });
+
         // Stop streaming on error - don't continue with other batches
         throw error;
       }

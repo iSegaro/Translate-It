@@ -236,13 +236,18 @@ export class BaseTranslateProvider extends BaseProvider {
         } else {
           logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
         }
-        
+
         // Send error stream message to content script
         await this._streamChunkError(error, chunkIndex, messageId, engine);
-        
-        // Send streaming end notification with error status
-        await this._sendStreamEnd(messageId, { error: true });
-        
+
+        // Send streaming end notification with error details
+        await this._sendStreamEnd(messageId, {
+          error: {
+            message: error.message,
+            type: errorType
+          }
+        });
+
         // Stop streaming on error - don't continue with other chunks
         throw error;
       }

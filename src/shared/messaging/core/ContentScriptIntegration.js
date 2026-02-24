@@ -5,6 +5,9 @@
  * - Legacy message handlers (for backward compatibility)
  * - New unified streaming system
  * - Response routing and coordination
+ *
+ * Note: Streaming messages are now routed through ContentMessageHandler,
+ * which delegates to this.streamingHandler. No separate listener setup needed.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -24,19 +27,14 @@ export class ContentScriptIntegration {
 
   /**
    * Initialize the integration layer
+   * Note: Streaming messages are now routed through MessageHandler,
+   * so we don't need to set up a separate listener
    */
   async initialize() {
-    if (this.isInitialized) {
-      return;
+    if (!this.isInitialized) {
+      this.isInitialized = true;
+      logger.debug('ContentScriptIntegration initialized');
     }
-
-    logger.debug('Initializing ContentScriptIntegration');
-
-    // Set up message listener for streaming responses
-    this._setupMessageListener();
-
-    this.isInitialized = true;
-    logger.info('ContentScriptIntegration initialized successfully');
   }
 
   /**
@@ -46,22 +44,18 @@ export class ContentScriptIntegration {
    */
   registerTranslationRequest(messageId, callbacks = {}) {
     if (!this.isInitialized) {
-      logger.warn('ContentScriptIntegration not initialized, auto-initializing...');
       this.initialize();
     }
 
-    logger.debug(`Registering translation request: ${messageId}`);
-
     // Register with streaming handler
+    // Note: MessageHandler will route streaming messages to this.streamingHandler
     return this.streamingHandler.registerHandler(messageId, {
       onStreamUpdate: (data) => {
-        logger.debug(`Stream update for ${messageId}:`, data);
         if (callbacks.onStreamUpdate) {
           callbacks.onStreamUpdate(data);
         }
       },
       onStreamEnd: (data) => {
-        logger.debug(`Stream end for ${messageId}:`, data);
         if (callbacks.onStreamEnd) {
           callbacks.onStreamEnd(data);
         }
@@ -168,29 +162,6 @@ export class ContentScriptIntegration {
 
     // Message not handled
     return false;
-  }
-
-  /**
-   * Setup message listener for streaming responses
-   * @private
-   */
-  _setupMessageListener() {
-    // Listen for streaming response messages
-    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
-      browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (this._isStreamingResponseAction(message.action)) {
-          const handled = this.streamingHandler.handleMessage(message);
-          if (handled) {
-            // Send ACK for streaming messages
-            sendResponse({ success: true, handled: true });
-            return true;
-          }
-        }
-        return false; // Let other handlers process
-      });
-
-      logger.debug('Message listener setup for streaming responses');
-    }
   }
 
   /**

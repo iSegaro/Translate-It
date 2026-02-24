@@ -34,7 +34,7 @@ export class StreamingResponseHandler {
       onError = () => {}
     } = callbacks;
 
-    logger.debug(`Registering streaming handler for: ${messageId}`);
+    console.log('[StreamingResponseHandler] Registering handler for:', messageId);
 
     const handler = {
       messageId,
@@ -52,6 +52,7 @@ export class StreamingResponseHandler {
     // Process any buffered messages for this messageId
     this._processBufferedMessages(messageId);
 
+    console.log('[StreamingResponseHandler] Active handlers count:', this.activeHandlers.size);
     return handler;
   }
 
@@ -63,6 +64,8 @@ export class StreamingResponseHandler {
   handleMessage(message) {
     const { action, messageId } = message;
 
+    console.log('[StreamingResponseHandler] handleMessage called:', action, messageId, 'Active handlers:', Array.from(this.activeHandlers.keys()));
+
     if (!messageId) {
       return false;
     }
@@ -71,28 +74,33 @@ export class StreamingResponseHandler {
     const handler = this.activeHandlers.get(messageId);
 
     if (!handler) {
+      console.log('[StreamingResponseHandler] No handler found for:', messageId, '- buffering message');
       // Buffer the message in case handler is registered later
       this._bufferMessage(messageId, message);
       return false;
     }
 
     if (handler.isCompleted) {
-      logger.debug(`Ignoring message for completed handler: ${messageId}`);
+      console.log('[StreamingResponseHandler] Handler already completed for:', messageId);
       return false;
     }
 
     try {
       switch (action) {
         case MessageActions.TRANSLATION_STREAM_UPDATE:
+          console.log('[StreamingResponseHandler] Handling STREAM_UPDATE for:', messageId);
           return this._handleStreamUpdate(handler, message);
 
         case MessageActions.TRANSLATION_STREAM_END:
+          console.log('[StreamingResponseHandler] Handling STREAM_END for:', messageId);
           return this._handleStreamEnd(handler, message);
 
         case MessageActions.TRANSLATION_RESULT_UPDATE:
+          console.log('[StreamingResponseHandler] Handling RESULT_UPDATE for:', messageId);
           return this._handleTranslationResult(handler, message);
 
         default:
+          console.log('[StreamingResponseHandler] Unknown action:', action);
           return false;
       }
     } catch (error) {
@@ -109,12 +117,16 @@ export class StreamingResponseHandler {
   _handleStreamUpdate(handler, message) {
     const { messageId, data } = message;
 
-    logger.debug(`Handling stream update for ${messageId}:`, {
-      success: data?.success,
-      batchIndex: data?.batchIndex
-    });
-
     handler.updateCount++;
+
+    console.log('[StreamingResponseHandler._handleStreamUpdate] Processing stream update:', {
+      messageId,
+      hasHandler: !!handler,
+      hasOnStreamUpdate: typeof handler.onStreamUpdate === 'function',
+      dataKeys: data ? Object.keys(data) : 'no data',
+      hasDataData: !!data?.data,
+      updateCount: handler.updateCount
+    });
 
     // Report progress to coordinator
     this.coordinator.reportStreamingProgress(messageId, {
@@ -127,6 +139,7 @@ export class StreamingResponseHandler {
     // Call handler callback
     try {
       handler.onStreamUpdate(data);
+      console.log('[StreamingResponseHandler._handleStreamUpdate] Callback completed successfully');
     } catch (error) {
       logger.warn(`Error in stream update callback for ${messageId}:`, error);
     }
@@ -140,11 +153,6 @@ export class StreamingResponseHandler {
    */
   _handleStreamEnd(handler, message) {
     const { messageId, data } = message;
-
-    logger.debug(`Handling stream end for ${messageId}:`, {
-      success: data?.success,
-      updateCount: handler.updateCount
-    });
 
     handler.isCompleted = true;
 
@@ -180,11 +188,6 @@ export class StreamingResponseHandler {
    */
   _handleTranslationResult(handler, message) {
     const { messageId, data } = message;
-
-    logger.debug(`Handling translation result for ${messageId}:`, {
-      success: data?.success,
-      mode: data?.translationMode
-    });
 
     handler.isCompleted = true;
 
@@ -295,8 +298,6 @@ export class StreamingResponseHandler {
   _cleanupHandler(messageId) {
     this.activeHandlers.delete(messageId);
     this.messageBuffer.delete(messageId);
-
-    logger.debug(`Cleaned up streaming handler for: ${messageId}`);
   }
 
   /**
@@ -308,8 +309,6 @@ export class StreamingResponseHandler {
     if (!handler) {
       return false;
     }
-
-    logger.debug(`Cancelling streaming handler for: ${messageId}`);
 
     handler.isCompleted = true;
 
@@ -372,8 +371,6 @@ export class StreamingResponseHandler {
    * Cleanup all handlers and resources
    */
   cleanup() {
-    logger.debug('Cleaning up StreamingResponseHandler');
-
     // Cancel all active handlers
     for (const messageId of this.activeHandlers.keys()) {
       this.cancelHandler(messageId);

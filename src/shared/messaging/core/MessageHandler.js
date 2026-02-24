@@ -97,18 +97,13 @@ class MessageHandler {
     const handler = this.handlers.get(action);
 
     if (handler) {
-      getLogger().debug(`Handler found for action: ${action}`);
-
-
       const result = handler(normalizedMessage, sender, sendResponse);
 
       if (result instanceof Promise) {
-        getLogger().debug(`Promise-based handler for ${action}. Waiting for resolution.`);
         // Store the sendResponse function to be called when the promise resolves
         this.pendingResponses.set(messageId, sendResponse);
         result
           .then(response => {
-            getLogger().debug(`Handler ${action} resolved with:`, response);
             this._sendResponse(messageId, response);
           })
           .catch(error => {
@@ -134,7 +129,12 @@ class MessageHandler {
         return false;
       }
     } else {
-      getLogger().debug(`No handler registered for action: ${action}. Available handlers:`, Array.from(this.handlers.keys()));
+      // Streaming messages are now handled by ContentMessageHandler
+      // Don't log for these to reduce verbosity
+      const streamingActions = ['TRANSLATION_STREAM_UPDATE', 'TRANSLATION_STREAM_END', 'TRANSLATION_RESULT_UPDATE'];
+      if (!streamingActions.includes(action)) {
+        getLogger().debug(`No handler for: ${action}`);
+      }
       // No handler, so we don't need to keep the message channel open
       // Return false to allow other listeners to handle the message
       return false;

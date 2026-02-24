@@ -123,6 +123,19 @@ export function ContentScriptCore() {
     }
 
     try {
+      // IMPORTANT: Initialize ContentScriptIntegration BEFORE MessageHandler
+      // This ensures streaming messages are properly routed
+      try {
+        console.log('[ContentScriptCore] About to initialize ContentScriptIntegration...');
+        const { initializeContentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+        await initializeContentScriptIntegration();
+        console.log('[ContentScriptCore] ContentScriptIntegration initialized successfully');
+      } catch (error) {
+        console.error('[ContentScriptCore] Failed to initialize ContentScriptIntegration:', error);
+        logger.warn('Failed to initialize ContentScriptIntegration:', error);
+        // Don't throw - streaming is optional for basic functionality
+      }
+
       this.messageHandler = createMessageHandler();
       await this.registerCoreHandlers();
 

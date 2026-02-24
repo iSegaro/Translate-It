@@ -151,6 +151,15 @@ export class StreamingManager extends ResourceTracker {
         { messageId }
       );
 
+      console.log('[StreamingManager.streamStreamUpdate] Sending stream update:', {
+        messageId,
+        batchIndex,
+        batchResultsLength: batchResults?.length,
+        messageDataKeys: streamMessage.data ? Object.keys(streamMessage.data) : 'no data',
+        hasDataData: !!streamMessage.data?.data,
+        hasBatchResults: !!batchResults
+      });
+
       // Send to content script
       if (senderInfo.tab?.id) {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
@@ -159,6 +168,7 @@ export class StreamingManager extends ResourceTracker {
         logger.warn(`[StreamingManager] No tab ID for streaming messageId: ${messageId}`);
       }
     } catch (error) {
+      console.error('[StreamingManager.streamStreamUpdate] Failed to stream batch:', error);
       logger.error(`[StreamingManager] Failed to stream batch ${batchIndex}:`, error);
     }
   }

@@ -211,11 +211,15 @@ class SelectElementManager extends ResourceTracker {
       preserveTranslations = false,
     } = options;
 
+    // When cancelling, preserve translations so user can revert them later with ESC
+    const shouldPreserve = preserveTranslations || fromCancel;
+
     this.logger.debug('Deactivating SelectElementManager', {
       fromBackground,
       fromNotification,
       fromCancel,
       preserveTranslations,
+      shouldPreserve,
       instanceId: this.instanceId,
     });
 
@@ -223,7 +227,7 @@ class SelectElementManager extends ResourceTracker {
       // Set active state immediately
       this.isActive = false;
 
-      // Cancel any ongoing translations
+      // Cancel any ongoing translations (but don't revert them)
       if (!preserveTranslations) {
         this.domTranslatorAdapter.cancelTranslation();
       }
@@ -239,8 +243,8 @@ class SelectElementManager extends ResourceTracker {
         this.dismissNotification();
       }
 
-      // Clear translation state if not preserving
-      if (!preserveTranslations) {
+      // Clear translation state only if not preserving
+      if (!shouldPreserve) {
         if (this.domTranslatorAdapter.hasTranslation()) {
           await this.domTranslatorAdapter.revertTranslation();
         }
@@ -470,6 +474,9 @@ class SelectElementManager extends ResourceTracker {
 
         // Deactivate mode after translation
         this.performPostTranslationCleanup();
+      } else if (result.cancelled) {
+        this.logger.debug('Translation was cancelled by user, no action needed');
+        // Don't show error notification or perform cleanup - already done in deactivate()
       }
     } catch (error) {
       this.logger.error('Error during translation:', error);

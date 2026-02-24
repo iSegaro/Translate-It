@@ -217,9 +217,11 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
+
+    // Streaming translation handlers - delegate to ContentScriptIntegration
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
-    
+
     // IFrame support handlers
     this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
     this.registerHandler(MessageActions.IFRAME_TRANSLATE_SELECTION, this.handleIFrameTranslateSelection.bind(this));
@@ -393,24 +395,24 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleStreamUpdate(message) {
-    // logger.trace('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', {
-    //   messageId: message.messageId,
-    //   success: message.data?.success,
-    //   batchIndex: message.data?.batchIndex,
-    //   hasSelectElementManager: !!this.selectElementManager,
-    //   isActive: this.selectElementManager?.isSelectElementActive()
-    // });
-
-    if (this.selectElementManager && this.selectElementManager.translationOrchestrator) {
-      return this.selectElementManager.translationOrchestrator.handleStreamUpdate(message);
-    } else {
-      this.logger.warn('[ContentMessageHandler] SelectElementManager not available for stream update');
+    // Delegate to ContentScriptIntegration's streaming handler
+    try {
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      return contentScriptIntegration.streamingHandler.handleMessage(message);
+    } catch (error) {
+      this.logger.error('Failed to delegate stream update to ContentScriptIntegration:', error);
+      return false;
     }
   }
 
   async handleStreamEnd(message) {
-    if (this.selectElementManager && this.selectElementManager.translationOrchestrator) {
-      return this.selectElementManager.translationOrchestrator.handleStreamEnd(message);
+    // Delegate to ContentScriptIntegration's streaming handler
+    try {
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      return contentScriptIntegration.streamingHandler.handleMessage(message);
+    } catch (error) {
+      this.logger.error('Failed to delegate stream end to ContentScriptIntegration:', error);
+      return false;
     }
   }
 
