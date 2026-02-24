@@ -84,6 +84,21 @@ export class ElementSelector extends ResourceTracker {
    */
   isOurElement(element) {
     if (!element) return false;
+    
+    // Check for our own unique markers first (most reliable)
+    if (element.id && element.id.startsWith('translate-it-')) return true;
+    if (element.closest && element.closest('[id^="translate-it-"]')) return true;
+    
+    // Check for our classes
+    if (element.classList && (
+      element.classList.contains('translate-it-toast') || 
+      element.classList.contains('translate-it-notification') ||
+      element.classList.contains('translate-it-ui-host')
+    )) {
+      return true;
+    }
+
+    // Fallback to detector but with a safer check
     return ToastElementDetector.shouldExcludeFromSelection(element);
   }
 

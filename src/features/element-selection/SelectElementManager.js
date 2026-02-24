@@ -397,13 +397,16 @@ class SelectElementManager extends ResourceTracker {
     if (!this.isActive) return;
 
     // Check if click is on our own elements (Toast, etc.)
-    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
-      this.logger.debug('Click on our own element, letting it pass');
+    const isOurUI = this.elementSelector && this.elementSelector.isOurElement(event.target);
+    
+    // IMPORTANT: Even if it might be our element, we only let it pass if it's confirmed
+    // Otherwise, we MUST block to prevent site navigation
+    if (isOurUI) {
+      this.logger.debug('Click confirmed on our own element, letting it pass');
       return;
     }
 
-    // IMPORTANT: Prevent default and stop propagation for EVERYTHING else early
-    // This ensures other managers don't dismiss things and sites don't navigate
+    // Block everything else
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
