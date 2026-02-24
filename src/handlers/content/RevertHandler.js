@@ -125,7 +125,17 @@ export class RevertHandler extends ResourceTracker {
    */
   async revertVueTranslations() {
     try {
-      // Get SelectElementManager instance through FeatureManager
+      // First, try to revert Select Element translation using global state
+      // This works even when SelectElementManager is deactivated
+      const { revertSelectElementTranslation } = await import('@/features/element-selection/core/DomTranslatorAdapter.js');
+      const selectElementReverted = await revertSelectElementTranslation();
+
+      if (selectElementReverted) {
+        logger.debug('Reverted Select Element translation via global state');
+        return 1;
+      }
+
+      // Fallback: Try to get SelectElementManager instance through FeatureManager
       const selectElementManager = await this.getSelectElementManagerFromFeatureManager();
 
       if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {

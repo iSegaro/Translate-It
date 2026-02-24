@@ -10,7 +10,6 @@ import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { extractTextFromElement } from '../utils/elementHelpers.js';
 
 /**
  * RTL language codes for automatic direction detection
@@ -19,6 +18,29 @@ const RTL_LANGUAGES = new Set([
   'ar', 'he', 'fa', 'ur', 'yi', 'ps', 'sd', 'ckb', 'dv', 'ug',
   'ae', 'arc', 'xh', 'zu'
 ]);
+
+/**
+ * Global translation state for Select Element mode
+ * This persists even when SelectElementManager is deactivated
+ * so ESC key revert can work properly
+ */
+const globalSelectElementState = {
+  currentTranslation: null,
+  isTranslating: false,
+};
+
+// Make it available globally for RevertHandler access
+if (typeof window !== 'undefined') {
+  window.__selectElementTranslationState__ = globalSelectElementState;
+}
+
+/**
+ * Get the global Select Element translation state
+ * @returns {Object} Global state object
+ */
+export function getSelectElementTranslationState() {
+  return globalSelectElementState;
+}
 
 /**
  * Adapter class that provides one-shot translation for Select Element mode
@@ -30,8 +52,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorAdapter');
 
-    // State tracking
-    this.currentTranslation = null;
+    // Use global state instead of instance state
     this.isTranslating = false;
 
     this.logger.debug('DomTranslatorAdapter created');
@@ -71,28 +92,48 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalHTML = element.innerHTML;
       const elementId = this._generateElementId();
 
-      // Extract text content from element
-      const text = extractTextFromElement(element);
+      // Collect all text nodes within the element
+      const textNodes = this._collectTextNodes(element);
 
-      if (!text || !text.trim()) {
+      if (textNodes.length === 0) {
         this.logger.warn('No text content found in element');
         throw new Error('No translatable text found in element');
       }
 
-      this.logger.debug('Extracted text for translation:', {
-        length: text.length,
-        preview: text.substring(0, 100),
+      this.logger.debug('Collected text nodes for translation:', {
+        count: textNodes.length,
+      });
+
+      // Store original text BEFORE translation for revert
+      const originalTextNodesData = textNodes.map(node => ({
+        node,
+        originalText: node.textContent
+      }));
+
+      // Prepare texts for batch translation
+      const textsToTranslate = textNodes.map(node => ({
+        text: node.textContent.trim()
+      })).filter(item => item.text);
+
+      if (textsToTranslate.length === 0) {
+        this.logger.warn('No translatable text after filtering');
+        throw new Error('No translatable text found in element');
+      }
+
+      this.logger.debug('Prepared texts for translation:', {
+        count: textsToTranslate.length,
+        preview: textsToTranslate.map(t => t.text.substring(0, 30)).join(' | '),
       });
 
       // Get provider and target language
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
 
-      // Send single translation request
+      // Send batch translation request
       const translationRequest = {
         action: MessageActions.TRANSLATE,
         data: {
-          text: JSON.stringify([{ text }]),
+          text: JSON.stringify(textsToTranslate),
           provider,
           sourceLanguage: AUTO_DETECT_VALUE,
           targetLanguage,
@@ -110,43 +151,67 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error(result?.error || 'Translation failed');
       }
 
-      // Parse translated text
-      let translatedText;
+      // Parse translated texts
+      let translatedTexts;
       try {
-        const translated = JSON.parse(result.translatedText);
-        translatedText = Array.isArray(translated) && translated[0]?.text
-          ? translated[0].text
-          : result.translatedText;
-      } catch {
-        translatedText = result.translatedText;
+        const parsed = JSON.parse(result.translatedText);
+        if (Array.isArray(parsed)) {
+          translatedTexts = parsed;
+        } else if (parsed.text) {
+          translatedTexts = [parsed];
+        } else {
+          throw new Error('Invalid translation response format');
+        }
+      } catch (error) {
+        this.logger.error('Failed to parse translation response', error);
+        throw new Error('Invalid translation response format');
+      }
+
+      // Validate response length matches input
+      if (translatedTexts.length !== textsToTranslate.length) {
+        this.logger.warn('Translation count mismatch', {
+          expected: textsToTranslate.length,
+          received: translatedTexts.length
+        });
       }
 
       this.logger.debug('Translation received:', {
-        length: translatedText.length,
-        preview: translatedText.substring(0, 100),
+        count: translatedTexts.length,
+        preview: translatedTexts.map(t => (t?.text || t)?.substring(0, 30)).join(' | '),
       });
 
-      // Replace element content with translated text
-      // For simple elements, we just replace the text content
-      // For complex elements, we replace innerHTML with the translated text wrapped in a span
-      if (element.children.length === 0) {
-        // Simple element with no children - just replace text
-        element.textContent = translatedText;
-      } else {
-        // Complex element with children - create a text wrapper
-        // Clear all content and set translated text
-        element.innerHTML = '';
-        element.textContent = translatedText;
-      }
+      // Replace each text node's content individually
+      let textNodeIndex = 0;
+      textNodes.forEach((textNode) => {
+        const originalText = textNode.textContent.trim();
+        if (!originalText) return;
+
+        if (textNodeIndex < translatedTexts.length) {
+          const translatedItem = translatedTexts[textNodeIndex];
+          const translatedText = translatedItem?.text || translatedItem || originalText;
+
+          // Preserve leading/trailing whitespace
+          const hasLeadingSpace = /^\s/.test(textNode.textContent);
+          const hasTrailingSpace = /\s$/.test(textNode.textContent);
+
+          let finalText = translatedText;
+          if (hasLeadingSpace) finalText = ' ' + finalText;
+          if (hasTrailingSpace) finalText = finalText + ' ';
+
+          textNode.nodeValue = finalText;
+          textNodeIndex++;
+        }
+      });
 
       // Apply direction attribute based on target language
       this._applyDirectionToElement(element, targetLanguage);
 
       // Store translation state for revert
-      this.currentTranslation = {
+      globalSelectElementState.currentTranslation = {
         elementId,
         element,
-        originalHTML,
+        originalHTML,  // Keep for full fallback
+        originalTextNodes: originalTextNodesData,  // Use original data saved before translation
         targetLanguage,
         timestamp: Date.now(),
       };
@@ -191,35 +256,45 @@ export class DomTranslatorAdapter extends ResourceTracker {
    * @returns {Promise<boolean>} Success status
    */
   async revertTranslation() {
-    if (!this.currentTranslation) {
+    if (!globalSelectElementState.currentTranslation) {
       this.logger.debug('No translation to revert');
       return false;
     }
 
     try {
-      const { element, originalHTML } = this.currentTranslation;
+      const { element, originalHTML, originalTextNodes } = globalSelectElementState.currentTranslation;
 
-      if (originalHTML && element) {
-        // Restore from HTML snapshot
-        // eslint-disable-next-line noUnsanitized/property
-        element.innerHTML = originalHTML;
-
-        // Remove direction attributes
-        element.removeAttribute('dir');
-        element.removeAttribute('data-translate-dir');
-
-        // Hide translation overlay via event bus
-        pageEventBus.emit('hide-translation', { element });
-
-        this.logger.info('Translation reverted', {
-          elementId: this.currentTranslation.elementId,
+      if (originalTextNodes && originalTextNodes.length > 0) {
+        // Restore each text node individually
+        originalTextNodes.forEach(({ node, originalText }) => {
+          // Check if node is still in DOM
+          if (node.parentNode) {
+            node.nodeValue = originalText;
+          }
         });
 
-        this.currentTranslation = null;
-        return true;
+        this.logger.info('Text nodes restored', {
+          count: originalTextNodes.length
+        });
+      } else if (originalHTML && element) {
+        // Fallback to full HTML restore
+        // eslint-disable-next-line noUnsanitized/property
+        element.innerHTML = originalHTML;
       }
 
-      return false;
+      // Remove direction attributes
+      element.removeAttribute('dir');
+      element.removeAttribute('data-translate-dir');
+
+      // Hide translation overlay via event bus
+      pageEventBus.emit('hide-translation', { element });
+
+      this.logger.info('Translation reverted', {
+        elementId: globalSelectElementState.currentTranslation.elementId,
+      });
+
+      globalSelectElementState.currentTranslation = null;
+      return true;
     } catch (error) {
       this.logger.error('Failed to revert translation', error);
       return false;
@@ -254,6 +329,49 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   /**
+   * Collect all text nodes within an element
+   * @param {HTMLElement} element - Root element
+   * @returns {Text[]} Array of text nodes
+   */
+  _collectTextNodes(element) {
+    const textNodes = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        // Skip certain element types
+        const tagName = parent.tagName;
+        if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        // Check visibility
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // If getComputedStyle fails, accept the node
+        }
+
+        // Accept nodes with non-whitespace content
+        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node);
+    }
+
+    this.logger.debug(`Collected ${textNodes.length} text nodes for translation`);
+
+    return textNodes;
+  }
+
+  /**
    * Check if currently translating
    * @returns {boolean} Translation status
    */
@@ -266,7 +384,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
    * @returns {boolean} Has translation state
    */
   hasTranslation() {
-    return this.currentTranslation !== null;
+    return globalSelectElementState.currentTranslation !== null;
   }
 
   /**
@@ -274,7 +392,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
    * @returns {Object|null} Current translation state
    */
   getCurrentTranslation() {
-    return this.currentTranslation;
+    return globalSelectElementState.currentTranslation;
   }
 
   /**
@@ -299,12 +417,64 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     // Clear references
-    this.currentTranslation = null;
+    globalSelectElementState.currentTranslation = null;
 
     // Use ResourceTracker cleanup
     super.cleanup();
 
     this.logger.debug('DomTranslatorAdapter cleanup completed');
+  }
+}
+
+/**
+ * Global function to revert Select Element translation
+ * This can be called from RevertHandler even when SelectElementManager is deactivated
+ * @returns {Promise<boolean>} Success status
+ */
+export async function revertSelectElementTranslation() {
+  const state = getSelectElementTranslationState();
+
+  if (!state.currentTranslation) {
+    return false;
+  }
+
+  try {
+    const { element, originalHTML, originalTextNodes } = state.currentTranslation;
+
+    if (originalTextNodes && originalTextNodes.length > 0) {
+      // Restore each text node individually
+      originalTextNodes.forEach(({ node, originalText }) => {
+        // Check if node is still in DOM
+        if (node.parentNode) {
+          node.nodeValue = originalText;
+        }
+      });
+
+      const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
+      logger.info('Text nodes restored via global function', {
+        count: originalTextNodes.length
+      });
+    } else if (originalHTML && element) {
+      // Fallback to full HTML restore
+      // eslint-disable-next-line noUnsanitized/property
+      element.innerHTML = originalHTML;
+    }
+
+    // Remove direction attributes
+    element.removeAttribute('dir');
+    element.removeAttribute('data-translate-dir');
+
+    // Hide translation overlay via event bus
+    pageEventBus.emit('hide-translation', { element });
+
+    // Clear state
+    state.currentTranslation = null;
+
+    return true;
+  } catch (error) {
+    const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
+    logger.error('Failed to revert translation via global function', error);
+    return false;
   }
 }
 
