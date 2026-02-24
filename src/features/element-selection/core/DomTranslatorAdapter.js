@@ -22,6 +22,16 @@ const RTL_LANGUAGES = new Set([
 ]);
 
 /**
+ * Tags that are safe to apply RTL direction without breaking layout
+ */
+const TEXT_TAGS = new Set([
+  'P', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'A', 
+  'TD', 'TH', 'DT', 'DD', 'LABEL', 'CAPTION', 'Q', 'CITE', 
+  'SMALL', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'BUTTON',
+  'INPUT', 'TEXTAREA'
+]);
+
+/**
  * Global translation state for Select Element mode
  * This persists even when SelectElementManager is deactivated
  * so ESC key revert can work properly
@@ -515,9 +525,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
         element.innerHTML = originalHTML;
       }
 
-      // Remove direction attributes
+      // Remove direction attributes from the element and all its text children
       element.removeAttribute('dir');
       element.removeAttribute('data-translate-dir');
+      
+      const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
+      childTextElements.forEach(child => child.removeAttribute('dir'));
 
       // Hide translation overlay via event bus
       pageEventBus.emit('hide-translation', { element });
@@ -543,13 +556,34 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const langCode = targetLanguage.toLowerCase().split('-')[0];
     const isRTL = RTL_LANGUAGES.has(langCode);
 
-    // Set dir attribute on the element
-    element.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
-    element.setAttribute('data-translate-dir', isRTL ? 'rtl' : 'ltr');
+    if (!isRTL) {
+      element.setAttribute('dir', 'ltr');
+      element.setAttribute('data-translate-dir', 'ltr');
+      return;
+    }
 
-    this.logger.debug('Applied direction to element', {
+    // Surgical RTL application:
+    // 1. Apply to the root element ONLY if it's a safe text tag and a leaf (no other element children)
+    const isLeaf = element.children.length === 0;
+    if (isLeaf && TEXT_TAGS.has(element.tagName)) {
+      element.setAttribute('dir', 'rtl');
+    }
+
+    // 2. Apply to all child text tags that might contain translated text
+    const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
+    childTextElements.forEach(child => {
+      // Only apply to children that are either leaves or have very simple structure
+      if (child.children.length === 0) {
+        child.setAttribute('dir', 'rtl');
+      }
+    });
+
+    element.setAttribute('data-translate-dir', 'rtl');
+
+    this.logger.debug('Applied surgical direction to element', {
       langCode,
       isRTL,
+      tagName: element.tagName
     });
   }
 
@@ -732,9 +766,12 @@ export async function revertSelectElementTranslation() {
       element.innerHTML = originalHTML;
     }
 
-    // Remove direction attributes
+    // Remove direction attributes from the element and all its text children
     element.removeAttribute('dir');
     element.removeAttribute('data-translate-dir');
+    
+    const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
+    childTextElements.forEach(child => child.removeAttribute('dir'));
 
     // Hide translation overlay via event bus
     pageEventBus.emit('hide-translation', { element });
