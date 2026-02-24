@@ -247,12 +247,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
             // Don't show notification for user cancellation - it's expected behavior
             // Just resolve with cancellation info
-            streamEndResolve({
-              success: false,
-              error: errorMessage,
-              errorHandled: true,
-              cancelled: true
-            });
+            if (typeof streamEndResolve === 'function') {
+              streamEndResolve({
+                success: false,
+                error: errorMessage,
+                errorHandled: true,
+                cancelled: true
+              });
+            }
             return;
           }
 
@@ -290,18 +292,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
             });
 
             // Resolve with failure
-            streamEndResolve({
-              success: false,
-              error: errorMessage,
-              errorHandled: true
-            });
+            if (typeof streamEndResolve === 'function') {
+              streamEndResolve({
+                success: false,
+                error: errorMessage,
+                errorHandled: true
+              });
+            }
           } else {
             // Stream completed successfully
-            streamEndResolve({
-              success: true,
-              translatedCount: translatedNodeCount,
-              totalCount: textNodes.length,
-            });
+            if (typeof streamEndResolve === 'function') {
+              streamEndResolve({
+                success: true,
+                translatedCount: translatedNodeCount,
+                totalCount: textNodes.length,
+              });
+            }
           }
         },
         onError: async (error) => {
@@ -316,11 +322,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
             showInUI: false
           });
           // Resolve with failure instead of rejecting - error already handled above
-          streamEndResolve({
-            success: false,
-            error: error.message || String(error),
-            errorHandled: true // Flag to indicate error was already handled
-          });
+          if (typeof streamEndResolve === 'function') {
+            streamEndResolve({
+              success: false,
+              error: error.message || String(error),
+              errorHandled: true // Flag to indicate error was already handled
+            });
+          }
         }
       });
 
@@ -502,6 +510,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       throw error;
     } finally {
+      // Unregister handlers if translation ends (successfully or not)
+      if (this.currentMessageId) {
+        try {
+          contentScriptIntegration.streamingHandler.cancelHandler(this.currentMessageId);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+
       this.isTranslating = false;
       this.currentMessageId = null;
       this.currentStreamEndReject = null;
