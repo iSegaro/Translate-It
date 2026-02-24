@@ -47,6 +47,7 @@ const OPERATION_TIMEOUTS = {
   'TRANSLATE_PAGE': 20000,
   'TRANSLATE_TEXT': 15000,
   'TRANSLATE_IMAGE': 18000,
+  'page-translate-batch': 60000,
   'FETCH_TRANSLATION': 10000,
   'PROCESS_SELECTED_ELEMENT': 8000,
   'TEST_PROVIDER': 8000,
@@ -85,14 +86,15 @@ function getTimeoutForAction(action, context = null) {
 }
 
 /**
- * Creates a promise that rejects after a specified timeout.
+ * Creates a promise that rejects after a specified timeout and a function to clear it.
  * @param {number} ms - Timeout in milliseconds.
  * @param {string} action - The action name for the error message.
- * @returns {Promise<never>} A promise that always rejects.
+ * @returns {{promise: Promise<never>, clear: function}} An object with the timeout promise and a clear function.
  */
-function timeout(ms, action) {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
+function createTimeout(ms, action) {
+  let timeoutId;
+  const promise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
       const timeoutError = new Error(`Operation '${action}' timed out after ${ms}ms`);
       timeoutError.type = 'OPERATION_TIMEOUT';
 
@@ -111,6 +113,11 @@ function timeout(ms, action) {
       reject(timeoutError);
     }, ms);
   });
+
+  return {
+    promise,
+    clear: () => clearTimeout(timeoutId)
+  };
 }
 
 /**
@@ -255,13 +262,18 @@ export async function sendRegularMessage(message, options = {}) {
 
     const sendPromise = browser.runtime.sendMessage(message);
 
+    // Create a timeout promise and clear function
+    const { promise: timeoutPromise, clear: clearTimeoutTimer } = createTimeout(actionTimeout, message.action);
+
     // Create a cancellation promise for this messageId
     let isCancelled = false;
+    let cancellationInterval;
     const cancellationPromise = new Promise((_, reject) => {
       const checkCancellation = () => {
         // Check streaming timeout manager first
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
           isCancelled = true;
+          if (cancellationInterval) clearInterval(cancellationInterval);
           reject(new Error('Translation cancelled by user'));
           return;
         }
@@ -269,28 +281,31 @@ export async function sendRegularMessage(message, options = {}) {
         // Also check for global ESC flag (faster response to user ESC)
         if (window.selectElementHandlingESC === true) {
           isCancelled = true;
+          if (cancellationInterval) clearInterval(cancellationInterval);
           getLogger().debug('ESC flag detected, cancelling message immediately');
           const cancelError = new Error('Translation cancelled by user ESC');
           cancelError.type = 'USER_CANCELLED';
           reject(cancelError);
           return;
         }
-
-        // Check again more frequently - every 50ms for faster response
-        if (!isCancelled) {
-          setTimeout(checkCancellation, 50);
-        }
       };
 
       // Start cancellation checking immediately for faster response to ESC
-      setTimeout(checkCancellation, 50);
+      cancellationInterval = setInterval(checkCancellation, 50);
     });
 
-    const response = await Promise.race([
-      sendPromise,
-      cancellationPromise,
-      timeout(actionTimeout, message.action),
-    ]);
+    let response;
+    try {
+      response = await Promise.race([
+        sendPromise,
+        cancellationPromise,
+        timeoutPromise,
+      ]);
+    } finally {
+      // CRITICAL: Clear timeout and cancellation interval once the race is settled
+      clearTimeoutTimer();
+      if (cancellationInterval) clearInterval(cancellationInterval);
+    }
 
     if (!response) {
       throw new Error(`No response received for ${message.action}`);
