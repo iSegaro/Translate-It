@@ -18,9 +18,9 @@ export const TRANSLATION_CONSTANTS = {
 
   // Provider-specific character limits
   CHARACTER_LIMITS: {
-    GOOGLE: 3900,
+    GOOGLE: 3500,
     BING: 800,
-    YANDEX: 5000,
+    YANDEX: 3500,
     DEEPL: 10000,
   },
 

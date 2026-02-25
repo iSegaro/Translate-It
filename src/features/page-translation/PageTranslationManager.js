@@ -65,57 +65,50 @@ export class PageTranslationManager extends ResourceTracker {
     this.batchTimer = null;
     this.translatedCount = 0;
     this.activeFlushes = 0;
+    this.lastFlushTime = 0;
     this.targetLanguage = 'fa';
 
     // Settings
     this.settings = {
       lazyLoading: true,
       autoTranslateOnDOMChanges: false,
-      chunkSize: 50,
-      debounceDelay: 300,
-      maxConcurrentFlushes: 4,
+      chunkSize: 20, 
+      debounceDelay: 500,
+      maxConcurrentFlushes: 3,
     };
 
     this.logger.debug('PageTranslationManager created');
   }
 
   /**
-   * Check if a node is likely visible to the user
+   * Check if a node is within the current viewport (with margin)
    */
-  _isNodeVisible(node) {
-    if (!node) return true;
+  _isInViewport(node) {
+    if (!node) return false; // Default to false for lazy loading if node is missing
     
     try {
-      // If node is a text node, check its parent
       const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
                      (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
       
-      if (!element || element.nodeType !== Node.ELEMENT_NODE) return true;
+      if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
       
-      // 1. checkVisibility is the modern, high-performance way to check if an element is rendered.
-      // It handles display: none, visibility: hidden, and content-visibility: hidden.
-      if (typeof element.checkVisibility === 'function') {
-        return element.checkVisibility({
-          checkOpacity: false,
-          checkVisibilityCSS: true
-        });
-      }
-      
-      // 2. Basic fallback for older browsers
-      // offsetParent is null if element or any parent is display:none
+      // If element is display:none, it's definitely not in viewport
       if (element.offsetParent === null && element.tagName !== 'BODY' && !(element instanceof SVGElement)) {
         return false;
       }
+
+      const rect = element.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
       
-      // 3. Check for obvious hidden styles if possible
-      const style = element.style;
-      if (style && (style.display === 'none' || style.visibility === 'hidden')) {
-        return false;
-      }
+      // Add a small margin (200px) to pre-load content slightly before it appears
+      const margin = 200;
       
-      return true;
+      return (
+        rect.bottom >= -margin &&
+        rect.top <= viewportHeight + margin
+      );
     } catch (e) {
-      return true; // Default to visible on error to avoid missing content
+      return false;
     }
   }
 
@@ -125,21 +118,38 @@ export class PageTranslationManager extends ResourceTracker {
   async _enqueueTranslation(text, node) {
     if (!text || !text.trim()) return text;
 
-    // Performance optimization: Skip elements that are definitely hidden (display: none).
-    // This dramatically reduces the initial translation time by not translating hidden menus, 
-    // modals, and other off-screen elements that aren't visible yet.
-    if (!this._isNodeVisible(node)) {
-      // For hidden elements, we return the original text. 
-      // If they become visible later, domtranslator's scheduler or mutation observer
-      // will trigger another translation attempt.
-      return text;
+    // Strict Lazy Loading: If enabled, double check if it's actually in viewport
+    if (this.settings.lazyLoading && !this._isInViewport(node)) {
+      // Return a promise that only resolves when the node becomes visible
+      return new Promise((resolve) => {
+        const observer = new IntersectionObserver((entries) => {
+          if (entries[0].isIntersecting) {
+            observer.disconnect();
+            resolve(this._doEnqueue(text, node));
+          }
+        }, { rootMargin: '200px' });
+        
+        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
+                       (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
+        
+        if (element && element.nodeType === Node.ELEMENT_NODE) {
+          observer.observe(element);
+        } else {
+          resolve(this._doEnqueue(text, node));
+        }
+      });
     }
 
+    return this._doEnqueue(text, node);
+  }
+
+  /**
+   * Actual enqueueing logic
+   */
+  _doEnqueue(text, node) {
     return new Promise((resolve, reject) => {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
-      // Trigger flush if we reached chunk size, even if we're already flushing
-      // This allows starting multiple parallel flushes if queue grows very fast
       if (this.queue.length >= this.settings.chunkSize) {
         this._flushBatch();
       } else {
@@ -156,13 +166,24 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.queue.length === 0) return;
     
     // Check if we can start a new flush (concurrency limit)
-    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 4)) {
-      // Too many active flushes, the next one will be scheduled when one finishes
+    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 3)) {
+      return;
+    }
+
+    // Rate limiting: Ensure at least 1000ms between batch flushes
+    const now = Date.now();
+    const timeSinceLastFlush = now - this.lastFlushTime;
+    const minDelay = 1000;
+
+    if (timeSinceLastFlush < minDelay) {
+      if (this.batchTimer) clearTimeout(this.batchTimer);
+      this.batchTimer = setTimeout(() => this._flushBatch(), minDelay - timeSinceLastFlush);
       return;
     }
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
+    this.lastFlushTime = Date.now();
     this.activeFlushes++;
     
     // Take a chunk of texts
@@ -427,24 +448,31 @@ export class PageTranslationManager extends ResourceTracker {
       }
 
       // Create NodesTranslator with batching callback
-      // NodesTranslator expects (text, score) => Promise<string>
+      // Note: NodesTranslator calls this with (text, score). 
+      // We'll use this._currentNode to track the node being processed.
       const nodesTranslator = new NodesTranslator(async (text) => {
-        // Find the node being translated. This is a bit tricky with the basic NodesTranslator API.
-        // But we can override NodesTranslator.translate below to capture the node.
-        return await this._enqueueTranslation(text, this._lastNodeBeingTranslated);
+        return await this._enqueueTranslation(text, this._currentNode);
       });
 
-      // Wrap translate to capture the current node
+      // Wrap translate/update to capture the node context safely
       const originalTranslate = nodesTranslator.translate.bind(nodesTranslator);
       nodesTranslator.translate = (node, callback) => {
-        this._lastNodeBeingTranslated = node;
-        return originalTranslate(node, callback);
+        this._currentNode = node;
+        return originalTranslate(node, (text) => {
+          if (typeof callback === 'function') {
+            callback(text, node);
+          }
+        });
       };
       
       const originalUpdate = nodesTranslator.update.bind(nodesTranslator);
       nodesTranslator.update = (node, callback) => {
-        this._lastNodeBeingTranslated = node;
-        return originalUpdate(node, callback);
+        this._currentNode = node;
+        return originalUpdate(node, (text) => {
+          if (typeof callback === 'function') {
+            callback(text, node);
+          }
+        });
       };
 
       // Create DOMTranslator

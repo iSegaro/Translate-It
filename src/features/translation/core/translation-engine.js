@@ -627,51 +627,98 @@ export class TranslationEngine {
   }
 
   /**
+   * Split a very long text into smaller chunks at sentence boundaries if possible
+   */
+  _splitOversizedSegment(text, maxChars) {
+    if (!text || text.length <= maxChars) return [text];
+    
+    const chunks = [];
+    let remaining = text;
+    
+    while (remaining.length > maxChars) {
+      // Try to find a good breaking point (sentence end, then space)
+      let breakPoint = -1;
+      const lookback = Math.floor(maxChars * 0.2); // Look back 20% for a break point
+      const searchRegion = remaining.substring(maxChars - lookback, maxChars);
+      
+      // Try sentence endings: . ! ?
+      const sentenceEnd = searchRegion.search(/[.!?]\s/);
+      if (sentenceEnd !== -1) {
+        breakPoint = maxChars - lookback + sentenceEnd + 1;
+      } else {
+        // Try space
+        const space = searchRegion.lastIndexOf(' ');
+        if (space !== -1) {
+          breakPoint = maxChars - lookback + space;
+        } else {
+          // Hard break
+          breakPoint = maxChars;
+        }
+      }
+      
+      chunks.push(remaining.substring(0, breakPoint).trim());
+      remaining = remaining.substring(breakPoint).trim();
+    }
+    
+    if (remaining.length > 0) {
+      chunks.push(remaining);
+    }
+    
+    return chunks;
+  }
+
+  /**
    * Create intelligent batches based on text complexity and characteristics
    */
-  createIntelligentBatches(segments, baseBatchSize) {
+  createIntelligentBatches(segments, baseBatchSize, maxCharsPerBatch = 5000) {
+    // First, flatten segments by splitting any single segment that's too long
+    const flattenedSegments = [];
+    for (const seg of segments) {
+      const text = seg || '';
+      if (text.length > maxCharsPerBatch) {
+        flattenedSegments.push(...this._splitOversizedSegment(text, maxCharsPerBatch));
+      } else {
+        flattenedSegments.push(text);
+      }
+    }
+
     const batches = [];
     let currentBatch = [];
     let currentBatchComplexity = 0;
+    let currentBatchChars = 0;
     
-    // Smart batching for small texts: use single batch if total segments <= 20
-    const totalSegments = segments.length;
-    const totalComplexity = segments.reduce((sum, seg) => sum + this.calculateTextComplexity(seg), 0);
-    
-    if (totalSegments <= 20 || totalComplexity < 300) {
-      logger.debug(`[TranslationEngine] Using single batch for ${totalSegments} segments (complexity: ${totalComplexity})`);
-      return [segments];
-    }
-    
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
+    for (let i = 0; i < flattenedSegments.length; i++) {
+      const segment = flattenedSegments[i];
       const segmentComplexity = this.calculateTextComplexity(segment);
+      const segmentChars = segment.length;
       
       // Calculate optimal batch size based on segment complexity
       const adjustedBatchSize = this.getAdjustedBatchSize(segmentComplexity, baseBatchSize);
       
       // Check if adding this segment would exceed batch limits
       const wouldExceedSize = currentBatch.length >= adjustedBatchSize;
-      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 400; // Increased from 200 for better efficiency
+      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 400;
+      const wouldExceedChars = currentBatchChars + segmentChars > maxCharsPerBatch;
       
-      if (wouldExceedSize || wouldExceedComplexity) {
+      if (wouldExceedSize || wouldExceedComplexity || wouldExceedChars) {
         if (currentBatch.length > 0) {
           batches.push([...currentBatch]);
           currentBatch = [];
           currentBatchComplexity = 0;
+          currentBatchChars = 0;
         }
       }
       
       currentBatch.push(segment);
       currentBatchComplexity += segmentComplexity;
+      currentBatchChars += segmentChars;
     }
     
-    // Add the last batch if not empty
     if (currentBatch.length > 0) {
       batches.push(currentBatch);
     }
     
-    logger.debug(`[TranslationEngine] Created ${batches.length} intelligent batches from ${segments.length} segments`);
+    logger.debug(`[TranslationEngine] Created ${batches.length} intelligent batches (Max chars: ${maxCharsPerBatch})`);
     return batches;
   }
 

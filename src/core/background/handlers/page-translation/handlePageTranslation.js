@@ -130,14 +130,21 @@ async function handleBatchTranslationRequest(message, sender) {
       rateLimitManager.reloadConfigurations();
 
       // Create batches (use smaller batch size for better reliability)
+      // Character limit is crucial to avoid 413 (Payload Too Large) errors. 
+      // 3500 is safer than 5000 for mobile/free APIs.
       const OPTIMAL_BATCH_SIZE = 20;
-      const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
+      const OPTIMAL_CHAR_LIMIT = 3500;
+      const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE, OPTIMAL_CHAR_LIMIT);
 
-      logger.debug(`Created ${batches.length} batches for ${segments.length} segments`);
+      logger.debug(`Created ${batches.length} batches for ${segments.length} segments (Provider: ${provider})`);
 
       const results = new Array(segments.length).fill(null);
       const errorMessages = [];
       let hasErrors = false;
+
+      // Check if provider is an AI provider
+      const isAIProvider = providerInstance?.constructor?.type === "ai" ||
+                         typeof providerInstance?._translateBatch === 'function';
 
       // Process each batch
       for (let i = 0; i < batches.length; i++) {
@@ -149,14 +156,16 @@ async function handleBatchTranslationRequest(message, sender) {
           break;
         }
 
+        // For non-AI providers (Google/Yandex), add a delay between batches
+        // 500ms is safer to avoid 429 when multiple page-translate requests are active
+        if (i > 0 && !isAIProvider) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
         try {
           const batchResult = await rateLimitManager.executeWithRateLimit(
             provider || 'google',
             () => {
-              // Check provider type to determine which method to call
-              const isAIProvider = providerInstance?.constructor?.type === "ai" ||
-                                 typeof providerInstance?._translateBatch === 'function';
-
               if (isAIProvider) {
                 return providerInstance._translateBatch(
                   batch,
