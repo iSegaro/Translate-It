@@ -155,7 +155,8 @@ export const CONFIG = {
   WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label"], // Attributeهایی که ترجمه می‌شوند
   WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
   WHOLE_PAGE_CHUNK_SIZE: 50, // تعداد nodeها در هر batch request
-  WHOLE_PAGE_DEBOUNCE_DELAY: 1000, // تاخیر برای DOM change debouncing (ms)
+  WHOLE_PAGE_DEBOUNCE_DELAY: 300, // تاخیر برای DOM change debouncing (ms)
+  WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 4, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
 
   // --- Proxy Settings ---

@@ -64,7 +64,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.queue = [];
     this.batchTimer = null;
     this.translatedCount = 0;
-    this.isFlushing = false;
+    this.activeFlushes = 0;
     this.targetLanguage = 'fa';
 
     // Settings
@@ -72,10 +72,51 @@ export class PageTranslationManager extends ResourceTracker {
       lazyLoading: true,
       autoTranslateOnDOMChanges: false,
       chunkSize: 50,
-      debounceDelay: 1000, // Increase delay for better batching
+      debounceDelay: 300,
+      maxConcurrentFlushes: 4,
     };
 
     this.logger.debug('PageTranslationManager created');
+  }
+
+  /**
+   * Check if a node is likely visible to the user
+   */
+  _isNodeVisible(node) {
+    if (!node) return true;
+    
+    try {
+      // If node is a text node, check its parent
+      const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
+                     (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
+      
+      if (!element || element.nodeType !== Node.ELEMENT_NODE) return true;
+      
+      // 1. checkVisibility is the modern, high-performance way to check if an element is rendered.
+      // It handles display: none, visibility: hidden, and content-visibility: hidden.
+      if (typeof element.checkVisibility === 'function') {
+        return element.checkVisibility({
+          checkOpacity: false,
+          checkVisibilityCSS: true
+        });
+      }
+      
+      // 2. Basic fallback for older browsers
+      // offsetParent is null if element or any parent is display:none
+      if (element.offsetParent === null && element.tagName !== 'BODY' && !(element instanceof SVGElement)) {
+        return false;
+      }
+      
+      // 3. Check for obvious hidden styles if possible
+      const style = element.style;
+      if (style && (style.display === 'none' || style.visibility === 'hidden')) {
+        return false;
+      }
+      
+      return true;
+    } catch (e) {
+      return true; // Default to visible on error to avoid missing content
+    }
   }
 
   /**
@@ -84,14 +125,21 @@ export class PageTranslationManager extends ResourceTracker {
   async _enqueueTranslation(text, node) {
     if (!text || !text.trim()) return text;
 
+    // Performance optimization: Skip elements that are definitely hidden (display: none).
+    // This dramatically reduces the initial translation time by not translating hidden menus, 
+    // modals, and other off-screen elements that aren't visible yet.
+    if (!this._isNodeVisible(node)) {
+      // For hidden elements, we return the original text. 
+      // If they become visible later, domtranslator's scheduler or mutation observer
+      // will trigger another translation attempt.
+      return text;
+    }
+
     return new Promise((resolve, reject) => {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
-      // If we're already flushing, don't start another timer, 
-      // the current flush will pick up new items if they arrive before it starts,
-      // or the next flush will handle them.
-      if (this.isFlushing) return;
-
+      // Trigger flush if we reached chunk size, even if we're already flushing
+      // This allows starting multiple parallel flushes if queue grows very fast
       if (this.queue.length >= this.settings.chunkSize) {
         this._flushBatch();
       } else {
@@ -105,16 +153,23 @@ export class PageTranslationManager extends ResourceTracker {
    * Flush the current translation queue
    */
   async _flushBatch() {
-    if (this.queue.length === 0 || this.isFlushing) return;
+    if (this.queue.length === 0) return;
+    
+    // Check if we can start a new flush (concurrency limit)
+    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 4)) {
+      // Too many active flushes, the next one will be scheduled when one finishes
+      return;
+    }
+
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
-    this.isFlushing = true;
+    this.activeFlushes++;
     
     // Take a chunk of texts
     const currentBatch = this.queue.splice(0, this.settings.chunkSize);
 
     try {
-      this.logger.debug(`Flushing batch of ${currentBatch.length} texts. Remaining in queue: ${this.queue.length}`);
+      this.logger.debug(`Flushing batch of ${currentBatch.length} texts. Active: ${this.activeFlushes}. Remaining in queue: ${this.queue.length}`);
 
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
@@ -174,13 +229,13 @@ export class PageTranslationManager extends ResourceTracker {
       this.logger.error('Batch translation failed', error);
       currentBatch.forEach(item => item.resolve(item.text));
     } finally {
-      this.isFlushing = false;
+      this.activeFlushes--;
       
-      // If there are still items in queue, schedule another flush with a small delay
-      // to avoid overwhelming the provider/background
+      // If there are still items in queue, schedule another flush
       if (this.queue.length > 0) {
         if (this.batchTimer) clearTimeout(this.batchTimer);
-        this.batchTimer = setTimeout(() => this._flushBatch(), 200);
+        // Small delay to prevent tight loops, but smaller than before for performance
+        this.batchTimer = setTimeout(() => this._flushBatch(), 50);
       }
     }
   }
@@ -356,6 +411,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings.maxElements = CONFIG.WHOLE_PAGE_MAX_ELEMENTS;
     this.settings.chunkSize = CONFIG.WHOLE_PAGE_CHUNK_SIZE;
     this.settings.debounceDelay = CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY;
+    this.settings.maxConcurrentFlushes = CONFIG.WHOLE_PAGE_MAX_CONCURRENT_REQUESTS;
 
     this.logger.debug('Settings loaded', this.settings);
   }
