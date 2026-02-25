@@ -29,14 +29,16 @@ export function applyDirection(element, targetLanguage) {
   const processElement = (el) => {
     if (!TEXT_TAGS.has(el.tagName)) return;
 
-    // Logic: Apply 'dir' only to text-holders, avoid flipping layout containers
-    const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(el.tagName);
-    const hasComplexChildren = Array.from(el.children).some(child => !FORMATTING_TAGS.has(child.tagName));
+    // Logic: Apply 'dir' attribute ONLY if the element is not a complex widget container.
+    // A complex container is one that has descendants like SVG, IMG, or UI widgets
+    // that are sensitive to layout flipping.
+    const hasWidgetDescendants = !!el.querySelector('svg, img, button, input, iframe, video, canvas, select');
 
-    if (!isLayoutTag || !hasComplexChildren) {
+    if (!hasWidgetDescendants) {
       el.setAttribute('dir', direction);
     }
 
+    // Block-level alignment is safe: it aligns text without flipping child elements flow
     if (BLOCK_TAGS.has(el.tagName)) {
       el.style.textAlign = 'start';
     }
@@ -59,10 +61,11 @@ export function applyNodeDirection(textNode, targetLanguage) {
   const parent = textNode.parentElement;
   if (parent && TEXT_TAGS.has(parent.tagName)) {
     const direction = isRTL(targetLanguage) ? 'rtl' : 'ltr';
-    const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(parent.tagName);
-    const hasComplexChildren = Array.from(parent.children).some(child => !FORMATTING_TAGS.has(child.tagName));
+    
+    // Check for complex widgets in parent to avoid flipping layouts like GitHub icons
+    const hasWidgetDescendants = !!parent.querySelector('svg, img, button, input, iframe, video, canvas, select');
 
-    if (!isLayoutTag || !hasComplexChildren) {
+    if (!hasWidgetDescendants) {
       parent.setAttribute('dir', direction);
     }
 
