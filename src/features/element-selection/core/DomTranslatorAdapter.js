@@ -1,5 +1,7 @@
-// DomTranslatorAdapter - Simplified adapter for Select Element translation
-// Uses one-shot translation instead of recursive node processing
+/**
+ * DomTranslatorAdapter - Orchestrator for Select Element translation
+ * Coordinates between background services and visual DOM management
+ */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -9,365 +11,105 @@ import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
-/**
- * RTL language codes for automatic direction detection
- */
-const RTL_LANGUAGES = new Set([
-  'ar', 'he', 'fa', 'ur', 'yi', 'ps', 'sd', 'ckb', 'dv', 'ug',
-  'ae', 'arc', 'xh', 'zu'
-]);
+import { RTL_LANGUAGES } from './DomTranslatorConstants.js';
+import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
+import { collectTextNodes, generateElementId } from './DomTranslatorUtils.js';
+import * as DirectionManager from './DomDirectionManager.js';
 
-/**
- * Tags that are safe to apply RTL direction without breaking layout
- */
-const TEXT_TAGS = new Set([
-  'P', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'A', 
-  'TD', 'TH', 'DT', 'DD', 'LABEL', 'CAPTION', 'Q', 'CITE', 
-  'SMALL', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'BUTTON',
-  'INPUT', 'TEXTAREA', 'DIV'
-]);
+// Export state and revert logic for external use
+export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
-/**
- * Inline formatting tags that don't constitute a "complex layout"
- */
-const FORMATTING_TAGS = new Set([
-  'SPAN', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'SMALL', 'BR', 'A', 'SUB', 'SUP', 'CODE', 'CITE', 'Q'
-]);
-
-/**
- * Block-level tags that should have text-align: start applied
- */
-const BLOCK_TAGS = new Set([
-  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'DIV', 'TD', 'TH', 'CAPTION'
-]);
-
-/**
- * Global translation state for Select Element mode
- * This persists even when SelectElementManager is deactivated
- * so ESC key revert can work properly
- */
-const globalSelectElementState = {
-  currentTranslation: null,
-  isTranslating: false,
-};
-
-// Make it available globally for RevertHandler access
-if (typeof window !== 'undefined') {
-  window.__selectElementTranslationState__ = globalSelectElementState;
-}
-
-/**
- * Get the global Select Element translation state
- * @returns {Object} Global state object
- */
-export function getSelectElementTranslationState() {
-  return globalSelectElementState;
-}
-
-/**
- * Adapter class that provides one-shot translation for Select Element mode
- * Simplified from domtranslator library usage - no recursive node processing
- */
 export class DomTranslatorAdapter extends ResourceTracker {
   constructor() {
     super('dom-translator-adapter');
-
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorAdapter');
-
-    // Use global state instead of instance state
+    this.errorHandler = ErrorHandler.getInstance();
+    
     this.isTranslating = false;
-
-    // Track current translation info for cancellation
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
-
-    // Centralized error handler
-    this.errorHandler = ErrorHandler.getInstance();
   }
 
-  /**
-   * Initialize the adapter
-   */
   async initialize() {
-    // Initialization is handled by ResourceTracker
+    // Initialization handled by ResourceTracker
   }
 
   /**
-   * Translate text content using one-shot translation
-   * @param {HTMLElement} element - Element to translate
-   * @param {Object} options - Translation options
-   * @returns {Promise<Object>} Translation result
+   * Main translation method
    */
   async translateElement(element, options = {}) {
-    const {
-      onProgress = null,
-      onComplete = null,
-      onError = null,
-    } = options;
-
+    const { onProgress, onComplete, onError } = options;
     this.logger.operation('Starting element translation (one-shot)');
-
-    // Accumulated translation results from streaming batches
-    let accumulatedTranslations = [];
-    let streamEndResolve = null;
-    let streamEndReject = null;
-
-    // Flag to track if error was already handled in streaming callback
-    // Must be declared outside try block so catch can access it
-    let errorHandledInStream = false;
 
     try {
       this.isTranslating = true;
+      if (onProgress) await onProgress({ status: 'translating', message: 'Translating...' });
 
-      // Notify translation start
-      if (onProgress) {
-        await onProgress({ status: 'translating', message: 'Translating...' });
-      }
-
-      // Store original state before translation
       const originalHTML = element.innerHTML;
-      const elementId = this._generateElementId();
+      const elementId = generateElementId();
+      const textNodes = collectTextNodes(element);
 
-      // Collect all text nodes within the element
-      const textNodes = this._collectTextNodes(element);
+      if (textNodes.length === 0) throw new Error('No translatable text found');
 
-      if (textNodes.length === 0) {
-        this.logger.warn('No text content found in element');
-        throw new Error('No translatable text found in element');
-      }
+      const originalTextNodesData = textNodes.map(node => ({ node, originalText: node.textContent }));
+      const textsToTranslate = textNodes.map(node => ({ text: node.textContent.trim() })).filter(item => item.text);
 
-      this.logger.debug('Collected text nodes for translation:', {
-        count: textNodes.length,
-      });
-
-      // Store original text BEFORE translation for revert
-      const originalTextNodesData = textNodes.map(node => ({
-        node,
-        originalText: node.textContent
-      }));
-
-      // Prepare texts for batch translation
-      const textsToTranslate = textNodes.map(node => ({
-        text: node.textContent.trim()
-      })).filter(item => item.text);
-
-      if (textsToTranslate.length === 0) {
-        this.logger.warn('No translatable text after filtering');
-        throw new Error('No translatable text found in element');
-      }
-
-      this.logger.debug('Prepared texts for translation:', {
-        count: textsToTranslate.length,
-        preview: textsToTranslate.map(t => t.text.substring(0, 30)).join(' | '),
-      });
-
-      // Get provider and target language
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
-      const isTargetRTL = RTL_LANGUAGES.has(targetLanguage.toLowerCase().split('-')[0]);
-
-      // Generate message ID for this request
       const messageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Store for cancellation
+      
       this.currentMessageId = messageId;
-
-      // Track how many text nodes have been translated so far
       let translatedNodeCount = 0;
-
-      // Create a promise that resolves when stream ends
-      const streamEndPromise = new Promise((resolve, reject) => {
-        streamEndResolve = resolve;
-        streamEndReject = reject;
-        // Store reject function for cancellation
-        this.currentStreamEndReject = reject;
-      });
-
-      // Register stream handlers with ContentScriptIntegration
-      await contentScriptIntegration.initialize();
-
-      // Track the actual target language (might change due to language swapping in background)
       let effectiveTargetLanguage = targetLanguage;
 
-      registerTranslation(messageId, {
-        onStreamUpdate: (data) => {
-          // Update effective target language if provided by background
-          if (data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
-            this.logger.debug(`Effective target language updated from background: ${data.targetLanguage}`);
-            effectiveTargetLanguage = data.targetLanguage;
-          }
+      const streamEndPromise = new Promise((resolve, reject) => {
+        this.currentStreamEndReject = reject;
+        registerTranslation(messageId, {
+          onStreamUpdate: (data) => {
+            if (data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
+              effectiveTargetLanguage = data.targetLanguage;
+            }
 
-          // Debug log to see what we receive
-          this.logger.debug('onStreamUpdate called with data:', {
-            hasData: !!data,
-            keys: data ? Object.keys(data) : 'none',
-            targetLanguage: data.targetLanguage,
-            hasDataData: !!data?.data,
-            dataDataIsArray: Array.isArray(data?.data),
-            dataDataLength: data?.data?.length,
-          });
+            if (data.data && Array.isArray(data.data)) {
+              data.data.forEach((translatedItem) => {
+                if (translatedNodeCount < textNodes.length) {
+                  const textNode = textNodes[translatedNodeCount];
+                  const translatedText = translatedItem?.text || translatedItem || textNode.textContent;
 
-          // Apply translations immediately as each batch arrives
-          // data.data contains the batchResults from StreamingManager
-          if (data.data && Array.isArray(data.data)) {
-            this.logger.debug(`Received translation batch: ${data.data.length} items`);
+                  // Preserve whitespace and apply text
+                  const hasLeading = /^\s/.test(textNode.textContent);
+                  const hasTrailing = /\s$/.test(textNode.textContent);
+                  textNode.nodeValue = (hasLeading ? ' ' : '') + translatedText + (hasTrailing ? ' ' : '');
 
-            // Apply each translation immediately to the corresponding text node
-            data.data.forEach((translatedItem) => {
-              if (translatedNodeCount < textNodes.length) {
-                const textNode = textNodes[translatedNodeCount];
-                const originalText = textNode.textContent.trim();
-
-                if (originalText) {
-                  const translatedText = translatedItem?.text || translatedItem || originalText;
-
-                  // Preserve leading/trailing whitespace
-                  const hasLeadingSpace = /^\s/.test(textNode.textContent);
-                  const hasTrailingSpace = /\s$/.test(textNode.textContent);
-
-                  let finalText = translatedText;
-                  if (hasLeadingSpace) finalText = ' ' + finalText;
-                  if (hasTrailingSpace) finalText = finalText + ' ';
-
-                  textNode.nodeValue = finalText;
-
-                  // Apply direction IMMEDIATELY to this specific node's parent if it's a text tag
-                  // Use explicit direction based on effective target language
-                  const parent = textNode.parentElement;
-                  if (parent && TEXT_TAGS.has(parent.tagName)) {
-                    const isEffectiveRTL = RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]);
-                    const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(parent.tagName);
-                    const hasComplexChildren = Array.from(parent.children).some(child => !FORMATTING_TAGS.has(child.tagName));
-
-                    // Only apply 'dir' if it's not a container with complex components
-                    if (!isLayoutTag || !hasComplexChildren) {
-                      parent.setAttribute('dir', isEffectiveRTL ? 'rtl' : 'ltr');
-                    }
-
-                    if (BLOCK_TAGS.has(parent.tagName)) {
-                      parent.style.textAlign = 'start';
-                    }
-                  }
+                  // Visual Direction Management
+                  DirectionManager.applyNodeDirection(textNode, effectiveTargetLanguage);
+                  translatedNodeCount++;
                 }
-
-                translatedNodeCount++;
-              }
-            });
-
-            this.logger.debug(`Applied ${data.data.length} translations, total: ${translatedNodeCount}/${textNodes.length}`);
-
-            // Also accumulate for final validation
-            accumulatedTranslations.push(...data.data);
-          }
-        },
-        onStreamEnd: async (data) => {
-          // Stream end signals completion
-          this.logger.debug(`Stream ended with ${translatedNodeCount}/${textNodes.length} translations applied`, data);
-
-          // Check if stream was cancelled by user
-          if (data.cancelled) {
-            this.logger.debug('Stream was cancelled by user:', data.reason);
-            errorHandledInStream = true;
-
-            // Use the cancellation reason as error message
-            const errorMessage = data.reason || 'Translation cancelled by user';
-            const error = new Error(errorMessage);
-            error.type = 'USER_CANCELLED';
-
-            // Don't show notification for user cancellation - it's expected behavior
-            // Just resolve with cancellation info
-            if (typeof streamEndResolve === 'function') {
-              streamEndResolve({
-                success: false,
-                error: errorMessage,
-                errorHandled: true,
-                cancelled: true
               });
             }
-            return;
-          }
-
-          // Check if stream ended with an error
-          if (data.success === false || data.error) {
-            this.logger.error('Stream ended with error:', data.error);
-            errorHandledInStream = true;
-
-            // Extract error message and type from data
-            let errorMessage = 'Translation failed';
-            let errorType = 'STREAMING_ERROR';
-
-            if (typeof data.error === 'string') {
-              errorMessage = data.error;
-            } else if (data.error?.message) {
-              errorMessage = data.error.message;
-              errorType = data.error.type || errorType;
-            } else if (data.error) {
-              // error is a truthy value but not an object (fallback)
-              errorMessage = String(data.error);
-            }
-
-            // Create proper error object
-            const error = new Error(errorMessage);
-            error.type = errorType;
-
-            this.logger.debug('Extracted error from stream end:', { errorMessage, errorType, originalData: data });
-
-            // Use centralized error handling
-            await this.errorHandler.handle(error, {
-              context: 'select-element-streaming',
-              component: 'DomTranslatorAdapter',
-              showToast: true,
-              showInUI: false
+          },
+          onStreamEnd: (data) => {
+            if (data.cancelled) return resolve({ success: false, cancelled: true });
+            if (data.success === false) return resolve({ success: false, error: data.error, errorHandled: true });
+            
+            resolve({
+              success: true,
+              translatedCount: translatedNodeCount,
+              targetLanguage: data.targetLanguage || effectiveTargetLanguage
             });
-
-            // Resolve with failure
-            if (typeof streamEndResolve === 'function') {
-              streamEndResolve({
-                success: false,
-                error: errorMessage,
-                errorHandled: true
-              });
-            }
-          } else {
-            // Stream completed successfully
-            if (typeof streamEndResolve === 'function') {
-              streamEndResolve({
-                success: true,
-                translatedCount: translatedNodeCount,
-                totalCount: textNodes.length,
-                targetLanguage: data.targetLanguage // Include actual target language from end of stream
-              });
-            }
+          },
+          onError: async (error) => {
+            await this.errorHandler.handle(error, { context: 'select-element-streaming', showToast: true });
+            resolve({ success: false, error: error.message, errorHandled: true });
           }
-        },
-        onError: async (error) => {
-          this.logger.error('Stream error', error);
-          // Mark error as handled in streaming callback
-          errorHandledInStream = true;
-          // Use centralized error handling
-          await this.errorHandler.handle(error, {
-            context: 'select-element-streaming',
-            component: 'DomTranslatorAdapter',
-            showToast: true,
-            showInUI: false
-          });
-          // Resolve with failure instead of rejecting - error already handled above
-          if (typeof streamEndResolve === 'function') {
-            streamEndResolve({
-              success: false,
-              error: error.message || String(error),
-              errorHandled: true // Flag to indicate error was already handled
-            });
-          }
-        }
+        });
       });
 
-      // Send batch translation request
-      const translationRequest = {
+      await contentScriptIntegration.initialize();
+      const directResponsePromise = sendRegularMessage({
         action: MessageActions.TRANSLATE,
         messageId,
         data: {
@@ -379,509 +121,88 @@ export class DomTranslatorAdapter extends ResourceTracker {
           options: { rawJsonPayload: true },
         },
         context: 'select-element',
-      };
+      });
 
-      // Send the request and handle both streaming and non-streaming responses
-      const directResponsePromise = sendRegularMessage(translationRequest);
-
-      // Wait for either direct response (non-streaming) or stream end (streaming)
       const result = await Promise.race([
-        directResponsePromise.then(response => {
-          // If we get a complete translation response (non-streaming), use it
-          if (response?.success && response?.translatedText && !response?.streaming) {
-            this.logger.debug('Received direct (non-streaming) translation response');
-            // Parse and return as stream-compatible format
-            try {
-              const parsed = JSON.parse(response.translatedText);
-              return {
-                success: true,
-                isNonStreaming: true,
-                translatedResults: Array.isArray(parsed) ? parsed : [parsed],
-              };
-            } catch (error) {
-              this.logger.error('Failed to parse non-streaming response:', error);
-              throw new Error('Invalid translation response format');
-            }
-          }
-          // If streaming=true, wait for stream end promise
-          return streamEndPromise;
-        }),
+        directResponsePromise.then(res => (!res?.streaming && res?.success) ? this._handleDirectResponse(res, textNodes) : streamEndPromise),
         streamEndPromise
       ]);
 
-      if (!result?.success) {
-        // Check if translation was cancelled by user
-        if (result.cancelled) {
-          this.logger.debug('Translation was cancelled by user, preserving partial translations for revert');
-
-          // Store partial translation state for revert - user might want to undo what was translated
-          globalSelectElementState.currentTranslation = {
-            elementId,
-            element,
-            originalHTML,  // Keep for full fallback
-            originalTextNodes: originalTextNodesData,  // Use original data saved before translation
-            targetLanguage,
-            timestamp: Date.now(),
-            partial: true,  // Mark as partial translation
-            translatedCount: translatedNodeCount,  // How many nodes were actually translated
-          };
-
-          // Don't throw error - just return early to avoid error notification
-          return {
-            success: false,
-            cancelled: true,
-            element,
-          };
-        }
-
-        // If error was already handled in streaming callback, we still need to throw
-        // so that startTranslation can perform cleanup (dismiss notification, etc.)
-        // Mark the error as already handled to prevent duplicate notifications
-        if (result.errorHandled) {
-          const error = new Error(result.error || 'Translation failed');
-          error.alreadyHandled = true;
-          this.logger.debug('Error already handled in streaming callback, throwing for cleanup');
-          throw error;
-        }
-        // Otherwise throw for non-streaming errors
-        throw new Error(result?.error || 'Translation failed');
-      }
-
-      // Update effective target language from final result if provided
-      if (result.targetLanguage) {
-        effectiveTargetLanguage = result.targetLanguage;
-      }
-
-      // Handle non-streaming response - apply all translations at once
-      if (result.isNonStreaming && result.translatedResults) {
-        const translatedTexts = result.translatedResults;
-
-        this.logger.debug('Applying non-streaming translations:', {
-          count: translatedTexts.length,
-          preview: translatedTexts.map(t => (t?.text || t)?.substring(0, 30)).join(' | '),
-        });
-
-        // Apply each translation
-        translatedTexts.forEach((translatedItem, index) => {
-          if (index < textNodes.length) {
-            const textNode = textNodes[index];
-            const originalText = textNode.textContent.trim();
-
-            if (originalText) {
-              const translatedText = translatedItem?.text || translatedItem || originalText;
-
-              // Preserve leading/trailing whitespace
-              const hasLeadingSpace = /^\s/.test(textNode.textContent);
-              const hasTrailingSpace = /\s$/.test(textNode.textContent);
-
-              let finalText = translatedText;
-              if (hasLeadingSpace) finalText = ' ' + finalText;
-              if (hasTrailingSpace) finalText = finalText + ' ';
-
-              textNode.nodeValue = finalText;
-
-              // Apply direction to this specific node's parent if it's a text tag
-              // Use explicit direction based on effective target language
-              const parent = textNode.parentElement;
-              if (parent && TEXT_TAGS.has(parent.tagName)) {
-                const isEffectiveRTL = RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]);
-                const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(parent.tagName);
-                const hasComplexChildren = Array.from(parent.children).some(child => !FORMATTING_TAGS.has(child.tagName));
-
-                if (!isLayoutTag || !hasComplexChildren) {
-                  parent.setAttribute('dir', isEffectiveRTL ? 'rtl' : 'ltr');
-                }
-
-                if (BLOCK_TAGS.has(parent.tagName)) {
-                  parent.style.textAlign = 'start';
-                }
-              }
-            }
-          }
-        });
-      }
-
-      // Apply direction attribute based on actual target language
-      this._applyDirectionToElement(element, effectiveTargetLanguage);
-
-      // Store translation state for revert
-      globalSelectElementState.currentTranslation = {
-        elementId,
-        element,
-        originalHTML,  // Keep for full fallback
-        originalTextNodes: originalTextNodesData,  // Use original data saved before translation
-        targetLanguage: effectiveTargetLanguage,
-        timestamp: Date.now(),
-      };
-
-      this.logger.info('Element translation completed', {
-        elementId,
-        targetLanguage: effectiveTargetLanguage,
-        translatedCount: result.isNonStreaming ? result.translatedResults?.length : result.translatedCount,
-        totalCount: result.isNonStreaming ? result.translatedResults?.length : result.totalCount,
-        isRTL: RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]),
+      return await this._finalizeTranslation({
+        result, element, elementId, originalHTML, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete
       });
 
-      // Notify completion
-      if (onComplete) {
-        await onComplete({
-          status: 'completed',
-          elementId,
-          translated: true,
-        });
-      }
-
-      return {
-        success: true,
-        elementId,
-        element,
-        originalHTML,
-      };
     } catch (error) {
-      this.logger.error('Element translation failed', error);
-
-      // Only handle error if it wasn't already handled in streaming callback
-      if (!errorHandledInStream) {
-        // Use centralized error handling
-        await this.errorHandler.handle(error, {
-          context: 'select-element-translation',
-          component: 'DomTranslatorAdapter',
-          showToast: true,
-          showInUI: false
-        });
-      }
-
-      // Notify error
-      if (onError) {
-        await onError({ status: 'error', error });
-      }
-
+      if (onError) await onError({ status: 'error', error });
       throw error;
     } finally {
-      // Unregister handlers if translation ends (successfully or not)
-      if (this.currentMessageId) {
-        try {
-          contentScriptIntegration.streamingHandler.cancelHandler(this.currentMessageId);
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
-
-      this.isTranslating = false;
-      this.currentMessageId = null;
-      this.currentStreamEndReject = null;
-      accumulatedTranslations = [];
-      streamEndResolve = null;
-      streamEndReject = null;
-      errorHandledInStream = false;
+      this._cleanupCurrentSession();
     }
   }
 
-  /**
-   * Revert the last translation
-   * @returns {Promise<boolean>} Success status
-   */
-  async revertTranslation() {
-    if (!globalSelectElementState.currentTranslation) {
-      this.logger.debug('No translation to revert');
-      return false;
-    }
-
+  async _handleDirectResponse(response, textNodes) {
     try {
-      const { element, originalHTML, originalTextNodes } = globalSelectElementState.currentTranslation;
-
-      if (originalTextNodes && originalTextNodes.length > 0) {
-        // Restore each text node individually
-        originalTextNodes.forEach(({ node, originalText }) => {
-          // Check if node is still in DOM
-          if (node.parentNode) {
-            node.nodeValue = originalText;
-          }
-        });
-
-        this.logger.info('Text nodes restored', {
-          count: originalTextNodes.length
-        });
-      } else if (originalHTML && element) {
-        // Fallback to full HTML restore
-        // eslint-disable-next-line noUnsanitized/property
-        element.innerHTML = originalHTML;
-      }
-
-      // Remove direction attributes and alignment styles from the element and all its text children
-      element.removeAttribute('dir');
-      element.removeAttribute('data-translate-dir');
-      element.style.textAlign = '';
-      
-      const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-      childTextElements.forEach(child => {
-        child.removeAttribute('dir');
-        child.style.textAlign = '';
-      });
-
-      // Hide translation overlay via event bus
-      pageEventBus.emit('hide-translation', { element });
-
-      this.logger.info('Translation reverted', {
-        elementId: globalSelectElementState.currentTranslation.elementId,
-      });
-
-      globalSelectElementState.currentTranslation = null;
-      return true;
-    } catch (error) {
-      this.logger.error('Failed to revert translation', error);
-      return false;
+      const parsed = JSON.parse(response.translatedText);
+      const results = Array.isArray(parsed) ? parsed : [parsed];
+      return { success: true, isNonStreaming: true, translatedResults: results };
+    } catch (e) {
+      throw new Error('Invalid translation format');
     }
   }
 
-  /**
-   * Apply direction attribute based on target language
-   * @param {HTMLElement} element - Element to apply direction to
-   * @param {string} targetLanguage - Target language code
-   */
-  _applyDirectionToElement(element, targetLanguage) {
-    const langCode = targetLanguage.toLowerCase().split('-')[0];
-    const isRTL = RTL_LANGUAGES.has(langCode);
-    const direction = isRTL ? 'rtl' : 'ltr';
-
-    const processElement = (el) => {
-      if (!TEXT_TAGS.has(el.tagName)) return;
-
-      // Logic: Apply 'dir' if it's a simple text element OR a container
-      // that only holds text and simple formatting tags.
-      const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(el.tagName);
-      
-      // Check if it has any children that are NOT simple formatting tags (like SVG, BUTTON, etc.)
-      const hasComplexChildren = Array.from(el.children).some(child => !FORMATTING_TAGS.has(child.tagName));
-
-      if (!isLayoutTag || !hasComplexChildren) {
-        el.setAttribute('dir', direction);
+  async _finalizeTranslation({ result, element, elementId, originalHTML, originalTextNodesData, targetLanguage, onComplete }) {
+    if (!result?.success) {
+      if (result.cancelled) {
+        this._storeTranslationState({ element, elementId, originalHTML, originalTextNodesData, targetLanguage, partial: true });
+        return { success: false, cancelled: true, element };
       }
-
-      // Always apply text-align to block tags.
-      if (BLOCK_TAGS.has(el.tagName)) {
-        el.style.textAlign = 'start';
-      }
-    };
-
-    // Apply to the root element
-    processElement(element);
-
-    // Apply to all relevant descendants
-    const descendants = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-    descendants.forEach(processElement);
-
-    element.setAttribute('data-translate-dir', isRTL ? 'rtl' : 'ltr');
-
-    this.logger.debug('Applied surgical explicit direction and alignment to element', {
-      langCode,
-      isRTL,
-      direction,
-      tagName: element.tagName
-    });
-  }
-
-  /**
-   * Generate unique element ID
-   * @returns {string} Unique ID
-   */
-  _generateElementId() {
-    return `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Collect all text nodes within an element
-   * @param {HTMLElement} element - Root element
-   * @returns {Text[]} Array of text nodes
-   */
-  _collectTextNodes(element) {
-    const textNodes = [];
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-
-        // Skip certain element types
-        const tagName = parent.tagName;
-        if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
-          return NodeFilter.FILTER_REJECT;
-        }
-
-        // Check visibility
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
-            return NodeFilter.FILTER_REJECT;
-          }
-        } catch {
-          // If getComputedStyle fails, accept the node
-        }
-
-        // Accept nodes with non-whitespace content
-        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-      }
-    });
-
-    let node;
-    while ((node = walker.nextNode())) {
-      textNodes.push(node);
+      throw new Error(result.error || 'Translation failed');
     }
 
-    this.logger.debug(`Collected ${textNodes.length} text nodes for translation`);
+    const finalTarget = result.targetLanguage || targetLanguage;
 
-    return textNodes;
+    // Apply non-streaming results if needed
+    if (result.isNonStreaming) {
+      result.translatedResults.forEach((item, i) => {
+        if (i < originalTextNodesData.length) {
+          const textNode = originalTextNodesData[i].node;
+          textNode.nodeValue = item?.text || item || textNode.textContent;
+          DirectionManager.applyNodeDirection(textNode, finalTarget);
+        }
+      });
+    }
+
+    DirectionManager.applyDirection(element, finalTarget);
+    this._storeTranslationState({ element, elementId, originalHTML, originalTextNodesData, targetLanguage: finalTarget });
+
+    if (onComplete) await onComplete({ status: 'completed', elementId, translated: true });
+    return { success: true, elementId, element };
   }
 
-  /**
-   * Check if currently translating
-   * @returns {boolean} Translation status
-   */
-  isCurrentlyTranslating() {
-    return this.isTranslating;
+  _storeTranslationState(data) {
+    globalSelectElementState.currentTranslation = { ...data, timestamp: Date.now() };
   }
 
-  /**
-   * Check if there's a translation to revert
-   * @returns {boolean} Has translation state
-   */
+  _cleanupCurrentSession() {
+    if (this.currentMessageId) {
+      try { contentScriptIntegration.streamingHandler.cancelHandler(this.currentMessageId); } catch(e) {}
+    }
+    this.isTranslating = false;
+    this.currentMessageId = null;
+    this.currentStreamEndReject = null;
+  }
+
+  async revertTranslation() {
+    return await revertSelectElementTranslation();
+  }
+
   hasTranslation() {
     return globalSelectElementState.currentTranslation !== null;
   }
 
-  /**
-   * Get current translation state
-   * @returns {Object|null} Current translation state
-   */
-  getCurrentTranslation() {
-    return globalSelectElementState.currentTranslation;
-  }
-
-  /**
-   * Cancel ongoing translation
-   */
-  async cancelTranslation() {
-    if (this.isTranslating) {
-      this.logger.debug('Cancelling translation');
-
-      const messageId = this.currentMessageId;
-
-      // Step 1: Send cancellation to background to stop actual translation
-      // This must be done BEFORE rejecting the stream promise
-      if (messageId) {
-        try {
-          const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-
-          await sendMessage({
-            action: MessageActions.CANCEL_TRANSLATION,
-            data: {
-              messageId,
-              reason: 'user_cancelled',
-              context: 'select-element'
-            }
-          });
-
-          this.logger.debug(`Sent CANCEL_TRANSLATION to background for ${messageId}`);
-        } catch (error) {
-          this.logger.warn('Failed to send cancellation to background:', error);
-        }
-      }
-
-      // Step 2: Reject the stream promise to stop waiting
-      if (this.currentStreamEndReject) {
-        this.currentStreamEndReject(new Error('Translation cancelled by user'));
-        this.currentStreamEndReject = null;
-      }
-
-      // Step 3: Cancel the streaming handler to stop processing further updates
-      if (messageId) {
-        try {
-          const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
-          contentScriptIntegration.streamingHandler.cancelHandler(messageId);
-          this.logger.debug(`Cancelled streaming handler for ${messageId}`);
-        } catch (error) {
-          this.logger.warn('Failed to cancel streaming handler:', error);
-        }
-        this.currentMessageId = null;
-      }
-
-      this.isTranslating = false;
-    }
-  }
-
-  /**
-   * Cleanup resources
-   */
   async cleanup() {
-    // Revert any active translation
-    if (this.hasTranslation()) {
-      await this.revertTranslation();
-    }
-
-    // Clear references
-    globalSelectElementState.currentTranslation = null;
-
-    // Use ResourceTracker cleanup
+    if (this.hasTranslation()) await this.revertTranslation();
     super.cleanup();
-  }
-}
-
-/**
- * Global function to revert Select Element translation
- * This can be called from RevertHandler even when SelectElementManager is deactivated
- * @returns {Promise<boolean>} Success status
- */
-export async function revertSelectElementTranslation() {
-  const state = getSelectElementTranslationState();
-
-  if (!state.currentTranslation) {
-    return false;
-  }
-
-  try {
-    const { element, originalHTML, originalTextNodes } = state.currentTranslation;
-
-    if (originalTextNodes && originalTextNodes.length > 0) {
-      // Restore each text node individually
-      originalTextNodes.forEach(({ node, originalText }) => {
-        // Check if node is still in DOM
-        if (node.parentNode) {
-          node.nodeValue = originalText;
-        }
-      });
-
-      const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
-      logger.info('Text nodes restored via global function', {
-        count: originalTextNodes.length
-      });
-    } else if (originalHTML && element) {
-      // Fallback to full HTML restore
-      // eslint-disable-next-line noUnsanitized/property
-      element.innerHTML = originalHTML;
-    }
-
-    // Remove direction attributes and alignment styles from the element and all its text children
-    element.removeAttribute('dir');
-    element.removeAttribute('data-translate-dir');
-    element.style.textAlign = '';
-    
-    const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-    childTextElements.forEach(child => {
-      child.removeAttribute('dir');
-      child.style.textAlign = '';
-    });
-
-    // Hide translation overlay via event bus
-    pageEventBus.emit('hide-translation', { element });
-
-    // Clear state
-    state.currentTranslation = null;
-
-    return true;
-  } catch (error) {
-    const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
-    logger.error('Failed to revert translation via global function', error);
-    return false;
   }
 }
 
