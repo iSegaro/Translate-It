@@ -10,10 +10,3 @@ https://www.reverso.net/text-translation#sl=eng&tl=per&text=who%2520are%2520you%
 ‌DeepL Bug:
 ---
 https://x.com/justchangingun/status/2008960525129105608
-
-
-DomTranslator:
----
-https://github.com/translate-tools/domtranslator
-
-https://github.com/browsermt/bergamot-translator
