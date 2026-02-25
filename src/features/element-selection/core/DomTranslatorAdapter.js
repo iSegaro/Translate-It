@@ -106,7 +106,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
           },
           onStreamEnd: (data) => {
             if (data.cancelled) return resolve({ success: false, cancelled: true });
-            if (data.success === false) return resolve({ success: false, error: data.error, errorHandled: true });
+            
+            // If stream ended with error, resolve without marking as handled
+            // so the main catch block can show the toast notification
+            if (data.success === false || data.error) {
+              return resolve({ 
+                success: false, 
+                error: data.error, 
+                errorHandled: false 
+              });
+            }
             
             resolve({
               success: true,
@@ -151,6 +160,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
     } catch (error) {
+      this.logger.error('Element translation failed', error);
+
+      // Use centralized error handling if not already handled
+      if (!error.alreadyHandled) {
+        await this.errorHandler.handle(error, {
+          context: 'select-element-translation',
+          component: 'DomTranslatorAdapter',
+          showToast: true
+        });
+      }
+
       if (onError) await onError({ status: 'error', error });
       throw error;
     } finally {
@@ -184,7 +204,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (result.cancelled) {
         return { success: false, cancelled: true, element };
       }
-      throw new Error(result.error || 'Translation failed');
+      
+      // Extract error message correctly to avoid [object Object]
+      const errorMessage = result.error?.message || (typeof result.error === 'string' ? result.error : 'Translation failed');
+      const error = new Error(errorMessage);
+      if (result.errorHandled) error.alreadyHandled = true;
+      
+      throw error;
     }
 
     // Unregister stream handler on success before finalizing
