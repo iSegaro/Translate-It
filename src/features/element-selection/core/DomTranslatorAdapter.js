@@ -59,6 +59,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
+
+      // IMPORTANT: Store state BEFORE translation starts.
+      // This allows Revert to work even if an error occurs during streaming
+      // after some nodes have already been modified.
+      this._storeTranslationState({ 
+        element, 
+        elementId, 
+        originalHTML, 
+        originalTextNodesData, 
+        targetLanguage,
+        partial: true // Initially mark as partial
+      });
+
       const messageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       this.currentMessageId = messageId;
@@ -169,7 +182,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async _finalizeTranslation({ result, element, elementId, originalHTML, originalTextNodesData, targetLanguage, onComplete }) {
     if (!result?.success) {
       if (result.cancelled) {
-        this._storeTranslationState({ element, elementId, originalHTML, originalTextNodesData, targetLanguage, partial: true });
         return { success: false, cancelled: true, element };
       }
       throw new Error(result.error || 'Translation failed');
@@ -197,7 +209,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     DirectionManager.applyDirection(element, finalTarget);
-    this._storeTranslationState({ element, elementId, originalHTML, originalTextNodesData, targetLanguage: finalTarget });
+
+    // Update target language and mark as no longer partial
+    if (globalSelectElementState.currentTranslation) {
+      globalSelectElementState.currentTranslation.targetLanguage = finalTarget;
+      globalSelectElementState.currentTranslation.partial = false;
+    }
 
     if (onComplete) await onComplete({ status: 'completed', elementId, translated: true });
     return { success: true, elementId, element };
