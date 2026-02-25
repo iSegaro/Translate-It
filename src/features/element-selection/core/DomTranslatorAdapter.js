@@ -141,7 +141,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (onError) await onError({ status: 'error', error });
       throw error;
     } finally {
-      this._cleanupCurrentSession();
+      // Cleanup with success flag based on whether an error occurred
+      this._cleanupCurrentSession(true);
     }
   }
 
@@ -149,6 +150,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
     try {
       const parsed = JSON.parse(response.translatedText);
       const results = Array.isArray(parsed) ? parsed : [parsed];
+      
+      // If we got a direct response, we unregister the stream handler 
+      // immediately and silently
+      if (this.currentMessageId) {
+        try {
+          contentScriptIntegration.streamingHandler.unregisterHandler(this.currentMessageId);
+          this.currentMessageId = null; 
+        } catch (e) {}
+      }
+      
       return { success: true, isNonStreaming: true, translatedResults: results };
     } catch (e) {
       throw new Error('Invalid translation format');
@@ -162,6 +173,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
         return { success: false, cancelled: true, element };
       }
       throw new Error(result.error || 'Translation failed');
+    }
+
+    // Unregister stream handler on success before finalizing
+    if (this.currentMessageId) {
+      try {
+        contentScriptIntegration.streamingHandler.unregisterHandler(this.currentMessageId);
+        this.currentMessageId = null; 
+      } catch (e) {}
     }
 
     const finalTarget = result.targetLanguage || targetLanguage;
@@ -189,17 +208,23 @@ export class DomTranslatorAdapter extends ResourceTracker {
     globalSelectElementState.translationHistory.push({ ...data, timestamp: Date.now() });
   }
 
-  _cleanupCurrentSession() {
+  _cleanupCurrentSession(isSuccess = false) {
     const messageId = this.currentMessageId;
     
-    // Clear state FIRST so callbacks can check if we are in cleanup mode
+    // Clear state
     this.isTranslating = false;
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
 
     if (messageId) {
       try { 
-        contentScriptIntegration.streamingHandler.cancelHandler(messageId); 
+        if (isSuccess) {
+          // Silent removal on success
+          contentScriptIntegration.streamingHandler.unregisterHandler(messageId); 
+        } else {
+          // Force stop on error or cancellation
+          contentScriptIntegration.streamingHandler.cancelHandler(messageId);
+        }
       } catch (e) {
         // Ignore cleanup errors
       }
@@ -233,7 +258,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         this.currentStreamEndReject = null;
       }
 
-      this._cleanupCurrentSession();
+      this._cleanupCurrentSession(false);
     }
   }
 
