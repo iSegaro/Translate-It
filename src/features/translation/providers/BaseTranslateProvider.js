@@ -223,7 +223,9 @@ export class BaseTranslateProvider extends BaseProvider {
           chunkResults,
           chunk.texts,
           chunkIndex,
-          messageId
+          messageId,
+          sourceLang,
+          targetLang
         );
 
         // Streamed chunk progress
@@ -254,7 +256,7 @@ export class BaseTranslateProvider extends BaseProvider {
     }
 
     // Send streaming end notification
-    await this._sendStreamEnd(messageId);
+    await this._sendStreamEnd(messageId, { sourceLanguage: sourceLang, targetLanguage: targetLang });
     
     // Streaming translation completed
     return allResults;
@@ -332,15 +334,19 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {string[]} originalChunkTexts - Original texts for this chunk
    * @param {number} chunkIndex - Index of this chunk
    * @param {string} messageId - Message ID
+   * @param {string} sourceLanguage - Actual source language
+   * @param {string} targetLanguage - Actual target language
    */
-  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId) {
+  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId, sourceLanguage = null, targetLanguage = null) {
     try {
       // Stream the results
       await streamingManager.streamBatchResults(
         messageId,
         chunkResults,
         originalChunkTexts,
-        chunkIndex
+        chunkIndex,
+        sourceLanguage,
+        targetLanguage
       );
       
       logger.debug(`[${this.providerName}] Successfully streamed chunk ${chunkIndex + 1} results`);

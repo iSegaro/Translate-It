@@ -408,6 +408,17 @@ export class TranslationEngine {
     const OPTIMAL_BATCH_SIZE = 25; // Increased from 10 for better efficiency
     const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
+    // Use LanguageSwappingService to handle potential language flipping (e.g. translating Farsi to English if target is Farsi)
+    const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+    const [actualSource, actualTarget] = await LanguageSwappingService.applyLanguageSwapping(
+      segments[0] || '', sourceLanguage, targetLanguage, data.originalSourceLang || sourceLanguage, data.originalTargetLang || targetLanguage,
+      { providerName: provider }
+    );
+
+    // Update data with potentially swapped languages
+    const effectiveSource = actualSource;
+    const effectiveTarget = actualTarget;
+
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
     let hasErrors = false; // Move hasErrors to function scope
 
@@ -455,10 +466,10 @@ export class TranslationEngine {
 
                             if (isAIProvider) {
                                 // AI providers use _translateBatch method directly
-                                return providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode, abortController);
+                                return providerInstance._translateBatch(batch, effectiveSource, effectiveTarget, mode, abortController);
                             } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method for SelectElement mode
-                                return providerInstance._translateChunk(batch, sourceLanguage, targetLanguage, mode, abortController);
+                                return providerInstance._translateChunk(batch, effectiveSource, effectiveTarget, mode, abortController);
                             } else {
                                 // Fallback: gather detailed information about the provider issue
                                 const providerInfo = {
@@ -511,8 +522,8 @@ export class TranslationEngine {
                           originalData: batch,
                           batchIndex: i,
                           provider: provider,
-                          sourceLanguage: sourceLanguage,
-                          targetLanguage: targetLanguage,
+                          sourceLanguage: effectiveSource,
+                          targetLanguage: effectiveTarget,
                           timestamp: Date.now(),
                           translationMode: mode,
                         },
@@ -583,7 +594,10 @@ export class TranslationEngine {
         } finally {
             const streamEndMessage = MessageFormat.create(
                 MessageActions.TRANSLATION_STREAM_END,
-                { success: !hasErrors },
+                { 
+                  success: !hasErrors,
+                  targetLanguage: effectiveTargetLanguage
+                },
                 'background-stream',
                 { messageId: messageId }
               );

@@ -28,7 +28,14 @@ const TEXT_TAGS = new Set([
   'P', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'A', 
   'TD', 'TH', 'DT', 'DD', 'LABEL', 'CAPTION', 'Q', 'CITE', 
   'SMALL', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'BUTTON',
-  'INPUT', 'TEXTAREA'
+  'INPUT', 'TEXTAREA', 'DIV'
+]);
+
+/**
+ * Block-level tags that should have text-align: start applied
+ */
+const BLOCK_TAGS = new Set([
+  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'DIV', 'TD', 'TH', 'CAPTION'
 ]);
 
 /**
@@ -176,12 +183,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Register stream handlers with ContentScriptIntegration
       await contentScriptIntegration.initialize();
 
+      // Track the actual target language (might change due to language swapping in background)
+      let effectiveTargetLanguage = targetLanguage;
+
       registerTranslation(messageId, {
         onStreamUpdate: (data) => {
+          // Update effective target language if provided by background
+          if (data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
+            this.logger.debug(`Effective target language updated from background: ${data.targetLanguage}`);
+            effectiveTargetLanguage = data.targetLanguage;
+          }
+
           // Debug log to see what we receive
           this.logger.debug('onStreamUpdate called with data:', {
             hasData: !!data,
             keys: data ? Object.keys(data) : 'none',
+            targetLanguage: data.targetLanguage,
             hasDataData: !!data?.data,
             dataDataIsArray: Array.isArray(data?.data),
             dataDataLength: data?.data?.length,
@@ -211,12 +228,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
                   textNode.nodeValue = finalText;
 
-                  // Apply RTL IMMEDIATELY to this specific node's parent if it's a text tag
-                  // This prevents flicker without affecting the main container structure
-                  if (isTargetRTL) {
-                    const parent = textNode.parentElement;
-                    if (parent && TEXT_TAGS.has(parent.tagName) && parent.children.length === 0) {
-                      parent.setAttribute('dir', 'rtl');
+                  // Apply direction IMMEDIATELY to this specific node's parent if it's a text tag
+                  // Use 'auto' to let the browser detect the direction based on translated content
+                  const parent = textNode.parentElement;
+                  if (parent && TEXT_TAGS.has(parent.tagName)) {
+                    parent.setAttribute('dir', 'auto');
+                    if (BLOCK_TAGS.has(parent.tagName)) {
+                      parent.style.textAlign = 'start';
                     }
                   }
                 }
@@ -306,6 +324,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 success: true,
                 translatedCount: translatedNodeCount,
                 totalCount: textNodes.length,
+                targetLanguage: data.targetLanguage // Include actual target language from end of stream
               });
             }
           }
@@ -413,6 +432,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error(result?.error || 'Translation failed');
       }
 
+      // Update effective target language from final result if provided
+      if (result.targetLanguage) {
+        effectiveTargetLanguage = result.targetLanguage;
+      }
+
       // Handle non-streaming response - apply all translations at once
       if (result.isNonStreaming && result.translatedResults) {
         const translatedTexts = result.translatedResults;
@@ -441,11 +465,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               textNode.nodeValue = finalText;
 
-              // Apply RTL to this specific node's parent if it's a text tag
-              if (RTL_LANGUAGES.has(targetLanguage.toLowerCase().split('-')[0])) {
-                const parent = textNode.parentElement;
-                if (parent && TEXT_TAGS.has(parent.tagName) && parent.children.length === 0) {
-                  parent.setAttribute('dir', 'rtl');
+              // Apply direction to this specific node's parent if it's a text tag
+              // Use 'auto' to let the browser detect the direction based on content
+              const parent = textNode.parentElement;
+              if (parent && TEXT_TAGS.has(parent.tagName)) {
+                parent.setAttribute('dir', 'auto');
+                if (BLOCK_TAGS.has(parent.tagName)) {
+                  parent.style.textAlign = 'start';
                 }
               }
             }
@@ -453,8 +479,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       }
 
-      // Apply direction attribute based on target language
-      this._applyDirectionToElement(element, targetLanguage);
+      // Apply direction attribute based on actual target language
+      this._applyDirectionToElement(element, effectiveTargetLanguage);
 
       // Store translation state for revert
       globalSelectElementState.currentTranslation = {
@@ -462,16 +488,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         element,
         originalHTML,  // Keep for full fallback
         originalTextNodes: originalTextNodesData,  // Use original data saved before translation
-        targetLanguage,
+        targetLanguage: effectiveTargetLanguage,
         timestamp: Date.now(),
       };
 
       this.logger.info('Element translation completed', {
         elementId,
-        targetLanguage,
+        targetLanguage: effectiveTargetLanguage,
         translatedCount: result.isNonStreaming ? result.translatedResults?.length : result.translatedCount,
         totalCount: result.isNonStreaming ? result.translatedResults?.length : result.totalCount,
-        isRTL: RTL_LANGUAGES.has(targetLanguage.toLowerCase().split('-')[0]),
+        isRTL: RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]),
       });
 
       // Notify completion
@@ -560,12 +586,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         element.innerHTML = originalHTML;
       }
 
-      // Remove direction attributes from the element and all its text children
+      // Remove direction attributes and alignment styles from the element and all its text children
       element.removeAttribute('dir');
       element.removeAttribute('data-translate-dir');
+      element.style.textAlign = '';
       
       const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-      childTextElements.forEach(child => child.removeAttribute('dir'));
+      childTextElements.forEach(child => {
+        child.removeAttribute('dir');
+        child.style.textAlign = '';
+      });
 
       // Hide translation overlay via event bus
       pageEventBus.emit('hide-translation', { element });
@@ -591,31 +621,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const langCode = targetLanguage.toLowerCase().split('-')[0];
     const isRTL = RTL_LANGUAGES.has(langCode);
 
-    if (!isRTL) {
-      element.setAttribute('dir', 'ltr');
-      element.setAttribute('data-translate-dir', 'ltr');
-      return;
-    }
-
-    // Surgical RTL application ONLY:
-    // 1. Apply to the root element ONLY if it's a safe text tag and a leaf
-    const isLeaf = element.children.length === 0;
-    if (isLeaf && TEXT_TAGS.has(element.tagName)) {
-      element.setAttribute('dir', 'rtl');
+    // Surgical direction application:
+    // 1. Apply to the root element if it's a text tag
+    if (TEXT_TAGS.has(element.tagName)) {
+      element.setAttribute('dir', 'auto');
+      if (BLOCK_TAGS.has(element.tagName)) {
+        element.style.textAlign = 'start';
+      }
     }
 
     // 2. Apply to all child text tags that might contain translated text
     const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
     childTextElements.forEach(child => {
-      // Only apply to children that are either leaves or have very simple structure
-      if (child.children.length === 0) {
-        child.setAttribute('dir', 'rtl');
+      child.setAttribute('dir', 'auto');
+      if (BLOCK_TAGS.has(child.tagName)) {
+        child.style.textAlign = 'start';
       }
     });
 
-    element.setAttribute('data-translate-dir', 'rtl');
+    element.setAttribute('data-translate-dir', isRTL ? 'rtl' : 'ltr');
 
-    this.logger.debug('Applied surgical direction to element', {
+    this.logger.debug('Applied surgical auto-direction and alignment to element', {
       langCode,
       isRTL,
       tagName: element.tagName
@@ -801,12 +827,16 @@ export async function revertSelectElementTranslation() {
       element.innerHTML = originalHTML;
     }
 
-    // Remove direction attributes from the element and all its text children
+    // Remove direction attributes and alignment styles from the element and all its text children
     element.removeAttribute('dir');
     element.removeAttribute('data-translate-dir');
+    element.style.textAlign = '';
     
     const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-    childTextElements.forEach(child => child.removeAttribute('dir'));
+    childTextElements.forEach(child => {
+      child.removeAttribute('dir');
+      child.style.textAlign = '';
+    });
 
     // Hide translation overlay via event bus
     pageEventBus.emit('hide-translation', { element });

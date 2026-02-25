@@ -110,8 +110,10 @@ export class StreamingManager extends ResourceTracker {
    * @param {string[]} batchResults - Results for this batch
    * @param {string[]} originalBatch - Original texts for this batch
    * @param {number} batchIndex - Index of this batch
+   * @param {string} sourceLanguage - Actual source language
+   * @param {string} targetLanguage - Actual target language
    */
-  async streamBatchResults(messageId, batchResults, originalBatch, batchIndex) {
+  async streamBatchResults(messageId, batchResults, originalBatch, batchIndex, sourceLanguage = null, targetLanguage = null) {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
@@ -145,6 +147,8 @@ export class StreamingManager extends ResourceTracker {
           provider: streamInfo.providerName,
           processedSegments: streamInfo.processedSegments,
           totalSegments: streamInfo.totalSegments,
+          sourceLanguage,
+          targetLanguage,
           timestamp: Date.now()
         },
         'background-streaming',

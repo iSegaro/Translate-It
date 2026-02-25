@@ -153,7 +153,9 @@ export class BaseAIProvider extends BaseProvider {
           batch,
           batchIndex,
           messageId,
-          engine
+          engine,
+          sourceLang,
+          targetLang
         );
 
                 // Streamed batch progress
@@ -184,7 +186,7 @@ export class BaseAIProvider extends BaseProvider {
     }
 
     // Send streaming end notification
-    await this._sendStreamEnd(messageId, engine);
+    await this._sendStreamEnd(messageId, engine, { targetLanguage: targetLang });
 
     // Log performance metrics for Select Element mode
     const totalTime = Date.now() - startTime;
@@ -410,8 +412,10 @@ export class BaseAIProvider extends BaseProvider {
    * @param {number} batchIndex - Index of this batch
    * @param {string} messageId - Message ID
    * @param {object} engine - Translation engine
+   * @param {string} sourceLanguage - Actual source language
+   * @param {string} targetLanguage - Actual target language
    */
-  async _streamBatchResults(batchResults, originalBatch, batchIndex, messageId, engine) {
+  async _streamBatchResults(batchResults, originalBatch, batchIndex, messageId, engine, sourceLanguage = null, targetLanguage = null) {
     if (!engine || !messageId) {
       logger.warn(`[${this.providerName}] Cannot stream results - missing engine or messageId`);
       return;
@@ -427,6 +431,8 @@ export class BaseAIProvider extends BaseProvider {
           originalData: originalBatch,
           batchIndex: batchIndex,
           provider: this.providerName,
+          sourceLanguage,
+          targetLanguage,
           timestamp: Date.now()
         },
         'background-streaming',
@@ -463,6 +469,7 @@ export class BaseAIProvider extends BaseProvider {
           completed: true,
           error: options.error,
           provider: this.providerName,
+          targetLanguage: options.targetLanguage,
           timestamp: Date.now()
         },
         'background-streaming',
@@ -727,7 +734,7 @@ export class BaseAIProvider extends BaseProvider {
         
         // Stream the result immediately for this segment
         if (engine && messageId) {
-          await this._streamFallbackResult([translatedResult], [batch[i]], i, messageId, engine);
+          await this._streamFallbackResult([translatedResult], [batch[i]], i, messageId, engine, sourceLang, targetLang);
         }
       } catch (error) {
         // Log cancellation as debug instead of warn using proper error management
@@ -753,8 +760,10 @@ export class BaseAIProvider extends BaseProvider {
    * @param {number} segmentIndex - Index of this segment in the batch
    * @param {string} messageId - Message ID
    * @param {object} engine - Translation engine instance
+   * @param {string} sourceLanguage - Actual source language
+   * @param {string} targetLanguage - Actual target language
    */
-  async _streamFallbackResult(result, original, segmentIndex, messageId, engine) {
+  async _streamFallbackResult(result, original, segmentIndex, messageId, engine, sourceLanguage = null, targetLanguage = null) {
     try {
       const { MessageFormat } = await import('@/shared/messaging/core/MessagingCore.js');
       const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
@@ -767,6 +776,8 @@ export class BaseAIProvider extends BaseProvider {
           originalData: original,
           batchIndex: segmentIndex,
           provider: this.providerName,
+          sourceLanguage,
+          targetLanguage,
           timestamp: Date.now()
         },
         'background-streaming',
