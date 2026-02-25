@@ -32,6 +32,13 @@ const TEXT_TAGS = new Set([
 ]);
 
 /**
+ * Inline formatting tags that don't constitute a "complex layout"
+ */
+const FORMATTING_TAGS = new Set([
+  'SPAN', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'SMALL', 'BR', 'A', 'SUB', 'SUP', 'CODE', 'CITE', 'Q'
+]);
+
+/**
  * Block-level tags that should have text-align: start applied
  */
 const BLOCK_TAGS = new Set([
@@ -229,10 +236,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   textNode.nodeValue = finalText;
 
                   // Apply direction IMMEDIATELY to this specific node's parent if it's a text tag
-                  // Use 'auto' to let the browser detect the direction based on translated content
+                  // Use explicit direction based on effective target language
                   const parent = textNode.parentElement;
                   if (parent && TEXT_TAGS.has(parent.tagName)) {
-                    parent.setAttribute('dir', 'auto');
+                    const isEffectiveRTL = RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]);
+                    const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(parent.tagName);
+                    const hasComplexChildren = Array.from(parent.children).some(child => !FORMATTING_TAGS.has(child.tagName));
+
+                    // Only apply 'dir' if it's not a container with complex components
+                    if (!isLayoutTag || !hasComplexChildren) {
+                      parent.setAttribute('dir', isEffectiveRTL ? 'rtl' : 'ltr');
+                    }
+
                     if (BLOCK_TAGS.has(parent.tagName)) {
                       parent.style.textAlign = 'start';
                     }
@@ -466,10 +481,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
               textNode.nodeValue = finalText;
 
               // Apply direction to this specific node's parent if it's a text tag
-              // Use 'auto' to let the browser detect the direction based on content
+              // Use explicit direction based on effective target language
               const parent = textNode.parentElement;
               if (parent && TEXT_TAGS.has(parent.tagName)) {
-                parent.setAttribute('dir', 'auto');
+                const isEffectiveRTL = RTL_LANGUAGES.has(effectiveTargetLanguage.toLowerCase().split('-')[0]);
+                const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(parent.tagName);
+                const hasComplexChildren = Array.from(parent.children).some(child => !FORMATTING_TAGS.has(child.tagName));
+
+                if (!isLayoutTag || !hasComplexChildren) {
+                  parent.setAttribute('dir', isEffectiveRTL ? 'rtl' : 'ltr');
+                }
+
                 if (BLOCK_TAGS.has(parent.tagName)) {
                   parent.style.textAlign = 'start';
                 }
@@ -620,30 +642,41 @@ export class DomTranslatorAdapter extends ResourceTracker {
   _applyDirectionToElement(element, targetLanguage) {
     const langCode = targetLanguage.toLowerCase().split('-')[0];
     const isRTL = RTL_LANGUAGES.has(langCode);
+    const direction = isRTL ? 'rtl' : 'ltr';
 
-    // Surgical direction application:
-    // 1. Apply to the root element if it's a text tag
-    if (TEXT_TAGS.has(element.tagName)) {
-      element.setAttribute('dir', 'auto');
-      if (BLOCK_TAGS.has(element.tagName)) {
-        element.style.textAlign = 'start';
-      }
-    }
+    const processElement = (el) => {
+      if (!TEXT_TAGS.has(el.tagName)) return;
 
-    // 2. Apply to all child text tags that might contain translated text
-    const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-    childTextElements.forEach(child => {
-      child.setAttribute('dir', 'auto');
-      if (BLOCK_TAGS.has(child.tagName)) {
-        child.style.textAlign = 'start';
+      // Logic: Apply 'dir' if it's a simple text element OR a container
+      // that only holds text and simple formatting tags.
+      const isLayoutTag = ['DIV', 'LI', 'TD', 'TH'].includes(el.tagName);
+      
+      // Check if it has any children that are NOT simple formatting tags (like SVG, BUTTON, etc.)
+      const hasComplexChildren = Array.from(el.children).some(child => !FORMATTING_TAGS.has(child.tagName));
+
+      if (!isLayoutTag || !hasComplexChildren) {
+        el.setAttribute('dir', direction);
       }
-    });
+
+      // Always apply text-align to block tags.
+      if (BLOCK_TAGS.has(el.tagName)) {
+        el.style.textAlign = 'start';
+      }
+    };
+
+    // Apply to the root element
+    processElement(element);
+
+    // Apply to all relevant descendants
+    const descendants = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
+    descendants.forEach(processElement);
 
     element.setAttribute('data-translate-dir', isRTL ? 'rtl' : 'ltr');
 
-    this.logger.debug('Applied surgical auto-direction and alignment to element', {
+    this.logger.debug('Applied surgical explicit direction and alignment to element', {
       langCode,
       isRTL,
+      direction,
       tagName: element.tagName
     });
   }
