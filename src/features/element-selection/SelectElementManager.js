@@ -581,6 +581,7 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Revert translations
+   * @returns {Promise<number>} Number of translations reverted
    */
   async revertTranslations() {
     this.logger.info('Starting translation revert process in SelectElementManager');
@@ -588,12 +589,12 @@ class SelectElementManager extends ResourceTracker {
     // Clear the global translation in progress flag
     window.isTranslationInProgress = false;
 
-    // Revert via domtranslator adapter
-    const reverted = await this.domTranslatorAdapter.revertTranslation();
+    // Revert via domtranslator adapter (returns count of reverted translations)
+    const revertedCount = await this.domTranslatorAdapter.revertTranslation();
 
-    this.logger.info('Translation revert completed', { reverted });
+    this.logger.info('Translation revert completed', { revertedCount });
 
-    return reverted ? 1 : 0;
+    return revertedCount;
   }
 
   // ========== Notification Management ==========

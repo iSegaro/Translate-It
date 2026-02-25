@@ -185,7 +185,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   _storeTranslationState(data) {
-    globalSelectElementState.currentTranslation = { ...data, timestamp: Date.now() };
+    // Add to history instead of overwriting
+    globalSelectElementState.translationHistory.push({ ...data, timestamp: Date.now() });
   }
 
   _cleanupCurrentSession() {
@@ -245,11 +246,20 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   /**
-   * Get current translation state
+   * Get current translation state (last in history)
    * @returns {Object|null}
    */
   getCurrentTranslation() {
-    return globalSelectElementState.currentTranslation;
+    const history = globalSelectElementState.translationHistory;
+    return history && history.length > 0 ? history[history.length - 1] : null;
+  }
+
+  /**
+   * Get all translations in history
+   * @returns {Array}
+   */
+  getAllTranslations() {
+    return globalSelectElementState.translationHistory || [];
   }
 
   async revertTranslation() {
@@ -257,7 +267,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   hasTranslation() {
-    return globalSelectElementState.currentTranslation !== null;
+    const history = globalSelectElementState.translationHistory;
+    return history && history.length > 0;
   }
 
   async cleanup() {

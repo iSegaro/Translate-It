@@ -8,7 +8,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { TEXT_TAGS } from './DomTranslatorConstants.js';
 
 export const globalSelectElementState = {
-  currentTranslation: null,
+  translationHistory: [], // Store all translations for proper revert
   isTranslating: false,
 };
 
@@ -26,51 +26,66 @@ export function getSelectElementTranslationState() {
 }
 
 /**
- * Global function to revert Select Element translation
+ * Global function to revert ALL Select Element translations
  * Can be called independently of the Adapter class
- * @returns {Promise<boolean>} Success status
+ * @returns {Promise<number>} Number of translations reverted
  */
 export async function revertSelectElementTranslation() {
-  if (!globalSelectElementState.currentTranslation) {
-    return false;
+  if (!globalSelectElementState.translationHistory || globalSelectElementState.translationHistory.length === 0) {
+    return 0;
   }
 
   const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'GlobalRevert');
+  let revertedCount = 0;
 
   try {
-    const { element, originalHTML, originalTextNodes } = globalSelectElementState.currentTranslation;
+    // Process all translations in reverse order (newest first)
+    const translationsToRevert = [...globalSelectElementState.translationHistory].reverse();
 
-    if (originalTextNodes && originalTextNodes.length > 0) {
-      // Restore each text node individually
-      originalTextNodes.forEach(({ node, originalText }) => {
-        if (node.parentNode) {
-          node.nodeValue = originalText;
-        }
-      });
-      logger.info('Text nodes restored via global function');
-    } else if (originalHTML && element) {
-      element.innerHTML = originalHTML;
+    for (const translation of translationsToRevert) {
+      const { element, originalHTML, originalTextNodes } = translation;
+
+      // Skip if element no longer exists in DOM
+      if (!document.body.contains(element)) {
+        logger.debug('Element no longer in DOM, skipping', { element });
+        continue;
+      }
+
+      if (originalTextNodes && originalTextNodes.length > 0) {
+        // Restore each text node individually
+        originalTextNodes.forEach(({ node, originalText }) => {
+          if (node && node.parentNode) {
+            node.nodeValue = originalText;
+          }
+        });
+        revertedCount++;
+      } else if (originalHTML && element) {
+        element.innerHTML = originalHTML;
+        revertedCount++;
+      }
+
+      // Clean up directions and styles
+      if (element) {
+        element.removeAttribute('dir');
+        element.removeAttribute('data-translate-dir');
+        element.style.textAlign = '';
+
+        const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
+        childTextElements.forEach(child => {
+          child.removeAttribute('dir');
+          child.style.textAlign = '';
+        });
+
+        pageEventBus.emit('hide-translation', { element });
+      }
     }
 
-    // Clean up directions and styles
-    if (element) {
-      element.removeAttribute('dir');
-      element.removeAttribute('data-translate-dir');
-      element.style.textAlign = '';
-      
-      const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-      childTextElements.forEach(child => {
-        child.removeAttribute('dir');
-        child.style.textAlign = '';
-      });
-
-      pageEventBus.emit('hide-translation', { element });
-    }
-
-    globalSelectElementState.currentTranslation = null;
-    return true;
+    // Clear history after successful revert
+    globalSelectElementState.translationHistory = [];
+    logger.info(`Reverted ${revertedCount} translations via global function`);
+    return revertedCount;
   } catch (error) {
-    logger.error('Failed to revert translation via global function', error);
-    return false;
+    logger.error('Failed to revert translations via global function', error);
+    return revertedCount;
   }
 }
