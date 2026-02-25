@@ -102,6 +102,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
             });
           },
           onError: async (error) => {
+            // Ignore errors if we are already cleaning up or if the session is no longer active
+            if (!this.currentMessageId || error.message === 'Handler cancelled') {
+              return;
+            }
+
             await this.errorHandler.handle(error, { context: 'select-element-streaming', showToast: true });
             resolve({ success: false, error: error.message, errorHandled: true });
           }
@@ -184,12 +189,67 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   _cleanupCurrentSession() {
-    if (this.currentMessageId) {
-      try { contentScriptIntegration.streamingHandler.cancelHandler(this.currentMessageId); } catch(e) {}
-    }
+    const messageId = this.currentMessageId;
+    
+    // Clear state FIRST so callbacks can check if we are in cleanup mode
     this.isTranslating = false;
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
+
+    if (messageId) {
+      try { 
+        contentScriptIntegration.streamingHandler.cancelHandler(messageId); 
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Cancel ongoing translation
+   */
+  async cancelTranslation() {
+    if (this.isTranslating) {
+      this.logger.debug('Cancelling translation');
+      const messageId = this.currentMessageId;
+
+      if (messageId) {
+        try {
+          // Send cancellation to background
+          await sendRegularMessage({
+            action: MessageActions.CANCEL_TRANSLATION,
+            data: { messageId, reason: 'user_cancelled', context: 'select-element' }
+          });
+          this.logger.debug(`Sent CANCEL_TRANSLATION to background for ${messageId}`);
+        } catch (error) {
+          this.logger.warn('Failed to send cancellation to background:', error);
+        }
+      }
+
+      // Stop waiting for stream
+      if (this.currentStreamEndReject) {
+        this.currentStreamEndReject(new Error('Translation cancelled by user'));
+        this.currentStreamEndReject = null;
+      }
+
+      this._cleanupCurrentSession();
+    }
+  }
+
+  /**
+   * Check if currently translating
+   * @returns {boolean}
+   */
+  isCurrentlyTranslating() {
+    return this.isTranslating;
+  }
+
+  /**
+   * Get current translation state
+   * @returns {Object|null}
+   */
+  getCurrentTranslation() {
+    return globalSelectElementState.currentTranslation;
   }
 
   async revertTranslation() {
