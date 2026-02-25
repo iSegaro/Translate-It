@@ -1,98 +1,133 @@
 # Select Element System Documentation
 
-## 🎯 Overview
+## Overview
 
-The Select Element system provides an intuitive way for users to translate content directly on a webpage. By activating this mode, users can hover over any element, see a visual highlight, and click to translate its text content.
+The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content.
 
-**Major Update (2026)**: The system has been significantly simplified by integrating the [domtranslator](https://github.com/translate-tools/domtranslator) library - a battle-tested solution used in the Linguist Translate extension (200k+ users). This migration reduced the codebase by **~70%** while maintaining all core functionality.
-
-## 🎉 Migration to domtranslator (2026)
-
-### What Changed
-
-| Aspect | Before | After | Reduction |
-|--------|--------|-------|-----------|
-| SelectElementManager | ~1,265 lines | ~300 lines | **76%** |
-| Total services | 13+ specialized services | 2 core services | **85%** |
-| Architecture layers | 5+ layers | 2 layers | **60%** |
-| External deps | 0 | 1 (domtranslator) | +1 small dep |
-| Streaming support | Yes (complex) | No (simplified) | Removed |
-
-### What Was Removed
-
-- **Streaming translation system** - Simplified to one-shot translation
-- **Multi-segment processing** - Replaced by simple text extraction
-- **Placeholder system** - Not needed for simple case
-- **Complex node matching** - domtranslator handles this
-- **Mode management** - Simple mode only
-- **Direction manager** - Simplified to language-based detection
-
-### What Was Preserved
-
-✅ Element selection and highlighting
-✅ Click-to-translate functionality
-✅ Navigation prevention on interactive elements
-✅ Toast notifications with actionable buttons
-✅ Revert functionality
-✅ Cross-frame communication
-✅ ESC key deactivation
-✅ RTL/LTR direction handling
-
-## 🏗️ Simplified Architecture
-
-The new architecture uses domtranslator for DOM manipulation and translation:
+## Architecture
 
 ```
-User Click → SelectElementManager (~300 lines)
+User Click → SelectElementManager (~830 lines)
      ↓
      ├─→ ElementSelector (highlight, extract, prevent nav)
-     ├─→ DomTranslatorAdapter
+     ├─→ DomTranslatorAdapter (translation orchestration)
      │       ↓
-     │   domtranslator (NodesTranslator + DOMTranslator)
+     │   Streaming/Non-Streaming Translation
      │       ↓
-     │   Translation via Provider System
+     │   Translation via UnifiedMessaging → Provider System
      └─→ SelectElementNotificationManager (toast)
 ```
 
-### Core Components
+## Core Components
 
-#### 1. **SelectElementManager.js** (~300 lines)
-The central controller that manages the entire Select Element lifecycle:
-- **Mode Management**: Activate/deactivate Select Element mode
-- **Event Coordination**: Mouse events, keyboard events, click handling
-- **Cross-Frame Support**: Works in both main page and iframes
-- **FeatureManager Integration**: Integrated with smart feature management
-- **Resource Management**: Extends ResourceTracker for automatic cleanup
+### 1. SelectElementManager.js
+**Central controller** managing the entire Select Element lifecycle.
 
-#### 2. **DomTranslatorAdapter.js** (~200 lines)
-Wrapper around domtranslator library:
-- **Translation Function**: Bridges domtranslator with extension's provider system
-- **Direction Handling**: Applies RTL/LTR attributes based on target language
-- **State Tracking**: Manages translation state for revert functionality
-- **Progress Callbacks**: Optional callbacks for translation progress
+**Responsibilities:**
+- Mode Management: activate/deactivate Select Element mode
+- Event Coordination: mouse events, keyboard events, click handling
+- Cross-Frame Support: works in both main page and iframes
+- FeatureManager Integration: registered as ESSENTIAL feature
+- Resource Management: extends ResourceTracker for automatic cleanup
 
-#### 3. **ElementSelector.js** (~200 lines)
-Handles element selection and highlighting:
-- **Mouse Events**: Hover highlighting with visual feedback
-- **Click Prevention**: Stops navigation on interactive elements
-- **Element Validation**: Smart detection of valid text elements
-- **Cursor Management**: Crosshair cursor during activation
+**Key Methods:**
+| Method | Description |
+|--------|-------------|
+| `activateSelectElementMode()` | Starts interactive selection mode |
+| `deactivate(options)` | Stops mode, optionally preserves translations |
+| `startTranslation(element)` | Initiates translation for clicked element |
+| `revertTranslations()` | Restores original text |
 
-#### 4. **elementHelpers.js** (~150 lines)
-Utility functions for text extraction and validation:
-- `extractTextFromElement()` - Simple text extraction
-- `isValidTextElement()` - Element validation
-- `hasValidTextContent()` - Text content validation
-- `getDirectionFromLanguage()` - RTL/LTR detection
+### 2. ElementSelector.js
+Handles element selection and highlighting.
 
-#### 5. **SelectElementNotificationManager.js** (Unchanged)
-Manages toast notifications:
-- **Singleton Pattern**: Single notification manager instance
-- **Event Integration**: pageEventBus for communication
-- **Actionable Buttons**: Cancel and Revert buttons
-- **Cross-Context Support**: Works across frames
+**Responsibilities:**
+- Mouse Events: hover highlighting with visual feedback
+- Click Prevention: stops navigation on interactive elements
+- Element Validation: smart detection of valid text elements
+- Cursor Management: crosshair cursor during activation
 
-## 🔧 Usage
+**Configuration:**
+```javascript
+{
+  minArea: 4000,           // Minimum element size
+  maxArea: 120000,         // Maximum element size
+  minTextLength: 20,       // Minimum text characters
+  minWordCount: 3,         // Minimum word count
+  maxAncestors: 10,        // Max parent levels to check
+  highlightTimeout: 100    // Highlight clear delay (ms)
+}
+```
+
+**Key Methods:**
+| Method | Description |
+|--------|-------------|
+| `handleMouseOver(element)` | Highlights element on hover |
+| `findBestTextElement(element)` | Finds optimal translation target |
+| `preventNavigation(event)` | Blocks clicks on interactive elements |
+| `isOurElement(element)` | Detects extension UI elements |
+
+### 3. DomTranslatorAdapter.js
+Orchestrates translation between background services and DOM manipulation.
+
+**Responsibilities:**
+- Translation Function: bridges with extension's provider system
+- Direction Handling: applies RTL/LTR attributes based on target language
+- State Tracking: manages translation state for revert functionality
+- Progress Callbacks: optional callbacks for translation progress
+- Streaming Support: handles both streaming and non-streaming responses
+
+**Key Methods:**
+| Method | Description |
+|--------|-------------|
+| `translateElement(element, options)` | Main translation entry point |
+| `revertTranslation()` | Restores original text |
+| `hasTranslation()` | Check if translation exists |
+| `cancelTranslation()` | Cancel ongoing translation |
+
+### 4. DomDirectionManager.js
+Manages RTL/LTR direction and text alignment.
+
+**Functions:**
+| Function | Description |
+|----------|-------------|
+| `isRTL(langCode)` | Checks if language is RTL |
+| `applyDirection(element, targetLanguage)` | Applies direction to element tree |
+| `applyNodeDirection(textNode, targetLanguage)` | Applies direction to single node (streaming) |
+
+**RTL Languages:**
+`ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ckb`, `dv`, `ug`, `ae`, `arc`, `xh`, `zu`
+
+### 5. DomTranslatorState.js
+Global translation state and revert logic.
+
+**Exports:**
+- `globalSelectElementState`: Shared state object
+- `revertSelectElementTranslation()`: Global revert function
+- `getSelectElementTranslationState()`: State accessor
+
+### 6. elementHelpers.js
+Utility functions for text extraction and validation.
+
+**Key Functions:**
+| Function | Description |
+|----------|-------------|
+| `extractTextFromElement(element)` | Extracts text from element |
+| `hasValidTextContent(element, options)` | Validates text content |
+| `isValidTextElement(element)` | Element validation |
+| `findBestContainer(element, options)` | Finds optimal container |
+| `getDirectionFromLanguage(langCode)` | Returns 'rtl' or 'ltr' |
+
+### 7. SelectElementNotificationManager.js
+Manages toast notifications for Select Element mode.
+
+**Features:**
+- Singleton pattern for single instance
+- pageEventBus integration for communication
+- Actionable buttons: Cancel and Revert
+- Cross-context support: works in all contexts and iframes
+
+## Usage
 
 ### Activating Select Element Mode
 
@@ -112,7 +147,7 @@ await sendMessage({
 ```javascript
 // Via ESC key (automatic)
 // Or programmatically:
-await manager.deactivate();
+await manager.deactivate({ preserveTranslations: true });
 ```
 
 ### Reverting Translations
@@ -122,39 +157,25 @@ const manager = window.featureManager.getFeatureHandler('selectElement');
 await manager.revertTranslations();
 ```
 
-## 🔗 Message Handling
-
-### Background Script Messages
-
-- **ACTIVATE_SELECT_ELEMENT_MODE**: Activate Select Element mode
-- **DEACTIVATE_SELECT_ELEMENT_MODE**: Deactivate Select Element mode
-- **GET_SELECT_ELEMENT_STATE**: Get current mode state
-- **SET_SELECT_ELEMENT_STATE**: Set mode state (internal)
-
-### pageEventBus Events
-
-- **show-select-element-notification**: Show activation notification
-- **update-select-element-notification**: Update notification status
-- **dismiss-select-element-notification**: Dismiss notification
-- **cancel-select-element-mode**: Cancel from toast button
-- **revert-translations**: Revert from toast button
-- **hide-translation**: Hide translation overlay
-
-## 📁 File Structure
+## File Structure
 
 ```
 src/features/element-selection/
-├── SelectElementManager.js              # Main manager (~300 lines)
-├── SelectElementNotificationManager.js  # Notification manager (unchanged)
+├── SelectElementManager.js              # Main manager (~830 lines)
+├── SelectElementNotificationManager.js  # Notification manager (~380 lines)
 ├── ElementSelectionFactory.js           # Lazy loading factory
 ├── index.js                             # Feature entry point
 │
-├── core/                                # New core services
-│   ├── DomTranslatorAdapter.js          # domtranslator wrapper
-│   └── ElementSelector.js               # Selection & highlighting
+├── core/                                # Core translation services
+│   ├── DomTranslatorAdapter.js          # Translation orchestrator (~210 lines)
+│   ├── DomTranslatorState.js            # Global state & revert
+│   ├── DomTranslatorUtils.js            # Text node collection utilities
+│   ├── DomTranslatorConstants.js        # RTL languages, tag sets
+│   ├── DomDirectionManager.js           # RTL/LTR direction management
+│   └── ElementSelector.js               # Selection & highlighting (~400 lines)
 │
-├── utils/                               # Simplified utilities
-│   ├── elementHelpers.js                # Main helpers
+├── utils/                               # Utility functions
+│   ├── elementHelpers.js                # Text extraction & validation (~300 lines)
 │   ├── textDirection.js                 # RTL/LTR utilities
 │   ├── timeoutCalculator.js             # Dynamic timeouts
 │   └── cleanupSelectionWindows.js       # Window cleanup
@@ -162,7 +183,7 @@ src/features/element-selection/
 ├── constants/                           # Configuration
 │   └── SelectElementModes.js            # Mode definitions
 │
-├── handlers/                            # Message handlers (unchanged)
+├── handlers/                            # Message handlers
 │   ├── handleActivateSelectElementMode.js
 │   ├── handleDeactivateSelectElementMode.js
 │   ├── handleGetSelectElementState.js
@@ -173,7 +194,29 @@ src/features/element-selection/
     └── useElementSelectionLazy.js       # Lazy loading
 ```
 
-## 🎨 UI/UX Features
+## Message Handling
+
+### Background Script Messages
+
+| Action | Description |
+|--------|-------------|
+| `ACTIVATE_SELECT_ELEMENT_MODE` | Activate Select Element mode |
+| `DEACTIVATE_SELECT_ELEMENT_MODE` | Deactivate Select Element mode |
+| `GET_SELECT_ELEMENT_STATE` | Get current mode state |
+| `SET_SELECT_ELEMENT_STATE` | Set mode state (internal) |
+
+### pageEventBus Events
+
+| Event | Description |
+|-------|-------------|
+| `show-select-element-notification` | Show activation notification |
+| `update-select-element-notification` | Update notification status |
+| `dismiss-select-element-notification` | Dismiss notification |
+| `cancel-select-element-mode` | Cancel from toast button |
+| `revert-translations` | Revert from toast button |
+| `hide-translation` | Hide translation overlay |
+
+## UI/UX Features
 
 ### Visual Feedback
 - **Hover Highlighting**: Blue outline on hoverable elements
@@ -186,7 +229,7 @@ src/features/element-selection/
 - **Action Buttons**: Cancel and Revert buttons
 - **Cross-Context**: Works in all contexts and iframes
 
-## 🧩 Integration Points
+## Integration Points
 
 ### FeatureManager Integration
 ```javascript
@@ -207,7 +250,7 @@ const manager = window.featureManager.getFeatureHandler('selectElement');
 // Actionable buttons trigger pageEventBus events
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Mode Settings
 - **Simple Mode**: Direct element selection (default)
@@ -222,7 +265,7 @@ const manager = window.featureManager.getFeatureHandler('selectElement');
 - **RTL Languages**: Auto-detected from target language
 - **Language List**: ar, he, fa, ur, yi, ps, sd, ckb, dv, ug
 
-## 🔍 Debugging
+## Debugging
 
 ### Get Manager Status
 ```javascript
@@ -233,44 +276,35 @@ console.log(manager.getStatus());
 
 ### Check Translation State
 ```javascript
-const adapter = manager.domTranslatorAdapter;
-console.log(adapter.getCurrentTranslation());
-// { elementId, element, originalHTML, translatedHTML, targetLanguage, timestamp }
+import { getSelectElementTranslationState } from '@/features/element-selection/core/DomTranslatorState.js';
+const state = getSelectElementTranslationState();
+console.log(state.currentTranslation);
+// { element, originalHTML, originalTextNodes, targetLanguage, timestamp }
 ```
 
-## 📊 Performance
+## Cross-Frame Communication
+
+The system handles iframe scenarios:
+
+1. **Main Frame**: Shows notifications, coordinates deactivation
+2. **Iframe**: Can trigger translations, sends deactivation requests
+3. **Communication**: Uses `window.postMessage` with `DEACTIVATE_ALL_SELECT_MANAGERS` type
+
+## Performance
 
 ### Memory Usage
-- **Improved**: ~70% reduction in code size
-- **Simplified**: Fewer objects to track
-- **Efficient**: domtranslator uses WeakMap for storage
+- **ResourceTracker**: Automatic cleanup of services
+- **WeakMap**: Used for storing translation state
+- **Event Listeners**: Properly removed on deactivation
 
 ### Translation Speed
-- **One-Shot**: No streaming overhead for simple translations
+- **Streaming**: Real-time updates for large content
+- **Non-Streaming**: Single response for simple translations
 - **Direct**: Single provider call per translation
-- **Optimized**: domtranslator is highly optimized
 
-## 🚀 Future Enhancements
+## References
 
-### Potential Additions
-- **Smart Mode**: Re-add Ctrl+click for intelligent container selection
-- **Batch Translation**: Translate multiple elements at once
-- **Cache System**: Cache translation results (previously removed)
-
-### Known Limitations
-- **No Streaming**: Large content may take longer to translate
-- **Simple Mode Only**: No intelligent container detection
-- **Single Element**: One element per translation (no batch)
-
-## 📝 References
-
-- [domtranslator Library](https://github.com/translate-tools/domtranslator)
 - [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
 - [Translation Provider System](./PROVIDERS.md)
-
-## 🔄 Migration History
-
-- **2026-02**: Migrated to domtranslator library (~70% code reduction)
-- **2025**: Previous architecture with 13+ specialized services
-- **2024**: Initial implementation with streaming and placeholder support
+- [Messaging System](./MessagingSystem.md)

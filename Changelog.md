@@ -1,3 +1,15 @@
+#### v1.9.0 – Released on February X, 2026
+
+##### Added
+
+- `Whole Page` Translation feature
+
+##### Fixed
+
+- Improved the `Select Element` functionality
+
+---
+
 #### v1.8.0 – Released on Janurary 06, 2026
 
 ##### Added
