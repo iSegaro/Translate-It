@@ -43,7 +43,14 @@ export async function revertSelectElementTranslation() {
     const translationsToRevert = [...globalSelectElementState.translationHistory].reverse();
 
     for (const translation of translationsToRevert) {
-      const { element, originalHTML, originalTextNodes } = translation;
+      const { 
+        element, 
+        originalHTML, 
+        originalTextNodesData, 
+        originalDir, 
+        originalTextAlign, 
+        originalDataDir 
+      } = translation;
 
       // Skip if element no longer exists in DOM
       if (!document.body.contains(element)) {
@@ -51,9 +58,9 @@ export async function revertSelectElementTranslation() {
         continue;
       }
 
-      if (originalTextNodes && originalTextNodes.length > 0) {
+      if (originalTextNodesData && originalTextNodesData.length > 0) {
         // Restore each text node individually
-        originalTextNodes.forEach(({ node, originalText }) => {
+        originalTextNodesData.forEach(({ node, originalText }) => {
           if (node && node.parentNode) {
             node.nodeValue = originalText;
           }
@@ -64,12 +71,26 @@ export async function revertSelectElementTranslation() {
         revertedCount++;
       }
 
-      // Clean up directions and styles
+      // Restore original structure, direction and styles
       if (element) {
-        element.removeAttribute('dir');
-        element.removeAttribute('data-translate-dir');
-        element.style.textAlign = '';
+        // Restore dir attribute
+        if (originalDir !== null) {
+          element.setAttribute('dir', originalDir);
+        } else {
+          element.removeAttribute('dir');
+        }
 
+        // Restore data-translate-dir
+        if (originalDataDir !== null) {
+          element.setAttribute('data-translate-dir', originalDataDir);
+        } else {
+          element.removeAttribute('data-translate-dir');
+        }
+
+        // Restore text alignment
+        element.style.textAlign = originalTextAlign || '';
+
+        // Clean up children (they were modified during translation)
         const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
         childTextElements.forEach(child => {
           child.removeAttribute('dir');

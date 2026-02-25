@@ -136,6 +136,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
       await contentScriptIntegration.initialize();
+      
+      this.logger.debug('Sending translation request:', {
+        messageId,
+        nodeCount: textNodes.length,
+        payload: textsToTranslate
+      });
+
       const directResponsePromise = sendRegularMessage({
         action: MessageActions.TRANSLATE,
         messageId,
@@ -247,8 +254,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   _storeTranslationState(data) {
-    // Add to history instead of overwriting
-    globalSelectElementState.translationHistory.push({ ...data, timestamp: Date.now() });
+    const { element } = data;
+    // Add to history with original structural metadata for perfect revert
+    globalSelectElementState.translationHistory.push({ 
+      ...data, 
+      originalDir: element.getAttribute('dir'),
+      originalTextAlign: element.style.textAlign,
+      originalDataDir: element.getAttribute('data-translate-dir'),
+      timestamp: Date.now() 
+    });
   }
 
   _cleanupCurrentSession(isSuccess = false) {
