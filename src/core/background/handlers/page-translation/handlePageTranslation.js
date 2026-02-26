@@ -231,6 +231,15 @@ async function handleBatchTranslationRequest(message, sender) {
         errorMessages: errorMessages
       });
 
+      // If we had errors (like 429), return success: false so the content script knows to stop
+      if (hasErrors) {
+        return {
+          success: false,
+          error: errorMessages.join(', ') || 'Batch translation failed',
+          partialResults: JSON.stringify(results.map(text => ({ text })))
+        };
+      }
+
       // Create the response format
       const translatedTexts = results.map(text => ({ text }));
       const translatedJson = JSON.stringify(translatedTexts);
