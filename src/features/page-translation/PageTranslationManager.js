@@ -367,11 +367,11 @@ export class PageTranslationManager extends ResourceTracker {
 
       return { success: true };
     } catch (error) {
+      this.isTranslating = false;
       this.logger.error('Page translation failed to start', error);
       pageEventBus.emit('page-translation-error', { error });
       throw error;
     } finally {
-      this.isTranslating = false;
       this.abortController = null;
     }
   }
