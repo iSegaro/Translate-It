@@ -83,8 +83,9 @@ export class PageTranslationManager extends ResourceTracker {
       lazyLoading: true,
       autoTranslateOnDOMChanges: false,
       chunkSize: 20, 
+      maxCharsPerBatch: 3000, // Safety limit for characters
       debounceDelay: 500,
-      maxConcurrentFlushes: 3,
+      maxConcurrentFlushes: 1, // Serial processing is much safer for API limits
     };
 
     this.logger.debug('PageTranslationManager created');
@@ -159,7 +160,8 @@ export class PageTranslationManager extends ResourceTracker {
     return new Promise((resolve, reject) => {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
-      if (this.queue.length >= this.settings.chunkSize) {
+      // If queue is getting large, flush it
+      if (this.queue.length >= this.settings.chunkSize * 2) {
         this._flushBatch();
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
@@ -180,13 +182,14 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.queue.length === 0) return;
     
-    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 3)) {
+    // Check concurrency limit
+    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       return;
     }
 
     const now = Date.now();
     const timeSinceLastFlush = now - this.lastFlushTime;
-    const minDelay = 1000;
+    const minDelay = 800; // Minimum delay between batches
 
     if (timeSinceLastFlush < minDelay) {
       if (this.batchTimer) clearTimeout(this.batchTimer);
@@ -196,13 +199,30 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
+    // Character-aware batching logic
+    let currentBatch = [];
+    let currentChars = 0;
+    let itemsToProcess = 0;
+
+    for (const item of this.queue) {
+      const itemLen = item.text.length;
+      if (itemsToProcess >= this.settings.chunkSize || 
+          (currentChars + itemLen > this.settings.maxCharsPerBatch && itemsToProcess > 0)) {
+        break;
+      }
+      currentChars += itemLen;
+      itemsToProcess++;
+    }
+
+    if (itemsToProcess === 0) return;
+
     this.lastFlushTime = Date.now();
     this.activeFlushes++;
     
-    const currentBatch = this.queue.splice(0, this.settings.chunkSize);
+    currentBatch = this.queue.splice(0, itemsToProcess);
 
     try {
-      this.logger.debug(`Flushing batch of ${currentBatch.length} texts. Active: ${this.activeFlushes}. Remaining in queue: ${this.queue.length}`);
+      this.logger.debug(`Flushing batch: ${currentBatch.length} texts, ${currentChars} chars. Active: ${this.activeFlushes}. Queue: ${this.queue.length}`);
 
       const provider = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
