@@ -612,6 +612,9 @@
   "ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED": {
     "message": "The selected language pair is not supported by Chrome Translation API. Please try a different translation service or language combination."
   },
+  "ERRORS_PAGE_TRANSLATION_STOPPED": {
+    "message": "Whole-page translation stopped: {error}"
+  },
 
   "gemini_thinking_label": {
     "message": "Enable Thinking Mode"

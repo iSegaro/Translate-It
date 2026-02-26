@@ -11,6 +11,11 @@ import { getTranslationApiAsync, getTargetLanguageAsync, getWholePageLazyLoading
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 
 // Import domtranslator library
 import {
@@ -254,10 +259,33 @@ export class PageTranslationManager extends ResourceTracker {
       this.queue = []; 
       if (this.batchTimer) clearTimeout(this.batchTimer);
       
-      // SHOW NOTIFICATION: Use baseNotifier which is always available
-      this.baseNotifier.show(`Translation stopped: ${errorMsg}`, 'error', Infinity, {
-        persistent: true
-      });
+      // SHOW ORGANIZED NOTIFICATION:
+      (async () => {
+        try {
+          const underlyingType = matchErrorToType(error);
+          const underlyingMessage = await getErrorMessage(underlyingType);
+          const stoppedMessage = await getErrorMessage(ErrorTypes.PAGE_TRANSLATION_STOPPED);
+          
+          const fullMessage = stoppedMessage.includes('{error}') 
+            ? stoppedMessage.replace('{error}', underlyingMessage)
+            : `${stoppedMessage}: ${underlyingMessage}`;
+
+          // Use ErrorHandler for consistent reporting
+          ErrorHandler.getInstance().handle(new Error(fullMessage), {
+            type: ErrorTypes.PAGE_TRANSLATION_STOPPED,
+            context: 'page-translation',
+            persistent: false, // Allow dismissal
+            duration: NOTIFICATION_TIME.ERROR // Respect configured error timeout
+          });
+        } catch (err) {
+          // Fallback if i18n fails
+          ErrorHandler.getInstance().handle(error, {
+            context: 'page-translation',
+            persistent: false,
+            duration: NOTIFICATION_TIME.ERROR
+          });
+        }
+      })();
 
       // CLEANUP: Resolve current batch so they don't hang
       currentBatch.forEach(item => item.resolve(item.text));

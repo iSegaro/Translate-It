@@ -183,7 +183,7 @@ export class ErrorHandler {
 
       // Show toast notification if enabled  
       if (enhancedMeta.showToast) {
-        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE);
+        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE, enhancedMeta);
       }
       
       return err;
@@ -314,7 +314,7 @@ export class ErrorHandler {
     return retryableErrors.has(type);
   }
 
-  _notifyUser(message, type) {
+  _notifyUser(message, type, options = {}) {
     if (this.displayedErrors.has(message)) return;
 
     const typeMap = {
@@ -337,12 +337,18 @@ export class ErrorHandler {
     };
     const toastType = typeMap[type] || "error";
     
-    // The new NotificationManager doesn't support onClick handlers directly through the event bus.
-    // The logic for opening the settings page would need to be handled differently if required.
-    this.notifier.show(message, toastType);
+    // Pass duration and persistent options to the notifier
+    this.notifier.show(message, toastType, options.duration, {
+      persistent: options.persistent || false,
+      actions: options.actions || []
+    });
 
     this.displayedErrors.add(message);
-    setTimeout(() => this.displayedErrors.delete(message), 5500);
+    
+    // Only auto-remove from displayedErrors if not persistent
+    if (!options.persistent) {
+      setTimeout(() => this.displayedErrors.delete(message), (options.duration || 5500) + 500);
+    }
   }
 }
 

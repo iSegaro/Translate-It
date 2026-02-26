@@ -14,6 +14,7 @@ export const errorMessages = {
   [ErrorTypes.TRANSLATION_TIMEOUT]: "Translation timed out",
   [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]:
     "Language pair not supported by the selected translation service",
+  [ErrorTypes.PAGE_TRANSLATION_STOPPED]: "Whole-page translation stopped",
 
   // API settings errors
   [ErrorTypes.API]: "API error",

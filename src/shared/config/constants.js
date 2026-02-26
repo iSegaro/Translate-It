@@ -5,7 +5,10 @@ export const AUTO_DETECT_VALUE = "auto";
 export const DEFAULT_TARGET_LANGUAGE = "fa";
 
 export const NOTIFICATION_TIME = {
-  REVERT: 1500
+  REVERT: 1500,
+  PERSISTENT: 5000,
+  DEFAULT: 4000,
+  ERROR: 6000
 }
 
 // HTML Input Types for text field detection
