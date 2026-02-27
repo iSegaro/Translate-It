@@ -80,6 +80,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.activeFlushes = 0;
     this.lastFlushTime = 0;
     this.targetLanguage = 'fa';
+    this.isFirstBatch = true; // Track first batch for longer debounce
 
     // Settings
     this.settings = {
@@ -187,7 +188,12 @@ export class PageTranslationManager extends ResourceTracker {
         this._flushBatch();
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
-        this.batchTimer = setTimeout(() => this._flushBatch(), this.settings.debounceDelay);
+        // Use longer debounce for first batch to allow complete DOM traversal
+        const debounceDelay = this.isFirstBatch ? 2000 : this.settings.debounceDelay;
+        if (this.isFirstBatch && this.queue.length <= 5) {
+          this.logger.debug(`[First Batch] Collecting viewport nodes with ${debounceDelay}ms debounce (${this.queue.length} queued so far...)`);
+        }
+        this.batchTimer = setTimeout(() => this._flushBatch(), debounceDelay);
       }
     });
   }
@@ -259,6 +265,9 @@ export class PageTranslationManager extends ResourceTracker {
 
       this.lastFlushTime = Date.now();
       currentBatch = this.queue.splice(0, itemsToProcess);
+
+      // Reset first batch flag after first flush
+      this.isFirstBatch = false;
 
       this.logger.debug(`Flushing batch (${providerRegistryId}): ${currentBatch.length} texts, ${currentChars} chars. Queue: ${this.queue.length}`);
 
@@ -405,6 +414,7 @@ export class PageTranslationManager extends ResourceTracker {
     }
 
     this.isTranslating = true;
+    this.isFirstBatch = true; // Reset for new translation session
     this.abortController = new AbortController();
 
     try {
@@ -441,6 +451,7 @@ export class PageTranslationManager extends ResourceTracker {
       }
       this.isTranslated = false;
       this.isTranslating = false;
+      this.isFirstBatch = true; // Reset for next translation
       this.translatedCount = 0;
       this._nodeTrackingQueue.clear();
       const translatedElements = document.querySelectorAll('[data-page-translated]');
