@@ -222,11 +222,43 @@ export class PageTranslationManager extends ResourceTracker {
     currentBatch = this.queue.splice(0, itemsToProcess);
 
     try {
-      this.logger.debug(`Flushing batch: ${currentBatch.length} texts, ${currentChars} chars. Active: ${this.activeFlushes}. Queue: ${this.queue.length}`);
-
-      const provider = await getTranslationApiAsync();
+      const providerRegistryId = await getTranslationApiAsync();
       const targetLanguage = await getTargetLanguageAsync();
       this.targetLanguage = targetLanguage;
+
+      // PROVIDER-AWARE LIMITS using project constants:
+      // Dynamically determine if the current provider is an AI type
+      const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
+      const providerName = registryIdToName(providerRegistryId);
+      const isAI = isProviderType(providerName, ProviderTypes.AI);
+
+      const effectiveChunkSize = isAI ? 100 : this.settings.chunkSize;
+      const effectiveMaxChars = isAI ? 10000 : this.settings.maxCharsPerBatch;
+
+      // Character-aware batching logic
+      let currentBatch = [];
+      let currentChars = 0;
+      let itemsToProcess = 0;
+
+      for (const item of this.queue) {
+        const itemLen = item.text.length;
+        if (itemsToProcess >= effectiveChunkSize || 
+            (currentChars + itemLen > effectiveMaxChars && itemsToProcess > 0)) {
+          break;
+        }
+        currentChars += itemLen;
+        itemsToProcess++;
+      }
+
+      if (itemsToProcess === 0) {
+        this.activeFlushes--;
+        return;
+      }
+
+      this.lastFlushTime = Date.now();
+      currentBatch = this.queue.splice(0, itemsToProcess);
+
+      this.logger.debug(`Flushing batch (${providerRegistryId}): ${currentBatch.length} texts, ${currentChars} chars. Queue: ${this.queue.length}`);
 
       const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
 
@@ -234,7 +266,7 @@ export class PageTranslationManager extends ResourceTracker {
         action: MessageActions.PAGE_TRANSLATE_BATCH,
         data: {
           text: JSON.stringify(textsToTranslate),
-          provider,
+          provider: providerRegistryId,
           sourceLanguage: AUTO_DETECT_VALUE, 
           targetLanguage,
           mode: TranslationMode.Page,
