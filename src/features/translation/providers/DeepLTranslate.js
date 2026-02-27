@@ -308,6 +308,44 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       return chunkTexts.map(() => '');
     }
 
+    // CRITICAL: Pre-compile regex patterns FIRST, before any usage
+    // Build control character pattern from character codes to avoid lint errors
+    const CONTROL_CHAR_CODES = [
+      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  // \x00-\x08
+      0x0B, 0x0C,  // \x0B-\x0C (vertical tab, form feed)
+      0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,  // \x0E-\x1F
+      0x7F  // DEL
+    ];
+    const CONTROL_CHARS_PATTERN = new RegExp(`[${CONTROL_CHAR_CODES.map(c => String.fromCharCode(c)).join('')}]`, 'g');
+    const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\uFEFF]/g;
+    const SPECIAL_UNICODE_PATTERN = /[\uFFF0-\uFFFF]/g;
+
+    // Pattern to detect potentially problematic characters BEFORE escaping
+    // These cause "not well-formed" errors in XML mode
+    const PROBLEMATIC_XML_CHARS = /[<>&]|&#?\w+;/;
+
+    // Unescape XML entities back to original characters after translation
+    const unescapeXML = (text) => {
+      if (!text) return text;
+      return text
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');  // Must be last to avoid double-unescaping
+    };
+
+    // PRE-FLIGHT: Detect texts with problematic XML characters
+    // This helps identify which segments would cause HTTP 400 errors
+    const problematicIndices = [];
+    validTexts.forEach((text, i) => {
+      if (PROBLEMATIC_XML_CHARS.test(text)) {
+        problematicIndices.push(i);
+      }
+    });
+
+    if (problematicIndices.length > 0) {
+      logger.debug(`[DeepL] Pre-flight: Found ${problematicIndices.length} texts with XML-special chars (indices: ${problematicIndices.join(', ')}) - will escape them`);
+    }
+
     if (validTexts.length < chunkTexts.length) {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
@@ -322,28 +360,24 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       textCount: validTexts.length
     });
 
-    // Pre-compile regex patterns once for better performance
-    // Build control character pattern from character codes to avoid lint errors
-    const CONTROL_CHAR_CODES = [
-      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  // \x00-\x08
-      0x0B, 0x0C,  // \x0B-\x0C (vertical tab, form feed)
-      0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,  // \x0E-\x1F
-      0x7F  // DEL
-    ];
-    const CONTROL_CHARS_PATTERN = new RegExp(`[${CONTROL_CHAR_CODES.map(c => String.fromCharCode(c)).join('')}]`, 'g');
-    const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\uFEFF]/g;
-    const SPECIAL_UNICODE_PATTERN = /[\uFFF0-\uFFFF]/g;
-
     const sanitizeText = (text) => {
       const originalLength = text.length;
-      const sanitized = text
+      let sanitized = text
         .replace(ZERO_WIDTH_PATTERN, '')  // Zero-width characters
         .replace(CONTROL_CHARS_PATTERN, '')  // Control chars except \n, \r, \t
         .replace(SPECIAL_UNICODE_PATTERN, '');  // Other special Unicode characters
 
+      // CRITICAL: Escape XML special characters BEFORE adding XML markers
+      // This prevents "not well-formed (invalid token)" errors when tag_handling=xml
+      // Order matters: escape & first, then < and >
+      sanitized = sanitized
+        .replace(/&/g, '&amp;')           // Must be first to avoid double-escaping
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
       // Log if sanitization removed any characters
       if (sanitized.length !== originalLength) {
-        logger.debug(`[DeepL] Sanitization removed ${originalLength - sanitized.length} chars from ${originalLength} char text`);
+        logger.debug(`[DeepL] Sanitization processed ${originalLength} char text (removed special chars, escaped XML)`);
       }
 
       return sanitized;
@@ -519,6 +553,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
               restored = restored.replace(/<n1\s*\/?>/g, '\n');
             }
 
+            // Step 3: Unescape XML entities back to original characters
+            restored = unescapeXML(restored);
+
             return restored;
           });
 
@@ -573,8 +610,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
-      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 5) {
-        logger.debug(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/5)`);
+      // Reduced retry attempts from 5 to 3 since we now escape XML characters properly
+      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 3) {
+        logger.debug(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/3)`);
 
         // Split into smaller chunks and retry SEQUENTIALLY (not parallel)
         // DeepL Free API has issues with concurrent requests
@@ -602,8 +640,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       }
 
       // Final fallback for HTTP 400: translate each segment individually (sequential)
-      // Only do this if we haven't already tried individual translation
-      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt >= 5) {
+      // Only do this if we haven't already tried individual translation (now after 3 attempts)
+      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt >= 3) {
         logger.debug(`[DeepL] Retry attempts exhausted, attempting sequential one-by-one translation for ${validTexts.length} segments`);
 
         const results = [];
@@ -620,11 +658,17 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           }
 
           try {
-            // CRITICAL: Sanitize text before processing
-            const sanitizedText = text
+            // CRITICAL: Sanitize and escape XML special characters before processing
+            let sanitizedText = text
               .replace(ZERO_WIDTH_PATTERN, '')
               .replace(CONTROL_CHARS_PATTERN, '')
               .replace(SPECIAL_UNICODE_PATTERN, '');
+
+            // Escape XML special characters to prevent parsing errors
+            sanitizedText = sanitizedText
+              .replace(/&/g, '&amp;')    // Must be first
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
 
             // Step 1: Convert blank lines (\n\n) to marker
             let textWithMarkers = sanitizedText.replace(/\n\n+/g, (match) => {
@@ -673,6 +717,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
                 // Restore markers
                 translated = translated.replace(/<n2\s*\/?>/g, '\n\n');
                 translated = translated.replace(/<n1\s*\/?>/g, '\n');
+
+                // Unescape XML entities back to original characters
+                translated = unescapeXML(translated);
 
                 return translated;
               },
