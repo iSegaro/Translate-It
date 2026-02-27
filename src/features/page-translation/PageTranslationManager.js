@@ -85,13 +85,21 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings = {
       lazyLoading: true,
       autoTranslateOnDOMChanges: false,
-      chunkSize: 20, 
-      maxCharsPerBatch: 3000, // Safety limit for characters
+      chunkSize: 100, 
+      maxCharsPerBatch: 5000, 
       debounceDelay: 500,
-      maxConcurrentFlushes: 1, // Serial processing is much safer for API limits
+      maxConcurrentFlushes: 1, 
     };
 
     this.logger.debug('PageTranslationManager created');
+  }
+
+  /**
+   * Normalize text for consistent tracking and comparison
+   */
+  _normalizeText(text) {
+    if (!text) return '';
+    return text.trim().replace(/\s+/g, ' ');
   }
 
   /**
@@ -129,14 +137,16 @@ export class PageTranslationManager extends ResourceTracker {
   async _enqueueTranslation(text, score = 0) {
     if (!text || !text.trim() || !this.isTranslating) return text;
 
+    // Normalize text before looking up tracked nodes
+    const normalizedText = this._normalizeText(text);
+
     // Retrieve the specific node associated with this text (FIFO)
-    const nodeQueue = this._nodeTrackingQueue.get(text);
+    const nodeQueue = this._nodeTrackingQueue.get(normalizedText);
     const node = (nodeQueue && nodeQueue.length > 0) ? nodeQueue.shift() : null;
 
     if (!node) {
-      // Fallback: This might happen if domtranslator's scheduler triggers 
-      // out of expected sync, but it shouldn't under normal conditions.
-      this.logger.warn('Could not find tracked node for text:', text.substring(0, 30));
+      // Fallback
+      this.logger.warn('Could not find tracked node for text:', normalizedText.substring(0, 30));
       return text;
     }
 
@@ -172,8 +182,8 @@ export class PageTranslationManager extends ResourceTracker {
     return new Promise((resolve, reject) => {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
-      // If queue is getting large, flush it
-      if (this.queue.length >= this.settings.chunkSize * 2) {
+      // If queue is getting large, flush it (allow more accumulation for debounce to catch up)
+      if (this.queue.length >= this.settings.chunkSize * 5) {
         this._flushBatch();
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
@@ -492,10 +502,11 @@ export class PageTranslationManager extends ResourceTracker {
       const originalTranslate = nodesTranslator.translate.bind(nodesTranslator);
       nodesTranslator.translate = (node, callback) => {
         const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
-        if (textContent && textContent.trim()) {
-          const queue = this._nodeTrackingQueue.get(textContent.trim()) || [];
+        const normalized = this._normalizeText(textContent);
+        if (normalized) {
+          const queue = this._nodeTrackingQueue.get(normalized) || [];
           queue.push(node);
-          this._nodeTrackingQueue.set(textContent.trim(), queue);
+          this._nodeTrackingQueue.set(normalized, queue);
         }
         
         return originalTranslate(node, (text) => {
@@ -506,10 +517,11 @@ export class PageTranslationManager extends ResourceTracker {
       const originalUpdate = nodesTranslator.update.bind(nodesTranslator);
       nodesTranslator.update = (node, callback) => {
         const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
-        if (textContent && textContent.trim()) {
-          const queue = this._nodeTrackingQueue.get(textContent.trim()) || [];
+        const normalized = this._normalizeText(textContent);
+        if (normalized) {
+          const queue = this._nodeTrackingQueue.get(normalized) || [];
           queue.push(node);
-          this._nodeTrackingQueue.set(textContent.trim(), queue);
+          this._nodeTrackingQueue.set(normalized, queue);
         }
         
         return originalUpdate(node, (text) => {

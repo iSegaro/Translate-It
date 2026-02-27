@@ -154,9 +154,9 @@ export const CONFIG = {
   WHOLE_PAGE_EXCLUDED_SELECTORS: ["script", "style", "code", "pre", "noscript", "iframe", "[data-translate-ignore]"], // المنت‌هایی که ترجمه نمی‌شوند
   WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label"], // Attributeهایی که ترجمه می‌شوند
   WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
-  WHOLE_PAGE_CHUNK_SIZE: 20, // تعداد nodeها در هر batch request
+  WHOLE_PAGE_CHUNK_SIZE: 100, // تعداد nodeها در هر batch request
   WHOLE_PAGE_DEBOUNCE_DELAY: 500, // تاخیر برای DOM change debouncing (ms)
-  WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 3, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
+  WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
 
   // --- Proxy Settings ---

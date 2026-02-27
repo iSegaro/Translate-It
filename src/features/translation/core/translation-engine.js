@@ -697,7 +697,7 @@ export class TranslationEngine {
       
       // Check if adding this segment would exceed batch limits
       const wouldExceedSize = currentBatch.length >= adjustedBatchSize;
-      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 400;
+      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 1000; // Increased from 400
       const wouldExceedChars = currentBatchChars + segmentChars > maxCharsPerBatch;
       
       if (wouldExceedSize || wouldExceedComplexity || wouldExceedChars) {
@@ -731,8 +731,8 @@ export class TranslationEngine {
     // Length factor
     complexity += Math.min(text.length / 20, 50);
     
-    // Special characters
-    const specialChars = (text.match(/[^\w\s]/g) || []).length;
+    // Special characters (punctuation, symbols) - excluding non-Latin word characters
+    const specialChars = (text.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
     complexity += specialChars;
     
     // Technical content
@@ -772,8 +772,8 @@ export class TranslationEngine {
       // Length factor (longer texts are more complex)
       textComplexity += Math.min(text.length / 10, 30);
       
-      // Special characters and formatting
-      const specialChars = (text.match(/[^\w\s]/g) || []).length;
+      // Special characters and formatting - excluding non-Latin word characters
+      const specialChars = (text.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
       textComplexity += specialChars * 0.5;
       
       // Technical terms (URLs, code, etc.)
