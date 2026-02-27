@@ -125,15 +125,19 @@ async function handleBatchTranslationRequest(message, sender) {
     try {
       // Get the rate limit manager for proper rate limiting (singleton instance)
       const { rateLimitManager } = await import('@/features/translation/core/RateLimitManager.js');
+      const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
 
       // Force reload configurations to ensure latest rate limiting settings
       rateLimitManager.reloadConfigurations();
 
-      // Create batches (use smaller batch size for better reliability)
-      // Character limit is crucial to avoid 413 (Payload Too Large) errors. 
-      // 3500 is safer than 5000 for mobile/free APIs.
-      const OPTIMAL_BATCH_SIZE = 20;
-      const OPTIMAL_CHAR_LIMIT = 3500;
+      // PROVIDER-AWARE LIMITS:
+      // AI providers need large batches to stay under RPM limits and maintain context
+      const pName = registryIdToName(provider || 'google');
+      const isAI = isProviderType(pName, ProviderTypes.AI);
+
+      const OPTIMAL_BATCH_SIZE = isAI ? 100 : 20;
+      const OPTIMAL_CHAR_LIMIT = isAI ? 10000 : 3500;
+      
       const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE, OPTIMAL_CHAR_LIMIT);
 
       logger.debug(`Created ${batches.length} batches for ${segments.length} segments (Provider: ${provider})`);
