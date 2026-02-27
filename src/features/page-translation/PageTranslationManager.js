@@ -64,6 +64,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.currentUrl = null;
     this.translatedNodes = new WeakSet(); 
     this.abortController = null;
+    
+    // Node tracking to solve race conditions during async translation
+    this._nodeTrackingQueue = new Map(); // text -> Array of Nodes
 
     // domtranslator instances
     this.domTranslator = null;
@@ -123,13 +126,21 @@ export class PageTranslationManager extends ResourceTracker {
   /**
    * Enqueue a text for batch translation
    */
-  async _enqueueTranslation(text, node) {
-    if (!text || !text.trim()) return text;
-    
-    if (!this.isTranslating) {
+  async _enqueueTranslation(text, score = 0) {
+    if (!text || !text.trim() || !this.isTranslating) return text;
+
+    // Retrieve the specific node associated with this text (FIFO)
+    const nodeQueue = this._nodeTrackingQueue.get(text);
+    const node = (nodeQueue && nodeQueue.length > 0) ? nodeQueue.shift() : null;
+
+    if (!node) {
+      // Fallback: This might happen if domtranslator's scheduler triggers 
+      // out of expected sync, but it shouldn't under normal conditions.
+      this.logger.warn('Could not find tracked node for text:', text.substring(0, 30));
       return text;
     }
 
+    // Lazy Loading: Check if node is in viewport
     if (this.settings.lazyLoading && !this._isInViewport(node)) {
       return new Promise((resolve) => {
         const observer = new IntersectionObserver((entries) => {
@@ -137,7 +148,7 @@ export class PageTranslationManager extends ResourceTracker {
             observer.disconnect();
             resolve(this._doEnqueue(text, node));
           }
-        }, { rootMargin: '200px' });
+        }, { rootMargin: '300px' });
         
         const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
                        (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
@@ -145,6 +156,7 @@ export class PageTranslationManager extends ResourceTracker {
         if (element && element.nodeType === Node.ELEMENT_NODE) {
           observer.observe(element);
         } else {
+          // If we can't observe (rare), just translate it
           resolve(this._doEnqueue(text, node));
         }
       });
@@ -199,27 +211,9 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
-    // Character-aware batching logic
-    let currentBatch = [];
-    let currentChars = 0;
-    let itemsToProcess = 0;
-
-    for (const item of this.queue) {
-      const itemLen = item.text.length;
-      if (itemsToProcess >= this.settings.chunkSize || 
-          (currentChars + itemLen > this.settings.maxCharsPerBatch && itemsToProcess > 0)) {
-        break;
-      }
-      currentChars += itemLen;
-      itemsToProcess++;
-    }
-
-    if (itemsToProcess === 0) return;
-
-    this.lastFlushTime = Date.now();
     this.activeFlushes++;
     
-    currentBatch = this.queue.splice(0, itemsToProcess);
+    let currentBatch = [];
 
     try {
       const providerRegistryId = await getTranslationApiAsync();
@@ -227,7 +221,6 @@ export class PageTranslationManager extends ResourceTracker {
       this.targetLanguage = targetLanguage;
 
       // PROVIDER-AWARE LIMITS using project constants:
-      // Dynamically determine if the current provider is an AI type
       const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
       const providerName = registryIdToName(providerRegistryId);
       const isAI = isProviderType(providerName, ProviderTypes.AI);
@@ -236,9 +229,8 @@ export class PageTranslationManager extends ResourceTracker {
       const effectiveMaxChars = isAI ? 10000 : this.settings.maxCharsPerBatch;
 
       // Character-aware batching logic
-      let currentBatch = [];
-      let currentChars = 0;
       let itemsToProcess = 0;
+      let currentChars = 0;
 
       for (const item of this.queue) {
         const itemLen = item.text.length;
@@ -438,7 +430,9 @@ export class PageTranslationManager extends ResourceTracker {
         this.domTranslator.restore(document.documentElement);
       }
       this.isTranslated = false;
+      this.isTranslating = false;
       this.translatedCount = 0;
+      this._nodeTrackingQueue.clear();
       const translatedElements = document.querySelectorAll('[data-page-translated]');
       translatedElements.forEach(el => {
         el.removeAttribute('dir');
@@ -488,26 +482,45 @@ export class PageTranslationManager extends ResourceTracker {
       if (this.settings.lazyLoading) {
         this.intersectionScheduler = new IntersectionScheduler();
       }
-      const nodesTranslator = new NodesTranslator(async (text) => {
-        return await this._enqueueTranslation(text, this._currentNode);
+
+      // The translator callback receives (text, score)
+      const nodesTranslator = new NodesTranslator(async (text, score) => {
+        return await this._enqueueTranslation(text, score);
       });
+
+      // Capture the node for each call and store it for our translator callback
       const originalTranslate = nodesTranslator.translate.bind(nodesTranslator);
       nodesTranslator.translate = (node, callback) => {
-        this._currentNode = node;
+        const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
+        if (textContent && textContent.trim()) {
+          const queue = this._nodeTrackingQueue.get(textContent.trim()) || [];
+          queue.push(node);
+          this._nodeTrackingQueue.set(textContent.trim(), queue);
+        }
+        
         return originalTranslate(node, (text) => {
           if (typeof callback === 'function') callback(text, node);
         });
       };
+
       const originalUpdate = nodesTranslator.update.bind(nodesTranslator);
       nodesTranslator.update = (node, callback) => {
-        this._currentNode = node;
+        const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
+        if (textContent && textContent.trim()) {
+          const queue = this._nodeTrackingQueue.get(textContent.trim()) || [];
+          queue.push(node);
+          this._nodeTrackingQueue.set(textContent.trim(), queue);
+        }
+        
         return originalUpdate(node, (text) => {
           if (typeof callback === 'function') callback(text, node);
         });
       };
+
       const config = { filter: this.nodeFilter };
       if (this.intersectionScheduler) config.scheduler = this.intersectionScheduler;
       this.domTranslator = new DOMTranslator(nodesTranslator, config);
+      
       if (this.settings.autoTranslateOnDOMChanges) {
         this.persistentTranslator = new PersistentDOMTranslator(this.domTranslator);
       }
@@ -547,6 +560,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.persistentTranslator = null;
     this.intersectionScheduler = null;
     this.queue = [];
+    this._nodeTrackingQueue.clear();
     this.translatedCount = 0;
     super.cleanup();
   }
