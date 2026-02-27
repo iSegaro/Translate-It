@@ -24,7 +24,7 @@ export class BaseTranslateProvider extends BaseProvider {
   static supportsStreaming = true;
   static chunkingStrategy = 'character_limit'; // 'character_limit', 'segment_count'
   static characterLimit = 5000;
-  static maxChunksPerBatch = 10;
+  static maxChunksPerBatch = 150;
 
   constructor(providerName) {
     super(providerName);

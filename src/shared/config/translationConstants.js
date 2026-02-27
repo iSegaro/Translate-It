@@ -18,18 +18,18 @@ export const TRANSLATION_CONSTANTS = {
 
   // Provider-specific character limits
   CHARACTER_LIMITS: {
-    GOOGLE: 3500,
+    GOOGLE: 5000,
     BING: 800,
-    YANDEX: 3500,
+    YANDEX: 5000,
     DEEPL: 10000,
   },
 
   // Provider-specific batch sizes (max segments per request)
   MAX_CHUNKS_PER_BATCH: {
-    GOOGLE: 10,
+    GOOGLE: 150,
     BING: 15,
-    YANDEX: 25,
-    DEEPL: 5, // Very conservative for DeepL Free API with beta languages
+    YANDEX: 150,
+    DEEPL: 150, 
   },
 
   // Dictionary support flags

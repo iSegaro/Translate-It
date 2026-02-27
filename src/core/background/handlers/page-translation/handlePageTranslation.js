@@ -135,7 +135,7 @@ async function handleBatchTranslationRequest(message, sender) {
       const pName = registryIdToName(provider || 'google');
       const isAI = isProviderType(pName, ProviderTypes.AI);
 
-      const OPTIMAL_BATCH_SIZE = isAI ? 100 : 50;
+      const OPTIMAL_BATCH_SIZE = isAI ? 150 : 150; // Increased to 150 for all to favor single-request translations
       const OPTIMAL_CHAR_LIMIT = isAI ? 10000 : 5000;
       
       const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE, OPTIMAL_CHAR_LIMIT);
