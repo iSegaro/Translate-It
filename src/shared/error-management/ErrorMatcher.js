@@ -274,8 +274,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("http 456") ||
     msg.includes("456 error") ||
     msg.includes("status 456") ||
-    msg.includes("quota exceeded") ||
-    msg.includes("character limit")
+    (msg.includes("deepl") && (msg.includes("quota exceeded") || msg.includes("character limit")))
   )
     return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
 
