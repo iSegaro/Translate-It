@@ -163,36 +163,9 @@ export class PageTranslationManager extends ResourceTracker {
       return text;
     }
 
-    // Lazy Loading: Check if node is in viewport
-    if (this.settings.lazyLoading && !this._isInViewport(node)) {
-      return new Promise((resolve) => {
-        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
-                       (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
-
-        // CRITICAL: Check with EXPANDED margin (matching IntersectionObserver)
-        // This prevents elements on the edge from being handled asynchronously
-        const marginValue = parseInt(this.settings.rootMargin, 10) || 300;
-        if (this._isInViewportWithMargin(node, marginValue)) {
-          // Element is in expanded viewport - enqueue immediately
-          resolve(this._doEnqueue(text, node));
-          return;
-        }
-
-        const observer = new IntersectionObserver((entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect();
-            resolve(this._doEnqueue(text, node));
-          }
-        }, { rootMargin: this.settings.rootMargin });
-
-        if (element && element.nodeType === Node.ELEMENT_NODE) {
-          observer.observe(element);
-        } else {
-          resolve(this._doEnqueue(text, node));
-        }
-      });
-    }
-
+    // Rely on domtranslator's scheduler for visibility/lazy loading
+    // The library's IntersectionScheduler already ensures this is only called 
+    // when the node is visible (or near viewport based on rootMargin)
     return this._doEnqueue(text, node);
   }
 
