@@ -235,6 +235,7 @@ export class ContentMessageHandler extends ResourceTracker {
     // Page translation handlers
     this.registerHandler(MessageActions.PAGE_TRANSLATE, this.handlePageTranslate.bind(this));
     this.registerHandler(MessageActions.PAGE_RESTORE, this.handlePageRestore.bind(this));
+    this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -715,6 +716,24 @@ export class ContentMessageHandler extends ResourceTracker {
 
       return { success: false, error: error.message };
     }
+  }
+
+  async handlePageGetStatus() {
+    this.logger.debug('Page translation status request received');
+
+    if (!this.pageTranslationManager) {
+      return { 
+        success: true, 
+        isActive: false, 
+        isTranslating: false, 
+        isTranslated: false 
+      };
+    }
+
+    return {
+      success: true,
+      ...this.pageTranslationManager.getStatus()
+    };
   }
 
   async cleanup() {

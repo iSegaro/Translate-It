@@ -19,10 +19,29 @@ export async function handlePageTranslation(message, sender) {
       return await handleBatchTranslationRequest(message, sender);
     }
 
+    // Actions that are events originating from content script and need to be broadcasted
+    const eventActions = [
+      MessageActions.PAGE_TRANSLATE_START,
+      MessageActions.PAGE_TRANSLATE_PROGRESS,
+      MessageActions.PAGE_TRANSLATE_COMPLETE,
+      MessageActions.PAGE_TRANSLATE_ERROR,
+      MessageActions.PAGE_RESTORE_COMPLETE,
+      MessageActions.PAGE_RESTORE_ERROR,
+      MessageActions.PAGE_TRANSLATE_CANCELLED,
+    ];
+
+    if (eventActions.includes(message.action)) {
+      logger.debug('Broadcasting page translation event:', message.action);
+      // Re-broadcast to all extension views (Sidepanel, Popup, etc.)
+      browser.runtime.sendMessage(message).catch(() => {});
+      return { success: true };
+    }
+
     // Actions that should be forwarded to content scripts
     const forwardActions = [
       MessageActions.PAGE_TRANSLATE,
       MessageActions.PAGE_RESTORE,
+      MessageActions.PAGE_TRANSLATE_GET_STATUS,
     ];
 
     if (!forwardActions.includes(message.action)) {
@@ -62,7 +81,7 @@ export async function handlePageTranslation(message, sender) {
  */
 async function handleBatchTranslationRequest(message, sender) {
   try {
-    const { text, provider, sourceLanguage, targetLanguage, mode } = message.data;
+    const { text, provider, sourceLanguage, targetLanguage } = message.data;
 
     if (!text) {
       return { success: false, error: 'No text provided for translation' };
@@ -101,11 +120,8 @@ async function handleBatchTranslationRequest(message, sender) {
     });
 
     // Get original source and target languages for proper handling
-    const { getSourceLanguageAsync, getTargetLanguageAsync } = await import('@/shared/config/config.js');
-    const [originalSourceLang, originalTargetLang] = await Promise.all([
-      getSourceLanguageAsync(),
-      getTargetLanguageAsync()
-    ]);
+    const { getTargetLanguageAsync } = await import('@/shared/config/config.js');
+    await getTargetLanguageAsync();
 
     // Extract text segments from the JSON payload
     const segments = textsToTranslate.map(item => item.text);

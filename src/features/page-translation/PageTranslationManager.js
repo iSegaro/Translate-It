@@ -13,7 +13,6 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 
@@ -137,7 +136,7 @@ export class PageTranslationManager extends ResourceTracker {
         rect.bottom >= -margin &&
         rect.top <= viewportHeight + margin
       );
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
@@ -145,8 +144,8 @@ export class PageTranslationManager extends ResourceTracker {
   /**
    * Enqueue a text for batch translation
    */
-  async _enqueueTranslation(text, score = 0) {
-    if (!text || !text.trim() || !this.isTranslating) return text;
+  async _enqueueTranslation(text, _score = 0) {
+    if (!text || !text.trim() || !this.isTranslated) return text;
 
     // Normalize text before looking up tracked nodes
     const normalizedText = this._normalizeText(text);
@@ -190,7 +189,7 @@ export class PageTranslationManager extends ResourceTracker {
    * Flush the current translation queue
    */
   async _flushBatch() {
-    if (!this.isTranslating) {
+    if (!this.isTranslated) {
       this.queue = [];
       if (this.batchTimer) clearTimeout(this.batchTimer);
       return;
@@ -216,6 +215,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
     this.activeFlushes++;
+    this.isTranslating = true; // Signal we are actively translating
     
     let currentBatch = [];
 
@@ -337,18 +337,28 @@ export class PageTranslationManager extends ResourceTracker {
 
       // CLEANUP: Resolve current batch with original text if not already resolved
       currentBatch.forEach(item => {
-        try { item.resolve(item.text); } catch (e) { /* ignore */ }
+        try { item.resolve(item.text); } catch (_) { /* ignore */ }
       });
 
       // Notify other components via event bus
-      pageEventBus.emit('page-translation-error', { 
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
         error: error instanceof Error ? error.message : String(error), 
         errorType,
         isFatal: !isQuotaError 
       });
     } finally {
       this.activeFlushes--;
-      if (this.isTranslating && this.queue.length > 0) {
+      
+      // If no more active flushes and queue is empty, we're not translating anymore
+      if (this.activeFlushes <= 0 && this.queue.length === 0) {
+        this.isTranslating = false;
+        // Broadcast completion of the current batch of activity
+        this._reportProgress();
+      }
+
+      if (this.queue.length > 0) {
+        // More items in queue, ensure isTranslating is true so next flush proceeds
+        this.isTranslating = true;
         if (this.batchTimer) clearTimeout(this.batchTimer);
         this.batchTimer = setTimeout(() => this._flushBatch(), 50);
       }
@@ -356,10 +366,37 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Broadcast translation event to other extension components
+   * @param {string} action - Message action from MessageActions
+   * @param {Object} data - Event data
+   */
+  async _broadcastEvent(action, data = {}) {
+    try {
+      // Always emit locally first
+      pageEventBus.emit(action, data);
+
+      // Then broadcast to other contexts (Sidepanel, Popup)
+      // We don't wait for response as this is fire-and-forget
+      sendRegularMessage({
+        action,
+        data,
+        context: 'page-translation-broadcast'
+      }).catch(err => {
+        // Only log if not a "no receiver" error
+        if (err.message && !err.message.includes('Could not establish connection')) {
+          this.logger.debug('Broadcast failed (expected if no UI open):', err.message);
+        }
+      });
+    } catch (_) {
+      // Ignore broadcast errors
+    }
+  }
+
+  /**
    * Report translation progress
    */
   _reportProgress() {
-    pageEventBus.emit('page-translation-progress', {
+    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
       translated: this.translatedCount,
       progress: -1,
     });
@@ -392,7 +429,7 @@ export class PageTranslationManager extends ResourceTracker {
   /**
    * Translate the entire page
    */
-  async translatePage(options = {}) {
+  async translatePage(_options = {}) {
     if (this.isTranslating) return { success: false, reason: 'already_translating' };
 
     if (this.currentUrl !== window.location.href) {
@@ -406,7 +443,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.abortController = new AbortController();
 
     try {
-      pageEventBus.emit('page-translation-start', { url: this.currentUrl });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl });
 
       // Force reload settings to pick up any changes since initialization
       await this._loadSettings();
@@ -427,14 +464,15 @@ export class PageTranslationManager extends ResourceTracker {
       }
       
       this.isTranslated = true;
+      this.isTranslating = false; // Initial pass setup complete
       
-      pageEventBus.emit('page-translation-complete', { url: this.currentUrl });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, { url: this.currentUrl });
 
       return { success: true };
     } catch (error) {
       this.isTranslating = false;
       this.logger.error('Page translation failed to start', error);
-      pageEventBus.emit('page-translation-error', { error });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message || String(error) });
       throw error;
     } finally {
       this.abortController = null;
@@ -450,7 +488,7 @@ export class PageTranslationManager extends ResourceTracker {
       if (this.persistentTranslator) {
         try {
           this.persistentTranslator.restore(document.documentElement);
-        } catch (e) {
+        } catch (_) {
           // Ignore "not under observe" errors
         }
       }
@@ -469,11 +507,11 @@ export class PageTranslationManager extends ResourceTracker {
         el.removeAttribute('data-page-translated');
         el.removeAttribute('data-translate-dir');
       });
-      pageEventBus.emit('page-restore-complete', { url: this.currentUrl });
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, { url: this.currentUrl });
       return { success: true };
     } catch (error) {
       this.logger.error('Failed to restore page content', error);
-      pageEventBus.emit('page-restore-error', { error });
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message || String(error) });
       throw error;
     }
   }
@@ -485,7 +523,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.persistentTranslator) {
       try {
         this.persistentTranslator.restore(document.documentElement);
-      } catch (e) {
+      } catch (_) {
         // Ignore errors
       }
     }
@@ -493,7 +531,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.abortController) {
       this.abortController.abort();
       this.isTranslating = false;
-      pageEventBus.emit('page-translation-cancelled');
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
     }
   }
 
@@ -590,6 +628,7 @@ export class PageTranslationManager extends ResourceTracker {
       isActive: this.isActive,
       isTranslating: this.isTranslating,
       isTranslated: this.isTranslated,
+      translatedCount: this.translatedCount,
       currentUrl: this.currentUrl,
       settings: this.settings,
     };

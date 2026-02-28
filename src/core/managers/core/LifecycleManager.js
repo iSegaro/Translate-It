@@ -165,6 +165,14 @@ class LifecycleManager {
       [MessageActions.PAGE_TRANSLATE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_BATCH]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_RESTORE]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_GET_STATUS]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_START]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_PROGRESS]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_COMPLETE]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_ERROR]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_RESTORE_COMPLETE]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_RESTORE_ERROR]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_CANCELLED]: Handlers.handlePageTranslation,
 
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,

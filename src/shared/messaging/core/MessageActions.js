@@ -31,10 +31,15 @@ export class MessageActions {
   // Whole Page Translation (NEW)
   static PAGE_TRANSLATE = 'page-translate';
   static PAGE_TRANSLATE_BATCH = 'page-translate-batch'; // For actual translation request
+  static PAGE_TRANSLATE_START = 'page-translate-start';
   static PAGE_TRANSLATE_PROGRESS = 'page-translate-progress';
   static PAGE_TRANSLATE_COMPLETE = 'page-translate-complete';
+  static PAGE_TRANSLATE_ERROR = 'page-translate-error';
   static PAGE_RESTORE = 'page-restore';
   static PAGE_RESTORE_COMPLETE = 'page-restore-complete';
+  static PAGE_RESTORE_ERROR = 'page-restore-error';
+  static PAGE_TRANSLATE_CANCELLED = 'page-translate-cancelled';
+  static PAGE_TRANSLATE_GET_STATUS = 'page-translate-get-status';
 
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';

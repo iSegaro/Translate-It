@@ -5,6 +5,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Composable for page translation UI
@@ -26,6 +27,36 @@ export function usePageTranslation() {
   let errorListener = null;
   let restoreCompleteListener = null;
   let cancelledListener = null;
+
+  /**
+   * Fetch current translation status from the active tab
+   */
+  async function refreshStatus() {
+    try {
+      const result = await sendRegularMessage({
+        action: MessageActions.PAGE_TRANSLATE_GET_STATUS,
+        context: 'page-translation-ui',
+      });
+
+      if (result && result.success) {
+        isTranslated.value = result.isTranslated || false;
+        isTranslating.value = result.isTranslating || false;
+        
+        // Update progress if available
+        if (result.translatedCount !== undefined) {
+          translatedCount.value = result.translatedCount;
+        }
+      } else {
+        // Reset state if we can't get status (e.g. restricted page)
+        isTranslated.value = false;
+        isTranslating.value = false;
+      }
+    } catch {
+      // Content script might not be injected or ready
+      isTranslated.value = false;
+      isTranslating.value = false;
+    }
+  }
 
   /**
    * Translate the current page
@@ -54,9 +85,9 @@ export function usePageTranslation() {
       } else {
         throw new Error(result.reason || 'Translation failed');
       }
-    } catch (err) {
-      error.value = err.message || 'Translation failed';
-      message.value = `Translation failed: ${err.message}`;
+    } catch {
+      error.value = 'Translation failed';
+      message.value = 'Translation failed';
       isTranslated.value = false;
     } finally {
       isTranslating.value = false;
@@ -90,9 +121,9 @@ export function usePageTranslation() {
       } else {
         throw new Error(result.reason || 'Restore failed');
       }
-    } catch (err) {
-      error.value = err.message || 'Restore failed';
-      message.value = `Restore failed: ${err.message}`;
+    } catch {
+      error.value = 'Restore failed';
+      message.value = 'Restore failed';
     } finally {
       isTranslating.value = false;
     }
@@ -172,8 +203,64 @@ export function usePageTranslation() {
     message.value = 'Translation cancelled';
   }
 
+  // Tab change handlers for Sidepanel sync
+  const handleTabChange = () => {
+    refreshStatus();
+  };
+
+  const handleTabUpdate = (tabId, changeInfo) => {
+    if (changeInfo.status === 'complete') {
+      refreshStatus();
+    }
+  };
+
+  /**
+   * Handle incoming messages from other extension components (broadcasting)
+   */
+  const handleRuntimeMessage = (message) => {
+    if (!message || !message.action) return;
+
+    // We only care about page translation events
+    switch (message.action) {
+      case MessageActions.PAGE_TRANSLATE_START:
+        isTranslating.value = true;
+        isTranslated.value = false;
+        progress.value = 0;
+        break;
+      case MessageActions.PAGE_TRANSLATE_PROGRESS:
+        updateProgress(message.data || {});
+        break;
+      case MessageActions.PAGE_TRANSLATE_COMPLETE:
+        handleComplete(message.data || {});
+        break;
+      case MessageActions.PAGE_TRANSLATE_ERROR:
+        handleError(message.data || {});
+        break;
+      case MessageActions.PAGE_RESTORE_COMPLETE:
+        handleRestoreComplete(message.data || {});
+        break;
+      case MessageActions.PAGE_TRANSLATE_CANCELLED:
+        handleCancelled();
+        break;
+    }
+  };
+
   // Setup event listeners
   onMounted(() => {
+    // Initial status fetch
+    refreshStatus();
+
+    // Tab awareness for sidepanel
+    if (typeof browser !== 'undefined' && browser.tabs) {
+      browser.tabs.onActivated.addListener(handleTabChange);
+      browser.tabs.onUpdated.addListener(handleTabUpdate);
+    }
+
+    // Runtime message listener for cross-context broadcasting
+    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
+      browser.runtime.onMessage.addListener(handleRuntimeMessage);
+    }
+
     // Progress updates
     progressListener = (data) => updateProgress(data);
     pageEventBus.on('page-translation-progress', progressListener);
@@ -197,6 +284,15 @@ export function usePageTranslation() {
 
   // Cleanup event listeners
   onUnmounted(() => {
+    if (typeof browser !== 'undefined' && browser.tabs) {
+      browser.tabs.onActivated.removeListener(handleTabChange);
+      browser.tabs.onUpdated.removeListener(handleTabUpdate);
+    }
+
+    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
+      browser.runtime.onMessage.removeListener(handleRuntimeMessage);
+    }
+
     pageEventBus.off('page-translation-progress', progressListener);
     pageEventBus.off('page-translation-complete', completeListener);
     pageEventBus.off('page-translation-error', errorListener);
@@ -218,6 +314,7 @@ export function usePageTranslation() {
     translatePage,
     restorePage,
     cancelTranslation,
+    refreshStatus,
 
     // Computed
     canTranslate: computed(() => !isTranslating.value),
@@ -234,3 +331,4 @@ export function usePageTranslation() {
     }),
   };
 }
+
