@@ -85,7 +85,7 @@ export class PageTranslationManager extends ResourceTracker {
     // Settings
     this.settings = {
       lazyLoading: true,
-      rootMargin: '800px', // Default
+      rootMargin: '300px', // Default
       autoTranslateOnDOMChanges: false,
       chunkSize: 250, 
       maxCharsPerBatch: 5000, 
@@ -108,8 +108,8 @@ export class PageTranslationManager extends ResourceTracker {
    * Check if a node is within the current viewport (with default margin)
    */
   _isInViewport(node) {
-    // Parse numeric value from rootMargin (e.g., '800px' -> 800)
-    const marginValue = parseInt(this.settings.rootMargin, 10) || 800;
+    // Parse numeric value from rootMargin (e.g., '300px' -> 300)
+    const marginValue = parseInt(this.settings.rootMargin, 10) || 300;
     return this._isInViewportWithMargin(node, marginValue);
   }
 
@@ -119,7 +119,7 @@ export class PageTranslationManager extends ResourceTracker {
    * @param {number} margin - Margin in pixels
    * @returns {boolean} True if node is in viewport with margin
    */
-  _isInViewportWithMargin(node, margin = 800) {
+  _isInViewportWithMargin(node, margin = 300) {
     if (!node) return false;
 
     try {
@@ -171,7 +171,7 @@ export class PageTranslationManager extends ResourceTracker {
 
         // CRITICAL: Check with EXPANDED margin (matching IntersectionObserver)
         // This prevents elements on the edge from being handled asynchronously
-        const marginValue = parseInt(this.settings.rootMargin, 10) || 800;
+        const marginValue = parseInt(this.settings.rootMargin, 10) || 300;
         if (this._isInViewportWithMargin(node, marginValue)) {
           // Element is in expanded viewport - enqueue immediately
           resolve(this._doEnqueue(text, node));
@@ -212,7 +212,7 @@ export class PageTranslationManager extends ResourceTracker {
         // Extended to 2000ms to catch lazy-loaded content on modern pages
         const debounceDelay = this.isFirstBatch ? 2000 : this.settings.debounceDelay;
         if (this.isFirstBatch && this.queue.length <= 15) {
-          const marginStr = this.settings.rootMargin || '800px';
+          const marginStr = this.settings.rootMargin || '300px';
           this.logger.debug(`[First Batch] Collecting viewport nodes with ${debounceDelay}ms debounce, rootMargin=${marginStr} (${this.queue.length} queued so far...)`);
         }
         this.batchTimer = setTimeout(() => this._flushBatch(), debounceDelay);
@@ -508,7 +508,7 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async _loadSettings() {
     this.settings.lazyLoading = await getWholePageLazyLoadingAsync();
-    this.settings.rootMargin = await getWholePageRootMarginAsync() || '800px';
+    this.settings.rootMargin = await getWholePageRootMarginAsync() || '300px';
     this.settings.autoTranslateOnDOMChanges = await getWholePageAutoTranslateOnDOMChangesAsync();
     const { CONFIG } = await import('@/shared/config/config.js');
     this.settings.excludedSelectors = CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS;
