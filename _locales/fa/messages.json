@@ -767,5 +767,12 @@
   "action_speak_text": { "message": "خواندن متن" },
   "action_stop_speaking": { "message": "توقف خواندن" },
 
-  "translateSelectedText": { "message": "ترجمه متن انتخاب شده" }
+  "translateSelectedText": { "message": "ترجمه متن انتخاب شده" },
+  "whole_page_translation_section_title": { "message": "ترجمه کل صفحه" },
+  "whole_page_translation_enabled_label": { "message": "فعال‌سازی ترجمه کل صفحه" },
+  "whole_page_translation_enabled_description": { "message": "اجازه ترجمه تمام محتوای صفحه وب با حفظ چیدمان و ساختار آن." },
+  "whole_page_lazy_loading_label": { "message": "بارگذاری تنبل (بهینه‌سازی)" },
+  "whole_page_lazy_loading_description": { "message": "فقط بخش‌هایی از صفحه را ترجمه می‌کند که قابل مشاهده هستند یا به محدوده دید نزدیک‌اند. برای سرعت بیشتر توصیه می‌شود." },
+  "whole_page_auto_translate_on_dom_changes_label": { "message": "ترجمه خودکار محتوای جدید (اسکرول نامحدود)" },
+  "whole_page_auto_translate_on_dom_changes_description": { "message": "تشخیص و ترجمه خودکار محتوای جدید به محض ظاهر شدن (مثلاً هنگام اسکرول در توییتر یا ساب‌استک)." }
 }

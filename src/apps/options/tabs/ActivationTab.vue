@@ -166,6 +166,44 @@
         </span>
       </div>
     </BaseFieldset>
+
+    <!-- Whole Page Translation (NEW) -->
+    <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="wholePageEnabled"
+          :disabled="!extensionEnabled"
+          :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
+        />
+        <span class="setting-description">
+          {{ t('whole_page_translation_enabled_description') || 'Allow translating the entire web page content while maintaining the layout.' }}
+        </span>
+      </div>
+
+      <div class="sub-options-group" v-if="wholePageEnabled">
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="wholePageLazyLoading"
+            :disabled="!extensionEnabled"
+            :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
+          />
+          <span class="setting-description">
+            {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
+          </span>
+        </div>
+
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="wholePageAutoTranslate"
+            :disabled="!extensionEnabled"
+            :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
+          />
+          <span class="setting-description">
+            {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
+          </span>
+        </div>
+      </div>
+    </BaseFieldset>
   </section>
 </template>
 
@@ -260,6 +298,22 @@ const enhancedTripleClickDrag = computed({
 const enableDictionary = computed({
   get: () => settingsStore.settings?.ENABLE_DICTIONARY || false,
   set: (value) => settingsStore.updateSettingLocally('ENABLE_DICTIONARY', value)
+})
+
+// Whole Page settings
+const wholePageEnabled = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_TRANSLATION_ENABLED', value)
+})
+
+const wholePageLazyLoading = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_LAZY_LOADING ?? true,
+  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_LAZY_LOADING', value)
+})
+
+const wholePageAutoTranslate = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES ?? true,
+  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES', value)
 })
 </script>
 
