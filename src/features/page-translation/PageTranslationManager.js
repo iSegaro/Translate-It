@@ -431,6 +431,7 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async translatePage(_options = {}) {
     if (this.isTranslating) return { success: false, reason: 'already_translating' };
+    if (this.isTranslated) return { success: false, reason: 'already_translated' };
 
     if (this.currentUrl !== window.location.href) {
       this.isTranslated = false;
@@ -455,12 +456,21 @@ export class PageTranslationManager extends ResourceTracker {
         this.persistentTranslator = new PersistentDOMTranslator(this.domTranslator);
       }
 
-      // Handle infinite scroll / dynamic content
-      if (this.persistentTranslator) {
-        this.persistentTranslator.translate(document.documentElement);
-      } else {
-        // Fallback to one-time translation if persistent is not enabled
-        this.domTranslator.translate(document.documentElement);
+      try {
+        // Handle infinite scroll / dynamic content
+        if (this.persistentTranslator) {
+          this.persistentTranslator.translate(document.documentElement);
+        } else {
+          // Fallback to one-time translation if persistent is not enabled
+          this.domTranslator.translate(document.documentElement);
+        }
+      } catch (libError) {
+        // Handle "already translated" error from library gracefully
+        if (libError.message && libError.message.includes('already been translated')) {
+          this.logger.info('Node already under translation, ignoring duplicate call');
+        } else {
+          throw libError;
+        }
       }
       
       this.isTranslated = true;
