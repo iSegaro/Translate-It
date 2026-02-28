@@ -134,9 +134,10 @@ async function handleBatchTranslationRequest(message, sender) {
       // AI providers need large batches to stay under RPM limits and maintain context
       const pName = registryIdToName(provider || 'google');
       const isAI = isProviderType(pName, ProviderTypes.AI);
+      const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
 
-      const OPTIMAL_BATCH_SIZE = isAI ? 150 : 150; // Increased to 150 for all to favor single-request translations
-      const OPTIMAL_CHAR_LIMIT = isAI ? 10000 : 5000;
+      const OPTIMAL_BATCH_SIZE = globalConfig.WHOLE_PAGE_CHUNK_SIZE;
+      const OPTIMAL_CHAR_LIMIT = isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS;
       
       const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE, OPTIMAL_CHAR_LIMIT);
 

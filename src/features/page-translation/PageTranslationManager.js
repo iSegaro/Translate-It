@@ -7,7 +7,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
-import { getTranslationApiAsync, getTargetLanguageAsync, getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync } from '@/config.js';
+import { getTranslationApiAsync, getTargetLanguageAsync, getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -85,8 +85,9 @@ export class PageTranslationManager extends ResourceTracker {
     // Settings
     this.settings = {
       lazyLoading: true,
+      rootMargin: '800px', // Default
       autoTranslateOnDOMChanges: false,
-      chunkSize: 100, 
+      chunkSize: 250, 
       maxCharsPerBatch: 5000, 
       debounceDelay: 500,
       maxConcurrentFlushes: 1, 
@@ -104,25 +105,36 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Check if a node is within the current viewport (with margin)
+   * Check if a node is within the current viewport (with default margin)
    */
   _isInViewport(node) {
-    if (!node) return false; 
-    
+    // Parse numeric value from rootMargin (e.g., '800px' -> 800)
+    const marginValue = parseInt(this.settings.rootMargin, 10) || 800;
+    return this._isInViewportWithMargin(node, marginValue);
+  }
+
+  /**
+   * Check if a node is within the current viewport with custom margin
+   * @param {Node} node - The node to check
+   * @param {number} margin - Margin in pixels
+   * @returns {boolean} True if node is in viewport with margin
+   */
+  _isInViewportWithMargin(node, margin = 800) {
+    if (!node) return false;
+
     try {
-      const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
+      const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
                      (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
-      
+
       if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-      
+
       if (element.offsetParent === null && element.tagName !== 'BODY' && !(element instanceof SVGElement)) {
         return false;
       }
 
       const rect = element.getBoundingClientRect();
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const margin = 200;
-      
+
       return (
         rect.bottom >= -margin &&
         rect.top <= viewportHeight + margin
@@ -154,20 +166,28 @@ export class PageTranslationManager extends ResourceTracker {
     // Lazy Loading: Check if node is in viewport
     if (this.settings.lazyLoading && !this._isInViewport(node)) {
       return new Promise((resolve) => {
+        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
+                       (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
+
+        // CRITICAL: Check with EXPANDED margin (matching IntersectionObserver)
+        // This prevents elements on the edge from being handled asynchronously
+        const marginValue = parseInt(this.settings.rootMargin, 10) || 800;
+        if (this._isInViewportWithMargin(node, marginValue)) {
+          // Element is in expanded viewport - enqueue immediately
+          resolve(this._doEnqueue(text, node));
+          return;
+        }
+
         const observer = new IntersectionObserver((entries) => {
           if (entries[0].isIntersecting) {
             observer.disconnect();
             resolve(this._doEnqueue(text, node));
           }
-        }, { rootMargin: '300px' });
-        
-        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : 
-                       (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
-        
+        }, { rootMargin: this.settings.rootMargin });
+
         if (element && element.nodeType === Node.ELEMENT_NODE) {
           observer.observe(element);
         } else {
-          // If we can't observe (rare), just translate it
           resolve(this._doEnqueue(text, node));
         }
       });
@@ -189,9 +209,11 @@ export class PageTranslationManager extends ResourceTracker {
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
         // Use longer debounce for first batch to allow complete DOM traversal
+        // Extended to 2000ms to catch lazy-loaded content on modern pages
         const debounceDelay = this.isFirstBatch ? 2000 : this.settings.debounceDelay;
-        if (this.isFirstBatch && this.queue.length <= 5) {
-          this.logger.debug(`[First Batch] Collecting viewport nodes with ${debounceDelay}ms debounce (${this.queue.length} queued so far...)`);
+        if (this.isFirstBatch && this.queue.length <= 15) {
+          const marginStr = this.settings.rootMargin || '800px';
+          this.logger.debug(`[First Batch] Collecting viewport nodes with ${debounceDelay}ms debounce, rootMargin=${marginStr} (${this.queue.length} queued so far...)`);
         }
         this.batchTimer = setTimeout(() => this._flushBatch(), debounceDelay);
       }
@@ -217,7 +239,7 @@ export class PageTranslationManager extends ResourceTracker {
 
     const now = Date.now();
     const timeSinceLastFlush = now - this.lastFlushTime;
-    const minDelay = 800; // Minimum delay between batches
+    const minDelay = 1500; // Minimum delay between batches
 
     if (timeSinceLastFlush < minDelay) {
       if (this.batchTimer) clearTimeout(this.batchTimer);
@@ -236,13 +258,14 @@ export class PageTranslationManager extends ResourceTracker {
       const targetLanguage = await getTargetLanguageAsync();
       this.targetLanguage = targetLanguage;
 
-      // PROVIDER-AWARE LIMITS using project constants:
+      // PROVIDER-AWARE LIMITS:
       const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
+      const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
       const providerName = registryIdToName(providerRegistryId);
       const isAI = isProviderType(providerName, ProviderTypes.AI);
 
-      const effectiveChunkSize = isAI ? 100 : this.settings.chunkSize;
-      const effectiveMaxChars = isAI ? 10000 : this.settings.maxCharsPerBatch;
+      const effectiveChunkSize = this.settings.chunkSize;
+      const effectiveMaxChars = isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS;
 
       // Character-aware batching logic
       let itemsToProcess = 0;
@@ -485,6 +508,7 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async _loadSettings() {
     this.settings.lazyLoading = await getWholePageLazyLoadingAsync();
+    this.settings.rootMargin = await getWholePageRootMarginAsync() || '800px';
     this.settings.autoTranslateOnDOMChanges = await getWholePageAutoTranslateOnDOMChangesAsync();
     const { CONFIG } = await import('@/shared/config/config.js');
     this.settings.excludedSelectors = CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS;
@@ -501,7 +525,8 @@ export class PageTranslationManager extends ResourceTracker {
   async _initializeDomTranslator() {
     try {
       if (this.settings.lazyLoading) {
-        this.intersectionScheduler = new IntersectionScheduler();
+        // Pass rootMargin to IntersectionScheduler from settings
+        this.intersectionScheduler = new IntersectionScheduler({ rootMargin: this.settings.rootMargin });
       }
 
       // The translator callback receives (text, score)

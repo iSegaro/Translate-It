@@ -154,7 +154,10 @@ export const CONFIG = {
   WHOLE_PAGE_EXCLUDED_SELECTORS: ["script", "style", "code", "pre", "noscript", "iframe", "[data-translate-ignore]"], // المنت‌هایی که ترجمه نمی‌شوند
   WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label"], // Attributeهایی که ترجمه می‌شوند
   WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
-  WHOLE_PAGE_CHUNK_SIZE: 100, // تعداد nodeها در هر batch request
+  WHOLE_PAGE_CHUNK_SIZE: 250, // تعداد nodeها در هر batch request
+  WHOLE_PAGE_MAX_CHARS: 5000, // حداکثر کاراکتر در هر درخواست معمولی
+  WHOLE_PAGE_AI_MAX_CHARS: 15000, // حداکثر کاراکتر در هر درخواست برای مدل‌های AI
+  WHOLE_PAGE_ROOT_MARGIN: '800px', // حاشیه اطراف viewport برای شروع ترجمه lazy
   WHOLE_PAGE_DEBOUNCE_DELAY: 500, // تاخیر برای DOM change debouncing (ms)
   WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
@@ -913,6 +916,13 @@ export const getWholePageDebounceDelayAsync = async () => {
   return getSettingValueAsync(
     "WHOLE_PAGE_DEBOUNCE_DELAY",
     CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY
+  );
+};
+
+export const getWholePageRootMarginAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_ROOT_MARGIN",
+    CONFIG.WHOLE_PAGE_ROOT_MARGIN
   );
 };
 
