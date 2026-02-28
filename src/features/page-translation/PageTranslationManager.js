@@ -92,8 +92,6 @@ export class PageTranslationManager extends ResourceTracker {
       debounceDelay: 500,
       maxConcurrentFlushes: 1, 
     };
-
-    this.logger.debug('PageTranslationManager created');
   }
 
   /**
@@ -182,12 +180,7 @@ export class PageTranslationManager extends ResourceTracker {
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
         // Use longer debounce for first batch to allow complete DOM traversal
-        // Extended to 2000ms to catch lazy-loaded content on modern pages
         const debounceDelay = this.isFirstBatch ? 2000 : this.settings.debounceDelay;
-        if (this.isFirstBatch && this.queue.length <= 15) {
-          const marginStr = this.settings.rootMargin || '300px';
-          this.logger.debug(`[First Batch] Collecting viewport nodes with ${debounceDelay}ms debounce, rootMargin=${marginStr} (${this.queue.length} queued so far...)`);
-        }
         this.batchTimer = setTimeout(() => this._flushBatch(), debounceDelay);
       }
     });
@@ -310,47 +303,49 @@ export class PageTranslationManager extends ResourceTracker {
 
       this._reportProgress();
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Batch translation failed:', errorMsg);
+      const errorType = matchErrorToType(error);
+      const isQuotaError = [
+        ErrorTypes.QUOTA_EXCEEDED, 
+        ErrorTypes.DEEPL_QUOTA_EXCEEDED, 
+        ErrorTypes.RATE_LIMIT_REACHED,
+        ErrorTypes.INSUFFICIENT_BALANCE
+      ].includes(errorType);
       
-      // KILL PROCESS: First, stop all future attempts
-      this.isTranslating = false;
-      this.queue = []; 
-      if (this.batchTimer) clearTimeout(this.batchTimer);
+      this.logger.error('Batch translation failed:', { error, errorType, isQuotaError });
       
-      // SHOW ORGANIZED NOTIFICATION:
-      (async () => {
-        try {
-          const underlyingType = matchErrorToType(error);
-          const underlyingMessage = await getErrorMessage(underlyingType);
-          const stoppedMessage = await getErrorMessage(ErrorTypes.PAGE_TRANSLATION_STOPPED);
-          
-          const fullMessage = stoppedMessage.includes('{error}') 
-            ? stoppedMessage.replace('{error}', underlyingMessage)
-            : `${stoppedMessage}: ${underlyingMessage}`;
+      if (isQuotaError) {
+        // Just report quota error but keep system alive for potential retry/provider change
+        this.logger.info(`Quota/Rate limit hit (${errorType}). Skipping this batch.`);
+        
+        // Resolve items with original text so they don't hang
+        currentBatch.forEach(item => item.resolve(item.text));
+      } else {
+        // KILL PROCESS for other fatal errors (Network, Auth, etc)
+        this.isTranslating = false;
+        this.queue = []; 
+        if (this.batchTimer) clearTimeout(this.batchTimer);
+      }
+      
+      // Handle the error through central system (this will handle toasts and UI)
+      ErrorHandler.getInstance().handle(error, {
+        type: isQuotaError ? errorType : ErrorTypes.PAGE_TRANSLATION_STOPPED,
+        context: 'page-translation',
+        showToast: true,
+        persistent: false,
+        duration: NOTIFICATION_TIME.ERROR
+      });
 
-          // Use ErrorHandler for consistent reporting
-          ErrorHandler.getInstance().handle(new Error(fullMessage), {
-            type: ErrorTypes.PAGE_TRANSLATION_STOPPED,
-            context: 'page-translation',
-            persistent: false, // Allow dismissal
-            duration: NOTIFICATION_TIME.ERROR // Respect configured error timeout
-          });
-        } catch (err) {
-          // Fallback if i18n fails
-          ErrorHandler.getInstance().handle(error, {
-            context: 'page-translation',
-            persistent: false,
-            duration: NOTIFICATION_TIME.ERROR
-          });
-        }
-      })();
+      // CLEANUP: Resolve current batch with original text if not already resolved
+      currentBatch.forEach(item => {
+        try { item.resolve(item.text); } catch (e) { /* ignore */ }
+      });
 
-      // CLEANUP: Resolve current batch so they don't hang
-      currentBatch.forEach(item => item.resolve(item.text));
-
-      // Notify other components
-      pageEventBus.emit('page-translation-error', { error: errorMsg, isFatal: true });
+      // Notify other components via event bus
+      pageEventBus.emit('page-translation-error', { 
+        error: error instanceof Error ? error.message : String(error), 
+        errorType,
+        isFatal: !isQuotaError 
+      });
     } finally {
       this.activeFlushes--;
       if (this.isTranslating && this.queue.length > 0) {
@@ -376,8 +371,6 @@ export class PageTranslationManager extends ResourceTracker {
   async initialize() {
     if (this.isActive) return;
 
-    this.logger.debug('Initializing PageTranslationManager');
-
     try {
       // Initialize specialized notification manager for other features if needed
       if (!this.notificationManager) {
@@ -390,7 +383,6 @@ export class PageTranslationManager extends ResourceTracker {
       await this._initializeDomTranslator();
 
       this.isActive = true;
-      this.logger.info('PageTranslationManager initialized successfully');
     } catch (error) {
       this.logger.error('Error initializing PageTranslationManager:', error);
       throw error;
@@ -416,11 +408,24 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       pageEventBus.emit('page-translation-start', { url: this.currentUrl });
 
+      // Force reload settings to pick up any changes since initialization
+      await this._loadSettings();
+
       if (!this.domTranslator) {
         await this.initialize();
+      } else if (this.settings.autoTranslateOnDOMChanges && !this.persistentTranslator) {
+        // If it was disabled during init but now enabled, create it
+        this.persistentTranslator = new PersistentDOMTranslator(this.domTranslator);
       }
 
-      this.domTranslator.translate(document.documentElement);
+      // Handle infinite scroll / dynamic content
+      if (this.persistentTranslator) {
+        this.persistentTranslator.translate(document.documentElement);
+      } else {
+        // Fallback to one-time translation if persistent is not enabled
+        this.domTranslator.translate(document.documentElement);
+      }
+      
       this.isTranslated = true;
       
       pageEventBus.emit('page-translation-complete', { url: this.currentUrl });
@@ -442,6 +447,14 @@ export class PageTranslationManager extends ResourceTracker {
   async restorePage() {
     this.logger.info('Restoring original page content');
     try {
+      if (this.persistentTranslator) {
+        try {
+          this.persistentTranslator.restore(document.documentElement);
+        } catch (e) {
+          // Ignore "not under observe" errors
+        }
+      }
+
       if (this.domTranslator) {
         this.domTranslator.restore(document.documentElement);
       }
@@ -469,6 +482,14 @@ export class PageTranslationManager extends ResourceTracker {
    * Cancel ongoing translation
    */
   cancelTranslation() {
+    if (this.persistentTranslator) {
+      try {
+        this.persistentTranslator.restore(document.documentElement);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
     if (this.abortController) {
       this.abortController.abort();
       this.isTranslating = false;
@@ -483,6 +504,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings.lazyLoading = await getWholePageLazyLoadingAsync();
     this.settings.rootMargin = await getWholePageRootMarginAsync() || '300px';
     this.settings.autoTranslateOnDOMChanges = await getWholePageAutoTranslateOnDOMChangesAsync();
+    
     const { CONFIG } = await import('@/shared/config/config.js');
     this.settings.excludedSelectors = CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS;
     this.settings.attributesToTranslate = CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE;
