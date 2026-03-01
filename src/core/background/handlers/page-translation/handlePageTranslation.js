@@ -57,9 +57,73 @@ export async function handlePageTranslation(message, sender) {
     const tab = tabs[0];
 
     try {
-      // Forward the message to the content script
-      const response = await browser.tabs.sendMessage(tab.id, message);
-      return response || { success: true };
+      // Get all frames in the tab to ensure we reach every part of the page (especially iframes)
+      // Safety check: webNavigation might not be available if permissions aren't fully reloaded
+      const hasWebNav = typeof browser !== 'undefined' && browser.webNavigation;
+      let allFrames = hasWebNav 
+        ? await browser.webNavigation.getAllFrames({ tabId: tab.id }).catch(() => [{ frameId: 0 }])
+        : [{ frameId: 0 }];
+      
+      // Filter frames to skip common ad domains and non-content frames
+      allFrames = allFrames.filter(frame => {
+        // Always include main frame
+        if (frame.frameId === 0) return true;
+        
+        // Skip frames with no URL or common non-content protocols
+        if (!frame.url) return false;
+        if (frame.url.startsWith('about:') || frame.url.startsWith('javascript:')) return false;
+        if (frame.url.startsWith('chrome-extension:')) return false;
+        
+        // Skip common ad networks early (optional but improves performance)
+        const adDomains = [
+          'doubleclick.net', 'googleads', 'adnxs.com', 'pubmatic.com', 
+          'rubiconproject.com', 'openx.net', 'advertising.com'
+        ];
+        if (adDomains.some(domain => frame.url.includes(domain))) {
+          logger.debug(`Filtering out ad frame: ${frame.url}`);
+          return false;
+        }
+        
+        return true;
+      });
+
+      if (message.action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
+        // Query status from all frames and return the most active one
+        const statusResponses = await Promise.all(
+          allFrames.map(frame => 
+            browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId })
+              .catch(() => null)
+          )
+        );
+        
+        // Find the most relevant response (prefer one that is currently translating or already translated)
+        const bestResponse = statusResponses.find(r => r && (r.isTranslating || r.isTranslated)) || 
+                           statusResponses.find(r => r && r.success) || 
+                           { success: false, error: 'No active translation found' };
+                           
+        // Aggregate translated count if possible
+        const totalCount = statusResponses.reduce((acc, r) => acc + (r?.translatedCount || 0), 0);
+        if (bestResponse.success) {
+          bestResponse.translatedCount = totalCount;
+        }
+        
+        return bestResponse;
+      }
+
+      // Forward TRANSLATE and RESTORE to all frames
+      const responses = await Promise.all(
+        allFrames.map(frame => 
+          browser.tabs.sendMessage(tab.id, message, { frameId: frame.frameId })
+            .catch(err => {
+              logger.debug(`Could not send to frame ${frame.frameId}:`, err.message);
+              return null;
+            })
+        )
+      );
+
+      // Return success if at least one frame responded successfully
+      const success = responses.some(r => r && r.success);
+      return { success, responses: responses.filter(Boolean) };
     } catch (sendError) {
       // Use centralized context error detection
       if (ExtensionContextManager.isContextError(sendError)) {

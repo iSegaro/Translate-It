@@ -7,7 +7,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
-import { getTranslationApiAsync, getTargetLanguageAsync, getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync } from '@/config.js';
+import { getTranslationApiAsync, getTargetLanguageAsync, getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -427,11 +427,69 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Check if the current frame/document is suitable for translation
+   * Used to avoid translating small iframes, ads, or empty pages
+   * @returns {boolean} True if suitable
+   */
+  _isSuitableForTranslation() {
+    // Main frame is always suitable
+    if (window === window.top) return true;
+
+    try {
+      // Heuristics for iframes:
+      
+      // 1. Size check: Tiny iframes are almost certainly ads or tracking pixels
+      // Common ad sizes: 300x250, 728x90, 160x600. 
+      // We skip anything smaller than 120px in both dimensions unless it's very wide/tall
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      if (width < 50 || height < 50) {
+        this.logger.debug(`Skipping tiny iframe: ${width}x${height}`);
+        return false;
+      }
+      
+      if (width < 120 && height < 120) {
+        this.logger.debug(`Skipping small square-ish iframe: ${width}x${height}`);
+        return false;
+      }
+
+      // 2. Visibility check: Skip hidden iframes
+      const style = window.getComputedStyle(document.documentElement);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return false;
+      }
+
+      // 3. Content density check: Skip iframes with very little text
+      // We check body innerText. This is usually cheap for small iframes.
+      const text = document.body ? document.body.innerText.trim() : '';
+      if (text.length < 20) {
+        // Double check if there are any translatable attributes if text is short
+        const hasTranslatableAttributes = !!document.querySelector('[title], [alt], [placeholder], [aria-label]');
+        if (!hasTranslatableAttributes) {
+          this.logger.debug(`Skipping iframe with low text density (${text.length} chars) and no translatable attributes`);
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      // In case of any error (security or DOM), fallback to size-based check
+      return window.innerWidth > 150 && window.innerHeight > 150;
+    }
+  }
+
+  /**
    * Translate the entire page
    */
   async translatePage(_options = {}) {
     if (this.isTranslating) return { success: false, reason: 'already_translating' };
     if (this.isTranslated) return { success: false, reason: 'already_translated' };
+
+    // Check if this frame is suitable for translation (ads/tiny frames)
+    if (!this._isSuitableForTranslation()) {
+      return { success: false, reason: 'not_suitable_for_translation' };
+    }
 
     if (this.currentUrl !== window.location.href) {
       this.isTranslated = false;
@@ -552,10 +610,10 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings.lazyLoading = await getWholePageLazyLoadingAsync();
     this.settings.rootMargin = await getWholePageRootMarginAsync() || '300px';
     this.settings.autoTranslateOnDOMChanges = await getWholePageAutoTranslateOnDOMChangesAsync();
+    this.settings.excludedSelectors = await getWholePageExcludedSelectorsAsync();
+    this.settings.attributesToTranslate = await getWholePageAttributesToTranslateAsync();
     
     const { CONFIG } = await import('@/shared/config/config.js');
-    this.settings.excludedSelectors = CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS;
-    this.settings.attributesToTranslate = CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE;
     this.settings.maxElements = CONFIG.WHOLE_PAGE_MAX_ELEMENTS;
     this.settings.chunkSize = CONFIG.WHOLE_PAGE_CHUNK_SIZE;
     this.settings.debounceDelay = CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY;
@@ -626,8 +684,8 @@ export class PageTranslationManager extends ResourceTracker {
    */
   _createNodesFilter() {
     return createNodesFilter({
-      ignoredSelectors: this.settings.excludedSelectors || ['script', 'style', 'noscript', 'iframe', 'code', 'pre', '[data-translate-ignore]'],
-      attributesList: this.settings.attributesToTranslate || ['title', 'alt', 'placeholder', 'aria-label'],
+      ignoredSelectors: this.settings.excludedSelectors || ['script', 'style', 'noscript', 'code', 'pre', '[data-translate-ignore]'],
+      attributesList: this.settings.attributesToTranslate || ['title', 'alt', 'placeholder', 'value', 'aria-label', 'aria-placeholder', 'aria-roledescription', 'data-label', 'data-title', 'data-placeholder'],
     });
   }
 

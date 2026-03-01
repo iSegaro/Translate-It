@@ -151,8 +151,8 @@ export const CONFIG = {
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
   WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
-  WHOLE_PAGE_EXCLUDED_SELECTORS: ["script", "style", "code", "pre", "noscript", "iframe", "[data-translate-ignore]"], // المنت‌هایی که ترجمه نمی‌شوند
-  WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label"], // Attributeهایی که ترجمه می‌شوند
+  WHOLE_PAGE_EXCLUDED_SELECTORS: ["script", "style", "code", "pre", "noscript", "[data-translate-ignore]"], // المنت‌هایی که ترجمه نمی‌شوند (Removed iframe)
+  WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "value", "aria-label", "aria-placeholder", "aria-roledescription", "data-label", "data-title", "data-placeholder"], // Attributeهایی که ترجمه می‌شوند
   WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
   WHOLE_PAGE_CHUNK_SIZE: 250, // تعداد nodeها در هر batch request
   WHOLE_PAGE_MAX_CHARS: 5000, // حداکثر کاراکتر در هر درخواست معمولی

@@ -23,6 +23,7 @@ export function generateManifest(browser = 'chrome') {
       'storage',
       'scripting',
       'tabs',
+      'webNavigation',
       'clipboardWrite',
       'clipboardRead',
       'notifications',
