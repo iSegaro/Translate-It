@@ -102,11 +102,11 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Check if a node is within the current viewport (with default margin)
+   * Check if a node is within the current viewport (with margin from settings)
    */
   _isInViewport(node) {
-    // Parse numeric value from rootMargin (e.g., '300px' -> 300)
-    const marginValue = parseInt(this.settings.rootMargin, 10) || 300;
+    const marginStr = this.settings.rootMargin || '300px';
+    const marginValue = parseInt(marginStr, 10);
     return this._isInViewportWithMargin(node, marginValue);
   }
 
@@ -116,8 +116,11 @@ export class PageTranslationManager extends ResourceTracker {
    * @param {number} margin - Margin in pixels
    * @returns {boolean} True if node is in viewport with margin
    */
-  _isInViewportWithMargin(node, margin = 300) {
+  _isInViewportWithMargin(node, margin) {
     if (!node) return false;
+
+    // Use default margin if not provided
+    const effectiveMargin = margin !== undefined ? margin : parseInt(this.settings.rootMargin || '300px', 10);
 
     try {
       const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
@@ -133,8 +136,8 @@ export class PageTranslationManager extends ResourceTracker {
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
 
       return (
-        rect.bottom >= -margin &&
-        rect.top <= viewportHeight + margin
+        rect.bottom >= -effectiveMargin &&
+        rect.top <= viewportHeight + effectiveMargin
       );
     } catch (_) {
       return false;
@@ -199,23 +202,37 @@ export class PageTranslationManager extends ResourceTracker {
     
     // Check concurrency limit
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
-      return;
-    }
-
-    const now = Date.now();
-    const timeSinceLastFlush = now - this.lastFlushTime;
-    const minDelay = 1500; // Minimum delay between batches
-
-    if (timeSinceLastFlush < minDelay) {
-      if (this.batchTimer) clearTimeout(this.batchTimer);
-      this.batchTimer = setTimeout(() => this._flushBatch(), minDelay - timeSinceLastFlush);
+      // If we're already flushing but the queue is large, we might want to schedule another check soon
+      if (!this.batchTimer) {
+        this.batchTimer = setTimeout(() => this._flushBatch(), 500);
+      }
       return;
     }
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
 
+    // PRIORITIZATION LOGIC:
+    // Move items that are currently visible to the front of the queue
+    const visibleItems = [];
+    const nonVisibleItems = [];
+    
+    // Parse numeric value from rootMargin (e.g., '300px' -> 300)
+    const marginValue = parseInt(this.settings.rootMargin || '300', 10);
+
+    for (const item of this.queue) {
+      // Prioritize nodes that are currently in or near viewport
+      if (this._isInViewportWithMargin(item.node, marginValue)) {
+        visibleItems.push(item);
+      } else {
+        nonVisibleItems.push(item);
+      }
+    }
+    
+    // Re-assemble queue with priority
+    this.queue = [...visibleItems, ...nonVisibleItems];
+
     this.activeFlushes++;
-    this.isTranslating = true; // Signal we are actively translating
+    this.isTranslating = true; 
     
     let currentBatch = [];
 
@@ -224,7 +241,6 @@ export class PageTranslationManager extends ResourceTracker {
       const targetLanguage = await getTargetLanguageAsync();
       this.targetLanguage = targetLanguage;
 
-      // PROVIDER-AWARE LIMITS:
       const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
       const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
       const providerName = registryIdToName(providerRegistryId);
@@ -249,6 +265,7 @@ export class PageTranslationManager extends ResourceTracker {
 
       if (itemsToProcess === 0) {
         this.activeFlushes--;
+        this.isTranslating = this.queue.length > 0;
         return;
       }
 
