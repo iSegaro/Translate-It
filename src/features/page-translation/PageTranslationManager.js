@@ -133,11 +133,29 @@ export class PageTranslationManager extends ResourceTracker {
       }
 
       const rect = element.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      
+      // Basic visibility check: must have some size
+      if (rect.width === 0 || rect.height === 0) return false;
 
+      // Check if element is hidden by CSS
+      try {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+          return false;
+        }
+      } catch { 
+        /* ignore */
+      }
+
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+      // Check both vertical and horizontal axes with margin
       return (
         rect.bottom >= -effectiveMargin &&
-        rect.top <= viewportHeight + effectiveMargin
+        rect.top <= viewportHeight + effectiveMargin &&
+        rect.right >= -effectiveMargin &&
+        rect.left <= viewportWidth + effectiveMargin
       );
     } catch (_) {
       return false;
@@ -147,10 +165,11 @@ export class PageTranslationManager extends ResourceTracker {
   /**
    * Prioritize visible items in the translation queue.
    * Elements that are currently in or near the viewport are moved to the front.
+   * @returns {number} The number of visible items moved to the front.
    */
   _prioritizeQueue() {
-    if (this.queue.length <= 1) return;
-
+    if (this.queue.length === 0) return 0;
+    
     const visibleItems = [];
     const nonVisibleItems = [];
     
@@ -169,6 +188,31 @@ export class PageTranslationManager extends ResourceTracker {
     if (visibleItems.length > 0) {
       this.queue = [...visibleItems, ...nonVisibleItems];
     }
+    
+    return visibleItems.length;
+  }
+
+  /**
+   * Determine if a text should be translated.
+   * Filters out numbers, timers, and very short noisy strings.
+   */
+  _shouldTranslate(text) {
+    if (!text) return false;
+    const trimmed = text.trim();
+    
+    // Ignore purely numeric strings
+    if (/^\d+$/.test(trimmed)) return false;
+    
+    // Ignore timers (e.g., 0:11, 1:20:05)
+    if (/^(\d+:)+\d+$/.test(trimmed)) return false;
+    
+    // Ignore very short strings that are likely just icons or punctuation
+    if (trimmed.length < 2 && !/[\u0600-\u06FF]/.test(trimmed)) return false;
+
+    // Ignore strings that are just units or stats (e.g., "10k", "5.2M")
+    if (/^\d+(\.\d+)?[kKM]$/.test(trimmed)) return false;
+
+    return true;
   }
 
   /**
@@ -176,6 +220,11 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async _enqueueTranslation(text, _score = 0) {
     if (!text || !text.trim() || !this.isTranslated) return text;
+    
+    // Filter out noise (timers, numbers, etc.)
+    if (!this._shouldTranslate(text)) {
+      return text;
+    }
 
     // Normalize text before looking up tracked nodes
     const normalizedText = this._normalizeText(text);
@@ -204,12 +253,12 @@ export class PageTranslationManager extends ResourceTracker {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
       // If queue is getting large, flush it (allow more accumulation for debounce to catch up)
-      if (this.queue.length >= this.settings.chunkSize * 5) {
+      if (this.queue.length >= this.settings.chunkSize * 2) {
         this._flushBatch();
       } else {
         if (this.batchTimer) clearTimeout(this.batchTimer);
-        // Use longer debounce for first batch to allow complete DOM traversal
-        const debounceDelay = this.isFirstBatch ? 2000 : this.settings.debounceDelay;
+        // Use longer debounce for regular updates to allow batching
+        const debounceDelay = this.isFirstBatch ? 2000 : 1000;
         this.batchTimer = setTimeout(() => this._flushBatch(), debounceDelay);
       }
     });
@@ -237,13 +286,19 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Extract a batch of items from the queue based on character and size limits.
+   * Extract a batch of items from the queue based on character, size, and visibility limits.
+   * @param {Object} config - Batch configuration
+   * @param {number} maxToExtract - Maximum items allowed (for visibility-aware batching)
    */
-  _extractBatch(config) {
+  _extractBatch(config, maxToExtract = Infinity) {
     let itemsToProcess = 0;
     let currentChars = 0;
 
     for (const item of this.queue) {
+      // If lazy loading is enabled, we only take items that are currently visible
+      // (up to the limit found by prioritizeQueue)
+      if (itemsToProcess >= maxToExtract) break;
+
       const itemLen = item.text.length;
       if (itemsToProcess >= config.chunkSize || 
           (currentChars + itemLen > config.maxChars && itemsToProcess > 0)) {
@@ -346,8 +401,15 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
     
-    // Prioritize visible items
-    this._prioritizeQueue();
+    // Prioritize visible items and get their count
+    const visibleCount = this._prioritizeQueue();
+    this.logger.debug(`Flush check - Queue: ${this.queue.length}, Visible: ${visibleCount}`);
+
+    // If lazy loading is on and NO items are visible, don't flush yet
+    if (this.settings.lazyLoading && visibleCount === 0) {
+      this.isTranslating = this.queue.length > 0;
+      return;
+    }
 
     this.activeFlushes++;
     this.isTranslating = true; 
@@ -355,7 +417,9 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       const config = await this._getBatchConfig();
-      currentBatch = this._extractBatch(config);
+      // Only extract what's visible if lazy loading is enabled
+      const maxToExtract = this.settings.lazyLoading ? visibleCount : Infinity;
+      currentBatch = this._extractBatch(config, maxToExtract);
 
       if (currentBatch.length === 0) {
         this.activeFlushes--;
@@ -533,7 +597,10 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.currentUrl !== window.location.href) {
       this.isTranslated = false;
       this.translatedCount = 0;
+      this.queue = [];
+      this._nodeTrackingQueue.clear();
       this.currentUrl = window.location.href;
+      this.logger.debug('URL changed, resetting translation state and clearing queue');
     }
 
     this.isTranslating = true;
