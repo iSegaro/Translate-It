@@ -145,6 +145,33 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Prioritize visible items in the translation queue.
+   * Elements that are currently in or near the viewport are moved to the front.
+   */
+  _prioritizeQueue() {
+    if (this.queue.length <= 1) return;
+
+    const visibleItems = [];
+    const nonVisibleItems = [];
+    
+    // Parse numeric value from rootMargin (e.g., '300px' -> 300)
+    const marginValue = parseInt(this.settings.rootMargin || '300', 10);
+
+    for (const item of this.queue) {
+      if (this._isInViewportWithMargin(item.node, marginValue)) {
+        visibleItems.push(item);
+      } else {
+        nonVisibleItems.push(item);
+      }
+    }
+    
+    // Re-assemble queue with priority
+    if (visibleItems.length > 0) {
+      this.queue = [...visibleItems, ...nonVisibleItems];
+    }
+  }
+
+  /**
    * Enqueue a text for batch translation
    */
   async _enqueueTranslation(text, _score = 0) {
@@ -210,26 +237,9 @@ export class PageTranslationManager extends ResourceTracker {
     }
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
-
-    // PRIORITIZATION LOGIC:
-    // Move items that are currently visible to the front of the queue
-    const visibleItems = [];
-    const nonVisibleItems = [];
     
-    // Parse numeric value from rootMargin (e.g., '300px' -> 300)
-    const marginValue = parseInt(this.settings.rootMargin || '300', 10);
-
-    for (const item of this.queue) {
-      // Prioritize nodes that are currently in or near viewport
-      if (this._isInViewportWithMargin(item.node, marginValue)) {
-        visibleItems.push(item);
-      } else {
-        nonVisibleItems.push(item);
-      }
-    }
-    
-    // Re-assemble queue with priority
-    this.queue = [...visibleItems, ...nonVisibleItems];
+    // Prioritize visible items in the queue
+    this._prioritizeQueue();
 
     this.activeFlushes++;
     this.isTranslating = true; 
