@@ -638,32 +638,48 @@ export class PageTranslationManager extends ResourceTracker {
       // Capture the node for each call and store it for our translator callback
       const originalTranslate = nodesTranslator.translate.bind(nodesTranslator);
       nodesTranslator.translate = (node, callback) => {
-        const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
-        const normalized = this._normalizeText(textContent);
-        if (normalized) {
-          const queue = this._nodeTrackingQueue.get(normalized) || [];
-          queue.push(node);
-          this._nodeTrackingQueue.set(normalized, queue);
+        try {
+          const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
+          const normalized = this._normalizeText(textContent);
+          if (normalized) {
+            const queue = this._nodeTrackingQueue.get(normalized) || [];
+            queue.push(node);
+            this._nodeTrackingQueue.set(normalized, queue);
+          }
+          
+          return originalTranslate(node, (text) => {
+            if (typeof callback === 'function') callback(text, node);
+          });
+        } catch (err) {
+          if (err.message && err.message.includes('already been translated')) {
+            // Silently ignore - node is already being handled
+            return;
+          }
+          throw err;
         }
-        
-        return originalTranslate(node, (text) => {
-          if (typeof callback === 'function') callback(text, node);
-        });
       };
 
       const originalUpdate = nodesTranslator.update.bind(nodesTranslator);
       nodesTranslator.update = (node, callback) => {
-        const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
-        const normalized = this._normalizeText(textContent);
-        if (normalized) {
-          const queue = this._nodeTrackingQueue.get(normalized) || [];
-          queue.push(node);
-          this._nodeTrackingQueue.set(normalized, queue);
+        try {
+          const textContent = node.nodeValue || node.value || (node.nodeType === Node.ATTRIBUTE_NODE ? node.nodeValue : '');
+          const normalized = this._normalizeText(textContent);
+          if (normalized) {
+            const queue = this._nodeTrackingQueue.get(normalized) || [];
+            queue.push(node);
+            this._nodeTrackingQueue.set(normalized, queue);
+          }
+          
+          return originalUpdate(node, (text) => {
+            if (typeof callback === 'function') callback(text, node);
+          });
+        } catch (err) {
+          if (err.message && err.message.includes('already been translated')) {
+            // Silently ignore - node is already being handled
+            return;
+          }
+          throw err;
         }
-        
-        return originalUpdate(node, (text) => {
-          if (typeof callback === 'function') callback(text, node);
-        });
       };
 
       const config = { filter: this.nodeFilter };
