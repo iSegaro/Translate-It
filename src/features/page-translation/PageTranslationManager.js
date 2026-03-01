@@ -216,6 +216,117 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Get configuration for the current translation batch based on provider type.
+   */
+  async _getBatchConfig() {
+    const providerRegistryId = await getTranslationApiAsync();
+    const targetLanguage = await getTargetLanguageAsync();
+    
+    const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
+    const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
+    
+    const providerName = registryIdToName(providerRegistryId);
+    const isAI = isProviderType(providerName, ProviderTypes.AI);
+
+    return {
+      providerRegistryId,
+      targetLanguage,
+      chunkSize: this.settings.chunkSize,
+      maxChars: isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS
+    };
+  }
+
+  /**
+   * Extract a batch of items from the queue based on character and size limits.
+   */
+  _extractBatch(config) {
+    let itemsToProcess = 0;
+    let currentChars = 0;
+
+    for (const item of this.queue) {
+      const itemLen = item.text.length;
+      if (itemsToProcess >= config.chunkSize || 
+          (currentChars + itemLen > config.maxChars && itemsToProcess > 0)) {
+        break;
+      }
+      currentChars += itemLen;
+      itemsToProcess++;
+    }
+
+    if (itemsToProcess === 0) return [];
+
+    this.lastFlushTime = Date.now();
+    return this.queue.splice(0, itemsToProcess);
+  }
+
+  /**
+   * Apply translated texts to the original nodes and handle RTL if needed.
+   */
+  _applyBatchResults(batch, translatedTexts, targetLanguage) {
+    batch.forEach((item, index) => {
+      const translated = translatedTexts[index]?.text || translatedTexts[index] || item.text;
+      
+      if (item.node && RTL_LANGUAGES.has(targetLanguage)) {
+        const element = item.node.nodeType === Node.TEXT_NODE ? item.node.parentElement : item.node.ownerElement;
+        
+        if (element && !element.hasAttribute('data-page-translated')) {
+          const isLeaf = element.children.length === 0;
+          if (isLeaf && TEXT_TAGS.has(element.tagName)) {
+            element.setAttribute('dir', 'rtl');
+          } else if (item.node.nodeType === Node.ATTRIBUTE_NODE && (item.node.name === 'placeholder' || item.node.name === 'title')) {
+            element.setAttribute('dir', 'rtl');
+          }
+          element.setAttribute('data-page-translated', 'true');
+        }
+      }
+      item.resolve(translated);
+      this.translatedCount++;
+    });
+  }
+
+  /**
+   * Handle errors during batch translation.
+   */
+  _handleBatchError(error, batch) {
+    const errorType = matchErrorToType(error);
+    const isQuotaError = [
+      ErrorTypes.QUOTA_EXCEEDED, 
+      ErrorTypes.DEEPL_QUOTA_EXCEEDED, 
+      ErrorTypes.RATE_LIMIT_REACHED,
+      ErrorTypes.INSUFFICIENT_BALANCE
+    ].includes(errorType);
+    
+    this.logger.error('Batch translation failed:', { error, errorType, isQuotaError });
+    
+    if (isQuotaError) {
+      this.logger.info(`Quota/Rate limit hit (${errorType}). Skipping this batch.`);
+    } else {
+      this.isTranslating = false;
+      this.queue = []; 
+      if (this.batchTimer) clearTimeout(this.batchTimer);
+    }
+    
+    // Handle via central error system
+    ErrorHandler.getInstance().handle(error, {
+      type: isQuotaError ? errorType : ErrorTypes.PAGE_TRANSLATION_STOPPED,
+      context: 'page-translation',
+      showToast: true,
+      duration: NOTIFICATION_TIME.ERROR
+    });
+
+    // Resolve all items to prevent hanging, even on error
+    batch.forEach(item => {
+      try { item.resolve(item.text); } catch (_) { /* ignore */ }
+    });
+
+    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
+      error: error instanceof Error ? error.message : String(error), 
+      errorType,
+      isFatal: !isQuotaError 
+    });
+  }
+
+  /**
    * Flush the current translation queue
    */
   async _flushBatch() {
@@ -229,63 +340,31 @@ export class PageTranslationManager extends ResourceTracker {
     
     // Check concurrency limit
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
-      // If we're already flushing but the queue is large, we might want to schedule another check soon
-      if (!this.batchTimer) {
-        this.batchTimer = setTimeout(() => this._flushBatch(), 500);
-      }
+      if (!this.batchTimer) this.batchTimer = setTimeout(() => this._flushBatch(), 500);
       return;
     }
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
     
-    // Prioritize visible items in the queue
+    // Prioritize visible items
     this._prioritizeQueue();
 
     this.activeFlushes++;
     this.isTranslating = true; 
-    
     let currentBatch = [];
 
     try {
-      const providerRegistryId = await getTranslationApiAsync();
-      const targetLanguage = await getTargetLanguageAsync();
-      this.targetLanguage = targetLanguage;
+      const config = await this._getBatchConfig();
+      currentBatch = this._extractBatch(config);
 
-      const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
-      const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
-      const providerName = registryIdToName(providerRegistryId);
-      const isAI = isProviderType(providerName, ProviderTypes.AI);
-
-      const effectiveChunkSize = this.settings.chunkSize;
-      const effectiveMaxChars = isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS;
-
-      // Character-aware batching logic
-      let itemsToProcess = 0;
-      let currentChars = 0;
-
-      for (const item of this.queue) {
-        const itemLen = item.text.length;
-        if (itemsToProcess >= effectiveChunkSize || 
-            (currentChars + itemLen > effectiveMaxChars && itemsToProcess > 0)) {
-          break;
-        }
-        currentChars += itemLen;
-        itemsToProcess++;
-      }
-
-      if (itemsToProcess === 0) {
+      if (currentBatch.length === 0) {
         this.activeFlushes--;
         this.isTranslating = this.queue.length > 0;
         return;
       }
 
-      this.lastFlushTime = Date.now();
-      currentBatch = this.queue.splice(0, itemsToProcess);
-
-      // Reset first batch flag after first flush
       this.isFirstBatch = false;
-
-      this.logger.debug(`Flushing batch (${providerRegistryId}): ${currentBatch.length} texts, ${currentChars} chars. Queue: ${this.queue.length}`);
+      this.logger.debug(`Flushing batch (${config.providerRegistryId}): ${currentBatch.length} texts. Queue: ${this.queue.length}`);
 
       const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
 
@@ -293,98 +372,31 @@ export class PageTranslationManager extends ResourceTracker {
         action: MessageActions.PAGE_TRANSLATE_BATCH,
         data: {
           text: JSON.stringify(textsToTranslate),
-          provider: providerRegistryId,
+          provider: config.providerRegistryId,
           sourceLanguage: AUTO_DETECT_VALUE, 
-          targetLanguage,
+          targetLanguage: config.targetLanguage,
           mode: TranslationMode.Page,
           options: { rawJsonPayload: true },
         },
         context: 'page-translation',
       }, { timeout: 60000 });
 
-      if (!result?.success) {
-        throw new Error(result?.error || 'Batch translation failed');
-      }
+      if (!result?.success) throw new Error(result?.error || 'Batch translation failed');
 
       const translatedTexts = JSON.parse(result.translatedText);
-
-      currentBatch.forEach((item, index) => {
-        const translated = translatedTexts[index]?.text || translatedTexts[index] || item.text;
-        
-        if (item.node && RTL_LANGUAGES.has(this.targetLanguage)) {
-          const element = item.node.nodeType === Node.TEXT_NODE ? item.node.parentElement : item.node.ownerElement;
-          
-          if (element && !element.hasAttribute('data-page-translated')) {
-            const isLeaf = element.children.length === 0;
-            if (isLeaf && TEXT_TAGS.has(element.tagName)) {
-              element.setAttribute('dir', 'rtl');
-            } else if (item.node.nodeType === Node.ATTRIBUTE_NODE && (item.node.name === 'placeholder' || item.node.name === 'title')) {
-              element.setAttribute('dir', 'rtl');
-            }
-            element.setAttribute('data-page-translated', 'true');
-          }
-        }
-        item.resolve(translated);
-        this.translatedCount++;
-      });
-
+      this._applyBatchResults(currentBatch, translatedTexts, config.targetLanguage);
       this._reportProgress();
     } catch (error) {
-      const errorType = matchErrorToType(error);
-      const isQuotaError = [
-        ErrorTypes.QUOTA_EXCEEDED, 
-        ErrorTypes.DEEPL_QUOTA_EXCEEDED, 
-        ErrorTypes.RATE_LIMIT_REACHED,
-        ErrorTypes.INSUFFICIENT_BALANCE
-      ].includes(errorType);
-      
-      this.logger.error('Batch translation failed:', { error, errorType, isQuotaError });
-      
-      if (isQuotaError) {
-        // Just report quota error but keep system alive for potential retry/provider change
-        this.logger.info(`Quota/Rate limit hit (${errorType}). Skipping this batch.`);
-        
-        // Resolve items with original text so they don't hang
-        currentBatch.forEach(item => item.resolve(item.text));
-      } else {
-        // KILL PROCESS for other fatal errors (Network, Auth, etc)
-        this.isTranslating = false;
-        this.queue = []; 
-        if (this.batchTimer) clearTimeout(this.batchTimer);
-      }
-      
-      // Handle the error through central system (this will handle toasts and UI)
-      ErrorHandler.getInstance().handle(error, {
-        type: isQuotaError ? errorType : ErrorTypes.PAGE_TRANSLATION_STOPPED,
-        context: 'page-translation',
-        showToast: true,
-        persistent: false,
-        duration: NOTIFICATION_TIME.ERROR
-      });
-
-      // CLEANUP: Resolve current batch with original text if not already resolved
-      currentBatch.forEach(item => {
-        try { item.resolve(item.text); } catch (_) { /* ignore */ }
-      });
-
-      // Notify other components via event bus
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
-        error: error instanceof Error ? error.message : String(error), 
-        errorType,
-        isFatal: !isQuotaError 
-      });
+      this._handleBatchError(error, currentBatch);
     } finally {
       this.activeFlushes--;
       
-      // If no more active flushes and queue is empty, we're not translating anymore
       if (this.activeFlushes <= 0 && this.queue.length === 0) {
         this.isTranslating = false;
-        // Broadcast completion of the current batch of activity
         this._reportProgress();
       }
 
       if (this.queue.length > 0) {
-        // More items in queue, ensure isTranslating is true so next flush proceeds
         this.isTranslating = true;
         if (this.batchTimer) clearTimeout(this.batchTimer);
         this.batchTimer = setTimeout(() => this._flushBatch(), 50);
