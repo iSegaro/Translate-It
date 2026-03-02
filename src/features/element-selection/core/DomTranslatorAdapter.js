@@ -31,6 +31,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.isTranslating = false;
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
+    
+    // Persistent session ID for the duration of this adapter's life
+    // This allows maintaining AI context between multiple translated elements
+    this.sessionMessageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   async initialize() {
@@ -145,7 +149,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const directResponsePromise = sendRegularMessage({
         action: MessageActions.TRANSLATE,
-        messageId,
+        messageId, // ID for this specific element (streaming coordination)
         data: {
           text: JSON.stringify(textsToTranslate),
           provider,
@@ -153,6 +157,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           targetLanguage,
           mode: TranslationMode.Select_Element,
           options: { rawJsonPayload: true },
+          sessionId: this.sessionMessageId, // Persists across multiple elements
         },
         context: 'select-element',
       });
@@ -354,6 +359,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   async cleanup() {
+    this.logger.info('Cleaning up DomTranslatorAdapter session');
+    
+    // Clear background AI session
+    if (this.sessionMessageId) {
+      sendRegularMessage({
+        action: MessageActions.CANCEL_SESSION,
+        data: { sessionId: this.sessionMessageId }
+      }).catch(e => {});
+    }
+
     if (this.hasTranslation()) await this.revertTranslation();
     super.cleanup();
   }

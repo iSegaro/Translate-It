@@ -121,6 +121,7 @@ class LifecycleManager {
       'translateText': Handlers.handleTranslateTextLazy,
       'revertTranslation': Handlers.handleRevertTranslationLazy,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
+      [MessageActions.CANCEL_SESSION]: Handlers.handleCancelSessionLazy,
       'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResultLazy,
       'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
 

@@ -39,7 +39,7 @@ export class OpenAIProvider extends BaseAIProvider {
   }
 
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
     const [apiKeys, apiUrl, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
@@ -49,8 +49,7 @@ export class OpenAIProvider extends BaseAIProvider {
     // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    logger.info(`[OpenAI] Using model: ${model || 'gpt-3.5-turbo'}`);
-    logger.info(`[OpenAI] Starting translation: ${text.length} chars`);
+    logger.info(`[OpenAI] Using model: ${model || 'gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId})` : ''}`);
 
     // Validate configuration
     this._validateConfig(
@@ -59,16 +58,16 @@ export class OpenAIProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    // Check if this is a batch prompt (starts with specific pattern)
-    const prompt = text.startsWith('Translate the following JSON array')
-      ? text
-      : await buildPrompt(
-          text,
-          sourceLang,
-          targetLang,
-          translateMode,
-          this.constructor.type
-        );
+    // Build base prompt if not a batch prompt
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId);
+
+    // Log translation details (handle both string and array)
+    const logInfo = Array.isArray(text) ? `${text.length} segments` : `${text.length} chars`;
+    logger.info(`[OpenAI] Using model: ${model || 'gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId})` : ''}`);
+    logger.debug(`[OpenAI] Starting translation for ${logInfo}`);
+
+    // Get messages with conversation history
+    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt);
 
     const fetchOptions = {
       method: "POST",
@@ -78,7 +77,7 @@ export class OpenAIProvider extends BaseAIProvider {
       },
       body: JSON.stringify({
         model: model || "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
+        messages: messages,
       }),
     };
 
@@ -93,6 +92,11 @@ export class OpenAIProvider extends BaseAIProvider {
         options.headers.Authorization = `Bearer ${newKey}`;
       }
     });
+
+    // Update session history
+    if (sessionId && result) {
+      await this._updateSessionHistory(sessionId, userText, result);
+    }
 
     // CRITICAL FIX: Handle single segment JSON arrays properly
     // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content

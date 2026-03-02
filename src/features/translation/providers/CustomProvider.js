@@ -35,7 +35,7 @@ export class CustomProvider extends BaseAIProvider {
   }
 
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
     const [apiUrl, apiKeys, model] = await Promise.all([
       getCustomApiUrlAsync(),
       getCustomApiKeysAsync(),
@@ -45,8 +45,7 @@ export class CustomProvider extends BaseAIProvider {
     // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    logger.info(`[Custom] Using model: ${model}`);
-    logger.info(`[Custom] Starting translation: ${text.length} chars`);
+    logger.info(`[Custom] Using model: ${model}${sessionId ? ` (Session: ${sessionId})` : ''}`);
 
     // Validate configuration
     this._validateConfig(
@@ -55,16 +54,16 @@ export class CustomProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    // Check if text is already a batch prompt (like Gemini does)
-    const prompt = text.includes('Translate the following')
-      ? text
-      : await buildPrompt(
-          text,
-          sourceLang,
-          targetLang,
-          translateMode,
-          this.constructor.type
-        );
+    // Build base prompt if not a batch prompt
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId);
+
+    // Log translation details (handle both string and array)
+    const logInfo = Array.isArray(text) ? `${text.length} segments` : `${text.length} chars`;
+    logger.info(`[Custom] Using model: ${model}${sessionId ? ` (Session: ${sessionId})` : ''}`);
+    logger.debug(`[Custom] Starting translation for ${logInfo}`);
+
+    // Get conversation history
+    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt);
 
     const fetchOptions = {
       method: "POST",
@@ -74,7 +73,7 @@ export class CustomProvider extends BaseAIProvider {
       },
       body: JSON.stringify({
         model: model, // مدل باید توسط کاربر مشخص شود
-        messages: [{ role: "user", content: prompt }],
+        messages: messages,
       }),
     };
 
@@ -89,6 +88,11 @@ export class CustomProvider extends BaseAIProvider {
         options.headers.Authorization = `Bearer ${newKey}`;
       }
     });
+
+    // Update session history
+    if (sessionId && result) {
+      await this._updateSessionHistory(sessionId, userText, result);
+    }
 
     // CRITICAL FIX: Handle single segment JSON arrays properly
     // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content

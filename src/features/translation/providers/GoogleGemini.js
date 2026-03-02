@@ -82,11 +82,11 @@ export class GeminiProvider extends BaseAIProvider {
   /**
    * Single text translation - extracted from original translate method
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
     const { apiKey, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
 
     // Configuration applied for translation
-    logger.info(`[Gemini] Starting translation: ${text.length} chars`);
+    logger.info(`[Gemini] Starting translation: ${text.length} chars${sessionId ? ` (Session: ${sessionId})` : ''}`);
 
     // Build API URL with enhanced custom model and URL support
     let apiUrl;
@@ -108,18 +108,37 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const prompt = text.startsWith('Translate the following JSON array')
-      ? text
-      : await buildPrompt(
-          text,
-          sourceLang,
-          targetLang,
-          translateMode,
-          this.constructor.type
-        );
+    // Build base prompt if not a batch prompt
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId);
 
-    // Determine thinking budget based on model and user settings
-    let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
+    // Log translation details (handle both string and array)
+    const logInfo = Array.isArray(text) ? `${text.length} segments` : `${text.length} chars`;
+    logger.info(`[Gemini] Using model: ${geminiModel}${sessionId ? ` (Session: ${sessionId})` : ''}`);
+    logger.debug(`[Gemini] Starting translation for ${logInfo}`);
+
+    // Get conversation history
+    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt);
+
+    // Convert generic roles to Gemini specific roles (system -> system_instruction, assistant -> model)
+    const geminiSystemPrompt = messages.find(m => m.role === 'system')?.content;
+    const geminiContents = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+    // Prepare request body
+    const requestBody = {
+      contents: geminiContents
+    };
+
+    // Add system instruction if present
+    if (geminiSystemPrompt) {
+      requestBody.system_instruction = {
+        parts: [{ text: geminiSystemPrompt }]
+      };
+    }
 
     // Add thinking parameter for supported models
     const modelConfig = CONFIG.GEMINI_MODELS?.find(
@@ -154,7 +173,6 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-translation`;
-    // About to call API (logged at TRACE level)
 
     try {
       // Use failover-enabled API call with updateApiKey callback
@@ -166,13 +184,16 @@ export class GeminiProvider extends BaseAIProvider {
         context: context,
         abortController: abortController,
         updateApiKey: (newKey, options) => {
-          // For Gemini, the key is in the URL query parameter
-          // We need to update the URL with the new key
           const urlObj = new URL(url);
           urlObj.searchParams.set('key', newKey);
           options.url = urlObj.toString();
         }
       });
+
+      // Update session history
+      if (sessionId && result) {
+        await this._updateSessionHistory(sessionId, userText, result);
+      }
 
       // CRITICAL FIX: Handle single segment JSON arrays properly
       // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content

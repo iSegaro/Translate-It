@@ -257,7 +257,10 @@ async function handleBatchTranslationRequest(message, sender) {
                   sourceLanguage || 'auto',
                   targetLanguage,
                   TranslationMode.Select_Element,
-                  abortController
+                  abortController,
+                  translationEngine, // Pass engine
+                  messageId, // Pass messageId
+                  messageId  // Use messageId as sessionId for context preservation
                 );
               } else if (typeof providerInstance._translateChunk === 'function') {
                 return providerInstance._translateChunk(

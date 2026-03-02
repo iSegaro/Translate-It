@@ -352,6 +352,7 @@ export class TranslationEngine {
           originalSourceLang: originalSourceLang,
           originalTargetLang: originalTargetLang,
           messageId: data.messageId,
+          sessionId: data.sessionId, // Pass sessionId to provider
           engine: this
         }
       );
@@ -420,6 +421,7 @@ export class TranslationEngine {
     const effectiveTarget = actualTarget;
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
+    const sessionId = data.sessionId || messageId; // Use provided sessionId or fallback to messageId (for whole page)
     let hasErrors = false; // Move hasErrors to function scope
 
     (async () => {
@@ -466,7 +468,16 @@ export class TranslationEngine {
 
                             if (isAIProvider) {
                                 // AI providers use _translateBatch method directly
-                                return providerInstance._translateBatch(batch, effectiveSource, effectiveTarget, mode, abortController);
+                                return providerInstance._translateBatch(
+                                  batch, 
+                                  effectiveSource, 
+                                  effectiveTarget, 
+                                  mode, 
+                                  abortController,
+                                  this,
+                                  messageId,
+                                  sessionId // Pass sessionId for context maintenance
+                                );
                             } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method for SelectElement mode
                                 return providerInstance._translateChunk(batch, effectiveSource, effectiveTarget, mode, abortController);

@@ -63,6 +63,18 @@ export async function handleCancelTranslationLazy(message, sender, sendResponse)
     }
 }
 
+export async function handleCancelSessionLazy(message, sender, sendResponse) {
+    try {
+        logger.debug('Loading CancelSession handler');
+        const { handleCancelSession } = await import('@/features/translation/handlers/handleCancelSession.js');
+        logger.debug('CancelSession handler loaded successfully');
+        return handleCancelSession(message, sender, sendResponse);
+    } catch (error) {
+        logger.error('Failed to load CancelSession handler:', error);
+        return { success: false, error: 'Failed to load cancel session functionality' };
+    }
+}
+
 export async function handleCheckTranslationStatusLazy(message, sender, sendResponse) {
     try {
         logger.debug('Loading CheckTranslationStatus handler');

@@ -63,6 +63,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.currentUrl = null;
     this.translatedNodes = new WeakSet(); 
     this.abortController = null;
+    this.translationMessageId = null; // Track session messageId
     
     // Node tracking to solve race conditions during async translation
     this._nodeTrackingQueue = new Map(); // text -> Array of Nodes
@@ -434,6 +435,7 @@ export class PageTranslationManager extends ResourceTracker {
 
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE_BATCH,
+        messageId: this.translationMessageId, // Include session ID
         data: {
           text: JSON.stringify(textsToTranslate),
           provider: config.providerRegistryId,
@@ -626,9 +628,10 @@ export class PageTranslationManager extends ResourceTracker {
     this.isTranslating = true;
     this.isFirstBatch = true; // Reset for new translation session
     this.abortController = new AbortController();
+    this.translationMessageId = `page-translate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     try {
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl });
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
 
       // Force reload settings to pick up any changes since initialization
       await this._loadSettings();
@@ -678,6 +681,16 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async restorePage() {
     this.logger.info('Restoring original page content');
+    
+    // Cleanup background AI session
+    if (this.translationMessageId) {
+      sendRegularMessage({
+        action: MessageActions.CANCEL_SESSION,
+        data: { sessionId: this.translationMessageId }
+      }).catch(e => this.logger.debug('Failed to cleanup session (ignore if no session):', e.message));
+      this.translationMessageId = null;
+    }
+
     try {
       if (this.persistentTranslator) {
         try {
@@ -714,6 +727,17 @@ export class PageTranslationManager extends ResourceTracker {
    * Cancel ongoing translation
    */
   cancelTranslation() {
+    this.logger.info('Cancelling translation');
+    
+    // Cleanup background AI session
+    if (this.translationMessageId) {
+      sendRegularMessage({
+        action: MessageActions.CANCEL_SESSION,
+        data: { sessionId: this.translationMessageId }
+      }).catch(e => this.logger.debug('Failed to cleanup session (ignore if no session):', e.message));
+      this.translationMessageId = null;
+    }
+
     if (this.persistentTranslator) {
       try {
         this.persistentTranslator.restore(document.documentElement);

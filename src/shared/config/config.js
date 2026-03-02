@@ -331,6 +331,11 @@ $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH ---*/
 
+/*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
+  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON array from $_{SOURCE} to $_{TARGET} using the same JSON format and placeholder preservation rules as established in the first turn of this session.
+  Return only the JSON array with translated texts, no additional text.`,
+/*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
+
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
   PROMPT_BASE_DICTIONARY: `You are a concise dictionary service. Translate the word/phrase into $_{TARGET} and provide only essential information.
@@ -607,6 +612,10 @@ export const getPromptBASEBatchAsync = async () => {
 
 export const getPromptBASEAIBatchAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_AI_BATCH", CONFIG.PROMPT_BASE_AI_BATCH);
+};
+
+export const getPromptBASEAIFollowupAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_AI_FOLLOWUP", CONFIG.PROMPT_BASE_AI_FOLLOWUP);
 };
 
 export const getPromptBASEFieldAsync = async () => {
