@@ -130,6 +130,7 @@ LOG_COMPONENTS.CONTENT_APP // Content application (src/apps/content/)
 ### Feature Modules
 ```javascript
 LOG_COMPONENTS.TRANSLATION          // Translation engine and services
+LOG_COMPONENTS.PAGE_TRANSLATION     // Whole-page translation system
 LOG_COMPONENTS.TTS                  // Text-to-Speech system
 LOG_COMPONENTS.SCREEN_CAPTURE        // Screen capture and OCR
 LOG_COMPONENTS.ELEMENT_SELECTION     // Element selection functionality
@@ -412,6 +413,7 @@ const componentLogLevels = {
 
   // Features (all set to INFO for production visibility)
   Translation: LOG_LEVELS.INFO,
+  PageTranslation: LOG_LEVELS.INFO,
   TTS: LOG_LEVELS.INFO,
   ScreenCapture: LOG_LEVELS.INFO,
   ElementSelection: LOG_LEVELS.INFO,

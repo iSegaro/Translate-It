@@ -44,6 +44,7 @@ const globalState = {
     TextActions: 2,
     TextSelection: 2,
     Translation: 2,
+    PageTranslation: 2,
     Shortcuts: 2,
     Exclusion: 2,
     Capture: 2,

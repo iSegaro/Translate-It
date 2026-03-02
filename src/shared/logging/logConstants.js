@@ -21,6 +21,7 @@ export const LOG_COMPONENTS = {
 
   // Features
   TRANSLATION: 'Translation',     // src/features/translation/
+  PAGE_TRANSLATION: 'PageTranslation', // src/features/page-translation/
   TTS: 'TTS',                     // src/features/tts/
   SCREEN_CAPTURE: 'ScreenCapture', // src/features/screen-capture/
   ELEMENT_SELECTION: 'ElementSelection', // src/features/element-selection/
