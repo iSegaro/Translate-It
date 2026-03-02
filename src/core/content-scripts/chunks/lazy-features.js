@@ -391,9 +391,9 @@ async function loadPageTranslationFeature() {
     // Import PageTranslationManager
     const { pageTranslationManager } = await import('@/features/page-translation/PageTranslationManager.js');
 
-    // Initialize if not already active
+    // Activate if not already active
     if (!pageTranslationManager.isActive) {
-      await pageTranslationManager.initialize();
+      await pageTranslationManager.activate();
     }
 
     logger.info('PageTranslationManager loaded and initialized');

@@ -197,7 +197,8 @@ export class ExclusionChecker {
       'textSelection': 'TRANSLATE_ON_TEXT_SELECTION',
       'textFieldIcon': 'TRANSLATE_ON_TEXT_SELECTION', // Changed from TRANSLATE_ON_TEXT_FIELDS since it's under On-Page Selection
       'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-      'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION'
+      'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION',
+      'pageTranslation': 'WHOLE_PAGE_TRANSLATION_ENABLED'
     };
 
     // Default values for each feature
@@ -206,7 +207,8 @@ export class ExclusionChecker {
       'textSelection': true,
       'textFieldIcon': false,
       'shortcut': true,
-      'windowsManager': true
+      'windowsManager': true,
+      'pageTranslation': true
     };
 
     if (featureName === 'contentMessageHandler') {

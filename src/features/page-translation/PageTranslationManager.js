@@ -506,10 +506,12 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Initialize the manager
+   * Activate the manager
+   * Satisfies FeatureManager's expected interface
+   * @returns {boolean} Success status
    */
-  async initialize() {
-    if (this.isActive) return;
+  async activate() {
+    if (this.isActive) return true;
 
     try {
       // Initialize specialized notification manager for other features if needed
@@ -523,9 +525,27 @@ export class PageTranslationManager extends ResourceTracker {
       await this._initializeDomTranslator();
 
       this.isActive = true;
+      this.logger.init('PageTranslationManager activated successfully');
+      return true;
     } catch (error) {
-      this.logger.error('Error initializing PageTranslationManager:', error);
-      throw error;
+      this.logger.error('Error activating PageTranslationManager:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Deactivate the manager
+   * Satisfies FeatureManager's expected interface
+   */
+  async deactivate() {
+    if (!this.isActive) return;
+    
+    try {
+      await this.cleanup();
+      this.isActive = false;
+      this.logger.info('PageTranslationManager deactivated successfully');
+    } catch (error) {
+      this.logger.error('Error deactivating PageTranslationManager:', error);
     }
   }
 
@@ -614,7 +634,7 @@ export class PageTranslationManager extends ResourceTracker {
       await this._loadSettings();
 
       if (!this.domTranslator) {
-        await this.initialize();
+        await this.activate();
       } else if (this.settings.autoTranslateOnDOMChanges && !this.persistentTranslator) {
         // If it was disabled during init but now enabled, create it
         this.persistentTranslator = new PersistentDOMTranslator(this.domTranslator);
