@@ -14,3 +14,13 @@ export const TEXT_TAGS = new Set([
   'SMALL', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'BUTTON',
   'INPUT', 'TEXTAREA'
 ]);
+
+/**
+ * Default settings for page translation
+ */
+export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
+  chunkSize: 250,
+  maxConcurrentFlushes: 1,
+  lazyLoading: true,
+  rootMargin: '300px'
+};

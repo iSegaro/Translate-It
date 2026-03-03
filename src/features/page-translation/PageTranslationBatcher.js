@@ -9,7 +9,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { RTL_LANGUAGES, TEXT_TAGS } from './PageTranslationConstants.js';
+import { RTL_LANGUAGES, TEXT_TAGS, DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
 
 export class PageTranslationBatcher {
   constructor(logger) {
@@ -24,12 +24,7 @@ export class PageTranslationBatcher {
     this.translationMessageId = null;
     this._nodeTrackingQueue = new Map(); // text -> Array of Nodes
     
-    this.settings = {
-      chunkSize: 250,
-      maxConcurrentFlushes: 1,
-      lazyLoading: true,
-      rootMargin: '300px'
-    };
+    this.settings = { ...DEFAULT_PAGE_TRANSLATION_SETTINGS };
   }
 
   setSettings(settings) {
