@@ -58,30 +58,31 @@ export async function revertSelectElementTranslation() {
         continue;
       }
 
-      if (originalTextNodesData && originalTextNodesData.length > 0) {
-        // Restore each text node individually
+      // 1. Restore content (innerHTML is most reliable for restoring attributes/styles of children)
+      if (originalHTML && element) {
+        element.innerHTML = originalHTML;
+        revertedCount++;
+      } else if (originalTextNodesData && originalTextNodesData.length > 0) {
+        // Fallback to surgical text node restoration if HTML is not available
         originalTextNodesData.forEach(({ node, originalText }) => {
           if (node && node.parentNode) {
             node.nodeValue = originalText;
           }
         });
         revertedCount++;
-      } else if (originalHTML && element) {
-        element.innerHTML = originalHTML;
-        revertedCount++;
       }
 
-      // Restore original structure, direction and styles
+      // 2. Restore root element's own direction and styles
       if (element) {
         // Restore dir attribute
-        if (originalDir !== null) {
+        if (originalDir !== null && originalDir !== undefined) {
           element.setAttribute('dir', originalDir);
         } else {
           element.removeAttribute('dir');
         }
 
         // Restore data-translate-dir
-        if (originalDataDir !== null) {
+        if (originalDataDir !== null && originalDataDir !== undefined) {
           element.setAttribute('data-translate-dir', originalDataDir);
         } else {
           element.removeAttribute('data-translate-dir');
@@ -90,12 +91,8 @@ export async function revertSelectElementTranslation() {
         // Restore text alignment
         element.style.textAlign = originalTextAlign || '';
 
-        // Clean up children (they were modified during translation)
-        const childTextElements = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-        childTextElements.forEach(child => {
-          child.removeAttribute('dir');
-          child.style.textAlign = '';
-        });
+        // NOTE: We no longer need to manually clean up children's dir/textAlign
+        // because restoring element.innerHTML already replaced them with their original state.
 
         pageEventBus.emit('hide-translation', { element });
       }
