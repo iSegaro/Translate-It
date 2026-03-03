@@ -41,6 +41,8 @@ export class MessageActions {
   static PAGE_RESTORE_ERROR = 'page-restore-error';
   static PAGE_TRANSLATE_CANCELLED = 'page-translate-cancelled';
   static PAGE_TRANSLATE_GET_STATUS = 'page-translate-get-status';
+  static PAGE_TRANSLATE_STOP_AUTO = 'page-translate-stop-auto'; // Stop auto-translation (NEW)
+  static PAGE_AUTO_RESTORE_COMPLETE = 'page-auto-restore-complete'; // Auto-restore complete (NEW)
 
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';

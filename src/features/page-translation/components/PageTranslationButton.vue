@@ -9,7 +9,7 @@
 
     <!-- Translate Button -->
     <BaseButton
-      v-if="!isTranslated && !isTranslating"
+      v-if="!isTranslated && !isTranslating && !isAutoTranslating"
       :variant="compact ? 'secondary' : 'primary'"
       :disabled="!canTranslate"
       :title="translateButtonTitle"
@@ -19,20 +19,20 @@
       <span v-if="!compact">{{ translateButtonText }}</span>
     </BaseButton>
 
-    <!-- Translating State (with Cancel) -->
+    <!-- Translating or Auto-Translating State (with Spinner) -->
     <BaseButton
-      v-if="isTranslating"
+      v-if="isTranslating || isAutoTranslating"
       variant="secondary"
       :title="cancelButtonTitle"
-      @click="handleCancel"
+      @click="handleCancelOrStop"
     >
-      <LoadingSpinner v-if="compact" size="sm" />
-      <span v-else>{{ translatingText }}</span>
+      <LoadingSpinner size="sm" />
+      <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
     </BaseButton>
 
     <!-- Restore Button -->
     <BaseButton
-      v-if="isTranslated && !isTranslating"
+      v-if="isTranslated && !isTranslating && !isAutoTranslating"
       variant="secondary"
       :disabled="!canRestore"
       :title="restoreButtonTitle"
@@ -66,6 +66,7 @@ const props = defineProps({
 const {
   isTranslating,
   isTranslated,
+  isAutoTranslating,
   progress,
   message,
   canTranslate,
@@ -74,6 +75,7 @@ const {
   hasError,
   translatePage,
   restorePage,
+  stopAutoTranslation,
   cancelTranslation,
 } = usePageTranslation();
 
@@ -98,6 +100,11 @@ const translatingText = computed(() => {
   return 'Translating...';
 });
 
+const autoTranslatingText = computed(() => {
+  if (props.compact) return 'Auto Translating...';
+  return 'Auto Translating...';
+});
+
 const restoreButtonText = computed(() => {
   if (props.compact) return 'Restore';
   return 'Restore Original';
@@ -105,18 +112,19 @@ const restoreButtonText = computed(() => {
 
 const translateButtonTitle = computed(() => {
   if (!canTranslate.value) {
-    return isTranslating.value ? 'Translation in progress...' : 'Translate entire page';
+    return isTranslating.value || isAutoTranslating.value ? 'Translation in progress...' : 'Translate entire page';
   }
   return 'Translate entire page';
 });
 
 const cancelButtonTitle = computed(() => {
+  if (isAutoTranslating.value) return 'Stop auto-translation';
   return 'Cancel translation';
 });
 
 const restoreButtonTitle = computed(() => {
   if (!canRestore.value) {
-    return isTranslating.value ? 'Cannot restore during translation' : 'No translation to restore';
+    return isTranslating.value || isAutoTranslating.value ? 'Cannot restore during translation' : 'No translation to restore';
   }
   return 'Restore original page content';
 });
@@ -126,8 +134,12 @@ const handleTranslate = () => {
   translatePage();
 };
 
-const handleCancel = () => {
-  cancelTranslation();
+const handleCancelOrStop = () => {
+  if (isTranslating.value) {
+    cancelTranslation();
+  } else if (isAutoTranslating.value) {
+    stopAutoTranslation();
+  }
 };
 
 const handleRestore = () => {

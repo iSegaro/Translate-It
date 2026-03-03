@@ -94,6 +94,23 @@ export class PageTranslationBridge {
     } catch (_) { /* ignore */ }
   }
 
+  stopPersistence() {
+    try {
+      if (this.persistentTranslator) {
+        // PersistentDOMTranslator uses MutationObserver. 
+        // We look for a way to disconnect it if available in the library.
+        if (typeof this.persistentTranslator.disconnect === 'function') {
+          this.persistentTranslator.disconnect();
+        } else if (typeof this.persistentTranslator.stop === 'function') {
+          this.persistentTranslator.stop();
+        }
+        this.persistentTranslator = null;
+      }
+    } catch (error) {
+      this.logger.error('Error stopping persistence:', error);
+    }
+  }
+
   cleanup() {
     this.domTranslator = null;
     this.persistentTranslator = null;

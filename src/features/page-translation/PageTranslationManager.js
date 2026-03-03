@@ -24,6 +24,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.isActive = false;
     this.isTranslating = false;
     this.isTranslated = false;
+    this.isAutoTranslating = false; // Persistent translation state (NEW)
     this.currentUrl = null;
     this.abortController = null;
     this.translationMessageId = null;
@@ -98,10 +99,17 @@ export class PageTranslationManager extends ResourceTracker {
       
       this.isTranslated = true;
       this.isTranslating = false;
+      
+      // Handle auto-translation state (NEW)
+      if (this.settings.autoTranslateOnDOMChanges) {
+        this.isAutoTranslating = true;
+      }
+      
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, { url: this.currentUrl });
       return { success: true };
     } catch (error) {
       this.isTranslating = false;
+      this.isAutoTranslating = false;
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message });
       throw error;
     }
@@ -113,6 +121,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.bridge.restore(document.documentElement);
       this.isTranslated = false;
       this.isTranslating = false;
+      this.isAutoTranslating = false;
       this.batcher.setTranslationState(false);
       
       const translatedElements = document.querySelectorAll('[data-page-translated]');
@@ -130,12 +139,32 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Stop auto-translation (persistence) without restoring
+   */
+  async stopAutoTranslation() {
+    if (!this.isAutoTranslating) return { success: false, reason: 'not_auto_translating' };
+    
+    try {
+      this.bridge.stopPersistence();
+      this.isAutoTranslating = false;
+      
+      // We notify UI to change icon to Restore
+      this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, { url: this.currentUrl });
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Failed to stop auto-translation', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   cancelTranslation() {
     this._cleanupSession();
     this.bridge.restore(document.documentElement);
     if (this.abortController) {
       this.abortController.abort();
       this.isTranslating = false;
+      this.isAutoTranslating = false;
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
     }
   }
@@ -144,6 +173,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.logger.info('[CIRCUIT BREAKER] Fatal error. Stopping page translation.');
     this.cancelTranslation();
     this.isTranslated = false;
+    this.isAutoTranslating = false;
     this.batcher.setTranslationState(false);
     
     pageEventBus.emit('show-notification', {
@@ -196,6 +226,7 @@ export class PageTranslationManager extends ResourceTracker {
       isActive: this.isActive,
       isTranslating: this.isTranslating,
       isTranslated: this.isTranslated,
+      isAutoTranslating: this.isAutoTranslating,
       translatedCount: this.batcher.translatedCount,
       currentUrl: this.currentUrl,
       settings: this.settings,
@@ -205,6 +236,7 @@ export class PageTranslationManager extends ResourceTracker {
   async cleanup() {
     this.cancelTranslation();
     if (this.isTranslated) await this.restorePage();
+    this.isAutoTranslating = false;
     this.bridge.cleanup();
     this.batcher.reset();
     super.cleanup();

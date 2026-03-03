@@ -26,6 +26,7 @@ export async function handlePageTranslation(message, sender) {
       MessageActions.PAGE_TRANSLATE_COMPLETE,
       MessageActions.PAGE_TRANSLATE_ERROR,
       MessageActions.PAGE_RESTORE_COMPLETE,
+      MessageActions.PAGE_AUTO_RESTORE_COMPLETE, // NEW
       MessageActions.PAGE_RESTORE_ERROR,
       MessageActions.PAGE_TRANSLATE_CANCELLED,
     ];
@@ -42,6 +43,7 @@ export async function handlePageTranslation(message, sender) {
       MessageActions.PAGE_TRANSLATE,
       MessageActions.PAGE_RESTORE,
       MessageActions.PAGE_TRANSLATE_GET_STATUS,
+      MessageActions.PAGE_TRANSLATE_STOP_AUTO, // NEW
     ];
 
     if (!forwardActions.includes(message.action)) {
@@ -97,14 +99,17 @@ export async function handlePageTranslation(message, sender) {
         );
         
         // Find the most relevant response (prefer one that is currently translating or already translated)
-        const bestResponse = statusResponses.find(r => r && (r.isTranslating || r.isTranslated)) || 
+        const bestResponse = statusResponses.find(r => r && (r.isTranslating || r.isAutoTranslating || r.isTranslated)) || 
                            statusResponses.find(r => r && r.success) || 
                            { success: false, error: 'No active translation found' };
                            
         // Aggregate translated count if possible
         const totalCount = statusResponses.reduce((acc, r) => acc + (r?.translatedCount || 0), 0);
+        const anyAutoTranslating = statusResponses.some(r => r && r.isAutoTranslating);
+        
         if (bestResponse.success) {
           bestResponse.translatedCount = totalCount;
+          bestResponse.isAutoTranslating = anyAutoTranslating;
         }
         
         return bestResponse;

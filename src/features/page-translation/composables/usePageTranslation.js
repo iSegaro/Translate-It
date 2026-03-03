@@ -15,6 +15,7 @@ export function usePageTranslation() {
   // State
   const isTranslating = ref(false);
   const isTranslated = ref(false);
+  const isAutoTranslating = ref(false); // Persistent state (NEW)
   const progress = ref(0);
   const translatedCount = ref(0);
   const totalNodes = ref(0);
@@ -26,6 +27,7 @@ export function usePageTranslation() {
   let completeListener = null;
   let errorListener = null;
   let restoreCompleteListener = null;
+  let autoRestoreCompleteListener = null; // Auto-restore event (NEW)
   let cancelledListener = null;
 
   /**
@@ -41,6 +43,7 @@ export function usePageTranslation() {
       if (result && result.success) {
         isTranslated.value = result.isTranslated || false;
         isTranslating.value = result.isTranslating || false;
+        isAutoTranslating.value = result.isAutoTranslating || false;
         
         // Update progress if available
         if (result.translatedCount !== undefined) {
@@ -50,11 +53,13 @@ export function usePageTranslation() {
         // Reset state if we can't get status (e.g. restricted page)
         isTranslated.value = false;
         isTranslating.value = false;
+        isAutoTranslating.value = false;
       }
     } catch {
       // Content script might not be injected or ready
       isTranslated.value = false;
       isTranslating.value = false;
+      isAutoTranslating.value = false;
     }
   }
 
@@ -67,6 +72,7 @@ export function usePageTranslation() {
     }
 
     isTranslating.value = true;
+    isAutoTranslating.value = false;
     progress.value = 0;
     message.value = 'Starting translation...';
     error.value = null;
@@ -82,6 +88,11 @@ export function usePageTranslation() {
         message.value = `Translated ${result.translatedCount} elements`;
         translatedCount.value = result.translatedCount;
         totalNodes.value = result.totalNodes;
+        
+        // Update auto-translating status if returned
+        if (result.isAutoTranslating !== undefined) {
+          isAutoTranslating.value = result.isAutoTranslating;
+        }
       } else {
         throw new Error(result.reason || 'Translation failed');
       }
@@ -89,6 +100,7 @@ export function usePageTranslation() {
       error.value = 'Translation failed';
       message.value = 'Translation failed';
       isTranslated.value = false;
+      isAutoTranslating.value = false;
     } finally {
       isTranslating.value = false;
     }
@@ -103,6 +115,7 @@ export function usePageTranslation() {
     }
 
     isTranslating.value = true;
+    isAutoTranslating.value = false;
     message.value = 'Restoring original content...';
     error.value = null;
 
@@ -114,6 +127,7 @@ export function usePageTranslation() {
 
       if (result.success) {
         isTranslated.value = false;
+        isAutoTranslating.value = false;
         message.value = `Restored ${result.restoredCount} elements`;
         translatedCount.value = 0;
         totalNodes.value = 0;
@@ -130,6 +144,25 @@ export function usePageTranslation() {
   }
 
   /**
+   * Stop auto-translation (persistence)
+   */
+  async function stopAutoTranslation() {
+    try {
+      const result = await sendRegularMessage({
+        action: MessageActions.PAGE_TRANSLATE_STOP_AUTO,
+        context: 'page-translation-ui',
+      });
+
+      if (result.success) {
+        isAutoTranslating.value = false;
+        message.value = 'Auto-translation stopped';
+      }
+    } catch {
+      isAutoTranslating.value = false;
+    }
+  }
+
+  /**
    * Cancel ongoing translation
    */
   function cancelTranslation() {
@@ -140,6 +173,7 @@ export function usePageTranslation() {
         context: 'page-translation-ui',
       });
       isTranslating.value = false;
+      isAutoTranslating.value = false;
       message.value = 'Translation cancelled';
     }
   }
@@ -168,6 +202,15 @@ export function usePageTranslation() {
   function handleComplete(data) {
     isTranslating.value = false;
     isTranslated.value = true;
+    
+    // Check if auto-translating is active from data
+    if (data.isAutoTranslating !== undefined) {
+      isAutoTranslating.value = data.isAutoTranslating;
+    } else {
+      // Fallback: refresh to be sure
+      refreshStatus();
+    }
+    
     progress.value = 100;
     translatedCount.value = data.translatedCount || 0;
     totalNodes.value = data.totalNodes || 0;
@@ -179,6 +222,7 @@ export function usePageTranslation() {
    */
   function handleError(data) {
     isTranslating.value = false;
+    isAutoTranslating.value = false;
     error.value = data.error;
     message.value = `Error: ${data.error?.message || data.error}`;
   }
@@ -189,6 +233,7 @@ export function usePageTranslation() {
   function handleRestoreComplete(data) {
     isTranslating.value = false;
     isTranslated.value = false;
+    isAutoTranslating.value = false;
     progress.value = 0;
     translatedCount.value = 0;
     totalNodes.value = 0;
@@ -196,10 +241,19 @@ export function usePageTranslation() {
   }
 
   /**
+   * Handle auto-restore complete (just stopped auto-translation)
+   */
+  function handleAutoRestoreComplete() {
+    isAutoTranslating.value = false;
+    message.value = 'Auto-translation stopped';
+  }
+
+  /**
    * Handle translation cancelled
    */
   function handleCancelled() {
     isTranslating.value = false;
+    isAutoTranslating.value = false;
     message.value = 'Translation cancelled';
   }
 
@@ -225,6 +279,7 @@ export function usePageTranslation() {
       case MessageActions.PAGE_TRANSLATE_START:
         isTranslating.value = true;
         isTranslated.value = false;
+        isAutoTranslating.value = false;
         progress.value = 0;
         break;
       case MessageActions.PAGE_TRANSLATE_PROGRESS:
@@ -238,6 +293,9 @@ export function usePageTranslation() {
         break;
       case MessageActions.PAGE_RESTORE_COMPLETE:
         handleRestoreComplete(message.data || {});
+        break;
+      case MessageActions.PAGE_AUTO_RESTORE_COMPLETE:
+        handleAutoRestoreComplete();
         break;
       case MessageActions.PAGE_TRANSLATE_CANCELLED:
         handleCancelled();
@@ -277,6 +335,10 @@ export function usePageTranslation() {
     restoreCompleteListener = (data) => handleRestoreComplete(data);
     pageEventBus.on('page-restore-complete', restoreCompleteListener);
 
+    // Auto restore complete
+    autoRestoreCompleteListener = () => handleAutoRestoreComplete();
+    pageEventBus.on(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, autoRestoreCompleteListener);
+
     // Translation cancelled
     cancelledListener = () => handleCancelled();
     pageEventBus.on('page-translation-cancelled', cancelledListener);
@@ -297,6 +359,7 @@ export function usePageTranslation() {
     pageEventBus.off('page-translation-complete', completeListener);
     pageEventBus.off('page-translation-error', errorListener);
     pageEventBus.off('page-restore-complete', restoreCompleteListener);
+    pageEventBus.off(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, autoRestoreCompleteListener);
     pageEventBus.off('page-translation-cancelled', cancelledListener);
   });
 
@@ -304,6 +367,7 @@ export function usePageTranslation() {
     // State
     isTranslating,
     isTranslated,
+    isAutoTranslating,
     progress,
     translatedCount,
     totalNodes,
@@ -313,22 +377,25 @@ export function usePageTranslation() {
     // Actions
     translatePage,
     restorePage,
+    stopAutoTranslation,
     cancelTranslation,
     refreshStatus,
 
     // Computed
-    canTranslate: computed(() => !isTranslating.value),
+    canTranslate: computed(() => !isTranslating.value && !isAutoTranslating.value),
     canRestore: computed(() => isTranslated.value && !isTranslating.value),
     canCancel: computed(() => isTranslating.value),
+    canStopAuto: computed(() => isAutoTranslating.value),
     hasError: computed(() => error.value !== null),
 
     // Status
     status: computed(() => {
       if (error.value) return 'error';
-      if (isTranslating.value) return 'translating';
+      if (isTranslating.value || isAutoTranslating.value) return 'translating';
       if (isTranslated.value) return 'translated';
       return 'idle';
     }),
   };
 }
+
 
