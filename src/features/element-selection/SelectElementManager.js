@@ -66,7 +66,8 @@ class SelectElementManager extends ResourceTracker {
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
     this.handleClick = this.handleClick.bind(this);
-    this.preventNavigationHandler = this.preventNavigationHandler.bind(this);
+    this.handleInteraction = this.handleInteraction.bind(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
 
     // Escape key flag
     window.selectElementHandlingESC = false;
@@ -309,16 +310,24 @@ class SelectElementManager extends ResourceTracker {
    */
   setupEventListeners() {
     if (this.isActive) {
-      // Use window instead of document and capture phase to ensure we intercept events before any other listeners
+      // Mouseover/mouseout for highlighting
       window.addEventListener('mouseover', this.handleMouseOver, true);
       window.addEventListener('mouseout', this.handleMouseOut, true);
-      window.addEventListener('click', this.handleClick, true);
+
+      // Block ALL interaction events in capture phase to prevent any site logic from firing
+      // This is the core fix for site navigation/actions interfering with selection
+      const interactionEvents = [
+        'click', 'dblclick', 'mousedown', 'mouseup', 
+        'pointerdown', 'pointerup', 'contextmenu', 
+        'dragstart', 'touchstart', 'touchend'
+      ];
       
-      // Global navigation prevention in capture phase
-      window.addEventListener('click', this.preventNavigationHandler, true);
-      window.addEventListener('mousedown', this.preventNavigationHandler, true);
-      window.addEventListener('mouseup', this.preventNavigationHandler, true);
-      window.addEventListener('dragstart', this.preventNavigationHandler, true);
+      interactionEvents.forEach(eventType => {
+        window.addEventListener(eventType, this.handleInteraction, true);
+      });
+
+      // Handle Escape key in capture phase for highest reliability
+      window.addEventListener('keydown', this.handleKeyDown, true);
 
       // Listen for deactivation requests from iframes (only in main frame)
       if (window === window.top) {
@@ -343,14 +352,23 @@ class SelectElementManager extends ResourceTracker {
    * Remove event listeners
    */
   removeEventListeners() {
+    // Remove mouseover/mouseout
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
-    window.removeEventListener('click', this.handleClick, true);
     
-    window.removeEventListener('click', this.preventNavigationHandler, true);
-    window.removeEventListener('mousedown', this.preventNavigationHandler, true);
-    window.removeEventListener('mouseup', this.preventNavigationHandler, true);
-    window.removeEventListener('dragstart', this.preventNavigationHandler, true);
+    // Remove all interaction event blockers
+    const interactionEvents = [
+      'click', 'dblclick', 'mousedown', 'mouseup', 
+      'pointerdown', 'pointerup', 'contextmenu', 
+      'dragstart', 'touchstart', 'touchend'
+    ];
+    
+    interactionEvents.forEach(eventType => {
+      window.removeEventListener(eventType, this.handleInteraction, true);
+    });
+
+    // Remove Escape key handler
+    window.removeEventListener('keydown', this.handleKeyDown, true);
 
     // Remove iframe message listener
     if (window === window.top && this.iframeMessageHandler) {
@@ -391,25 +409,63 @@ class SelectElementManager extends ResourceTracker {
   }
 
   /**
-   * Handle element click - trigger translation
+   * Universal interaction handler - blocks all site interactions while mode is active
    */
-  async handleClick(event) {
+  handleInteraction(event) {
     if (!this.isActive) return;
 
-    // Check if click is on our own elements (Toast, etc.)
-    const isOurUI = this.elementSelector && this.elementSelector.isOurElement(event.target);
+    // Use composedPath for more reliable detection, especially with Shadow DOM
+    const path = event.composedPath ? event.composedPath() : [event.target];
     
-    // IMPORTANT: Even if it might be our element, we only let it pass if it's confirmed
-    // Otherwise, we MUST block to prevent site navigation
+    // Check if any element in the path belongs to our UI
+    const isOurUI = path.some(el => this.elementSelector && this.elementSelector.isOurElement(el));
+    
     if (isOurUI) {
-      this.logger.debug('Click confirmed on our own element, letting it pass');
+      // Let it pass to our own buttons/UI (Toast, etc.)
       return;
     }
 
-    // Block everything else
+    // BLOCK EVERYTHING ELSE to prevent site navigation or actions
+    // Using stopImmediatePropagation to ensure no other listeners fire
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+
+    // Only trigger translation logic on click event
+    if (event.type === 'click') {
+      this.handleClick(event).catch(err => {
+        this.logger.error('Error in handleClick:', err);
+      });
+    }
+  }
+
+  /**
+   * Handle keydown events (specifically Escape) in capture phase
+   */
+  handleKeyDown(event) {
+    if (!this.isActive) return;
+
+    if (event.key === 'Escape' && !window.selectElementHandlingESC) {
+      this.logger.debug('ESC key pressed (captured), deactivating SelectElement mode');
+
+      // Set flag to prevent other ESC handlers
+      window.selectElementHandlingESC = true;
+      setTimeout(() => {
+        window.selectElementHandlingESC = false;
+      }, 100);
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      this.deactivate({ fromCancel: true });
+    }
+  }
+
+  /**
+   * Handle element click - trigger translation
+   */
+  async handleClick(event) {
+    // Blocking is now done by handleInteraction, so we focus on translation logic
 
     // If already processing, don't start new translation
     if (this.isProcessingClick) {
@@ -422,13 +478,13 @@ class SelectElementManager extends ResourceTracker {
     try {
       this.isProcessingClick = true;
 
-      // Get the highlighted element
+      // Get the highlighted element or the clicked target
       const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
 
       // Validate element
       if (!isValidTextElement(elementToTranslate)) {
         this.logger.debug('Element is not valid for translation', {
-          tag: elementToTranslate.tagName,
+          tag: elementToTranslate?.tagName,
         });
         return;
       }
@@ -436,14 +492,13 @@ class SelectElementManager extends ResourceTracker {
       // Extract text
       const text = extractTextFromElement(elementToTranslate);
 
-      this.logger.debug(`Text extraction result: length=${text?.length || 0}, element=${elementToTranslate.tagName}`);
-
       if (text && text.trim()) {
         this.logger.debug(`Text extracted successfully: ${text.length} chars from ${elementToTranslate.tagName}`);
 
-        // Deactivate selector but keep mode active
+        // IMPORTANT: We no longer call removeEventListeners() here.
+        // We keep blockers active during translation to prevent accidental navigation.
+        // The elementSelector is deactivated just to remove the visual highlight.
         this.elementSelector.deactivate();
-        this.removeEventListeners();
 
         // Start translation
         await this.startTranslation(elementToTranslate);
@@ -456,19 +511,6 @@ class SelectElementManager extends ResourceTracker {
       this.logger.error('Error handling element click:', error);
     } finally {
       this.isProcessingClick = false;
-    }
-  }
-
-  /**
-   * Prevent navigation on interactive elements
-   */
-  preventNavigationHandler(event) {
-    if (!this.isActive) return;
-
-    const prevented = this.elementSelector.preventNavigation(event);
-
-    if (prevented) {
-      this.logger.debug('Navigation prevented on interactive element');
     }
   }
 
@@ -632,22 +674,9 @@ class SelectElementManager extends ResourceTracker {
   // ========== Keyboard and Cancel Listeners ==========
 
   setupKeyboardListeners() {
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && this.isActive && !window.selectElementHandlingESC) {
-        this.logger.debug('ESC key pressed, deactivating SelectElement mode');
-
-        // Set flag to prevent other ESC handlers
-        window.selectElementHandlingESC = true;
-        setTimeout(() => {
-          window.selectElementHandlingESC = false;
-        }, 100);
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        this.deactivate({ fromCancel: true });
-      }
-    });
+    // Note: Escape key is now handled in the capture phase by handleKeyDown
+    // which is more reliable for blocking site-specific ESC handlers.
+    this.logger.debug('setupKeyboardListeners called (ESC handled via capture phase)');
   }
 
   setupCancelListener() {

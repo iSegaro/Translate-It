@@ -82,24 +82,53 @@ export class ElementSelector extends ResourceTracker {
    * @param {HTMLElement} element - Element to check
    * @returns {boolean} Whether element should be excluded
    */
+  /**
+   * Check if element belongs to the extension's UI (should be excluded from blocking)
+   * This is critical: it must ONLY return true for our actual UI controls,
+   * NOT for elements of the site that we have highlighted.
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element is our UI
+   */
   isOurElement(element) {
-    if (!element) return false;
+    if (!element || !element.classList) return false;
     
-    // Check for our own unique markers first (most reliable)
-    if (element.id && element.id.startsWith('translate-it-')) return true;
-    if (element.closest && element.closest('[id^="translate-it-"]')) return true;
-    
-    // Check for our classes
-    if (element.classList && (
-      element.classList.contains('translate-it-toast') || 
-      element.classList.contains('translate-it-notification') ||
-      element.classList.contains('translate-it-ui-host')
-    )) {
+    // 1. Check for our UI Host (Shadow DOM root)
+    if (element.id && (element.id === 'translate-it-host-main' || element.id === 'translate-it-host-iframe')) {
       return true;
     }
 
-    // Fallback to detector but with a safer check
-    return ToastElementDetector.shouldExcludeFromSelection(element);
+    // 2. Check for our UI container classes
+    if (element.classList.contains('translate-it-toast') || 
+        element.classList.contains('translate-it-notification') ||
+        element.classList.contains('translate-it-ui-host')) {
+      return true;
+    }
+
+    // 3. Check for specific extension IDs
+    if (element.id && element.id.startsWith('translate-it-')) {
+      // EXCEPTION: Don't count the highlighted element as "our UI" 
+      // even if it has our styles or ID prefix (if we used any there)
+      if (element.classList.contains(this.HIGHLIGHT_CLASS)) {
+        return false;
+      }
+      return true;
+    }
+
+    // 4. Use the detector but specifically for extension UI, not highlighted items
+    // We traverse up to see if it's inside our UI host
+    let current = element;
+    while (current && current !== document.body) {
+      if (current.id === 'translate-it-host-main' || current.id === 'translate-it-host-iframe') {
+        return true;
+      }
+      // If it's inside a toast/notification container
+      if (current.classList && (current.classList.contains('translate-it-toast') || current.classList.contains('translate-it-notification'))) {
+        return true;
+      }
+      current = current.parentElement || (current.parentNode instanceof ShadowRoot ? current.parentNode.host : null);
+    }
+
+    return false;
   }
 
   /**
@@ -250,59 +279,6 @@ export class ElementSelector extends ResourceTracker {
     // Must have text content
     const text = element.textContent?.trim() || '';
     return text.length > 0;
-  }
-
-  /**
-   * Prevent navigation on interactive elements
-   * @param {Event} event - Event to check
-   * @returns {boolean} Whether navigation was prevented
-   */
-  preventNavigation(event) {
-    if (!event || !event.target) return false;
-
-    // Skip our own elements
-    if (this.isOurElement(event.target)) {
-      return false;
-    }
-
-    let target = event.target;
-    const interactiveTags = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
-    
-    // Check target and its ancestors for interactivity
-    let isInteractive = false;
-    let current = target;
-    let depth = 0;
-    
-    while (current && current !== document.body && depth < 5) {
-      if (
-        interactiveTags.includes(current.tagName) ||
-        current.getAttribute('role') === 'button' ||
-        current.getAttribute('role') === 'link' ||
-        current.onclick !== null ||
-        current.style?.cursor === 'pointer'
-      ) {
-        isInteractive = true;
-        target = current;
-        break;
-      }
-      current = current.parentElement;
-      depth++;
-    }
-
-    if (isInteractive) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      this.logger.debug('Navigation prevented', {
-        tag: target.tagName,
-        role: target.getAttribute('role'),
-      });
-
-      return true;
-    }
-
-    return false;
   }
 
   /**
