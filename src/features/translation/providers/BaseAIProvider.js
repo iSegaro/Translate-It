@@ -536,63 +536,80 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {Promise<string[]>} - Translated texts
    */
   async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null, sessionId = null) {
-    // Check if provider supports batch translation
     const batchStrategy = this.constructor.batchStrategy || 'single';
     
-    // Single text fallback
     if (batch.length === 1) {
-      const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController, sessionId);
-      return [result || batch[0]];
+      return [await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController, sessionId)];
     }
     
-    // Use strategy pattern based on provider configuration
     try {
       if (batchStrategy === 'json') {
-        // DataType Safe: Pass raw array to _translateSingle
-        const result = await this._translateSingle(batch, sourceLang, targetLang, translateMode, abortController, sessionId);
+        // Prepare batch text once here
+        const jsonInput = batch.map((t, i) => ({ id: i, text: t }));
+        const batchText = JSON.stringify(jsonInput, null, 2);
         
-        // Parse JSON batch result
+        // Pass with explicit isBatch=true flag - no more guessing inside _translateSingle
+        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, sessionId, true);
+        
         const parsedResults = this._parseBatchResult(result, batch.length, batch);
-        if (parsedResults.length === batch.length) {
-          logger.debug(`[${this.providerName}] JSON batch translation successful: ${batch.length} segments`);
-          return parsedResults;
-        } else {
-          throw new Error('JSON batch result count mismatch');
-        }
+        if (parsedResults.length === batch.length) return parsedResults;
+        throw new Error('JSON batch result count mismatch');
       }
-      
-      throw new Error(`Unknown or unsupported batch strategy: ${batchStrategy}`);
-      
+      throw new Error(`Unsupported batch strategy: ${batchStrategy}`);
     } catch (error) {
-      logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
+      const errorMsg = (error.message || String(error)).toLowerCase();
+      const errorType = error.type || matchErrorToType(error);
+
+      // CRITICAL: Check if the error is fatal (Rate Limit, Auth, etc.)
+      const isFatal = [
+        ErrorTypes.RATE_LIMIT_REACHED,
+        ErrorTypes.INVALID_API_KEY,
+        ErrorTypes.QUOTA_EXCEEDED,
+        ErrorTypes.OFFLINE,
+        ErrorTypes.USER_CANCELLED
+      ].includes(errorType) || 
+      error.status === 429 || 
+      error.status === 401 ||
+      errorMsg.includes("quota") || 
+      errorMsg.includes("limit exceeded") ||
+      errorMsg.includes("too many requests");
+
+      if (isFatal) {
+        logger.error(`[${this.providerName}] Batch failed with fatal error, skipping fallback:`, error.message);
+        // Ensure error type is set for higher level managers
+        if (!error.type) error.type = errorType;
+        throw error;
+      }
+
+      logger.warn(`[${this.providerName}] Batch failed (likely structural), falling back to individual requests:`, error.message);
       return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
     }
   }
 
   /**
-   * Abstract method for single text translation - must be implemented by subclasses
-   * @param {string|string[]} text - Text to translate or Array of texts for batch
+   * Abstract method for single text translation
+   * @param {string} text - Text to translate
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
-   * @param {string} sessionId - Session ID for maintaining context (optional)
-   * @returns {Promise<string>} - Translated text
+   * @param {string} sessionId - Session ID (optional)
+   * @param {boolean} isBatch - Whether this is a batch request (optional)
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
-    throw new Error(`_translateSingle method must be implemented by ${this.constructor.name}`);
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
+    throw new Error(`_translateSingle must be implemented by ${this.constructor.name}`);
   }
 
   /**
    * Check if this is the first turn in a session
    * @param {string} sessionId - Session ID
-   * @returns {boolean} - True if first turn or no session
+   * @returns {Promise<boolean>} - True if first turn or no session
    * @private
    */
-  _isFirstTurn(sessionId) {
+  async _isFirstTurn(sessionId) {
     if (!sessionId) return true;
     try {
-      const { translationSessionManager } = require('@/features/translation/core/TranslationSessionManager.js');
+      const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
       return !session || session.history.length === 0;
     } catch (e) {
@@ -601,54 +618,38 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
-   * Helper to prepare system prompt and user text based on input type
-   * @param {string|string[]} text - Input text or batch array
+   * Helper to prepare system prompt and user text
+   * @param {string} text - Input text
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {string} sessionId - Session identifier
+   * @param {boolean} isBatch - Whether this is a batch request
    * @returns {Promise<object>} - { systemPrompt, userText }
    * @protected
    */
-  async _preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId = null) {
-    const isBatch = Array.isArray(text);
-    const isFirstTurn = !sessionId || this._isFirstTurn(sessionId);
-    
+  async _preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId = null, isBatch = false) {
+    const isFirstTurn = await this._isFirstTurn(sessionId);
     let systemPrompt;
-    let userText;
 
     if (isBatch) {
-      // DataType Safe: We know it's a batch because text is an Array
-      const jsonInput = text.map((t, i) => ({ id: i, text: t }));
-      userText = JSON.stringify(jsonInput, null, 2);
-
       if (isFirstTurn) {
-        // Use full batch prompt template from config
         const promptTemplate = await getPromptBASEAIBatchAsync();
         systemPrompt = promptTemplate
           .replace("_{SOURCE}", sourceLang)
           .replace("_{TARGET}", targetLang)
-          .split("_{TEXT}")[0].trim(); // Extract instructions only
+          .split("_{TEXT}")[0].trim();
       } else {
-        // Minimal follow-up instruction from config
         const followUpTemplate = await getPromptBASEAIFollowupAsync();
         systemPrompt = followUpTemplate
           .replace("_{SOURCE}", sourceLang)
           .replace("_{TARGET}", targetLang);
       }
     } else {
-      // Single text translation
-      systemPrompt = await buildPrompt(
-        "", // empty text to get instructions only
-        sourceLang,
-        targetLang,
-        translateMode,
-        this.constructor.type
-      );
-      userText = text;
+      systemPrompt = await buildPrompt("", sourceLang, targetLang, translateMode, this.constructor.type);
     }
 
-    return { systemPrompt, userText };
+    return { systemPrompt, userText: text };
   }
 
   /**
@@ -657,10 +658,11 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} providerName - Name of the provider
    * @param {string} currentText - New text to translate
    * @param {string} systemPrompt - Base system prompt
+   * @param {string} translateMode - Translation mode (Page, Selection, etc.)
    * @returns {object} - { messages, session }
    * @protected
    */
-  async _getConversationMessages(sessionId, providerName, currentText, systemPrompt) {
+  async _getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '') {
     if (!sessionId) {
       return {
         messages: [
@@ -674,7 +676,7 @@ export class BaseAIProvider extends BaseProvider {
     const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
     const session = translationSessionManager.getOrCreateSession(sessionId, providerName);
 
-    // Initial turn: Set system prompt and combine with first text
+    // Initial turn: Set system prompt
     if (session.history.length === 0) {
       session.systemPrompt = systemPrompt;
       return {
@@ -691,8 +693,14 @@ export class BaseAIProvider extends BaseProvider {
       { role: 'system', content: session.systemPrompt }
     ];
 
-    // Add rolling history (last 2-3 turns)
-    messages.push(...session.history);
+    // For Page Translation, we MUST NOT send history of previous batches.
+    // Each batch is independent content from the page. Sending history
+    // causes massive token bloat and triggers Rate Limits (especially on Gemini Free).
+    if (translateMode !== 'page') {
+      const maxHistoryMessages = 10;
+      const history = session.history.slice(-maxHistoryMessages);
+      messages.push(...history);
+    }
 
     // Add current text
     messages.push({ role: 'user', content: currentText });

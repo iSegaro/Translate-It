@@ -81,6 +81,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.lastFlushTime = 0;
     this.targetLanguage = 'fa';
     this.isFirstBatch = true; // Track first batch for longer debounce
+    this.fatalErrorOccurred = false; // New flag for circuit breaker
 
     // Settings
     this.settings = {
@@ -220,7 +221,7 @@ export class PageTranslationManager extends ResourceTracker {
    * Enqueue a text for batch translation
    */
   async _enqueueTranslation(text, _score = 0) {
-    if (!text || !text.trim() || !this.isTranslated) return text;
+    if (this.fatalErrorOccurred || !text || !text.trim() || !this.isTranslated) return text;
     
     // Filter out noise (timers, numbers, etc.)
     if (!this._shouldTranslate(text)) {
@@ -344,33 +345,77 @@ export class PageTranslationManager extends ResourceTracker {
    * Handle errors during batch translation.
    */
   _handleBatchError(error, batch) {
+    if (this.fatalErrorOccurred) return; // Already stopped
+
     const errorType = matchErrorToType(error);
+    const errorMsg = (error.message || String(error)).toLowerCase();
+    
     const isQuotaError = [
-      ErrorTypes.QUOTA_EXCEEDED, 
+      ErrorTypes.QUOTA_EXCEEDED,
       ErrorTypes.DEEPL_QUOTA_EXCEEDED, 
       ErrorTypes.RATE_LIMIT_REACHED,
       ErrorTypes.INSUFFICIENT_BALANCE
-    ].includes(errorType);
-    
+    ].includes(errorType) || 
+    errorMsg.includes("quota") || 
+    errorMsg.includes("limit") || 
+    errorMsg.includes("429");
+
     this.logger.error('Batch translation failed:', { error, errorType, isQuotaError });
-    
+
     if (isQuotaError) {
-      this.logger.info(`Quota/Rate limit hit (${errorType}). Skipping this batch.`);
-    } else {
+      this.logger.info(`[CIRCUIT BREAKER] Fatal error detected. Stopping ALL page translation activity.`);
+      
+      // 1. Set global fatal flag
+      this.fatalErrorOccurred = true;
+      
+      // 2. Stop everything including MutationObservers
+      this.stopTranslation(); 
+      
+      // 3. Clear all state
+      this.isTranslated = false;
       this.isTranslating = false;
-      this.queue = []; 
-      if (this.batchTimer) clearTimeout(this.batchTimer);
+      this.queue = [];
+      if (this.batchTimer) {
+        clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+      }
+
+      // 4. Resolve pending items with original text to unblock UI
+      batch.forEach(item => {
+        try { item.resolve(item.text); } catch (_) {}
+      });
+
+      // 5. Notify user
+      pageEventBus.emit('show-notification', {
+        type: 'error',
+        message: browser.i18n.getMessage('error_rate_limit_reached') || 'Rate limit reached. Please wait a moment before trying again.',
+        duration: 10000
+      });
+
+      // 6. Update UI state
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
+        error: error instanceof Error ? error.message : String(error), 
+        errorType,
+        isFatal: true 
+      });
+
+      return;
     }
+
+    // Normal non-fatal error handling
+    this.isTranslating = false;
+    this.queue = []; 
+    if (this.batchTimer) clearTimeout(this.batchTimer);
     
     // Handle via central error system
     ErrorHandler.getInstance().handle(error, {
-      type: isQuotaError ? errorType : ErrorTypes.PAGE_TRANSLATION_STOPPED,
+      type: ErrorTypes.PAGE_TRANSLATION_STOPPED,
       context: 'page-translation',
       showToast: true,
       duration: NOTIFICATION_TIME.ERROR
     });
 
-    // Resolve all items to prevent hanging, even on error
+    // Resolve all items to prevent hanging
     batch.forEach(item => {
       try { item.resolve(item.text); } catch (_) { /* ignore */ }
     });
@@ -378,7 +423,7 @@ export class PageTranslationManager extends ResourceTracker {
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
       error: error instanceof Error ? error.message : String(error), 
       errorType,
-      isFatal: !isQuotaError 
+      isFatal: false 
     });
   }
 
@@ -386,27 +431,33 @@ export class PageTranslationManager extends ResourceTracker {
    * Flush the current translation queue
    */
   async _flushBatch() {
+    // 1. Immediate exit if not in translated state
     if (!this.isTranslated) {
       this.queue = [];
-      if (this.batchTimer) clearTimeout(this.batchTimer);
+      this.isTranslating = false;
+      if (this.batchTimer) {
+        clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+      }
       return;
     }
 
-    if (this.queue.length === 0) return;
+    if (this.queue.length === 0) {
+      this.isTranslating = false;
+      return;
+    }
     
     // Check concurrency limit
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
-      if (!this.batchTimer) this.batchTimer = setTimeout(() => this._flushBatch(), 500);
+      if (!this.batchTimer && this.isTranslated) {
+        this.batchTimer = setTimeout(() => this._flushBatch(), 500);
+      }
       return;
     }
 
     if (this.batchTimer) clearTimeout(this.batchTimer);
     
-    // Prioritize visible items and get their count
     const visibleCount = this._prioritizeQueue();
-    this.logger.debug(`Flush check - Queue: ${this.queue.length}, Visible: ${visibleCount}`);
-
-    // If lazy loading is on and NO items are visible, don't flush yet
     if (this.settings.lazyLoading && visibleCount === 0) {
       this.isTranslating = this.queue.length > 0;
       return;
@@ -418,7 +469,6 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       const config = await this._getBatchConfig();
-      // Only extract what's visible if lazy loading is enabled
       const maxToExtract = this.settings.lazyLoading ? visibleCount : Infinity;
       currentBatch = this._extractBatch(config, maxToExtract);
 
@@ -429,13 +479,14 @@ export class PageTranslationManager extends ResourceTracker {
       }
 
       this.isFirstBatch = false;
-      this.logger.debug(`Flushing batch (${config.providerRegistryId}): ${currentBatch.length} texts. Queue: ${this.queue.length}`);
-
       const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
+      const charCount = textsToTranslate.reduce((sum, item) => sum + item.text.length, 0);
+      
+      this.logger.debug(`Flushing batch (${config.providerRegistryId}): ${currentBatch.length} segments, ${charCount} chars. Queue: ${this.queue.length}`);
 
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE_BATCH,
-        messageId: this.translationMessageId, // Include session ID
+        messageId: this.translationMessageId,
         data: {
           text: JSON.stringify(textsToTranslate),
           provider: config.providerRegistryId,
@@ -447,6 +498,9 @@ export class PageTranslationManager extends ResourceTracker {
         context: 'page-translation',
       }, { timeout: 60000 });
 
+      // 2. Critical check after message returns - did we stop while waiting?
+      if (!this.isTranslated) throw new Error('Translation stopped during request');
+
       if (!result?.success) throw new Error(result?.error || 'Batch translation failed');
 
       const translatedTexts = JSON.parse(result.translatedText);
@@ -457,12 +511,20 @@ export class PageTranslationManager extends ResourceTracker {
     } finally {
       this.activeFlushes--;
       
-      if (this.activeFlushes <= 0 && this.queue.length === 0) {
+      // 3. Final kill-switch check
+      if (!this.isTranslated) {
         this.isTranslating = false;
-        this._reportProgress();
+        this.queue = [];
+        if (this.batchTimer) clearTimeout(this.batchTimer);
+        return;
       }
 
-      if (this.queue.length > 0) {
+      if (this.activeFlushes <= 0 && this.queue.length === 0) {
+        this.isTranslating = false;
+        // Removed redundant _reportProgress() here as it's already called after each batch success/error
+      }
+
+      if (this.queue.length > 0 && this.isTranslated) {
         this.isTranslating = true;
         if (this.batchTimer) clearTimeout(this.batchTimer);
         this.batchTimer = setTimeout(() => this._flushBatch(), 50);
@@ -608,6 +670,9 @@ export class PageTranslationManager extends ResourceTracker {
    * Translate the entire page
    */
   async translatePage(_options = {}) {
+    // 1. Reset fatal error flag on new request
+    this.fatalErrorOccurred = false;
+
     if (this.isTranslating) return { success: false, reason: 'already_translating' };
     if (this.isTranslated) return { success: false, reason: 'already_translated' };
 

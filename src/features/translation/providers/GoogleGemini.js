@@ -82,11 +82,8 @@ export class GeminiProvider extends BaseAIProvider {
   /**
    * Single text translation - extracted from original translate method
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
     const { apiKey, geminiModel, thinkingEnabled, geminiApiUrl, isCustomModel } = await this._getConfig();
-
-    // Configuration applied for translation
-    logger.info(`[Gemini] Starting translation: ${text.length} chars${sessionId ? ` (Session: ${sessionId})` : ''}`);
 
     // Build API URL with enhanced custom model and URL support
     let apiUrl;
@@ -108,16 +105,16 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    // Build base prompt if not a batch prompt
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId);
+    // Build base prompt using explicit isBatch flag
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
 
-    // Log translation details (handle both string and array)
-    const logInfo = Array.isArray(text) ? `${text.length} segments` : `${text.length} chars`;
-    logger.info(`[Gemini] Using model: ${geminiModel}${sessionId ? ` (Session: ${sessionId})` : ''}`);
-    logger.debug(`[Gemini] Starting translation for ${logInfo}`);
+    // Simple logging
+    const isFirst = await this._isFirstTurn(sessionId);
+    logger.info(`[Gemini] Model: ${geminiModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
+    logger.debug(`[Gemini] Translating ${isBatch ? (Array.isArray(text) ? text.length : 'JSON') + ' segments' : text.length + ' chars'}`);
 
     // Get conversation history
-    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt);
+    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     // Convert generic roles to Gemini specific roles (system -> system_instruction, assistant -> model)
     const geminiSystemPrompt = messages.find(m => m.role === 'system')?.content;

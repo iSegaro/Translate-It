@@ -344,7 +344,8 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("fewer max_tokens") ||
     msg.includes("insufficient balance") ||
     msg.includes("exceeded your current quota") ||
-    msg.includes("check your plan and billing details")
+    msg.includes("check your plan and billing details") ||
+    msg.includes("generativelanguage.googleapis.com")
   )
     return ErrorTypes.QUOTA_EXCEEDED;
 

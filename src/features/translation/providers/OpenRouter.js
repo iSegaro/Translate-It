@@ -36,7 +36,7 @@ export class OpenRouterProvider extends BaseAIProvider {
   }
 
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
       getOpenRouterApiModelAsync(),
@@ -45,8 +45,6 @@ export class OpenRouterProvider extends BaseAIProvider {
     // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    logger.info(`[OpenRouter] Using model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId})` : ''}`);
-
     // Validate configuration
     this._validateConfig(
       { apiKey },
@@ -54,16 +52,16 @@ export class OpenRouterProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    // Build base prompt if not a batch prompt
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId);
+    // Build base prompt using explicit isBatch flag
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
 
-    // Log translation details (handle both string and array)
-    const logInfo = Array.isArray(text) ? `${text.length} segments` : `${text.length} chars`;
-    logger.info(`[OpenRouter] Using model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId})` : ''}`);
-    logger.debug(`[OpenRouter] Starting translation for ${logInfo}`);
+    // Simple logging
+    const isFirst = await this._isFirstTurn(sessionId);
+    logger.info(`[OpenRouter] Model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
+    logger.debug(`[OpenRouter] Translating ${isBatch ? 'batch' : text.length + ' chars'}`);
 
     // Get conversation history
-    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt);
+    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     const fetchOptions = {
       method: "POST",
