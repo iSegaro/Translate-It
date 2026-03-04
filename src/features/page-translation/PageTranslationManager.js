@@ -70,14 +70,17 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   async translatePage() {
-    if (this.isTranslating || this.isTranslated) return { success: false, reason: 'busy_or_done' };
-    if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: 'not_suitable' };
-
+    // 1. Check for URL change first in SPAs
     if (this.currentUrl !== window.location.href) {
+      this.logger.debug('URL change detected in translatePage, resetting state');
       this.isTranslated = false;
+      this.isAutoTranslating = false;
       this.batcher.reset();
       this.currentUrl = window.location.href;
     }
+
+    if (this.isTranslating || this.isTranslated) return { success: false, reason: 'busy_or_done' };
+    if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: 'not_suitable' };
 
     this.isTranslating = true;
     this.abortController = new AbortController();
@@ -94,7 +97,13 @@ export class PageTranslationManager extends ResourceTracker {
       try {
         this.bridge.translate(document.documentElement);
       } catch (libError) {
-        if (!libError.message?.includes('already been translated')) throw libError;
+        // If library thinks it is already translated (internal state), we try to force it
+        if (libError.message?.includes('already been translated')) {
+          this.logger.debug('Library reported already translated, re-triggering for safety');
+          if (this.bridge.domTranslator) this.bridge.domTranslator.translate(document.documentElement);
+        } else {
+          throw libError;
+        }
       }
       
       this.isTranslated = true;
@@ -105,8 +114,15 @@ export class PageTranslationManager extends ResourceTracker {
         this.isAutoTranslating = true;
       }
       
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, { url: this.currentUrl });
-      return { success: true };
+      const resultData = { 
+        url: this.currentUrl, 
+        translatedCount: this.batcher.translatedCount,
+        isAutoTranslating: this.isAutoTranslating,
+        isTranslated: this.isTranslated
+      };
+      
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);
+      return { success: true, ...resultData };
     } catch (error) {
       this.isTranslating = false;
       this.isAutoTranslating = false;
@@ -119,9 +135,12 @@ export class PageTranslationManager extends ResourceTracker {
     this._cleanupSession();
     try {
       this.bridge.restore(document.documentElement);
+      
+      // CRITICAL: Reset everything so we can translate again on the same URL
       this.isTranslated = false;
       this.isTranslating = false;
       this.isAutoTranslating = false;
+      this.batcher.reset(); // Clear counts and tracking
       this.batcher.setTranslationState(false);
       
       const translatedElements = document.querySelectorAll('[data-page-translated]');
@@ -131,8 +150,9 @@ export class PageTranslationManager extends ResourceTracker {
         el.removeAttribute('data-translate-dir');
       });
 
-      this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, { url: this.currentUrl });
-      return { success: true };
+      const resultData = { url: this.currentUrl, restoredCount: 0 };
+      this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData);
+      return { success: true, ...resultData };
     } catch (error) {
       this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message });
       throw error;
@@ -144,14 +164,21 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async stopAutoTranslation() {
     if (!this.isAutoTranslating) return { success: false, reason: 'not_auto_translating' };
-    
+
     try {
       this.bridge.stopPersistence();
+      this.batcher.stop(); // Stop batcher queue (NEW)
       this.isAutoTranslating = false;
-      
+
+      const resultData = {
+        url: this.currentUrl, 
+        translatedCount: this.batcher.translatedCount,
+        isTranslated: this.isTranslated,
+        isAutoTranslating: false
+      };
       // We notify UI to change icon to Restore
-      this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, { url: this.currentUrl });
-      return { success: true };
+      this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
+      return { success: true, ...resultData };
     } catch (error) {
       this.logger.error('Failed to stop auto-translation', error);
       return { success: false, error: error.message };
@@ -161,10 +188,14 @@ export class PageTranslationManager extends ResourceTracker {
   cancelTranslation() {
     this._cleanupSession();
     this.bridge.restore(document.documentElement);
+    
+    // Reset flags always when cancelling
+    this.isTranslating = false;
+    this.isAutoTranslating = false;
+    this.batcher.setTranslationState(false);
+
     if (this.abortController) {
       this.abortController.abort();
-      this.isTranslating = false;
-      this.isAutoTranslating = false;
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
     }
   }
@@ -174,7 +205,6 @@ export class PageTranslationManager extends ResourceTracker {
     this.cancelTranslation();
     this.isTranslated = false;
     this.isAutoTranslating = false;
-    this.batcher.setTranslationState(false);
     
     pageEventBus.emit('show-notification', {
       type: 'error',
@@ -222,6 +252,15 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   getStatus() {
+    // Check for URL change on every status request
+    if (this.currentUrl && this.currentUrl !== window.location.href) {
+      this.logger.debug('URL change detected in getStatus, resetting status');
+      this.isTranslated = false;
+      this.isAutoTranslating = false;
+      this.batcher.reset();
+      this.currentUrl = window.location.href;
+    }
+
     return {
       isActive: this.isActive,
       isTranslating: this.isTranslating,

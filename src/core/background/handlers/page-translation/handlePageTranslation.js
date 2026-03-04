@@ -105,7 +105,10 @@ export async function handlePageTranslation(message, sender) {
                            
         // Aggregate translated count if possible
         const totalCount = statusResponses.reduce((acc, r) => acc + (r?.translatedCount || 0), 0);
-        const anyAutoTranslating = statusResponses.some(r => r && r.isAutoTranslating);
+        
+        // Only count as auto-translating if the frame is also in a valid state (translating or translated)
+        // This prevents stale auto-translating flags in buggy frames from stucking the whole tab status.
+        const anyAutoTranslating = statusResponses.some(r => r && r.isAutoTranslating && (r.isTranslating || r.isTranslated));
         
         if (bestResponse.success) {
           bestResponse.translatedCount = totalCount;

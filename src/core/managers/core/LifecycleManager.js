@@ -172,8 +172,10 @@ class LifecycleManager {
       [MessageActions.PAGE_TRANSLATE_COMPLETE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_ERROR]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_RESTORE_COMPLETE]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_AUTO_RESTORE_COMPLETE]: Handlers.handlePageTranslation, // NEW
       [MessageActions.PAGE_RESTORE_ERROR]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_CANCELLED]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_STOP_AUTO]: Handlers.handlePageTranslation, // NEW
 
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,

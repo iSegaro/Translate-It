@@ -35,18 +35,39 @@ export class PageTranslationBatcher {
     this.isTranslated = isTranslated;
     this.translationMessageId = messageId;
     if (!isTranslated) {
-      this.reset();
+      this.stop();
     }
   }
 
   reset() {
-    this.queue = [];
-    if (this.batchTimer) clearTimeout(this.batchTimer);
-    this.batchTimer = null;
+    this.stop();
     this.translatedCount = 0;
+    this.fatalErrorOccurred = false;
+  }
+
+  /**
+   * Fully stop the batcher and clear all pending items
+   */
+  stop() {
+    this.isTranslated = false;
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    
+    // Resolve all pending items with their original text
+    if (this.queue.length > 0) {
+      this.logger.debug(`Stopping batcher, resolving ${this.queue.length} pending items`);
+      while (this.queue.length > 0) {
+        const item = this.queue.shift();
+        try {
+          item.resolve(item.text);
+        } catch (_) {}
+      }
+    }
+    
     this.activeFlushes = 0;
     this.isFirstBatch = true;
-    this.fatalErrorOccurred = false;
     this._nodeTrackingQueue.clear();
   }
 
@@ -76,11 +97,13 @@ export class PageTranslationBatcher {
     return new Promise((resolve, reject) => {
       this.queue.push({ text: text.trim(), node, resolve, reject });
 
-      if (this.queue.length >= this.settings.chunkSize * 2) {
+      // Immediate flush only if we reached a full chunk size
+      if (this.queue.length >= this.settings.chunkSize) {
         this.flush();
       } else {
+        // Otherwise use a more generous debounce to group dynamic updates (especially for SPAs like X)
         if (this.batchTimer) clearTimeout(this.batchTimer);
-        const debounceDelay = this.isFirstBatch ? 2000 : 1000;
+        const debounceDelay = this.isFirstBatch ? 1500 : 3000; // Increased delay
         this.batchTimer = setTimeout(() => this.flush(), debounceDelay);
       }
     });
@@ -108,7 +131,7 @@ export class PageTranslationBatcher {
 
   async flush() {
     if (!this.isTranslated) {
-      this.reset();
+      this.stop();
       return;
     }
 
@@ -116,7 +139,7 @@ export class PageTranslationBatcher {
     
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       if (!this.batchTimer && this.isTranslated) {
-        this.batchTimer = setTimeout(() => this.flush(), 500);
+        this.batchTimer = setTimeout(() => this.flush(), 1000);
       }
       return;
     }
@@ -124,17 +147,22 @@ export class PageTranslationBatcher {
     if (this.batchTimer) clearTimeout(this.batchTimer);
     
     const visibleCount = this._prioritizeQueue();
-    if (this.settings.lazyLoading && visibleCount === 0) return;
+    if (this.settings.lazyLoading && visibleCount === 0 && this.isFirstBatch === false) {
+      // If not first batch and nothing visible, wait for next trigger
+      return;
+    }
 
     this.activeFlushes++;
     let currentBatch = [];
 
     try {
+      if (!this.isTranslated) throw new Error('Stopped');
+
       const config = await this._getBatchConfig();
-      const maxToExtract = this.settings.lazyLoading ? visibleCount : Infinity;
+      const maxToExtract = this.settings.lazyLoading ? Math.max(visibleCount, config.chunkSize) : Infinity;
       currentBatch = this._extractBatch(config, maxToExtract);
 
-      if (currentBatch.length === 0) {
+      if (currentBatch.length === 0 || !this.isTranslated) {
         this.activeFlushes--;
         return;
       }
