@@ -660,7 +660,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Ensure manager is initialized
       if (!this.pageTranslationManager.isActive) {
-        await this.pageTranslationManager.initialize();
+        await this.pageTranslationManager.activate();
       }
 
       // Execute page translation
