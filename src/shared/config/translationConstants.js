@@ -20,7 +20,7 @@ export const TRANSLATION_CONSTANTS = {
   CHARACTER_LIMITS: {
     GOOGLE: 5000,
     BING: 800,
-    YANDEX: 5000,
+    YANDEX: 10000,
     DEEPL: 10000,
   },
 
@@ -28,7 +28,7 @@ export const TRANSLATION_CONSTANTS = {
   MAX_CHUNKS_PER_BATCH: {
     GOOGLE: 150,
     BING: 15,
-    YANDEX: 150,
+    YANDEX: 100,
     DEEPL: 150, 
   },
 
@@ -60,7 +60,7 @@ export const TRANSLATION_CONSTANTS = {
   CHUNKING_STRATEGIES: {
     GOOGLE: 'character_limit',
     BING: 'character_limit',
-    YANDEX: 'segment_count',
+    YANDEX: 'character_limit',
     DEEPL: 'character_limit',
   },
 };

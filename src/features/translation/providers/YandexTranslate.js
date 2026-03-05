@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-// import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
 
@@ -16,24 +16,24 @@ const yandexLangCode = {
 
 // Language name to code mapping
 const langNameToCodeMap = {
-  afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepal: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
+  afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepal: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", uz: "uz", vietnamese: "vi",
 };
 
 export class YandexTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
-  static reliableJsonMode = false;
-  static supportsDictionary = false;
+  static reliableJsonMode = TRANSLATION_CONSTANTS.RELIABLE_JSON_MODE.YANDEX;
+  static supportsDictionary = TRANSLATION_CONSTANTS.SUPPORTS_DICTIONARY.YANDEX;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
-  static CHAR_LIMIT = 10000;
+  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.YANDEX;
   
   // BaseTranslateProvider capabilities
-  static supportsStreaming = true;
-  static chunkingStrategy = 'character_limit';
-  static characterLimit = 10000;
-  static maxChunksPerBatch = 8;
+  static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.YANDEX;
+  static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.YANDEX;
+  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.YANDEX;
+  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.YANDEX;
 
   constructor() {
     super(ProviderNames.YANDEX_TRANSLATE);

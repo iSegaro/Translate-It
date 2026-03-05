@@ -41,67 +41,70 @@ export class BaseTranslateProvider extends BaseProvider {
       originalTargetLang,
       messageId,
       engine,
+      priority
     } = typeof options === 'object' && options !== null ? options : { mode: options };
 
     const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
 
-    logger.debug(`[${this.providerName}] Traditional provider translate call - bypassing JSON mode`);
+    logger.debug(`[${this.providerName}] Traditional provider translate call - Mode: ${translateMode}`);
 
-    // IMPORTANT: Set Field/Subtitle mode BEFORE language swapping
-    // LanguageSwappingService needs sourceLang=AUTO_DETECT_VALUE to work properly
+    // 1. Language swapping and normalization
     if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
     }
 
-    // Language swapping and normalization (after Field mode is set)
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: this.providerName, useRegexFallback: true }
     );
 
-    // Convert to provider-specific language codes
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
     if (sl === tl) return text;
 
-    // For traditional providers, always treat as plain text array (no JSON mode)
+    // 2. Handle input format
     let textsToTranslate;
+    let isJson = false;
+    let parsedJson = null;
+
     try {
       const parsed = JSON.parse(text);
       if (this._isSpecificTextJsonFormat(parsed)) {
-        // Extract texts from JSON structure
+        isJson = true;
+        parsedJson = parsed;
         textsToTranslate = parsed.map((item) => item.text || '');
-        logger.debug(`[${this.providerName}] Extracted ${textsToTranslate.length} texts from JSON input for traditional processing`);
-        
-        // Perform batch translation
-        const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController);
-        
-        // Reconstruct JSON structure
-        if (translatedSegments.length !== parsed.length) {
-          logger.error(`[${this.providerName}] JSON reconstruction failed due to segment mismatch.`);
-          return translatedSegments.join('\n');
-        }
-        
-        const translatedJson = parsed.map((item, index) => ({
-          ...item,
-          text: translatedSegments[index] || "",
-        }));
-        
-        return JSON.stringify(translatedJson, null, 2);
       } else {
-        // Single text
         textsToTranslate = [text];
       }
     } catch {
-      // Not valid JSON, treat as single text
       textsToTranslate = [text];
     }
 
-    // Perform batch translation  
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController);
-    
-    // Return single result for plain text
+    // 3. Perform batch translation
+    const translatedSegments = await this._batchTranslate(
+      textsToTranslate, 
+      sl, 
+      tl, 
+      translateMode, 
+      engine, 
+      messageId, 
+      abortController,
+      priority
+    );
+
+    // 4. Reconstruct output
+    if (isJson && Array.isArray(translatedSegments)) {
+      if (translatedSegments.length !== parsedJson.length) {
+        return translatedSegments.join('\n');
+      }
+      const translatedJson = parsedJson.map((item, index) => ({
+        ...item,
+        text: translatedSegments[index] || "",
+      }));
+      return JSON.stringify(translatedJson, null, 2);
+    }
+
     return translatedSegments[0];
   }
 
@@ -116,14 +119,14 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
     // Check if streaming is supported and beneficial
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority);
     }
 
     // Fall back to traditional translation (original implementation)
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority);
   }
 
   /**
@@ -169,7 +172,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - All translated texts
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
     
     // Initialize streaming session if messageId is available
@@ -212,7 +215,7 @@ export class BaseTranslateProvider extends BaseProvider {
           this.providerName,
           () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length),
           `streaming-chunk-${chunkIndex + 1}/${chunks.length}`,
-          translateMode
+          priority
         );
 
         // Add results to collection
@@ -398,7 +401,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
     // Default implementation with chunking and rate limiting
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
@@ -426,7 +429,7 @@ export class BaseTranslateProvider extends BaseProvider {
           this.providerName,
           () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length),
           chunkContext,
-          translateMode
+          priority
         );
 
         allResults.push(...(result || chunk.texts.map(() => '')));

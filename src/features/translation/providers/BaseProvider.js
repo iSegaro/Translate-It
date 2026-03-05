@@ -590,8 +590,11 @@ export class BaseProvider {
    * @param {AbortController} abortController - Optional abort controller for cancellation.
    * @returns {Promise<Array<string>>} - A promise that resolves to an array of translated segments.
    */
-  async _processInBatches(segments, translateChunk, limits, abortController = null) {
+  async _processInBatches(segments, translateChunk, limits, abortController = null, priority = null) {
     const { CHUNK_SIZE, CHAR_LIMIT } = limits;
+    const { TranslationPriority, rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    const targetPriority = priority || TranslationPriority.NORMAL;
+
     const chunks = [];
     const chunkIndexMap = []; // Map to track which original indices each chunk contains
     let currentChunk = [];
@@ -637,9 +640,6 @@ export class BaseProvider {
       chunkIndexMap.push([...currentIndices]);
     }
 
-    // Import rate limiting manager
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-
     // Process chunks sequentially with rate limiting
     const translatedSegments = new Array(segments.length); // Pre-allocate array to maintain order
 
@@ -662,7 +662,7 @@ export class BaseProvider {
           this.providerName,
           () => translateChunk(chunk, i, chunks.length), // Pass chunk index and total
           context,
-          null // translateMode not available in this generic method
+          targetPriority
         );
 
         // Place translated results in correct positions
