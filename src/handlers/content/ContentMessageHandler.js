@@ -518,6 +518,12 @@ export class ContentMessageHandler extends ResourceTracker {
         this.logger.info(`Displaying result for ${translationMode} mode in notification.`);
         return true;
 
+      case TranslationMode.Page:
+        // Page translation results are handled directly by PageTranslationBatcher
+        // as a direct response to the batch message. We ignore broadcasts here.
+        this.logger.debug('Ignoring broadcasted page translation result (already handled by Batcher)');
+        return true;
+
       default:
         this.logger.warn(`No handler for translation result mode: ${translationMode}`);
         return false;

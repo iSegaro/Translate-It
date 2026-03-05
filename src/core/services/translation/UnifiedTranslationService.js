@@ -233,7 +233,7 @@ class TranslationResultDispatcher {
     }
 
     // Dispatch based on mode
-    if (request.mode === TranslationMode.Field || request.mode === TranslationMode.Page) {
+    if (request.mode === TranslationMode.Field) {
       await this.dispatchFieldResult({ messageId, result, request, originalMessage });
     } else if (request.mode === 'select-element') {
       await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
@@ -450,7 +450,7 @@ class TranslationModeCoordinator {
                   abortController,
                   translationEngine,
                   messageId,
-                  messageId // sessionId
+                  data.sessionId || messageId // Use provided sessionId if available
                 );
               } else {
                 return providerInstance._translateChunk(

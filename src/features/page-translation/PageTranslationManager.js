@@ -1,4 +1,3 @@
-// PageTranslationManager - Orchestrates whole page translation
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -6,7 +5,7 @@ import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync } from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 
 // Internal components
 import { PageTranslationHelper } from './PageTranslationHelper.js';
@@ -18,22 +17,31 @@ export class PageTranslationManager extends ResourceTracker {
     super('page-translation-manager');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'PageTranslationManager');
     
-    this.baseNotifier = new NotificationManager();
-    this.notificationManager = null;
+    this.toastIntegration = new ToastIntegration(pageEventBus);
 
     this.isActive = false;
     this.isTranslating = false;
     this.isTranslated = false;
-    this.isAutoTranslating = false; // Persistent translation state (NEW)
+    this.isAutoTranslating = false;
     this.currentUrl = null;
     this.abortController = null;
     this.translationMessageId = null;
+    this.sessionContext = null;
     
     this.batcher = new PageTranslationBatcher(this.logger);
     this.bridge = new PageTranslationBridge(this.logger);
 
     this.settings = {};
     
+    // Listen for progress from batcher and forward to background
+    pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+      sendRegularMessage({ 
+        action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
+        data, 
+        context: 'page-translation-progress-forward' 
+      }).catch(() => {});
+    });
+
     // Listen for fatal errors from batcher (Circuit Breaker)
     pageEventBus.on('page-translation-fatal-error', ({ error, errorType }) => this._handleFatalError(error, errorType));
   }
@@ -41,19 +49,10 @@ export class PageTranslationManager extends ResourceTracker {
   async activate() {
     if (this.isActive) return true;
     try {
-      if (!this.notificationManager) {
-        const { getSelectElementNotificationManager } = await import('@/features/element-selection/SelectElementNotificationManager.js');
-        this.notificationManager = await getSelectElementNotificationManager(this.baseNotifier);
-      }
+      await this.toastIntegration.initialize();
       await this._loadSettings();
       this.batcher.setSettings(this.settings);
       
-      await this.bridge.initialize(
-        this.settings, 
-        (text) => this.batcher.enqueue(text),
-        (text, node) => this.batcher.trackNode(text, node)
-      );
-
       this.isActive = true;
       this.logger.init('PageTranslationManager activated');
       return true;
@@ -72,10 +71,7 @@ export class PageTranslationManager extends ResourceTracker {
   async translatePage() {
     // 1. Check for URL change first in SPAs
     if (this.currentUrl !== window.location.href) {
-      this.logger.debug('URL change detected in translatePage, resetting state');
-      this.isTranslated = false;
-      this.isAutoTranslating = false;
-      this.batcher.reset();
+      this.resetLocalState();
       this.currentUrl = window.location.href;
     }
 
@@ -85,31 +81,27 @@ export class PageTranslationManager extends ResourceTracker {
     this.isTranslating = true;
     this.abortController = new AbortController();
     this.translationMessageId = `page-translate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    this.sessionContext = Symbol('translation-session');
 
     try {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
+      
       await this._loadSettings();
       this.batcher.setSettings(this.settings);
-      this.batcher.setTranslationState(true, this.translationMessageId);
+      this.batcher.setTranslationState(true, this.translationMessageId, this.sessionContext);
 
-      if (!this.bridge.domTranslator) await this.activate();
+      // Initialize bridge with fresh context and standard callback
+      await this.bridge.initialize(
+        this.settings, 
+        (text, context) => this.batcher.enqueue(text, context),
+        this.sessionContext
+      );
       
-      try {
-        this.bridge.translate(document.documentElement);
-      } catch (libError) {
-        // If library thinks it is already translated (internal state), we try to force it
-        if (libError.message?.includes('already been translated')) {
-          this.logger.debug('Library reported already translated, re-triggering for safety');
-          if (this.bridge.domTranslator) this.bridge.domTranslator.translate(document.documentElement);
-        } else {
-          throw libError;
-        }
-      }
+      this.bridge.translate(document.documentElement);
       
       this.isTranslated = true;
       this.isTranslating = false;
       
-      // Handle auto-translation state (NEW)
       if (this.settings.autoTranslateOnDOMChanges) {
         this.isAutoTranslating = true;
       }
@@ -124,6 +116,7 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
+      this.logger.error('translatePage failed', error);
       this.isTranslating = false;
       this.isAutoTranslating = false;
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message });
@@ -134,29 +127,37 @@ export class PageTranslationManager extends ResourceTracker {
   async restorePage() {
     this._cleanupSession();
     try {
+      // 1. First stop batcher to prevent loop during library's restore
+      this.batcher.setTranslationState(false);
+      this.isTranslated = false;
+      this.isAutoTranslating = false;
+
+      // 2. Use standard library restore
       this.bridge.restore(document.documentElement);
       
-      // CRITICAL: Reset everything so we can translate again on the same URL
-      this.isTranslated = false;
-      this.isTranslating = false;
-      this.isAutoTranslating = false;
-      this.batcher.reset(); // Clear counts and tracking
-      this.batcher.setTranslationState(false);
-      
-      const translatedElements = document.querySelectorAll('[data-page-translated]');
-      translatedElements.forEach(el => {
-        el.removeAttribute('dir');
-        el.removeAttribute('data-page-translated');
-        el.removeAttribute('data-translate-dir');
-      });
+      // 3. Complete reset
+      this.resetLocalState();
+
+      // Small delay for DOM to stabilize
+      await new Promise(r => setTimeout(r, 50));
 
       const resultData = { url: this.currentUrl, restoredCount: 0 };
       this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
+      this.logger.error('Restore failed', error);
       this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message });
       throw error;
     }
+  }
+
+  resetLocalState() {
+    this.isTranslated = false;
+    this.isTranslating = false;
+    this.isAutoTranslating = false;
+    this.sessionContext = null;
+    this.batcher.reset();
+    this.bridge.cleanup();
   }
 
   /**
@@ -167,7 +168,6 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this.bridge.stopPersistence();
-      this.batcher.stop(); // Stop batcher queue (NEW)
       this.isAutoTranslating = false;
 
       const resultData = {
@@ -176,7 +176,6 @@ export class PageTranslationManager extends ResourceTracker {
         isTranslated: this.isTranslated,
         isAutoTranslating: false
       };
-      // We notify UI to change icon to Restore
       this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
@@ -187,13 +186,8 @@ export class PageTranslationManager extends ResourceTracker {
 
   cancelTranslation() {
     this._cleanupSession();
-    this.bridge.restore(document.documentElement);
+    this.restorePage(); // Use full restore for cancel
     
-    // Reset flags always when cancelling
-    this.isTranslating = false;
-    this.isAutoTranslating = false;
-    this.batcher.setTranslationState(false);
-
     if (this.abortController) {
       this.abortController.abort();
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
@@ -203,14 +197,9 @@ export class PageTranslationManager extends ResourceTracker {
   _handleFatalError(error, errorType) {
     this.logger.info('[CIRCUIT BREAKER] Fatal error. Stopping page translation.');
     this.cancelTranslation();
-    this.isTranslated = false;
-    this.isAutoTranslating = false;
     
-    pageEventBus.emit('show-notification', {
-      type: 'error',
-      message: browser.i18n.getMessage('error_rate_limit_reached') || 'Rate limit reached.',
-      duration: 10000
-    });
+    const message = browser.i18n.getMessage('error_rate_limit_reached') || 'Rate limit reached.';
+    this.toastIntegration.showError(message, { duration: 10000 });
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
       error: error.message || String(error), 
@@ -255,9 +244,7 @@ export class PageTranslationManager extends ResourceTracker {
     // Check for URL change on every status request
     if (this.currentUrl && this.currentUrl !== window.location.href) {
       this.logger.debug('URL change detected in getStatus, resetting status');
-      this.isTranslated = false;
-      this.isAutoTranslating = false;
-      this.batcher.reset();
+      this.resetLocalState();
       this.currentUrl = window.location.href;
     }
 
@@ -278,6 +265,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.isAutoTranslating = false;
     this.bridge.cleanup();
     this.batcher.reset();
+    if (this.toastIntegration) {
+      this.toastIntegration.shutdown();
+    }
     super.cleanup();
   }
 }
