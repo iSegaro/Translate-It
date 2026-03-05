@@ -414,7 +414,7 @@ class TranslationModeCoordinator {
    */
   async processPageTranslation(request, { translationEngine }) {
     const { messageId, data, sender } = request;
-    const { text, provider, sourceLanguage, targetLanguage } = data;
+    const { text, provider, sourceLanguage, targetLanguage, priority } = data;
 
     if (!text) {
       throw new Error('No text provided for translation');
@@ -478,7 +478,8 @@ class TranslationModeCoordinator {
                   abortController,
                   translationEngine,
                   messageId,
-                  data.sessionId || messageId // Use provided sessionId if available
+                  data.sessionId || messageId,
+                  priority // Use detected priority (LOW)
                 );
               } else {
                 return providerInstance._translateChunk(
@@ -491,7 +492,7 @@ class TranslationModeCoordinator {
               }
             },
             `batch-${i + 1}/${batches.length}`,
-            TranslationMode.Page
+            priority // Use detected priority (LOW)
           );
 
           // Apply results

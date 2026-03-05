@@ -121,7 +121,7 @@ export class BaseTranslateProvider extends BaseProvider {
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
     // Check if streaming is supported and beneficial
-    if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
+    if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority);
     }
 
@@ -136,16 +136,17 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {object} engine - Translation engine
    * @returns {boolean} - Whether to use streaming
    */
-  _shouldUseStreaming(texts, messageId, engine) {
-    // Only use streaming if:
-    // 1. Provider supports it
-    // 2. We have a valid messageId for streaming
-    // 3. Engine is available for streaming notifications
-    // 4. There are multiple texts or chunking is needed
-    return this.constructor.supportsStreaming && 
-           messageId && 
-           engine && 
-           (texts.length > 1 || this._needsChunking(texts));
+  _shouldUseStreaming(texts, messageId, engine, translateMode = null) {
+    // 1. Provider must support streaming
+    if (!this.constructor.supportsStreaming || !messageId || !engine) return false;
+
+    // 2. CRITICAL: Never use internal streaming for WHOLE PAGE translation
+    // Page translation is already batched by PageTranslationBatcher and handled by processPageTranslation.
+    // Double streaming causes context mismatches and result rejection.
+    if (translateMode === TranslationMode.Page) return false;
+
+    // 3. Use streaming for multiple texts (like Select Element) or if chunking is needed
+    return texts.length > 1 || this._needsChunking(texts);
   }
 
   /**
