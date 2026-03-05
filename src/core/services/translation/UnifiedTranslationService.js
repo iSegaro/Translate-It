@@ -365,29 +365,28 @@ class TranslationModeCoordinator {
     // Update request status
     request.status = RequestStatus.PROCESSING;
 
-    // Determine priority based on mode
+    // Determine priority based on mode using project constants
     const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
     let priority = TranslationPriority.NORMAL;
 
-    // Interactive modes get HIGH priority
-    const highPriorityModes = [
-      TranslationMode.Field, 
-      'popup', 
-      'sidepanel', 
-      'selection', 
-      'select-element'
-    ];
+    // Map modes to priorities using TranslationMode constants
+    const highPriorityModes = new Set([
+      TranslationMode.Field,
+      TranslationMode.Selection,
+      TranslationMode.Dictionary_Translation,
+      TranslationMode.Popup_Translate,
+      TranslationMode.Sidepanel_Translate,
+    ]);
     
-    // Page modes get LOW priority
-    const lowPriorityModes = [
-      TranslationMode.Page, 
-      'page-batch', 
-      'page-translate'
-    ];
+    const lowPriorityModes = new Set([
+      TranslationMode.Page,
+      TranslationMode.Select_Element,
+      TranslationMode.ScreenCapture
+    ]);
 
-    if (highPriorityModes.some(m => mode.toLowerCase().includes(m))) {
+    if (highPriorityModes.has(mode)) {
       priority = TranslationPriority.HIGH;
-    } else if (lowPriorityModes.some(m => mode.toLowerCase().includes(m))) {
+    } else if (lowPriorityModes.has(mode)) {
       priority = TranslationPriority.LOW;
     }
 
@@ -402,7 +401,7 @@ class TranslationModeCoordinator {
       case TranslationMode.Page:
         return await this.processPageTranslation(request, { translationEngine });
 
-      case 'select-element':
+      case TranslationMode.Select_Element:
         return await this.processSelectElementTranslation(request, { translationEngine });
 
       default:
