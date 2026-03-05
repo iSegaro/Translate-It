@@ -1,6 +1,12 @@
-import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+/**
+ * Rate Limit Manager - Intelligent request throttling with priority-based scheduling
+ * Combines advanced stability (Circuit Breaker, Adaptive Backoff) with 
+ * priority-based queuing (HIGH, NORMAL, LOW).
+ */
+
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -9,8 +15,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
  */
 export const TranslationPriority = {
   HIGH: 10,   // Interactive UI (Popup, Sidepanel, Selection)
-  NORMAL: 5, // Default/Standard requests
-  LOW: 1,    // Background tasks (Whole Page Translation)
+  NORMAL: 5,  // Default/Standard requests
+  LOW: 1,     // Background tasks (Whole Page Translation)
 };
 
 /**
@@ -19,7 +25,7 @@ export const TranslationPriority = {
 const DEFAULT_PROVIDER_CONFIGS = {
   [ProviderNames.GOOGLE_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 100 },
   [ProviderNames.BING_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
-  [ProviderNames.GEMINI]: { maxConcurrent: 2, delayBetweenRequests: 600 },
+  [ProviderNames.GEMINI]: { maxConcurrent: 2, delayBetweenRequests: 600, burstLimit: 5 },
   [ProviderNames.OPENAI]: { maxConcurrent: 2, delayBetweenRequests: 500 },
   [ProviderNames.YANDEX_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 150 },
   [ProviderNames.DEEPL_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
@@ -28,130 +34,301 @@ const DEFAULT_PROVIDER_CONFIGS = {
   [ProviderNames.WEBAI]: { maxConcurrent: 2, delayBetweenRequests: 500 },
 };
 
-class RateLimitManager {
+export class RateLimitManager {
   constructor() {
-    this.configs = {};
-    this.activeRequests = {}; 
-    this.queues = {};
-    this.reloadConfigurations();
-  }
-
-  /**
-   * Load or reload configurations from constants
-   */
-  reloadConfigurations() {
-    Object.entries(DEFAULT_PROVIDER_CONFIGS).forEach(([name, config]) => {
-      this.setProviderConfig(name, config);
-    });
-    logger.debug("Provider configurations reloaded");
-  }
-
-  /**
-   * Initialize configuration for a provider
-   */
-  setProviderConfig(providerName, config = {}) {
-    this.configs[providerName] = {
-      maxConcurrent: config.maxConcurrent || 2,
-      delayBetweenRequests: config.delayBetweenRequests || 100,
-      ...config
-    };
-    
-    if (this.activeRequests[providerName] === undefined) {
-      this.activeRequests[providerName] = 0;
+    if (RateLimitManager.instance) {
+      return RateLimitManager.instance;
     }
     
-    if (!this.queues[providerName]) {
-      this.queues[providerName] = {
+    this.providerStates = new Map();
+    RateLimitManager.instance = this;
+    
+    // Initialize default configs
+    this.reloadConfigurations();
+    logger.debug('RateLimitManager initialized with priority support');
+  }
+  
+  static getInstance() {
+    if (!RateLimitManager.instance) {
+      RateLimitManager.instance = new RateLimitManager();
+    }
+    return RateLimitManager.instance;
+  }
+
+  /**
+   * Reset or load configurations
+   */
+  reloadConfigurations() {
+    this.providerStates.clear();
+    Object.entries(DEFAULT_PROVIDER_CONFIGS).forEach(([name, config]) => {
+      this._initializeProvider(name, config);
+    });
+  }
+
+  /**
+   * Initialize or get provider state
+   */
+  _initializeProvider(providerName, config = {}) {
+    if (this.providerStates.has(providerName)) {
+      return this.providerStates.get(providerName);
+    }
+    
+    const defaultConfig = DEFAULT_PROVIDER_CONFIGS[providerName] || { maxConcurrent: 2, delayBetweenRequests: 200 };
+    
+    const state = {
+      config: { ...defaultConfig, ...config },
+      activeRequests: 0,
+      lastRequestTime: 0,
+      queues: {
         [TranslationPriority.HIGH]: [],
         [TranslationPriority.NORMAL]: [],
         [TranslationPriority.LOW]: []
-      };
-    }
+      },
+      isProcessingQueue: false,
+      // Circuit breaker
+      consecutiveFailures: 0,
+      isCircuitOpen: false,
+      circuitOpenTime: 0,
+      circuitBreakThreshold: 5,
+      circuitRecoveryTime: 30000,
+      // Adaptive backoff
+      currentBackoffMultiplier: 1,
+      // Performance monitoring (Crucial for AI providers)
+      performanceStats: {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        totalWaitTime: 0,
+        totalProcessingTime: 0,
+        averageWaitTime: 0,
+        averageRequestTime: 0,
+        requestsPerMinute: 0,
+        successRate: 100,
+        lastPerformanceReset: Date.now()
+      }
+    };
+    
+    this.providerStates.set(providerName, state);
+    return state;
   }
 
   /**
-   * Execute a task with rate limiting and priority
+   * Execute task with rate limiting and priority
    */
   async executeWithRateLimit(providerName, task, context = "", priority = TranslationPriority.NORMAL) {
-    // Handle cases where provider might not be initialized with its registry ID
-    // We map registry IDs to full names if needed
+    // Resolve registry ID to name if necessary
     let name = providerName;
-    if (!this.configs[name]) {
-      // Try to find full name from registry ID
-      try {
-        const { registryIdToName } = await import("@/features/translation/providers/ProviderConstants.js");
-        name = registryIdToName(providerName) || providerName;
-      } catch (e) { /* ignore */ }
-      
-      if (!this.configs[name]) {
-        this.setProviderConfig(name);
-      }
+    try {
+      const { registryIdToName } = await import("@/features/translation/providers/ProviderConstants.js");
+      name = registryIdToName(providerName) || providerName;
+    } catch (e) { /* Fallback to raw providerName */ }
+
+    const state = this._initializeProvider(name);
+    
+    // Check circuit breaker
+    if (this._isCircuitOpen(state)) {
+      const error = new Error(`Circuit breaker open for ${name}. Too many failures.`);
+      error.type = 'CIRCUIT_BREAKER_OPEN';
+      throw error;
     }
 
+    const startTime = Date.now();
+
     return new Promise((resolve, reject) => {
-      const request = { task, resolve, reject, context, priority };
+      const request = { 
+        task, 
+        resolve, 
+        reject, 
+        context, 
+        priority, 
+        enqueuedAt: startTime 
+      };
       
-      const targetPriority = TranslationPriority[Object.keys(TranslationPriority).find(k => TranslationPriority[k] === priority)] 
+      // Ensure priority is valid
+      const targetPriority = [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].includes(priority)
         ? priority : TranslationPriority.NORMAL;
 
-      this.queues[name][targetPriority].push(request);
+      state.queues[targetPriority].push(request);
       this._processQueue(name);
     });
   }
 
   /**
-   * Process the next task in the queue based on priority
+   * Main queue processing logic - respects priorities (HIGH > NORMAL > LOW)
    */
-  _processQueue(providerName) {
-    const config = this.configs[providerName];
-    const active = this.activeRequests[providerName];
+  async _processQueue(providerName) {
+    const state = this.providerStates.get(providerName);
+    if (!state || state.isProcessingQueue) return;
 
-    if (active >= config.maxConcurrent) return;
+    state.isProcessingQueue = true;
 
-    const providerQueue = this.queues[providerName];
-    let nextRequest = null;
-    
-    // Order: HIGH -> NORMAL -> LOW
-    if (providerQueue[TranslationPriority.HIGH].length > 0) {
-      nextRequest = providerQueue[TranslationPriority.HIGH].shift();
-    } else if (providerQueue[TranslationPriority.NORMAL].length > 0) {
-      nextRequest = providerQueue[TranslationPriority.NORMAL].shift();
-    } else if (providerQueue[TranslationPriority.LOW].length > 0) {
-      nextRequest = providerQueue[TranslationPriority.LOW].shift();
-    }
+    try {
+      while (this._hasPendingRequests(state)) {
+        // Check concurrency
+        if (state.activeRequests >= state.config.maxConcurrent) break;
 
-    if (!nextRequest) return;
+        // Check delay between requests
+        const now = Date.now();
+        const baseDelay = state.config.delayBetweenRequests || 100;
+        const adjustedDelay = baseDelay * state.currentBackoffMultiplier;
+        const timeSinceLast = now - state.lastRequestTime;
 
-    this.activeRequests[providerName]++;
+        if (timeSinceLast < adjustedDelay) {
+          const waitTime = Math.max(0, adjustedDelay - timeSinceLast);
+          await new Promise(r => setTimeout(r, waitTime));
+          continue; // Re-check conditions after wait
+        }
 
-    (async () => {
-      try {
-        const result = await nextRequest.task();
-        nextRequest.resolve(result);
-      } catch (error) {
-        nextRequest.reject(error);
-      } finally {
-        setTimeout(() => {
-          this.activeRequests[providerName]--;
-          this._processQueue(providerName);
-        }, config.delayBetweenRequests);
+        // Get next request by priority
+        const nextRequest = this._getNextRequest(state);
+        if (!nextRequest) break;
+
+        // Update stats and execute
+        state.activeRequests++;
+        state.lastRequestTime = Date.now();
+        
+        // Track wait time
+        const waitTime = Date.now() - nextRequest.enqueuedAt;
+        state.performanceStats.totalWaitTime += waitTime;
+        state.performanceStats.totalRequests++;
+
+        this._executeRequest(state, nextRequest, providerName);
       }
-    })();
+    } finally {
+      state.isProcessingQueue = false;
+    }
+  }
+
+  _hasPendingRequests(state) {
+    return state.queues[TranslationPriority.HIGH].length > 0 ||
+           state.queues[TranslationPriority.NORMAL].length > 0 ||
+           state.queues[TranslationPriority.LOW].length > 0;
+  }
+
+  _getNextRequest(state) {
+    if (state.queues[TranslationPriority.HIGH].length > 0) return state.queues[TranslationPriority.HIGH].shift();
+    if (state.queues[TranslationPriority.NORMAL].length > 0) return state.queues[TranslationPriority.NORMAL].shift();
+    if (state.queues[TranslationPriority.LOW].length > 0) return state.queues[TranslationPriority.LOW].shift();
+    return null;
+  }
+
+  async _executeRequest(state, request, providerName) {
+    const requestStartTime = Date.now();
+    try {
+      const result = await request.task();
+      const duration = Date.now() - requestStartTime;
+      
+      // Success record
+      state.performanceStats.successfulRequests++;
+      state.performanceStats.totalProcessingTime += duration;
+      this._recordSuccess(state);
+      
+      request.resolve(result);
+    } catch (error) {
+      this._recordFailure(state, error, providerName);
+      request.reject(error);
+    } finally {
+      state.activeRequests--;
+      this._updateDerivedStats(state);
+      
+      // Process next in queue
+      setTimeout(() => this._processQueue(providerName), 10);
+    }
   }
 
   /**
-   * Clear all pending tasks for a provider
+   * Update calculated metrics for AI providers
    */
-  clearQueue(providerName) {
-    if (this.queues[providerName]) {
-      const q = this.queues[providerName];
-      [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
-        q[p].forEach(req => req.reject(new Error("Queue cleared")));
-        q[p] = [];
-      });
+  _updateDerivedStats(state) {
+    const stats = state.performanceStats;
+    const totalProcessed = stats.successfulRequests + stats.failedRequests;
+    
+    if (totalProcessed > 0) {
+      stats.successRate = (stats.successfulRequests / totalProcessed) * 100;
+      stats.averageWaitTime = stats.totalWaitTime / stats.totalRequests;
     }
-    this.activeRequests[providerName] = 0;
+    
+    if (stats.successfulRequests > 0) {
+      stats.averageRequestTime = stats.totalProcessingTime / stats.successfulRequests;
+    }
+
+    const timeSinceReset = (Date.now() - stats.lastPerformanceReset) / 60000; // in minutes
+    if (timeSinceReset > 0) {
+      stats.requestsPerMinute = stats.totalRequests / timeSinceReset;
+    }
+  }
+
+  _isCircuitOpen(state) {
+    if (!state.isCircuitOpen) return false;
+    const now = Date.now();
+    if (now - state.circuitOpenTime > state.circuitRecoveryTime) {
+      state.isCircuitOpen = false;
+      state.consecutiveFailures = 0;
+      return false;
+    }
+    return true;
+  }
+
+  _recordSuccess(state) {
+    state.consecutiveFailures = 0;
+    state.isCircuitOpen = false;
+    state.currentBackoffMultiplier = 1;
+  }
+
+  _recordFailure(state, error, providerName) {
+    state.performanceStats.failedRequests++;
+    state.consecutiveFailures++;
+    
+    // Adaptive Backoff: Increase delay on 429 or quota errors
+    const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
+    if (isRateLimit) {
+      state.currentBackoffMultiplier = Math.min(state.currentBackoffMultiplier * 2, 10);
+      logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
+    }
+
+    if (state.consecutiveFailures >= state.circuitBreakThreshold) {
+      state.isCircuitOpen = true;
+      state.circuitOpenTime = Date.now();
+      logger.error(`Circuit breaker OPENED for ${providerName} after ${state.consecutiveFailures} failures`);
+    }
+  }
+
+  /**
+   * API for AI Providers to monitor performance
+   */
+  getPerformanceStats(providerName) {
+    const state = this.providerStates.get(providerName);
+    if (!state) {
+      return { 
+        averageWaitTime: 0, averageRequestTime: 0, requestsPerMinute: 0, 
+        successRate: 0, totalPending: 0, active: 0 
+      };
+    }
+    
+    this._updateDerivedStats(state);
+    
+    const q = state.queues;
+    const totalPending = q[TranslationPriority.HIGH].length + 
+                         q[TranslationPriority.NORMAL].length + 
+                         q[TranslationPriority.LOW].length;
+                         
+    return {
+      ...state.performanceStats,
+      active: state.activeRequests,
+      totalPending
+    };
+  }
+
+  clearQueue(providerName) {
+    const state = this.providerStates.get(providerName);
+    if (state) {
+      [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
+        state.queues[p].forEach(req => req.reject(new Error("Queue cleared")));
+        state.queues[p] = [];
+      });
+      state.activeRequests = 0;
+    }
   }
 }
 
-export const rateLimitManager = new RateLimitManager();
+export const rateLimitManager = RateLimitManager.getInstance();
