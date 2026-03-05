@@ -359,11 +359,40 @@ class TranslationModeCoordinator {
   /**
    * Process request based on mode
    */
-  async processRequest(request, { translationEngine }) {
+  async processRequest(request, { translationEngine, backgroundService }) {
     const { mode } = request;
 
     // Update request status
     request.status = RequestStatus.PROCESSING;
+
+    // Determine priority based on mode
+    const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
+    let priority = TranslationPriority.NORMAL;
+
+    // Interactive modes get HIGH priority
+    const highPriorityModes = [
+      TranslationMode.Field, 
+      'popup', 
+      'sidepanel', 
+      'selection', 
+      'select-element'
+    ];
+    
+    // Page modes get LOW priority
+    const lowPriorityModes = [
+      TranslationMode.Page, 
+      'page-batch', 
+      'page-translate'
+    ];
+
+    if (highPriorityModes.some(m => mode.toLowerCase().includes(m))) {
+      priority = TranslationPriority.HIGH;
+    } else if (lowPriorityModes.some(m => mode.toLowerCase().includes(m))) {
+      priority = TranslationPriority.LOW;
+    }
+
+    // Attach priority to request data for downstream use
+    request.data.priority = priority;
 
     // Route to appropriate handler
     switch (mode) {

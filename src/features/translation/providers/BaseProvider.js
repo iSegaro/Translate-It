@@ -116,7 +116,8 @@ export class BaseProvider {
     }
 
     // 5. Perform batch translation using the subclass implementation
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController);
+    const priority = options?.priority || (await import("@/features/translation/core/RateLimitManager.js")).TranslationPriority.NORMAL;
+    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController, priority);
 
     // 6. Reconstruct the final output
     if (isJsonMode) {
