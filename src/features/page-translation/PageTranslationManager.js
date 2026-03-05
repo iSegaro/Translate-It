@@ -169,11 +169,15 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
+      this.isTranslated = false; // Disable further batch processing
+      
+      // Notify batcher to stop and clear any pending timers/queues
+      this.batcher.setTranslationState(false);
 
       const resultData = {
         url: this.currentUrl, 
         translatedCount: this.batcher.translatedCount,
-        isTranslated: this.isTranslated,
+        isTranslated: false,
         isAutoTranslating: false
       };
       this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);

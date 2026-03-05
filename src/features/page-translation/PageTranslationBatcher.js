@@ -100,7 +100,12 @@ export class PageTranslationBatcher {
   }
 
   async flush() {
-    if (!this.isTranslated || this.queue.length === 0) return;
+    if (!this.isTranslated || this.queue.length === 0) {
+      if (!this.isTranslated && this.queue.length > 0) {
+        this.stop(); // Ensure cleanup if we have items but are not translating
+      }
+      return;
+    }
     
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       if (!this.batchTimer && this.isTranslated) {
@@ -109,15 +114,21 @@ export class PageTranslationBatcher {
       return;
     }
 
-    if (this.batchTimer) clearTimeout(this.batchTimer);
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
     
     const flushContext = this.sessionContext;
     this.activeFlushes++;
     let currentBatch = [];
 
     try {
+      // RE-CHECK: Ensure we are still translating before starting heavy work
+      if (!this.isTranslated) return;
+
       const config = await this._getBatchConfig();
-      // Extract based on chunkSize or characters, but ONLY for the same context
+      // ... rest of the code logic remains similar but with more checks ...
       let itemsToProcess = 0;
       let currentChars = 0;
       for (const item of this.queue) {
@@ -131,7 +142,6 @@ export class PageTranslationBatcher {
       currentBatch = this.queue.splice(0, itemsToProcess);
 
       if (currentBatch.length === 0 || !this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
-        this.activeFlushes--;
         return;
       }
 
@@ -152,6 +162,11 @@ export class PageTranslationBatcher {
         MessageContexts.CONTENT
       );
 
+      // FINAL CHECK: Before making the network call
+      if (!this.isTranslated) {
+        throw new Error('Session stopped');
+      }
+
       const result = await sendRegularMessage(batchMessage, { timeout: 60000 });
 
       // After async call, verify context still matches
@@ -170,7 +185,7 @@ export class PageTranslationBatcher {
 
       this._reportProgress();
     } catch (error) {
-      if (error.message !== 'Session changed or stopped') {
+      if (error.message !== 'Session changed or stopped' && error.message !== 'Session stopped') {
         this._handleBatchError(error, currentBatch);
       } else {
         currentBatch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
@@ -180,6 +195,9 @@ export class PageTranslationBatcher {
       if (this.queue.length > 0 && this.isTranslated) {
         if (this.batchTimer) clearTimeout(this.batchTimer);
         this.batchTimer = setTimeout(() => this.flush(), 50);
+      } else if (!this.isTranslated && this.queue.length > 0) {
+        // Force cleanup of leftover items if session stopped while processing
+        this.stop();
       }
     }
   }
