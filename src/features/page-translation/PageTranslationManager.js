@@ -169,15 +169,16 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
-      this.isTranslated = false; // Disable further batch processing
+      this.isTranslated = true; // KEEP TRUE: The page IS still translated!
       
       // Notify batcher to stop and clear any pending timers/queues
+      // This stops the background loop but we keep the manager's isTranslated=true
       this.batcher.setTranslationState(false);
 
       const resultData = {
         url: this.currentUrl, 
         translatedCount: this.batcher.translatedCount,
-        isTranslated: false,
+        isTranslated: true, // Tell background/UI we are still in translated state
         isAutoTranslating: false
       };
       this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
