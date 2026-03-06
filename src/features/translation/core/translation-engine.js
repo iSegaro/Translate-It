@@ -607,7 +607,7 @@ export class TranslationEngine {
                 MessageActions.TRANSLATION_STREAM_END,
                 { 
                   success: !hasErrors,
-                  targetLanguage: effectiveTargetLanguage
+                  targetLanguage: effectiveTarget
                 },
                 'background-stream',
                 { messageId: messageId }
