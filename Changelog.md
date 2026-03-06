@@ -2,11 +2,14 @@
 
 ##### Added
 
-- `Whole Page` Translation feature
+- `Whole Page` translation feature.
+- Japanese UI localization – Special thanks to [monta-gh](https://github.com/monta-gh).
+- Microsoft Edge translation engine.
+- Lingva translator support.
 
 ##### Fixed
 
-- Improved the `Select Element` functionality
+- Improved `Select Element` functionality for better stability and precision.
 
 ---
 
