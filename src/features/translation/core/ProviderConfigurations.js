@@ -480,6 +480,55 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Microsoft Edge - Official Edge Browser translation service
+  MicrosoftEdge: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 200,
+      burstLimit: 5,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 20000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 5000,
+      maxChunksPerBatch: 20, // Edge API supports larger batches
+      delimiter: null // Uses JSON array
+    },
+    streaming: {
+      enabled: true,
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'rate_limit',
+        'auth_error'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 10000, temporary: true },
+        'auth_error': { delay: 0, temporary: true } // Instant retry with new token
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true,
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: false
+    }
+  },
+
   // Custom Provider - Flexible/configurable settings
   Custom: {
     rateLimit: {
@@ -576,6 +625,9 @@ function normalizeProviderName(providerName) {
     'bingtranslate': ProviderNames.BING_TRANSLATE,
     'bing-translate': ProviderNames.BING_TRANSLATE,
     'bing': ProviderNames.BING_TRANSLATE,
+    'edge': ProviderNames.MICROSOFT_EDGE,
+    'microsoftedge': ProviderNames.MICROSOFT_EDGE,
+    'microsoft-edge': ProviderNames.MICROSOFT_EDGE,
     'browser': ProviderNames.BROWSER_API,
     'browserranslate': ProviderNames.BROWSER_API,
     'custom': ProviderNames.CUSTOM,
