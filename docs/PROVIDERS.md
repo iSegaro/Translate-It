@@ -17,6 +17,36 @@
 - **UnifiedTranslationCoordinator**: هماهنگی streaming translation operations با timeout management هوشمند و progress reporting.
 - **StreamingTimeoutManager**: مدیریت timeout های پویا برای streaming operations بر اساس اندازه محتوا.
 
+## 🚀 Workflow: Adding a New Provider (Quick Start)
+
+برای اضافه کردن یک پرووایدر جدید، این ۷ مرحله را به ترتیب انجام دهید:
+
+### ۱. تعریف ثابت‌ها (`ProviderConstants.js`)
+نام و ID پرووایدر را اضافه کنید:
+- `ProviderNames`: نام کلاس (مانند `MICROSOFT_EDGE: 'MicrosoftEdge'`)
+- `ProviderRegistryIds`: آی‌دی رجیستری (مانند `EDGE: 'edge'`)
+- آپدیت توابع `isProviderType` و نگاشت‌های ID به Name.
+
+### ۲. پیاده‌سازی کلاس پرووایدر (`providers/YourProvider.js`)
+کلاس جدید را با ارث‌بری از `BaseTranslateProvider` یا `BaseAIProvider` ایجاد کنید.
+- متدهای `_getLangCode` و `_translateChunk` (یا `_translateSingle`) را پیاده‌سازی کنید.
+
+### ۳. تنظیم Rate Limit (`core/RateLimitManager.js`)
+کانفیگ اولیه (تعداد درخواست همزمان و تاخیر) را در `DEFAULT_PROVIDER_CONFIGS` وارد کنید.
+
+### ۴. ثبت برای بارگذاری Lazy (`providers/register-providers.js`)
+پرووایدر را به `providerConfigs` اضافه کنید تا سیستم بتواند آن را به صورت داینامیک Import کند.
+
+### ۵. تعریف جزئیات فنی (`core/ProviderConfigurations.js`)
+استراتژی‌های خطا، محدودیت کاراکتر و قابلیت‌های پرووایدر را در `PROVIDER_CONFIGURATIONS` تعریف کنید.
+- تابع `normalizeProviderName` را برای شناسایی نام‌های مختلف پرووایدر آپدیت کنید.
+
+### ۶. ثبت در UI Registry (`core/provider-registry.js`)
+اطلاعات نمایشی (نام، توضیحات، آیکون و دسته‌بندی) را به آرایه `PROVIDER_REGISTRY` اضافه کنید تا در دراپ‌داون‌ها ظاهر شود.
+
+### ۷. تایید در منوی کلیک‌راست (`core/managers/context-menu.js`)
+آی‌دی پرووایدر را به لیست `knownProviderIds` اضافه کنید تا از بروز هشدارهای "Unknown provider" جلوگیری شود.
+
 ## ProviderConstants System (2026)
 
 ### Overview
