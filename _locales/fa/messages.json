@@ -50,6 +50,16 @@
     "message": "از سرویس رایگان و عمومی Microsoft Bing Translator استفاده می کند. کلید API لازم نیست."
   },
 
+  "edge_translate_settings_title": { "message": "مترجم مایکروسافت اج" },
+  "edge_translate_description": {
+    "message": "سرویس رسمی ترجمه مرورگر مایکروسافت اج. سریع‌تر و پایدارتر. بدون نیاز به کلید API."
+  },
+
+  "lingva_translate_settings_title": { "message": "مترجم لینگوا" },
+  "lingva_translate_description": {
+    "message": "رابط متن‌باز و رایگان گوگل ترنسلیت. متمرکز بر حریم خصوصی و غیرمتمرکز. بدون نیاز به کلید API."
+  },
+
   "notification_update_title": { "message": "افزونه به‌روز شد" },
   "notification_update_message": {
     "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد."

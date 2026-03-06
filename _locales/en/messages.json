@@ -51,6 +51,16 @@
     "message": "Uses the free, public Microsoft Bing Translator endpoint. No API key is required."
   },
 
+  "edge_translate_settings_title": { "message": "Microsoft Edge Translator" },
+  "edge_translate_description": {
+    "message": "Official Microsoft Edge browser translation service. Faster and more stable. No API key required."
+  },
+
+  "lingva_translate_settings_title": { "message": "Lingva Translator" },
+  "lingva_translate_description": {
+    "message": "Free open-source Google Translate front-end. Privacy-focused and decentralized. No API key required."
+  },
+
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
   "options_changelog_loading": { "message": "Loading changelog..." },

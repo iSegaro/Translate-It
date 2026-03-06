@@ -69,6 +69,26 @@
           </p>
         </div>
 
+        <div
+          v-else-if="selectedProvider === 'edge'"
+          class="api-info"
+        >
+          <h3>{{ t('edge_translate_settings_title') || 'Microsoft Edge Translate' }}</h3>
+          <p class="setting-description">
+            {{ t('edge_translate_description') || 'Official Microsoft Edge browser translation service. Faster and more stable. No API key required.' }}
+          </p>
+        </div>
+
+        <div
+          v-else-if="selectedProvider === 'lingva'"
+          class="api-info"
+        >
+          <h3>{{ t('lingva_translate_settings_title') || 'Lingva Translate' }}</h3>
+          <p class="setting-description">
+            {{ t('lingva_translate_description') || 'Free open-source Google Translate front-end. Privacy-focused and decentralized. No API key required.' }}
+          </p>
+        </div>
+
         <component :is="providerSettingsComponent" />
       </div>
     </div>
