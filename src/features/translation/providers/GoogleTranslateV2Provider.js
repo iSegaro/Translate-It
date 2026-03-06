@@ -5,6 +5,10 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import {
+  getEnableDictionaryAsync,
+  TranslationMode
+} from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslateV2');
 
@@ -24,6 +28,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   static type = "translate";
   static displayName = "Google Translate (Robust)";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
+  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;
 
   constructor() {
     super(ProviderNames.GOOGLE_TRANSLATE_V2);
@@ -78,6 +84,10 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
+    const isDictionaryEnabled = await getEnableDictionaryAsync();
+    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
+    const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
+
     const url = new URL("https://translate.google.com/translate_a/single");
     const params = {
       client: 't',
@@ -105,7 +115,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const body = new URLSearchParams();
     body.append("q", combinedText);
 
-    return this._executeApiCall({
+    const result = await this._executeApiCall({
       url: url.toString(),
       fetchOptions: {
         method: "POST",
@@ -123,23 +133,64 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       extractResponse: (data) => {
         if (!data || !data[0]) {
           logger.warn('[GoogleV2] Empty or invalid response data');
-          return chunkTexts.map(() => "");
+          return { translatedSegments: chunkTexts.map(() => ""), candidateText: "" };
         }
 
         // Combine segments back
         const translatedText = data[0].map(segment => segment[0] || "").join('');
         const translatedSegments = translatedText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
+        let candidateText = "";
+        if (shouldIncludeDictionary && data[1]) {
+          candidateText = data[1].map((dict) => {
+            const pos = dict[0] || "";
+            const terms = dict[1] || [];
+            return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+          }).join("");
+        }
+
         if (translatedSegments.length === chunkTexts.length) {
-          return translatedSegments;
+          return { translatedSegments, candidateText: candidateText.trim() };
         }
 
         // Mismatch handling
         logger.debug('[GoogleV2] Segment count mismatch, returning joined text');
-        return [translatedText];
+        return { translatedSegments: [translatedText], candidateText: candidateText.trim() };
       },
       context: 'googlev2-translate-chunk',
       abortController
     });
+
+    // Handle dictionary formatting for single segment
+    if (chunkTexts.length === 1 && result?.candidateText) {
+      const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
+      return [`${result.translatedSegments[0]}\n\n${formattedDictionary}`];
+    }
+
+    return result?.translatedSegments || chunkTexts;
+  }
+
+  _formatDictionaryAsMarkdown(candidateText) {
+    if (!candidateText || candidateText.trim() === "") {
+      return "";
+    }
+    const lines = candidateText.trim().split("\n").filter((line) => line.trim() !== "");
+    if (lines.length === 0) return "";
+
+    let markdownOutput = "";
+    lines.forEach((line) => {
+      const colonIndex = line.indexOf(":");
+      if (colonIndex > 0) {
+        const partOfSpeech = line.substring(0, colonIndex).trim();
+        const terms = line.substring(colonIndex + 1).trim();
+        if (partOfSpeech && terms) {
+          markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
+        }
+      } else if (line.trim()) {
+        markdownOutput += `**${line.trim()}**\n\n`;
+      }
+    });
+    return markdownOutput.trim();
   }
 }
+
