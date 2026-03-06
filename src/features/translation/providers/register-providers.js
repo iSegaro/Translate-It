@@ -5,6 +5,10 @@ const providerConfigs = {
     importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
     metadata: { id: "google", name: "Google Translate", type: "translate" }
   },
+  "googlev2": {
+    importFunction: () => import("./GoogleTranslateV2Provider.js").then(m => ({ default: m.GoogleTranslateV2Provider })),
+    metadata: { id: "googlev2", name: "Google Translate (Robust)", type: "translate" }
+  },
   "deepl": {
     importFunction: () => import("./DeepLTranslate.js").then(m => ({ default: m.DeepLTranslateProvider })),
     metadata: { id: "deepl", name: "DeepL Translate", type: "translate" }

@@ -35,7 +35,12 @@
   "google_translate_description": {
     "message": "Uses the free, public Google Translate endpoint. No API key is required."
   },
-  
+
+  "googlev2_translate_settings_title": { "message": "Google Translate (Robust)" },
+  "googlev2_translate_description": {
+    "message": "Robust version of Google Translate using secure tokens and browser-like headers. More stable for large texts. No API key required."
+  },
+
   "yandex_translate_settings_title": { "message": "Yandex Translate" },
   "yandex_translate_description": {
     "message": "Uses the free, public Yandex Translate endpoint. No API key is required."

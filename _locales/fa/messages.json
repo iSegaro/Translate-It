@@ -35,6 +35,11 @@
     "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست."
   },
 
+  "googlev2_translate_settings_title": { "message": "مترجم گوگل (پایدار)" },
+  "googlev2_translate_description": {
+    "message": "نسخه پایدار گوگل ترنسلیت با استفاده از توکن‌های امنیتی و شبیه‌سازی دقیق مرورگر. مناسب برای متن‌های طولانی. بدون نیاز به کلید API."
+  },
+
   "yandex_translate_settings_title": { "message": "مترجم Yandex" },
   "yandex_translate_description": {
     "message": "از سرویس رایگان و عمومی Yandex Translate استفاده می کند. کلید API لازم نیست."

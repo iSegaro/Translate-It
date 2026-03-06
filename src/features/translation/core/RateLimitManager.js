@@ -24,6 +24,7 @@ export const TranslationPriority = {
  */
 const DEFAULT_PROVIDER_CONFIGS = {
   [ProviderNames.GOOGLE_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 100 },
+  [ProviderNames.GOOGLE_TRANSLATE_V2]: { maxConcurrent: 2, delayBetweenRequests: 200 },
   [ProviderNames.BING_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
   [ProviderNames.MICROSOFT_EDGE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
   [ProviderNames.LINGVA]: { maxConcurrent: 1, delayBetweenRequests: 500 },

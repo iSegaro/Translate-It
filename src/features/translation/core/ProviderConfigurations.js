@@ -320,6 +320,55 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Google Translate V2 - Robust translation service settings
+  GoogleTranslateV2: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 200,
+      burstLimit: 5,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 20000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 5000,
+      maxChunksPerBatch: 15,
+      delimiter: '\n\n---\n\n'
+    },
+    streaming: {
+      enabled: true,
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'rate_limit',
+        'tkk_error'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 10000, temporary: true },
+        'tkk_error': { delay: 0, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true,
+      supportsThinking: false,
+      reliableJsonMode: false,
+      supportsDictionary: true
+    }
+  },
+
   // Yandex Translate - Free translation service settings
   YandexTranslate: {
     rateLimit: {
@@ -663,6 +712,9 @@ function normalizeProviderName(providerName) {
     'webai': ProviderNames.WEBAI,
     'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
     'google-translate': ProviderNames.GOOGLE_TRANSLATE,
+    'googlev2': ProviderNames.GOOGLE_TRANSLATE_V2,
+    'google-v2': ProviderNames.GOOGLE_TRANSLATE_V2,
+    'google-robust': ProviderNames.GOOGLE_TRANSLATE_V2,
     'yandextranslate': ProviderNames.YANDEX_TRANSLATE,
     'yandex-translate': ProviderNames.YANDEX_TRANSLATE,
     'yandex': ProviderNames.YANDEX_TRANSLATE,

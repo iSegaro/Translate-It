@@ -60,6 +60,16 @@
         </div>
 
         <div
+          v-else-if="selectedProvider === 'googlev2'"
+          class="api-info"
+        >
+          <h3>{{ t('googlev2_translate_settings_title') || 'Google Translate (Robust)' }}</h3>
+          <p class="setting-description">
+            {{ t('googlev2_translate_description') || 'Robust version of Google Translate using secure tokens and browser-like headers.' }}
+          </p>
+        </div>
+
+        <div
           v-else-if="selectedProvider === 'bing'"
           class="api-info"
         >

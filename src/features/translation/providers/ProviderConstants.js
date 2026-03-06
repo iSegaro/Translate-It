@@ -19,6 +19,7 @@
 export const ProviderNames = {
   // Traditional Translation Services
   GOOGLE_TRANSLATE: 'GoogleTranslate',
+  GOOGLE_TRANSLATE_V2: 'GoogleTranslateV2',
   DEEPL_TRANSLATE: 'DeepLTranslate',
   YANDEX_TRANSLATE: 'YandexTranslate',
   BING_TRANSLATE: 'BingTranslate',
@@ -47,6 +48,7 @@ export const ProviderNames = {
  */
 export const ProviderRegistryIds = {
   GOOGLE: 'google',
+  GOOGLE_V2: 'googlev2',
   DEEPL: 'deepl',
   YANDEX: 'yandex',
   BING: 'bing',
@@ -91,6 +93,7 @@ export function isProviderType(providerName, type) {
   // Map provider names to their types
   const providerTypeMap = {
     [ProviderNames.GOOGLE_TRANSLATE]: ProviderTypes.TRANSLATE,
+    [ProviderNames.GOOGLE_TRANSLATE_V2]: ProviderTypes.TRANSLATE,
     [ProviderNames.DEEPL_TRANSLATE]: ProviderTypes.TRANSLATE,
     [ProviderNames.YANDEX_TRANSLATE]: ProviderTypes.TRANSLATE,
     [ProviderNames.BING_TRANSLATE]: ProviderTypes.TRANSLATE,
@@ -115,6 +118,7 @@ export function isProviderType(providerName, type) {
 export function registryIdToName(registryId) {
   const idToNameMap = {
     [ProviderRegistryIds.GOOGLE]: ProviderNames.GOOGLE_TRANSLATE,
+    [ProviderRegistryIds.GOOGLE_V2]: ProviderNames.GOOGLE_TRANSLATE_V2,
     [ProviderRegistryIds.DEEPL]: ProviderNames.DEEPL_TRANSLATE,
     [ProviderRegistryIds.YANDEX]: ProviderNames.YANDEX_TRANSLATE,
     [ProviderRegistryIds.BING]: ProviderNames.BING_TRANSLATE,
@@ -139,6 +143,7 @@ export function registryIdToName(registryId) {
 export function nameToRegistryId(providerName) {
   const nameToIdMap = {
     [ProviderNames.GOOGLE_TRANSLATE]: ProviderRegistryIds.GOOGLE,
+    [ProviderNames.GOOGLE_TRANSLATE_V2]: ProviderRegistryIds.GOOGLE_V2,
     [ProviderNames.DEEPL_TRANSLATE]: ProviderRegistryIds.DEEPL,
     [ProviderNames.YANDEX_TRANSLATE]: ProviderRegistryIds.YANDEX,
     [ProviderNames.BING_TRANSLATE]: ProviderRegistryIds.BING,
