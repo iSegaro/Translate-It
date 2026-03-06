@@ -47,8 +47,14 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         credentials: 'omit',
         headers: {
           'Accept': '*/*',
+          'Accept-Language': 'zh-TW,zh;q=0.9,ja;q=0.8,zh-CN;q=0.7,en-US;q=0.6,en;q=0.5',
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Priority': 'u=1, i',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-Storage-Access': 'active'
         }
       });
 
@@ -66,7 +72,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         const payload = JSON.parse(atob(token.split('.')[1]));
         MicrosoftEdgeProvider.tokenExpiry = payload.exp * 1000;
       } catch (e) {
-        MicrosoftEdgeProvider.tokenExpiry = Date.now() + (10 * 60 * 1000);
+        // Fallback to 30 second lifetime as seen in anylang
+        MicrosoftEdgeProvider.tokenExpiry = Date.now() + (30 * 1000);
       }
 
       logger.debug('[Edge] Auth token obtained successfully');
@@ -90,7 +97,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
     const url = new URL(MicrosoftEdgeProvider.translateUrl);
     url.searchParams.set("api-version", "3.0");
-    url.searchParams.set("from", sl || "");
+    if (sl) url.searchParams.set("from", sl);
     url.searchParams.set("to", tl);
     url.searchParams.set("includeSentenceLength", "true");
 
@@ -107,8 +114,15 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
           "Accept": "*/*",
+          "Accept-Language": "zh-TW,zh;q=0.9,ja;q=0.8,zh-CN;q=0.7,en-US;q=0.6,en;q=0.5",
           "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
+          "Pragma": "no-cache",
+          "Priority": "u=1, i",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "none",
+          "Sec-Fetch-Storage-Access": "active"
         },
         body: JSON.stringify(body)
       },
@@ -117,7 +131,12 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           logger.error('[Edge] Unexpected API response format:', data);
           return chunkTexts.map(() => "");
         }
-        return data.map(item => item.translations?.[0]?.text || "");
+        
+        // Match anylang logic: Join multiple translation segments if present
+        return data.map(item => {
+          if (!item.translations || !Array.isArray(item.translations)) return "";
+          return item.translations.map(t => t.text).join(' ');
+        });
       },
       context: 'edge-translate-chunk',
       abortController
