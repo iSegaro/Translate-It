@@ -1,10 +1,11 @@
 /**
- * Manages direction (RTL/LTR) and text alignment for DOM elements
+ * DomDirectionManager - Simplified direction management for Select Element
+ * Uses native 'dir="auto"' for reliable BiDi handling instead of surgical injection
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { RTL_LANGUAGES, TEXT_TAGS, FORMATTING_TAGS, BLOCK_TAGS } from './DomTranslatorConstants.js';
+import { RTL_LANGUAGES, BLOCK_TAGS } from './DomTranslatorConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomDirectionManager');
 
@@ -14,63 +15,56 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomDirectionMa
  * @returns {boolean}
  */
 export function isRTL(langCode) {
+  if (!langCode) return false;
   const base = langCode.toLowerCase().split('-')[0];
   return RTL_LANGUAGES.has(base);
 }
 
 /**
- * Apply surgical direction and alignment to an element and its descendants
+ * Apply direction and alignment to an element
+ * Strategy: Use 'dir="auto"' to let browser handle the punctuation and BiDi logic
+ * This is the most robust way to handle mixed LTR/RTL content.
+ * 
  * @param {HTMLElement} element 
  * @param {string} targetLanguage 
  */
 export function applyDirection(element, targetLanguage) {
-  const direction = isRTL(targetLanguage) ? 'rtl' : 'ltr';
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
-  const processElement = (el) => {
-    if (!TEXT_TAGS.has(el.tagName)) return;
+  const isTargetRTL = isRTL(targetLanguage);
+  const directionAttr = 'auto'; // Browser-native BiDi detection
 
-    // Logic: Apply 'dir' attribute ONLY if the element is not a complex widget container.
-    // A complex container is one that has descendants like SVG, IMG, or UI widgets
-    // that are sensitive to layout flipping.
-    const hasWidgetDescendants = !!el.querySelector('svg, img, button, input, iframe, video, canvas, select');
+  // Apply to main element
+  element.setAttribute('dir', directionAttr);
+  
+  // Apply text-align only to block elements to ensure they start from correct side
+  if (BLOCK_TAGS.has(element.tagName)) {
+    element.style.textAlign = 'start';
+  }
 
-    if (!hasWidgetDescendants) {
-      el.setAttribute('dir', direction);
-    }
-
-    // Block-level alignment is safe: it aligns text without flipping child elements flow
-    if (BLOCK_TAGS.has(el.tagName)) {
-      el.style.textAlign = 'start';
-    }
-  };
-
-  processElement(element);
-  const descendants = element.querySelectorAll(Array.from(TEXT_TAGS).join(','));
-  descendants.forEach(processElement);
-
-  element.setAttribute('data-translate-dir', direction);
-  logger.debug(`Applied surgical direction: ${direction}`);
+  // Set meta-data for potential custom CSS/tracking
+  element.setAttribute('data-translate-dir', isTargetRTL ? 'rtl' : 'ltr');
+  
+  logger.debug(`Applied native auto-direction to ${element.tagName}`);
 }
 
 /**
  * Apply direction to a single node's parent (for streaming)
+ * Simplified to only target immediate parent if it lacks 'dir'
  * @param {Node} textNode 
  * @param {string} targetLanguage 
  */
 export function applyNodeDirection(textNode, targetLanguage) {
   const parent = textNode.parentElement;
-  if (parent && TEXT_TAGS.has(parent.tagName)) {
-    const direction = isRTL(targetLanguage) ? 'rtl' : 'ltr';
-    
-    // Check for complex widgets in parent to avoid flipping layouts like GitHub icons
-    const hasWidgetDescendants = !!parent.querySelector('svg, img, button, input, iframe, video, canvas, select');
-
-    if (!hasWidgetDescendants) {
-      parent.setAttribute('dir', direction);
-    }
-
-    if (BLOCK_TAGS.has(parent.tagName)) {
-      parent.style.textAlign = 'start';
+  if (parent && parent.nodeType === Node.ELEMENT_NODE) {
+    // If parent doesn't have dir="auto", apply it once
+    if (parent.getAttribute('dir') !== 'auto') {
+      parent.setAttribute('dir', 'auto');
+      
+      if (BLOCK_TAGS.has(parent.tagName)) {
+        parent.style.textAlign = 'start';
+      }
     }
   }
 }
+
