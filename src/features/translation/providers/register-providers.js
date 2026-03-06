@@ -41,6 +41,10 @@ const providerConfigs = {
     importFunction: () => import("./MicrosoftEdgeProvider.js").then(m => ({ default: m.MicrosoftEdgeProvider })),
     metadata: { id: "edge", name: "Microsoft Edge", type: "translate" }
   },
+  "lingva": {
+    importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
+    metadata: { id: "lingva", name: "Lingva", type: "translate" }
+  },
   "browser": {
     importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
     metadata: { id: "browser", name: "Browser API", type: "native" }

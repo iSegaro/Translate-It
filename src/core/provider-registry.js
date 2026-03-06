@@ -192,6 +192,20 @@ export const PROVIDER_REGISTRY = [
     speed: "Variable",
     requirements: "Compatible API endpoint",
   },
+  {
+    id: "lingva",
+    name: "Lingva",
+    description: "Free open-source Google Translate front-end",
+    icon: "providers/lingva.svg",
+    category: PROVIDER_CATEGORIES.FREE,
+    needsApiKey: false,
+    supported: true,
+    features: ["text", "autoDetect"],
+    languages: 100,
+    rateLimit: "None",
+    quality: "High",
+    speed: "Fast",
+  },
 ];
 
 // For backward compatibility and easy access

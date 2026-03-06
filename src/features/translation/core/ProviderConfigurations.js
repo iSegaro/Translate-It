@@ -529,6 +529,53 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Lingva - Open-source Google Translate front-end settings
+  Lingva: {
+    rateLimit: {
+      maxConcurrent: 1, // Conservative for public instances
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 500,
+      burstLimit: 2,
+      burstWindow: 2000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 2,
+        maxDelay: 30000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 4000,
+      maxChunksPerBatch: 5,
+      delimiter: null // Uses JSON POST
+    },
+    streaming: {
+      enabled: true,
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'rate_limit'
+      ],
+      retryStrategies: {
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 30000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true,
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: false
+    }
+  },
+
   // Custom Provider - Flexible/configurable settings
   Custom: {
     rateLimit: {
@@ -628,6 +675,9 @@ function normalizeProviderName(providerName) {
     'edge': ProviderNames.MICROSOFT_EDGE,
     'microsoftedge': ProviderNames.MICROSOFT_EDGE,
     'microsoft-edge': ProviderNames.MICROSOFT_EDGE,
+    'lingva': ProviderNames.LINGVA,
+    'lingvatranslate': ProviderNames.LINGVA,
+    'lingva-translate': ProviderNames.LINGVA,
     'browser': ProviderNames.BROWSER_API,
     'browserranslate': ProviderNames.BROWSER_API,
     'custom': ProviderNames.CUSTOM,

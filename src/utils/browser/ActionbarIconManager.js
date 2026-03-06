@@ -119,6 +119,7 @@ class ActionbarIconManager {
       'gemini': 'icons/providers/gemini.png',
       'bing': 'icons/providers/bing.png',
       'edge': 'icons/providers/edge.png',
+      'google': 'icons/providers/lingva.png',
       'yandex': 'icons/providers/yandex.png',
       'deepl': 'icons/providers/deepl.png',
       'openai': 'icons/providers/openai.png',
