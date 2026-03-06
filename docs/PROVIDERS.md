@@ -47,6 +47,12 @@
 ### ۷. تایید در منوی کلیک‌راست (`core/managers/context-menu.js`)
 آی‌دی پرووایدر را به لیست `knownProviderIds` اضافه کنید تا از بروز هشدارهای "Unknown provider" جلوگیری شود.
 
+### ۸. تنظیم آیکون نوار ابزار (`utils/browser/ActionbarIconManager.js`)
+نگاشت آی‌دی پرووایدر به مسیر فایل آیکون (PNG) را در متد `getProviderIconPath` اضافه کنید تا هنگام انتخاب پرووایدر، آیکون آن روی آیکون اصلی افزونه نمایش داده شود.
+
+### ۹. افزودن توضیحات در صفحه تنظیمات (`_locales` و `LanguagesTab.vue`)
+برای پرووایدرهایی که نیاز به کلید API ندارند (Free)، توضیحات مربوطه را در فایل‌های زبان (`_locales/*/messages.json`) تعریف کنید و سپس در فایل `src/apps/options/tabs/LanguagesTab.vue` یک بلوک `v-else-if` برای نمایش آن توضیحات هنگام انتخاب پرووایدر اضافه نمایید.
+
 ## ProviderConstants System (2026)
 
 ### Overview
