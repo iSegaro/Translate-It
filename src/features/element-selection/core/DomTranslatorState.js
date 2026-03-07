@@ -54,8 +54,9 @@ export async function revertSelectElementTranslation() {
       } = translation;
 
       // Skip if element no longer exists in DOM
-      if (!document.body.contains(element)) {
-        logger.debug('Element no longer in DOM, skipping', { element });
+      // Use documentElement.contains to support reverting HTML and BODY tags
+      if (!document.documentElement.contains(element)) {
+        logger.debug('Element no longer in DOM, skipping', { tagName: element?.tagName });
         continue;
       }
 
