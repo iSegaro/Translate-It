@@ -44,6 +44,9 @@ class SelectElementNotificationManager extends ResourceTracker {
       } finally {
         SelectElementNotificationManager.initializing = false;
       }
+    } else if (notificationManager) {
+      // Update the reference to the notification manager in case the old one is stale
+      SelectElementNotificationManager.instance.notificationManager = notificationManager;
     }
     return SelectElementNotificationManager.instance;
   }
@@ -105,22 +108,16 @@ class SelectElementNotificationManager extends ResourceTracker {
       return null;
     }
 
-    // Check if we already have an active notification
-    if (this.currentNotification && this.currentNotification.isActive) {
-      this.logger.debug('Select Element notification already exists, returning existing ID:', this.currentNotification.id);
-      return this.currentNotification.id;
-    }
-
-    // Clean up any existing notification first
+    // Force clean up any existing notification state before showing a new one
+    // This fixed the issue where subsequent activations wouldn't show the notification
     if (this.currentNotification) {
-      this.dismissNotification();
+      this.logger.debug('Cleaning up stale notification state before showing new one');
+      this.dismissNotification({ isCancelAction: true });
     }
 
     try {
       // Only show notifications in the main frame (top window)
-      // This prevents duplicate notifications in iframes
       if (window !== window.top) {
-        this.logger.debug('Select Element notification requested from iframe, ignoring (will be handled by main frame)');
         return 'iframe-notification-skipped';
       }
 
@@ -155,6 +152,7 @@ class SelectElementNotificationManager extends ResourceTracker {
 
     } catch (error) {
       this.logger.error('Error showing Select Element notification:', error);
+      this.currentNotification = null; // Ensure state is cleared on error
       return null;
     }
   }
@@ -185,7 +183,7 @@ class SelectElementNotificationManager extends ResourceTracker {
           handler: () => {
             // Emit cancel event through pageEventBus
             pageEventBus.emit('cancel-select-element-mode', {
-              managerId: this.currentNotification?.data?.managerId
+              managerId: this.currentNotification?.managerId
             });
           }
         };
@@ -225,7 +223,7 @@ class SelectElementNotificationManager extends ResourceTracker {
         }
         
         this.logger.debug('Select Element notification updated for translation', {
-          oldNotificationId: this.currentNotification.id,
+          oldNotificationId: oldNotificationId,
           newNotificationId: updatedNotificationId,
           hasCancelAction: true
         });
@@ -265,7 +263,6 @@ class SelectElementNotificationManager extends ResourceTracker {
     }
 
     // Only dismiss notifications in the main frame
-    // Skip if this is an iframe or if the notification was skipped (iframe notification)
     if (window !== window.top || notificationId === 'iframe-notification-skipped') {
       this.logger.debug('Notification dismissal requested from iframe or for skipped notification, ignoring');
       this.currentNotification = null;
