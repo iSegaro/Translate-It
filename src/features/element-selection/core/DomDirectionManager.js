@@ -1,18 +1,16 @@
 /**
- * DomDirectionManager - Robust direction management for Select Element
- * Uses explicit 'dir="rtl"' or 'dir="ltr"' for reliable BiDi handling
+ * DomDirectionManager - Standardized direction management for Select Element
+ * Uses a combination of Unicode Marks (BiDi Isolation) and Surgical CSS direction.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { RTL_LANGUAGES, BLOCK_TAGS } from './DomTranslatorConstants.js';
+import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS } from './DomTranslatorConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomDirectionManager');
 
 /**
  * Check if a language code is RTL
- * @param {string} langCode - Language code
- * @returns {boolean}
  */
 export function isRTL(langCode) {
   if (!langCode) return false;
@@ -21,61 +19,100 @@ export function isRTL(langCode) {
 }
 
 /**
- * Apply explicit direction and alignment to an element
- * Strategy: Force the direction based on target language to ensure correct 
- * segment ordering in complex layouts (like Twitter/X).
- * 
- * @param {HTMLElement} element 
- * @param {string} targetLanguage 
+ * Standard Unicode Marks for BiDi control
+ */
+const RLM = '\u200F'; // Right-to-Left Mark
+const LRM = '\u200E'; // Left-to-Right Mark
+
+/**
+ * Universally identify Layout Containers.
+ * A layout container coordinates major UI components (Avatars, Sidebars, Grids).
+ */
+function isLayoutContainer(el) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  
+  // 1. Structural Tags are always layout walls
+  if (LAYOUT_TAGS.has(el.tagName)) return true;
+
+  // 2. Multi-column Flex/Grid detection
+  const style = window.getComputedStyle(el);
+  const isLayoutDisplay = style.display === 'flex' || style.display === 'grid';
+  if (isLayoutDisplay && el.children.length > 1) {
+    // If it has multiple children, it's likely a row/column structure
+    return true;
+  }
+
+  // 3. Block-level Child Check
+  // If an element contains block-level children, it's a structural wrapper, not a simple text box.
+  const hasBlockChildren = Array.from(el.children).some(child => {
+    const childStyle = window.getComputedStyle(child);
+    return !FORMATTING_TAGS.has(child.tagName) || childStyle.display === 'block' || childStyle.display === 'flex';
+  });
+  
+  if (hasBlockChildren) return true;
+
+  return false;
+}
+
+/**
+ * Apply direction to a text node and its shared content context.
+ * This is the most robust and universal method.
+ */
+export function applyNodeDirection(textNode, targetLanguage, rootElement = null) {
+  const isTargetRTL = isRTL(targetLanguage);
+  const mark = isTargetRTL ? RLM : LRM;
+  
+  // A. String-Level Isolation: Inject Unicode BiDi Mark (RLM/LRM)
+  // This solves punctuation jumping issues at the source.
+  if (textNode.nodeValue && !textNode.nodeValue.startsWith(mark)) {
+    // Remove any existing marks first to avoid duplication
+    const cleanValue = textNode.nodeValue.replace(/^[\u200E\u200F]/, '');
+    textNode.nodeValue = mark + cleanValue;
+  }
+
+  // B. Context-Level Alignment: Fix segment ordering (Hashtags/Links)
+  // We climb up to find the SMALLEST shared container that is NOT a layout wall.
+  const targetDir = isTargetRTL ? 'rtl' : 'ltr';
+  let container = textNode.parentElement;
+  let lastSafeContainer = null;
+
+  while (container && container !== document.body) {
+    if (isLayoutContainer(container)) break; // Stop at structural boundaries
+    
+    lastSafeContainer = container;
+    
+    if (container === rootElement) break;
+    container = container.parentElement;
+  }
+
+  // Apply direction ONLY to the safe content box
+  if (lastSafeContainer) {
+    if (lastSafeContainer.style.direction !== targetDir) {
+      lastSafeContainer.style.direction = targetDir;
+      // Ensure text starts from the logical beginning of the box
+      if (BLOCK_TAGS.has(lastSafeContainer.tagName)) {
+        lastSafeContainer.style.textAlign = 'start';
+      }
+    }
+  }
+}
+
+/**
+ * Apply direction to an element (used for non-streaming or full-element updates)
  */
 export function applyDirection(element, targetLanguage) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
+  // We rely on the more granular applyNodeDirection logic which is safer.
+  // This method now acts as a guard to ensure we don't flip layouts.
+  if (isLayoutContainer(element)) return;
+
   const isTargetRTL = isRTL(targetLanguage);
   const directionAttr = isTargetRTL ? 'rtl' : 'ltr';
 
-  // Apply explicit direction to main element
-  // This is crucial for fixing the "swapped segments" issue
-  element.setAttribute('dir', directionAttr);
-  
-  // Apply text-align to block elements to ensure they align to the correct side
+  element.style.direction = directionAttr;
   if (BLOCK_TAGS.has(element.tagName)) {
     element.style.textAlign = 'start';
   }
-
-  // Set meta-data for potential custom CSS/tracking
   element.setAttribute('data-translate-dir', directionAttr);
-  
-  logger.debug(`Applied explicit ${directionAttr} direction to ${element.tagName}`);
 }
-
-/**
- * Apply direction to a single node's parent (for streaming)
- * In simplified mode, we prioritize setting the root element's direction.
- * @param {Node} textNode 
- * @param {string} targetLanguage 
- * @param {HTMLElement} rootElement - Optional root element of the translation
- */
-export function applyNodeDirection(textNode, targetLanguage, rootElement = null) {
-  // 1. If we have a root element, ensure IT has the correct explicit direction
-  if (rootElement && rootElement.nodeType === Node.ELEMENT_NODE) {
-    const targetDir = isRTL(targetLanguage) ? 'rtl' : 'ltr';
-    if (rootElement.getAttribute('dir') !== targetDir) {
-      applyDirection(rootElement, targetLanguage);
-    }
-  }
-
-  // 2. Also ensure immediate parent is not fighting the direction
-  const parent = textNode.parentElement;
-  if (parent && parent.nodeType === Node.ELEMENT_NODE && parent !== rootElement) {
-    // We only touch parent's dir if it's explicitly wrong (e.g. site set dir="ltr" on a span)
-    // But generally, we want to avoid over-engineering here.
-    // For now, let's just make sure it doesn't have a conflicting fixed dir.
-    const currentDir = parent.getAttribute('dir');
-    if (currentDir && currentDir !== 'auto' && currentDir !== (isRTL(targetLanguage) ? 'rtl' : 'ltr')) {
-      parent.setAttribute('dir', 'auto');
-    }
-  }
-}
-
-
