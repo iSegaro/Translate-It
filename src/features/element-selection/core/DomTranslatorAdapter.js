@@ -96,12 +96,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   const textNode = textNodes[translatedNodeCount];
                   const translatedText = translatedItem?.text || translatedItem || textNode.textContent;
 
-                  // Preserve whitespace and apply text
-                  const hasLeading = /^\s/.test(textNode.textContent);
-                  const hasTrailing = /\s$/.test(textNode.textContent);
-                  textNode.nodeValue = (hasLeading ? ' ' : '') + translatedText + (hasTrailing ? ' ' : '');
+                  // Capture ALL original leading and trailing whitespace (including newlines)
+                  const originalText = textNode.textContent;
+                  const leadingMatch = originalText.match(/^(\s*)/);
+                  const trailingMatch = originalText.match(/(\s*)$/);
+                  
+                  const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
+                  const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
 
-                  // Visual Direction Management
+                  // Apply translation while preserving full whitespace structure
+                  textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
+
+                  // Apply native auto-direction to parent only once per node
                   DirectionManager.applyNodeDirection(textNode, effectiveTargetLanguage);
                   translatedNodeCount++;
                 }
@@ -240,7 +246,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       result.translatedResults.forEach((item, i) => {
         if (i < originalTextNodesData.length) {
           const textNode = originalTextNodesData[i].node;
-          textNode.nodeValue = item?.text || item || textNode.textContent;
+          const translatedText = item?.text || item || textNode.textContent;
+
+          // Capture ALL original leading and trailing whitespace
+          const originalText = originalTextNodesData[i].originalText;
+          const leadingMatch = originalText.match(/^(\s*)/);
+          const trailingMatch = originalText.match(/(\s*)$/);
+          
+          const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
+          const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
+
+          // Apply translation while preserving full whitespace structure
+          textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
+          
           DirectionManager.applyNodeDirection(textNode, finalTarget);
         }
       });
