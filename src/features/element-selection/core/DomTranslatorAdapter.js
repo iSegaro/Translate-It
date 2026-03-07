@@ -283,6 +283,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     globalSelectElementState.translationHistory.push({ 
       ...data, 
       originalDir: element.getAttribute('dir'),
+      originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,
       originalDataDir: element.getAttribute('data-translate-dir'),
       timestamp: Date.now() 

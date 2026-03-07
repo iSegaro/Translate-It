@@ -48,6 +48,7 @@ export async function revertSelectElementTranslation() {
         originalHTML, 
         originalTextNodesData, 
         originalDir, 
+        originalStyleDirection,
         originalTextAlign, 
         originalDataDir 
       } = translation;
@@ -80,6 +81,9 @@ export async function revertSelectElementTranslation() {
         } else {
           element.removeAttribute('dir');
         }
+
+        // Restore CSS direction
+        element.style.direction = originalStyleDirection || '';
 
         // Restore data-translate-dir
         if (originalDataDir !== null && originalDataDir !== undefined) {
