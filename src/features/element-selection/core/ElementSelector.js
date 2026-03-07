@@ -240,8 +240,8 @@ export class ElementSelector extends ResourceTracker {
       element = element.parentElement;
     }
 
-    // Fallback: if no good candidate found via area, use startElement if it has meaningful text
-    if (startElement) {
+    // Fallback: if no good candidate found via area, use startElement if it is a valid text element
+    if (startElement && this.isValidTextElement(startElement)) {
       const text = startElement.textContent?.trim() || '';
       if (text.length >= this.config.minTextLength) {
         return startElement;
@@ -259,8 +259,9 @@ export class ElementSelector extends ResourceTracker {
   isValidTextElement(element) {
     if (!element) return false;
 
-    // Skip invalid tags
-    const invalidTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
+    // Skip root and invalid tags
+    // Translating HTML/BODY destroys the extension's UI containers
+    const invalidTags = ['HTML', 'BODY', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
     if (invalidTags.includes(element.tagName)) {
       return false;
     }
