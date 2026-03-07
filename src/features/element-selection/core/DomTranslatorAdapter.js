@@ -108,7 +108,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
 
                   // Apply native auto-direction to parent only once per node
-                  DirectionManager.applyNodeDirection(textNode, effectiveTargetLanguage);
+                  // Pass 'element' as the root to ensure the container direction is set early
+                  DirectionManager.applyNodeDirection(textNode, effectiveTargetLanguage, element);
                   translatedNodeCount++;
                 }
               });
@@ -259,7 +260,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           // Apply translation while preserving full whitespace structure
           textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
           
-          DirectionManager.applyNodeDirection(textNode, finalTarget);
+          DirectionManager.applyNodeDirection(textNode, finalTarget, element);
         }
       });
     }
