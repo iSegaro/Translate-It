@@ -181,6 +181,7 @@ export function isRTLText(text) {
 export function getDirectionFromLanguage(langCode) {
   if (!langCode || typeof langCode !== 'string') return 'auto';
 
+  // Use the shared RTL_LANGUAGES set logic if possible, or simple list
   const rtlLanguages = ['ar', 'he', 'fa', 'ur', 'yi', 'ps', 'sd', 'ckb', 'dv', 'ug'];
   const baseLang = langCode.toLowerCase().split('-')[0];
 
