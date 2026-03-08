@@ -49,40 +49,35 @@ export class LingvaProvider extends BaseTranslateProvider {
     for (const text of chunkTexts) {
       if (abortController?.signal?.aborted) break;
 
-      try {
-        // Use GET method as per original script for better compatibility with public instances
-        // URL encode the text to handle special characters
-        const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(text)}`;
-        
-        const result = await this._executeApiCall({
-          url,
-          fetchOptions: {
-            method: "GET",
-            mode: 'cors',
-            credentials: 'omit',
-            headers: {
-              "Accept": "*/*",
-              "Accept-Language": "en-US,en;q=0.5",
-              "Sec-Fetch-Dest": "empty",
-              "Sec-Fetch-Mode": "cors",
-              "Sec-Fetch-Site": "same-origin"
-            }
-          },
-          extractResponse: (data) => {
-            if (data && data.translation) {
-              return data.translation;
-            }
-            throw new Error("Invalid response from Lingva API");
-          },
-          context: 'lingva-translate-segment',
-          abortController
-        });
-        
-        results.push(result || "");
-      } catch (error) {
-        logger.error(`[Lingva] Segment failed:`, error);
-        results.push(""); // Fallback
-      }
+      // Use GET method as per original script for better compatibility with public instances
+      // URL encode the text to handle special characters
+      const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(text)}`;
+      
+      const result = await this._executeWithErrorHandling({
+        url,
+        fetchOptions: {
+          method: "GET",
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin"
+          }
+        },
+        extractResponse: (data) => {
+          if (data && data.translation) {
+            return data.translation;
+          }
+          throw new Error("Invalid response from Lingva API");
+        },
+        context: 'lingva-translate-segment',
+        abortController
+      });
+      
+      results.push(result || "");
     }
 
     return results;
