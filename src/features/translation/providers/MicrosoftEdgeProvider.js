@@ -2,10 +2,8 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MicrosoftEdge');
 
@@ -39,10 +37,10 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
     logger.debug('[Edge] Fetching new auth token...');
     
-    try {
-      const response = await fetch(MicrosoftEdgeProvider.authUrl, {
+    return this._executeWithErrorHandling({
+      url: MicrosoftEdgeProvider.authUrl,
+      fetchOptions: {
         method: 'GET',
-        signal: abortController?.signal,
         mode: 'cors',
         credentials: 'omit',
         headers: {
@@ -56,34 +54,28 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           'Sec-Fetch-Site': 'none',
           'Sec-Fetch-Storage-Access': 'active'
         }
-      });
+      },
+      extractResponse: async (response) => {
+        const token = await response.text();
+        if (!token) throw new Error("Received empty token from Edge auth");
 
-      if (!response.ok) {
-        throw new Error(`Auth failed with status ${response.status}`);
-      }
+        // Decode JWT to get expiry
+        MicrosoftEdgeProvider.accessToken = token;
+        
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          MicrosoftEdgeProvider.tokenExpiry = payload.exp * 1000;
+        } catch (e) {
+          // Fallback to 30 second lifetime as seen in anylang
+          MicrosoftEdgeProvider.tokenExpiry = Date.now() + (30 * 1000);
+        }
 
-      const token = await response.text();
-      if (!token) throw new Error("Received empty token from Edge auth");
-
-      // Decode JWT to get expiry
-      MicrosoftEdgeProvider.accessToken = token;
-      
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        MicrosoftEdgeProvider.tokenExpiry = payload.exp * 1000;
-      } catch (e) {
-        // Fallback to 30 second lifetime as seen in anylang
-        MicrosoftEdgeProvider.tokenExpiry = Date.now() + (30 * 1000);
-      }
-
-      logger.debug('[Edge] Auth token obtained successfully');
-      return token;
-    } catch (error) {
-      logger.error('[Edge] Failed to obtain auth token:', error);
-      const authError = new Error(`Edge Auth failed: ${error.message}`);
-      authError.type = ErrorTypes.API_KEY_INVALID;
-      throw authError;
-    }
+        logger.debug('[Edge] Auth token obtained successfully');
+        return token;
+      },
+      context: 'edge-auth',
+      abortController
+    });
   }
 
   /**
@@ -104,7 +96,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
     // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
     const body = chunkTexts.map(text => ({ Text: text }));
 
-    return this._executeApiCall({
+    return this._executeWithErrorHandling({
       url: url.toString(),
       fetchOptions: {
         method: "POST",
