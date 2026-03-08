@@ -273,6 +273,11 @@
   "webai_api_url_placeholder": { "message": "آدرس API را وارد کنید" },
   "webai_api_model_label": { "message": "مدل" },
   "webai_api_model_placeholder": { "message": "مدل" },
+  "lingva_api_settings_title": { "message": "تنظیمات API لینگوا" },
+  "lingva_api_url_label": { "message": "آدرس API" },
+  "lingva_api_url_placeholder": { "message": "آدرس API لینگوا را وارد کنید (مانند https://lingva.ml)" },
+  "lingva_api_url_info": { "message": "شما می‌توانید از نمونه‌های عمومی لینگوا استفاده کنید یا خودتان آن را میزبانی کنید." },
+  "lingva_instances_link": { "message": "مشاهده نمونه‌های عمومی لینگوا." },
   "openai_api_settings_title": { "message": "تنظیمات OpenAI" },
   "openai_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت OpenAI دریافت کنید."

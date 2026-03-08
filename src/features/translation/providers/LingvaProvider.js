@@ -4,6 +4,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -17,9 +18,6 @@ export class LingvaProvider extends BaseTranslateProvider {
   static displayName = "Lingva";
   static reliableJsonMode = true;
   
-  // Default instance, can be made configurable in the future
-  static defaultApiPath = "https://lingva.ml";
-
   constructor() {
     super(ProviderNames.LINGVA);
   }
@@ -29,9 +27,7 @@ export class LingvaProvider extends BaseTranslateProvider {
    * This is where we can later inject a custom instance from settings
    */
   async _getApiPath() {
-    // Future: const customPath = await getLingvaInstanceUrl();
-    // return customPath || LingvaProvider.defaultApiPath;
-    return LingvaProvider.defaultApiPath;
+    return await getLingvaApiUrlAsync();
   }
 
   _getLangCode(lang) {

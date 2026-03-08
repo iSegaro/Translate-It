@@ -70,6 +70,7 @@ export const CONFIG = {
     { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
+  LINGVA_API_URL: "https://lingva.ml", // Lingva Translate API URL
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.5-flash",
   OPENAI_API_KEY: "",
@@ -555,6 +556,11 @@ export const getGeminiApiUrlAsync = async () => {
 // Google Translate Specific
 export const getGoogleTranslateUrlAsync = async () => {
   return getSettingValueAsync("GOOGLE_TRANSLATE_URL", CONFIG.GOOGLE_TRANSLATE_URL);
+};
+
+// Lingva Translate Specific
+export const getLingvaApiUrlAsync = async () => {
+  return getSettingValueAsync("LINGVA_API_URL", CONFIG.LINGVA_API_URL);
 };
 
 export const getApplication_LocalizeAsync = async () => {

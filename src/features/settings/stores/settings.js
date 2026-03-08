@@ -26,6 +26,7 @@ function getDefaultSettings() {
     GEMINI_API_URL: CONFIG.GEMINI_API_URL || '',
     GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
     GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? true,
+    LINGVA_API_URL: CONFIG.LINGVA_API_URL || 'https://lingva.ml',
     WEBAI_API_URL: CONFIG.WEBAI_API_URL || 'http://localhost:6969/translate',
     WEBAI_API_MODEL: CONFIG.WEBAI_API_MODEL || 'gemini-2.5-flash',
     OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',

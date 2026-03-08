@@ -316,6 +316,8 @@ const providerSettingsComponent = computed(() => {
       return defineAsyncComponent(() => import('@/components/feature/api-settings/BrowserApiSettings.vue'));
     case 'webai':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/WebAIApiSettings.vue'));
+    case 'lingva':
+      return defineAsyncComponent(() => import('@/components/feature/api-settings/LingvaApiSettings.vue'));
     case 'openai':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenAIApiSettings.vue'));
     case 'openrouter':
