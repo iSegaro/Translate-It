@@ -22,7 +22,7 @@ export const ProviderCategories = {
  * The Central Manifest
  * Each entry defines everything the system needs to know about a provider.
  */
-export const PROVIDER_MANIFEST = [
+const RAW_MANIFEST = [
   {
     id: ProviderRegistryIds.GOOGLE_V2,
     name: ProviderNames.GOOGLE_TRANSLATE_V2,
@@ -30,8 +30,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "google.png",
-    descriptionKey: "googlev2_translate_description",
-    titleKey: "googlev2_translate_settings_title",
     importFunction: () => import("./GoogleTranslateV2Provider.js").then(m => ({ default: m.GoogleTranslateV2Provider })),
     features: ["text", "autoDetect", "bulk", "dictionary"],
     needsApiKey: false,
@@ -44,8 +42,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "edge.png",
-    descriptionKey: "edge_translate_description",
-    titleKey: "edge_translate_settings_title",
     importFunction: () => import("./MicrosoftEdgeProvider.js").then(m => ({ default: m.MicrosoftEdgeProvider })),
     features: ["text", "autoDetect"],
     needsApiKey: false,
@@ -58,8 +54,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "deepl.png",
-    descriptionKey: "deepl_translate_description",
-    titleKey: "deepl_translate_settings_title",
     importFunction: () => import("./DeepLTranslate.js").then(m => ({ default: m.DeepLTranslateProvider })),
     features: ["text", "autoDetect", "formality"],
     needsApiKey: true,
@@ -72,8 +66,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "yandex.png",
-    descriptionKey: "yandex_translate_description",
-    titleKey: "yandex_translate_settings_title",
     importFunction: () => import("./YandexTranslate.js").then(m => ({ default: m.YandexTranslateProvider })),
     features: ["text", "autoDetect"],
     needsApiKey: false,
@@ -86,8 +78,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.AI,
     category: ProviderCategories.AI,
     icon: "gemini.png",
-    descriptionKey: "gemini_translate_description",
-    titleKey: "gemini_settings_title",
     importFunction: () => import("./GoogleGemini.js").then(m => ({ default: m.GeminiProvider })),
     features: ["text", "context", "smart", "bulk", "image"],
     needsApiKey: true,
@@ -100,8 +90,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.AI,
     category: ProviderCategories.AI,
     icon: "openai.png",
-    descriptionKey: "openai_translate_description",
-    titleKey: "openai_settings_title",
     importFunction: () => import("./OpenAI.js").then(m => ({ default: m.OpenAIProvider })),
     features: ["text", "context", "smart", "image"],
     needsApiKey: true,
@@ -114,8 +102,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.AI,
     category: ProviderCategories.AI,
     icon: "openrouter.png",
-    descriptionKey: "openrouter_translate_description",
-    titleKey: "openrouter_settings_title",
     importFunction: () => import("./OpenRouter.js").then(m => ({ default: m.OpenRouterProvider })),
     features: ["text", "context", "smart"],
     needsApiKey: true,
@@ -128,8 +114,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.AI,
     category: ProviderCategories.AI,
     icon: "deepseek.png",
-    descriptionKey: "deepseek_translate_description",
-    titleKey: "deepseek_settings_title",
     importFunction: () => import("./DeepSeek.js").then(m => ({ default: m.DeepSeekProvider })),
     features: ["text", "context", "smart", "thinking"],
     needsApiKey: true,
@@ -142,8 +126,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.AI,
     category: ProviderCategories.LOCAL,
     icon: "webai.png",
-    descriptionKey: "webai_translate_description",
-    titleKey: "webai_settings_title",
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     features: ["text", "context", "offline"],
     needsApiKey: false,
@@ -156,8 +138,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "google.png",
-    descriptionKey: "google_translate_description",
-    titleKey: "google_translate_settings_title",
     importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
     features: ["text", "autoDetect", "bulk", "dictionary"],
     needsApiKey: false,
@@ -170,8 +150,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "lingva.png",
-    descriptionKey: "lingva_translate_description",
-    titleKey: "lingva_translate_settings_title",
     importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
     features: ["text", "autoDetect"],
     needsApiKey: false,
@@ -184,8 +162,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.TRANSLATE,
     category: ProviderCategories.FREE,
     icon: "bing.png",
-    descriptionKey: "bing_translate_description",
-    titleKey: "bing_translate_settings_title",
     importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
     features: ["text", "autoDetect"],
     needsApiKey: false,
@@ -198,8 +174,6 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.NATIVE,
     category: ProviderCategories.BROWSER,
     icon: "chrome-translate.png",
-    descriptionKey: "browser_translate_description",
-    titleKey: "browser_translate_settings_title",
     importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
     features: ["text", "autoDetect", "offline"],
     needsApiKey: false,
@@ -212,14 +186,21 @@ export const PROVIDER_MANIFEST = [
     type: ProviderTypes.CUSTOM,
     category: ProviderCategories.CUSTOM,
     icon: "custom.png",
-    descriptionKey: "custom_translate_description",
-    titleKey: "custom_settings_title",
     importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
     features: ["text", "context", "configurable"],
     needsApiKey: true,
     supported: true,
   },
 ];
+
+/**
+ * Process manifest to add dynamic i18n keys
+ */
+export const PROVIDER_MANIFEST = RAW_MANIFEST.map(provider => ({
+  ...provider,
+  titleKey: `provider_${provider.id}_title`,
+  descriptionKey: `provider_${provider.id}_description`
+}));
 
 /**
  * Helper: Find provider by Registry ID

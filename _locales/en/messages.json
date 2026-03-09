@@ -31,39 +31,74 @@
   "api_provider_custom": { "message": "Custom (OpenAI)" },
   "api_provider_deepl": { "message": "DeepL" },
 
-  "google_translate_settings_title": { "message": "Google Translate (Classic)" },
-  "google_translate_description": {
+  "provider_google_title": { "message": "Google Translate (Classic)" },
+  "provider_google_description": {
     "message": "Uses the free, public Google Translate endpoint. No API key is required."
   },
 
-  "googlev2_translate_settings_title": { "message": "Google Translate" },
-  "googlev2_translate_description": {
+  "provider_googlev2_title": { "message": "Google Translate" },
+  "provider_googlev2_description": {
     "message": "Robust version of Google Translate using secure tokens and browser-like headers. More stable for large texts. No API key required."
   },
 
-  "yandex_translate_settings_title": { "message": "Yandex Translate" },
-  "yandex_translate_description": {
+  "provider_yandex_title": { "message": "Yandex Translate" },
+  "provider_yandex_description": {
     "message": "Uses the free, public Yandex Translate endpoint. No API key is required."
   },
 
-  "deepl_translate_settings_title": { "message": "DeepL Translate" },
-  "deepl_translate_description": {
+  "provider_deepl_title": { "message": "DeepL Translate" },
+  "provider_deepl_description": {
     "message": "AI-powered translation service by DeepL. Requires an API key."
   },
 
-  "bing_translate_settings_title": { "message": "Microsoft Bing Translator" },
-  "bing_translate_description": {
+  "provider_bing_title": { "message": "Microsoft Bing Translator" },
+  "provider_bing_description": {
     "message": "Uses the free, public Microsoft Bing Translator endpoint. No API key is required."
   },
 
-  "edge_translate_settings_title": { "message": "Microsoft Edge Translator" },
-  "edge_translate_description": {
+  "provider_edge_title": { "message": "Microsoft Edge Translator" },
+  "provider_edge_description": {
     "message": "Official Microsoft Edge browser translation service. Faster and more stable. No API key required."
   },
 
-  "lingva_translate_settings_title": { "message": "Lingva Translator" },
-  "lingva_translate_description": {
+  "provider_lingva_title": { "message": "Lingva Translator" },
+  "provider_lingva_description": {
     "message": "Free open-source Google Translate front-end. Privacy-focused and decentralized. No API key required."
+  },
+
+  "provider_gemini_title": { "message": "Google Gemini" },
+  "provider_gemini_description": {
+    "message": "AI-powered translation with context understanding. Requires an API key."
+  },
+
+  "provider_openai_title": { "message": "OpenAI GPT" },
+  "provider_openai_description": {
+    "message": "AI translation using GPT models. Requires an API key."
+  },
+
+  "provider_openrouter_title": { "message": "OpenRouter" },
+  "provider_openrouter_description": {
+    "message": "Access to multiple AI models via OpenRouter. Requires an API key."
+  },
+
+  "provider_deepseek_title": { "message": "DeepSeek" },
+  "provider_deepseek_description": {
+    "message": "DeepSeek AI models for translation. Fast and efficient. Requires an API key."
+  },
+
+  "provider_webai_title": { "message": "WebAI Local Server" },
+  "provider_webai_description": {
+    "message": "Local server for AI model access. No API key required for local instances."
+  },
+
+  "provider_browser_title": { "message": "Browser Translation" },
+  "provider_browser_description": {
+    "message": "Built-in browser translation API (Chrome 138+). Supports offline translation."
+  },
+
+  "provider_custom_title": { "message": "Custom Provider" },
+  "provider_custom_description": {
+    "message": "Custom OpenAI-compatible API endpoint. Configure your own URL and key."
   },
 
   "options_page_title": { "message": "Settings" },

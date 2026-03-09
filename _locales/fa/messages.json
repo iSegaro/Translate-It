@@ -30,39 +30,74 @@
   "api_provider_custom": { "message": "(OpenAI) سفارشی" },
   "api_provider_deepl": { "message": "DeepL" },
 
-  "google_translate_settings_title": { "message": "مترجم گوگل (کلاسیک)" },
-  "google_translate_description": {
+  "provider_google_title": { "message": "مترجم گوگل (کلاسیک)" },
+  "provider_google_description": {
     "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست."
   },
 
-  "googlev2_translate_settings_title": { "message": "مترجم گوگل" },
-  "googlev2_translate_description": {
+  "provider_googlev2_title": { "message": "مترجم گوگل" },
+  "provider_googlev2_description": {
     "message": "نسخه پایدار گوگل ترنسلیت با استفاده از توکن‌های امنیتی و شبیه‌سازی دقیق مرورگر. مناسب برای متن‌های طولانی. بدون نیاز به کلید API."
   },
 
-  "yandex_translate_settings_title": { "message": "مترجم Yandex" },
-  "yandex_translate_description": {
+  "provider_yandex_title": { "message": "مترجم یاندکس" },
+  "provider_yandex_description": {
     "message": "از سرویس رایگان و عمومی Yandex Translate استفاده می کند. کلید API لازم نیست."
   },
 
-  "deepl_translate_settings_title": { "message": "مترجم DeepL" },
-  "deepl_translate_description": {
+  "provider_deepl_title": { "message": "مترجم DeepL" },
+  "provider_deepl_description": {
     "message": "سرویس ترجمه هوشمند توسط DeepL. نیاز به کلید API دارد."
   },
 
-  "bing_translate_settings_title": { "message": "مترجم Microsoft Bing" },
-  "bing_translate_description": {
+  "provider_bing_title": { "message": "مترجم بینگ" },
+  "provider_bing_description": {
     "message": "از سرویس رایگان و عمومی Microsoft Bing Translator استفاده می کند. کلید API لازم نیست."
   },
 
-  "edge_translate_settings_title": { "message": "مترجم مایکروسافت اج" },
-  "edge_translate_description": {
+  "provider_edge_title": { "message": "مترجم مایکروسافت اج" },
+  "provider_edge_description": {
     "message": "سرویس رسمی ترجمه مرورگر مایکروسافت اج. سریع‌تر و پایدارتر. بدون نیاز به کلید API."
   },
 
-  "lingva_translate_settings_title": { "message": "مترجم لینگوا" },
-  "lingva_translate_description": {
+  "provider_lingva_title": { "message": "مترجم لینگوا" },
+  "provider_lingva_description": {
     "message": "رابط متن‌باز و رایگان گوگل ترنسلیت. متمرکز بر حریم خصوصی و غیرمتمرکز. بدون نیاز به کلید API."
+  },
+
+  "provider_gemini_title": { "message": "گوگل جمینای (Gemini)" },
+  "provider_gemini_description": {
+    "message": "ترجمه هوشمند با درک متن توسط هوش مصنوعی گوگل. نیاز به کلید API دارد."
+  },
+
+  "provider_openai_title": { "message": "OpenAI GPT" },
+  "provider_openai_description": {
+    "message": "ترجمه با استفاده از مدل‌های پیشرفته GPT. نیاز به کلید API دارد."
+  },
+
+  "provider_openrouter_title": { "message": "OpenRouter" },
+  "provider_openrouter_description": {
+    "message": "دسترسی به مجموعه‌ای از مدل‌های هوش مصنوعی از طریق OpenRouter. نیاز به کلید API دارد."
+  },
+
+  "provider_deepseek_title": { "message": "DeepSeek" },
+  "provider_deepseek_description": {
+    "message": "مدل‌های هوش مصنوعی DeepSeek برای ترجمه سریع و با کیفیت. نیاز به کلید API دارد."
+  },
+
+  "provider_webai_title": { "message": "سرور محلی WebAI" },
+  "provider_webai_description": {
+    "message": "استفاده از مدل‌های هوش مصنوعی به صورت محلی. بدون نیاز به کلید API."
+  },
+
+  "provider_browser_title": { "message": "مترجم داخلی مرورگر" },
+  "provider_browser_description": {
+    "message": "استفاده از قابلیت ترجمه داخلی مرورگر (کروم ۱۳۸+). قابلیت ترجمه آفلاین."
+  },
+
+  "provider_custom_title": { "message": "سرویس سفارشی" },
+  "provider_custom_description": {
+    "message": "استفاده از APIهای سازگار با OpenAI. آدرس سرور و کلید اختصاصی خود را وارد کنید."
   },
 
   "notification_update_title": { "message": "افزونه به‌روز شد" },
