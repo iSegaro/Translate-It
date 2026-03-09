@@ -169,9 +169,9 @@ export class ProviderHtmlGenerator {
   static _generateGoogleSettingsHtml(provider) {
     return `
       <div id="googleApiSettingsInfo" style="display: none">
-        <h3 data-i18n="google_translate_settings_title">Google Translate</h3>
+        <h3 data-i18n="provider_google_title">Google Translate (Classic)</h3>
         <div class="setting-group api-key-info">
-          <span class="setting-description" data-i18n="google_translate_description">
+          <span class="setting-description" data-i18n="provider_google_description">
             ${provider.description}
           </span>
         </div>
@@ -185,9 +185,9 @@ export class ProviderHtmlGenerator {
   static _generateBingSettingsHtml(provider) {
     return `
       <div id="bingApiSettingsInfo" style="display: none">
-        <h3 data-i18n="bing_translate_settings_title">Microsoft Bing Translate</h3>
+        <h3 data-i18n="provider_bing_title">Microsoft Bing Translate</h3>
         <div class="setting-group api-key-info">
-          <span class="setting-description" data-i18n="bing_translate_description">
+          <span class="setting-description" data-i18n="provider_bing_description">
             ${provider.description}
           </span>
         </div>
@@ -201,9 +201,9 @@ export class ProviderHtmlGenerator {
   static _generateYandexSettingsHtml(provider) {
     return `
       <div id="yandexApiSettingsInfo" style="display: none">
-        <h3 data-i18n="yandex_translate_settings_title">Yandex Translate</h3>
+        <h3 data-i18n="provider_yandex_title">Yandex Translate</h3>
         <div class="setting-group api-key-info">
-          <span class="setting-description" data-i18n="yandex_translate_description">
+          <span class="setting-description" data-i18n="provider_yandex_description">
             ${provider.description}
           </span>
         </div>
