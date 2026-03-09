@@ -94,7 +94,8 @@ const manifestVersion = ref('v0.0.0')
 const getFlagUrl = (code) => {
   const flagMap = {
     en: 'gb',
-    fa: 'ir'
+    fa: 'ir',
+    ja: 'jp'
   };
   const flag = flagMap[code] || code;
   try {

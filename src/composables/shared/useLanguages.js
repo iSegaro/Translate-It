@@ -122,6 +122,7 @@ export function useLanguages() {
     return [
       { code: "en", name: "English" },
       { code: "fa", name: "فارسی" },
+      { code: "ja", name: "日本語" },
     ];
   };
 
