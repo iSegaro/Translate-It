@@ -112,27 +112,15 @@ class ActionbarIconManager {
   /**
    * Get icon path for provider
    */
-  getProviderIconPath(provider) {
-    // Map provider to icon path
-    const providerIconPaths = {
-      'google': 'icons/providers/google.png',
-      'googlev2': 'icons/providers/google.png',
-      'gemini': 'icons/providers/gemini.png',
-      'bing': 'icons/providers/bing.png',
-      'edge': 'icons/providers/edge.png',
-      'lingva': 'icons/providers/lingva.png',
-      'yandex': 'icons/providers/yandex.png',
-      'deepl': 'icons/providers/deepl.png',
-      'openai': 'icons/providers/openai.png',
-      'openrouter': 'icons/providers/openrouter.png',
-      'deepseek': 'icons/providers/deepseek.png',
-      'webai': 'icons/providers/webai.png',
-      'custom': 'icons/providers/custom.png',
-      'browserapi': 'icons/providers/chrome-translate.png',
-      'browser': 'icons/providers/provider.png'
-    };
+  async getProviderIconPath(provider) {
+    const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
+    const providerConfig = findProviderById(provider);
+    
+    if (providerConfig && providerConfig.icon) {
+      return `icons/providers/${providerConfig.icon}`;
+    }
 
-    return providerIconPaths[provider] || 'icons/providers/provider.png';
+    return 'icons/providers/provider.png';
   }
 
   // Note: The following methods are no longer needed with the new path-based approach:

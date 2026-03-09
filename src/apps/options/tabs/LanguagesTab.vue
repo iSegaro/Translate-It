@@ -50,52 +50,12 @@
 
       <div class="provider-settings">
         <div
-          v-if="selectedProvider === 'google'"
+          v-if="selectedProviderInfo"
           class="api-info"
         >
-          <h3>{{ t('google_translate_settings_title') || 'Google Translate (Classic)' }}</h3>
+          <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
           <p class="setting-description">
-            {{ t('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
-          </p>
-        </div>
-
-        <div
-          v-else-if="selectedProvider === 'googlev2'"
-          class="api-info"
-        >
-          <h3>{{ t('googlev2_translate_settings_title') || 'Google Translate' }}</h3>
-          <p class="setting-description">
-            {{ t('googlev2_translate_description') || 'Robust version of Google Translate using secure tokens and browser-like headers.' }}
-          </p>
-        </div>
-
-        <div
-          v-else-if="selectedProvider === 'bing'"
-          class="api-info"
-        >
-          <h3>{{ t('bing_translate_settings_title') || 'Microsoft Bing Translate' }}</h3>
-          <p class="setting-description">
-            {{ t('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}
-          </p>
-        </div>
-
-        <div
-          v-else-if="selectedProvider === 'edge'"
-          class="api-info"
-        >
-          <h3>{{ t('edge_translate_settings_title') || 'Microsoft Edge Translate' }}</h3>
-          <p class="setting-description">
-            {{ t('edge_translate_description') || 'Official Microsoft Edge browser translation service. Faster and more stable. No API key required.' }}
-          </p>
-        </div>
-
-        <div
-          v-else-if="selectedProvider === 'lingva'"
-          class="api-info"
-        >
-          <h3>{{ t('lingva_translate_settings_title') || 'Lingva Translate' }}</h3>
-          <p class="setting-description">
-            {{ t('lingva_translate_description') || 'Free open-source Google Translate front-end. Privacy-focused and decentralized. No API key required.' }}
+            {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
           </p>
         </div>
 
@@ -112,6 +72,7 @@ import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { useI18n } from 'vue-i18n'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -301,6 +262,10 @@ watch(targetLanguage, (value) => {
 // ========== API Settings ==========
 // Selected provider
 const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+
+const selectedProviderInfo = computed(() => {
+  return findProviderById(selectedProvider.value)
+})
 
 // Dynamically load the settings component based on the selected provider
 const providerSettingsComponent = computed(() => {

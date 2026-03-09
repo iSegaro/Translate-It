@@ -1,79 +1,35 @@
 import { providerRegistry } from "./ProviderRegistry.js";
+import { PROVIDER_MANIFEST } from "./ProviderManifest.js";
 
-const providerConfigs = {
-  "googlev2": {
-    importFunction: () => import("./GoogleTranslateV2Provider.js").then(m => ({ default: m.GoogleTranslateV2Provider })),
-    metadata: { id: "googlev2", name: "Google Translate", type: "translate" }
-  },
-  "edge": {
-    importFunction: () => import("./MicrosoftEdgeProvider.js").then(m => ({ default: m.MicrosoftEdgeProvider })),
-    metadata: { id: "edge", name: "Microsoft Translator", type: "translate" }
-  },
-  "deepl": {
-    importFunction: () => import("./DeepLTranslate.js").then(m => ({ default: m.DeepLTranslateProvider })),
-    metadata: { id: "deepl", name: "DeepL Translate", type: "translate" }
-  },
-  "yandex": {
-    importFunction: () => import("./YandexTranslate.js").then(m => ({ default: m.YandexTranslateProvider })),
-    metadata: { id: "yandex", name: "Yandex Translate", type: "translate" }
-  },
-  "gemini": {
-    importFunction: () => import("./GoogleGemini.js").then(m => ({ default: m.GeminiProvider })),
-    metadata: { id: "gemini", name: "Google Gemini", type: "ai" }
-  },
-  "openai": {
-    importFunction: () => import("./OpenAI.js").then(m => ({ default: m.OpenAIProvider })),
-    metadata: { id: "openai", name: "OpenAI", type: "ai" }
-  },
-  "openrouter": {
-    importFunction: () => import("./OpenRouter.js").then(m => ({ default: m.OpenRouterProvider })),
-    metadata: { id: "openrouter", name: "OpenRouter", type: "ai" }
-  },
-  "deepseek": {
-    importFunction: () => import("./DeepSeek.js").then(m => ({ default: m.DeepSeekProvider })),
-    metadata: { id: "deepseek", name: "DeepSeek", type: "ai" }
-  },
-  "custom": {
-    importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
-    metadata: { id: "custom", name: "Custom Provider", type: "ai" }
-  },
-  "webai": {
-    importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
-    metadata: { id: "webai", name: "WebAI", type: "ai" }
-  },
-  "google": {
-    importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
-    metadata: { id: "google", name: "Google Translate (Classic)", type: "translate" }
-  },
-  "lingva": {
-    importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
-    metadata: { id: "lingva", name: "Lingva", type: "translate" }
-  },
-  "bing": {
-    importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
-    metadata: { id: "bing", name: "Bing Translate", type: "translate" }
-  },
-  "browser": {
-    importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
-    metadata: { id: "browser", name: "Browser API", type: "native" }
-  }
-};
-
+/**
+ * Register all providers defined in the manifest for lazy loading.
+ */
 export function registerAllProviders() {
-  Object.entries(providerConfigs).forEach(([id, config]) => {
-    providerRegistry.registerLazy(id, config.importFunction, config.metadata);
+  PROVIDER_MANIFEST.forEach(config => {
+    providerRegistry.registerLazy(config.id, config.importFunction, {
+      id: config.id,
+      name: config.displayName,
+      type: config.type,
+      category: config.category,
+      icon: config.icon,
+      features: config.features
+    });
   });
 }
 
+/**
+ * Preload a specific provider by its registry ID.
+ */
 export function preloadProvider(providerId) {
-  if (providerConfigs[providerId]) {
-    return providerRegistry.get(providerId);
-  }
-  throw new Error(`Provider '${providerId}' not found for preloading`);
+  return providerRegistry.get(providerId);
 }
 
+/**
+ * Preload critical providers for faster initial translation.
+ */
 export function preloadCriticalProviders() {
-  const criticalProviders = ["google", "bing"];
+  // We can now define critical providers by ID or even add a 'critical' flag in the manifest
+  const criticalProviders = ["google", "googlev2", "bing"];
   return Promise.allSettled(
     criticalProviders.map(id => preloadProvider(id).catch(() => null))
   );

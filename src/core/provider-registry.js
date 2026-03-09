@@ -1,239 +1,46 @@
 /**
- * Provider Registry for UI - Static provider information for UI display only
- * Rebuilt version with all supported providers for proper dropdown functionality
+ * Provider Registry for UI - Dynamic provider information derived from ProviderManifest
  */
 
+import { PROVIDER_MANIFEST, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
+
 /**
- * Provider categories
+ * Re-export ProviderCategories for UI components
  */
-export const PROVIDER_CATEGORIES = {
-  FREE: "free",
-  AI: "ai", 
-  BROWSER: "browser",
-  LOCAL: "local",
-  CUSTOM: "custom",
-};
+export const PROVIDER_CATEGORIES = ProviderCategories;
 
 /**
  * Complete provider registry with metadata for UI
+ * Automatically generated from ProviderManifest
  */
-export const PROVIDER_REGISTRY = [
-  {
-    id: "googlev2",
-    name: "Google Translate",
-    description: "Robust version using secure tokens, similar to Microsoft Edge",
-    icon: "providers/google.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect", "bulk"],
-    languages: 100,
-    rateLimit: "None",
-    quality: "Very High",
-    speed: "Fast",
-  },
-  {
-    id: "edge",
-    name: "Microsoft Translator",
-    description: "Official Microsoft Edge translation service (Free)",
-    icon: "providers/edge.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect"],
-    languages: 100,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Fast",
-  },
-  {
-    id: "deepl",
-    name: "DeepL Translate",
-    description: "AI-powered translation service by DeepL",
-    icon: "providers/deepl.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "autoDetect", "formality"],
-    languages: 35,
-    rateLimit: "API dependent (Free: 500K chars/month)",
-    quality: "Very High",
-    speed: "Fast",
-  },
-  {
-    id: "yandex",
-    name: "Yandex Translate",
-    description: "Free translation service by Yandex",
-    icon: "providers/yandex.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect"],
-    languages: 90,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Fast",
-  },
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    description: "AI-powered translation with context understanding",
-    icon: "providers/gemini.svg",
-    category: PROVIDER_CATEGORIES.AI,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "context", "smart", "bulk"],
-    languages: 100,
-    rateLimit: "API dependent",
-    quality: "Very High",
-    speed: "Medium",
-    models: ["gemini-pro", "gemini-flash"],
-  },
-  {
-    id: "openai",
-    name: "OpenAI GPT",
-    description: "AI translation using GPT models",
-    icon: "providers/openai.svg",
-    category: PROVIDER_CATEGORIES.AI,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "context", "smart"],
-    languages: 100,
-    rateLimit: "API dependent",
-    quality: "Very High",
-    speed: "Medium",
-    models: ["gpt-4", "gpt-3.5-turbo"],
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    description: "Access to multiple AI models via OpenRouter",
-    icon: "providers/openrouter.svg",
-    category: PROVIDER_CATEGORIES.AI,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "context", "smart"],
-    languages: 100,
-    rateLimit: "API dependent",
-    quality: "Very High",
-    speed: "Medium",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    description: "DeepSeek AI models for translation",
-    icon: "providers/deepseek.svg",
-    category: PROVIDER_CATEGORIES.AI,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "context", "smart"],
-    languages: 100,
-    rateLimit: "API dependent",
-    quality: "High",
-    speed: "Medium",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-  },
-  {
-    id: "custom",
-    name: "Custom OpenAI-compatible",
-    description: "Custom OpenAI-compatible API endpoint",
-    icon: "providers/custom.svg",
-    category: PROVIDER_CATEGORIES.AI,
-    needsApiKey: true,
-    supported: true,
-    features: ["text", "context", "configurable"],
-    languages: 100,
-    rateLimit: "Server dependent",
-    quality: "Variable",
-    speed: "Variable",
-    requirements: "Compatible API endpoint",
-  },
-  {
-    id: "webai",
-    name: "WebAI Local Server",
-    description: "Local server for AI model access",
-    icon: "providers/webai.svg",
-    category: PROVIDER_CATEGORIES.LOCAL,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "context", "offline"],
-    languages: 100,
-    rateLimit: "None",
-    quality: "Variable",
-    speed: "Variable",
-    requirements: "Local WebAI to API server",
-  },
-  {
-    id: "google",
-    name: "Google Translate (Classic)",
-    description: "Free translation service by Google",
-    icon: "providers/google.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect", "bulk"],
-    languages: 100,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Fast",
-  },
-  {
-    id: "lingva",
-    name: "Lingva",
-    description: "Free open-source Google Translate front-end",
-    icon: "providers/lingva.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect"],
-    languages: 100,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Fast",
-  },
-  {
-    id: "bing",
-    name: "Bing Translate",
-    description: "Free translation service by Microsoft",
-    icon: "providers/bing.svg",
-    category: PROVIDER_CATEGORIES.FREE,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect"],
-    languages: 70,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Fast",
-  },
-  {
-    id: "browser",
-    name: "Browser Translation",
-    description: "Built-in browser translation API (Chrome 138+)",
-    icon: "providers/chrome-translate.svg",
-    category: PROVIDER_CATEGORIES.BROWSER,
-    needsApiKey: false,
-    supported: true,
-    features: ["text", "autoDetect", "offline"],
-    languages: 50,
-    rateLimit: "None",
-    quality: "High",
-    speed: "Very Fast",
-    requirements: "Chrome 138+ or compatible browser",
-  },
-];
+export const PROVIDER_REGISTRY = PROVIDER_MANIFEST.map(provider => ({
+  id: provider.id,
+  name: provider.displayName,
+  description: provider.descriptionKey, // Will be used with i18n
+  icon: `providers/${provider.icon}`,
+  category: provider.category,
+  needsApiKey: provider.needsApiKey,
+  supported: provider.supported,
+  features: provider.features,
+  // These can be moved to manifest later for full control
+  languages: provider.type === 'ai' ? 100 : (provider.id === 'deepl' ? 35 : 100),
+  rateLimit: provider.needsApiKey ? "API dependent" : "None",
+  quality: provider.type === 'ai' ? "Very High" : "High",
+  speed: provider.id === 'browser' ? "Very Fast" : "Fast",
+}));
 
 // For backward compatibility and easy access
 const FALLBACK_PROVIDERS = PROVIDER_REGISTRY;
 
 // Export functions for compatibility
-export const getProvidersForDropdown = () => FALLBACK_PROVIDERS;
+export const getProvidersForDropdown = () => FALLBACK_PROVIDERS.filter(p => p.supported);
 export const getProviderById = (id) => FALLBACK_PROVIDERS.find(p => p.id === id);
-export const getSupportedProviders = () => FALLBACK_PROVIDERS;
+export const getSupportedProviders = () => FALLBACK_PROVIDERS.filter(p => p.supported);
 
 // Export class for compatibility
 export class ProviderRegistry {
   static getAll() {
-    return FALLBACK_PROVIDERS;
+    return FALLBACK_PROVIDERS.filter(p => p.supported);
   }
   
   static getById(id) {

@@ -87,11 +87,9 @@ async function getApiProviders() {
         continue;
       }
 
-      // Check against known provider IDs for extra validation
-      const knownProviderIds = [
-        'google', 'googlev2', 'yandex', 'deepl', 'gemini', 'openai', 'openrouter',
-        'deepseek', 'webai', 'bing', 'edge', 'lingva', 'browser', 'custom'
-      ];
+      // Check against known provider IDs for extra validation from manifest
+      const { PROVIDER_MANIFEST } = await import('@/features/translation/providers/ProviderManifest.js');
+      const knownProviderIds = PROVIDER_MANIFEST.map(p => p.id.toLowerCase());
 
       if (!knownProviderIds.includes(id.toLowerCase())) {
         logger.warn("Unknown provider ID detected:", { id, name });

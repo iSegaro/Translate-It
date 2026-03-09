@@ -19,24 +19,6 @@ export const TranslationPriority = {
   LOW: 1,     // Background tasks (Whole Page Translation)
 };
 
-/**
- * Default configurations for various providers
- */
-const DEFAULT_PROVIDER_CONFIGS = {
-  [ProviderNames.GOOGLE_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 100 },
-  [ProviderNames.GOOGLE_TRANSLATE_V2]: { maxConcurrent: 2, delayBetweenRequests: 200 },
-  [ProviderNames.BING_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
-  [ProviderNames.MICROSOFT_EDGE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
-  [ProviderNames.LINGVA]: { maxConcurrent: 1, delayBetweenRequests: 500 },
-  [ProviderNames.GEMINI]: { maxConcurrent: 2, delayBetweenRequests: 600 },
-  [ProviderNames.OPENAI]: { maxConcurrent: 2, delayBetweenRequests: 500 },
-  [ProviderNames.YANDEX_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 150 },
-  [ProviderNames.DEEPL_TRANSLATE]: { maxConcurrent: 2, delayBetweenRequests: 200 },
-  [ProviderNames.DEEPSEEK]: { maxConcurrent: 2, delayBetweenRequests: 500 },
-  [ProviderNames.OPENROUTER]: { maxConcurrent: 2, delayBetweenRequests: 500 },
-  [ProviderNames.WEBAI]: { maxConcurrent: 2, delayBetweenRequests: 500 },
-};
-
 export class RateLimitManager {
   constructor() {
     if (RateLimitManager.instance) {
@@ -59,12 +41,15 @@ export class RateLimitManager {
   }
 
   /**
-   * Reset or load configurations
+   * Reset or load configurations from ProviderConfigurations
    */
-  reloadConfigurations() {
+  async reloadConfigurations() {
     this.providerStates.clear();
-    Object.entries(DEFAULT_PROVIDER_CONFIGS).forEach(([name, config]) => {
-      this._initializeProvider(name, config);
+    const { PROVIDER_CONFIGURATIONS } = await import('@/features/translation/core/ProviderConfigurations.js');
+    
+    Object.entries(PROVIDER_CONFIGURATIONS).forEach(([name, config]) => {
+      // Map PROVIDER_CONFIGURATIONS.rateLimit to what we need
+      this._initializeProvider(name, config.rateLimit);
     });
   }
 
@@ -76,10 +61,11 @@ export class RateLimitManager {
       return this.providerStates.get(providerName);
     }
     
-    const defaultConfig = DEFAULT_PROVIDER_CONFIGS[providerName] || { maxConcurrent: 2, delayBetweenRequests: 200 };
+    // Default safe configuration if none provided
+    const safeDefault = { maxConcurrent: 2, delayBetweenRequests: 200 };
     
     const state = {
-      config: { ...defaultConfig, ...config },
+      config: { ...safeDefault, ...config },
       activeRequests: 0,
       lastRequestTime: 0,
       queues: {
