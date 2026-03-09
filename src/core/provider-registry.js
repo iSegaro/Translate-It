@@ -165,7 +165,7 @@ export const PROVIDER_REGISTRY = [
   },
   {
     id: "google",
-    name: "Google Translate (Backup)",
+    name: "Google Translate (Classic)",
     description: "Free translation service by Google",
     icon: "providers/google.svg",
     category: PROVIDER_CATEGORIES.FREE,

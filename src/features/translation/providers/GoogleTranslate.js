@@ -17,7 +17,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 export class GoogleTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Free Google Translate service";
-  static displayName = "Google Translate";
+  static displayName = "Google Translate (Classic)";
   static reliableJsonMode = false;
   static supportsDictionary = true;
   static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;

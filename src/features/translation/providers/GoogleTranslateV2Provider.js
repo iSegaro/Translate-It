@@ -26,7 +26,7 @@ const GOOGLE_TKK = '448487.932609646';
  */
 export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   static type = "translate";
-  static displayName = "Google Translate (Robust)";
+  static displayName = "Google Translate";
   static reliableJsonMode = false;
   static supportsDictionary = true;
   static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;

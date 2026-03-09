@@ -53,7 +53,7 @@
           v-if="selectedProvider === 'google'"
           class="api-info"
         >
-          <h3>{{ t('google_translate_settings_title') || 'Google Translate' }}</h3>
+          <h3>{{ t('google_translate_settings_title') || 'Google Translate (Classic)' }}</h3>
           <p class="setting-description">
             {{ t('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
           </p>
@@ -63,7 +63,7 @@
           v-else-if="selectedProvider === 'googlev2'"
           class="api-info"
         >
-          <h3>{{ t('googlev2_translate_settings_title') || 'Google Translate (Robust)' }}</h3>
+          <h3>{{ t('googlev2_translate_settings_title') || 'Google Translate' }}</h3>
           <p class="setting-description">
             {{ t('googlev2_translate_description') || 'Robust version of Google Translate using secure tokens and browser-like headers.' }}
           </p>

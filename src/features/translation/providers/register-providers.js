@@ -43,7 +43,7 @@ const providerConfigs = {
   },
   "google": {
     importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
-    metadata: { id: "google", name: "Google Translate (Backup)", type: "translate" }
+    metadata: { id: "google", name: "Google Translate (Classic)", type: "translate" }
   },
   "lingva": {
     importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),

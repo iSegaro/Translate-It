@@ -132,7 +132,8 @@ async function getApiProviders() {
 
     // Fallback to basic provider list if dynamic loading fails
     return [
-      { id: "google", defaultTitle: "Google Translate" },
+      { id: "googlev2", defaultTitle: "Google Translate" },
+      { id: "google", defaultTitle: "Google Translate (Classic)" },
       { id: "yandex", defaultTitle: "Yandex Translate" },
       { id: "deepl", defaultTitle: "DeepL Translate" },
       { id: "gemini", defaultTitle: "Google Gemini" },
