@@ -2,6 +2,7 @@
 // Composable for language management
 
 import { ref, computed } from "vue";
+import { UI_LOCALES } from "@/config/LocaleManifest.js";
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -119,11 +120,7 @@ export function useLanguages() {
    * @returns {Array} Array of interface languages
    */
   const getInterfaceLanguages = () => {
-    return [
-      { code: "en", name: "English" },
-      { code: "fa", name: "فارسی" },
-      { code: "ja", name: "日本語" },
-    ];
+    return UI_LOCALES.map(l => ({ code: l.code, name: l.name }));
   };
 
   /**

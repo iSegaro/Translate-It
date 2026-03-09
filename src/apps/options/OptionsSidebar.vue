@@ -82,6 +82,7 @@ import ThemeSelector from './components/ThemeSelector.vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getLocaleInfo } from '@/config/LocaleManifest.js'
 import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')
@@ -92,12 +93,8 @@ const { getInterfaceLanguages } = useLanguages()
 const manifestVersion = ref('v0.0.0')
 
 const getFlagUrl = (code) => {
-  const flagMap = {
-    en: 'gb',
-    fa: 'ir',
-    ja: 'jp'
-  };
-  const flag = flagMap[code] || code;
+  const locale = getLocaleInfo(code);
+  const flag = locale?.flag || code;
   try {
     return browser.runtime.getURL(`icons/flags/${flag}.svg`)
   } catch (error) {
