@@ -1,0 +1,771 @@
+{
+  "options_loading": { "message": "設定を読み込み中..." },
+  "app_welcome": { "message": "Translate It! へようこそ" },
+  "IsRTL": { "message": "false" },
+
+  "name": { "message": "Translate It" },
+  "nameChrome": { "message": "Translate It" },
+  "nameFirefox": { "message": "Translate It" },
+  "description": { "message": "どこでも翻訳。シンプルに。" },
+
+  "theme_section_title": { "message": "テーマ" },
+  "localization_section_title": { "message": "拡張機能の言語" },
+
+  "context_menu_options": { "message": "オプション" },
+  "context_menu_shortcuts": { "message": "キーボードショートカット" },
+  "context_menu_help": { "message": "ヘルプ" },
+  "context_menu_translate_screen": { "message": "画面を翻訳（キャプチャ）" },
+  "context_menu_reload_extension": { "message": "拡張機能を再読み込み（デバッグ）" },
+  "context_menu_translate_with_selection": { "message": "要素を翻訳" },
+  "context_menu_api_provider": { "message": "APIプロバイダー" },
+  "api_provider_google": { "message": "Google Translate" },
+  "api_provider_gemini": { "message": "Gemini" },
+  "api_provider_webai": { "message": "WebAI" },
+  "api_provider_openai": { "message": "OpenAI" },
+  "api_provider_openrouter": { "message": "OpenRouter" },
+  "api_provider_deepseek": { "message": "DeepSeek" },
+  "api_provider_bing": { "message": "Microsoft Bing" },
+  "api_provider_browser": { "message": "Browser API" },
+  "api_provider_yandex": { "message": "Yandex Translate" },
+  "api_provider_browserapi": { "message": "ブラウザ翻訳" },
+  "api_provider_custom": { "message": "カスタム（OpenAI）" },
+  "api_provider_deepl": { "message": "DeepL" },
+
+  "google_translate_settings_title": { "message": "Google Translate" },
+  "google_translate_description": {
+    "message": "無料で使えるGoogle Translateエンドポイント。APIキー不要。"
+  },
+
+  "yandex_translate_settings_title": { "message": "Yandex Translate" },
+  "yandex_translate_description": {
+    "message": "無料で使えるYandex Translateエンドポイント。APIキー不要。"
+  },
+
+  "deepl_translate_settings_title": { "message": "DeepL Translate" },
+  "deepl_translate_description": {
+    "message": "DeepL によるAI翻訳サービスです。APIキーが必要です。"
+  },
+
+  "bing_translate_settings_title": { "message": "Microsoft Bing 翻訳" },
+  "bing_translate_description": {
+    "message": "無料で使えるMicrosoft Bing翻訳エンドポイント。APIキー不要。"
+  },
+
+  "options_page_title": { "message": "設定" },
+  "options_description": { "message": "どこでも翻訳。シンプルに。" },
+  "options_changelog_loading": { "message": "変更履歴を読み込み中..." },
+  "github_link_title": { "message": "GitHubで見る" },
+
+  "options_error_same_languages": {
+    "message": "翻訳元と翻訳先の言語が同じです。"
+  },
+  "options_error_empty_language": {
+    "message": "言語フィールドを入力してください。"
+  },
+
+  "popup_loading": { "message": "ポップアップを読み込み中..." },
+  "popup_translate_button_text": { "message": "翻訳" },
+
+  "export_settings_description": {
+    "message": "現在の設定をJSONファイルにエクスポートして、バックアップまたは共有できます。"
+  },
+  "import_settings_description": {
+    "message": "インポートすると現在の設定が上書きされます。インポート成功後にページが再読み込みされます。"
+  },
+
+  "languages_tab_title": { "message": "言語" },
+  "appearance_tab_title": { "message": "外観" },
+  "activation_tab_title": { "message": "有効化" },
+  "prompt_tab_title": { "message": "プロンプト" },
+  "api_tab_title": { "message": "API設定" },
+  "import_export_tab_title": { "message": "インポート/エクスポート" },
+  "advance_tab_title": { "message": "詳細" },
+  "import_success": { "message": "設定のインポートが完了しました。" },
+
+  "prompt_reset_button": { "message": "リセット" },
+
+  "activation_group_general_title": { "message": "全般スイッチ" },
+  "activation_group_text_fields_title": { "message": "テキストフィールド翻訳" },
+  "activation_group_page_selection_title": { "message": "ページ内選択" },
+  "activation_group_dictionary_title": { "message": "辞書モード" },
+  "import_export_export_title": { "message": "設定のエクスポート" },
+  "import_export_import_title": { "message": "設定のインポート" },
+
+  "notification_update_title": { "message": "拡張機能が更新されました" },
+  "notification_update_message": {
+    "message": "{appName} がバージョン {version} に正常に更新されました。"
+  },
+
+  "ERRORS_TRANSLATION_TIMEOUT": { "message": "翻訳がタイムアウトしました。もう一度お試しください。" },
+
+  "languages_section_title": { "message": "言語" },
+  "source_language_label": { "message": "翻訳元言語" },
+  "target_language_label": { "message": "翻訳先言語" },
+  "source_language_placeholder": { "message": "翻訳元言語を入力" },
+  "target_language_placeholder": { "message": "翻訳先言語を入力" },
+
+  "help_tab_title": { "message": "ヘルプ" },
+  "about_tab_title": { "message": "新着情報" },
+  "help_section_title": { "message": "ヘルプ＆ドキュメント" },
+  "about_section_title": { "message": "変更履歴" },
+  "options_changelog_error": { "message": "変更履歴の読み込みに失敗しました。" },
+  "help_shortcut_title": { "message": "キーボードショートカットの変更方法" },
+  "help_shortcut_content_p1": {
+    "message": "Firefoxでは、ショートカットはアドオンページで管理します："
+  },
+  "help_shortcut_content_li1": {
+    "message": "アドレスバーに **about:addons** と入力します。"
+  },
+  "help_shortcut_content_li2": {
+    "message": "右上の **歯車アイコン（⚙️）** をクリックします。"
+  },
+  "help_shortcut_content_li3": {
+    "message": "メニューから **拡張機能のショートカットを管理** を選択します。"
+  },
+  "help_shortcut_content_li4": {
+    "message": "**Translate It** を見つけて、お好みのショートカットを設定します。"
+  },
+  "help_api_keys_title": { "message": "APIキーはどこで取得できますか？" },
+  "help_api_keys_content": {
+    "message": "各APIプロバイダーのウェブサイトへのリンクは **API** タブで確認できます。キーを発行するには、各プラットフォームでアカウントを作成してください。"
+  },
+  "help_free_providers_title": { "message": "無料プロバイダー（APIキー不要）" },
+  "help_api_providers_title": { "message": "APIベースのプロバイダー（APIキー必要）" },
+
+  "help_shortcut_content_p2": {
+    "message": "**Chrome** では操作が異なります："
+  },
+  "help_shortcut_content_chrome_li1": {
+    "message": "拡張機能アイコンを右クリックします。"
+  },
+  "help_shortcut_content_chrome_li2": {
+    "message": "メニューから **キーボードショートカット** を選択します。"
+  },
+  "help_shortcut_content_chrome_li3": {
+    "message": "**Translate It** の横にある鉛筆アイコン（✏️）をクリックして、新しいショートカットを入力します。"
+  },
+
+  "translation_activation_section_title": {
+    "message": "翻訳の有効化方法"
+  },
+  "extension_enabled_label": { "message": "拡張機能を有効にする" },
+  "extension_enabled_description": {
+    "message": "ポップアップを除く拡張機能全体の機能を有効または無効にします。"
+  },
+  "translate_on_text_fields_label": {
+    "message": "テキストフィールドに翻訳アイコンを表示"
+  },
+  "translate_on_text_fields_description": {
+    "message": "入力欄・テキストエリア内にアイコンを表示して、素早く翻訳できます。"
+  },
+  "enable_shortcut_for_text_fields_label": {
+    "message": "テキストフィールドのショートカットを有効にする"
+  },
+  "enable_shortcut_for_text_fields_description": {
+    "message": "テキストフィールド内でCtrl+/ショートカットを使って翻訳を呼び出せます。"
+  },
+  "translate_with_select_element_label": {
+    "message": "要素選択による翻訳を有効にする"
+  },
+  "translate_with_select_element_description": {
+    "message": "特定の選択方法（例：段落全体の選択）で翻訳を呼び出せます。"
+  },
+  "translate_on_text_selection_label": {
+    "message": "テキスト選択時の翻訳を有効にする"
+  },
+  "translate_on_text_selection_description": {
+    "message": "ページ上でテキストを選択したとき、自動またはアイコン経由で翻訳を呼び出せます。"
+  },
+  "options_textField_mode_copy": {
+    "message": "クリップボードにコピー"
+  },
+  "options_textField_mode_replace": {
+    "message": "テキストフィールドで置換"
+  },
+  "enable_replace_on_special_sites": {
+    "message": "特定サイトでの置換を有効にする（WhatsApp、Telegram、Instagramなど）"
+  },
+  "options_selection_mode_label": {
+    "message": "選択翻訳モード"
+  },
+  "options_selection_mode_immediate": {
+    "message": "すぐに翻訳"
+  },
+  "options_selection_mode_onclick": {
+    "message": "アイコンをクリックして翻訳"
+  },
+  "require_ctrl_for_text_selection_label": {
+    "message": "テキスト選択翻訳にCtrlキーを必要とする"
+  },
+  "require_ctrl_for_text_selection_description": {
+    "message": "テキスト選択翻訳が有効な場合、Ctrlキーを押しながら選択することで翻訳を呼び出せます。"
+  },
+  "active_selection_icon_on_textfields_label": {
+    "message": "テキストフィールドでのダブルクリックを有効にする"
+  },
+  "active_selection_icon_on_textfields_description": {
+    "message": "テキストフィールド（textarea）内のテキストをダブルクリックすると翻訳アイコンを表示します。"
+  },
+  "enhanced_triple_click_drag_label": {
+    "message": "トリプルクリック＋ドラッグのサポートを強化"
+  },
+  "enhanced_triple_click_drag_description": {
+    "message": "有効にすると、段落をトリプルクリックで選択してからドラッグで範囲を広げた場合、マウスを離すまで翻訳を待機します。複数段落を選択したいときに途中で翻訳されるのを防ぎます。"
+  },
+  "enable_dictionary_translation_label": {
+    "message": "辞書翻訳を有効にする"
+  },
+  "enable_dictionary_translation_description": {
+    "message": "テキスト選択翻訳が有効な場合、単語や短いフレーズを辞書として検索し、通常の翻訳の代わりに詳細な定義を表示します。"
+  },
+
+  "prompt_section_title": { "message": "プロンプトテンプレート" },
+  "prompt_template_label": { "message": "プロンプトテンプレート" },
+  "prompt_template_info": {
+    "message": "キーワードを使ってプロンプトをカスタマイズ..."
+  },
+  "prompt_template_placeholder": {
+    "message": "プロンプトテンプレートを入力してください。$_{SOURCE}、$_{TARGET}、$_{TEXT} などのキーワードが使用できます。"
+  },
+  "prompt_template_help": {
+    "message": "プロンプトテンプレートで使用できるキーワード："
+  },
+
+  "api_section_title": { "message": "翻訳API" },
+  "translation_api_label": { "message": "APIプロバイダーの選択" },
+  "gemini_api_settings_title": { "message": "Gemini 設定" },
+  "gemini_api_key_info": {
+    "message": "GeminiのAPIキーはGoogle AI Studioで取得できます。"
+  },
+  "openai_api_key_info": {
+    "message": "OpenAIのAPIキーはOpenAI Platformで取得できます。"
+  },
+  "deepseek_api_key_info": {
+    "message": "DeepSeekのAPIキーはDeepSeek Platformで取得できます。"
+  },
+  "openrouter_api_key_info": {
+    "message": "OpenRouterのAPIキーはOpenRouter Platformで取得できます。"
+  },
+  "webai_api_key_info": {
+    "message": "ローカルにホストしたWebAI APIサーバーを取得・実行できます。"
+  },
+  "gemini_api_key_link": { "message": "無料APIキーを取得" },
+  "openai_api_key_link": { "message": "APIキーを取得" },
+  "deepseek_api_key_link": { "message": "APIキーを取得" },
+  "openrouter_api_key_link": { "message": "APIキーを取得" },
+  "webai_api_key_link": { "message": "APIサーバーをローカルで実行" },
+  "gemini_api_settings_api_key_label": { "message": "APIキー" },
+  "gemini_api_key_placeholder": { "message": "APIキーを貼り付けてください" },
+  "gemini_api_settings_api_url_label": { "message": "API URL" },
+  "gemini_api_url_placeholder": { "message": "デフォルト Gemini API URL" },
+  "gemini_api_url_info": { "message": "空欄にするとデフォルトのGemini APIエンドポイントを使用します" },
+  "gemini_custom_model_label": { "message": "カスタムモデル名" },
+  "gemini_custom_model_placeholder": { "message": "カスタムモデル名を入力" },
+  "gemini_custom_model_info": { "message": "Googleが提供する正確なモデル名を入力してください" },
+  "gemini_custom_api_url_info": { "message": "モデル名を含む完全なAPI URLを入力してください" },
+  "webai_api_settings_title": { "message": "WebAI 設定" },
+  "webai_api_url_label": { "message": "API URL" },
+  "webai_api_url_placeholder": { "message": "WebAI API URLを入力" },
+  "webai_api_model_label": { "message": "モデル" },
+  "webai_api_model_placeholder": { "message": "WebAI APIモデルを入力" },
+  "openai_api_settings_title": { "message": "OpenAI 設定" },
+  "openai_api_settings_api_key_label": { "message": "APIキー" },
+  "openai_api_key_placeholder": { "message": "OpenAI APIキーを貼り付けてください" },
+  "openai_api_settings_model_label": { "message": "モデル" },
+  "openai_api_model_placeholder": { "message": "OpenAIモデルを入力" },
+  "openrouter_api_settings_title": { "message": "OpenRouter 設定" },
+  "openrouter_api_settings_api_key_label": { "message": "APIキー" },
+  "openrouter_api_key_placeholder": {
+    "message": "OpenRouter APIキーを貼り付けてください"
+  },
+  "openrouter_api_settings_model_label": { "message": "モデル" },
+  "openrouter_api_model_placeholder": {
+    "message": "OpenRouterモデルを入力（例：openai/gpt-4o）"
+  },
+  "deepseek_api_settings_title": { "message": "DeepSeek 設定" },
+  "deepseek_api_settings_api_key_label": { "message": "APIキー" },
+  "deepseek_api_key_placeholder": {
+    "message": "DeepSeek APIキーを貼り付けてください"
+  },
+  "deepseek_api_settings_model_label": { "message": "モデル" },
+  "deepseek_api_model_placeholder": {
+    "message": "DeepSeekモデルを入力（例：deepseek-chat）"
+  },
+
+  "deepl_api_settings_title": { "message": "DeepL API 設定" },
+  "deepl_api_key_info": {
+    "message": "DeepLのAPIキーは以下から取得できます："
+  },
+  "deepl_api_key_link": { "message": "DeepL API" },
+  "deepl_free_api_info": {
+    "message": "無料プランで月50万文字まで利用可能。"
+  },
+  "deepl_api_key_label": { "message": "APIキー" },
+  "deepl_api_key_placeholder": { "message": "DeepL APIキーを貼り付けてください" },
+  "deepl_api_tier_label": { "message": "APIプラン" },
+  "deepl_api_tier_free": { "message": "無料API（api-free.deepl.com）" },
+  "deepl_api_tier_pro": { "message": "ProAPI（api.deepl.com）" },
+  "deepl_free_tier_description": {
+    "message": "月50万文字制限の無料APIエンドポイント。api-free.deepl.comを使用します。"
+  },
+  "deepl_pro_tier_description": {
+    "message": "サブスクリプションに応じた上限のProAPIエンドポイント。api.deepl.comを使用します。"
+  },
+  "deepl_formality_label": { "message": "翻訳の丁寧さ" },
+  "deepl_formality_description": {
+    "message": "翻訳の丁寧さレベルを設定します。言語によっては対応していないオプションもあります。"
+  },
+  "deepl_formality_default": { "message": "デフォルト（自動）" },
+  "deepl_formality_more": { "message": "より丁寧に" },
+  "deepl_formality_less": { "message": "よりカジュアルに" },
+  "deepl_formality_prefer_more": { "message": "できるだけ丁寧に" },
+  "deepl_formality_prefer_less": { "message": "できるだけカジュアルに" },
+  "deepl_beta_languages_label": { "message": "ベータ言語を有効にする" },
+  "deepl_beta_languages_description": {
+    "message": "ベータ言語のサポートを有効にします。ベータ言語は丁寧さの設定に対応していません。"
+  },
+
+  "custom_api_settings_title": { "message": "カスタムAPI設定" },
+  "custom_api_settings_description": {
+    "message": "OpenAIのチャット補完形式と互換性のあるサービスを使用できます。"
+  },
+  "custom_api_settings_api_url_label": { "message": "API URL" },
+  "custom_api_url_placeholder": {
+    "message": "カスタムAPIの `v1/chat/completions` エンドポイントのURLを入力してください。"
+  },
+  "custom_api_url_example": { "message": "例：" },
+  "custom_api_settings_api_key_label": { "message": "APIキー" },
+  "custom_api_key_placeholder": { "message": "カスタムAPIキーを貼り付けてください" },
+  "custom_api_settings_model_label": { "message": "モデル" },
+  "custom_api_model_placeholder": { "message": "モデル名を入力" },
+
+  "import_export_section_title": { "message": "設定のインポート/エクスポート" },
+  "export_settings_button": { "message": "設定をエクスポート" },
+  "export_password_label": { "message": "🔐 エクスポートパスワード（セキュリティのため推奨）" },
+  "export_password_placeholder": { "message": "APIキーを保護するための強力なパスワードを作成してください" },
+  "export_password_description": {
+    "message": "<strong>🔒 強く推奨：</strong>軍用グレードのAES-256暗号化でAPIキーを保護するパスワードを入力してください。<br><strong>⚠️ パスワードなし：</strong>APIキーは平文でエクスポートされ、ファイルにアクセスした人に見られる可能性があります。<br><strong>📝 注意：</strong>設定をインポートする際に同じパスワードが必要です。"
+  },
+  "import_settings_label": { "message": "設定のインポート" },
+  "import_settings_button": { "message": "設定をインポート" },
+  "import_password_label": { "message": "🔑 インポートパスワードが必要です" },
+  "import_password_placeholder": { "message": "エクスポート時に使用したパスワードを入力" },
+  "import_password_description": {
+    "message": "<strong>🔐 暗号化ファイルを検出：</strong>この設定ファイルには暗号化されたAPIキーが含まれています。<br><strong>🔑 パスワードを入力：</strong>エクスポート時に作成したパスワードを使用してください。<br><strong>⏎ Enterキー：</strong>パスワードを入力後、Enterキーを押してインポートします。"
+  },
+  "security_warning_title": { "message": "⚠️ セキュリティ警告 ⚠️" },
+  "security_warning_message": {
+    "message": "パスワード保護なしで設定をエクスポートしようとしています。\nAPIキーが平文で保存され、誰でも読める状態になります。\n\n🔒 セキュリティのため、パスワードの使用を強く推奨します。"
+  },
+  "security_warning_question": { "message": "パスワード保護なしで続行しますか？" },
+  "save_settings_button": { "message": "設定を保存" },
+  "excluded_sites_label": {
+    "message": "除外するサイト（カンマ区切り）"
+  },
+
+  "advance_dev_api_mode_label": { "message": "開発APIモードを使用" },
+  "advance_debug_mode_label": { "message": "デバッグモード" },
+
+  "proxy_section_title": { "message": "プロキシ設定" },
+  "proxy_section_description": { "message": "地域制限のあるプロバイダー向けにプロキシを設定します（例：イランからのGemini）" },
+  "proxy_enabled_label": { "message": "プロキシを有効にする" },
+  "proxy_type_label": { "message": "プロキシの種類" },
+  "proxy_host_label": { "message": "ホスト" },
+  "proxy_port_label": { "message": "ポート" },
+  "proxy_username_label": { "message": "ユーザー名（任意）" },
+  "proxy_password_label": { "message": "パスワード（任意）" },
+  "proxy_testing": { "message": "テスト中..." },
+  "proxy_test_direct": { "message": "直接接続をテスト" },
+  "proxy_test_proxy": { "message": "プロキシ接続をテスト" },
+  "proxy_test_success": { "message": "プロキシ接続に成功しました！" },
+  "proxy_test_failed": { "message": "プロキシ接続に失敗しました。設定を確認してください。" },
+  "direct_test_success": { "message": "直接接続に成功しました！" },
+  "direct_test_failed": { "message": "直接接続に失敗しました。インターネット接続を確認してください。" },
+  "proxy_test_error": { "message": "エラーが発生しました。" },
+  "proxy_warning_title": { "message": "ブラウザ拡張機能の制限" },
+  "proxy_warning_message": { "message": "セキュリティ上の制限により、ブラウザ拡張機能はプロキシサーバーを直接使用できません。この設定は意図を構成しますが、実際のプロキシ使用には追加のセットアップが必要な場合があります。" },
+  "proxy_config_invalid": { "message": "プロキシ設定が無効です。設定を確認してください。" },
+  "proxy_host_invalid": { "message": "ホスト名が無効です。有効なドメイン名またはIPアドレスを入力してください。" },
+
+  "theme_auto": { "message": "自動（システム設定）" },
+  "theme_light": { "message": "ライト" },
+  "theme_dark": { "message": "ダーク" },
+  "theme_toggle_title": { "message": "テーマを切り替え" },
+
+  "popup_page_title": { "message": "Translate It!" },
+  "popup_translate_page_link": { "message": "ページを翻訳" },
+  "popup_translate_page_link_title": { "message": "新しいタブで翻訳を開く" },
+  "popup_select_element_alt_icon": { "message": "要素を選択" },
+  "popup_select_element_title_icon": { "message": "要素選択モード" },
+  "popup_revert_alt_icon": { "message": "元に戻す" },
+  "popup_revert_title_icon": { "message": "元に戻す（Escキー）" },
+  "popup_clear_storage_alt_icon": { "message": "クリア" },
+  "popup_clear_storage_title_icon": { "message": "フィールドをクリア" },
+  "popup_settings_alt_icon": { "message": "設定" },
+  "popup_settings_title_icon": { "message": "設定" },
+  "popup_target_language_title": { "message": "翻訳先言語" },
+  "popup_target_language_placeholder": { "message": "翻訳先言語" },
+  "popup_clear_target_language_title": { "message": "翻訳先言語をクリア" },
+  "popup_swap_languages_title": { "message": "言語を入れ替え" },
+  "popup_swap_languages_alt_icon": { "message": "入れ替え" },
+  "popup_source_language_placeholder": { "message": "翻訳元言語" },
+  "popup_source_language_title": { "message": "翻訳元言語" },
+  "popup_clear_source_language_title": { "message": "翻訳元言語をクリア" },
+  "popup_translate_button_title": { "message": "翻訳" },
+  "popup_translate_button_alt_icon": { "message": "翻訳" },
+  "popup_exclude_toggle_title": { "message": "このサイトで有効/無効を切り替え" },
+  "popup_copy_source_alt_icon": { "message": "コピー" },
+  "popup_copy_source_title_icon": { "message": "原文をコピー" },
+  "popup_voice_source_alt_icon": { "message": "原文を読み上げ" },
+  "popup_voice_source_title_icon": { "message": "読み上げ" },
+  "popup_paste_source_alt_icon": { "message": "貼り付け" },
+  "popup_paste_source_title_icon": { "message": "クリップボードから貼り付け" },
+  "popup_target_text_placeholder": { "message": "翻訳結果がここに表示されます..." },
+  "popup_source_text_placeholder": { "message": "テキストを入力..." },
+  "popup_copy_target_alt_icon": { "message": "翻訳をコピー" },
+  "popup_copy_target_title_icon": { "message": "翻訳テキストをコピー" },
+  "popup_voice_target_alt_icon": { "message": "翻訳を読み上げ" },
+  "popup_voice_target_title_icon": { "message": "読み上げ" },
+  "popup_string_during_translate": { "message": "翻訳中..." },
+  "popup_string_error_sending": { "message": "リクエストの送信に失敗しました。" },
+  "popup_string_error_response_empty": { "message": "（翻訳結果が空です）" },
+  "popup_string_translate_error_trigger": {
+    "message": "翻訳実行中にエラーが発生しました。"
+  },
+  "popup_string_translate_error_response": {
+    "message": "翻訳の応答中にエラーが発生しました。"
+  },
+  "popup_open_side_panel_title": {
+    "message": "サイドパネル"
+  },
+
+  "api_key_show": { "message": "表示" },
+  "api_key_hide": { "message": "非表示" },
+
+  "SIDEPANEL_SOURCE_TEXT_LABEL": { "message": "原文" },
+  "SIDEPANEL_TARGET_TEXT_LABEL": { "message": "翻訳" },
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "入力..." },
+  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": { "message": "翻訳結果がここに表示されます..." },
+  "SIDEPANEL_SELECT_ELEMENT_MESSAGE": { "message": "ウェブページ上の翻訳したい要素をクリックしてください..." },
+  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "翻訳" },
+  "SIDEPANEL_SETTINGS_TITLE_ICON": { "message": "オプション" },
+  "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "フィールドをクリア" },
+  "SIDEPANEL_REVERT_TOOLTIP": { "message": "元に戻す（Escキー）" },
+  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": { "message": "要素を選択" },
+  "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": { "message": "入力（自動）" },
+  "SIDEPANEL_SWAP_LANGUAGES_TITLE": { "message": "言語を入れ替え" },
+  "SIDEPANEL_SWAP_LANGUAGES_ALT": { "message": "入れ替え" },
+  "SIDEPANEL_SOURCE_LANGUAGE_TITLE": { "message": "翻訳元言語" },
+  "SIDEPANEL_TARGET_LANGUAGE_TITLE": { "message": "翻訳先言語" },
+  "SIDEPANEL_COPY_SOURCE_ALT_ICON": { "message": "コピー" },
+  "SIDEPANEL_VOICE_SOURCE_ALT_ICON": { "message": "原文を読み上げ" },
+  "SIDEPANEL_PASTE_SOURCE_ALT_ICON": { "message": "貼り付け" },
+  "SIDEPANEL_COPY_TARGET_ALT_ICON": { "message": "翻訳をコピー" },
+  "SIDEPANEL_VOICE_TARGET_ALT_ICON": { "message": "翻訳を読み上げ" },
+  "SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": { "message": "翻訳先言語" },
+  "SIDEPANEL_VOICE_TARGET_TITLE_ICON": { "message": "読み上げ" },
+  "SIDEPANEL_VOICE_SOURCE_TITLE_ICON": { "message": "読み上げ" },
+  "SIDEPANEL_COPY_SOURCE_TITLE_ICON": { "message": "コピー" },
+  "SIDEPANEL_COPY_TARGET_TITLE_ICON": { "message": "コピー" },
+  "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": { "message": "貼り付け" },
+
+  "history_delete": { "message": "削除" },
+  "history_delete_item": { "message": "この項目を削除" },
+
+  "STATUS_TRANSLATING_CTRLSLASH": { "message": "翻訳中..." },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "翻訳中..." },
+  "STATUS_TRANSLATING_ICON": { "message": "翻訳中..." },
+  "STATUS_Revert_Number": { "message": "元に戻しました" },
+  "STATUS_REVERT_NOT_FOUND": { "message": "元に戻すテキストが見つかりません。" },
+  "STATUS_FROM_MEMORY": { "message": "キャッシュから取得" },
+  "STATUS_REMOVE_MEMORY": { "message": "キャッシュをクリア" },
+  "STATUS_SMARTTRANSLATE_COPIED": {
+    "message": "翻訳をクリップボードにコピーしました（Ctrl+V）。"
+  },
+
+  "SIDEPANEL_API_PROVIDER_TOOLTIP": {
+    "message": "APIプロバイダーを変更"
+  },
+  "SIDEPANEL_HISTORY_TOOLTIP": {
+    "message": "翻訳履歴"
+  },
+  "SIDEPANEL_HISTORY_TITLE": {
+    "message": "翻訳履歴"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY": {
+    "message": "履歴をすべてクリア"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
+    "message": "翻訳履歴をすべて削除"
+  },
+  "CONFIRM_CLEAR_ALL_HISTORY": {
+    "message": "翻訳履歴をすべてクリアしますか？"
+  },
+
+  "OPTIONS_STATUS_SAVED_SUCCESS": {
+    "message": "保存しました :)"
+  },
+  "OPTIONS_STATUS_SAVED_FAILED": {
+    "message": "保存に失敗しました :("
+  },
+  "OPTIONS_STATUS_EXPORT_SUCCESS": {
+    "message": "設定のエクスポートに成功しました！"
+  },
+  "OPTIONS_STATUS_EXPORT_FAILED": {
+    "message": "設定のエクスポートに失敗しました。"
+  },
+  "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING": {
+    "message": "設定をインポートしました！再読み込み中..."
+  },
+  "OPTIONS_STATUS_IMPORT_FAILED": {
+    "message": "設定のインポートに失敗しました。ファイルが無効な可能性があります。"
+  },
+  "OPTIONS_STATUS_LOAD_FAILED": {
+    "message": "設定の読み込みに失敗しました。"
+  },
+
+  "browser_api_settings_title": { "message": "ブラウザ翻訳" },
+  "browser_api_description": { "message": "Chrome内蔵の翻訳API。Chrome 138以降が必要で、オフラインでも動作します。" },
+  "browser_api_requirements": { "message": "動作要件：" },
+  "browser_api_requirements_chrome": {
+    "message": "Chrome 138以降（デスクトップのみ）"
+  },
+  "browser_api_requirements_gpu": { "message": "VRAM 4GB以上のGPU" },
+  "browser_api_requirements_storage": { "message": "大容量の空きストレージ（22GB以上）" },
+  "browser_api_requirements_internet": {
+    "message": "初回ダウンロード用の無制限ネットワーク接続"
+  },
+
+  "PROVIDER_MODEL_LABEL": {
+    "message": "モデル"
+  },
+  "gemini_model_title": {
+    "message": "GeminiモデルまたはカスタムURLを選択"
+  },
+  "openai_custom_model_placeholder": {
+    "message": "カスタムモデル名を入力"
+  },
+  "openai_custom_model_label": { "message": "カスタムモデル名" },
+  "openrouter_custom_model_placeholder": {
+    "message": "カスタムモデル名を入力（例：provider/model-name）"
+  },
+  "openrouter_custom_model_label": { "message": "カスタムモデル名" },
+  "deepseek_custom_model_placeholder": {
+    "message": "カスタムモデル名を入力"
+  },
+  "deepseek_custom_model_label": { "message": "カスタムモデル名" },
+
+  "ERRORS_UNKNOWN": { "message": "不明なエラーが発生しました。" },
+  "ERRORS_INVALID_CONTEXT": {
+    "message": "拡張機能のコンテキストが無効です。ページを更新してください。"
+  },
+  "ERRORS_CONTEXT_LOST": { "message": "拡張機能のコンテキストが失われました。" },
+  "ERRORS_TAB_AVAILABILITY": { "message": "タブが利用できません。" },
+  "ERRORS_EMPTY_PROMPT": { "message": "プロンプトが無効または空です。" },
+  "ERRORS_NETWORK_ERROR": {
+    "message": "ネットワークエラー。インターネット接続を確認してください。"
+  },
+  "ERRORS_HTTP_ERROR": {
+    "message": "サーバーとの通信でHTTPエラーが発生しました。"
+  },
+  "ERRORS_API_KEY_MISSING": { "message": "APIキーが設定されていません。" },
+  "ERRORS_API_KEY_INVALID": {
+    "message": "APIキーが無効または認証されていません。"
+  },
+  "ERRORS_API_URL_MISSING": { "message": "API URLが設定されていません。" },
+  "ERRORS_MODEL_MISSING": {
+    "message": "選択したAIモデルが見つからないか無効です。"
+  },
+  "ERRORS_INVALID_REQUEST": {
+    "message": "リクエストの形式またはパラメータが無効です。"
+  },
+  "ERRORS_INSUFFICIENT_BALANCE": {
+    "message": "選択したAPIの残高またはクレジットが不足しています。"
+  },
+  "ERRORS_FORBIDDEN_ERROR": {
+    "message": "アクセスが拒否されました。権限またはコンテンツポリシーを確認してください。"
+  },
+  "ERRORS_RATE_LIMIT_REACHED": {
+    "message": "レート制限に達しました。リクエストを減らすか、しばらくしてから再試行してください。"
+  },
+  "ERRORS_SERVER_ERROR": {
+    "message": "サービスプロバイダーのサーバーでエラーが発生しました。しばらくしてから再試行してください。"
+  },
+  "ERRORS_MODEL_OVERLOADED": {
+    "message": "AIモデルが現在過負荷状態です。少し待ってから再試行してください。"
+  },
+  "ERRORS_QUOTA_EXCEEDED": {
+    "message": "このAPIのクォータを超過しました。"
+  },
+  "ERRORS_DEEPL_QUOTA_EXCEEDED": {
+    "message": "DeepLの文字数制限を超えました。無料プランは月50万文字まで。DeepLアカウントの設定を確認するか、プランをアップグレードしてください。"
+  },
+  "ERRORS_GEMINI_QUOTA_REGION": {
+    "message": "Geminiのクォータを超えました。地域別の制限が原因の可能性があります。"
+  },
+  "ERRORS_IMPORT_PASSWORD_REQUIRED": {
+    "message": "暗号化された設定をインポートするにはパスワードが必要です。"
+  },
+  "ERRORS_IMPORT_PASSWORD_INCORRECT": {
+    "message": "パスワードが違うか、データが破損しています。"
+  },
+  "ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED": {
+    "message": "選択した言語の組み合わせはChrome翻訳APIに対応していません。別の翻訳サービスまたは言語の組み合わせをお試しください。"
+  },
+
+  "gemini_thinking_label": {
+    "message": "思考モードを有効にする"
+  },
+  "gemini_thinking_description": {
+    "message": "回答前にモデルがステップごとに考えられるようにします。"
+  },
+  "advance_section_title": { "message": "詳細設定" },
+  "prompt_source_help": { "message": "プロンプトの翻訳元言語を選択してください。" },
+  "prompt_target_help": { "message": "プロンプトの翻訳先言語を選択してください。" },
+  "prompt_text_help": { "message": "翻訳または処理したいテキストを入力してください。" },
+  "export_success_plaintext": { "message": "設定をエクスポートしました（APIキーは平文で保存されています）。" },
+  "import_error_generic": { "message": "設定のインポートに失敗しました。" },
+  "import_error_password": { "message": "インポート失敗：パスワードが違います。" },
+
+  "appearance_section_title": { "message": "外観" },
+  "font_settings_title": { "message": "フォント設定" },
+  "font_settings_description": { "message": "翻訳表示のフォントとサイズをカスタマイズ" },
+  "font_family_label": { "message": "フォントファミリー" },
+  "font_size_label": { "message": "フォントサイズ" },
+  "font_preview_label": { "message": "プレビュー" },
+  "font_family_required": { "message": "フォントファミリーは必須です" },
+  "font_size_invalid": { "message": "フォントサイズは有効な数値を入力してください" },
+  "font_size_range_error": { "message": "フォントサイズは10〜30ピクセルの範囲で指定してください" },
+  "font_family_update_error": { "message": "フォントファミリーの更新に失敗しました" },
+  "font_size_update_error": { "message": "フォントサイズの更新に失敗しました" },
+  "font_validation_failed": { "message": "フォント設定の検証に失敗しました" },
+  "search_fonts_placeholder": { "message": "フォントを検索..." },
+  "loading_fonts": { "message": "フォントを読み込み中..." },
+  "no_fonts_found": { "message": "フォントが見つかりません" },
+  "system_font": { "message": "システム" },
+  "font_loading_error": { "message": "フォントの読み込みに失敗しました" },
+
+  "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "要素選択モードが有効です。翻訳したいテキスト要素をクリックしてください。" },
+  "SELECT_ELEMENT_TRANSLATING": { "message": "翻訳中..." },
+  "SELECT_ELEMENT_CANCEL": { "message": "キャンセル" },
+  "SELECT_ELEMENT_REVERT": { "message": "元に戻す" },
+  "SELECT_ELEMENT_BING_WARNING": { "message": "Bingは長文や複雑なテキストで問題が生じる場合があります。エラーが発生した場合は別のプロバイダーをお試しください。" },
+
+  "text_field_shortcut_label": { "message": "カスタムショートカット：" },
+  "click_to_set_shortcut": { "message": "クリックしてショートカットを設定" },
+  "text_field_shortcut_description": { "message": "テキストフィールドで翻訳を呼び出すショートカットキーを選択してください。" },
+  "shortcut_recording_title": { "message": "ショートカットを押してください" },
+  "shortcut_recording_instruction": { "message": "使用したいキーを押してください。" },
+  "shortcut_waiting": { "message": "キー入力を待機中..." },
+  "cancel": { "message": "キャンセル" },
+  "clear": { "message": "クリア" },
+  "confirm": { "message": "確認" },
+
+  "api_test_button": { "message": "キーをテスト" },
+  "api_test_testing": { "message": "テスト中..." },
+  "api_test_no_keys": { "message": "テストするキーがありません" },
+  "api_test_result_partial": { "message": "{valid}個の有効なキー、{invalid}個の無効なキーが見つかりました" },
+  "api_test_result_all_invalid": { "message": "{count}個のキーがすべて無効です" },
+  "api_test_unknown_provider": { "message": "不明なプロバイダー：{provider}" },
+  "api_test_failed": { "message": "キーのテストに失敗しました：{error}" },
+  "api_key_tips": { "message": "💡 APIキーは1行に1つずつ入力してください" },
+
+  "validation_source_language_empty": { "message": "翻訳元言語を入力してください。" },
+  "validation_target_language_empty": { "message": "翻訳先言語を入力してください。" },
+  "validation_same_languages": { "message": "翻訳元と翻訳先の言語が同じです。" },
+  "validation_api_key_empty": { "message": "{provider} のAPIキーを入力してください。" },
+  "validation_api_key_too_short": { "message": "APIキーが短すぎます。" },
+  "validation_api_key_invalid": { "message": "APIキーは10文字以上で、スペースなしで入力してください" },
+  "validation_prompt_template_empty": { "message": "プロンプトテンプレートを入力してください。" },
+  "validation_prompt_template_missing_placeholders": { "message": "プロンプトテンプレートに次のキーワードが必要です：{placeholders}" },
+  "validation_invalid_domains": { "message": "無効なドメイン：{domains}" },
+  "validation_import_file_required": { "message": "インポートするファイルを選択してください。" },
+  "validation_import_file_json_only": { "message": "JSONファイルのみ対応しています。" },
+  "validation_import_file_too_large": { "message": "ファイルサイズは5MB未満にしてください。" },
+  "validation_field_required": { "message": "この項目は必須です" },
+  "validation_min_length": { "message": "{min}文字以上で入力してください" },
+  "validation_max_length": { "message": "{max}文字以内で入力してください" },
+  "validation_invalid_email": { "message": "有効なメールアドレスを入力してください" },
+  "validation_invalid_url": { "message": "有効なURLを入力してください" },
+
+  "history_title": { "message": "翻訳履歴" },
+  "history_items_count": { "message": "{count}件" },
+  "history_search_placeholder": { "message": "履歴を検索..." },
+  "history_filter": { "message": "フィルター" },
+  "history_filter_tooltip": { "message": "フィルターオプション" },
+  "history_filter_by_provider": { "message": "プロバイダーで絞り込む" },
+  "history_all_providers": { "message": "すべてのプロバイダー" },
+  "history_filter_by_type": { "message": "種類で絞り込む" },
+  "history_text_translations": { "message": "テキスト翻訳" },
+  "history_image_translations": { "message": "画像翻訳" },
+  "history_time_period": { "message": "期間" },
+  "history_time_all": { "message": "すべての期間" },
+  "history_time_today": { "message": "今日" },
+  "history_time_week": { "message": "今週" },
+  "history_time_month": { "message": "今月" },
+  "history_sort": { "message": "並び替え" },
+  "history_sort_tooltip": { "message": "並び替えオプション" },
+  "history_sort_by_date": { "message": "日付順" },
+  "history_sort_by_provider": { "message": "プロバイダー順" },
+  "history_sort_by_length": { "message": "文字数順" },
+  "history_sort_newest": { "message": "新しい順" },
+  "history_sort_oldest": { "message": "古い順" },
+  "history_clear_all": { "message": "すべてクリア" },
+  "history_clear_all_tooltip": { "message": "履歴をすべてクリア" },
+  "history_loading": { "message": "履歴を読み込み中..." },
+  "history_no_results": { "message": "結果が見つかりません" },
+  "history_no_history": { "message": "翻訳履歴はまだありません" },
+  "history_no_results_hint": { "message": "検索条件やフィルターを変えてみてください" },
+  "history_no_history_hint": { "message": "翻訳するとここに表示されます" },
+  "history_type_image": { "message": "画像" },
+  "history_type_text": { "message": "テキスト" },
+  "history_label_source": { "message": "原文：" },
+  "history_label_translation": { "message": "翻訳：" },
+  "history_label_confidence": { "message": "信頼度：" },
+  "history_retranslate_tooltip": { "message": "再翻訳" },
+  "history_more_actions_tooltip": { "message": "その他の操作" },
+  "history_action_edit": { "message": "編集" },
+  "history_action_favorite": { "message": "お気に入りに追加" },
+  "history_action_unfavorite": { "message": "お気に入りから削除" },
+  "history_action_export": { "message": "エクスポート" },
+  "history_action_delete": { "message": "削除" },
+  "history_page_first": { "message": "最初のページ" },
+  "history_page_previous": { "message": "前のページ" },
+  "history_page_next": { "message": "次のページ" },
+  "history_page_last": { "message": "最後のページ" },
+  "history_page_info": { "message": "{total}ページ中 {current}ページ" },
+  "history_items_selected": { "message": "{count}件を選択中" },
+  "history_items_selected_plural": { "message": "{count}件を選択中" },
+  "history_bulk_export": { "message": "エクスポート" },
+  "history_bulk_delete": { "message": "削除" },
+  "history_bulk_cancel": { "message": "キャンセル" },
+  "history_copy_all_selected_tooltip": { "message": "選択したものをすべてコピー" },
+  "history_clear_confirm_title": { "message": "履歴をクリア" },
+  "history_clear_confirm_message": { "message": "翻訳履歴をすべてクリアしますか？" },
+  "history_clear_confirm_warning": { "message": "この操作は取り消せません。" },
+  "history_clear_confirm_button": { "message": "すべてクリア" },
+  "history_copied_feedback": { "message": "{count}件をクリップボードにコピーしました！" },
+  "history_cleared_feedback": { "message": "履歴をクリアしました" },
+  "history_deleted_feedback": { "message": "{count}件の翻訳を削除しました" },
+  "history_delete_confirm_message": { "message": "この翻訳を削除しますか？" },
+  "history_bulk_delete_confirm_message": { "message": "{count}件の翻訳を削除しますか？" },
+
+  "window_copy_translation": { "message": "翻訳をコピー" },
+  "window_close": { "message": "閉じる" },
+  "window_tts_no_text": { "message": "読み上げるテキストがありません" },
+  "window_tts_stop": { "message": "読み上げを停止（クリックして停止）" },
+  "window_tts_speak_original": { "message": "🔊 原文を読み上げ（まず原文を表示してからこのボタンをクリック）" },
+  "window_tts_speak_translation": { "message": "🔊 翻訳を読み上げ（現在のモード：翻訳）" },
+  "window_show_original": { "message": "原文を表示（スピーカーボタンで原文を読み上げ）" },
+  "window_hide_original": { "message": "原文を非表示（TTSボタンは原文を読み上げます）" },
+  "window_loading_alt": { "message": "読み込み中..." },
+  "window_translation_placeholder": { "message": "翻訳がここに表示されます..." },
+
+  "action_copy_text": { "message": "テキストをコピー" },
+  "action_copy_to_clipboard": { "message": "テキストをクリップボードにコピー" },
+  "action_paste_from_clipboard": { "message": "クリップボードから貼り付け" },
+  "action_speak_text": { "message": "テキストを読み上げ" },
+  "action_stop_speaking": { "message": "読み上げを停止" },
+
+  "translateSelectedText": { "message": "選択したテキストを翻訳" }
+}
