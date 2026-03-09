@@ -18,7 +18,7 @@
   "context_menu_reload_extension": { "message": "拡張機能を再読み込み（デバッグ）" },
   "context_menu_translate_with_selection": { "message": "要素を翻訳" },
   "context_menu_api_provider": { "message": "APIプロバイダー" },
-  "api_provider_google": { "message": "Google Translate" },
+  "api_provider_google": { "message": "Google Translate (Classic)" },
   "api_provider_gemini": { "message": "Gemini" },
   "api_provider_webai": { "message": "WebAI" },
   "api_provider_openai": { "message": "OpenAI" },
@@ -31,24 +31,74 @@
   "api_provider_custom": { "message": "カスタム（OpenAI）" },
   "api_provider_deepl": { "message": "DeepL" },
 
-  "google_translate_settings_title": { "message": "Google Translate" },
-  "google_translate_description": {
+  "provider_google_title": { "message": "Google Translate (Classic)" },
+  "provider_google_description": {
     "message": "無料で使えるGoogle Translateエンドポイント。APIキー不要。"
   },
 
-  "yandex_translate_settings_title": { "message": "Yandex Translate" },
-  "yandex_translate_description": {
+  "provider_googlev2_title": { "message": "Google Translate" },
+  "provider_googlev2_description": {
+    "message": "安全なトークンとブラウザのようなヘッダーを使用したGoogle Translateの堅牢なバージョン。長いテキストに対してより安定しています。APIキー不要。"
+  },
+
+  "provider_yandex_title": { "message": "Yandex Translate" },
+  "provider_yandex_description": {
     "message": "無料で使えるYandex Translateエンドポイント。APIキー不要。"
   },
 
-  "deepl_translate_settings_title": { "message": "DeepL Translate" },
-  "deepl_translate_description": {
+  "provider_deepl_title": { "message": "DeepL Translate" },
+  "provider_deepl_description": {
     "message": "DeepL によるAI翻訳サービスです。APIキーが必要です。"
   },
 
-  "bing_translate_settings_title": { "message": "Microsoft Bing 翻訳" },
-  "bing_translate_description": {
+  "provider_bing_title": { "message": "Microsoft Bing 翻訳" },
+  "provider_bing_description": {
     "message": "無料で使えるMicrosoft Bing翻訳エンドポイント。APIキー不要。"
+  },
+
+  "provider_edge_title": { "message": "Microsoft Edge 翻訳" },
+  "provider_edge_description": {
+    "message": "公式のMicrosoft Edgeブラウザ翻訳サービス。より高速で安定しています。APIキー不要。"
+  },
+
+  "provider_lingva_title": { "message": "Lingva 翻訳" },
+  "provider_lingva_description": {
+    "message": "無料のオープンソースGoogle 翻訳フロントエンド。プライバシー重視で分散型。APIキー不要。"
+  },
+
+  "provider_gemini_title": { "message": "Google Gemini" },
+  "provider_gemini_description": {
+    "message": "文脈理解を備えたAI駆動の翻訳。APIキーが必要です。"
+  },
+
+  "provider_openai_title": { "message": "OpenAI GPT" },
+  "provider_openai_description": {
+    "message": "GPTモデルを使用したAI翻訳。APIキーが必要です。"
+  },
+
+  "provider_openrouter_title": { "message": "OpenRouter" },
+  "provider_openrouter_description": {
+    "message": "OpenRouter経由で複数のAIモデルにアクセスできます。APIキーが必要です。"
+  },
+
+  "provider_deepseek_title": { "message": "DeepSeek" },
+  "provider_deepseek_description": {
+    "message": "翻訳用のDeepSeek AIモデル。高速で効率的。APIキーが必要です。"
+  },
+
+  "provider_webai_title": { "message": "WebAI ローカルサーバー" },
+  "provider_webai_description": {
+    "message": "AIモデルへのアクセスのためのローカルサーバー。ローカルインスタンスの場合はAPIキー不要です。"
+  },
+
+  "provider_browser_title": { "message": "ブラウザ内蔵翻訳" },
+  "provider_browser_description": {
+    "message": "Chrome内蔵の翻訳API（Chrome 138+）。オフライン翻訳をサポートします。"
+  },
+
+  "provider_custom_title": { "message": "カスタムプロバイダー" },
+  "provider_custom_description": {
+    "message": "カスタムOpenAI互換APIエンドポイント。独自のURLとキーを設定してください。"
   },
 
   "options_page_title": { "message": "設定" },
@@ -434,6 +484,9 @@
   },
   "popup_string_translate_error_response": {
     "message": "翻訳の応答中にエラーが発生しました。"
+  },
+  "popup_string_error_429": {
+    "message": "リクエストが多すぎます。しばらくしてから再試行してください。"
   },
   "popup_open_side_panel_title": {
     "message": "サイドパネル"
