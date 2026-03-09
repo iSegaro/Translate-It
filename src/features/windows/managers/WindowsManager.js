@@ -1038,11 +1038,15 @@ export class WindowsManager extends ResourceTracker {
                          !originalMessage.includes('Translation failed: No translated text') ? 
                          originalMessage : errorInfo.message;
     
+    // Get localized error prefix
+    const { getTranslationString } = await import('@/utils/i18n/i18n.js');
+    const errorPrefix = await getTranslationString('error_prefix') || 'Error';
+    
     // Emit event to create error window through Vue UI Host
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText: selectedText,
-      initialTranslatedText: `Error: ${displayMessage}`,
+      initialTranslatedText: `${errorPrefix}: ${displayMessage}`,
       position: position,
       theme: theme,
       isError: true

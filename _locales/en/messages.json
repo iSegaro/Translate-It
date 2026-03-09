@@ -787,6 +787,8 @@
   "window_loading_alt": { "message": "Loading..." },
   "window_translation_placeholder": { "message": "Translation will appear here..." },
 
+  "error_prefix": { "message": "Error" },
+
   "action_copy_text": { "message": "Copy text" },
   "action_copy_to_clipboard": { "message": "Copy text to clipboard" },
   "action_paste_from_clipboard": { "message": "Paste from clipboard" },
@@ -794,6 +796,8 @@
   "action_stop_speaking": { "message": "Stop speaking" },
 
   "translateSelectedText": { "message": "Translate selected text" },
+  "translateWithTranslateIt": { "message": "Translate with Translate-It" },
+  "click_to_translate": { "message": "Click to translate" },
   "whole_page_translation_section_title": { "message": "Whole Page Translation" },
   "whole_page_translation_enabled_label": { "message": "Enable Whole Page Translation" },
   "whole_page_translation_enabled_description": { "message": "Allow translating the entire web page content while maintaining the layout." },

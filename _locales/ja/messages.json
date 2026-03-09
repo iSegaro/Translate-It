@@ -1520,6 +1520,9 @@
   "window_translation_placeholder": {
     "message": "翻訳がここに表示されます..."
   },
+  "error_prefix": {
+    "message": "エラー"
+  },
   "action_copy_text": {
     "message": "テキストをコピー"
   },
@@ -1537,6 +1540,12 @@
   },
   "translateSelectedText": {
     "message": "選択したテキストを翻訳"
+  },
+  "translateWithTranslateIt": {
+    "message": "Translate-It で翻訳"
+  },
+  "click_to_translate": {
+    "message": "クリックして翻訳"
   },
   "whole_page_translation_section_title": {
     "message": "ページ全体の翻訳"

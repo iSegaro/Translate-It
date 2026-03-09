@@ -1520,6 +1520,9 @@
   "window_translation_placeholder": {
     "message": "ترجمه اینجا نمایش داده می‌شود..."
   },
+  "error_prefix": {
+    "message": "خطا"
+  },
   "action_copy_text": {
     "message": "کپی متن"
   },
@@ -1537,6 +1540,12 @@
   },
   "translateSelectedText": {
     "message": "ترجمه متن انتخاب شده"
+  },
+  "translateWithTranslateIt": {
+    "message": "ترجمه با Translate-It"
+  },
+  "click_to_translate": {
+    "message": "برای ترجمه کلیک کنید"
   },
   "whole_page_translation_section_title": {
     "message": "ترجمه کل صفحه"

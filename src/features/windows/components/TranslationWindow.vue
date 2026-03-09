@@ -153,7 +153,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
@@ -164,7 +164,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
 // i18n
-const { t } = useI18n();
+const { t } = useUnifiedI18n();
 
 const props = defineProps({
   id: { type: String, required: true },

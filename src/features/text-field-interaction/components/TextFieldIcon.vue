@@ -10,11 +10,10 @@
       :data-translate-ui="true"
       :class="computedClasses"
       :style="computedStyle"
-      :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
-      :aria-label="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
+      :title="t('translateWithTranslateIt')"
+      :aria-label="t('translateWithTranslateIt')"
       role="button"
-      tabindex="0"
-      @click="onClick"
+      tabindex="0"      @click="onClick"
       @mousedown.prevent.stop
       @mouseup.prevent.stop
       @mouseenter="onMouseEnter"
@@ -73,9 +72,13 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 // Use the new Vue composable for automatic cleanup
 const tracker = useResourceTracker('text-field-icon-component')
+
+// i18n
+const { t } = useUnifiedI18n();
 
 const props = defineProps({
   id: { type: String, required: true },

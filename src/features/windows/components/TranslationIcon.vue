@@ -6,8 +6,8 @@
     :class="{ 'is-hovering': isHovering, 'is-active': isActive }"
     :style="dynamicStyle"
     data-translate-ui="true"
-    :title="$t ? $t('translateSelectedText') : 'Translate selected text'"
-    :aria-label="$t ? $t('translateSelectedText') : 'Translate selected text'"
+    :title="t('translateSelectedText')"
+    :aria-label="t('translateSelectedText')"
     role="button"
     tabindex="0"
     @click="handleClick"
@@ -70,6 +70,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const pageEventBus = window.pageEventBus;
 
@@ -81,6 +82,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['click', 'hover', 'focus', 'close']);
+
+// i18n
+const { t } = useUnifiedI18n();
 
 // Reactive state
 const isVisible = ref(false);

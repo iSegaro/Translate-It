@@ -22,10 +22,15 @@ import { ref } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const activeHighlights = ref([]);
 const showTooltip = ref(false);
-const tooltipText = ref('Click to translate');
+
+// i18n
+const { t } = useUnifiedI18n();
+
+const tooltipText = computed(() => t('click_to_translate'));
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ElementHighlightOverlay');
 
 // Generate unique IDs for highlights
