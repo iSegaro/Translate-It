@@ -260,12 +260,6 @@
   "target_language_label": {
     "message": "زبان مقصد"
   },
-  "source_language_placeholder": {
-    "message": "زبان مبدا را وارد کنید"
-  },
-  "target_language_placeholder": {
-    "message": "زبان مقصد را وارد کنید"
-  },
   "help_tab_title": {
     "message": "راهنما"
   },
@@ -376,9 +370,6 @@
   },
   "require_ctrl_for_text_selection_label": {
     "message": "الزام استفاده از کلید Ctrl برای ترجمه متن"
-  },
-  "require_ctrl_for_text_selection_description": {
-    "message": "هنگام فعال بودن ترجمه انتخاب متن، نیاز است کلید Ctrl در حین انتخاب نگه داشته شود تا ترجمه فعال شود."
   },
   "active_selection_icon_on_textfields_label": {
     "message": "فعال‌سازی دوبار کلیک در فیلدهای متنی"
@@ -653,9 +644,6 @@
   "export_password_placeholder": {
     "message": "رمز قوی برای محافظت از کلیدهای API ایجاد کنید"
   },
-  "export_password_description": {
-    "message": "<strong>🔒 به‌شدت پیشنهاد می‌شود:</strong> رمز عبوری وارد کنید تا کلیدهای API شما با رمزگذاری نظامی AES-256 محافظت شوند.<br><strong>⚠️ بدون رمز عبور:</strong> کلیدهای API شما به صورت متن ساده صادر شده و برای هرکسی که به فایل دسترسی دارد، قابل مشاهده خواهند بود.<br><strong>📝 به خاطر بسپارید:</strong> هنگام وارد کردن این تنظیمات، به همین رمز عبور نیاز خواهید داشت."
-  },
   "import_settings_label": {
     "message": "بازیابی تنظیمات از فایل"
   },
@@ -667,9 +655,6 @@
   },
   "import_password_placeholder": {
     "message": "رمز عبور مورد استفاده در صادرات را وارد کنید"
-  },
-  "import_password_description": {
-    "message": "<strong>🔐 فایل رمزگذاری شده تشخیص داده شد:</strong> این فایل تنظیمات حاوی کلیدهای API رمزگذاری شده است.<br><strong>🔑 رمز عبور را وارد کنید:</strong> از همان رمز عبوری که هنگام صادرات ایجاد کردید، استفاده کنید.<br><strong>⏎ Enter را فشار دهید:</strong> پس از وارد کردن رمز عبور، Enter را فشار دهید تا وارد کردن انجام شود."
   },
   "security_warning_title": {
     "message": "⚠️ هشدار امنیتی ⚠️"
@@ -730,12 +715,6 @@
   },
   "proxy_test_failed": {
     "message": "اتصال پروکسی ناموفق. تنظیمات را بررسی کنید."
-  },
-  "direct_test_success": {
-    "message": "اتصال مستقیم موفقیت‌آمیز بود!"
-  },
-  "direct_test_failed": {
-    "message": "اتصال مستقیم ناموفق. اتصال اینترنت را بررسی کنید."
   },
   "proxy_test_error": {
     "message": "تست با خطا مواجه شد."
@@ -1022,21 +1001,6 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "ذخیره نشد :("
   },
-  "OPTIONS_STATUS_EXPORT_SUCCESS": {
-    "message": "فایل پشتیبان با موفقیت ایجاد شد."
-  },
-  "OPTIONS_STATUS_EXPORT_FAILED": {
-    "message": "خطا در ایجاد فایل پشتیبان."
-  },
-  "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING": {
-    "message": "تنظیمات با موفقیت بازیابی شد! در حال بارگذاری مجدد..."
-  },
-  "OPTIONS_STATUS_IMPORT_FAILED": {
-    "message": "خطا در بازیابی تنظیمات. فایل نامعتبر است؟"
-  },
-  "OPTIONS_STATUS_LOAD_FAILED": {
-    "message": "خطا در بارگذاری تنظیمات."
-  },
   "browser_api_settings_title": {
     "message": "رابط ترجمه مرورگر"
   },
@@ -1247,14 +1211,8 @@
   "SELECT_ELEMENT_BING_WARNING": {
     "message": "سرویس Bing ممکن است در متن‌های طولانی یا پیچیده دچار مشکل شود. در صورت بروز خطا، از یک سرویس دیگر استفاده کنید."
   },
-  "text_field_shortcut_label": {
-    "message": "میانبر سفارشی:"
-  },
   "click_to_set_shortcut": {
     "message": "برای تنظیم میانبر کلیک کنید"
-  },
-  "text_field_shortcut_description": {
-    "message": "میانبر کیبورد دلخواه خود را برای فعال‌سازی ترجمه در فیلدهای متنی انتخاب کنید."
   },
   "shortcut_recording_title": {
     "message": "میانبر خود را فشار دهید"

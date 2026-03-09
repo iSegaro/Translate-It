@@ -260,12 +260,6 @@
   "target_language_label": {
     "message": "翻訳先言語"
   },
-  "source_language_placeholder": {
-    "message": "翻訳元言語を入力"
-  },
-  "target_language_placeholder": {
-    "message": "翻訳先言語を入力"
-  },
   "help_tab_title": {
     "message": "ヘルプ"
   },
@@ -376,9 +370,6 @@
   },
   "require_ctrl_for_text_selection_label": {
     "message": "テキスト選択翻訳にCtrlキーを必要とする"
-  },
-  "require_ctrl_for_text_selection_description": {
-    "message": "テキスト選択翻訳が有効な場合、Ctrlキーを押しながら選択することで翻訳を呼び出せます。"
   },
   "active_selection_icon_on_textfields_label": {
     "message": "テキストフィールドでのダブルクリックを有効にする"
@@ -653,9 +644,6 @@
   "export_password_placeholder": {
     "message": "APIキーを保護するための強力なパスワードを作成してください"
   },
-  "export_password_description": {
-    "message": "<strong>🔒 強く推奨：</strong>軍用グレードのAES-256暗号化でAPIキーを保護するパスワードを入力してください。<br><strong>⚠️ パスワードなし：</strong>APIキーは平文でエクスポートされ、ファイルにアクセスした人に見られる可能性があります。<br><strong>📝 注意：</strong>設定をインポートする際に同じパスワードが必要です。"
-  },
   "import_settings_label": {
     "message": "設定のインポート"
   },
@@ -667,9 +655,6 @@
   },
   "import_password_placeholder": {
     "message": "エクスポート時に使用したパスワードを入力"
-  },
-  "import_password_description": {
-    "message": "<strong>🔐 暗号化ファイルを検出：</strong>この設定ファイルには暗号化されたAPIキーが含まれています。<br><strong>🔑 パスワードを入力：</strong>エクスポート時に作成したパスワードを使用してください。<br><strong>⏎ Enterキー：</strong>パスワードを入力後、Enterキーを押してインポートします。"
   },
   "security_warning_title": {
     "message": "⚠️ セキュリティ警告 ⚠️"
@@ -730,12 +715,6 @@
   },
   "proxy_test_failed": {
     "message": "プロキシ接続に失敗しました。設定を確認してください。"
-  },
-  "direct_test_success": {
-    "message": "直接接続に成功しました！"
-  },
-  "direct_test_failed": {
-    "message": "直接接続に失敗しました。インターネット接続を確認してください。"
   },
   "proxy_test_error": {
     "message": "エラーが発生しました。"
@@ -1022,21 +1001,6 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "保存に失敗しました :("
   },
-  "OPTIONS_STATUS_EXPORT_SUCCESS": {
-    "message": "設定のエクスポートに成功しました！"
-  },
-  "OPTIONS_STATUS_EXPORT_FAILED": {
-    "message": "設定のエクスポートに失敗しました。"
-  },
-  "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING": {
-    "message": "設定をインポートしました！再読み込み中..."
-  },
-  "OPTIONS_STATUS_IMPORT_FAILED": {
-    "message": "設定のインポートに失敗しました。ファイルが無効な可能性があります。"
-  },
-  "OPTIONS_STATUS_LOAD_FAILED": {
-    "message": "設定の読み込みに失敗しました。"
-  },
   "browser_api_settings_title": {
     "message": "ブラウザ翻訳"
   },
@@ -1247,14 +1211,8 @@
   "SELECT_ELEMENT_BING_WARNING": {
     "message": "Bingは長文や複雑なテキストで問題が生じる場合があります。エラーが発生した場合は別のプロバイダーをお試しください。"
   },
-  "text_field_shortcut_label": {
-    "message": "カスタムショートカット："
-  },
   "click_to_set_shortcut": {
     "message": "クリックしてショートカットを設定"
-  },
-  "text_field_shortcut_description": {
-    "message": "テキストフィールドで翻訳を呼び出すショートカットキーを選択してください。"
   },
   "shortcut_recording_title": {
     "message": "ショートカットを押してください"

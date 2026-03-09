@@ -150,8 +150,6 @@
   "languages_section_title": { "message": "Languages" },
   "source_language_label": { "message": "Source Language" },
   "target_language_label": { "message": "Target Language" },
-  "source_language_placeholder": { "message": "Enter source language" },
-  "target_language_placeholder": { "message": "Enter target language" },
 
   "help_tab_title": { "message": "Help" },
   "about_tab_title": { "message": "What's New" },
@@ -245,9 +243,6 @@
   },
   "require_ctrl_for_text_selection_label": {
     "message": "Require Ctrl key for text selection translation"
-  },
-  "require_ctrl_for_text_selection_description": {
-    "message": "When text selection translation is enabled, require holding Ctrl key during selection to trigger translation."
   },
   "active_selection_icon_on_textfields_label": {
     "message": "Active Double Click on Textfields"
@@ -397,16 +392,10 @@
   "export_settings_button": { "message": "Export Settings" },
   "export_password_label": { "message": "🔐 Export Password (Recommended for Security)" },
   "export_password_placeholder": { "message": "Create a strong password to protect your API keys" },
-  "export_password_description": { 
-    "message": "<strong>🔒 Strongly Recommended:</strong> Enter a password to encrypt your API keys using military-grade AES-256 encryption.<br><strong>⚠️ Without password:</strong> Your API keys will be exported in plain text and visible to anyone who accesses the file.<br><strong>📝 Remember:</strong> You'll need this same password when importing these settings."
-  },
   "import_settings_label": { "message": "Import Settings" },
   "import_settings_button": { "message": "Import Settings" },
   "import_password_label": { "message": "🔑 Import Password Required" },
   "import_password_placeholder": { "message": "Enter the password used during export" },
-  "import_password_description": { 
-    "message": "<strong>🔐 Encrypted File Detected:</strong> This settings file contains encrypted API keys.<br><strong>🔑 Enter Password:</strong> Use the same password you created during export.<br><strong>⏎ Press Enter:</strong> After entering the password, press Enter to import."
-  },
   "security_warning_title": { "message": "⚠️ SECURITY WARNING ⚠️" },
   "security_warning_message": { 
     "message": "You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it's STRONGLY recommended to use a password."
@@ -433,8 +422,6 @@
   "proxy_test_proxy": { "message": "Test Proxy Connection" },
   "proxy_test_success": { "message": "Proxy connection successful!" },
   "proxy_test_failed": { "message": "Proxy connection failed. Check your settings." },
-  "direct_test_success": { "message": "Direct connection successful!" },
-  "direct_test_failed": { "message": "Direct connection failed. Check your internet connection." },
   "proxy_test_error": { "message": "Test failed with an error." },
   "proxy_warning_title": { "message": "Browser Extension Limitation" },
   "proxy_warning_message": { "message": "Browser extensions cannot directly use proxy servers due to security restrictions. This setting configures the intent, but actual proxy usage may require additional setup or may work differently than expected." },
@@ -563,22 +550,6 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "Save failed :("
   },
-  "OPTIONS_STATUS_EXPORT_SUCCESS": {
-    "message": "Settings exported successfully!"
-  },
-  "OPTIONS_STATUS_EXPORT_FAILED": {
-    "message": "Failed to export settings."
-  },
-  "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING": {
-    "message": "Settings imported! Reloading..."
-  },
-  "OPTIONS_STATUS_IMPORT_FAILED": {
-    "message": "Failed to import settings. Invalid file?"
-  },
-  "OPTIONS_STATUS_LOAD_FAILED": {
-    "message": "Failed to load settings."
-  },
-
   "browser_api_settings_title": {"message": "Browser Translation"},
   "browser_api_description": {"message": "Built-in Chrome translation API. Requires Chrome 138+ and works offline."},
   "browser_api_requirements": { "message": "Requirements:" },
@@ -708,9 +679,7 @@
   "SELECT_ELEMENT_REVERT": { "message": "Revert" },
   "SELECT_ELEMENT_BING_WARNING": { "message": "Bing may have issues with long or complex texts. If you encounter errors, try using another provider." },
 
-  "text_field_shortcut_label": { "message": "Custom Shortcut:" },
   "click_to_set_shortcut": { "message": "Click to set shortcut" },
-  "text_field_shortcut_description": { "message": "Choose your preferred keyboard shortcut for triggering translation in text fields." },
   "shortcut_recording_title": { "message": "Press Your Shortcut" },
   "shortcut_recording_instruction": { "message": "Press the keys you want to use for this shortcut." },
   "shortcut_waiting": { "message": "Waiting for keys..." },
