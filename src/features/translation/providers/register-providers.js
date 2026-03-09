@@ -33,6 +33,10 @@ const providerConfigs = {
     importFunction: () => import("./DeepSeek.js").then(m => ({ default: m.DeepSeekProvider })),
     metadata: { id: "deepseek", name: "DeepSeek", type: "ai" }
   },
+  "custom": {
+    importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
+    metadata: { id: "custom", name: "Custom Provider", type: "ai" }
+  },
   "webai": {
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     metadata: { id: "webai", name: "WebAI", type: "ai" }
@@ -52,10 +56,6 @@ const providerConfigs = {
   "browser": {
     importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
     metadata: { id: "browser", name: "Browser API", type: "native" }
-  },
-  "custom": {
-    importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
-    metadata: { id: "custom", name: "Custom Provider", type: "custom" }
   }
 };
 
