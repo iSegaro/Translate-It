@@ -43,12 +43,13 @@ async function getApiProviders() {
 
     for (const provider of availableProviders) {
       // Handle both lazy providers and loaded provider classes
-      let id, name;
+      let id, name, category;
 
       if (provider.isLazy) {
         // This is a lazy provider with metadata
         id = provider.id;
         name = provider.name;
+        category = provider.category || provider.type; // Support both naming conventions
       } else {
         // This is a loaded provider class - should have been filtered out at registry level
         // But we handle it defensively
@@ -99,7 +100,8 @@ async function getApiProviders() {
 
       validProviders.push({
         id: id.toLowerCase(), // Normalize ID to lowercase
-        defaultTitle: name
+        defaultTitle: name,
+        category: category
       });
     }
 
@@ -380,12 +382,28 @@ export class ContextMenuManager extends ResourceTracker {
         const apiProviders = await getApiProviders();
         logger.debug(`📊 [ContextMenuManager] Found ${apiProviders.length} providers`);
 
+        let lastCategory = null;
+        let separatorCount = 0;
+
         for (const provider of apiProviders) {
+          // Add separator if category changes (except for the first provider)
+          if (lastCategory !== null && provider.category && provider.category !== lastCategory) {
+            separatorCount++;
+            await this.createMenu({
+              id: `api-provider-separator-${separatorCount}`,
+              parentId: API_PROVIDER_PARENT_ID,
+              type: "separator",
+              contexts: ["action"],
+            });
+          }
+          
+          lastCategory = provider.category;
+
           await this.createMenu({
             id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
             parentId: API_PROVIDER_PARENT_ID,
             title: provider.defaultTitle,
-            type: "radio",
+            type: "checkbox",
             checked: provider.id === currentApi,
             contexts: ["action"],
           });
