@@ -2,15 +2,15 @@
  * i18n Cleanup Tool
  * This script identifies keys in the English locale that are not referenced in the source code.
  * 
- * Usage: node scripts/cleanup-i18n.cjs [--remove]
+ * Usage: node scripts/check-i18n.cjs [--remove]
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Set base directory to the project root (one level up from /scripts)
-const projectRoot = path.resolve(__dirname, '..');
+// Set base directory to the project root (two levels up from /scripts/localization)
+const projectRoot = path.resolve(__dirname, '..', '..');
 const EN_LOCALE_PATH = path.join(projectRoot, '_locales/en/messages.json');
 
 if (!fs.existsSync(EN_LOCALE_PATH)) {
@@ -57,10 +57,16 @@ for (const key of allKeys) {
   // Search for the key in source files
   try {
     // Search for the key as a string literal
-    const searchDirs = ['src', 'manifest.json', 'html', 'public'];
-    const searchPaths = searchDirs.map(d => path.join(projectRoot, d)).join(' ');
+    const searchDirs = ['src', 'html', 'public', 'config'];
+    const searchPaths = searchDirs
+      .map(d => path.join(projectRoot, d))
+      .filter(p => fs.existsSync(p))
+      .join(' ');
     
-    const command = `grep -r "${key}" ${searchPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true`;
+    const manifestPath = path.join(projectRoot, 'manifest.json');
+    const extraPaths = fs.existsSync(manifestPath) ? manifestPath : '';
+    
+    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true`;
     const result = execSync(command).toString();
     
     if (!result.trim()) {
@@ -88,10 +94,10 @@ if (unusedKeys.length === 0) {
     try {
       execSync(`node ${path.join(projectRoot, 'scripts/sync-i18n.cjs')} --fix`, { stdio: 'inherit' });
     } catch (e) {
-      console.error('❌ Failed to sync after cleanup. Please run sync-i18n.cjs --fix manually.');
+      console.error('❌ Failed to sync after check. Please run sync-i18n.cjs --fix manually.');
     }
   } else {
     console.log('\n💡 Tip: Run with "--remove" flag to automatically delete these keys.');
-    console.log('Example: node scripts/cleanup-i18n.cjs --remove');
+    console.log('Example: node scripts/check-i18n.cjs --remove');
   }
 }

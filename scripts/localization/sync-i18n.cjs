@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOCALES_DIR = path.join(__dirname, '../_locales');
+const LOCALES_DIR = path.join(__dirname, '../../_locales');
 const REFERENCE_LANG = 'en';
 const REFERENCE_FILE = path.join(LOCALES_DIR, REFERENCE_LANG, 'messages.json');
 
