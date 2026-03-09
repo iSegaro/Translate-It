@@ -48,6 +48,7 @@
     "i18n:sync:fix": "node scripts/localization/sync-i18n.cjs --fix",
     "i18n:check": "node scripts/localization/check-i18n.cjs",
     "i18n:check:fix": "node scripts/localization/check-i18n.cjs --remove",
+    "i18n:purge": "node scripts/localization/purge-notes.cjs",
     "lint:styles": "stylelint \"src/assets/styles/**/*.{css,scss}\"",
     "lint:styles:fix": "stylelint \"src/assets/styles/**/*.{css,scss}\" --fix"
   },

@@ -1,14 +1,19 @@
 /**
  * i18n Sync Script - Ensures all language files are consistent with the English reference.
  * 
+ * This script is manifest-driven: it reads supported locales from LocaleManifest.js
+ * and ensures their folders/files exist in _locales/.
+ * 
  * Usage:
- *   node scripts/sync-i18n.cjs [--fix]
+ *   pnpm i18n:sync:fix
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const LOCALES_DIR = path.join(__dirname, '../../_locales');
+const projectRoot = path.resolve(__dirname, '..', '..');
+const LOCALES_DIR = path.join(projectRoot, '_locales');
+const MANIFEST_PATH = path.join(projectRoot, 'src/config/LocaleManifest.js');
 const REFERENCE_LANG = 'en';
 const REFERENCE_FILE = path.join(LOCALES_DIR, REFERENCE_LANG, 'messages.json');
 
@@ -17,6 +22,7 @@ const shouldFix = args.includes('--fix');
 
 function readJson(filePath) {
   try {
+    if (!fs.existsSync(filePath)) return null;
     const content = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(content);
   } catch (error) {
@@ -27,6 +33,10 @@ function readJson(filePath) {
 
 function writeJson(filePath, data) {
   try {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     const content = JSON.stringify(data, null, 2);
     fs.writeFileSync(filePath, content + '\n', 'utf8');
     return true;
@@ -36,24 +46,54 @@ function writeJson(filePath, data) {
   }
 }
 
+/**
+ * Extracts locale codes from the LocaleManifest.js file using regex
+ * to avoid complex ESM imports in a CJS script.
+ */
+function getTargetLocales() {
+  try {
+    const content = fs.readFileSync(MANIFEST_PATH, 'utf8');
+    const matches = content.match(/code:\s*['"]([^'"]+)['"]/g);
+    if (!matches) return [];
+    return matches.map(m => m.match(/['"]([^'"]+)['"]/)[1]).filter(c => c !== REFERENCE_LANG);
+  } catch (error) {
+    console.error('Error reading LocaleManifest.js:', error.message);
+    return [];
+  }
+}
+
 async function sync() {
-  console.log('🌐 Starting i18n Synchronization Check...');
+  console.log('🌐 Starting i18n Synchronization Check (Manifest-Driven)...');
   
   const reference = readJson(REFERENCE_FILE);
-  if (!reference) return;
+  if (!reference) {
+    console.error(`❌ Reference file not found: ${REFERENCE_FILE}`);
+    return;
+  }
 
   const refKeys = Object.keys(reference);
-  const locales = fs.readdirSync(LOCALES_DIR).filter(f => {
-    const stat = fs.statSync(path.join(LOCALES_DIR, f));
-    return stat.isDirectory() && f !== REFERENCE_LANG;
-  });
+  const targetLocales = getTargetLocales();
+
+  if (targetLocales.length === 0) {
+    console.warn('⚠️ No target locales found in LocaleManifest.js');
+  }
 
   let totalIssues = 0;
 
-  for (const locale of locales) {
+  for (const locale of targetLocales) {
     const filePath = path.join(LOCALES_DIR, locale, 'messages.json');
-    const data = readJson(filePath);
-    if (!data) continue;
+    let data = readJson(filePath);
+    
+    if (!data) {
+      if (shouldFix) {
+        console.log(`✨ Creating new locale: [${locale}]`);
+        data = {};
+      } else {
+        console.log(`❌ Locale folder/file missing for [${locale}].`);
+        totalIssues++;
+        continue;
+      }
+    }
 
     console.log(`\nChecking [${locale}]...`);
     
@@ -79,7 +119,7 @@ async function sync() {
       }
     }
 
-    if (shouldFix && (missingKeys.length > 0 || extraKeys.length > 0)) {
+    if (shouldFix && (missingKeys.length > 0 || extraKeys.length > 0 || !fs.existsSync(filePath))) {
       const sortedData = {};
       refKeys.forEach(k => {
         if (data[k]) sortedData[k] = data[k];
@@ -93,11 +133,11 @@ async function sync() {
 
   console.log(`\n--- Summary ---`);
   if (totalIssues === 0) {
-    console.log('✨ All localization files are perfectly in sync!');
+    console.log('✨ All localization files are perfectly in sync with the manifest!');
   } else {
     console.log(`Found issues across languages.`);
     if (!shouldFix) {
-      console.log('💡 Run with --fix to automatically resolve.');
+      console.log('💡 Run "pnpm i18n:sync:fix" to automatically create folders and sync keys.');
     }
   }
 }
