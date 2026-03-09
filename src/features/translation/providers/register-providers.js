@@ -1,13 +1,13 @@
 import { providerRegistry } from "./ProviderRegistry.js";
 
 const providerConfigs = {
-  "google": {
-    importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
-    metadata: { id: "google", name: "Google Translate", type: "translate" }
-  },
   "googlev2": {
     importFunction: () => import("./GoogleTranslateV2Provider.js").then(m => ({ default: m.GoogleTranslateV2Provider })),
-    metadata: { id: "googlev2", name: "Google Translate (Robust)", type: "translate" }
+    metadata: { id: "googlev2", name: "Google Translate", type: "translate" }
+  },
+  "edge": {
+    importFunction: () => import("./MicrosoftEdgeProvider.js").then(m => ({ default: m.MicrosoftEdgeProvider })),
+    metadata: { id: "edge", name: "Microsoft Translator", type: "translate" }
   },
   "deepl": {
     importFunction: () => import("./DeepLTranslate.js").then(m => ({ default: m.DeepLTranslateProvider })),
@@ -37,17 +37,17 @@ const providerConfigs = {
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     metadata: { id: "webai", name: "WebAI", type: "ai" }
   },
-  "bing": {
-    importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
-    metadata: { id: "bing", name: "Bing Translate", type: "translate" }
-  },
-  "edge": {
-    importFunction: () => import("./MicrosoftEdgeProvider.js").then(m => ({ default: m.MicrosoftEdgeProvider })),
-    metadata: { id: "edge", name: "Microsoft Edge", type: "translate" }
+  "google": {
+    importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
+    metadata: { id: "google", name: "Google Translate (Backup)", type: "translate" }
   },
   "lingva": {
     importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
     metadata: { id: "lingva", name: "Lingva", type: "translate" }
+  },
+  "bing": {
+    importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
+    metadata: { id: "bing", name: "Bing Translate", type: "translate" }
   },
   "browser": {
     importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
