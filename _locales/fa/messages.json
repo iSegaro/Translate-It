@@ -863,6 +863,9 @@
   "popup_open_side_panel_title": {
     "message": "پنل کناری"
   },
+  "page_translation_btn_translate": { "message": "ترجمه صفحه" },
+  "page_translation_btn_stop": { "message": "توقف ترجمه" },
+  "page_translation_btn_restore": { "message": "بازگرداندن نسخه اصلی" },
   "api_key_show": {
     "message": "نمایش"
   },
