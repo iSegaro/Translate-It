@@ -308,7 +308,8 @@ export function matchErrorToType(rawOrError = "") {
     (msg.includes("api url") && msg.includes("missing")) ||
     msg.includes("no endpoints found") ||
     msg.includes("no endpoint") ||
-    msg.includes("no endpoints")
+    msg.includes("no endpoints") ||
+    msg.includes("api_url_missing")
   )
     return ErrorTypes.API_URL_MISSING;
   if (
@@ -317,19 +318,21 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("model not found") ||
     msg.includes("model is missing") ||
     msg.includes("model not available") ||
+    msg.includes("model_missing") ||
     msg.includes("is not found for api version") ||
     (msg.includes("the model `") &&
       msg.includes("does not exist or you do not have access to it"))
   )
     return ErrorTypes.MODEL_MISSING;
 
-  if (msg.includes("the model is overloaded") || msg.includes("overloaded"))
+  if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded"))
     return ErrorTypes.MODEL_OVERLOADED;
 
   // Quota with region indicates Gemini-specific quota
   if (
     (msg.includes("quota exceeded") && msg.includes("region")) ||
-    msg.includes("location is not supported")
+    msg.includes("location is not supported") ||
+    msg.includes("gemini_quota_region")
   ) {
     logger.error('Quota exceeded with region, indicating Gemini-specific quota.',  );
     return ErrorTypes.GEMINI_QUOTA_REGION;
@@ -346,7 +349,8 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("insufficient balance") ||
     msg.includes("exceeded your current quota") ||
     msg.includes("check your plan and billing details") ||
-    msg.includes("generativelanguage.googleapis.com")
+    msg.includes("generativelanguage.googleapis.com") ||
+    msg.includes("quota_exceeded")
   )
     return ErrorTypes.QUOTA_EXCEEDED;
 
