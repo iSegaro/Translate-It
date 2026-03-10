@@ -1,6 +1,6 @@
 <!-- PageTranslationButton - Translate/Restore button or text label -->
 <template>
-  <div class="page-translation-controls" :class="{ 'text-only': textOnly }">
+  <div class="page-translation-controls" :class="{ 'text-only': textOnly, 'compact-wrapper': compact }">
     <!-- Progress Bar (shown during translation, only if not textOnly) -->
     <div v-if="showProgress && !textOnly" class="progress-bar" :class="{ compact }">
       <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
@@ -20,7 +20,7 @@
       </a>
       <BaseButton
         v-else
-        variant="secondary"
+        :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canTranslate"
         :title="translateButtonTitle"
         :class="{ 'is-compact-icon': compact }"
@@ -50,7 +50,7 @@
       </a>
       <BaseButton
         v-else
-        variant="primary"
+        :variant="compact ? 'ghost' : 'primary'"
         :title="cancelButtonTitle"
         :class="{ 'is-compact-icon': compact, 'is-active': isAutoTranslating }"
         @click="handleCancelOrStop"
@@ -80,7 +80,7 @@
       </a>
       <BaseButton
         v-else
-        variant="secondary"
+        :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canRestore"
         :title="restoreButtonTitle"
         :class="{ 'is-compact-icon': compact }"
@@ -225,6 +225,11 @@ export default {
   width: 100%;
 }
 
+.page-translation-controls.compact-wrapper {
+  width: auto;
+  gap: 0;
+}
+
 .page-translation-controls.text-only {
   width: auto;
 }
@@ -311,6 +316,7 @@ export default {
 .toolbar-icon {
   width: 20px;
   height: 20px;
+  display: block; /* Avoid baseline gap */
   object-fit: contain;
   opacity: var(--icon-opacity, 0.6);
   filter: var(--icon-filter);
@@ -323,30 +329,38 @@ export default {
 
 .ti-btn.is-active .toolbar-icon {
   opacity: 1;
-  filter: brightness(0) invert(1); /* Make PNG white on primary background */
+  /* Remove the white filter for a more minimal look */
 }
 
 /* Compact Icon Style (Unification) */
 :deep(.is-compact-icon) {
   padding: 4px !important;
+  width: 28px !important;
   min-width: 28px !important;
+  max-width: 28px !important;
   height: 28px !important;
-  background: none !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  background: transparent !important;
   border: none !important;
   border-radius: 4px !important;
   box-shadow: none !important;
-  display: inline-flex !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  transition: all 0.2s ease !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  transform: none !important; /* Prevent BaseButton's translateY(1px) on active */
 }
 
 :deep(.is-compact-icon:hover) {
-  background-color: var(--color-background) !important;
+  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
 }
 
 :deep(.is-compact-icon.is-active) {
-  background-color: var(--color-primary) !important;
-  color: white !important;
+  background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
+  color: var(--color-primary) !important;
 }
 
 :deep(.is-compact-icon:disabled) {
