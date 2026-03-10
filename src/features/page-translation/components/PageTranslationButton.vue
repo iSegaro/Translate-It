@@ -217,7 +217,9 @@ export default {
 };
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use "@/assets/styles/base/mixins" as *;
+
 .page-translation-controls {
   display: flex;
   align-items: center;
@@ -317,6 +319,7 @@ export default {
   width: 20px;
   height: 20px;
   display: block; /* Avoid baseline gap */
+  margin: 0 auto; /* Center icon */
   object-fit: contain;
   opacity: var(--icon-opacity, 0.6);
   filter: var(--icon-filter);
@@ -334,33 +337,18 @@ export default {
 
 /* Compact Icon Style (Unification) */
 :deep(.is-compact-icon) {
-  padding: 4px !important;
-  width: 28px !important;
-  min-width: 28px !important;
-  max-width: 28px !important;
-  height: 28px !important;
-  min-height: 28px !important;
-  max-height: 28px !important;
-  background: transparent !important;
-  border: none !important;
-  border-radius: 4px !important;
-  box-shadow: none !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  transition: all 0.2s ease !important;
-  line-height: 1 !important;
-  margin: 0 !important;
-  transform: none !important; /* Prevent BaseButton's translateY(1px) on active */
-}
+  @include toolbar-button-minimal;
 
-:deep(.is-compact-icon:hover) {
-  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-}
-
-:deep(.is-compact-icon.is-active) {
-  background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
-  color: var(--color-primary) !important;
+  /* Force internal BaseButton content to center */
+  .ti-btn__text {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
 }
 
 :deep(.is-compact-icon:disabled) {

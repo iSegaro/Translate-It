@@ -339,7 +339,9 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use "@/assets/styles/base/mixins" as *;
+
 /* Split Button Styles */
 .ti-split-translate-button-container {
   position: relative;
@@ -464,33 +466,15 @@ onUnmounted(() => {
   top: 0;
   margin-left: 4px;
   margin-top: 0;
-  width: 200px;
-  min-width: 200px;
 }
 
 .ti-provider-icon-button {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
-  }
+  @include toolbar-button-minimal;
 
   &.ti-active {
-    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12));
-
     .ti-provider-icon-only {
       opacity: 1;
-      /* Removed filter: invert(1) to keep original provider colors */
+      filter: none !important; /* Keep original provider colors */
     }
   }
 }

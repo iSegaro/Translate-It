@@ -208,7 +208,7 @@ const handleSettingsClick = async () => {
 </script>
 
 <style lang="scss" scoped>
-@use "@/assets/styles/base/variables" as *;
+@use "@/assets/styles/base/mixins" as *;
 
 .side-toolbar {
   width: 38px;
@@ -240,49 +240,9 @@ const handleSettingsClick = async () => {
 }
 
 .toolbar-button {
-  background: transparent;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  color: var(--color-text);
-
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
-  }
-
-  &.ti-active,
-  &.ti-active:focus,
-  &.ti-active:focus:not(:active) {
-    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
-    color: var(--color-primary) !important;
-
-    .toolbar-icon {
-      opacity: 1;
-      // Filter to make dark icons primary blue (#1976d2)
-      filter: brightness(0) saturate(100%) invert(39%) sepia(85%) saturate(1518%) hue-rotate(193deg) brightness(97%) contrast(92%);
-    }
-  }
-
-  &:not(.ti-active):focus:not(:active) {
-    background-color: transparent;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-
-    &:hover {
-      background-color: transparent;
-    }
-  }
+  @include toolbar-button-minimal;
 }
+
 /* Scoped styles for toolbar icons */
 .toolbar-icon {
   width: 20px;

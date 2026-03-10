@@ -289,7 +289,9 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use "@/assets/styles/base/mixins" as *;
+
 .sidepanel-wrapper {
   display: flex;
   flex-direction: column;
@@ -444,22 +446,7 @@ onUnmounted(() => {
 }
 
 .ti-icon-button {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.ti-icon-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
-  opacity: 1;
+  @include toolbar-button-minimal;
 }
 
 .ti-toolbar-icon {

@@ -1,3 +1,4 @@
+@forward './variables';
 @use './variables' as *;
 @use 'sass:list';
 
@@ -137,6 +138,51 @@
   &:hover:not(:disabled) {
     background-color: var(--color-primary);
     color: white;
+  }
+}
+
+// Minimal Toolbar Button Mixin (Unified Style)
+@mixin toolbar-button-minimal {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  line-height: 1;
+  margin: 0;
+  transform: none;
+
+  &:hover:not(:disabled) {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+    opacity: 1;
+  }
+
+  &.ti-active,
+  &.active {
+    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
+    color: var(--color-primary) !important;
+    
+    img, .toolbar-icon, .ti-toolbar-icon, .ti-provider-icon-only {
+      opacity: 1;
+      /* Filter to make dark icons primary blue (#1976d2) */
+      filter: brightness(0) saturate(100%) invert(39%) sepia(85%) saturate(1518%) hue-rotate(193deg) brightness(97%) contrast(92%);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
