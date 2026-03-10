@@ -200,7 +200,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("authentication fails")
   )
     return ErrorTypes.API_KEY_INVALID;
-  if (msg.includes("api key is missing") || msg.includes("key missing"))
+  if (msg.includes("api key is missing") || msg.includes("key missing") || msg.includes("key_missing") || msg.includes("api_key_missing"))
     return ErrorTypes.API_KEY_MISSING;
 
   // API key validation errors - should trigger failover
@@ -211,6 +211,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("invalid api key") ||
     msg.includes("invalid api key") ||
     msg.includes("api key invalid") ||
+    msg.includes("key_invalid") ||
     msg.includes("pass a valid api key") ||
     msg.includes("api key has expired")
   )

@@ -1,4 +1,5 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import browser from 'webextension-polyfill';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
@@ -27,6 +28,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.abortController = null;
     this.translationMessageId = null;
     this.sessionContext = null;
+    this.isFatalErrorHandling = false;
     
     this.scheduler = new PageTranslationScheduler(this.logger);
     this.bridge = new PageTranslationBridge(this.logger);
@@ -43,7 +45,8 @@ export class PageTranslationManager extends ResourceTracker {
     });
 
     // Listen for fatal errors from scheduler (Circuit Breaker)
-    pageEventBus.on('page-translation-fatal-error', ({ error, errorType }) => this._handleFatalError(error, errorType));
+    pageEventBus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
+      this._handleFatalError(error, errorType, localizedMessage));
   }
 
   async activate() {
@@ -156,6 +159,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.isTranslated = false;
     this.isTranslating = false;
     this.isAutoTranslating = false;
+    this.isFatalErrorHandling = false; // Reset flag
     this.sessionContext = null;
     this.scheduler.reset();
     this.bridge.cleanup();
@@ -200,15 +204,28 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
-  _handleFatalError(error, errorType) {
-    this.logger.info('[CIRCUIT BREAKER] Fatal error. Stopping page translation.');
+  _handleFatalError(error, errorType, localizedMessage = null) {
+    if (this.isFatalErrorHandling) return;
+    this.isFatalErrorHandling = true;
+
+    this.logger.info('[CIRCUIT BREAKER] Fatal error. Stopping page translation.', { errorType });
     this.cancelTranslation();
     
-    const message = browser.i18n.getMessage('error_rate_limit_reached') || 'Rate limit reached.';
-    this.toastIntegration.showError(message, { duration: 10000 });
+    // Get localized message for "Whole-page translation stopped"
+    const stopMessage = browser.i18n.getMessage('ERRORS_PAGE_TRANSLATION_STOPPED') || '$1';
+    
+    // Use the provided localized message from scheduler if available, fallback to error message
+    const displayError = localizedMessage || error.message || String(error);
+    const finalMessage = stopMessage.replace('{error}', displayError).replace('$1', displayError);
+
+    pageEventBus.emit('show-notification', { 
+      message: finalMessage, 
+      type: 'error', 
+      duration: 8000 
+    });
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
-      error: error.message || String(error), 
+      error: displayError, 
       errorType,
       isFatal: true 
     });

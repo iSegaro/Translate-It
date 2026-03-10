@@ -6,6 +6,7 @@ import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
@@ -256,24 +257,47 @@ export class PageTranslationScheduler {
   async _handleBatchError(error, batch) {
     if (this.fatalErrorOccurred) return;
 
-    const errorInfo = await this.errorHandler.handle(error, {
+    // Get error info including localized message and type
+    const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation-batch');
+    const errorType = errorInfo.type;
+
+    const fatalErrorTypes = [
+      ErrorTypes.QUOTA_EXCEEDED, 
+      ErrorTypes.RATE_LIMIT_REACHED, 
+      ErrorTypes.API_KEY_INVALID,
+      ErrorTypes.API_KEY_MISSING,
+      ErrorTypes.API_URL_MISSING,
+      ErrorTypes.MODEL_MISSING,
+      ErrorTypes.INSUFFICIENT_BALANCE,
+      ErrorTypes.FORBIDDEN_ERROR,
+      ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+      ErrorTypes.GEMINI_QUOTA_REGION
+    ];
+
+    const isFatal = fatalErrorTypes.includes(errorType);
+
+    // Handle error via centralized handler
+    // If it's fatal, we suppress the generic toast because the Manager will show a specific one
+    await this.errorHandler.handle(error, {
       context: 'page-translation-batch',
-      showToast: true,
+      showToast: !isFatal,
       silent: false
     });
 
-    const errorType = errorInfo?.type;
-
-    if ([ErrorTypes.QUOTA_EXCEEDED, ErrorTypes.RATE_LIMIT_REACHED, ErrorTypes.API_KEY_INVALID].includes(errorType)) {
+    if (isFatal) {
       this.fatalErrorOccurred = true;
-      pageEventBus.emit('page-translation-fatal-error', { error, errorType });
+      pageEventBus.emit('page-translation-fatal-error', { 
+        error, 
+        errorType, 
+        localizedMessage: errorInfo.message 
+      });
     }
 
     batch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { 
       error: error.message || String(error), 
       errorType, 
-      isFatal: this.fatalErrorOccurred 
+      isFatal: isFatal 
     });
   }
 
