@@ -130,7 +130,7 @@ function formatMessage(component, level, message, data) {
   }
 
   if (data && typeof data === "object") {
-    return [prefix, message, JSON.stringify(data, null, 2)];
+    return [prefix, message, data];
   }
   return [prefix, message, data].filter(Boolean);
 }
