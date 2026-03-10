@@ -479,17 +479,18 @@ onUnmounted(() => {
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   
   &:hover {
-    background-color: var(--color-background);
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
   }
 
   &.ti-active {
-    background-color: var(--color-primary);
+    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12));
 
     .ti-provider-icon-only {
-      filter: invert(1);
+      opacity: 1;
+      /* Removed filter: invert(1) to keep original provider colors */
     }
   }
 }
