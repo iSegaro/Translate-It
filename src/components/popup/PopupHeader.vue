@@ -15,7 +15,7 @@
         :alt="t('popup_select_element_alt_icon') || 'Select Element'"
         :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
-        :class="{ active: isSelectModeActive }"
+        :active="isSelectModeActive"
         @click="handleSelectElement"
       />
       <IconButton
