@@ -274,7 +274,9 @@ export class PageTranslationScheduler {
       ErrorTypes.GEMINI_QUOTA_REGION,
       ErrorTypes.NETWORK_ERROR,
       ErrorTypes.HTTP_ERROR,
-      ErrorTypes.SERVER_ERROR
+      ErrorTypes.SERVER_ERROR,
+      ErrorTypes.INVALID_REQUEST,
+      ErrorTypes.MODEL_OVERLOADED
     ];
 
     const isFatal = fatalErrorTypes.includes(errorType);

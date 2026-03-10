@@ -126,7 +126,13 @@ export class ErrorHandler {
           ErrorTypes.FORBIDDEN_ERROR,
           ErrorTypes.NETWORK_ERROR,
           ErrorTypes.HTTP_ERROR,
-          ErrorTypes.SERVER_ERROR
+          ErrorTypes.SERVER_ERROR,
+          ErrorTypes.QUOTA_EXCEEDED,
+          ErrorTypes.RATE_LIMIT_REACHED,
+          ErrorTypes.MODEL_OVERLOADED,
+          ErrorTypes.INVALID_REQUEST,
+          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+          ErrorTypes.GEMINI_QUOTA_REGION
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
@@ -259,7 +265,13 @@ export class ErrorHandler {
           ErrorTypes.FORBIDDEN_ERROR,
           ErrorTypes.NETWORK_ERROR,
           ErrorTypes.HTTP_ERROR,
-          ErrorTypes.SERVER_ERROR
+          ErrorTypes.SERVER_ERROR,
+          ErrorTypes.QUOTA_EXCEEDED,
+          ErrorTypes.RATE_LIMIT_REACHED,
+          ErrorTypes.MODEL_OVERLOADED,
+          ErrorTypes.INVALID_REQUEST,
+          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+          ErrorTypes.GEMINI_QUOTA_REGION
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
