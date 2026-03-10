@@ -112,11 +112,8 @@ export function usePageTranslation() {
    * Restore original page content
    */
   async function restorePage() {
-    if (isTranslating.value) {
-      return;
-    }
-
-    isTranslating.value = true;
+    // We don't set isTranslating = true here to avoid showing the loading spinner 
+    // during the fast restoration process.
     isAutoTranslating.value = false;
     message.value = 'Restoring original content...';
     error.value = null;
@@ -140,8 +137,6 @@ export function usePageTranslation() {
     } catch {
       error.value = 'Restore failed';
       message.value = 'Restore failed';
-    } finally {
-      isTranslating.value = false;
     }
   }
 
