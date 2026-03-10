@@ -23,6 +23,12 @@
           v-if="isWideLayout"
           class="translate-button-inline"
         >
+          <img
+            :src="browser.runtime.getURL('icons/ui/clear.png')"
+            class="ti-icon-button ti-toolbar-icon inline-clear-btn"
+            :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
+            @click="clearFields"
+          >
           <ProviderSelector
             mode="split"
             :disabled="!canTranslateFromForm"
@@ -37,22 +43,21 @@
         v-if="!isWideLayout"
         class="translate-button-row"
       >
-        <ProviderSelector
-          mode="split"
-          :disabled="!canTranslateFromForm"
-          @translate="handleTranslate"
-          @provider-change="handleProviderChange"
-        />
-      </div>
-
-      <!-- Clear Fields Button -->
-      <div class="clear-fields-row">
         <img
           :src="browser.runtime.getURL('icons/ui/clear.png')"
-          class="ti-icon-button ti-toolbar-icon"
+          class="ti-icon-button ti-toolbar-icon row-clear-btn"
           :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
           @click="clearFields"
         >
+        <div class="center-spacer">
+          <ProviderSelector
+            mode="split"
+            :disabled="!canTranslateFromForm"
+            @translate="handleTranslate"
+            @provider-change="handleProviderChange"
+          />
+        </div>
+        <div class="end-spacer" />
       </div>
     </div>
 
@@ -116,6 +121,7 @@ import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import browser from 'webextension-polyfill'
+
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
@@ -151,7 +157,7 @@ const canTranslateFromForm = ref(false)
 // Responsive layout management for Translate button placement
 const languageControlsRef = ref(null)
 const isWideLayout = ref(false)
-const WIDE_LAYOUT_THRESHOLD = 470 // Minimum width for horizontal layout with Translate button
+const WIDE_LAYOUT_THRESHOLD = 510 // Minimum width for horizontal layout with Translate button and Clear Fields button
 
 // Resize observer for responsive layout
 let resizeObserver = null
@@ -315,8 +321,15 @@ onUnmounted(() => {
 }
 
 .language-controls--wide .translate-button-inline {
-  flex: 0 0 auto;
+  flex: 1;
   margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.language-controls--wide .inline-clear-btn {
+  margin-right: auto;
 }
 
 .language-controls--wide .translate-button-inline :deep(.provider-selector) {
@@ -396,7 +409,6 @@ onUnmounted(() => {
 
 .translate-button-row {
   display: flex;
-  justify-content: center;
   align-items: center;
   width: 100%;
   position: relative;
@@ -404,21 +416,21 @@ onUnmounted(() => {
   min-height: 40px;
   box-sizing: border-box;
   margin-top: 8px;
+  padding: 0 8px;
+}
+
+.center-spacer {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.end-spacer {
+  width: 20px; /* Same as clear button width to keep Translate perfectly centered */
 }
 
 .translate-button-row :deep(.provider-selector) {
   min-width: auto;
-}
-
-.clear-fields-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  position: relative;
-  z-index: 5;
-  padding: 8px 0;
-  border-top: 1px solid var(--color-border);
 }
 
 .ti-icon-button {
@@ -432,8 +444,8 @@ onUnmounted(() => {
 }
 
 .ti-toolbar-icon {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   opacity: var(--icon-opacity, 0.6);
 }
 
