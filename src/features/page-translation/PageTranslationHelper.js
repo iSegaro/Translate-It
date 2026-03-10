@@ -25,28 +25,34 @@ export class PageTranslationHelper {
 
   /**
    * Deeply clean all translation-related markers from the DOM.
-   * This is crucial for allowing re-translation.
+   * This is crucial for allowing re-translation and clean restoration.
    */
   static deepCleanDOM() {
-    console.log('[Helper] 🧹 Performing deep DOM cleanup...');
-    
-    // 1. Remove our own markers
-    const ourMarkers = document.querySelectorAll('[data-page-translated], [data-translate-dir]');
-    ourMarkers.forEach(el => {
+    // 1. Remove our own markers and direction attributes from all elements
+    const elementsWithDir = document.querySelectorAll('[data-page-translated], [data-translate-dir], [dir]');
+    elementsWithDir.forEach(el => {
       el.removeAttribute('data-page-translated');
       el.removeAttribute('data-translate-dir');
-      el.removeAttribute('dir');
+      
+      // Only remove 'dir' if we were the ones who set it
+      if (el.hasAttribute('data-translate-dir')) {
+        el.removeAttribute('dir');
+      }
     });
 
-    // 2. Remove ANY attribute starting with data- (risky but we can limit it)
-    // Actually, domtranslator uses internal symbols mostly, 
-    // but some versions use hidden attributes.
+    // 2. Specific reset for common containers
+    const containers = ['html', 'body', 'main', 'article', 'section'];
+    containers.forEach(tag => {
+      const el = document.querySelector(tag);
+      if (el) {
+        el.removeAttribute('data-page-translated');
+        el.removeAttribute('data-translate-dir');
+      }
+    });
     
-    // 3. Reset any direction changes on the body/html
+    // 3. Reset any direction changes on the root elements
     document.documentElement.removeAttribute('dir');
     document.body.removeAttribute('dir');
-    
-    console.log('[Helper] ✅ Deep cleanup finished');
   }
 
   static isInViewportWithMargin(node, margin) {

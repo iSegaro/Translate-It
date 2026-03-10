@@ -9,7 +9,7 @@ import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 
 // Internal components
 import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { PageTranslationBatcher } from './PageTranslationBatcher.js';
+import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { PageTranslationBridge } from './PageTranslationBridge.js';
 
 export class PageTranslationManager extends ResourceTracker {
@@ -28,12 +28,12 @@ export class PageTranslationManager extends ResourceTracker {
     this.translationMessageId = null;
     this.sessionContext = null;
     
-    this.batcher = new PageTranslationBatcher(this.logger);
+    this.scheduler = new PageTranslationScheduler(this.logger);
     this.bridge = new PageTranslationBridge(this.logger);
 
     this.settings = {};
     
-    // Listen for progress from batcher and forward to background
+    // Listen for progress from scheduler and forward to background
     pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
@@ -42,7 +42,7 @@ export class PageTranslationManager extends ResourceTracker {
       }).catch(() => {});
     });
 
-    // Listen for fatal errors from batcher (Circuit Breaker)
+    // Listen for fatal errors from scheduler (Circuit Breaker)
     pageEventBus.on('page-translation-fatal-error', ({ error, errorType }) => this._handleFatalError(error, errorType));
   }
 
@@ -51,7 +51,7 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       await this.toastIntegration.initialize();
       await this._loadSettings();
-      this.batcher.setSettings(this.settings);
+      this.scheduler.setSettings(this.settings);
       
       this.isActive = true;
       this.logger.init('PageTranslationManager activated');
@@ -68,14 +68,14 @@ export class PageTranslationManager extends ResourceTracker {
     this.isActive = false;
   }
 
-  async translatePage() {
-    // 1. Check for URL change first in SPAs
+  async translatePage(options = {}) {
+    // 1. Check for URL change - ALWAYS reset for a clean slate in SPAs
     if (this.currentUrl !== window.location.href) {
       this.resetLocalState();
       this.currentUrl = window.location.href;
     }
 
-    if (this.isTranslating || this.isTranslated) return { success: false, reason: 'busy_or_done' };
+    if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: 'busy_or_done' };
     if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: 'not_suitable' };
 
     this.isTranslating = true;
@@ -87,13 +87,13 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
       
       await this._loadSettings();
-      this.batcher.setSettings(this.settings);
-      this.batcher.setTranslationState(true, this.translationMessageId, this.sessionContext);
+      this.scheduler.setSettings(this.settings);
+      this.scheduler.setTranslationState(true, this.translationMessageId, this.sessionContext);
 
       // Initialize bridge with fresh context and standard callback
       await this.bridge.initialize(
         this.settings, 
-        (text, context) => this.batcher.enqueue(text, context),
+        (text, context, score) => this.scheduler.enqueue(text, context, score),
         this.sessionContext
       );
       
@@ -102,13 +102,14 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = true;
       this.isTranslating = false;
       
-      if (this.settings.autoTranslateOnDOMChanges) {
+      // Force auto-translating if requested or if setting is enabled
+      if (this.settings.autoTranslateOnDOMChanges || options.isAuto) {
         this.isAutoTranslating = true;
       }
       
       const resultData = { 
         url: this.currentUrl, 
-        translatedCount: this.batcher.translatedCount,
+        translatedCount: this.scheduler.translatedCount,
         isAutoTranslating: this.isAutoTranslating,
         isTranslated: this.isTranslated
       };
@@ -128,7 +129,7 @@ export class PageTranslationManager extends ResourceTracker {
     this._cleanupSession();
     try {
       // 1. First stop batcher to prevent loop during library's restore
-      this.batcher.setTranslationState(false);
+      this.scheduler.setTranslationState(false);
       this.isTranslated = false;
       this.isAutoTranslating = false;
 
@@ -156,7 +157,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.isTranslating = false;
     this.isAutoTranslating = false;
     this.sessionContext = null;
-    this.batcher.reset();
+    this.scheduler.reset();
     this.bridge.cleanup();
   }
 
@@ -173,11 +174,11 @@ export class PageTranslationManager extends ResourceTracker {
       
       // Notify batcher to stop and clear any pending timers/queues
       // This stops the background loop but we keep the manager's isTranslated=true
-      this.batcher.setTranslationState(false);
+      this.scheduler.setTranslationState(false);
 
       const resultData = {
         url: this.currentUrl, 
-        translatedCount: this.batcher.translatedCount,
+        translatedCount: this.scheduler.translatedCount,
         isTranslated: true, // Tell background/UI we are still in translated state
         isAutoTranslating: false
       };
@@ -246,10 +247,9 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   getStatus() {
-    // Check for URL change on every status request
+    // We no longer reset on URL change here because the background script 
+    // and translatePage(isAuto) handle the state transition across navigations.
     if (this.currentUrl && this.currentUrl !== window.location.href) {
-      this.logger.debug('URL change detected in getStatus, resetting status');
-      this.resetLocalState();
       this.currentUrl = window.location.href;
     }
 
@@ -258,7 +258,7 @@ export class PageTranslationManager extends ResourceTracker {
       isTranslating: this.isTranslating,
       isTranslated: this.isTranslated,
       isAutoTranslating: this.isAutoTranslating,
-      translatedCount: this.batcher.translatedCount,
+      translatedCount: this.scheduler.translatedCount,
       currentUrl: this.currentUrl,
       settings: this.settings,
     };
@@ -269,7 +269,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.isTranslated) await this.restorePage();
     this.isAutoTranslating = false;
     this.bridge.cleanup();
-    this.batcher.reset();
+    this.scheduler.reset();
     if (this.toastIntegration) {
       this.toastIntegration.shutdown();
     }

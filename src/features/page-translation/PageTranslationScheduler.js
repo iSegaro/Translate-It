@@ -1,4 +1,3 @@
-import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
@@ -7,15 +6,18 @@ import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { RTL_LANGUAGES, TEXT_TAGS, DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
+import { DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
 
-export class PageTranslationBatcher {
+/**
+ * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
+ * Handles batching, prioritization (Viewport first), and fault tolerance.
+ */
+export class PageTranslationScheduler {
   constructor(logger) {
     this.logger = logger;
-    this.queue = [];
+    this.queue = []; // Tasks: { text, score, resolve, reject, context }
     this.batchTimer = null;
     this.translatedCount = 0;
     this.activeFlushes = 0;
@@ -24,8 +26,13 @@ export class PageTranslationBatcher {
     this.isTranslated = false;
     this.translationSessionId = null;
     this.sessionContext = null;
+    this.errorHandler = ErrorHandler.getInstance();
     
-    this.settings = { ...DEFAULT_PAGE_TRANSLATION_SETTINGS };
+    this.settings = { 
+      ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
+      poolDelay: 150, // Time to wait for collecting more items (AnyLang style)
+      priorityThreshold: 1, // Any score >= this is considered high priority (Viewport)
+    };
   }
 
   setSettings(settings) {
@@ -69,47 +76,75 @@ export class PageTranslationBatcher {
   }
 
   /**
-   * Pure enqueue without node tracking.
-   * Rely on domtranslator's internal scheduling for efficiency.
+   * Enqueue a text for translation with a given priority (score).
+   * @param {string} text - Text to translate
+   * @param {any} context - Session context validation
+   * @param {number} score - Priority score from domtranslator (greater = more important)
    */
-  async enqueue(text, context = null) {
-    // If context is provided, it must match the current session context
-    if (context && context !== this.sessionContext) {
-      return text;
-    }
-
-    if (!this.isTranslated || this.fatalErrorOccurred || !text || !text.trim()) {
-      return text;
-    }
-    
-    if (!PageTranslationHelper.shouldTranslate(text)) {
-      return text;
-    }
+  async enqueue(text, context = null, score = 0) {
+    // 1. Session & State Validation
+    if (context && context !== this.sessionContext) return text;
+    if (!this.isTranslated || this.fatalErrorOccurred || !text || !text.trim()) return text;
+    if (!PageTranslationHelper.shouldTranslate(text)) return text;
 
     return new Promise((resolve, reject) => {
-      this.queue.push({ text: text.trim(), resolve, reject, context });
+      this.queue.push({ 
+        text: text.trim(), 
+        score: score || 0, 
+        resolve, 
+        reject, 
+        context 
+      });
 
-      if (this.queue.length >= this.settings.chunkSize) {
-        this.flush();
-      } else {
-        if (this.batchTimer) clearTimeout(this.batchTimer);
-        const debounceDelay = this.isFirstBatch ? 800 : 2000;
-        this.batchTimer = setTimeout(() => this.flush(), debounceDelay);
-      }
+      this._scheduleFlush(score);
     });
+  }
+
+  /**
+   * Smart scheduling based on priority.
+   * High priority (Viewport) triggers faster flushes.
+   */
+  _scheduleFlush(score) {
+    if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) return;
+
+    const isHighPriority = score >= this.settings.priorityThreshold;
+    
+    // If we have a full chunk, flush immediately
+    if (this.queue.length >= this.settings.chunkSize) {
+      this.flush();
+      return;
+    }
+
+    // Adaptive delay: 
+    // - Very first batch is slightly delayed to collect initial content.
+    // - High priority items (Viewport) trigger faster processing (50ms).
+    // - Low priority items use the standard pool delay (150ms-300ms).
+    const delay = this.isFirstBatch ? 500 : (isHighPriority ? 50 : this.settings.poolDelay);
+
+    if (this.batchTimer) {
+      // If a high-priority item comes in, we might want to speed up the existing timer
+      if (isHighPriority && this.batchTimerDelay > 100) {
+        clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+      } else {
+        return; // Already scheduled
+      }
+    }
+
+    this.batchTimerDelay = delay;
+    this.batchTimer = setTimeout(() => this.flush(), delay);
   }
 
   async flush() {
     if (!this.isTranslated || this.queue.length === 0) {
-      if (!this.isTranslated && this.queue.length > 0) {
-        this.stop(); // Ensure cleanup if we have items but are not translating
-      }
+      if (!this.isTranslated && this.queue.length > 0) this.stop();
       return;
     }
     
+    // Respect concurrency limits
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       if (!this.batchTimer && this.isTranslated) {
-        this.batchTimer = setTimeout(() => this.flush(), 500);
+        this.batchTimer = setTimeout(() => this.flush(), 200);
       }
       return;
     }
@@ -124,17 +159,24 @@ export class PageTranslationBatcher {
     let currentBatch = [];
 
     try {
-      // RE-CHECK: Ensure we are still translating before starting heavy work
       if (!this.isTranslated) return;
 
       const config = await this._getBatchConfig();
-      // ... rest of the code logic remains similar but with more checks ...
+      
+      // 1. Sort queue by score (DESC) to ensure high priority items are picked first
+      this.queue.sort((a, b) => b.score - a.score);
+
+      // 2. Select items for this batch
       let itemsToProcess = 0;
       let currentChars = 0;
       for (const item of this.queue) {
         if (item.context && item.context !== flushContext) break;
         const itemLen = item.text.length;
-        if (itemsToProcess >= config.chunkSize || (currentChars + itemLen > config.maxChars && itemsToProcess > 0)) break;
+        
+        // Respect chunk size and character limits
+        if (itemsToProcess >= config.chunkSize) break;
+        if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
+        
         currentChars += itemLen;
         itemsToProcess++;
       }
@@ -162,14 +204,10 @@ export class PageTranslationBatcher {
         MessageContexts.CONTENT
       );
 
-      // FINAL CHECK: Before making the network call
-      if (!this.isTranslated) {
-        throw new Error('Session stopped');
-      }
+      if (!this.isTranslated) throw new Error('Session stopped');
 
-      const result = await sendRegularMessage(batchMessage, { timeout: 60000 });
+      const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
 
-      // After async call, verify context still matches
       if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
         throw new Error('Session changed or stopped');
       }
@@ -185,19 +223,16 @@ export class PageTranslationBatcher {
 
       this._reportProgress();
     } catch (error) {
-      if (error.message !== 'Session changed or stopped' && error.message !== 'Session stopped') {
-        this._handleBatchError(error, currentBatch);
+      const msg = error.message;
+      if (msg !== 'Session changed or stopped' && msg !== 'Session stopped') {
+        await this._handleBatchError(error, currentBatch);
       } else {
         currentBatch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
       }
     } finally {
       this.activeFlushes--;
       if (this.queue.length > 0 && this.isTranslated) {
-        if (this.batchTimer) clearTimeout(this.batchTimer);
-        this.batchTimer = setTimeout(() => this.flush(), 50);
-      } else if (!this.isTranslated && this.queue.length > 0) {
-        // Force cleanup of leftover items if session stopped while processing
-        this.stop();
+        this.flush(); // Immediate subsequent flush for remaining items
       }
     }
   }
@@ -218,22 +253,28 @@ export class PageTranslationBatcher {
     };
   }
 
-  _handleBatchError(error, batch) {
+  async _handleBatchError(error, batch) {
     if (this.fatalErrorOccurred) return;
-    const errorType = matchErrorToType(error);
-    if ([ErrorTypes.QUOTA_EXCEEDED, ErrorTypes.RATE_LIMIT_REACHED].includes(errorType)) {
+
+    const errorInfo = await this.errorHandler.handle(error, {
+      context: 'page-translation-batch',
+      showToast: true,
+      silent: false
+    });
+
+    const errorType = errorInfo?.type;
+
+    if ([ErrorTypes.QUOTA_EXCEEDED, ErrorTypes.RATE_LIMIT_REACHED, ErrorTypes.API_KEY_INVALID].includes(errorType)) {
       this.fatalErrorOccurred = true;
       pageEventBus.emit('page-translation-fatal-error', { error, errorType });
-    } else {
-      ErrorHandler.getInstance().handle(error, {
-        type: ErrorTypes.PAGE_TRANSLATION_STOPPED,
-        context: 'page-translation',
-        showToast: true,
-        duration: NOTIFICATION_TIME.ERROR
-      });
     }
+
     batch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { error: error.message || String(error), errorType, isFatal: false });
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { 
+      error: error.message || String(error), 
+      errorType, 
+      isFatal: this.fatalErrorOccurred 
+    });
   }
 
   _reportProgress() {

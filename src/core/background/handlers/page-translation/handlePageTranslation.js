@@ -7,16 +7,40 @@ import { unifiedTranslationService } from '@/core/services/translation/UnifiedTr
 
 const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'handlePageTranslation');
 
+// Registry to track which tabs have auto-translation active
+// Map<tabId, { targetLanguage: string, settings: object }>
+const autoTranslateRegistry = new Map();
+
 /**
  * Handle page translation related messages
  */
 export async function handlePageTranslation(message, sender) {
   try {
-    logger.debug('Handling page translation message:', message.action);
+    const tabId = sender?.tab?.id;
 
     // Handle batch translation request via UnifiedTranslationService
     if (message.action === MessageActions.PAGE_TRANSLATE_BATCH) {
       return await unifiedTranslationService.handleTranslationRequest(message, sender);
+    }
+
+    // Capture state change: Start Auto-Translation
+    if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE && message.data?.isAutoTranslating) {
+      if (tabId) {
+        autoTranslateRegistry.set(tabId, { 
+          active: true, 
+          url: message.data.url,
+          timestamp: Date.now()
+        });
+        logger.debug(`Tab ${tabId} added to auto-translate registry`);
+      }
+    }
+
+    // Capture state change: Stop/Restore Auto-Translation
+    if (message.action === MessageActions.PAGE_RESTORE_COMPLETE || message.action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
+      if (tabId) {
+        autoTranslateRegistry.delete(tabId);
+        logger.debug(`Tab ${tabId} removed from auto-translate registry`);
+      }
     }
 
     // Actions that are events originating from content script and need to be broadcasted
@@ -32,8 +56,6 @@ export async function handlePageTranslation(message, sender) {
     ];
 
     if (eventActions.includes(message.action)) {
-      logger.debug('Broadcasting page translation event:', message.action);
-      // Re-broadcast to all extension views (Sidepanel, Popup, etc.)
       browser.runtime.sendMessage(message).catch(() => {});
       return { success: true };
     }
@@ -122,4 +144,47 @@ export async function handlePageTranslation(message, sender) {
     logger.error('Error handling page translation message:', error);
     return { success: false, error: error.message };
   }
+}
+
+// Handle navigation events to persistent auto-translation across same-tab link clicks
+if (typeof browser !== 'undefined' && browser.webNavigation) {
+  browser.webNavigation.onCommitted.addListener((details) => {
+    // Only care about top-level navigation
+    if (details.frameId !== 0) return;
+
+    const tabId = details.tabId;
+    const transitionType = details.transitionType;
+
+    // Check if this tab was auto-translating
+    if (autoTranslateRegistry.has(tabId)) {
+      // 1. If it's a RELOAD or manual TYPED entry -> STOP translation as per user requirement
+      if (transitionType === 'reload' || transitionType === 'typed') {
+        logger.debug(`Stopping auto-translation for tab ${tabId} due to ${transitionType}`);
+        autoTranslateRegistry.delete(tabId);
+        return;
+      }
+
+      // 2. If it's a LINK click or FORM_SUBMIT -> CONTINUE translation
+      const allowedPersistence = ['link', 'form_submit', 'auto_bookmark', 'manual_subframe'];
+      if (allowedPersistence.includes(transitionType)) {
+        logger.debug(`Persisting auto-translation for tab ${tabId} on navigation (${transitionType})`);
+        
+        // Wait for page to load a bit before sending translate message
+        setTimeout(() => {
+          browser.tabs.sendMessage(tabId, { action: MessageActions.PAGE_TRANSLATE, data: { isAuto: true } })
+            .catch(() => {
+              // If fails (page not ready), try once more after 2 seconds
+              setTimeout(() => {
+                browser.tabs.sendMessage(tabId, { action: MessageActions.PAGE_TRANSLATE, data: { isAuto: true } }).catch(() => {});
+              }, 2000);
+            });
+        }, 1000);
+      }
+    }
+  });
+
+  // Cleanup on tab closure
+  browser.tabs.onRemoved.addListener((tabId) => {
+    autoTranslateRegistry.delete(tabId);
+  });
 }

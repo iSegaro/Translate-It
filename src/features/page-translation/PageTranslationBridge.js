@@ -26,19 +26,41 @@ export class PageTranslationBridge {
       currentSession.intersectionScheduler = new IntersectionScheduler({ rootMargin: settings.rootMargin });
     }
 
-    // Standard translator callback with context
-    const translateWithContext = async (text) => {
-      return onTranslateCallback(text, sessionContext);
+    // Standard translator callback with context, priority score, and direction application
+    const translateWithContext = async (text, score, node) => {
+      // In domtranslator callback, the second arg is score, third is node (optional)
+      const translated = await onTranslateCallback(text, sessionContext, score);
+      
+      // Post-process: Apply RTL direction if needed
+      if (translated && node && node.nodeType === Node.TEXT_NODE) {
+        const parent = node.parentElement;
+        if (parent) {
+          parent.setAttribute('data-page-translated', 'true');
+          
+          // Basic heuristic for RTL detection (can be expanded)
+          const isRTL = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(translated);
+          if (isRTL) {
+            parent.setAttribute('dir', 'rtl');
+            parent.setAttribute('data-translate-dir', 'rtl');
+          }
+        }
+      }
+      
+      return translated;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);
+    const filter = createNodesFilter({
+      ignoredSelectors: settings.excludedSelectors || ['script', 'style', 'noscript', 'code', 'pre', '[data-translate-ignore]'],
+      attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
+    });
+
+    currentSession.nodesTranslator = nodesTranslator;
+    currentSession.filter = filter;
 
     currentSession.domTranslator = new DOMTranslator(nodesTranslator, {
       scheduler: currentSession.intersectionScheduler,
-      filter: createNodesFilter({
-        ignoredSelectors: settings.excludedSelectors || ['script', 'style', 'noscript', 'code', 'pre', '[data-translate-ignore]'],
-        attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
-      })
+      filter: filter
     });
 
     // We always wrap in PersistentDOMTranslator to handle dynamic content consistently

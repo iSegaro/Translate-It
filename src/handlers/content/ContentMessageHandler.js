@@ -669,8 +669,8 @@ export class ContentMessageHandler extends ResourceTracker {
         await this.pageTranslationManager.activate();
       }
 
-      // Execute page translation
-      const result = await this.pageTranslationManager.translatePage();
+      // Execute page translation - PASS message.data to support options like { isAuto: true }
+      const result = await this.pageTranslationManager.translatePage(message.data || {});
 
       this.logger.info('Page translation completed', {
         translatedCount: result.translatedCount,
@@ -727,6 +727,14 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async handlePageGetStatus() {
     this.logger.debug('Page translation status request received');
+
+    if (!this.pageTranslationManager) {
+      try {
+        const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        const manager = await loadFeature('pageTranslation');
+        if (manager) this.setPageTranslationManager(manager);
+      } catch { /* ignore and return inactive status */ }
+    }
 
     if (!this.pageTranslationManager) {
       return { 
