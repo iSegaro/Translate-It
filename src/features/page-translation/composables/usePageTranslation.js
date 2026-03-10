@@ -65,14 +65,15 @@ export function usePageTranslation() {
 
   /**
    * Translate the current page
+   * @param {Object} data Optional data to pass to the translation message (e.g. { isAuto: true })
    */
-  async function translatePage() {
+  async function translatePage(data = {}) {
     if (isTranslating.value) {
       return;
     }
 
     isTranslating.value = true;
-    isAutoTranslating.value = false;
+    isAutoTranslating.value = data.isAuto || false;
     progress.value = 0;
     message.value = 'Starting translation...';
     error.value = null;
@@ -80,6 +81,7 @@ export function usePageTranslation() {
     try {
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE,
+        data: data,
         context: 'page-translation-ui',
       });
 

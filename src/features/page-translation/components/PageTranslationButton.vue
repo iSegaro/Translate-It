@@ -20,7 +20,7 @@
       </a>
       <BaseButton
         v-else
-        :variant="compact ? 'secondary' : 'primary'"
+        variant="secondary"
         :disabled="!canTranslate"
         :title="translateButtonTitle"
         :class="{ 'is-compact-icon': compact }"
@@ -43,18 +43,26 @@
         v-if="textOnly"
         href="#"
         class="toolbar-link loading"
+        :class="{ 'is-active': isAutoTranslating }"
         @click.prevent="handleCancelOrStop"
       >
         {{ t('page_translation_btn_stop') || 'Stop Translating' }}
       </a>
       <BaseButton
         v-else
-        variant="secondary"
+        variant="primary"
         :title="cancelButtonTitle"
-        :class="{ 'is-compact-icon': compact }"
+        :class="{ 'is-compact-icon': compact, 'is-active': isAutoTranslating }"
         @click="handleCancelOrStop"
       >
-        <LoadingSpinner size="sm" />
+        <LoadingSpinner v-if="isTranslating || isAutoTranslating" size="sm" variant="neutral" />
+        <img
+          v-if="compact && !isTranslating && !isAutoTranslating"
+          :src="browser.runtime.getURL('icons/ui/whole-page.png')"
+          class="toolbar-icon"
+          alt="Stop"
+        >
+        <Icon v-else-if="!compact && !isTranslating && !isAutoTranslating" icon="fa6-solid:language" />
         <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
       </BaseButton>
     </template>
@@ -184,7 +192,8 @@ const restoreButtonTitle = computed(() => {
 // Actions
 const handleTranslate = () => {
   if (!canTranslate.value) return;
-  translatePage();
+  // User wants auto-translation enabled immediately on click
+  translatePage({ isAuto: true });
 };
 
 const handleCancelOrStop = () => {
@@ -293,6 +302,12 @@ export default {
   color: var(--color-warning, #f39c12);
 }
 
+.toolbar-link.is-active {
+  color: var(--color-primary);
+  background-color: var(--toolbar-link-hover-bg-color);
+  font-weight: 600;
+}
+
 .toolbar-icon {
   width: 20px;
   height: 20px;
@@ -304,6 +319,11 @@ export default {
 
 .ti-btn:hover .toolbar-icon {
   opacity: var(--icon-hover-opacity, 1);
+}
+
+.ti-btn.is-active .toolbar-icon {
+  opacity: 1;
+  filter: brightness(0) invert(1); /* Make PNG white on primary background */
 }
 
 /* Compact Icon Style (Unification) */
@@ -322,6 +342,11 @@ export default {
 
 :deep(.is-compact-icon:hover) {
   background-color: var(--color-background) !important;
+}
+
+:deep(.is-compact-icon.is-active) {
+  background-color: var(--color-primary) !important;
+  color: white !important;
 }
 
 :deep(.is-compact-icon:disabled) {

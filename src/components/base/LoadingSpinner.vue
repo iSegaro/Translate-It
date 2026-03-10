@@ -80,7 +80,10 @@ defineProps({
 }
 
 .variant-neutral .spinner {
-  border-top-color: var(--color-text);
+  border-top-color: currentColor;
+  border-left-color: rgba(255, 255, 255, 0.1);
+  border-right-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 @keyframes spin {
