@@ -882,7 +882,7 @@
     "message": "اینجا بنویسید..."
   },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
-    "message": "معنی ترجمه"
+    "message": "ترجمه اینجا نمایش داده می‌شود"
   },
   "SIDEPANEL_SELECT_ELEMENT_MESSAGE": {
     "message": "روی المان‌ها در صفحه وب کلیک کنید تا ترجمه شوند..."
@@ -1521,7 +1521,7 @@
     "message": "در حال بارگذاری..."
   },
   "window_translation_placeholder": {
-    "message": "ترجمه اینجا نمایش داده می‌شود..."
+    "message": "ترجمه اینجا نمایش داده می‌شود"
   },
   "error_prefix": {
     "message": "خطا"
