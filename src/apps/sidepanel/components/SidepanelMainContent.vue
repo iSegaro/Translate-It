@@ -23,12 +23,17 @@
           v-if="isWideLayout"
           class="translate-button-inline"
         >
-          <img
-            :src="browser.runtime.getURL('icons/ui/clear.png')"
-            class="ti-icon-button ti-toolbar-icon inline-clear-btn"
+          <button
+            class="ti-icon-button inline-clear-btn"
             :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
             @click="clearFields"
           >
+            <img
+              :src="browser.runtime.getURL('icons/ui/clear.png')"
+              class="ti-toolbar-icon"
+              alt="Clear"
+            >
+          </button>
           <ProviderSelector
             mode="split"
             :disabled="!canTranslateFromForm"
@@ -43,12 +48,17 @@
         v-if="!isWideLayout"
         class="translate-button-row"
       >
-        <img
-          :src="browser.runtime.getURL('icons/ui/clear.png')"
-          class="ti-icon-button ti-toolbar-icon row-clear-btn"
+        <button
+          class="ti-icon-button row-clear-btn"
           :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
           @click="clearFields"
         >
+          <img
+            :src="browser.runtime.getURL('icons/ui/clear.png')"
+            class="ti-toolbar-icon"
+            alt="Clear"
+          >
+        </button>
         <div class="center-spacer">
           <ProviderSelector
             mode="split"
@@ -434,19 +444,34 @@ onUnmounted(() => {
 }
 
 .ti-icon-button {
+  background: transparent;
+  border: none;
+  padding: 0;
   cursor: pointer;
-  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
-  filter: var(--icon-filter);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
 .ti-icon-button:hover {
-  opacity: var(--icon-hover-opacity);
+  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+  opacity: 1;
 }
 
 .ti-toolbar-icon {
   width: 16px;
   height: 16px;
   opacity: var(--icon-opacity, 0.6);
+  filter: var(--icon-filter);
+  transition: opacity 0.2s ease-in-out;
+}
+
+.ti-icon-button:hover .ti-toolbar-icon {
+  opacity: var(--icon-hover-opacity, 1);
 }
 
 @keyframes spin {
