@@ -1,14 +1,7 @@
 <template>
   <div class="header-toolbar">
     <div class="toolbar-left-group">
-      <a
-        id="translatePageLink"
-        class="toolbar-link"
-        :title="t('popup_translate_page_link_title') || 'ترجمه این صفحه در تب جدید'"
-        @click="handleTranslatePage"
-      >
-        {{ t('popup_translate_page_link') || 'ترجمه این صفحه' }}
-      </a>
+      <PageTranslationButton textOnly />
     </div>
     <div class="toolbar-right-group">
       <IconButton
@@ -71,6 +64,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
+import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -102,26 +96,6 @@ const { t } = useUnifiedI18n()
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
 
 // Methods
-const handleTranslatePage = async () => {
-  logger.debug('🌐 Translate Page button clicked!')
-  try {
-    const [activeTab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-    
-    if (activeTab) {
-      const googleTranslateUrl = `https://translate.google.com/translate?sl=auto&tl=${encodeURIComponent(settingsStore.settings.TARGET_LANGUAGE)}&u=${encodeURIComponent(activeTab.url)}`
-      logger.debug('🌐 Opening Google Translate for page:', activeTab.url)
-      await browser.tabs.create({ url: googleTranslateUrl })
-      window.close()
-    }
-  } catch (error) {
-    logger.error('Failed to translate page:', error)
-    await handleError(error, 'PopupHeader-translatePage')
-  }
-}
-
 const handleSelectElement = async () => {
   logger.debug('Select Element button clicked!')
   

@@ -1,49 +1,81 @@
-<!-- PageTranslationButton - Translate/Restore button with progress indicator -->
+<!-- PageTranslationButton - Translate/Restore button or text label -->
 <template>
-  <div class="page-translation-controls">
-    <!-- Progress Bar (shown during translation) -->
-    <div v-if="showProgress" class="progress-bar" :class="{ compact }">
+  <div class="page-translation-controls" :class="{ 'text-only': textOnly }">
+    <!-- Progress Bar (shown during translation, only if not textOnly) -->
+    <div v-if="showProgress && !textOnly" class="progress-bar" :class="{ compact }">
       <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
       <span class="progress-text">{{ progressText }}</span>
     </div>
 
-    <!-- Translate Button -->
-    <BaseButton
-      v-if="!isTranslated && !isTranslating && !isAutoTranslating"
-      :variant="compact ? 'secondary' : 'primary'"
-      :disabled="!canTranslate"
-      :title="translateButtonTitle"
-      @click="handleTranslate"
-    >
-      <Icon icon="fa6-solid:language" />
-      <span v-if="!compact">{{ translateButtonText }}</span>
-    </BaseButton>
+    <!-- State: Not Translated -->
+    <template v-if="!isTranslated && !isTranslating && !isAutoTranslating">
+      <a
+        v-if="textOnly"
+        href="#"
+        class="toolbar-link"
+        :class="{ disabled: !canTranslate }"
+        @click.prevent="handleTranslate"
+      >
+        {{ t('page_translation_btn_translate') || 'Translate Page' }}
+      </a>
+      <BaseButton
+        v-else
+        :variant="compact ? 'secondary' : 'primary'"
+        :disabled="!canTranslate"
+        :title="translateButtonTitle"
+        @click="handleTranslate"
+      >
+        <Icon icon="fa6-solid:language" />
+        <span v-if="!compact">{{ translateButtonText }}</span>
+      </BaseButton>
+    </template>
 
-    <!-- Translating or Auto-Translating State (with Spinner) -->
-    <BaseButton
-      v-if="isTranslating || isAutoTranslating"
-      variant="secondary"
-      :title="cancelButtonTitle"
-      @click="handleCancelOrStop"
-    >
-      <LoadingSpinner size="sm" />
-      <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
-    </BaseButton>
+    <!-- State: Translating or Auto-Translating -->
+    <template v-if="isTranslating || isAutoTranslating">
+      <a
+        v-if="textOnly"
+        href="#"
+        class="toolbar-link loading"
+        @click.prevent="handleCancelOrStop"
+      >
+        {{ t('page_translation_btn_stop') || 'Stop Translating' }}
+      </a>
+      <BaseButton
+        v-else
+        variant="secondary"
+        :title="cancelButtonTitle"
+        @click="handleCancelOrStop"
+      >
+        <LoadingSpinner size="sm" />
+        <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
+      </BaseButton>
+    </template>
 
-    <!-- Restore Button -->
-    <BaseButton
-      v-if="isTranslated && !isTranslating && !isAutoTranslating"
-      variant="secondary"
-      :disabled="!canRestore"
-      :title="restoreButtonTitle"
-      @click="handleRestore"
-    >
-      <Icon icon="fa6-solid:rotate-left" />
-      <span v-if="!compact">{{ restoreButtonText }}</span>
-    </BaseButton>
+    <!-- State: Translated -->
+    <template v-if="isTranslated && !isTranslating && !isAutoTranslating">
+      <a
+        v-if="textOnly"
+        href="#"
+        class="toolbar-link"
+        :class="{ disabled: !canRestore }"
+        @click.prevent="handleRestore"
+      >
+        {{ t('page_translation_btn_restore') || 'Restore Original' }}
+      </a>
+      <BaseButton
+        v-else
+        variant="secondary"
+        :disabled="!canRestore"
+        :title="restoreButtonTitle"
+        @click="handleRestore"
+      >
+        <Icon icon="fa6-solid:rotate-left" />
+        <span v-if="!compact">{{ restoreButtonText }}</span>
+      </BaseButton>
+    </template>
 
     <!-- Error State -->
-    <div v-if="hasError && !compact" class="error-message">
+    <div v-if="hasError && !compact && !textOnly" class="error-message">
       {{ message }}
     </div>
   </div>
@@ -55,13 +87,20 @@ import BaseButton from '@/components/base/BaseButton.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { Icon } from '@iconify/vue';
 import { usePageTranslation } from '../composables/usePageTranslation.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const props = defineProps({
   compact: {
     type: Boolean,
     default: false,
   },
+  textOnly: {
+    type: Boolean,
+    default: false,
+  }
 });
+
+const { t } = useUnifiedI18n();
 
 const {
   isTranslating,
@@ -91,23 +130,20 @@ const progressText = computed(() => {
 });
 
 const translateButtonText = computed(() => {
-  if (props.compact) return 'Translate';
-  return 'Translate Page';
+  if (props.compact) return t('popup_translate_button_text') || 'Translate';
+  return t('page_translation_btn_translate') || 'Translate Page';
 });
 
 const translatingText = computed(() => {
-  if (props.compact) return 'Translating...';
-  return 'Translating...';
+  return t('popup_string_during_translate') || 'Translating...';
 });
 
 const autoTranslatingText = computed(() => {
-  if (props.compact) return 'Auto Translating...';
-  return 'Auto Translating...';
+  return t('page_translation_btn_stop') || 'Stop Translating';
 });
 
 const restoreButtonText = computed(() => {
-  if (props.compact) return 'Restore';
-  return 'Restore Original';
+  return t('page_translation_btn_restore') || 'Restore Original';
 });
 
 const translateButtonTitle = computed(() => {
@@ -131,6 +167,7 @@ const restoreButtonTitle = computed(() => {
 
 // Actions
 const handleTranslate = () => {
+  if (!canTranslate.value) return;
   translatePage();
 };
 
@@ -143,7 +180,15 @@ const handleCancelOrStop = () => {
 };
 
 const handleRestore = () => {
+  if (!canRestore.value) return;
   restorePage();
+};
+</script>
+
+<script>
+// For recursive or named access if needed
+export default {
+  name: 'PageTranslationButton'
 };
 </script>
 
@@ -153,6 +198,10 @@ const handleRestore = () => {
   align-items: center;
   gap: 8px;
   width: 100%;
+}
+
+.page-translation-controls.text-only {
+  width: auto;
 }
 
 .progress-bar {
@@ -194,5 +243,37 @@ const handleRestore = () => {
   padding: 4px 8px;
   background: var(--color-error-bg, #fee);
   border-radius: 4px;
+}
+
+/* Toolbar link style to match PopupHeader */
+.toolbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--toolbar-link-color);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: var(--icon-opacity);
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  background-color: transparent;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.toolbar-link:hover {
+  opacity: var(--icon-hover-opacity);
+  background-color: var(--toolbar-link-hover-bg-color);
+}
+
+.toolbar-link.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.toolbar-link.loading {
+  color: var(--color-warning, #f39c12);
 }
 </style>
