@@ -23,9 +23,16 @@
         :variant="compact ? 'secondary' : 'primary'"
         :disabled="!canTranslate"
         :title="translateButtonTitle"
+        :class="{ 'is-compact-icon': compact }"
         @click="handleTranslate"
       >
-        <Icon icon="fa6-solid:language" />
+        <img
+          v-if="compact"
+          :src="browser.runtime.getURL('icons/ui/whole-page.png')"
+          class="toolbar-icon"
+          alt="Translate"
+        >
+        <Icon v-else icon="fa6-solid:language" />
         <span v-if="!compact">{{ translateButtonText }}</span>
       </BaseButton>
     </template>
@@ -44,6 +51,7 @@
         v-else
         variant="secondary"
         :title="cancelButtonTitle"
+        :class="{ 'is-compact-icon': compact }"
         @click="handleCancelOrStop"
       >
         <LoadingSpinner size="sm" />
@@ -67,9 +75,16 @@
         variant="secondary"
         :disabled="!canRestore"
         :title="restoreButtonTitle"
+        :class="{ 'is-compact-icon': compact }"
         @click="handleRestore"
       >
-        <Icon icon="fa6-solid:rotate-left" />
+        <img
+          v-if="compact"
+          :src="browser.runtime.getURL('icons/ui/revert.png')"
+          class="toolbar-icon"
+          alt="Restore"
+        >
+        <Icon v-else icon="fa6-solid:rotate-left" />
         <span v-if="!compact">{{ restoreButtonText }}</span>
       </BaseButton>
     </template>
@@ -88,6 +103,7 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { Icon } from '@iconify/vue';
 import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import browser from 'webextension-polyfill';
 
 const props = defineProps({
   compact: {
@@ -275,5 +291,41 @@ export default {
 
 .toolbar-link.loading {
   color: var(--color-warning, #f39c12);
+}
+
+.toolbar-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  opacity: var(--icon-opacity, 0.6);
+  filter: var(--icon-filter);
+  transition: opacity 0.2s ease-in-out;
+}
+
+.ti-btn:hover .toolbar-icon {
+  opacity: var(--icon-hover-opacity, 1);
+}
+
+/* Compact Icon Style (Unification) */
+:deep(.is-compact-icon) {
+  padding: 4px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  background: none !important;
+  border: none !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+:deep(.is-compact-icon:hover) {
+  background-color: var(--color-background) !important;
+}
+
+:deep(.is-compact-icon:disabled) {
+  opacity: 0.5 !important;
+  background: none !important;
 }
 </style>

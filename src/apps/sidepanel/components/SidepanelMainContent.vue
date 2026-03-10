@@ -45,9 +45,14 @@
         />
       </div>
 
-      <!-- Page Translation Button -->
-      <div class="page-translation-row">
-        <PageTranslationButton :compact="true" />
+      <!-- Clear Fields Button -->
+      <div class="clear-fields-row">
+        <img
+          :src="browser.runtime.getURL('icons/ui/clear.png')"
+          class="ti-icon-button ti-toolbar-icon"
+          :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
+          @click="clearFields"
+        >
       </div>
     </div>
 
@@ -110,8 +115,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
-import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
-
+import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
@@ -406,7 +410,7 @@ onUnmounted(() => {
   min-width: auto;
 }
 
-.page-translation-row {
+.clear-fields-row {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -415,6 +419,22 @@ onUnmounted(() => {
   z-index: 5;
   padding: 8px 0;
   border-top: 1px solid var(--color-border);
+}
+
+.ti-icon-button {
+  cursor: pointer;
+  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
+  filter: var(--icon-filter);
+}
+
+.ti-icon-button:hover {
+  opacity: var(--icon-hover-opacity);
+}
+
+.ti-toolbar-icon {
+  width: 20px;
+  height: 20px;
+  opacity: var(--icon-opacity, 0.6);
 }
 
 @keyframes spin {

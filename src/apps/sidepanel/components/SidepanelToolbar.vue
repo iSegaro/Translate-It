@@ -31,20 +31,11 @@
           class="toolbar-icon"
         >
       </button>
-      <button
-        id="clearFieldsBtn"
-        class="toolbar-button"
-        :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON')"
-        @click="handleClearFields"
-        @keydown.enter.prevent="handleClearFields"
-        @keydown.space.prevent="handleClearFields"
-      >
-        <img
-          :src="clearIcon"
-          alt="Clear Fields"
-          class="toolbar-icon"
-        >
-      </button>
+
+      <!-- Page Translation Button -->
+      <div class="toolbar-page-translation">
+        <PageTranslationButton compact />
+      </div>
 
       <div class="toolbar-separator" />
 
@@ -107,9 +98,9 @@ const getLogger = () => {
 };
 
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
+import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
 
 const props = defineProps({
   isHistoryVisible: {
@@ -119,7 +110,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['historyToggle', 'clear-fields'])
+const emit = defineEmits(['historyToggle'])
 
 // Resource tracker for automatic cleanup
 
@@ -133,7 +124,6 @@ const { handleError } = useErrorHandler()
 // Icon URLs using runtime.getURL
 const selectIcon = browser.runtime.getURL('icons/ui/select.png')
 const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
-const clearIcon = browser.runtime.getURL('icons/ui/clear.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 
 const handleSelectElement = async () => {
@@ -192,12 +182,6 @@ const handleRevertAction = async () => {
     getLogger().error('[SidepanelToolbar] Unexpected error in handleRevertAction:', error)
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
   }
-}
-
-const handleClearFields = () => {
-  getLogger().debug('🧹 Clear Fields button clicked!')
-  emit('clear-fields')
-  showVisualFeedback(document.getElementById('clearFieldsBtn'), 'success')
 }
 
 const handleProviderChange = (provider) => {
@@ -303,6 +287,14 @@ const handleSettingsClick = async () => {
   height: 1px;
   background-color: var(--color-border);
   margin: $spacing-xs 0;
+}
+
+.toolbar-page-translation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
 }
 </style>
 
