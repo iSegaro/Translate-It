@@ -312,14 +312,10 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (response.success === false) {
-      // Debug logging to understand response structure
-      getLogger().debug('Response with success=false received:', {
-        response,
-        responseKeys: Object.keys(response),
-        hasError: !!response.error,
-        hasMessage: !!response.message,
-        errorType: typeof response.error,
-        messageType: typeof response.message
+      // Simplified logging to avoid console noise from large partialResults
+      getLogger().debug(`Response with success=false received for ${message.action}:`, {
+        error: response.error?.message || response.error || 'Unknown error',
+        hasPartialResults: !!response.partialResults
       });
 
       // Import tabPermissions utilities to check for restricted pages
@@ -335,9 +331,16 @@ export async function sendRegularMessage(message, options = {}) {
       const errorMessage = response.error?.message || response.message || response.error || 'An unknown error occurred';
       const error = new Error(errorMessage);
 
-      // Copy all response properties to error object for error matching
-      Object.assign(error, response.error || {});
-      Object.assign(error, response);
+      // Copy essential response properties to error object for error matching
+      // Avoid copying large objects like partialResults directly if possible
+      if (response.error && typeof response.error === 'object') {
+        Object.keys(response.error).forEach(key => {
+          if (key !== 'partialResults') error[key] = response.error[key];
+        });
+      }
+      Object.keys(response).forEach(key => {
+        if (key !== 'partialResults' && key !== 'error') error[key] = response[key];
+      });
 
       throw error;
     }
@@ -352,10 +355,9 @@ export async function sendRegularMessage(message, options = {}) {
     
     const errorType = matchErrorToType(error);
 
-    // Debug log to see what error type is detected
+    // Simplified debug log
     getLogger().debug(`Error type detected: ${errorType} for message: ${message.action}`, {
-      errorMessage: error.message,
-      errorObject: error
+      errorMessage: error.message
     });
 
     // Handle different error types with appropriate logging levels
