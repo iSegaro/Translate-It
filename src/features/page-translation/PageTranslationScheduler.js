@@ -271,7 +271,10 @@ export class PageTranslationScheduler {
       ErrorTypes.INSUFFICIENT_BALANCE,
       ErrorTypes.FORBIDDEN_ERROR,
       ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-      ErrorTypes.GEMINI_QUOTA_REGION
+      ErrorTypes.GEMINI_QUOTA_REGION,
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.HTTP_ERROR,
+      ErrorTypes.SERVER_ERROR
     ];
 
     const isFatal = fatalErrorTypes.includes(errorType);
