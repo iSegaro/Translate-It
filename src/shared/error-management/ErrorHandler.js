@@ -123,7 +123,10 @@ export class ErrorHandler {
           ErrorTypes.API_URL_MISSING,
           ErrorTypes.MODEL_MISSING,
           ErrorTypes.INSUFFICIENT_BALANCE,
-          ErrorTypes.FORBIDDEN_ERROR, // 403 errors typically indicate auth/permission issues
+          ErrorTypes.FORBIDDEN_ERROR,
+          ErrorTypes.NETWORK_ERROR,
+          ErrorTypes.HTTP_ERROR,
+          ErrorTypes.SERVER_ERROR
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
@@ -253,7 +256,10 @@ export class ErrorHandler {
           ErrorTypes.API_URL_MISSING,
           ErrorTypes.MODEL_MISSING,
           ErrorTypes.INSUFFICIENT_BALANCE,
-          ErrorTypes.FORBIDDEN_ERROR, // 403 errors typically indicate auth/permission issues
+          ErrorTypes.FORBIDDEN_ERROR,
+          ErrorTypes.NETWORK_ERROR,
+          ErrorTypes.HTTP_ERROR,
+          ErrorTypes.SERVER_ERROR
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
