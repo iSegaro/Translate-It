@@ -828,7 +828,7 @@
     "message": "クリップボードから貼り付け"
   },
   "popup_target_text_placeholder": {
-    "message": "翻訳結果がここに表示されます..."
+    "message": "翻訳結果がここに表示されます"
   },
   "popup_source_text_placeholder": {
     "message": "テキストを入力..."
@@ -882,7 +882,7 @@
     "message": "入力..."
   },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
-    "message": "翻訳結果がここに表示されます..."
+    "message": "翻訳結果がここに表示されます"
   },
   "SIDEPANEL_SELECT_ELEMENT_MESSAGE": {
     "message": "ウェブページ上の翻訳したい要素をクリックしてください..."

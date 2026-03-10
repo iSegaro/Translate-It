@@ -32,7 +32,7 @@
       :target-language="currentTargetLanguage"
       :is-loading="isTranslating"
       :error="translationError"
-      :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here...'"
+      :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here'"
       :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه'"
       :copy-alt="t('popup_copy_target_alt_icon') || 'Copy Result'"
       :tts-title="t('popup_voice_target_title_icon') || 'خواندن متن مقصد'"
