@@ -1119,7 +1119,7 @@
     "message": "زبان‌های انتخابی توسط Chrome Translation API پشتیبانی نمی‌شود. لطفاً سرویس ترجمه یا ترکیب زبانی دیگری انتخاب کنید."
   },
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
-    "message": "ترجمه کل صفحه متوقف شد: {error}"
+    "message": "{error}"
   },
   "gemini_thinking_label": {
     "message": "فعال‌سازی حالت تفکر"

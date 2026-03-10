@@ -1119,7 +1119,7 @@
     "message": "選択した言語の組み合わせはChrome翻訳APIに対応していません。別の翻訳サービスまたは言語の組み合わせをお試しください。"
   },
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
-    "message": "ページ全体の翻訳が停止しました: {error}"
+    "message": "{error}"
   },
   "gemini_thinking_label": {
     "message": "思考モードを有効にする"
