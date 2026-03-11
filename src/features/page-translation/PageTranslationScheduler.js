@@ -58,8 +58,23 @@ export class PageTranslationScheduler {
   }
 
   stop() {
+    const wasTranslating = this.isTranslated;
     this.isTranslated = false;
     this.sessionContext = null;
+    
+    // CRITICAL: Notify background to abort any pending batch for this session
+    if (wasTranslating && this.translationSessionId) {
+      const { sendRegularMessage } = import('@/shared/messaging/core/UnifiedMessaging.js').then(({ sendRegularMessage }) => {
+        sendRegularMessage({
+          action: MessageActions.CANCEL_TRANSLATION,
+          data: { 
+            messageId: this.translationSessionId,
+            reason: 'user_stopped_page_translation'
+          }
+        }).catch(() => {});
+      });
+    }
+
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
       this.batchTimer = null;
