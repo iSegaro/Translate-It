@@ -40,6 +40,8 @@ export function useWindowsManager() {
       position: detail.position,
       theme: detail.theme || 'light',
       isError: detail.isError || false,
+      canRetry: detail.canRetry || false,
+      needsSettings: detail.needsSettings || false,
       isLoading: detail.isLoading || false,
       initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal'),
       targetLanguage: detail.targetLanguage || detail.to || 'auto' // Add target language support

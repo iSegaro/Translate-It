@@ -265,7 +265,7 @@ export class ErrorHandler {
         // These errors have specific, user-friendly messages that should always be shown
         // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
         const shouldUseGenericMessage = [
-          ErrorTypes.API,
+          ErrorTypes.BROWSER_API_UNAVAILABLE,
           ErrorTypes.API_KEY_MISSING,
           ErrorTypes.API_KEY_INVALID,
           ErrorTypes.API_URL_MISSING,

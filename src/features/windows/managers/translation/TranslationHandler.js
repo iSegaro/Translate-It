@@ -70,19 +70,26 @@ export class TranslationHandler {
       this.logger.debug("Sending translation request", payload);
 
       // Send translation request using reliable messenger (retries + port fallback)
-      const ackOrResult = await sendMessage({
-        action: MessageActions.TRANSLATE,
-        context: 'content',
-        messageId: messageId,
-        data: {
-          text: payload.text,
-          provider: payload.provider,
-          sourceLanguage: payload.from,
-          targetLanguage: payload.to,
-          mode: payload.mode,
-          options: payload.options
-        }
-      })
+      let ackOrResult;
+      try {
+        ackOrResult = await sendMessage({
+          action: MessageActions.TRANSLATE,
+          context: 'content',
+          messageId: messageId,
+          data: {
+            text: payload.text,
+            provider: payload.provider,
+            sourceLanguage: payload.from,
+            targetLanguage: payload.to,
+            mode: payload.mode,
+            options: payload.options
+          }
+        });
+      } catch (sendError) {
+        this.logger.error("sendMessage failed:", sendError);
+        this._cleanupRequest(messageId);
+        throw sendError;
+      }
 
       // Check if sendMessage returned the complete result directly
       this.logger.debug("sendMessage returned:", ackOrResult);
@@ -91,12 +98,7 @@ export class TranslationHandler {
         // Direct result from sendMessage - use it immediately
         this.logger.operation("Translation completed successfully (direct result)");
         
-        // Clean up the timeout and pending request
-        const request = this.activeRequests.get(messageId);
-        if (request && request.timeout) {
-          clearTimeout(request.timeout);
-        }
-        this.activeRequests.delete(messageId);
+        this._cleanupRequest(messageId);
         
         return { 
           translatedText: ackOrResult.translatedText,
@@ -111,22 +113,19 @@ export class TranslationHandler {
         // Check for error in port fallback result
         if (final.success === false && final.error) {
           this.logger.debug("Port fallback detected error, will be handled by WindowsManager:", final.error);
+          this._cleanupRequest(messageId);
           const errorMessage = final.error.message || final.error || 'Translation failed';
           throw new Error(errorMessage);
         }
         
         if (!final || !final.translatedText) {
           this.logger.error("Port fallback result has no translatedText:", final);
+          this._cleanupRequest(messageId);
           throw new Error('Translation failed: No translated text received')
         }
         this.logger.operation("Translation completed successfully (via port fallback)");
         
-        // Clean up the timeout and pending request
-        const request = this.activeRequests.get(messageId);
-        if (request && request.timeout) {
-          clearTimeout(request.timeout);
-        }
-        this.activeRequests.delete(messageId);
+        this._cleanupRequest(messageId);
         
         return { translatedText: final.translatedText }
       }
@@ -155,9 +154,25 @@ export class TranslationHandler {
         // Preserve the specific error message from resultPromise
         this.logger.error("resultPromise was rejected with error:", resultError.message);
         this.logger.debug("Full error object:", resultError);
+        this._cleanupRequest(messageId);
         throw resultError; // Re-throw the original error from messageListener
       }
 
+  }
+
+  /**
+   * Helper to clean up an active request
+   * @private
+   */
+  _cleanupRequest(messageId) {
+    const request = this.activeRequests.get(messageId);
+    if (request) {
+      if (request.timeout) {
+        clearTimeout(request.timeout);
+      }
+      this.activeRequests.delete(messageId);
+      this.logger.debug(`Cleaned up request: ${messageId}`);
+    }
   }
 
   /**
@@ -204,8 +219,7 @@ export class TranslationHandler {
     const request = this.activeRequests.get(messageId);
     if (!request) return;
 
-    clearTimeout(request.timeout);
-    this.activeRequests.delete(messageId);
+    this._cleanupRequest(messageId);
     
     // Instead of rejecting with an error, resolve with a cancellation marker
     // This prevents uncaught promise rejection errors in the console
@@ -228,9 +242,7 @@ export class TranslationHandler {
     }
 
     this.logger.operation("Message matched! Processing translation result");
-    clearTimeout(request.timeout);
-    this.activeRequests.delete(messageId);
-
+    
     // Check for error first - error can be in data.error or directly in data
     if (message.data?.error || (message.data?.type && message.data?.message)) {
       this.logger.debug("Error detected in central handler, rejecting promise with error");
@@ -248,10 +260,13 @@ export class TranslationHandler {
         });
       }
 
+      this._cleanupRequest(messageId);
       request.reject(error);
       return true;
     } else if (message.data?.translatedText) {
       this.logger.operation("Translation success received");
+      
+      this._cleanupRequest(messageId);
       request.resolve({
         translatedText: message.data.translatedText,
         targetLanguage: message.data.targetLanguage
@@ -272,6 +287,7 @@ export class TranslationHandler {
         });
       }
 
+      this._cleanupRequest(messageId);
       request.reject(error);
       return true;
     }

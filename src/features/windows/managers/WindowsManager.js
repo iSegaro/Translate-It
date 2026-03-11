@@ -156,11 +156,18 @@ export class WindowsManager extends ResourceTracker {
       this._iconClickHandler = (payload) => {
         this._handleIconClickFromVue(payload);
       };
+      this._speakRequestHandler = this._handleSpeakRequest.bind(this);
+      this._retryRequestHandler = this._handleRetryRequest.bind(this);
       
       // Remove any existing listener first to prevent duplicates
       this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
       this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
-      this.pageEventBus.on('translation-window-speak', this._handleSpeakRequest.bind(this));
+      
+      this.pageEventBus.off('translation-window-speak', this._speakRequestHandler);
+      this.pageEventBus.on('translation-window-speak', this._speakRequestHandler);
+      
+      this.pageEventBus.off('translation-window-retry', this._retryRequestHandler);
+      this.pageEventBus.on('translation-window-retry', this._retryRequestHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
@@ -543,6 +550,58 @@ export class WindowsManager extends ResourceTracker {
   }
 
   /**
+   * Handle translation retry request from translation window
+   * @private
+   */
+  async _handleRetryRequest(detail) {
+    this.logger.info('Retry request received from translation window', detail);
+    
+    const windowId = detail.id || this.state.activeWindowId;
+    const textToTranslate = detail.text || this.state.originalText;
+
+    if (!windowId || !textToTranslate) {
+      this.logger.warn('Cannot retry: missing windowId or textToTranslate');
+      return;
+    }
+
+    // Set loading state in window
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true,
+      isError: false,
+      initialTranslatedText: ''
+    });
+
+    try {
+      const translationResult = await this._startTranslationProcess(textToTranslate);
+
+      if (!translationResult) {
+        this.logger.info('Retry translation cancelled by user');
+        return;
+      }
+
+      // Update window with result
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isError: false,
+        initialTranslatedText: translationResult.translatedText
+      });
+      
+    } catch (error) {
+      this.logger.error('Error during translation retry:', error);
+      
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');
+      
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isError: true,
+        canRetry: errorInfo.canRetry,
+        needsSettings: errorInfo.needsSettings,
+        initialTranslatedText: errorInfo.message
+      });
+    }
+  }
+
+  /**
    * Show translation window with two-phase loading
    */
   async _showWindow(selectedText, position) {
@@ -639,9 +698,13 @@ export class WindowsManager extends ResourceTracker {
       
       // Use ErrorHandler to get user-friendly error message
       let userFriendlyMessage;
+      let canRetry = false;
+      let needsSettings = false;
       try {
         const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
         userFriendlyMessage = errorInfo.message;
+        canRetry = errorInfo.canRetry;
+        needsSettings = errorInfo.needsSettings;
       } catch (handlerError) {
         this.logger.warn('Failed to get user-friendly error message, using fallback:', handlerError);
         // Fallback to original extraction logic
@@ -659,6 +722,8 @@ export class WindowsManager extends ResourceTracker {
         initialSize: 'normal',
         isLoading: false,
         isError: true,
+        canRetry,
+        needsSettings,
         initialTranslatedText: userFriendlyMessage
       });
     }
@@ -1104,7 +1169,7 @@ export class WindowsManager extends ResourceTracker {
    * Handle icon click event from the Vue UI Host
    * @param {object} detail - Event detail containing { id, text, position }
    */
-  _handleIconClickFromVue(detail) {
+  async _handleIconClickFromVue(detail) {
     this.logger.info('Icon click event received from UI Host', {
       id: detail?.id,
       processing: this.state.isProcessing,
@@ -1180,7 +1245,7 @@ export class WindowsManager extends ResourceTracker {
 
     // Show the translation window
     this.logger.info('Calling _showWindow', { textLength: text?.length });
-    this._showWindow(text, position);
+    await this._showWindow(text, position);
 
     // Reset flags after processing - don't reset immediately, let setTimeout handle it
     setTimeout(() => {

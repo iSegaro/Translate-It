@@ -143,8 +143,10 @@
         :show-toolbar="false"
         :show-copy-button="false"
         :show-tts-button="false"
-        :can-retry="!!errorMessage"
+        :can-retry="props.canRetry"
+        :can-open-settings="props.needsSettings"
         :on-retry="handleRetry"
+        :on-open-settings="handleOpenSettings"
         class="ti-window-translation-display"
       />
     </div>
@@ -173,6 +175,9 @@ const props = defineProps({
   initialTranslatedText: { type: String, default: '' },
   theme: { type: String, default: 'light' },
   isLoading: { type: Boolean, default: false },
+  isError: { type: Boolean, default: false },
+  canRetry: { type: Boolean, default: false },
+  needsSettings: { type: Boolean, default: false },
   initialSize: { type: String, default: 'normal' }, // 'small' or 'normal'
   targetLanguage: { type: String, default: 'auto' } // Add target language prop
 });
@@ -191,10 +196,11 @@ const tracker = useResourceTracker(`translation-window-${props.id}`);
 
 // State
 const isLoading = computed(() => {
-  const loading = props.isLoading || !props.initialTranslatedText;
+  const loading = props.isLoading || (!props.initialTranslatedText && !props.isError);
   logger.debug('Loading state:', {
     propsIsLoading: props.isLoading,
     hasInitialText: !!props.initialTranslatedText,
+    isError: props.isError,
     initialTextLength: props.initialTranslatedText?.length || 0,
     computed: loading
   });
@@ -203,9 +209,9 @@ const isLoading = computed(() => {
 
 const isVisible = ref(false); // Start as not visible
 const currentSize = ref(props.initialSize); // Track current size
-const translatedText = computed(() => props.initialTranslatedText);
+const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
-const errorMessage = ref('');
+const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
 const isSpeaking = computed(() => tts.ttsState.value === 'playing');
 
 // Enhanced TTS mode detection and smart text selection
@@ -260,6 +266,12 @@ const translatedTextTTSIcon = "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5
 const handleRetry = () => {
   // Emit retry event or perform retry logic
   logger.info('Retry requested for translation window:', props.id);
+  pageEventBus.emit('translation-window-retry', { id: props.id });
+};
+
+const handleOpenSettings = () => {
+  logger.info('Open settings requested for translation window:', props.id);
+  pageEventBus.emit('open-options-page', { section: 'api' });
 };
 const showOriginal = ref(false);
 
