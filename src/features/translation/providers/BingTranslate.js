@@ -23,7 +23,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
   static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING;
-  static CHUNK_SIZE = 15; // Reduced from 25 to avoid API limits
+  static CHUNK_SIZE = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING; 
 
   // BaseTranslateProvider capabilities
   static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.BING;
@@ -97,29 +97,44 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         throw new Error('Translation cancelled by user');
       }
 
-    const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+      const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
       
       const sl = this._getLangCode(sourceLang);
       const tl = this._getLangCode(targetLang);
 
-      // Additional size validation
-      if (textToTranslate.length > this.constructor.characterLimit * 2) {
-        logger.info(`[Bing] Text too long (${textToTranslate.length} chars), may cause API error`);
-        // Try to split by reducing chunk size
+      // Additional size validation - be more strict with Bing's limits
+      if (textToTranslate.length > this.constructor.characterLimit) {
+        logger.info(`[Bing] Text too long (${textToTranslate.length} chars, limit is ${this.constructor.characterLimit}), splitting`);
+
+        // Scenario A: Multiple chunks - split the array
         if (chunkTexts.length > 1) {
           const midPoint = Math.ceil(chunkTexts.length / 2);
           const firstHalf = chunkTexts.slice(0, midPoint);
           const secondHalf = chunkTexts.slice(midPoint);
-          
+
           const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController);
           const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController);
-          
+
           return [...firstResults, ...secondResults];
+        } 
+        // Scenario B: Single chunk but too long - split the string itself
+        else if (chunkTexts.length === 1) {
+          const singleText = chunkTexts[0];
+          const parts = this._splitSingleLongString(singleText, this.constructor.characterLimit);
+
+          logger.info(`[Bing] Single long node split into ${parts.length} parts`);
+
+          const translatedParts = [];
+          for (const part of parts) {
+            const res = await this._translateChunk([part], sourceLang, targetLang, translateMode, abortController);
+            translatedParts.push(res[0]);
+          }
+
+          return [translatedParts.join(' ')];
         }
       }
-      
-      const formData = new URLSearchParams({
-        text: textToTranslate, 
+
+      const formData = new URLSearchParams({        text: textToTranslate, 
         fromLang: sl, 
         to: tl, 
         token: tokenData.token, 
@@ -265,15 +280,15 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         throw error;
       }
 
-      // Handle HTML response and JSON parsing errors with retry
-      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
+      // Handle HTML response, JSON parsing errors, and Status 400 with retry
+      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
         const maxRetries = providerConfig?.batching?.maxRetries || 3;
         const minChunkSize = providerConfig?.batching?.minChunkSize || 100;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
 
-        logger.debug(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${error.chunkSize || chunkTexts.length}`);
+        logger.debug(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}`);
 
-        // Check if we should retry with smaller chunks
+        // For BingApiError (Status 400), we MUST reduce chunk size as it often means the request was too large or complex
         if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
           // Calculate new chunk size with exponential backoff
           const reductionFactor = Math.pow(2, retryAttempt + 1);
@@ -416,6 +431,55 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
   static cleanup() {
     BingTranslateProvider.bingAccessToken = null;
+  }
+
+  /**
+   * Split a single long string into multiple parts that don't exceed limit
+   * This is used when a single node is too long for the provider
+   * @param {string} text - String to split
+   * @param {number} limit - Maximum length for each part
+   * @returns {string[]} - Array of smaller strings
+   */
+  _splitSingleLongString(text, limit) {
+    if (!text || text.length <= limit) return [text];
+    
+    const parts = [];
+    let remaining = text;
+    
+    while (remaining.length > limit) {
+      // Try to split by sentence markers first (ordered by semantic strength)
+      // Including East Asian markers: 。(Japanese/Chinese period), ！(East Asian exclamation), ？(East Asian question), 、(East Asian comma)
+      const sentenceMarkers = ['\n', '. ', '! ', '? ', '。', '！', '？', '، ', '؛ ', '、', '; '];
+      let splitIdx = -1;
+      
+      for (const marker of sentenceMarkers) {
+        const idx = remaining.lastIndexOf(marker, limit);
+        // We want the furthest possible marker that's still within the limit
+        if (idx > splitIdx) {
+          // For markers with space, include the space. For single char markers, include the char.
+          splitIdx = idx + marker.length;
+        }
+      }
+      
+      // Fallback to space
+      if (splitIdx <= 0) {
+        splitIdx = remaining.lastIndexOf(' ', limit);
+      }
+      
+      // Fallback to hard cut
+      if (splitIdx <= 0) {
+        splitIdx = limit;
+      }
+      
+      parts.push(remaining.substring(0, splitIdx).trim());
+      remaining = remaining.substring(splitIdx).trim();
+    }
+    
+    if (remaining.length > 0) {
+      parts.push(remaining);
+    }
+    
+    return parts;
   }
 
   resetSessionContext() {

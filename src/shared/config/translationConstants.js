@@ -19,7 +19,7 @@ export const TRANSLATION_CONSTANTS = {
   // Provider-specific character limits
   CHARACTER_LIMITS: {
     GOOGLE: 5000,
-    BING: 800,
+    BING: 1000,
     YANDEX: 10000,
     DEEPL: 10000,
   },
@@ -27,7 +27,7 @@ export const TRANSLATION_CONSTANTS = {
   // Provider-specific batch sizes (max segments per request)
   MAX_CHUNKS_PER_BATCH: {
     GOOGLE: 150,
-    BING: 15,
+    BING: 10,
     YANDEX: 100,
     DEEPL: 150, 
   },
