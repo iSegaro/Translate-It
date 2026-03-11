@@ -7,6 +7,42 @@ const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
 
 
 /**
+ * Determines if an error is considered "fatal" (should stop translation process)
+ * @param {string|Error|object} errorOrType - Error type string, Error object, or response object
+ * @returns {boolean}
+ */
+export function isFatalError(errorOrType) {
+  if (!errorOrType) return false;
+  
+  const type = typeof errorOrType === 'string' 
+    ? errorOrType 
+    : (errorOrType.type || matchErrorToType(errorOrType));
+
+  const fatalErrorTypes = [
+    ErrorTypes.QUOTA_EXCEEDED,
+    ErrorTypes.RATE_LIMIT_REACHED,
+    ErrorTypes.API_KEY_INVALID,
+    ErrorTypes.API_KEY_MISSING,
+    ErrorTypes.API_URL_MISSING,
+    ErrorTypes.MODEL_MISSING,
+    ErrorTypes.INSUFFICIENT_BALANCE,
+    ErrorTypes.FORBIDDEN_ERROR,
+    ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+    ErrorTypes.GEMINI_QUOTA_REGION,
+    ErrorTypes.NETWORK_ERROR,
+    ErrorTypes.HTTP_ERROR,
+    ErrorTypes.SERVER_ERROR,
+    ErrorTypes.INVALID_REQUEST,
+    ErrorTypes.MODEL_OVERLOADED
+  ];
+
+  const isFatalStatusCode = errorOrType && typeof errorOrType === 'object' && 
+    [401, 402, 403, 404, 429].includes(errorOrType.statusCode);
+
+  return fatalErrorTypes.includes(type) || isFatalStatusCode;
+}
+
+/**
  * Determines the error type for a given error object or message by prioritizing:
  * 1. An explicit `type` property on the error object.
  * 2. A specific `statusCode` (e.g., 401, 402, 429).
@@ -22,11 +58,22 @@ export function matchErrorToType(rawOrError = "") {
 
   // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
+    const type = rawOrError.type;
+    
     // Ensure API_RESPONSE_INVALID is properly recognized
-    if (rawOrError.type === ErrorTypes.API_RESPONSE_INVALID) {
+    if (type === ErrorTypes.API_RESPONSE_INVALID) {
       return ErrorTypes.API_RESPONSE_INVALID;
     }
-    return rawOrError.type;
+    
+    // If it's a generic translation error or unknown type, we still want to check the message
+    // for more specific errors like NETWORK_ERROR, API_KEY_MISSING, etc.
+    if (type !== ErrorTypes.TRANSLATION_ERROR && 
+        type !== ErrorTypes.TRANSLATION_FAILED && 
+        type !== ErrorTypes.UNKNOWN &&
+        type !== 'TRANSLATION_ERROR' && 
+        type !== 'TRANSLATION_FAILED') {
+      return type;
+    }
   }
 
   // اولویت ۲: تشخیص دقیق خطا بر اساس کد وضعیت HTTP
@@ -109,7 +156,13 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
-  const msg = String(rawOrError).toLowerCase().trim();
+  // Normalize input to a lowercase string for message-based matching
+  const rawMsg = !rawOrError ? "" : 
+                 (rawOrError instanceof Error ? rawOrError.message : 
+                 (typeof rawOrError === 'string' ? rawOrError : 
+                 (rawOrError.message || String(rawOrError))));
+  
+  const msg = (rawMsg || "").toLowerCase().trim();
 
   // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا (برای مواردی که statusCode ندارند)
   if (typeof rawOrError === "string") {
@@ -137,7 +190,8 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TEXT_TOO_LONG;
   if (msg.includes("translation not found"))
     return ErrorTypes.TRANSLATION_NOT_FOUND;
-  if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
+  if (msg.includes("translation failed") || msg.includes("translation_failed") || msg.includes("batch translation failed") || msg === "translation failed") return ErrorTypes.TRANSLATION_FAILED;
+  if (msg.includes("translation error") || msg.includes("translation_error")) return ErrorTypes.TRANSLATION_ERROR;
 
   // User cancellation errors
   if (

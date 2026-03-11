@@ -13,6 +13,8 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 import { RTL_LANGUAGES } from './DomTranslatorConstants.js';
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
@@ -86,6 +88,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
         this.currentStreamEndReject = reject;
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
+            if (data.success === false || data.error) {
+              this.logger.error('Stream update error:', data.error);
+              
+              // If it's a fatal error, resolve immediately to stop waiting
+              const isFatal = isFatalError(data.error);
+              
+              if (isFatal) {
+                resolve({ 
+                  success: false, 
+                  error: data.error, 
+                  errorHandled: false 
+                });
+              }
+              return;
+            }
+
             if (data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
               effectiveTargetLanguage = data.targetLanguage;
             }
@@ -141,7 +159,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
 
             await this.errorHandler.handle(error, { context: 'select-element-streaming', showToast: true });
-            resolve({ success: false, error: error.message, errorHandled: true });
+            resolve({ success: false, error: error, errorHandled: true });
           }
         });
       });
@@ -224,9 +242,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         return { success: false, cancelled: true, element };
       }
       
-      // Extract error message correctly to avoid [object Object]
-      const errorMessage = result.error?.message || (typeof result.error === 'string' ? result.error : 'Translation failed');
+      // Extract error message correctly and preserve error properties for matching
+      const errorData = result.error;
+      const errorMessage = errorData?.message || (typeof errorData === 'string' ? errorData : ErrorTypes.TRANSLATION_FAILED);
       const error = new Error(errorMessage);
+      
+      // Copy properties to help ErrorMatcher detect the correct type
+      if (errorData && typeof errorData === 'object') {
+        Object.assign(error, errorData);
+      }
+      
       if (result.errorHandled) error.alreadyHandled = true;
       
       throw error;

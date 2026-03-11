@@ -132,7 +132,9 @@ export class ErrorHandler {
           ErrorTypes.MODEL_OVERLOADED,
           ErrorTypes.INVALID_REQUEST,
           ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION
+          ErrorTypes.GEMINI_QUOTA_REGION,
+          ErrorTypes.TRANSLATION_FAILED,
+          ErrorTypes.TRANSLATION_ERROR
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
@@ -271,7 +273,9 @@ export class ErrorHandler {
           ErrorTypes.MODEL_OVERLOADED,
           ErrorTypes.INVALID_REQUEST,
           ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION
+          ErrorTypes.GEMINI_QUOTA_REGION,
+          ErrorTypes.TRANSLATION_FAILED,
+          ErrorTypes.TRANSLATION_ERROR
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic

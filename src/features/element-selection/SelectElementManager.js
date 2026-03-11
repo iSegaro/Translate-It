@@ -571,7 +571,8 @@ class SelectElementManager extends ResourceTracker {
         if (errorType === ErrorTypes.USER_CANCELLED) {
           this.logger.debug('Translation cancelled by user:', error);
         } else if (!error.alreadyHandled) {
-          this.logger.error('Error during translation:', error);
+          // If not already handled by ErrorHandler in Adapter, we could handle it here, 
+          // but Adapter already handles most cases with showToast: true
         }
       }
 

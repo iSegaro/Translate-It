@@ -200,7 +200,7 @@ export class StreamingManager extends ResourceTracker {
           success: false,
           error: {
             message: error.message || 'Translation failed',
-            type: error.type || 'TRANSLATION_ERROR'
+            type: error.type || matchErrorToType(error) || 'TRANSLATION_ERROR'
           },
           batchIndex: batchIndex,
           provider: streamInfo.providerName,
@@ -304,7 +304,7 @@ export class StreamingManager extends ResourceTracker {
     await this.completeStream(messageId, false, {
       error: {
         message: error.message,
-        type: error.type || 'STREAMING_ERROR',
+        type: error.type || errorType || 'STREAMING_ERROR',
         timestamp: Date.now()
       }
     });

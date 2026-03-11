@@ -11,7 +11,7 @@ import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translat
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getProviderBatching } from '../core/ProviderConfigurations.js';
 import { getPromptBASEAIBatchAsync, getPromptBASEAIFollowupAsync } from '@/shared/config/config.js';
@@ -468,7 +468,10 @@ export class BaseAIProvider extends BaseProvider {
         {
           success: !options.error,
           completed: true,
-          error: options.error,
+          error: options.error ? {
+            message: options.error.message || 'Translation failed',
+            type: options.error.type || matchErrorToType(options.error) || 'TRANSLATION_ERROR'
+          } : null,
           provider: this.providerName,
           targetLanguage: options.targetLanguage,
           timestamp: Date.now()
@@ -503,7 +506,7 @@ export class BaseAIProvider extends BaseProvider {
           success: false,
           error: {
             message: error.message || 'Translation failed',
-            type: error.type || 'TRANSLATION_ERROR'
+            type: error.type || matchErrorToType(error) || 'TRANSLATION_ERROR'
           },
           batchIndex: batchIndex,
           provider: this.providerName,
@@ -560,19 +563,13 @@ export class BaseAIProvider extends BaseProvider {
       const errorMsg = (error.message || String(error)).toLowerCase();
       const errorType = error.type || matchErrorToType(error);
 
-      // CRITICAL: Check if the error is fatal (Rate Limit, Auth, etc.)
-      const isFatal = [
-        ErrorTypes.RATE_LIMIT_REACHED,
-        ErrorTypes.INVALID_API_KEY,
-        ErrorTypes.QUOTA_EXCEEDED,
-        ErrorTypes.OFFLINE,
-        ErrorTypes.USER_CANCELLED
-      ].includes(errorType) || 
-      error.status === 429 || 
-      error.status === 401 ||
-      errorMsg.includes("quota") || 
-      errorMsg.includes("limit exceeded") ||
-      errorMsg.includes("too many requests");
+      // CRITICAL: Check if the error is fatal (Rate Limit, Auth, Model Missing, etc.)
+      const isFatal = isFatalError(error) || 
+      error.statusCode === 429 || 
+      error.statusCode === 401 ||
+      error.statusCode === 403 ||
+      error.statusCode === 402 ||
+      error.statusCode === 404;
 
       if (isFatal) {
         logger.error(`[${this.providerName}] Batch failed with fatal error, skipping fallback:`, error.message);

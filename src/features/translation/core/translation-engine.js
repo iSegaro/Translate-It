@@ -422,7 +422,8 @@ export class TranslationEngine {
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
     const sessionId = data.sessionId || messageId; // Use provided sessionId or fallback to messageId (for whole page)
-    let hasErrors = false; // Move hasErrors to function scope
+    let hasErrors = false;
+    let lastError = null;
 
     (async () => {
         try {
@@ -554,6 +555,7 @@ export class TranslationEngine {
                 } catch (error) {
                     consecutiveFailures++;
                     hasErrors = true;
+                    lastError = error;
                     // Log cancellation as debug instead of warn using proper error management
                     const errorType = matchErrorToType(error);
                     if (errorType === ErrorTypes.USER_CANCELLED) {
@@ -575,7 +577,10 @@ export class TranslationEngine {
                         MessageActions.TRANSLATION_STREAM_UPDATE,
                         {
                           success: false,
-                          error: { message: error.message, type: error.type },
+                          error: { 
+                            message: error.message, 
+                            type: error.type || matchErrorToType(error) 
+                          },
                           batchIndex: i,
                           originalData: batch,
                         },
@@ -589,8 +594,8 @@ export class TranslationEngine {
                     }
                     
                     // Stop on quota exceeded or too many consecutive failures
-                    if (error.type === 'QUOTA_EXCEEDED' || error.type === 'CIRCUIT_BREAKER_OPEN') {
-                        logger.error(`[TranslationEngine] Critical error (${error.type}), stopping translation.`);
+                    if (errorType === 'QUOTA_EXCEEDED' || errorType === 'CIRCUIT_BREAKER_OPEN') {
+                        logger.error(`[TranslationEngine] Critical error (${errorType}), stopping translation.`);
                         break;
                     }
                     
@@ -607,6 +612,10 @@ export class TranslationEngine {
                 MessageActions.TRANSLATION_STREAM_END,
                 { 
                   success: !hasErrors,
+                  error: hasErrors ? { 
+                    message: lastError?.message || 'Translation failed', 
+                    type: lastError?.type || matchErrorToType(lastError) || 'TRANSLATION_ERROR'
+                  } : null,
                   targetLanguage: effectiveTarget
                 },
                 'background-stream',
@@ -1112,10 +1121,13 @@ export class TranslationEngine {
    * Format error response
    */
   formatError(error, context) {
+    // Extract error type using matcher if not explicitly provided
+    const errorType = error.type || matchErrorToType(error);
+    
     return {
       success: false,
       error: {
-        type: error.type || "TRANSLATION_ERROR",
+        type: errorType,
         message: error.message || "Translation failed",
         context: context || "unknown",
         timestamp: Date.now(),

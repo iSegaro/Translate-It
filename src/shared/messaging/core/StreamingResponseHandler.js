@@ -173,6 +173,7 @@ export class StreamingResponseHandler {
     } else {
       const error = new Error(data?.error?.message || 'Streaming ended with error');
       error.streamData = data;
+      if (data?.error?.type) error.type = data.error.type;
       this.coordinator.handleStreamingError(messageId, error);
     }
 
@@ -207,6 +208,7 @@ export class StreamingResponseHandler {
     } else {
       const error = new Error(data?.error?.message || 'Translation failed');
       error.translationData = data;
+      if (data?.error?.type) error.type = data.error.type;
       this.coordinator.handleStreamingError(messageId, error);
     }
 
