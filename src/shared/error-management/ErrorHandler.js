@@ -64,6 +64,7 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.FORBIDDEN_ERROR,
   ErrorTypes.INVALID_REQUEST,
   ErrorTypes.SERVER_ERROR,
+  ErrorTypes.CIRCUIT_BREAKER_OPEN,
 ]);
 
 export class ErrorHandler {
@@ -283,7 +284,8 @@ export class ErrorHandler {
           ErrorTypes.GEMINI_QUOTA_REGION,
           ErrorTypes.TRANSLATION_FAILED,
           ErrorTypes.TRANSLATION_ERROR,
-          ErrorTypes.USER_CANCELLED
+          ErrorTypes.USER_CANCELLED,
+          ErrorTypes.CIRCUIT_BREAKER_OPEN
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic

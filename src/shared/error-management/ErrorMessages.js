@@ -37,6 +37,8 @@ export const errorMessages = {
     "Rate limit reached. Please try again in a few minutes.", // برای 429
   [ErrorTypes.SERVER_ERROR]:
     "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
+  [ErrorTypes.CIRCUIT_BREAKER_OPEN]:
+    "Circuit breaker is open. This provider is temporarily disabled due to too many failures.",
 
   // Import/Export password errors
   [ErrorTypes.IMPORT_PASSWORD_REQUIRED]:

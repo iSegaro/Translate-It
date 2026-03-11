@@ -35,7 +35,8 @@ export function isFatalError(errorOrType) {
     ErrorTypes.HTTP_ERROR,
     ErrorTypes.SERVER_ERROR,
     ErrorTypes.INVALID_REQUEST,
-    ErrorTypes.MODEL_OVERLOADED
+    ErrorTypes.MODEL_OVERLOADED,
+    ErrorTypes.CIRCUIT_BREAKER_OPEN
   ];
 
   const isFatalStatusCode = errorOrType && typeof errorOrType === 'object' && 
@@ -412,6 +413,9 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded"))
     return ErrorTypes.MODEL_OVERLOADED;
+
+  if (msg.includes("circuit breaker open"))
+    return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   // Quota with region indicates Gemini-specific quota
   if (

@@ -1049,6 +1049,7 @@
   "deepseek_custom_model_label": {
     "message": "カスタムモデル名"
   },
+  "ERRORS_CIRCUIT_BREAKER_OPEN": { "message": "サーキットブレーカーが作動しました。エラーが多発したため、このプロバイダーは一時的に無効化されています。別のプロバイダーを試すか、数分後にもう一度お試しください。" },
   "ERRORS_UNKNOWN": {
     "message": "不明なエラーが発生しました。"
   },

@@ -584,6 +584,7 @@
   },
   "deepseek_custom_model_label": { "message": "Custom Model Name" },
 
+  "ERRORS_CIRCUIT_BREAKER_OPEN": { "message": "Circuit breaker is open. This provider is temporarily disabled due to too many failures. Please try another provider or try again in a few minutes." },
   "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },
   "ERRORS_INVALID_CONTEXT": {
     "message": "Extension context invalid. Please refresh the page to continue."

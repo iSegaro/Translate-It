@@ -59,6 +59,7 @@ export class ErrorTypes {
   static GEMINI_QUOTA_REGION = "GEMINI_QUOTA_REGION";
   static SERVER_ERROR = "SERVER_ERROR";
   static RATE_LIMIT_REACHED = "RATE_LIMIT_REACHED"; // برای خطای 429
+  static CIRCUIT_BREAKER_OPEN = "CIRCUIT_BREAKER_OPEN";
 
   // DeepL-specific errors
   static DEEPL_QUOTA_EXCEEDED = "DEEPL_QUOTA_EXCEEDED"; // HTTP 456 - DeepL character limit
