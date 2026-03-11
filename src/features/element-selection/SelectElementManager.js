@@ -177,8 +177,16 @@ class SelectElementManager extends ResourceTracker {
           pageEventBus.emit('show-notification', {
             type: 'warning',
             message: warningMessage || 'Bing may have issues with Select Element. Try another provider.',
-            duration: 8000,
+            duration: 5000,
             id: `bing-warning-${this.instanceId}`,
+          });
+        } else if (settings.TRANSLATION_API === 'lingva') {
+          const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
+          pageEventBus.emit('show-notification', {
+            type: 'warning',
+            message: warningMessage || 'Lingva may have issues with long texts. Try another provider.',
+            duration: 5000,
+            id: `lingva-warning-${this.instanceId}`,
           });
         }
       }

@@ -683,6 +683,8 @@
   "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
   "SELECT_ELEMENT_REVERT": { "message": "Revert" },
   "SELECT_ELEMENT_BING_WARNING": { "message": "Bing may have issues with long or complex texts. If you encounter errors, try using another provider." },
+  "LINGVA_WPT_WARNING": { "message": "Lingva provider may have issues with long texts during page translation. If you encounter errors, try using another provider." },
+  "BING_WPT_WARNING": { "message": "Bing provider may have issues with long or complex texts during page translation. If you encounter errors, try using another provider." },
 
   "click_to_set_shortcut": { "message": "Click to set shortcut" },
   "shortcut_recording_title": { "message": "Press Your Shortcut" },

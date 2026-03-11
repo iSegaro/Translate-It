@@ -1217,6 +1217,12 @@
   "SELECT_ELEMENT_BING_WARNING": {
     "message": "Bingは長文や複雑なテキストで問題が生じる場合があります。エラーが発生した場合は別のプロバイダーをお試しください。"
   },
+  "LINGVA_WPT_WARNING": {
+    "message": "Lingvaはページ翻訳や長文で問題が生じる場合があります。エラーが発生した場合は別のプロバイダーをお試しください。"
+  },
+  "BING_WPT_WARNING": {
+    "message": "Bingはページ翻訳や長文で問題が生じる場合があります。エラーが発生した場合は別のプロバイダーをお試しください。"
+  },
   "click_to_set_shortcut": {
     "message": "クリックしてショートカットを設定"
   },

@@ -4,9 +4,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync } from '@/config.js';
+import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getTranslationApiAsync } from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 // Internal components
 import { PageTranslationHelper } from './PageTranslationHelper.js';
@@ -90,6 +91,26 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
       
       await this._loadSettings();
+
+      // Show warning for Lingva provider in Whole Page Translation
+      if (this.settings.translationApi === 'lingva') {
+        const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
+        pageEventBus.emit('show-notification', {
+          type: 'warning',
+          message: warningMessage || 'Lingva may have issues with long texts during page translation.',
+          duration: 5000,
+          id: `lingva-wpt-warning-${Date.now()}`
+        });
+      } else if (this.settings.translationApi === 'bing') {
+        const warningMessage = await getTranslationString('BING_WPT_WARNING');
+        pageEventBus.emit('show-notification', {
+          type: 'warning',
+          message: warningMessage || 'Bing may have issues with long texts during page translation.',
+          duration: 5000,
+          id: `bing-wpt-warning-${Date.now()}`
+        });
+      }
+
       this.scheduler.setSettings(this.settings);
       this.scheduler.setTranslationState(true, this.translationMessageId, this.sessionContext);
 
@@ -233,6 +254,7 @@ export class PageTranslationManager extends ResourceTracker {
 
   async _loadSettings() {
     this.settings = {
+      translationApi: await getTranslationApiAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
       rootMargin: await getWholePageRootMarginAsync() || '300px',
       autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),
