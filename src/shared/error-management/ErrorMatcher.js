@@ -296,6 +296,8 @@ export function matchErrorToType(rawOrError = "") {
   if (
     msg.includes("http 400") ||
     msg.includes("400 error") ||
+    msg.includes("status 400") ||
+    msg.includes("bing api returned status 400") ||
     msg.includes("http 422") ||
     msg.includes("422 error") ||
     msg.includes("bad request") ||
