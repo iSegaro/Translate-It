@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
@@ -255,6 +256,15 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       return finalResult;
 
     } catch (error) {
+      const errorType = error.type || matchErrorToType(error);
+      const isFatal = isFatalError(error) || isFatalError(errorType);
+
+      // CRITICAL: If it's a fatal error, don't attempt any retries
+      if (isFatal) {
+        if (!error.type) error.type = errorType;
+        throw error;
+      }
+
       // Handle HTML response and JSON parsing errors with retry
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
         const maxRetries = providerConfig?.batching?.maxRetries || 3;
@@ -333,22 +343,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
         logger.debug(`[Bing] Chunk translation failed, will be handled by fallback. Chunk size: ${chunkTexts.length}`);
+        // Ensure type is set
+        if (!error.type) error.type = errorType;
         // Let BaseTranslateProvider handle the error and fallback
         throw error;
       }
 
-      // Handle token-related errors and other errors with proper typing
-      if (!error.type) {
-        if (error.message?.includes("token")) {
-          error.type = ErrorTypes.API_KEY_MISSING;
-        } else if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
-          error.type = ErrorTypes.QUOTA_EXCEEDED;
-        } else {
-          error.type = ErrorTypes.API;
-        }
-      }
-
       error.context = context;
+      if (!error.type) error.type = errorType;
       throw error;
     }
   }
