@@ -2,7 +2,6 @@ import { BaseTranslateProvider } from "./BaseTranslateProvider.js";
 import { ProviderNames } from "./ProviderConstants.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 
@@ -11,55 +10,53 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 /**
  * Lingva Translate Provider
  * A free and open-source alternative front-end for Google Translate.
- * Homepage: https://github.com/thedaviddelta/lingva-translate
+ * Following the project's standard pattern for traditional providers.
  */
 export class LingvaProvider extends BaseTranslateProvider {
   static type = "translate";
   static displayName = "Lingva";
   static reliableJsonMode = true;
   
+  // Standard delimiter used by traditional providers in this project
+  static TEXT_DELIMITER = '\n\n---\n\n';
+
   constructor() {
     super(ProviderNames.LINGVA);
   }
 
-  /**
-   * Get the current API path
-   * This is where we can later inject a custom instance from settings
-   */
   async _getApiPath() {
     return await getLingvaApiUrlAsync();
   }
 
   _getLangCode(lang) {
     if (lang === AUTO_DETECT_VALUE) return "auto";
-    // Lingva mostly uses ISO-639-1 codes, which match our internal codes
     return lang;
   }
 
   /**
-   * Implement translation for a single chunk
+   * Standard _translateChunk implementation.
+   * Receives a chunk of texts, joins them, and executes a single request.
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
     const apiPath = await this._getApiPath();
-    
-    // Validate configuration
-    this._validateConfig(
-      { apiPath },
-      ["apiPath"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
-
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
-    const results = [];
-    
-    for (const text of chunkTexts) {
-      if (abortController?.signal?.aborted) break;
+    // Filter and join texts using the standard delimiter
+    const validTexts = chunkTexts.map(t => (t || "").replace(/\//g, ' '));
+    const joinedText = validTexts.join(LingvaProvider.TEXT_DELIMITER);
 
-      // Use GET method as per original script for better compatibility with public instances
-      // URL encode the text to handle special characters
-      const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(text)}`;
+    // If joined text is too long for a GET request (Lingva limit),
+    // we take as many as we can from the start. 
+    // The central engine will handle the rest in subsequent chunks.
+    let textToTranslate = joinedText;
+    if (textToTranslate.length > 1200) {
+      logger.debug(`[Lingva] Chunk too long (${textToTranslate.length}), limiting to first segment for safety.`);
+      textToTranslate = validTexts[0];
+    }
+
+    try {
+      const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
       
       const result = await this._executeRequest({
         url,
@@ -67,29 +64,30 @@ export class LingvaProvider extends BaseTranslateProvider {
           method: "GET",
           mode: 'cors',
           credentials: 'omit',
-          headers: {
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin"
-          }
+          headers: { "Accept": "application/json" }
         },
-        extractResponse: (data) => {
-          if (data && data.translation) {
-            return data.translation;
-          }
-          const err = new Error("Invalid API response from Lingva");
-          err.type = ErrorTypes.API_RESPONSE_INVALID;
-          throw err;
-        },
-        context: 'lingva-translate-segment',
+        extractResponse: (data) => data?.translation,
+        context: 'lingva-standard-chunk',
         abortController
       });
-      
-      results.push(result || "");
-    }
 
-    return results;
+      if (!result) return chunkTexts;
+
+      // If we only translated the first one because of length
+      if (textToTranslate === validTexts[0] && chunkTexts.length > 1) {
+        return [result, ...chunkTexts.slice(1)];
+      }
+
+      // Standard splitting logic
+      const translatedParts = result.split(LingvaProvider.TEXT_DELIMITER.trim());
+      return chunkTexts.map((original, i) => {
+        return translatedParts[i]?.trim() || original;
+      });
+
+    } catch (error) {
+      // Standard error handling: BaseProvider._executeRequest already maps the error
+      // We just rethrow so the central engine handles the failure/fatal logic.
+      throw error;
+    }
   }
 }
