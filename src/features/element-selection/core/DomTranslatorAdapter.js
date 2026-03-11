@@ -343,9 +343,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
   /**
    * Cancel ongoing translation
    */
-  async cancelTranslation() {
+  async cancelTranslation(options = {}) {
+    const { silent = false } = options;
+
     if (this.isTranslating) {
-      this.logger.debug('Cancelling translation');
+      this.logger.debug(`Cancelling translation (silent: ${silent})`);
       const messageId = this.currentMessageId;
 
       if (messageId) {
@@ -363,7 +365,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Stop waiting for stream
       if (this.currentStreamEndReject) {
-        this.currentStreamEndReject(new Error('Translation cancelled by user'));
+        const cancelError = new Error('Translation cancelled by user');
+        if (silent) {
+          cancelError.showToast = false;
+        }
+        this.currentStreamEndReject(cancelError);
         this.currentStreamEndReject = null;
       }
 

@@ -210,6 +210,7 @@ class SelectElementManager extends ResourceTracker {
       fromNotification = false,
       fromCancel = false,
       preserveTranslations = false,
+      silent = false,
     } = options;
 
     // When cancelling, preserve translations so user can revert them later with ESC
@@ -221,6 +222,7 @@ class SelectElementManager extends ResourceTracker {
       fromCancel,
       preserveTranslations,
       shouldPreserve,
+      silent,
       instanceId: this.instanceId,
     });
 
@@ -230,7 +232,7 @@ class SelectElementManager extends ResourceTracker {
 
       // Cancel any ongoing translations (but don't revert them)
       if (!preserveTranslations) {
-        this.domTranslatorAdapter.cancelTranslation();
+        this.domTranslatorAdapter.cancelTranslation({ silent });
       }
 
       // Remove event listeners
@@ -457,7 +459,8 @@ class SelectElementManager extends ResourceTracker {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      this.deactivate({ fromCancel: true });
+      // ESC deactivation should NOT be silent (show "Cancelled by user")
+      this.deactivate({ fromCancel: true, silent: false });
     }
   }
 
@@ -691,7 +694,8 @@ class SelectElementManager extends ResourceTracker {
       });
       if (this.isActive) {
         this.logger.debug('Cancel requested, deactivating SelectElement mode');
-        this.deactivate({ fromCancel: true });
+        // Notification cancel button should be silent
+        this.deactivate({ fromCancel: true, silent: true });
       } else {
         this.logger.debug('Cancel event received but SelectElement is not active');
       }
