@@ -462,7 +462,7 @@
   "popup_paste_source_alt_icon": { "message": "Paste" },
   "popup_paste_source_title_icon": { "message": "Paste from clipboard" },
   "popup_target_text_placeholder": { "message": "Translation result will appear here" },
-  "popup_source_text_placeholder": { "message": "Enter text here..." },
+  "popup_source_text_placeholder": { "message": "Type Here" },
   "popup_copy_target_alt_icon": { "message": "Copy target" },
   "popup_copy_target_title_icon": { "message": "Copy target text" },
   "popup_voice_target_alt_icon": { "message": "Speak target" },
@@ -488,7 +488,7 @@
 
   "SIDEPANEL_SOURCE_TEXT_LABEL": { "message": "Source Text" },
   "SIDEPANEL_TARGET_TEXT_LABEL": { "message": "Translation" },
-  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Enter..." },
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Type Here" },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": { "message": "Translation result will appear here" },
   "SIDEPANEL_SELECT_ELEMENT_MESSAGE": { "message": "Click on any element on the webpage to translate..." },
   "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "Translate" },

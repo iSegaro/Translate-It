@@ -81,7 +81,7 @@
       <TranslationInputField
         ref="sourceInputRef"
         v-model="sourceText"
-        :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate...')"
+        :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Type Here')"
         :language="currentSourceLanguage"
         :source-language="currentSourceLanguage"
         :rows="6"

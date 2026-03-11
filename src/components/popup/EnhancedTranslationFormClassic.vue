@@ -9,7 +9,7 @@
     :show-result-label="false"
     :input-rows="2"
     :auto-translate-on-paste="settingsStore.settings.AUTO_TRANSLATE_ON_PASTE"
-    :input-placeholder="t('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
+    :input-placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
     :result-placeholder="t('TRANSLATION_PLACEHOLDER') || 'نتیجه ترجمه اینجا نمایش داده می‌شود...'"
     :copy-source-title="t('popup_copy_source_title_icon') || 'کپی متن مبدا'"
     :paste-title="t('popup_paste_source_title_icon') || 'چسباندن'"

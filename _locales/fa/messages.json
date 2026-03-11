@@ -831,7 +831,7 @@
     "message": "ترجمه در اینجا ظاهر می‌شود"
   },
   "popup_source_text_placeholder": {
-    "message": "اینجا بنویسید..."
+    "message": "اینجا بنویسید"
   },
   "popup_copy_target_alt_icon": {
     "message": "کپی مقصد"
@@ -879,7 +879,7 @@
     "message": "ترجمه"
   },
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
-    "message": "اینجا بنویسید..."
+    "message": "اینجا بنویسید"
   },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
     "message": "ترجمه اینجا نمایش داده می‌شود"

@@ -7,7 +7,7 @@
     <TranslationInputField
       ref="sourceInputRef"
       v-model="sourceText"
-      :placeholder="t('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
+      :placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
       :language="currentSourceLanguage"
       :source-language="currentSourceLanguage"
       :rows="2"

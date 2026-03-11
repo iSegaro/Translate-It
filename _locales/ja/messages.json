@@ -831,7 +831,7 @@
     "message": "翻訳結果がここに表示されます"
   },
   "popup_source_text_placeholder": {
-    "message": "テキストを入力..."
+    "message": "テキストを入力"
   },
   "popup_copy_target_alt_icon": {
     "message": "翻訳をコピー"
@@ -879,7 +879,7 @@
     "message": "翻訳"
   },
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
-    "message": "入力..."
+    "message": "テキストを入力"
   },
   "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
     "message": "翻訳結果がここに表示されます"
