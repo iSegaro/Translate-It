@@ -597,6 +597,9 @@
   "ERRORS_HTTP_ERROR": {
     "message": "HTTP Error communicating with the server."
   },
+  "ERRORS_BROWSER_API_UNAVAILABLE": {
+    "message": "Chrome Translation API is not available. This feature requires Chrome 138 or newer."
+  },
   "ERRORS_API_KEY_MISSING": { "message": "API Key is missing." },
   "ERRORS_API_KEY_INVALID": {
     "message": "API Key is invalid or unauthorized."

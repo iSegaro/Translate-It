@@ -119,6 +119,7 @@ export class ErrorHandler {
         // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
         // For API configuration, quota and rate limit errors, always use the localized generic message
         const isCriticalConfigError = [
+          ErrorTypes.BROWSER_API_UNAVAILABLE,
           ErrorTypes.API_KEY_MISSING,
           ErrorTypes.API_KEY_INVALID,
           ErrorTypes.API_URL_MISSING,
@@ -264,6 +265,7 @@ export class ErrorHandler {
         // These errors have specific, user-friendly messages that should always be shown
         // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
         const shouldUseGenericMessage = [
+          ErrorTypes.API,
           ErrorTypes.API_KEY_MISSING,
           ErrorTypes.API_KEY_INVALID,
           ErrorTypes.API_URL_MISSING,

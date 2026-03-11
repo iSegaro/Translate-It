@@ -1070,9 +1070,10 @@
   "ERRORS_HTTP_ERROR": {
     "message": "خطای HTTP در ارتباط با سرور."
   },
-  "ERRORS_API_KEY_MISSING": {
-    "message": "کلید API وارد نشده است."
+  "ERRORS_BROWSER_API_UNAVAILABLE": {
+    "message": "سرویس ترجمه کروم (Built-in) در دسترس نیست. این قابلیت به کروم ۱۳۸ یا بالاتر نیاز دارد."
   },
+  "ERRORS_API_KEY_MISSING": { "message": "کلید API وارد نشده است." },
   "ERRORS_API_KEY_INVALID": {
     "message": "کلید API نامعتبر یا غیرمجاز است."
   },

@@ -18,7 +18,7 @@ export const errorMessages = {
   [ErrorTypes.PAGE_TRANSLATION_STOPPED]: "Whole-page translation stopped: {error}",
 
   // API settings errors
-  [ErrorTypes.API]: "API error",
+  [ErrorTypes.BROWSER_API_UNAVAILABLE]: "The translation API is not available or supported in this browser",
   [ErrorTypes.API_RESPONSE_INVALID]: "Invalid API response format",
   [ErrorTypes.API_KEY_MISSING]: "API Key is missing",
   [ErrorTypes.API_KEY_INVALID]: "API Key is wrong or invalid",

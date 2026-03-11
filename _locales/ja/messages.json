@@ -1070,6 +1070,9 @@
   "ERRORS_HTTP_ERROR": {
     "message": "サーバーとの通信でHTTPエラーが発生しました。"
   },
+  "ERRORS_BROWSER_API_UNAVAILABLE": {
+    "message": "Chrome内蔵の翻訳APIが利用できません。この機能にはChrome 138以降が必要です。"
+  },
   "ERRORS_API_KEY_MISSING": {
     "message": "APIキーが設定されていません。"
   },

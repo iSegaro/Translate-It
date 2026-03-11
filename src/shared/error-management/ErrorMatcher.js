@@ -20,6 +20,7 @@ export function isFatalError(errorOrType) {
     : (errorOrType.type || matchErrorToType(errorOrType));
 
   const fatalErrorTypes = [
+    ErrorTypes.BROWSER_API_UNAVAILABLE,
     ErrorTypes.QUOTA_EXCEEDED,
     ErrorTypes.RATE_LIMIT_REACHED,
     ErrorTypes.API_KEY_INVALID,
@@ -134,6 +135,10 @@ export function matchErrorToType(rawOrError = "") {
           if (providerType === ProviderTypes.AI || msgLower.includes('model')) {
             return ErrorTypes.MODEL_MISSING;
           }
+          // If it looks like a browser API issue
+          if (msgLower.includes('chrome') || msgLower.includes('translator')) {
+            return ErrorTypes.BROWSER_API_UNAVAILABLE;
+          }
           return ErrorTypes.API_URL_MISSING;
         }
 
@@ -230,11 +235,11 @@ export function matchErrorToType(rawOrError = "") {
 
   // Chrome Translation API availability errors
   if (
-    msg.includes("Chrome Translation API not available") ||
-    msg.includes("Translation API not available") ||
-    (msg.includes("Requires Chrome") && msg.includes("138"))
+    msg.includes("chrome translation api not available") ||
+    msg.includes("translation api not available") ||
+    (msg.includes("requires chrome") && msg.includes("138"))
   )
-    return ErrorTypes.API;
+    return ErrorTypes.BROWSER_API_UNAVAILABLE;
 
   // Import/Export password issues
   if (
