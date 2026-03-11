@@ -195,6 +195,7 @@ ErrorTypes.NETWORK_ERROR          // Connection issues
 ErrorTypes.HTTP_ERROR            // HTTP status errors
 ErrorTypes.RATE_LIMIT_REACHED    // API rate limiting
 ErrorTypes.QUOTA_EXCEEDED        // API quota exceeded
+ErrorTypes.CIRCUIT_BREAKER_OPEN  // Temporary provider disable due to failures
 ```
 **Handling**: Toast notification + retry option
 
