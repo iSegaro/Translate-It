@@ -9,6 +9,7 @@
       <BaseInput
         v-model="customApiUrl"
         :placeholder="t('custom_api_url_placeholder') || 'Enter the base URL of your custom API'"
+        dir="ltr"
       />
       <span class="setting-help-text">
         {{ t('custom_api_url_example') || 'Example:' }} https://openai.com/v1/chat/completions
@@ -28,6 +29,7 @@
       <BaseInput
         v-model="customApiModel"
         :placeholder="t('custom_api_model_placeholder') || 'Enter the model name'"
+        dir="ltr"
       />
     </div>
   </div>

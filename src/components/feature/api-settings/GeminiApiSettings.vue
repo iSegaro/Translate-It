@@ -41,6 +41,7 @@
         v-model="geminiApiUrl"
         :placeholder="t('gemini_api_url_placeholder') || 'Enter custom API URL'"
         class="api-url-input"
+        dir="ltr"
       />
       <span class="setting-description">
         {{ t('gemini_custom_api_url_info') || 'Enter the complete API URL including the model name' }}

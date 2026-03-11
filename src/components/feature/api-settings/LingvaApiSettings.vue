@@ -19,6 +19,7 @@
       <BaseInput
         v-model="lingvaApiUrl"
         :placeholder="t('lingva_api_url_placeholder') || 'Enter Lingva API URL (e.g., https://lingva.ml)'"
+        dir="ltr"
       />
     </div>
   </div>

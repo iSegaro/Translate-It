@@ -19,6 +19,7 @@
       <BaseInput
         v-model="webAIApiUrl"
         :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
+        dir="ltr"
       />
     </div>
     <div class="setting-group">
@@ -26,6 +27,7 @@
       <BaseInput
         v-model="webAIApiModel"
         :placeholder="t('webai_api_model_placeholder') || 'Enter WebAI API model'"
+        dir="ltr"
       />
     </div>
   </div>
