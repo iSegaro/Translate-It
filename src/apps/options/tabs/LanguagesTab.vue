@@ -273,8 +273,6 @@ const providerSettingsComponent = computed(() => {
   switch (provider) {
     case 'gemini':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/GeminiApiSettings.vue'));
-    case 'yandex':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/YandexApiSettings.vue'));
     case 'deepl':
       return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepLApiSettings.vue'));
     case 'browser':
