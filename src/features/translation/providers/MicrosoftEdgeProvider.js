@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MicrosoftEdge');
 
@@ -57,7 +58,11 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
       },
       extractResponse: async (response) => {
         const token = await response.text();
-        if (!token) throw new Error("Received empty token from Edge auth");
+        if (!token) {
+          const err = new Error("Received empty token from Edge auth");
+          err.type = ErrorTypes.API_KEY_MISSING;
+          throw err;
+        }
 
         // Decode JWT to get expiry
         MicrosoftEdgeProvider.accessToken = token;

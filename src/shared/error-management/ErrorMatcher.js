@@ -251,10 +251,21 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("renew the api key") ||
     msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
-    msg.includes("authentication fails")
+    msg.includes("authentication fails") ||
+    msg.includes("auth failed") ||
+    msg.includes("token is invalid") ||
+    msg.includes("invalid token")
   )
     return ErrorTypes.API_KEY_INVALID;
-  if (msg.includes("api key is missing") || msg.includes("key missing") || msg.includes("key_missing") || msg.includes("api_key_missing"))
+  if (
+    msg.includes("api key is missing") || 
+    msg.includes("key missing") || 
+    msg.includes("key_missing") || 
+    msg.includes("api_key_missing") ||
+    msg.includes("token is missing") ||
+    msg.includes("received empty token") ||
+    msg.includes("empty token")
+  )
     return ErrorTypes.API_KEY_MISSING;
 
   // API key validation errors - should trigger failover

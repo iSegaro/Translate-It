@@ -13,7 +13,7 @@ import { TranslationMode } from "@/shared/config/config.js";
 // import browser from 'webextension-polyfill';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
@@ -236,7 +236,8 @@ export class BaseTranslateProvider extends BaseProvider {
 
       } catch (error) {
         // Log cancellation as debug instead of error using proper error management
-        const errorType = matchErrorToType(error);
+        const errorType = error.type || matchErrorToType(error);
+
         if (errorType === ErrorTypes.USER_CANCELLED) {
           logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
         } else {
@@ -250,7 +251,7 @@ export class BaseTranslateProvider extends BaseProvider {
         await this._sendStreamEnd(messageId, {
           error: {
             message: error.message,
-            type: errorType
+            type: error.type || errorType
           }
         });
 

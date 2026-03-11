@@ -342,7 +342,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         if (error.message?.includes("token")) {
           error.type = ErrorTypes.API_KEY_MISSING;
         } else if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
-          error.type = ErrorTypes.API_QUOTA_EXCEEDED;
+          error.type = ErrorTypes.QUOTA_EXCEEDED;
         } else {
           error.type = ErrorTypes.API;
         }
