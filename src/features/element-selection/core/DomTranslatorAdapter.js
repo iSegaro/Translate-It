@@ -89,7 +89,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
             if (data.success === false || data.error) {
-              this.logger.error('Stream update error:', data.error);
+              const errorMsg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Unknown update error');
+              const errorType = data.error?.type || 'UNKNOWN';
+              this.logger.error(`Stream update error: ${errorMsg} (${errorType})`);
               
               // If it's a fatal error, resolve immediately to stop waiting
               const isFatal = isFatalError(data.error);

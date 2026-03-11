@@ -540,8 +540,10 @@ class SelectElementManager extends ResourceTracker {
         onComplete: async (status) => {
           this.logger.debug('Translation completed:', status);
         },
-        onError: async (error) => {
-          this.logger.error('Translation error:', error);
+        onError: async (errorData) => {
+          const error = errorData.error;
+          const errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown translation error');
+          this.logger.error(`Translation error: ${errorMsg}`);
         },
       });
 

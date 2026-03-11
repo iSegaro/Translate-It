@@ -130,6 +130,7 @@ function formatMessage(component, level, message, data) {
   }
 
   if (data && typeof data === "object") {
+    // If it's a plain object or error, return it as-is for the console to handle
     return [prefix, message, data];
   }
   return [prefix, message, data].filter(Boolean);
