@@ -41,6 +41,14 @@ export class LingvaProvider extends BaseTranslateProvider {
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
     const apiPath = await this._getApiPath();
+    
+    // Validate configuration
+    this._validateConfig(
+      { apiPath },
+      ["apiPath"],
+      `${this.providerName.toLowerCase()}-translation`
+    );
+
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
@@ -71,7 +79,9 @@ export class LingvaProvider extends BaseTranslateProvider {
           if (data && data.translation) {
             return data.translation;
           }
-          throw new Error("Invalid response from Lingva API");
+          const err = new Error("Invalid API response from Lingva");
+          err.type = ErrorTypes.API_RESPONSE_INVALID;
+          throw err;
         },
         context: 'lingva-translate-segment',
         abortController
