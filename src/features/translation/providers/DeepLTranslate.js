@@ -13,6 +13,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 
@@ -741,6 +742,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       }
 
       // Otherwise, rethrow the error
+      const errorType = error.type || matchErrorToType(error);
+      if (isFatalError(error) || isFatalError(errorType)) {
+        if (!error.type) error.type = errorType;
+      }
       throw error;
     }
   }
