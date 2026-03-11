@@ -54,6 +54,7 @@
         {
           'fade-in': false /* Animation disabled */,
           /* 'loading-dim': isLoading */
+          'has-error': hasError
         },
         contentClass,
         { 'rtl-content': textDirection?.dir === 'rtl' },
@@ -67,13 +68,34 @@
       }"
     >
       <!-- Error State with Actions -->
-      <div v-if="hasError" class="error-message">
-        <div class="error-text">⚠️ {{ error }}</div>
-        <div v-if="canRetry || canOpenSettings" class="error-actions">
-          <button v-if="canRetry" class="error-action retry-btn" @click="handleRetry">
+      <div 
+        v-if="hasError" 
+        class="error-message"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 8px !important; box-sizing: border-box !important; margin: 4px 0 !important;"
+      >
+        <div 
+          class="error-text"
+          style="display: block !important; margin: 0 !important; color: #b02a37 !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
+        >
+          ⚠️ {{ error }}
+        </div>
+        <div 
+          v-if="canRetry || canOpenSettings" 
+          class="error-actions"
+          style="display: flex !important; gap: 8px !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin-top: 4px !important;"
+        >
+          <button 
+            v-if="canRetry" 
+            class="error-action retry-btn" 
+            @click="handleRetry"
+          >
             🔄 {{ t('action_retry') }}
           </button>
-          <button v-if="canOpenSettings" class="error-action settings-btn" @click="handleSettings">
+          <button 
+            v-if="canOpenSettings" 
+            class="error-action settings-btn" 
+            @click="handleSettings"
+          >
             ⚙️ {{ t('action_settings') }}
           </button>
         </div>
@@ -477,6 +499,10 @@ onMounted(() => {
   overflow-x: hidden;
 }
 
+.ti-translation-content.has-error {
+  padding-top: 2px !important;
+}
+
 /*
   ROOT-CAUSE FIX: CSS Grid-based List Layout
   - Eliminates absolute positioning issues
@@ -557,6 +583,10 @@ onMounted(() => {
   padding: 42px 5px 0px 5px;
 }
 
+.ti-sidepanel-mode .ti-translation-content.has-error {
+  padding-top: 2px !important;
+}
+
 /* Selection window adjustments */
 .ti-selection-mode .ti-translation-content {
   border: none;
@@ -575,8 +605,12 @@ onMounted(() => {
   padding: 40px 8px 8px 8px;
 }
 
+.ti-popup-mode .ti-translation-content.has-error {
+  padding-top: 2px !important;
+}
+
 /* Message styling */
-.ti-translation-content :deep(.placeholder-message) {
+.ti-translation-content .placeholder-message {
   color: #6c757d;
   font-style: italic;
   opacity: 0.7;
@@ -584,65 +618,102 @@ onMounted(() => {
   padding: 16px;
 }
 
-.ti-translation-content :deep(.error-message) {
-  color: #dc3545;
-  font-style: italic;
-  padding: 12px;
-  border-left: 3px solid #dc3545;
-  background-color: rgba(220, 53, 69, 0.1);
-  border-radius: 6px;
-  line-height: 1.4;
-  font-family: var(--translation-font-family, inherit);
-  font-size: var(--translation-font-size, 14px);
+.error-message {
+  color: #dc3545 !important;
+  font-style: normal !important;
+  padding: 24px 16px !important;
+  border-radius: 12px !important;
+  line-height: 1.6 !important;
+  background-color: rgba(220, 53, 69, 0.08) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  min-height: 140px !important;
+  gap: 20px !important;
+  border: 1px solid rgba(220, 53, 69, 0.2) !important;
+  margin: 12px 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  position: relative !important;
 }
 
-.ti-translation-content :deep(.error-text) {
-  margin-bottom: 8px;
+.error-text {
+  margin: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-weight: 500 !important;
+  flex-grow: 1 !important;
+  color: #b02a37 !important;
+  font-size: 14px !important;
 }
 
-.ti-translation-content :deep(.error-actions) {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
+.error-actions {
+  display: flex !important;
+  gap: 12px !important;
+  margin-top: auto !important;
+  margin-bottom: 4px !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
 }
 
-.ti-translation-content :deep(.error-action) {
+.error-action {
   background: #dc3545;
-  color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: background-color 0.2s ease;
-  font-weight: 500;
+  color: white !important;
+  border: none !important;
+  padding: 8px 20px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3) !important;
+  text-decoration: none !important;
+  min-width: 120px !important;
+  white-space: nowrap !important;
 }
 
-.ti-translation-content :deep(.error-action:hover) {
-  background: #c82333;
+.error-action:hover {
+  background: #c82333 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 5px 12px rgba(220, 53, 69, 0.4) !important;
 }
 
-.ti-translation-content :deep(.error-action.retry-btn) {
-  background: #007bff;
+.error-action:active {
+  transform: translateY(0) !important;
 }
 
-.ti-translation-content :deep(.error-action.retry-btn:hover) {
-  background: #0056b3;
+.error-action.retry-btn {
+  background: #1967d2 !important;
+  box-shadow: 0 2px 6px rgba(25, 103, 210, 0.3) !important;
 }
 
-.ti-translation-content :deep(.error-action.settings-btn) {
-  background: #6c757d;
+.error-action.retry-btn:hover {
+  background: #1557b0 !important;
+  box-shadow: 0 5px 12px rgba(25, 103, 210, 0.4) !important;
 }
 
-.ti-translation-content :deep(.error-action.settings-btn:hover) {
-  background: #5a6268;
+.error-action.settings-btn {
+  background: #5f6368 !important;
+  box-shadow: 0 2px 6px rgba(95, 99, 104, 0.3) !important;
 }
 
-.ti-translation-content :deep(.loading-message) {
+.error-action.settings-btn:hover {
+  background: #4a4e52 !important;
+  box-shadow: 0 5px 12px rgba(95, 99, 104, 0.4) !important;
+}
+
+.ti-translation-content .loading-message {
   color: var(--accent-color, #1967d2);
   font-style: italic;
   opacity: 0.8;
