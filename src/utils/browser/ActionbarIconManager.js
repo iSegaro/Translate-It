@@ -51,7 +51,7 @@ class ActionbarIconManager {
       const storedProvider = await storageManager.get('TRANSLATION_API');
       this.currentProvider = storedProvider.TRANSLATION_API || 'google';
 
-      logger.debug(`🎯 Simple icon manager initialized for: ${this.currentProvider}`);
+      logger.debug(`Simple icon manager initialized for: ${this.currentProvider}`);
 
       // Update icon immediately
       await this.updateIcon(this.currentProvider);
@@ -86,8 +86,8 @@ class ActionbarIconManager {
    * Update icon for provider
    */
   async updateIcon(provider) {
+    const logger = getLogger();
     try {
-      const logger = getLogger();
       logger.debug(`Updating icon for: ${provider}`);
 
       // Create composite icon with provider overlay
@@ -95,16 +95,13 @@ class ActionbarIconManager {
 
       if (compositeImageData) {
         await this.setBrowserIconWithImageData(compositeImageData);
-        const logger = getLogger();
         logger.debug(`Icon updated for: ${provider}`);
       } else {
-        const logger = getLogger();
         logger.warn(`Failed to create composite icon for: ${provider}`);
       }
 
     } catch (error) {
-      const logger = getLogger();
-      logger.error(`❌ Failed to update icon for ${provider}:`, error);
+      logger.error(`Failed to update icon for ${provider}:`, error);
     }
   }
 
@@ -132,6 +129,7 @@ class ActionbarIconManager {
    * Load image and convert to imageData using fetch and OffscreenCanvas
    */
   async loadImageData(iconPath) {
+    const logger = getLogger();
     try {
       // Get full URL for the icon
       const fullUrl = browser.runtime.getURL(iconPath);
@@ -139,7 +137,6 @@ class ActionbarIconManager {
       // Fetch the image
       const response = await fetch(fullUrl);
       if (!response.ok) {
-        const logger = getLogger();
         logger.error(`Failed to fetch image: ${fullUrl}`);
         return null;
       }
@@ -163,7 +160,6 @@ class ActionbarIconManager {
 
       return imageData;
     } catch (error) {
-      const logger = getLogger();
       logger.error('Error in loadImageData:', error);
       return null;
     }
@@ -173,17 +169,17 @@ class ActionbarIconManager {
    * Create composite icon with provider overlay
    */
   async createCompositeIcon(provider) {
+    const logger = getLogger();
     try {
       // Load main extension icon
       const mainIconBitmap = await this.loadImageBitmap('icons/extension/extension_icon_128.png');
 
       // Load provider overlay icon
-      const providerIconPath = this.getProviderIconPath(provider);
+      const providerIconPath = await this.getProviderIconPath(provider);
       const providerIconBitmap = await this.loadImageBitmap(providerIconPath);
 
       // Simple fallback check
       if (!mainIconBitmap || !providerIconBitmap) {
-        const logger = getLogger();
         logger.warn(`Icon loading failed - Main: ${!!mainIconBitmap}, Provider: ${!!providerIconBitmap} for ${provider}`);
         return null;
       }
