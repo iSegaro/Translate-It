@@ -365,7 +365,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Stop waiting for stream
       if (this.currentStreamEndReject) {
-        const cancelError = new Error('Translation cancelled by user');
+        const cancelError = new Error(ErrorTypes.USER_CANCELLED);
         if (silent) {
           cancelError.showToast = false;
         }

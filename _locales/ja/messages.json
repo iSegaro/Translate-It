@@ -1121,6 +1121,9 @@
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
     "message": "{error}"
   },
+  "ERRORS_USER_CANCELLED": { 
+    "message": "翻訳がキャンセルされました。"
+  },
   "gemini_thinking_label": {
     "message": "思考モードを有効にする"
   },

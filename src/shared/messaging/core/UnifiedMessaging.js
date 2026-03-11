@@ -257,7 +257,9 @@ export async function sendRegularMessage(message, options = {}) {
     // Check if streaming operation was cancelled before sending the message
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
       getLogger().debug('Streaming operation was cancelled, not sending message');
-      throw new Error('Translation cancelled by user');
+      const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+      cancelError.type = ErrorTypes.USER_CANCELLED;
+      throw cancelError;
     }
 
     const sendPromise = browser.runtime.sendMessage(message);
@@ -274,7 +276,9 @@ export async function sendRegularMessage(message, options = {}) {
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
           isCancelled = true;
           if (cancellationInterval) clearInterval(cancellationInterval);
-          reject(new Error('Translation cancelled by user'));
+          const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+          cancelError.type = ErrorTypes.USER_CANCELLED;
+          reject(cancelError);
           return;
         }
 

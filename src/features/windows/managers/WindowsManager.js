@@ -15,6 +15,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
@@ -611,11 +612,15 @@ export class WindowsManager extends ResourceTracker {
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
         this.logger.info('Translation cancelled by user, updating window with cancellation message');
+        
+        // Get localized message for cancellation
+        const errorInfo = await this.errorHandler.getErrorForUI(new Error(ErrorTypes.USER_CANCELLED), 'windows-translation');
+        
         WindowsManagerEvents.updateWindow(windowId, {
           initialSize: 'normal',
           isLoading: false,
           isError: true,
-          initialTranslatedText: 'Translation cancelled by user'
+          initialTranslatedText: errorInfo.message
         });
         return;
       }
@@ -900,12 +905,15 @@ export class WindowsManager extends ResourceTracker {
             });
           } else {
             // Translation was cancelled
-            WindowsManagerEvents.updateWindow(windowId, {
-              initialSize: 'normal',
-              isLoading: false,
-              isError: true,
-              initialTranslatedText: 'Translation cancelled by user'
-            });
+            this.errorHandler.getErrorForUI(new Error(ErrorTypes.USER_CANCELLED), 'windows-translation')
+              .then(errorInfo => {
+                WindowsManagerEvents.updateWindow(windowId, {
+                  initialSize: 'normal',
+                  isLoading: false,
+                  isError: true,
+                  initialTranslatedText: errorInfo.message
+                });
+              });
           }
         })
         .catch(async (error) => {

@@ -644,7 +644,9 @@
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
     "message": "{error}"
   },
-
+  "ERRORS_USER_CANCELLED": {
+    "message": "Translation cancelled by user."
+  },
   "gemini_thinking_label": {
     "message": "Enable Thinking Mode"
   },

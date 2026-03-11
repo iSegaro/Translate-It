@@ -889,7 +889,7 @@ export class TranslationEngine {
       }
 
       // If translation was cancelled by user, stop all processing
-      if (errorMessage && errorMessage.includes('Translation cancelled by user')) {
+      if (errorMessage && (errorMessage.includes('Translation cancelled by user') || errorMessage.includes(ErrorTypes.USER_CANCELLED))) {
         logger.debug('[TranslationEngine] User cancellation detected - stopping all batches');
         if (sharedState) sharedState.isCancelled = true;
         throw batchError; // Re-throw to stop translation completely
@@ -965,7 +965,7 @@ export class TranslationEngine {
           }
           
           // If translation was cancelled by user, stop all processing
-          if (errorMessage && errorMessage.includes('Translation cancelled by user')) {
+          if (errorMessage && (errorMessage.includes('Translation cancelled by user') || errorMessage.includes(ErrorTypes.USER_CANCELLED))) {
             logger.debug('[TranslationEngine] User cancellation detected in individual translation');
             return { idx, result: segments[idx], success: false };
           }
@@ -1191,7 +1191,7 @@ export class TranslationEngine {
       // Cancel streaming session if active
       try {
         const { streamingManager } = await import("./StreamingManager.js");
-        await streamingManager.cancelStream(messageId, 'Translation cancelled by user');
+        await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
       } catch (error) {
         logger.debug(`[TranslationEngine] StreamingManager cancel failed (might not be streaming): ${error.message}`);
       }

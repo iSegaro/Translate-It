@@ -198,6 +198,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("cancelled by user") ||
     msg.includes("translation cancelled") ||
     msg.includes("user cancelled") ||
+    msg.includes("user_cancelled") ||
     msg.includes("operation cancelled")
   )
     return ErrorTypes.USER_CANCELLED;

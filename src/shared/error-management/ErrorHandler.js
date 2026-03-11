@@ -134,7 +134,8 @@ export class ErrorHandler {
           ErrorTypes.DEEPL_QUOTA_EXCEEDED,
           ErrorTypes.GEMINI_QUOTA_REGION,
           ErrorTypes.TRANSLATION_FAILED,
-          ErrorTypes.TRANSLATION_ERROR
+          ErrorTypes.TRANSLATION_ERROR,
+          ErrorTypes.USER_CANCELLED
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic
@@ -275,7 +276,8 @@ export class ErrorHandler {
           ErrorTypes.DEEPL_QUOTA_EXCEEDED,
           ErrorTypes.GEMINI_QUOTA_REGION,
           ErrorTypes.TRANSLATION_FAILED,
-          ErrorTypes.TRANSLATION_ERROR
+          ErrorTypes.TRANSLATION_ERROR,
+          ErrorTypes.USER_CANCELLED
         ].includes(type);
 
         // Prefer the original message if it's informative and not generic

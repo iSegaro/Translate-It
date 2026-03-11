@@ -1121,6 +1121,9 @@
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
     "message": "{error}"
   },
+  "ERRORS_USER_CANCELLED": { 
+    "message": "ترجمه توسط کاربر لغو شد."
+  },
   "gemini_thinking_label": {
     "message": "فعال‌سازی حالت تفکر"
   },
