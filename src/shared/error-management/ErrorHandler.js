@@ -117,38 +117,42 @@ export class ErrorHandler {
         // For API configuration errors, always use the localized generic message
         // These errors have specific, user-friendly messages that should always be shown
         // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
-        const shouldUseGenericMessage = [
+        // For API configuration, quota and rate limit errors, always use the localized generic message
+        const isCriticalConfigError = [
           ErrorTypes.API_KEY_MISSING,
           ErrorTypes.API_KEY_INVALID,
           ErrorTypes.API_URL_MISSING,
           ErrorTypes.MODEL_MISSING,
+          ErrorTypes.QUOTA_EXCEEDED,
+          ErrorTypes.RATE_LIMIT_REACHED,
           ErrorTypes.INSUFFICIENT_BALANCE,
+          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+          ErrorTypes.GEMINI_QUOTA_REGION
+        ].includes(type);
+
+        const shouldUseGenericMessage = isCriticalConfigError || [
           ErrorTypes.FORBIDDEN_ERROR,
           ErrorTypes.NETWORK_ERROR,
           ErrorTypes.HTTP_ERROR,
           ErrorTypes.SERVER_ERROR,
-          ErrorTypes.QUOTA_EXCEEDED,
-          ErrorTypes.RATE_LIMIT_REACHED,
           ErrorTypes.MODEL_OVERLOADED,
           ErrorTypes.INVALID_REQUEST,
-          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION,
           ErrorTypes.TRANSLATION_FAILED,
           ErrorTypes.TRANSLATION_ERROR,
           ErrorTypes.USER_CANCELLED
         ].includes(type);
 
-        // Prefer the original message if it's informative and not generic
-        if (!shouldUseGenericMessage && raw &&
-            raw.length > 5 && // Must have meaningful content
-            !raw.includes('[object Object]') && // Not just object string
-            !raw.startsWith('Error:') && // Not generic error prefix
-            !raw.match(/^(undefined|null|object)$/) && // Not undefined/null
-            !raw.includes('Script error.') && // Not generic script error
-            !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
+        // Prefer the original message IF it's not a critical config error and is informative
+        if (!isCriticalConfigError && !shouldUseGenericMessage && raw &&
+            raw.length > 5 && 
+            !raw.includes('[object Object]') &&
+            !raw.startsWith('Error:') &&
+            !raw.match(/^(undefined|null|object)$/) &&
+            !raw.includes('Script error.') &&
+            !raw.includes('Non-Error promise rejection captured')) {
           msg = raw;
         } else {
-          // Use generic message for generic errors or API configuration errors
+          // Always use localized message for critical/quota/rate-limit errors
           msg = genericMsg;
         }
       } catch {

@@ -1077,7 +1077,7 @@
     "message": "کلید API نامعتبر یا غیرمجاز است."
   },
   "ERRORS_API_URL_MISSING": {
-    "message": "آدرس URL برای API وارد نشده است."
+    "message": "آدرس API نامعتبر است (خطای ۴۰۴)."
   },
   "ERRORS_MODEL_MISSING": {
     "message": "مدل هوش مصنوعی انتخاب شده نامعتبر یا پیدا نشده است."

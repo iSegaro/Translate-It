@@ -3,6 +3,7 @@
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
 const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
 
 
@@ -125,8 +126,16 @@ export function matchErrorToType(rawOrError = "") {
           return ErrorTypes.FORBIDDEN_ERROR;
 
         // منبع یا مدل پیدا نشد
-        case 404:
-          return ErrorTypes.MODEL_MISSING;
+        case 404: {
+          // برای تمام پرووایدرها، ۴۰۴ به معنی عدم دسترسی به آدرس صحیح است و باید فرآیند متوقف شود
+          const providerType = rawOrError.providerType;
+          const msgLower = (rawOrError.message || "").toLowerCase();
+          
+          if (providerType === ProviderTypes.AI || msgLower.includes('model')) {
+            return ErrorTypes.MODEL_MISSING;
+          }
+          return ErrorTypes.API_URL_MISSING;
+        }
 
         // درخواست نامعتبر (پارامترها یا ساختار اشتباه)
         // After message check above, fall back to INVALID_REQUEST
@@ -322,17 +331,20 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("http 404") ||
     msg.includes("404 error") ||
     msg.includes("not found") ||
-    msg.includes("model not found") ||
     msg.includes("resource not found")
-  )
-    return ErrorTypes.MODEL_MISSING;
+  ) {
+    if (msg.includes("model")) return ErrorTypes.MODEL_MISSING;
+    return ErrorTypes.API_URL_MISSING;
+  }
 
   if (
     msg.includes("http 429") ||
     msg.includes("429 error") ||
     msg.includes("status 429") ||
     msg.includes("rate limit") ||
-    msg.includes("too many requests")
+    msg.includes("too many requests") ||
+    msg.includes("rate-limited") ||
+    msg.includes("website owner's configuration")
   )
     return ErrorTypes.RATE_LIMIT_REACHED;
 

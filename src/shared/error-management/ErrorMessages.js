@@ -22,7 +22,7 @@ export const errorMessages = {
   [ErrorTypes.API_RESPONSE_INVALID]: "Invalid API response format",
   [ErrorTypes.API_KEY_MISSING]: "API Key is missing",
   [ErrorTypes.API_KEY_INVALID]: "API Key is wrong or invalid",
-  [ErrorTypes.API_URL_MISSING]: "API URL is missing",
+  [ErrorTypes.API_URL_MISSING]: "API URL is missing or invalid",
   [ErrorTypes.MODEL_MISSING]: "AI Model is missing or invalid",
   [ErrorTypes.MODEL_OVERLOADED]: "The Model is overloaded",
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
@@ -34,7 +34,7 @@ export const errorMessages = {
   [ErrorTypes.FORBIDDEN_ERROR]:
     "Access denied. Check permissions or potential content moderation.", // برای 403
   [ErrorTypes.RATE_LIMIT_REACHED]:
-    "Rate limit reached. Please pace your requests or try again later.", // برای 429
+    "Rate limit reached. Please try again in a few minutes.", // برای 429
   [ErrorTypes.SERVER_ERROR]:
     "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
 

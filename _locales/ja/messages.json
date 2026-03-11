@@ -1077,7 +1077,7 @@
     "message": "APIキーが無効または認証されていません。"
   },
   "ERRORS_API_URL_MISSING": {
-    "message": "API URLが設定されていません。"
+    "message": "APIアドレスが無効です（404エラー）。"
   },
   "ERRORS_MODEL_MISSING": {
     "message": "選択したAIモデルが見つからないか無効です。"

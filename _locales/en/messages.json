@@ -601,7 +601,7 @@
   "ERRORS_API_KEY_INVALID": {
     "message": "API Key is invalid or unauthorized."
   },
-  "ERRORS_API_URL_MISSING": { "message": "API URL is missing." },
+  "ERRORS_API_URL_MISSING": { "message": "Invalid API address (404 error)." },
   "ERRORS_MODEL_MISSING": {
     "message": "The selected AI Model is missing or invalid."
   },

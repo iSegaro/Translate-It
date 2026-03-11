@@ -345,9 +345,11 @@ export class BaseProvider {
         });
 
         // Determine error type centrally based on status code, message, and response body
+        // Pass providerType to differentiate between AI and traditional providers
         const errorType = matchErrorToType({ 
           statusCode: response.status, 
           message: msg, 
+          providerType: this.constructor.type,
           ...body 
         });
 
