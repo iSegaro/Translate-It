@@ -1553,6 +1553,12 @@
   "action_stop_speaking": {
     "message": "読み上げを停止"
   },
+  "action_retry": {
+    "message": "再試行"
+  },
+  "action_settings": {
+    "message": "設定"
+  },
   "translateSelectedText": {
     "message": "選択したテキストを翻訳"
   },

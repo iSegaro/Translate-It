@@ -155,6 +155,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
@@ -271,7 +272,7 @@ const handleRetry = () => {
 
 const handleOpenSettings = () => {
   logger.info('Open settings requested for translation window:', props.id);
-  pageEventBus.emit('open-options-page', { section: 'api' });
+  pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS, { section: 'languages' });
 };
 const showOriginal = ref(false);
 

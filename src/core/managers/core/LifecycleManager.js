@@ -103,7 +103,7 @@ class LifecycleManager {
     const handlerMappings = {
       // Common handlers
       'ping': Handlers.handlePingLazy,
-      'openOptionsPage': Handlers.handleOpenOptionsPageLazy,
+      [MessageActions.OPEN_OPTIONS_PAGE]: Handlers.handleOpenOptionsPageLazy,
       'openURL': Handlers.handleOpenURLLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,

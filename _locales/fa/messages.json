@@ -1551,6 +1551,12 @@
   "action_stop_speaking": {
     "message": "توقف خواندن"
   },
+  "action_retry": {
+    "message": "تلاش مجدد"
+  },
+  "action_settings": {
+    "message": "تنظیمات"
+  },
   "translateSelectedText": {
     "message": "ترجمه متن انتخاب شده"
   },

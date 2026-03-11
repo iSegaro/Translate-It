@@ -90,6 +90,8 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
 
 const pageEventBus = window.pageEventBus;
@@ -398,6 +400,17 @@ onMounted(async () => {
     logger.info('Received dismiss_all_notifications event');
     // Dismiss all notifications except select-element ones
     toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
+  });
+
+  // Handle open-options-page requests from translation windows and notifications
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS, (detail) => {
+    logger.info('Received open-options-page event:', detail);
+    const anchor = detail?.section || detail?.anchor;
+    
+    browser.runtime.sendMessage({
+      action: MessageActions.OPEN_OPTIONS_PAGE,
+      data: { anchor }
+    }).catch(err => logger.error('Error opening options page:', err));
   });
 
   // Select element notifications should NOT be auto-dismissed

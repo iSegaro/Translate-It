@@ -66,8 +66,32 @@
         textAlign: textDirection?.textAlign || 'left',
       }"
     >
-      <!-- Safe: Content is sanitized with DOMPurify -->
-      <div v-html="sanitizedContent" />
+      <!-- Error State with Actions -->
+      <div v-if="hasError" class="error-message">
+        <div class="error-text">⚠️ {{ error }}</div>
+        <div v-if="canRetry || canOpenSettings" class="error-actions">
+          <button v-if="canRetry" class="error-action retry-btn" @click="handleRetry">
+            🔄 {{ t('action_retry') }}
+          </button>
+          <button v-if="canOpenSettings" class="error-action settings-btn" @click="handleSettings">
+            ⚙️ {{ t('action_settings') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-else-if="isLoading" class="loading-message">
+        {{ t('SELECT_ELEMENT_TRANSLATING') }}
+      </div>
+
+      <!-- Placeholder State -->
+      <div v-else-if="!content" class="placeholder-message">
+        {{ placeholder }}
+      </div>
+
+      <!-- Normal Content with Markdown Support -->
+      <!-- Safe: Content is sanitized with DOMPurify if markdown is enabled -->
+      <div v-else v-html="sanitizedContent" />
     </div>
   </div>
 </template>
@@ -80,8 +104,12 @@ import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
 import { useFont } from "@/composables/shared/useFont.js";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+
+// Localization
+const { t } = useUnifiedI18n();
 
 // Props
 const props = defineProps({
@@ -308,40 +336,8 @@ const sanitizedContent = computed(() => {
 });
 
 const renderedContent = computed(() => {
-  if (props.error) {
-    const errorActions = [];
-
-    // Add retry action if available
-    if (props.canRetry && props.onRetry) {
-      errorActions.push(
-        `<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`,
-      );
-    }
-
-    // Add settings action if available
-    if (props.canOpenSettings && props.onOpenSettings) {
-      errorActions.push(
-        `<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`,
-      );
-    }
-
-    const actionsHtml =
-      errorActions.length > 0
-        ? `<div class="error-actions">${errorActions.join("")}</div>`
-        : "";
-
-    return `<div class="error-message">
-      <div class="error-text">⚠️ ${props.error}</div>
-      ${actionsHtml}
-    </div>`;
-  }
-
-  if (props.isLoading) {
-    return `<div class="loading-message">در حال ترجمه...</div>`;
-  }
-
   if (!props.content) {
-    return `<div class="placeholder-message">${props.placeholder}</div>`;
+    return '';
   }
 
   if (props.enableMarkdown) {
@@ -366,12 +362,6 @@ watch(
   () => props.content,
   () => {
     // Fade-in animation disabled as requested
-    // if (newContent && newContent !== oldContent) {
-    //   showFadeIn.value = true
-    //   setTimeout(() => {
-    //     showFadeIn.value = false
-    //   }, 400)
-    // }
   },
   { immediate: true },
 );
@@ -412,12 +402,6 @@ const handleSettings = () => {
   }
   emit("settings-requested");
 };
-
-// Make handlers globally accessible for onclick handlers
-if (typeof window !== "undefined") {
-  window.handleRetry = handleRetry;
-  window.handleSettings = handleSettings;
-}
 
 // Setup dynamic height for different modes
 onMounted(() => {

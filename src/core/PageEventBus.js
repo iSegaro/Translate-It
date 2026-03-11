@@ -13,16 +13,38 @@ class EventBus {
     this.bus = (typeof document !== 'undefined')
       ? document.createElement('div')
       : null;
+    
+    // Store wrapped callbacks for proper removal
+    this.wrappedCallbacks = new Map();
   }
 
   on(event, callback) {
     if (!this.bus) return; // Do nothing in non-document contexts (e.g., background script)
-    this.bus.addEventListener(event, (e) => callback(e.detail));
+    
+    const wrappedCallback = (e) => callback(e.detail);
+    
+    // Store mapping from original callback to wrapped callback
+    if (!this.wrappedCallbacks.has(event)) {
+      this.wrappedCallbacks.set(event, new Map());
+    }
+    this.wrappedCallbacks.get(event).set(callback, wrappedCallback);
+    
+    this.bus.addEventListener(event, wrappedCallback);
   }
 
   off(event, callback) {
     if (!this.bus) return;
-    this.bus.removeEventListener(event, callback);
+    
+    const eventCallbacks = this.wrappedCallbacks.get(event);
+    if (eventCallbacks && eventCallbacks.has(callback)) {
+      const wrappedCallback = eventCallbacks.get(callback);
+      this.bus.removeEventListener(event, wrappedCallback);
+      eventCallbacks.delete(callback);
+      
+      if (eventCallbacks.size === 0) {
+        this.wrappedCallbacks.delete(event);
+      }
+    }
   }
 
   emit(event, detail = {}) {
@@ -60,6 +82,9 @@ export const WINDOWS_MANAGER_EVENTS = {
   SHOW_ICON: 'windows-manager-show-icon',
   DISMISS_WINDOW: 'windows-manager-dismiss-window',
   DISMISS_ICON: 'windows-manager-dismiss-icon',
+  
+  // Settings
+  OPEN_SETTINGS: 'open-options-page',
   
   // Icon interaction
   ICON_CLICKED: 'windows-manager-icon-clicked'

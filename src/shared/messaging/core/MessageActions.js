@@ -6,6 +6,7 @@ export class MessageActions {
   static PING = 'ping';
   static GET_INFO = 'getInfo';
   static HANDLE_ERROR = 'handleError';
+  static OPEN_OPTIONS_PAGE = 'openOptionsPage';
   
   // Translation actions
   static TRANSLATE = 'TRANSLATE';

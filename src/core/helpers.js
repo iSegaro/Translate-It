@@ -1,5 +1,6 @@
 // src/core/helpers.js
 import browser from "webextension-polyfill";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -70,11 +71,11 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
 export const openOptionsPage = (anchor = null) => {
   browser.runtime
     .sendMessage({
-      action: "open_options_page",
+      action: MessageActions.OPEN_OPTIONS_PAGE,
       data: { anchor: anchor },
     })
     .catch((err) => {
-      logger.error("Error sending open_options_page message:", err);
+      logger.error("Error sending openOptionsPage message:", err);
     });
 };
 
