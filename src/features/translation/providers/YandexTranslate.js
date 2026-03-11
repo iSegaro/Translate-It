@@ -6,6 +6,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
 
@@ -99,7 +100,10 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       extractResponse: (data) => {
         if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunkTexts.length) {
           logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
-          return chunkTexts.map(() => '');
+          const err = new Error(`Yandex API error (Code: ${data?.code || 'unknown'})`);
+          err.type = ErrorTypes.API_RESPONSE_INVALID;
+          err.statusCode = data?.code;
+          throw err;
         }
         return data.text;
       },
