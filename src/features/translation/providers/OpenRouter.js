@@ -78,9 +78,9 @@ export class OpenRouterProvider extends BaseAIProvider {
       }),
     };
 
-    // Use failover-enabled API call with updateApiKey callback
+    // Use unified API request handler
     try {
-      const result = await this._executeApiCallWithFailover({
+      const result = await this._executeRequest({
         url: CONFIG.OPENROUTER_API_URL,
         fetchOptions,
         extractResponse: (data) => data?.choices?.[0]?.message?.content,

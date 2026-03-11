@@ -87,7 +87,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     url.searchParams.set("id", `${uuid}-0-0`);
     url.searchParams.set("srv", "android");
 
-    const result = await this._executeWithErrorHandling({
+    const result = await this._executeRequest({
       url: url.toString(),
       fetchOptions: {
         method: "POST",
@@ -139,7 +139,7 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     }
 
     try {
-      const result = await this._executeWithErrorHandling({
+      const result = await this._executeRequest({
         url: url.toString(),
         fetchOptions: {
           method: "POST",

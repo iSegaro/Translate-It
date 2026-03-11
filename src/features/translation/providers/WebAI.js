@@ -70,7 +70,8 @@ export class WebAIProvider extends BaseAIProvider {
     };
 
     try {
-      const result = await this._executeApiCall({
+      // Use unified API request handler
+      const result = await this._executeRequest({
         url: apiUrl,
         fetchOptions,
         extractResponse: (data) =>

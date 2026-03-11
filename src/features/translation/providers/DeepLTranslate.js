@@ -494,7 +494,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     });
 
     try {
-      const result = await this._executeWithErrorHandling({
+      const result = await this._executeRequest({
         url: apiUrl,
         fetchOptions: {
           method: "POST",
@@ -699,7 +699,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             requestBody.append('split_sentences', 'nonewlines');
             requestBody.append('preserve_formatting', '1');
 
-            const result = await this._executeWithErrorHandling({
+            const result = await this._executeRequest({
               url: apiUrl,
               fetchOptions: {
                 method: "POST",

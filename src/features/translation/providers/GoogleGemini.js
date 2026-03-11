@@ -172,8 +172,8 @@ export class GeminiProvider extends BaseAIProvider {
     const context = `${this.providerName.toLowerCase()}-translation`;
 
     try {
-      // Use failover-enabled API call with updateApiKey callback
-      const result = await this._executeApiCallWithFailover({
+      // Use unified API request handler
+      const result = await this._executeRequest({
         url,
         fetchOptions,
         extractResponse: (data) =>

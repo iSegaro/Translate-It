@@ -38,7 +38,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
     logger.debug('[Edge] Fetching new auth token...');
     
-    return this._executeWithErrorHandling({
+    return this._executeRequest({
       url: MicrosoftEdgeProvider.authUrl,
       fetchOptions: {
         method: 'GET',
@@ -101,7 +101,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
     // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
     const body = chunkTexts.map(text => ({ Text: text }));
 
-    return this._executeWithErrorHandling({
+    return this._executeRequest({
       url: url.toString(),
       fetchOptions: {
         method: "POST",

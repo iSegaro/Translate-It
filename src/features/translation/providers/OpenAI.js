@@ -79,8 +79,8 @@ export class OpenAIProvider extends BaseAIProvider {
       }),
     };
 
-    // Use failover-enabled API call with updateApiKey callback
-    const result = await this._executeApiCallWithFailover({
+    // Use unified API request handler
+    const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,

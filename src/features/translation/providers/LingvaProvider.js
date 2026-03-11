@@ -61,7 +61,7 @@ export class LingvaProvider extends BaseTranslateProvider {
       // URL encode the text to handle special characters
       const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(text)}`;
       
-      const result = await this._executeWithErrorHandling({
+      const result = await this._executeRequest({
         url,
         fetchOptions: {
           method: "GET",

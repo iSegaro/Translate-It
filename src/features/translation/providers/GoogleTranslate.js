@@ -75,7 +75,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
-    const result = await this._executeWithErrorHandling({
+    const result = await this._executeRequest({
       url: `${apiUrl}?${queryParams.toString()}`,
       fetchOptions: {
         method: "POST",
