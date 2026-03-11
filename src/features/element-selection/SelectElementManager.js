@@ -108,8 +108,15 @@ class SelectElementManager extends ResourceTracker {
       // Setup cross-frame communication
       this.setupCrossFrameCommunication();
 
-      this.isInitialized = true;
-      this.logger.debug('SelectElementManager initialized successfully');
+      // Listen for conflicting features (like Whole Page Translation)
+      pageEventBus.on('STOP_CONFLICTING_FEATURES', (data) => {
+        if (this.isActive && data?.source !== 'select-element') {
+          this.logger.info('Stopping Select Element mode due to conflicting feature:', data?.source);
+          this.deactivate({ silent: true });
+        }
+      });
+
+      this.isInitialized = true;      this.logger.debug('SelectElementManager initialized successfully');
     } catch (error) {
       this.logger.error('Error initializing SelectElementManager:', error);
       throw error;
@@ -147,6 +154,9 @@ class SelectElementManager extends ResourceTracker {
     }
 
     this.logger.debug(`SelectElementManager.activateSelectElementMode() instanceId=${this.instanceId}`);
+
+    // Emit event to stop conflicting features (e.g., Whole Page Translation)
+    pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
 
     try {
       // Reset state

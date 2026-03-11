@@ -48,6 +48,14 @@ export class PageTranslationManager extends ResourceTracker {
     // Listen for fatal errors from scheduler (Circuit Breaker)
     pageEventBus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
       this._handleFatalError(error, errorType, localizedMessage));
+
+    // Listen for conflicting features (like Select Element Mode)
+    pageEventBus.on('STOP_CONFLICTING_FEATURES', (data) => {
+      if ((this.isTranslating || this.isTranslated) && data?.source !== 'page-translation') {
+        this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
+        this.restorePage(); // Fully restore if conflict happens
+      }
+    });
   }
 
   async activate() {
@@ -81,6 +89,9 @@ export class PageTranslationManager extends ResourceTracker {
 
     if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: 'busy_or_done' };
     if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: 'not_suitable' };
+
+    // Emit event to stop conflicting features (e.g., Select Element Mode)
+    pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
 
     this.isTranslating = true;
     this.abortController = new AbortController();
