@@ -8,11 +8,14 @@ import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsyn
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { delay } from '@/core/helpers.js';
 
 // Internal components
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { PageTranslationBridge } from './PageTranslationBridge.js';
+import { PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 export class PageTranslationManager extends ResourceTracker {
   constructor() {
@@ -20,6 +23,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'PageTranslationManager');
     
     this.toastIntegration = new ToastIntegration(pageEventBus);
+    this.notificationManager = new NotificationManager();
 
     this.isActive = false;
     this.isTranslating = false;
@@ -106,20 +110,18 @@ export class PageTranslationManager extends ResourceTracker {
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === 'lingva') {
         const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
-        pageEventBus.emit('show-notification', {
-          type: 'warning',
-          message: warningMessage || 'Lingva may have issues with long texts during page translation.',
-          duration: 5000,
-          id: `lingva-wpt-warning-${Date.now()}`
-        });
+        this.notificationManager.show(
+          warningMessage || 'Lingva may have issues with long texts during page translation.',
+          'warning',
+          PAGE_TRANSLATION_TIMING.WARNING_DURATION
+        );
       } else if (this.settings.translationApi === 'bing') {
         const warningMessage = await getTranslationString('BING_WPT_WARNING');
-        pageEventBus.emit('show-notification', {
-          type: 'warning',
-          message: warningMessage || 'Bing may have issues with long texts during page translation.',
-          duration: 5000,
-          id: `bing-wpt-warning-${Date.now()}`
-        });
+        this.notificationManager.show(
+          warningMessage || 'Bing may have issues with long texts during page translation.',
+          'warning',
+          PAGE_TRANSLATION_TIMING.WARNING_DURATION
+        );
       }
 
       this.scheduler.setSettings(this.settings);
@@ -175,7 +177,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.resetLocalState();
 
       // Small delay for DOM to stabilize
-      await new Promise(r => setTimeout(r, 50));
+      await delay(PAGE_TRANSLATION_TIMING.DOM_STABILIZATION_DELAY);
 
       const resultData = { url: this.currentUrl, restoredCount: 0 };
       this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData);
@@ -250,11 +252,11 @@ export class PageTranslationManager extends ResourceTracker {
     const displayError = localizedMessage || error.message || String(error);
     const finalMessage = stopMessage.replace('{error}', displayError).replace('$1', displayError);
 
-    pageEventBus.emit('show-notification', { 
-      message: finalMessage, 
-      type: 'warning', 
-      duration: 5000 
-    });
+    this.notificationManager.show(
+      finalMessage,
+      'warning',
+      PAGE_TRANSLATION_TIMING.FATAL_ERROR_DURATION
+    );
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
       error: displayError, 

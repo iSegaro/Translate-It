@@ -8,7 +8,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
+import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 
 /**
  * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
@@ -134,7 +134,9 @@ export class PageTranslationScheduler {
     // - Very first batch is slightly delayed to collect initial content.
     // - High priority items (Viewport) trigger faster processing (50ms).
     // - Low priority items use the standard pool delay (150ms-300ms).
-    const delay = this.isFirstBatch ? 500 : (isHighPriority ? 50 : this.settings.poolDelay);
+    const delay = this.isFirstBatch 
+      ? PAGE_TRANSLATION_TIMING.FIRST_BATCH_DELAY 
+      : (isHighPriority ? PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY : (this.settings.poolDelay || PAGE_TRANSLATION_TIMING.STANDARD_LOAD_DELAY));
 
     if (this.batchTimer) {
       // If a high-priority item comes in, we might want to speed up the existing timer
@@ -159,7 +161,7 @@ export class PageTranslationScheduler {
     // Respect concurrency limits
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       if (!this.batchTimer && this.isTranslated) {
-        this.batchTimer = setTimeout(() => this.flush(), 200);
+        this.batchTimer = setTimeout(() => this.flush(), PAGE_TRANSLATION_TIMING.CONCURRENCY_RETRY_DELAY);
       }
       return;
     }
