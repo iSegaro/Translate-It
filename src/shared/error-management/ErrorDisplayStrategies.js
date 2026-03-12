@@ -2,6 +2,7 @@
 // Context-aware error display strategies for different UI contexts
 
 import { ErrorTypes } from './ErrorTypes.js'
+import { isSilentError, needsSettings } from './ErrorMatcher.js'
 
 /**
  * Error display strategies for different contexts
@@ -11,73 +12,73 @@ export const ErrorDisplayStrategies = {
   content: {
     showToast: true,
     showInUI: false,
-    errorLevel: 'detailed', // Show detailed errors in toast since it's the only way to communicate
-    defaultDuration: 6000,  // Longer duration for reading
+    errorLevel: 'detailed',
+    defaultDuration: 6000,
     position: 'top-right'
   },
 
   // Popup context - users see errors in translation field primarily
   popup: {
-    showToast: false,       // Avoid toast overlap with small popup
+    showToast: false,
     showInUI: true,
-    errorLevel: 'detailed', // Show detailed errors in UI
+    errorLevel: 'detailed',
     supportRetry: true,
     supportSettings: true
   },
 
-  // Sidepanel context - users see errors in translation field with optional toast for critical errors
+  // Sidepanel context - users see errors in translation field
   sidepanel: {
-    showToast: false,       // Generally avoid toast, show in UI
+    showToast: false,
     showInUI: true,
-    errorLevel: 'detailed', // Show detailed errors in UI
+    errorLevel: 'detailed',
     supportRetry: true,
     supportSettings: true,
-    criticalErrorsShowToast: true // Only critical errors show toast
+    criticalErrorsShowToast: true
   },
 
   // Selection window context - minimal inline error display
   selection: {
     showToast: false,
     showInUI: true,
-    errorLevel: 'simplified', // Keep it simple for floating UI
+    errorLevel: 'simplified',
     maxMessageLength: 100,
-    supportRetry: false,    // No retry in selection context
-    supportSettings: false  // No settings access from selection
+    supportRetry: false,
+    supportSettings: false
   },
 
   // Windows Manager context - errors shown in window UI only
   'windows-manager': {
-    showToast: false,       // No toast - errors shown in translation window
+    showToast: false,
     showInUI: true,
-    errorLevel: 'detailed', // Show detailed errors in UI
-    supportRetry: false,    // Retry handled by re-selecting text
-    supportSettings: false // No settings access from windows
+    errorLevel: 'detailed',
+    supportRetry: false,
+    supportSettings: false
   },
 
   // Windows Manager translate context (specific to translation errors)
   'windows-manager-translate': {
-    showToast: false,       // No toast - errors shown in translation window
+    showToast: false,
     showInUI: true,
-    errorLevel: 'detailed', // Show detailed errors in UI
-    supportRetry: false,    // Retry handled by re-selecting text
-    supportSettings: false // No settings access from windows
+    errorLevel: 'detailed',
+    supportRetry: false,
+    supportSettings: false
   },
 
-  // Select Element context - show toast for user awareness since no permanent UI
+  // Select Element context - show toast for user awareness
   'select-element': {
-    showToast: true,        // Show toast since no permanent error UI
+    showToast: true,
     showInUI: false,
-    errorLevel: 'detailed', // Show specific error details in toast
-    defaultDuration: 6000,  // Longer duration for reading
-    supportRetry: false,    // Retry handled by re-selecting element
-    supportSettings: true   // Allow settings access for config errors
+    errorLevel: 'detailed',
+    defaultDuration: 6000,
+    supportRetry: false,
+    supportSettings: true
   },
 
-  // Background/service context - toast notifications for user awareness
+  // Background/service context - toast notifications
   background: {
     showToast: true,
     showInUI: false,
-    errorLevel: 'generic',  // Keep it simple
+    errorLevel: 'generic',
     defaultDuration: 4000
   }
 }
@@ -94,23 +95,13 @@ export const CriticalErrorTypes = new Set([
 ])
 
 /**
- * Errors that should never show toast notifications
- */
-export const SilentErrorTypes = new Set([
-  ErrorTypes.CONTEXT,
-  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED // Handled by refresh message
-])
-
-/**
  * Get error display strategy for a given context and error type
- * @param {string} context - UI context (popup, sidepanel, content, selection, background)
+ * @param {string} context - UI context
  * @param {string} errorType - Error type from ErrorTypes
  * @returns {Object} Display strategy configuration
  */
 export function getErrorDisplayStrategy(context, errorType) {
   const baseStrategy = ErrorDisplayStrategies[context] || ErrorDisplayStrategies.background
-  
-  // Clone base strategy to avoid mutations
   const strategy = { ...baseStrategy }
   
   // Override for critical errors
@@ -118,43 +109,38 @@ export function getErrorDisplayStrategy(context, errorType) {
     strategy.showToast = true
     strategy.errorLevel = 'detailed'
     
-    // For popup/sidepanel, show both UI and toast for critical errors
     if (context === 'popup' || context === 'sidepanel') {
       strategy.showInUI = true
     }
   }
   
-  // Override for silent errors
-  if (SilentErrorTypes.has(errorType)) {
+  // Override for silent errors using centralized Matcher
+  if (isSilentError(errorType)) {
     strategy.showToast = false
     strategy.showInUI = false
   }
   
-  // Special cases for specific error types
+  // Special overrides for specific error types
   switch (errorType) {
     case ErrorTypes.NETWORK_ERROR:
     case ErrorTypes.HTTP_ERROR:
-      // Network errors should always be retryable
       strategy.supportRetry = true
       break
       
     case ErrorTypes.TEXT_EMPTY:
     case ErrorTypes.TEXT_TOO_LONG:
-      // Validation errors don't need toast in any UI context
       if (context !== 'content' && context !== 'background') {
         strategy.showToast = false
       }
       break
       
     case ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED:
-      // Language pair errors should suggest settings
       strategy.supportSettings = true
       strategy.suggestAction = 'change-provider'
       break
       
     case ErrorTypes.MODEL_MISSING:
     case ErrorTypes.API_URL_MISSING:
-      // Configuration errors always need settings access
       strategy.supportSettings = true
       strategy.suggestAction = 'open-settings'
       break
@@ -164,24 +150,40 @@ export function getErrorDisplayStrategy(context, errorType) {
 }
 
 /**
+ * Determine toast level (error, warning, info) for an error type
+ * @param {string} errorType 
+ * @returns {string} Toast type
+ */
+export function getErrorToastType(errorType) {
+  const warningTypes = new Set([
+    ErrorTypes.NETWORK_ERROR,
+    ErrorTypes.HTTP_ERROR,
+    ErrorTypes.CONTEXT,
+    ErrorTypes.VALIDATION,
+    ErrorTypes.INTEGRATION,
+    ErrorTypes.MODEL_OVERLOADED,
+    ErrorTypes.QUOTA_EXCEEDED,
+    ErrorTypes.GEMINI_QUOTA_REGION,
+    ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ErrorTypes.TEXT_EMPTY,
+    ErrorTypes.TEXT_TOO_LONG,
+    ErrorTypes.PROMPT_INVALID
+  ]);
+
+  return warningTypes.has(errorType) ? "warning" : "error";
+}
+
+/**
  * Get user-friendly error message based on context and error level
- * @param {string} message - Original error message
- * @param {string} errorLevel - Error level (detailed, simplified, generic)
- * @returns {string} Processed error message
  */
 export function processErrorMessage(message, errorLevel) {
   if (!message) return 'An error occurred'
   
   switch (errorLevel) {
     case 'simplified':
-      // For selection window - keep it very short
-      if (message.length > 100) {
-        return message.substring(0, 97) + '...'
-      }
-      return message
+      return message.length > 100 ? message.substring(0, 97) + '...' : message
       
     case 'generic': {
-      // For background/toast contexts - provide helpful but not technical info
       const genericMessages = {
         'API Key': 'Please check your API settings',
         'Network': 'Connection issue - please try again',
@@ -199,50 +201,32 @@ export function processErrorMessage(message, errorLevel) {
       
     case 'detailed':
     default:
-      // For UI contexts - show full detailed message
       return message
   }
 }
 
 /**
  * Determine if error should show retry action
- * @param {string} errorType - Error type
- * @param {Object} strategy - Display strategy
- * @returns {boolean} True if retry should be shown
  */
 export function shouldShowRetry(errorType, strategy) {
-  if (!strategy.supportRetry) return false
+  if (!strategy?.supportRetry) return false
   
-  const retryableErrors = new Set([
+  // Use centralized matcher for basic retryability
+  const retryableTypes = new Set([
     ErrorTypes.NETWORK_ERROR,
     ErrorTypes.HTTP_ERROR,
     ErrorTypes.MODEL_OVERLOADED,
     ErrorTypes.TRANSLATION_FAILED,
     ErrorTypes.SERVER_ERROR
-  ])
+  ]);
   
-  return retryableErrors.has(errorType)
+  return retryableTypes.has(errorType);
 }
 
 /**
  * Determine if error should show settings action
- * @param {string} errorType - Error type
- * @param {Object} strategy - Display strategy
- * @returns {boolean} True if settings should be shown
  */
 export function shouldShowSettings(errorType, strategy) {
-  if (!strategy.supportSettings) return false
-  
-  const settingsErrors = new Set([
-    ErrorTypes.API_KEY_INVALID,
-    ErrorTypes.API_KEY_MISSING,
-    ErrorTypes.API_URL_MISSING,
-    ErrorTypes.MODEL_MISSING,
-    ErrorTypes.MODEL_OVERLOADED,
-    ErrorTypes.QUOTA_EXCEEDED,
-    ErrorTypes.GEMINI_QUOTA_REGION,
-    ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED
-  ])
-  
-  return settingsErrors.has(errorType)
+  if (strategy && strategy.supportSettings === false) return false
+  return needsSettings(errorType);
 }

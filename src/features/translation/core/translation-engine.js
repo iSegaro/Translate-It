@@ -357,10 +357,8 @@ export class TranslationEngine {
         }
       );
     } catch (initialError) {
-      //TODO: این منطق در جای دیگری هم مثل WindowsManager وجود دارد که بهتر است به Error Management منتقل شود
-      // اگر خطا مربوط به عدم پشتیبانی از جفت زبان ها باشد، باید به کاربر نشان داده شود
-      // For language pair not supported errors, don't use fallback - show error to user
-      if (initialError.message && initialError.message.includes('Translation not available')) {
+      // For fatal errors like unsupported language pair, stop immediately
+      if (isFatalError(initialError)) {
         throw initialError;
       }
       

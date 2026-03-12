@@ -1,71 +1,24 @@
 // File: src/error-management/ErrorHandler.js
 
-
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
-import { matchErrorToType } from "./ErrorMatcher.js";
-import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
+import { 
+  matchErrorToType, 
+  isSilentError, 
+  shouldSuppressConsole, 
+  needsSettings,
+  CRITICAL_CONFIG_ERRORS,
+  FATAL_ERRORS
+} from "./ErrorMatcher.js";
+import { getErrorDisplayStrategy, getErrorToastType, shouldShowRetry } from "./ErrorDisplayStrategies.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorHandler');
 
 let _instance = null; // Singleton instance
-
-const SILENT = new Set([
-  ErrorTypes.CONTEXT,
-  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
-  ErrorTypes.PAGE_MOVED_TO_CACHE,
-  ErrorTypes.TAB_RESTRICTED,
-  ErrorTypes.TAB_BROWSER_INTERNAL,
-  ErrorTypes.TAB_EXTENSION_PAGE,
-  ErrorTypes.TAB_LOCAL_FILE,
-  ErrorTypes.TAB_NOT_ACCESSIBLE,
-]);
-const SUPPRESS_CONSOLE = new Set([
-  ErrorTypes.CONTEXT,
-  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
-  ErrorTypes.PAGE_MOVED_TO_CACHE,
-  ErrorTypes.API,
-  ErrorTypes.API_KEY_INVALID,
-  ErrorTypes.API_KEY_MISSING,
-  ErrorTypes.API_URL_MISSING,
-  ErrorTypes.MODEL_MISSING,
-  ErrorTypes.MODEL_OVERLOADED,
-  ErrorTypes.QUOTA_EXCEEDED,
-  ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.NETWORK_ERROR,
-  ErrorTypes.HTTP_ERROR,
-  ErrorTypes.INTEGRATION,
-  ErrorTypes.SERVICE,
-  ErrorTypes.VALIDATION,
-  ErrorTypes.UI,
-  ErrorTypes.PROMPT_INVALID,
-  ErrorTypes.TEXT_EMPTY,
-  ErrorTypes.TEXT_TOO_LONG,
-  ErrorTypes.TRANSLATION_NOT_FOUND,
-  ErrorTypes.TRANSLATION_FAILED,
-  ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
-  ErrorTypes.TAB_AVAILABILITY,
-  ErrorTypes.IMPORT_PASSWORD_INCORRECT,
-  ErrorTypes.IMPORT_PASSWORD_REQUIRED,
-]);
-const OPEN_SETTINGS = new Set([
-  ErrorTypes.API_KEY_INVALID,
-  ErrorTypes.API_KEY_MISSING,
-  ErrorTypes.MODEL_OVERLOADED,
-  ErrorTypes.MODEL_MISSING,
-  ErrorTypes.API_URL_MISSING,
-  ErrorTypes.QUOTA_EXCEEDED,
-  ErrorTypes.HTTP_ERROR,
-  ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.INSUFFICIENT_BALANCE,
-  ErrorTypes.FORBIDDEN_ERROR,
-  ErrorTypes.INVALID_REQUEST,
-  ErrorTypes.SERVER_ERROR,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN,
-]);
 
 export class ErrorHandler {
   constructor(notifier) {
@@ -75,12 +28,11 @@ export class ErrorHandler {
     this.notifier = notifier || new NotificationManager();
     this.displayedErrors = new Set();
     this.handling = false;
-    this.debugMode = false; // Debug mode state
-    this.errorListeners = new Set(); // For UI error state listeners
-    _instance = this; // Set singleton instance
+    this.debugMode = false;
+    this.errorListeners = new Set();
+    _instance = this;
   }
 
-  // Method to set debug mode
   setDebugMode(enabled) {
     this.debugMode = enabled;
   }
@@ -91,106 +43,66 @@ export class ErrorHandler {
     }
     return _instance;
   }
+
   static async processError(err) {
     return err?.then ? await err : err;
   }
+
   async handle(err, meta = {}) {
     if (this.handling) return err;
     this.handling = true;
+    
     try {
       const raw = err instanceof Error ? err.message : String(err);
 
-      // Use ExtensionContextManager for unified context error detection
+      // Handle extension context errors silently
       if (ExtensionContextManager.isContextError(err)) {
         ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
-        return err; // Handle silently
+        return err;
       }
 
-      // For non-context errors, continue with normal error handling
-      // Pass the full error object to matchErrorToType to preserve error.type
       const type = matchErrorToType(err);
-
-      // Use original error message if it's more specific than the generic one
+      
+      // Determine message to display
       let msg;
       try {
         const genericMsg = await getErrorMessage(type);
-
-        // For API configuration errors, always use the localized generic message
-        // These errors have specific, user-friendly messages that should always be shown
-        // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
-        // For API configuration, quota and rate limit errors, always use the localized generic message
-        const isCriticalConfigError = [
-          ErrorTypes.BROWSER_API_UNAVAILABLE,
-          ErrorTypes.API_KEY_MISSING,
-          ErrorTypes.API_KEY_INVALID,
-          ErrorTypes.API_URL_MISSING,
-          ErrorTypes.MODEL_MISSING,
-          ErrorTypes.QUOTA_EXCEEDED,
-          ErrorTypes.RATE_LIMIT_REACHED,
-          ErrorTypes.INSUFFICIENT_BALANCE,
-          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION,
-          ErrorTypes.CIRCUIT_BREAKER_OPEN
-        ].includes(type);
-
-        const shouldUseGenericMessage = isCriticalConfigError || [
-          ErrorTypes.FORBIDDEN_ERROR,
-          ErrorTypes.NETWORK_ERROR,
-          ErrorTypes.HTTP_ERROR,
-          ErrorTypes.SERVER_ERROR,
-          ErrorTypes.MODEL_OVERLOADED,
-          ErrorTypes.INVALID_REQUEST,
-          ErrorTypes.TRANSLATION_FAILED,
-          ErrorTypes.TRANSLATION_ERROR,
-          ErrorTypes.USER_CANCELLED,
-          ErrorTypes.CIRCUIT_BREAKER_OPEN
-        ].includes(type);
-
-        // Prefer the original message IF it's not a critical config error and is informative
-        if (!isCriticalConfigError && !shouldUseGenericMessage && raw &&
-            raw.length > 5 && 
-            !raw.includes('[object Object]') &&
-            !raw.startsWith('Error:') &&
-            !raw.match(/^(undefined|null|object)$/) &&
-            !raw.includes('Script error.') &&
-            !raw.includes('Non-Error promise rejection captured')) {
+        
+        // Decide whether to use raw message or localized generic message
+        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+        
+        if (!shouldUseGeneric && raw && raw.length > 5 && 
+            !raw.includes('[object Object]') && !raw.startsWith('Error:')) {
           msg = raw;
         } else {
-          // Always use localized message for critical/quota/rate-limit errors
           msg = genericMsg;
         }
       } catch {
-        // Fallback to original message
         msg = raw || 'An error occurred';
       }
       
-      // Get context-aware display strategy
       const displayStrategy = getErrorDisplayStrategy(meta.context || 'unknown', type);
       
-      // Enhanced metadata with context-aware defaults
       const enhancedMeta = {
         type: type,
         context: meta.context || 'unknown',
-        component: null,
         showToast: displayStrategy.showToast,
         showInUI: displayStrategy.showInUI,
         errorLevel: displayStrategy.errorLevel || 'generic',
         timestamp: Date.now(),
-        // Allow meta to override strategy defaults if explicitly set
         ...meta,
-        // But preserve strategy-based showToast unless explicitly overridden with isSilent
         ...(meta.isSilent !== undefined && { showToast: !meta.isSilent })
       };
       
-      // Use instance debug mode instead of importing from config to avoid circular dependency
-      if (this.debugMode && !SUPPRESS_CONSOLE.has(type)) {
-        // Use debug level for silent errors (like retryable DeepL 400)
+      // Logging
+      if (this.debugMode && !shouldSuppressConsole(type)) {
         const logLevel = enhancedMeta.showToast ? 'error' : 'debug';
         logger[logLevel](`[${type}] ${raw}`, err.stack);
       }
-      if (SILENT.has(type)) return err;
 
-      // Notify UI error listeners if enabled
+      if (isSilentError(type)) return err;
+
+      // Notify UI
       if (enhancedMeta.showInUI) {
         this._notifyUIErrorListeners({
           message: msg,
@@ -201,9 +113,9 @@ export class ErrorHandler {
         });
       }
 
-      // Show toast notification if enabled  
+      // Show Toast
       if (enhancedMeta.showToast) {
-        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE, enhancedMeta);
+        this._notifyUser(msg, type, enhancedMeta);
       }
       
       return err;
@@ -212,38 +124,21 @@ export class ErrorHandler {
     }
   }
 
-  _logError(error, meta) {
-    logger.error(
-      `[ErrorHandler] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
-    );
-  }
-
-  // UI Error Listener Management
   addUIErrorListener(listener) {
     this.errorListeners.add(listener);
     return () => this.errorListeners.delete(listener);
   }
 
-  removeUIErrorListener(listener) {
-    this.errorListeners.delete(listener);
-  }
-
   _notifyUIErrorListeners(errorData) {
     this.errorListeners.forEach(listener => {
-      try {
-        listener(errorData);
-      } catch (err) {
-        logger.error('Error in UI error listener:', err);
-      }
+      try { listener(errorData); } catch (err) { logger.error('UI listener error:', err); }
     });
   }
 
-  // Get error message for UI display without showing toast
   async getErrorForUI(err, context = 'ui') {
     try {
-      // Handle context errors with ExtensionContextManager
       if (ExtensionContextManager.isContextError(err)) {
-        const type = matchErrorToType(err instanceof Error ? err.message : String(err));
+        const type = matchErrorToType(err);
         return {
           message: ExtensionContextManager.getContextErrorMessage(type),
           type: type,
@@ -255,57 +150,19 @@ export class ErrorHandler {
       }
 
       const raw = err instanceof Error ? err.message : String(err);
-
-      // Pass the full error object to matchErrorToType to preserve error.type
       const type = matchErrorToType(err);
-
-      // Try to get localized message, but prefer specific original messages
+      
       let msg;
       try {
         const localizedMsg = await getErrorMessage(type);
+        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
 
-        // For API configuration errors, always use the localized generic message
-        // These errors have specific, user-friendly messages that should always be shown
-        // Also include FORBIDDEN_ERROR as it typically means auth issues (403)
-        const shouldUseGenericMessage = [
-          ErrorTypes.BROWSER_API_UNAVAILABLE,
-          ErrorTypes.API_KEY_MISSING,
-          ErrorTypes.API_KEY_INVALID,
-          ErrorTypes.API_URL_MISSING,
-          ErrorTypes.MODEL_MISSING,
-          ErrorTypes.INSUFFICIENT_BALANCE,
-          ErrorTypes.FORBIDDEN_ERROR,
-          ErrorTypes.NETWORK_ERROR,
-          ErrorTypes.HTTP_ERROR,
-          ErrorTypes.SERVER_ERROR,
-          ErrorTypes.QUOTA_EXCEEDED,
-          ErrorTypes.RATE_LIMIT_REACHED,
-          ErrorTypes.MODEL_OVERLOADED,
-          ErrorTypes.INVALID_REQUEST,
-          ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION,
-          ErrorTypes.TRANSLATION_FAILED,
-          ErrorTypes.TRANSLATION_ERROR,
-          ErrorTypes.USER_CANCELLED,
-          ErrorTypes.CIRCUIT_BREAKER_OPEN
-        ].includes(type);
-
-        // Prefer the original message if it's informative and not generic
-        if (!shouldUseGenericMessage && raw &&
-            raw.length > 5 && // Must have meaningful content
-            !raw.includes('[object Object]') && // Not just object string
-            !raw.startsWith('Error:') && // Not generic error prefix
-            !raw.match(/^(undefined|null|object)$/) && // Not undefined/null
-            !raw.includes('Script error.') && // Not generic script error
-            !raw.includes('Non-Error promise rejection captured')) { // Not generic promise error
+        if (!shouldUseGeneric && raw && raw.length > 5 && !raw.includes('[object Object]')) {
           msg = raw;
         } else {
-          // Use localized message for generic errors or API configuration errors
           msg = localizedMsg || raw || 'An error occurred';
         }
-      } catch (msgError) {
-        logger.warn('Failed to get localized error message, using original:', msgError);
-        // Use original error message as fallback
+      } catch {
         msg = raw || 'An error occurred';
       }
       
@@ -314,18 +171,13 @@ export class ErrorHandler {
         type: type,
         context: context,
         timestamp: Date.now(),
-        canRetry: this._canRetryError(type),
-        needsSettings: OPEN_SETTINGS.has(type)
+        canRetry: shouldShowRetry(type, getErrorDisplayStrategy(context, type)),
+        needsSettings: needsSettings(type)
       };
     } catch (error) {
       logger.error('Failed to get error for UI:', error);
-      
-      // Preserve original error message in fallback
-      const originalMessage = err instanceof Error ? err.message : String(err);
-      const fallbackMessage = originalMessage || 'An unknown error occurred';
-      
       return {
-        message: fallbackMessage,
+        message: (err instanceof Error ? err.message : String(err)) || 'Unknown error',
         type: ErrorTypes.UNKNOWN,
         context: context,
         timestamp: Date.now(),
@@ -335,43 +187,11 @@ export class ErrorHandler {
     }
   }
 
-  // Check if error type supports retry
-  _canRetryError(type) {
-    const retryableErrors = new Set([
-      ErrorTypes.NETWORK_ERROR,
-      ErrorTypes.HTTP_ERROR,
-      ErrorTypes.MODEL_OVERLOADED,
-      ErrorTypes.TRANSLATION_FAILED,
-      ErrorTypes.TRANSLATION_TIMEOUT,
-      ErrorTypes.SERVER_ERROR
-    ]);
-    return retryableErrors.has(type);
-  }
-
   _notifyUser(message, type, options = {}) {
     if (this.displayedErrors.has(message)) return;
 
-    const typeMap = {
-      [ErrorTypes.API]: "error",
-      [ErrorTypes.UI]: "error",
-      [ErrorTypes.NETWORK_ERROR]: "warning",
-      [ErrorTypes.HTTP_ERROR]: "warning",
-      [ErrorTypes.SERVICE]: "error",
-      [ErrorTypes.CONTEXT]: "warning",
-      [ErrorTypes.VALIDATION]: "warning",
-      [ErrorTypes.INTEGRATION]: "warning",
-      [ErrorTypes.API_KEY_INVALID]: "error",
-      [ErrorTypes.API_KEY_MISSING]: "error",
-      [ErrorTypes.API_URL_MISSING]: "error",
-      [ErrorTypes.MODEL_MISSING]: "error",
-      [ErrorTypes.MODEL_OVERLOADED]: "warning",
-      [ErrorTypes.QUOTA_EXCEEDED]: "warning",
-      [ErrorTypes.GEMINI_QUOTA_REGION]: "warning",
-      [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "warning",
-    };
-    const toastType = typeMap[type] || "error";
+    const toastType = getErrorToastType(type);
     
-    // Pass duration and persistent options to the notifier
     this.notifier.show(message, toastType, options.duration, {
       persistent: options.persistent || false,
       actions: options.actions || []
@@ -379,7 +199,6 @@ export class ErrorHandler {
 
     this.displayedErrors.add(message);
     
-    // Only auto-remove from displayedErrors if not persistent
     if (!options.persistent) {
       setTimeout(() => this.displayedErrors.delete(message), (options.duration || 5500) + 500);
     }
@@ -387,6 +206,5 @@ export class ErrorHandler {
 }
 
 export async function handleUIError(err, context = "") {
-  const handler = ErrorHandler.getInstance();
-  return handler.handle(err, { type: ErrorTypes.UI, context });
+  return ErrorHandler.getInstance().handle(err, { type: ErrorTypes.UI, context });
 }

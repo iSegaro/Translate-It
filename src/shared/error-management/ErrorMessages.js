@@ -1,6 +1,7 @@
 // s../error-management/ErrorMessages.js
 
 import { ErrorTypes } from "./ErrorTypes.js";
+import { matchErrorToType } from "./ErrorMatcher.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 
@@ -28,15 +29,15 @@ export const errorMessages = {
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
   [ErrorTypes.GEMINI_QUOTA_REGION]:
     "You reached the Gemini quota. (Region issue)",
-  [ErrorTypes.INVALID_REQUEST]: "Invalid request format or parameters.", // برای 400, 422
+  [ErrorTypes.INVALID_REQUEST]: "Invalid request format or parameters.",
   [ErrorTypes.INSUFFICIENT_BALANCE]:
-    "Insufficient balance or credits for the selected API.", // برای 402
+    "Insufficient balance or credits for the selected API.",
   [ErrorTypes.FORBIDDEN_ERROR]:
-    "Access denied. Check permissions or potential content moderation.", // برای 403
+    "Access denied. Check permissions or potential content moderation.",
   [ErrorTypes.RATE_LIMIT_REACHED]:
-    "Rate limit reached. Please try again in a few minutes.", // برای 429
+    "Rate limit reached. Please try again in a few minutes.",
   [ErrorTypes.SERVER_ERROR]:
-    "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
+    "The service provider's server encountered an error. Please try again later.",
   [ErrorTypes.CIRCUIT_BREAKER_OPEN]:
     "Circuit breaker is open. This provider is temporarily disabled due to too many failures.",
 
@@ -74,22 +75,14 @@ export const errorMessages = {
 
 /**
  * Returns a localized message for a given error type.
- * It prefixes the type with 'ERRORS_' when looking up in translations.
- * 
- * @param {string} type - Error type
- * @param {boolean} skipI18n - Skip i18n lookup (for extension context errors)
  */
 export async function getErrorMessage(type, skipI18n = false) {
-  // Use ExtensionContextManager for context errors
   if (skipI18n || ExtensionContextManager.isContextError({ message: type })) {
     return ExtensionContextManager.getContextErrorMessage(type, errorMessages);
   }
 
   try {
-    // Use ExtensionContextManager for safe i18n operations
     const translationKey = type?.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
-
-    // Get i18n utils from factory
     const { getTranslationString } = await utilsFactory.getI18nUtils();
 
     const msg = await ExtensionContextManager.safeI18nOperation(
@@ -98,21 +91,45 @@ export async function getErrorMessage(type, skipI18n = false) {
       errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]
     );
 
-    // Return the result (either translated string or fallback)
     return msg && msg.trim() ? msg : (errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]);
 
   } catch {
-    // If i18n fails (e.g., extension context invalidated), fall back to English
     return errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
   }
 }
 
 /**
  * Retrieves a localized error message by its key.
- * @param {string} key - The error type or message key
- * @returns {string|null} - Localized message or null if not found
  */
 export function getErrorMessageByKey(key) {
   if (typeof key !== "string") return null;
   return errorMessages[key] ?? null;
 }
+
+/**
+ * Translates an error object or message to a user-friendly string.
+ * Consolidates logic from previous ErrorMessagesLocalize.js
+ * 
+ * @param {string|Error|object} error 
+ * @returns {Promise<string>}
+ */
+export async function translateErrorMessage(error) {
+  if (!error) return errorMessages[ErrorTypes.UNKNOWN];
+
+  const type = (typeof error === 'object' && error.type) ? error.type : matchErrorToType(error);
+  
+  try {
+    const translated = await getErrorMessage(type);
+    if (translated) return translated;
+  } catch {
+    // Fallback if i18n fails
+  }
+
+  // Final fallback to raw message
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object' && error.message) return error.message;
+  
+  return errorMessages[ErrorTypes.UNKNOWN];
+}
+
