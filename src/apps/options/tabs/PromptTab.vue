@@ -153,6 +153,8 @@ h2 {
   max-width: 100%;
   margin-bottom: $spacing-sm;
   box-sizing: border-box;
+  /* Match the 1px padding of the input container for perfect alignment */
+  padding: 0 1px;
   
   span {
     font-size: $font-size-base;
@@ -174,7 +176,7 @@ h2 {
   cursor: pointer;
   transition: all $transition-base;
   flex-shrink: 0;
-  margin-left: $spacing-sm;
+  margin-inline-start: $spacing-sm;
   white-space: nowrap;
   
   &:hover {
@@ -186,6 +188,9 @@ h2 {
 .prompt-template-input {
   width: 100%;
   margin-bottom: $spacing-lg;
+  /* Fix for border being cut off in RTL due to overflow:hidden on container */
+  padding: 1px;
+  box-sizing: border-box;
   
   :deep(textarea) {
     font-family: inherit;

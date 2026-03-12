@@ -276,6 +276,7 @@ defineExpose({
   color: var(--color-text);
   background-color: var(--color-background);
   transition: all var(--transition-base);
+  box-sizing: border-box;
 
   &::placeholder {
     color: var(--color-text-disabled);
