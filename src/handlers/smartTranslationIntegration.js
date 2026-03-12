@@ -446,7 +446,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         return;
       } else if (messageResult && messageResult.success === false) {
         // Handle error response
-        logger.debug('Translation failed', { error: messageResult.error });
+        logger.error('Translation failed', { error: messageResult.error });
 
         // Dismiss notification on error
         pageEventBus.emit('dismiss_notification', { id: newToastId });
@@ -472,6 +472,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     }
     
   } catch (err) {
+    logger.error('Text field translation request failed:', err);
     const handler = ErrorHandler.getInstance();
     await handler.handle(err, {
       type: ErrorTypes.TRANSLATION_FAILED,
