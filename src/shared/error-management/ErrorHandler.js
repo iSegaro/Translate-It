@@ -129,7 +129,8 @@ export class ErrorHandler {
           ErrorTypes.RATE_LIMIT_REACHED,
           ErrorTypes.INSUFFICIENT_BALANCE,
           ErrorTypes.DEEPL_QUOTA_EXCEEDED,
-          ErrorTypes.GEMINI_QUOTA_REGION
+          ErrorTypes.GEMINI_QUOTA_REGION,
+          ErrorTypes.CIRCUIT_BREAKER_OPEN
         ].includes(type);
 
         const shouldUseGenericMessage = isCriticalConfigError || [
@@ -141,7 +142,8 @@ export class ErrorHandler {
           ErrorTypes.INVALID_REQUEST,
           ErrorTypes.TRANSLATION_FAILED,
           ErrorTypes.TRANSLATION_ERROR,
-          ErrorTypes.USER_CANCELLED
+          ErrorTypes.USER_CANCELLED,
+          ErrorTypes.CIRCUIT_BREAKER_OPEN
         ].includes(type);
 
         // Prefer the original message IF it's not a critical config error and is informative

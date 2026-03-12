@@ -145,6 +145,7 @@ export async function sendMessage(message, options = {}) {
           errorType === ErrorTypes.QUOTA_EXCEEDED ||
           errorType === ErrorTypes.MODEL_OVERLOADED ||
           errorType === ErrorTypes.SERVER_ERROR ||
+          errorType === ErrorTypes.CIRCUIT_BREAKER_OPEN ||
           (error.message && error.message.includes('Circuit breaker is open'))) {
         getLogger().debug('Translation failed with non-retryable error, not attempting fallback:', error);
         throw error; // Re-throw error without fallback
