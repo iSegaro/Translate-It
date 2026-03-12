@@ -507,7 +507,7 @@
     "message": "کلید API"
   },
   "openai_api_key_placeholder": {
-    "message": "کلید API OpenAI خود را اینجا وارد کنید"
+    "message": "کلید API خود را اینجا وارد کنید"
   },
   "openai_api_settings_model_label": {
     "message": "مدل"

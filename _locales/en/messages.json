@@ -319,7 +319,7 @@
   "lingva_instances_link": { "message": "Find public Lingva instances." },
   "openai_api_settings_title": { "message": "OpenAI Settings" },
   "openai_api_settings_api_key_label": { "message": "API Key" },
-  "openai_api_key_placeholder": { "message": "Paste your OpenAI API key here" },
+  "openai_api_key_placeholder": { "message": "Paste your API key here" },
   "openai_api_settings_model_label": { "message": "Model" },
   "openai_api_model_placeholder": { "message": "Enter OpenAI model" },
   "openrouter_api_settings_title": { "message": "OpenRouter Settings" },

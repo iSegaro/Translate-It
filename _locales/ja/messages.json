@@ -507,7 +507,7 @@
     "message": "APIキー"
   },
   "openai_api_key_placeholder": {
-    "message": "OpenAI APIキーを貼り付けてください"
+    "message": "APIキーを貼り付けてください"
   },
   "openai_api_settings_model_label": {
     "message": "モデル"
