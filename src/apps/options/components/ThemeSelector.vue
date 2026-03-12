@@ -262,7 +262,9 @@ input:disabled + .slider {
 }
 
 .theme-auto-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
   margin-left: 0;
   width: 100%;
   font-size: $font-size-sm;
@@ -275,6 +277,12 @@ input:disabled + .slider {
     margin: 0;
     width: 16px;
     height: 16px;
+    flex-shrink: 0;
+  }
+
+  span {
+    line-height: normal;
+    margin-top: 3px;
   }
 }
 
