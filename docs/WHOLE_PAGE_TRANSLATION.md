@@ -47,38 +47,36 @@ Contains pure and static methods for DOM calculations.
 - **Responsibilities**: Checking element visibility in the Viewport, determining frame suitability (filtering out ads and small iframes), and text normalization.
 
 ### 5. PageTranslationConstants
-System constants.
-- **Content**: RTL language codes, safe text tags for direction application, and default configurations (Chunk Size, Root Margin).
+System constants and shared configurations.
+- **Content**: RTL language codes, safe text tags, and default settings (Chunk Size, Root Margin).
+- **Timing**: Centralized timing constants (`PAGE_TRANSLATION_TIMING`) for toasts, scheduler delays, and DOM stabilization.
 
 ## Technical Flow
 
 1.  **Suitability Check**: The system first verifies if the current frame is worth translating (e.g., iframes smaller than 50px or ads are ignored).
 2.  **Activation**: Settings are loaded, and the `domtranslator` library is activated on `document.documentElement`.
 3.  **Traversal**: The library extracts all text and hands it over to the `Bridge`.
-4.  **Enqueue**: Text segments are queued in the `Batcher`.
+4.  **Enqueue**: Text segments are queued in the `Batcher` with priority scoring.
 5.  **Smart Flush**: 
-    - If `lazyLoading` is active, only Viewport text is sent in the first batch.
+    - Flushes are scheduled using centralized delays (e.g., 50ms for high-priority Viewport content).
     - Text is sent to the background in batches of 250 (configurable) to prevent overload.
 6.  **Application**: Upon receiving the translation, text direction (RTL/LTR) is intelligently applied, and the text is replaced in the DOM.
 
 ## Smart Features
 
-### 🛡️ Circuit Breaker
-If the system encounters an **HTTP 429 (Rate Limit)** error or quota exhaustion:
-1.  Whole-page translation operations are immediately halted.
-2.  All `MutationObservers` are disconnected to prevent further requests.
-3.  A notification is displayed to the user.
-4.  The system enters a "Fatal Error" state to prevent the user's API key from being banned.
+### 🛡️ Circuit Breaker & Error Handling
+If the system encounters a **Fatal Error** (e.g., Rate Limit, Auth issue):
+1.  **Centralized Detection**: The `Scheduler` uses `ErrorMatcher` to identify fatal errors immediately.
+2.  **Stop & Cleanup**: Whole-page translation is halted, and all observers are disconnected.
+3.  **UI Feedback**: A localized warning is shown via `NotificationManager` (using `PAGE_TRANSLATION_TIMING.FATAL_ERROR_DURATION`).
+4.  **Logging**: Detailed error info (with stack traces) is logged to the console via `ErrorHandler`.
 
 ### 💤 Lazy Loading
-Using an `IntersectionScheduler` and a `rootMargin` setting (default 300px), only content that the user is currently viewing or about to reach is translated. This significantly reduces API consumption on long pages (e.g., social media feeds).
-
-### 🔄 Dynamic Pages (Infinite Scroll)
-If the `autoTranslateOnDOMChanges` (Persistent Mode) option is enabled, any new content added to the page (such as infinite scrolling on Twitter/X) is automatically detected and translated.
+Using an `IntersectionScheduler` and a `rootMargin` setting (default 300px), only content that the user is currently viewing or about to reach is translated. This significantly reduces API consumption on long pages.
 
 ## Configuration
 
-Core settings are managed in the `config.js` file:
+Core settings are managed in the `config.js` file, while internal timings are in `PageTranslationConstants.js`:
 
 | Setting | Default | Description |
 | :--- | :--- | :--- |
@@ -89,8 +87,9 @@ Core settings are managed in the `config.js` file:
 
 ## Integration Points
 
--   **FeatureManager**: This module is registered as an `ESSENTIAL` feature within the system.
--   **PageEventBus**: Used for broadcasting progress status and displaying notifications.
+-   **FeatureManager**: This module is registered as an `ESSENTIAL` feature.
+-   **NotificationManager**: Used for all user-facing alerts (warnings, status updates).
+-   **ErrorHandler**: Integrated for consistent error classification and logging.
 -   **UnifiedMessaging**: All translation batches are sent to the background via a unified messaging protocol.
 
 ## Best Practices for Developers
