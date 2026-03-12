@@ -5,8 +5,7 @@ import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
@@ -64,7 +63,7 @@ export class PageTranslationScheduler {
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
-      const { sendRegularMessage } = import('@/shared/messaging/core/UnifiedMessaging.js').then(({ sendRegularMessage }) => {
+      import('@/shared/messaging/core/UnifiedMessaging.js').then(({ sendRegularMessage }) => {
         sendRegularMessage({
           action: MessageActions.CANCEL_TRANSLATION,
           data: { 
