@@ -15,7 +15,6 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
