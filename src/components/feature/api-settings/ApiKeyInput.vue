@@ -196,14 +196,6 @@ const handleTestKeys = () => {
 
   .api-key-textarea {
     width: 100%;
-
-    :deep(textarea) {
-      &::placeholder {
-        direction: rtl;
-        text-align: left;
-        unicode-bidi: plaintext;
-      }
-    }
   }
 
   .api-key-tips {

@@ -37,6 +37,7 @@
       :disabled="disabled || loading"
       :readonly="readonly"
       :class="textareaClasses"
+      :dir="dir"
       @beforeinput="handleBeforeInput"
       @input="handleInput"
       @focus="handleFocus"
@@ -106,6 +107,11 @@ const props = defineProps({
   toggleTitle: {
     type: String,
     default: null
+  },
+  dir: {
+    type: String,
+    default: null,
+    validator: (value) => ['ltr', 'rtl', 'auto'].includes(value)
   }
 })
 
@@ -273,6 +279,12 @@ defineExpose({
 
   &::placeholder {
     color: var(--color-text-disabled);
+  }
+
+  &[dir="ltr"]::placeholder {
+    direction: rtl;
+    text-align: left;
+    unicode-bidi: plaintext;
   }
 
   &:focus {

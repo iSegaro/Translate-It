@@ -217,6 +217,12 @@ const handleClear = () => {
   &::placeholder {
     color: var(--color-text-muted);
   }
+
+  &[dir="ltr"]::placeholder {
+    direction: rtl;
+    text-align: left;
+    unicode-bidi: plaintext;
+  }
 }
 
 /* Sizes */
