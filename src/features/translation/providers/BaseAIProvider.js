@@ -572,7 +572,7 @@ export class BaseAIProvider extends BaseProvider {
       error.statusCode === 404;
 
       if (isFatal) {
-        logger.error(`[${this.providerName}] Batch failed with fatal error, skipping fallback:`, error.message);
+        logger.info(`[${this.providerName}] Batch failed with fatal error, skipping fallback:`, error.message);
         // Ensure error type is set for higher level managers
         if (!error.type) error.type = errorType;
         throw error;

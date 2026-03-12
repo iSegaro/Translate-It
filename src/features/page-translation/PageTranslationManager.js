@@ -252,8 +252,8 @@ export class PageTranslationManager extends ResourceTracker {
 
     pageEventBus.emit('show-notification', { 
       message: finalMessage, 
-      type: 'error', 
-      duration: 8000 
+      type: 'warning', 
+      duration: 5000 
     });
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
