@@ -40,6 +40,7 @@
       <BaseInput
         v-model="deepseekCustomModel"
         :placeholder="t('deepseek_custom_model_placeholder') || 'Enter custom model name'"
+        dir="ltr"
       />
     </div>
   </div>

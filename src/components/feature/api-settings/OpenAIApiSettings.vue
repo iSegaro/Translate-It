@@ -41,6 +41,7 @@
       <BaseInput
         v-model="openaiCustomModel"
         :placeholder="t('openai_custom_model_placeholder') || 'Enter custom model name'"
+        dir="ltr"
       />
     </div>
   </div>

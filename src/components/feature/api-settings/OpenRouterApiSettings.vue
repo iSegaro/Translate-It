@@ -40,6 +40,7 @@
       <BaseInput
         v-model="openrouterCustomModel"
         :placeholder="t('openrouter_custom_model_placeholder') || 'Enter custom model name (e.g., provider/model-name)'"
+        dir="ltr"
       />
     </div>
   </div>
