@@ -5,7 +5,7 @@ import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS } from './PageTranslationConstants.js';
@@ -271,13 +271,18 @@ export class PageTranslationScheduler {
   async _handleBatchError(error, batch) {
     if (this.fatalErrorOccurred) return;
 
-    // Get error info including localized message and type
-    const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation-batch');
-    const errorType = errorInfo.type;
+    // Fast-check for fatal error before any awaits to prevent race conditions
+    const errorType = matchErrorToType(error);
     const isFatal = isFatalError(errorType);
 
+    if (isFatal) {
+      this.fatalErrorOccurred = true;
+    }
+
+    // Now safe to do async operations
+    const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation-batch');
+
     // Handle error via centralized handler
-    // If it's fatal, we suppress the generic toast because the Manager will show a specific one
     await this.errorHandler.handle(error, {
       context: 'page-translation-batch',
       showToast: !isFatal,
@@ -285,7 +290,6 @@ export class PageTranslationScheduler {
     });
 
     if (isFatal) {
-      this.fatalErrorOccurred = true;
       pageEventBus.emit('page-translation-fatal-error', { 
         error, 
         errorType, 

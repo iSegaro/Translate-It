@@ -240,7 +240,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
 
-    this.logger.info('[CIRCUIT BREAKER] Fatal error. Stopping page translation.', { errorType });
+    this.logger.error('Fatal error. Stopping page translation.', error);
     this.cancelTranslation();
     
     // Get localized message for "Whole-page translation stopped"
