@@ -8,4 +8,4 @@ dist/firefox/*
 # !dist/firefox/*.zip
 dist/*.zip
 dist/Publish/Source-*.zip
-OLD/
+temp/
