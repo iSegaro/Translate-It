@@ -3,7 +3,7 @@
     <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
     
     <div class="setting-group prompt-template-group">
-      <label class="prompt-label-with-button">
+      <div class="prompt-label-with-button">
         <span>{{ t('prompt_template_label') || 'Prompt Template' }}</span>
         <button
           type="button"
@@ -12,7 +12,7 @@
         >
           {{ t('prompt_reset_button') || 'Reset' }}
         </button>
-      </label>
+      </div>
       
       <BaseTextarea
         v-model="promptTemplate"
