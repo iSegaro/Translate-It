@@ -171,19 +171,6 @@ export const CONFIG = {
   PROXY_PASSWORD: "", // رمز عبور proxy (اختیاری)
 
   // --- UI & Styling ---
-  HIGHLIGHT_NEW_ELEMENT_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
-  TRANSLATION_ICON_TITLE: "Translate Text",
-  HIGHLIGHT_STYLE: "2px solid red",
-  ICON_TRANSLATION: "🌐",
-  ICON_SUCCESS: "✅ ",
-  ICON_WARNING: "⚠️ ",
-  ICON_STATUS: "⏳ ",
-  ICON_ERROR: "❌ ",
-  ICON_INFO: "🔵 ",
-  ICON_REVERT: "↩️",
-  NOTIFICATION_ALIGNMENT: "right",
-  NOTIFICATION_TEXT_DIRECTION: "rtl",
-  NOTIFICATION_TEXT_ALIGNMENT: "right",
 
   // --- Font Settings ---
   TRANSLATION_FONT_FAMILY: "auto", // Auto-detect based on target language or custom font
