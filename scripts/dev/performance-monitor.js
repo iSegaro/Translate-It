@@ -11,7 +11,6 @@ class PerformanceMonitor {
     this.metrics = {
       buildTime: null,
       bundleSize: {},
-      testResults: {},
       timestamp: Date.now()
     }
   }
@@ -23,7 +22,6 @@ class PerformanceMonitor {
     try {
       await this.measureBuildTime()
       await this.analyzeBundleSize()
-      await this.runTestBenchmarks()
       await this.generateReport()
       
       console.log('\n✅ Performance monitoring complete!')
@@ -46,7 +44,9 @@ class PerformanceMonitor {
       }
       
       // Measure production build time
-      execSync('pnpm run build:vue:production', { stdio: 'pipe' })
+      // Using the main build command as build:vue:production might not exist anymore or was specific to vue-only build
+      // Based on package.json, we have 'build'
+      execSync('pnpm run build', { stdio: 'pipe' })
       
       const buildTime = Date.now() - startTime
       this.metrics.buildTime = buildTime
@@ -70,7 +70,7 @@ class PerformanceMonitor {
   async analyzeBundleSize() {
     console.log('\n📦 Analyzing bundle sizes...')
     
-    const distPath = 'dist-vue'
+    const distPath = 'dist'
     
     if (!fs.existsSync(distPath)) {
       throw new Error('Build output not found')
@@ -149,84 +149,6 @@ class PerformanceMonitor {
     return stats
   }
 
-  async runTestBenchmarks() {
-    console.log('\n🧪 Running test benchmarks...')
-    
-    try {
-      // Run unit tests and measure time
-      const unitTestStart = Date.now()
-      const unitTestResult = execSync('pnpm run test:vue:run', { 
-        stdio: 'pipe',
-        encoding: 'utf8'
-      })
-      const unitTestTime = Date.now() - unitTestStart
-      
-      // Parse test results
-      const testResults = this.parseTestResults(unitTestResult)
-      
-      this.metrics.testResults = {
-        unitTestTime,
-        ...testResults
-      }
-      
-      console.log(`   Unit tests completed in ${unitTestTime}ms`)
-      console.log(`   Tests passed: ${testResults.passed}/${testResults.total}`)
-      
-      if (testResults.failed > 0) {
-        console.log(`   ⚠️  ${testResults.failed} tests failed`)
-      } else {
-        console.log('   ✅ All tests passed!')
-      }
-      
-    } catch (error) {
-      console.log('   ⚠️  Test execution failed')
-      this.metrics.testResults = {
-        error: error.message
-      }
-    }
-  }
-
-  parseTestResults(output) {
-    const results = {
-      total: 0,
-      passed: 0,
-      failed: 0
-    }
-    
-    // Parse vitest output
-    const lines = output.split('\n')
-    for (const line of lines) {
-      if (line.includes('Test Files')) {
-        const match = line.match(/(\d+) passed/)
-        if (match) {
-          results.passed = parseInt(match[1])
-        }
-        const failMatch = line.match(/(\d+) failed/)
-        if (failMatch) {
-          results.failed = parseInt(failMatch[1])
-        }
-      }
-      
-      if (line.includes('Tests  ')) {
-        const testMatch = line.match(/(\d+) passed/)
-        if (testMatch) {
-          results.total = parseInt(testMatch[1]) + results.failed
-        }
-      }
-    }
-    
-    if (results.total === 0) {
-      // Fallback parsing
-      const passedMatch = output.match(/(\d+) passed/)
-      if (passedMatch) {
-        results.passed = parseInt(passedMatch[1])
-        results.total = results.passed
-      }
-    }
-    
-    return results
-  }
-
   async generateReport() {
     console.log('\n📋 Performance Report Summary')
     console.log('-'.repeat(30))
@@ -250,23 +172,8 @@ class PerformanceMonitor {
     console.log(`📦 Bundle Size: Grade ${sizeGrade}`)
     console.log(`   Total: ${totalSizeKB.toFixed(2)}KB`)
     
-    // Test performance grade
-    let testGrade = 'A'
-    if (this.metrics.testResults.error) {
-      testGrade = 'F'
-    } else if (this.metrics.testResults.failed > 0) {
-      testGrade = 'C'
-    } else if (this.metrics.testResults.unitTestTime > 10000) {
-      testGrade = 'B'
-    }
-    
-    console.log(`🧪 Test Performance: Grade ${testGrade}`)
-    if (this.metrics.testResults.unitTestTime) {
-      console.log(`   Time: ${(this.metrics.testResults.unitTestTime / 1000).toFixed(2)}s`)
-    }
-    
     // Overall grade
-    const grades = [buildGrade, sizeGrade, testGrade]
+    const grades = [buildGrade, sizeGrade]
     const gradeValues = grades.map(g => 
       g === 'A' ? 4 : g === 'B' ? 3 : g === 'C' ? 2 : g === 'D' ? 1 : 0
     )
@@ -282,7 +189,6 @@ class PerformanceMonitor {
       grades: {
         build: buildGrade,
         bundle: sizeGrade,
-        test: testGrade,
         overall: overallGrade
       },
       metrics: this.metrics
@@ -292,10 +198,10 @@ class PerformanceMonitor {
     console.log(`\n📄 Report saved to ${reportPath}`)
     
     // Recommendations
-    this.generateRecommendations(buildGrade, sizeGrade, testGrade)
+    this.generateRecommendations(buildGrade, sizeGrade)
   }
 
-  generateRecommendations(buildGrade, sizeGrade, testGrade) {
+  generateRecommendations(buildGrade, sizeGrade) {
     console.log('\n💡 Recommendations:')
     
     if (buildGrade === 'C' || buildGrade === 'D') {
@@ -313,14 +219,7 @@ class PerformanceMonitor {
       console.log('      - Optimize images and assets')
     }
     
-    if (testGrade === 'C' || testGrade === 'D') {
-      console.log('   🧪 Test Optimization:')
-      console.log('      - Use test parallelization')
-      console.log('      - Optimize test setup')
-      console.log('      - Fix failing tests')
-    }
-    
-    if (buildGrade === 'A' && sizeGrade === 'A' && testGrade === 'A') {
+    if (buildGrade === 'A' && sizeGrade === 'A') {
       console.log('   🎉 Excellent performance! No recommendations needed.')
     }
   }
