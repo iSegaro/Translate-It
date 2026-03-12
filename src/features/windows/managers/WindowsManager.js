@@ -696,35 +696,17 @@ export class WindowsManager extends ResourceTracker {
     } catch (error) {
       this.logger.error('Error during translation process:', error);
       
-      // Use ErrorHandler to get user-friendly error message
-      let userFriendlyMessage;
-      let canRetry = false;
-      let needsSettings = false;
-      try {
-        const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
-        userFriendlyMessage = errorInfo.message;
-        canRetry = errorInfo.canRetry;
-        needsSettings = errorInfo.needsSettings;
-      } catch (handlerError) {
-        this.logger.warn('Failed to get user-friendly error message, using fallback:', handlerError);
-        // Fallback to original extraction logic
-        if (typeof error === 'string' && error.length > 0) {
-          userFriendlyMessage = error;
-        } else if (error && error.message && error.message.length > 0) {
-          userFriendlyMessage = error.message;
-        } else {
-          userFriendlyMessage = 'Translation failed';
-        }
-      }
+      // Use ErrorHandler to get robust, user-friendly error message
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
       
       // Update window with user-friendly error message
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
         isError: true,
-        canRetry,
-        needsSettings,
-        initialTranslatedText: userFriendlyMessage
+        canRetry: errorInfo.canRetry,
+        needsSettings: errorInfo.needsSettings,
+        initialTranslatedText: errorInfo.message
       });
     }
   }
@@ -985,21 +967,14 @@ export class WindowsManager extends ResourceTracker {
           this.logger.error('Translation process failed in cross-frame mode:', error);
 
           // Use ErrorHandler to get user-friendly error message (consistent with normal mode)
-          let userFriendlyMessage;
-          try {
-            const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
-            userFriendlyMessage = errorInfo.message;
-          } catch (handlerError) {
-            this.logger.warn('Failed to get user-friendly error message, using fallback:', handlerError);
-            userFriendlyMessage = error.message || 'Translation failed';
-          }
+          const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
 
           // Update window with error
           WindowsManagerEvents.updateWindow(windowId, {
             initialSize: 'normal',
             isLoading: false,
             isError: true,
-            initialTranslatedText: userFriendlyMessage
+            initialTranslatedText: errorInfo.message
           });
         });
       
@@ -1091,13 +1066,10 @@ export class WindowsManager extends ResourceTracker {
    * Handle translation error - now delegates to Vue UI Host
    */
   async _handleTranslationError(error, selectedText, position) {
-    // Get the original error message, preserve specific details
-    const originalMessage = error instanceof Error ? error.message : String(error);
-    
     // Use ErrorHandler for type detection and centralized logging
-    const errorInfo = await this.translationHandler.errorHandler.getErrorForUI(error, 'windows-manager-translate');
+    const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-manager-translate');
     
-    this.logger.error(`Translation error - Type: ${errorInfo.type}, Original: ${originalMessage}, Processed: ${errorInfo.message}`);
+    this.logger.error(`Translation error - Type: ${errorInfo.type}, Message: ${errorInfo.message}`);
     
     // Generate unique ID for error window
     const windowId = `translation-window-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1106,27 +1078,20 @@ export class WindowsManager extends ResourceTracker {
     // Get current theme
     const theme = await this.themeManager.getCurrentTheme();
 
-    // Use the original specific error message instead of the generic one
-    const displayMessage = originalMessage && originalMessage.length > 10 && 
-                         !originalMessage.includes('Translation failed: No translated text') ? 
-                         originalMessage : errorInfo.message;
-    
-    // Get localized error prefix
-    const { getTranslationString } = await import('@/utils/i18n/i18n.js');
-    const errorPrefix = await getTranslationString('error_prefix') || 'Error';
-    
     // Emit event to create error window through Vue UI Host
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText: selectedText,
-      initialTranslatedText: `${errorPrefix}: ${displayMessage}`,
+      initialTranslatedText: errorInfo.message,
       position: position,
       theme: theme,
-      isError: true
+      isError: true,
+      canRetry: errorInfo.canRetry,
+      needsSettings: errorInfo.needsSettings
     });
     
     // Use centralized error handler but keep silent to avoid double notifications
-    await this.translationHandler.errorHandler.handle(error, {
+    await this.errorHandler.handle(error, {
       type: errorInfo.type,
       context: "windows-manager-translate",
       isSilent: true

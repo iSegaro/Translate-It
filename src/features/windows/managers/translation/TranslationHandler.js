@@ -114,8 +114,7 @@ export class TranslationHandler {
         if (final.success === false && final.error) {
           this.logger.debug("Port fallback detected error, will be handled by WindowsManager:", final.error);
           this._cleanupRequest(messageId);
-          const errorMessage = final.error.message || final.error || 'Translation failed';
-          throw new Error(errorMessage);
+          throw final.error; // Throw the actual error object/message
         }
         
         if (!final || !final.translatedText) {
