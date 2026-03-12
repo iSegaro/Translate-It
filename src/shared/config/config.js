@@ -27,7 +27,6 @@ export const TRANSLATION_ERRORS = {
 export const CONFIG = {
   APP_NAME: "Translate It",
   // --- Core Settings ---
-  USE_MOCK: false,
   DEBUG_MODE: false,
   APPLICATION_LOCALIZE: "English",
   SOURCE_LANGUAGE: "en",
@@ -409,14 +408,6 @@ $_{TEXT}
 - If the input is in any other language, translate it into $_{TARGET}, focusing on readability, tone, and meaning rather than literal translation.
 - If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
   /*--- End PROMPT_TEMPLATE ---*/
-
-  // --- Debugging Values ---
-  DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
-  DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
-  DEBUG_TRANSLATED_ENGLISH_With_NewLine:
-    "This is a mock \ntranslation to English with \nnew lines.",
-  DEBUG_TRANSLATED_PERSIAN_With_NewLine:
-    "این یک ترجمه آزمایشی \nبرای ترجمه به فارسی \nبا خطوط جدید است.",
 };
 
 // --- Enums & State ---
@@ -503,10 +494,6 @@ const getSettingValueAsync = async (key, defaultValue) => {
     handler.handle(error, { type: ErrorTypes.SERVICE, context: `config-getSettingValueAsync-${key}` });
     return defaultValue;
   }
-};
-
-export const getUseMockAsync = async () => {
-  return getSettingValueAsync("USE_MOCK", CONFIG.USE_MOCK);
 };
 
 export const getDebugModeAsync = async () => {

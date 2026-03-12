@@ -406,7 +406,6 @@
     "message": "Exclude these sites (comma separated)"
   },
 
-  "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
   "advance_debug_mode_label": { "message": "Debug Mode" },
 
   "proxy_section_title": { "message": "Proxy Settings" },

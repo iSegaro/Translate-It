@@ -671,9 +671,6 @@
   "excluded_sites_label": {
     "message": "除外するサイト（カンマ区切り）"
   },
-  "advance_dev_api_mode_label": {
-    "message": "開発APIモードを使用"
-  },
   "advance_debug_mode_label": {
     "message": "デバッグモード"
   },

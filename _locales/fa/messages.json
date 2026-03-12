@@ -671,9 +671,6 @@
   "excluded_sites_label": {
     "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"
   },
-  "advance_dev_api_mode_label": {
-    "message": "استفاده از حالت توسعه API"
-  },
   "advance_debug_mode_label": {
     "message": "حالت اشکال‌زدایی (Debug Mode)"
   },

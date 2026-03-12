@@ -4,13 +4,6 @@
     
     <div class="setting-group">
       <BaseCheckbox
-        v-model="useMock"
-        :label="t('advance_dev_api_mode_label') || 'Use Dev API Mode'"
-      />
-    </div>
-    
-    <div class="setting-group">
-      <BaseCheckbox
         v-model="debugMode"
         :label="t('advance_debug_mode_label') || 'Debug Mode'"
       />
@@ -165,11 +158,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AdvanceTab')
 const { t } = useI18n()
 
 // Advanced settings
-const useMock = computed({
-  get: () => settingsStore.settings?.USE_MOCK || false,
-  set: (value) => settingsStore.updateSettingLocally('USE_MOCK', value)
-})
-
 const debugMode = computed({
   get: () => settingsStore.settings?.DEBUG_MODE || false,
   set: (value) => settingsStore.updateSettingLocally('DEBUG_MODE', value)
