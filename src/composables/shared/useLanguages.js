@@ -2,7 +2,7 @@
 // Composable for language management
 
 import { ref, computed } from "vue";
-import { UI_LOCALES } from "@/config/LocaleManifest.js";
+import { UI_LOCALES } from "@/shared/config/LocaleManifest.js";
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

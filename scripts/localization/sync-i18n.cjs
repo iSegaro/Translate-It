@@ -13,7 +13,7 @@ const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const LOCALES_DIR = path.join(projectRoot, '_locales');
-const MANIFEST_PATH = path.join(projectRoot, 'src/config/LocaleManifest.js');
+const MANIFEST_PATH = path.join(projectRoot, 'src/shared/config/LocaleManifest.js');
 const REFERENCE_LANG = 'en';
 const REFERENCE_FILE = path.join(LOCALES_DIR, REFERENCE_LANG, 'messages.json');
 

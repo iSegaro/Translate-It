@@ -6,7 +6,7 @@ Translate-It uses a **Manifest-Driven Architecture** for localization. Instead o
 
 ## Architecture Components
 
-1.  **LocaleManifest (`src/config/LocaleManifest.js`)**: The single source of truth for all supported UI languages.
+1.  **LocaleManifest (`src/shared/config/LocaleManifest.js`)**: The single source of truth for all supported UI languages.
 2.  **Chrome i18n Folders (`_locales/`)**: Standard browser extension localization folders (e.g., `_locales/en/messages.json`).
 3.  **Automated Scripts**: Tools for keeping all language files in sync with the primary English (EN) reference.
 
@@ -16,7 +16,7 @@ Translate-It uses a **Manifest-Driven Architecture** for localization. Instead o
 
 Follow these 4 steps to add a new language to the extension:
 
-### 1. Update the Manifest (`src/config/LocaleManifest.js`)
+### 1. Update the Manifest (`src/shared/config/LocaleManifest.js`)
 Add your language to the `UI_LOCALES` array. This automatically enables the language in the Options UI and Sidebar.
 
 ```javascript

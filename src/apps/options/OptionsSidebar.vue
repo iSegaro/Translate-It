@@ -82,7 +82,7 @@ import ThemeSelector from './components/ThemeSelector.vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getLocaleInfo } from '@/config/LocaleManifest.js'
+import { getLocaleInfo } from '@/shared/config/LocaleManifest.js'
 import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')
