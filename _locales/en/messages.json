@@ -303,8 +303,8 @@
   "gemini_api_settings_api_url_label": { "message": "API URL" },
   "gemini_api_url_placeholder": { "message": "Default Gemini API URL" },
   "gemini_api_url_info": { "message": "Leave empty to use the default Gemini API endpoint" },
-  "gemini_custom_model_label": { "message": "Custom Model Name" },
-  "gemini_custom_model_placeholder": { "message": "Enter custom model name" },
+  "gemini_custom_model_label": { "message": "Model Name" },
+  "gemini_custom_model_placeholder": { "message": "Enter model name" },
   "gemini_custom_model_info": { "message": "Enter the exact model name as provided by Google" },
   "gemini_custom_api_url_info": { "message": "Enter the complete API URL including the model name" },
   "webai_api_settings_title": { "message": "WebAI Settings" },
@@ -572,17 +572,17 @@
     "message": "Select Gemini model or custom URL"
   },
   "openai_custom_model_placeholder": {
-    "message": "Enter custom model name"
+    "message": "Enter model name"
   },
-  "openai_custom_model_label": { "message": "Custom Model Name" },
+  "openai_custom_model_label": { "message": "Model Name" },
   "openrouter_custom_model_placeholder": {
-    "message": "Enter custom model name (e.g., provider/model-name)"
+    "message": "Enter model name (e.g., provider/model-name)"
   },
-  "openrouter_custom_model_label": { "message": "Custom Model Name" },
+  "openrouter_custom_model_label": { "message": "Model Name" },
   "deepseek_custom_model_placeholder": {
-    "message": "Enter custom model name"
+    "message": "Enter model name"
   },
-  "deepseek_custom_model_label": { "message": "Custom Model Name" },
+  "deepseek_custom_model_label": { "message": "Model Name" },
 
   "ERRORS_CIRCUIT_BREAKER_OPEN": { "message": "Circuit breaker is open. This provider is temporarily disabled due to too many failures. Please try another provider or try again in a few minutes." },
   "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },

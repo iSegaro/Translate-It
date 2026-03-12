@@ -459,10 +459,10 @@
     "message": "برای استفاده از نقطه پایانی پیش‌فرض Gemini، این قسمت را خالی بگذارید"
   },
   "gemini_custom_model_label": {
-    "message": "نام مدل سفارشی"
+    "message": "نام مدل"
   },
   "gemini_custom_model_placeholder": {
-    "message": "نام مدل سفارشی را وارد کنید"
+    "message": "نام مدل را وارد کنید"
   },
   "gemini_custom_model_info": {
     "message": "نام دقیق مدل را که توسط Google ارائه شده است وارد کنید"
@@ -1032,22 +1032,22 @@
     "message": "انتخاب مدل Gemini یا آدرس سفارشی"
   },
   "openai_custom_model_placeholder": {
-    "message": "نام مدل سفارشی را وارد کنید"
+    "message": "نام مدل را وارد کنید"
   },
   "openai_custom_model_label": {
-    "message": "نام مدل سفارشی"
+    "message": "نام مدل"
   },
   "openrouter_custom_model_placeholder": {
-    "message": "نام مدل سفارشی را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
+    "message": "نام مدل را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
   },
   "openrouter_custom_model_label": {
-    "message": "نام مدل سفارشی"
+    "message": "نام مدل"
   },
   "deepseek_custom_model_placeholder": {
-    "message": "نام مدل سفارشی را وارد کنید"
+    "message": "نام مدل را وارد کنید"
   },
   "deepseek_custom_model_label": {
-    "message": "نام مدل سفارشی"
+    "message": "نام مدل"
   },
   "ERRORS_CIRCUIT_BREAKER_OPEN": {
     "message": "سرویس موقتاً مسدود شده است. به دلیل خطاهای مکرر، این سرویس برای دقایقی غیرفعال است. لطفا از سرویس دهنده دیگری استفاده کنید یا کمی بعد دوباره تلاش کنید."

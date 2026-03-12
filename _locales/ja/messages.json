@@ -459,10 +459,10 @@
     "message": "空欄にするとデフォルトのGemini APIエンドポイントを使用します"
   },
   "gemini_custom_model_label": {
-    "message": "カスタムモデル名"
+    "message": "モデル名"
   },
   "gemini_custom_model_placeholder": {
-    "message": "カスタムモデル名を入力"
+    "message": "モデル名を入力"
   },
   "gemini_custom_model_info": {
     "message": "Googleが提供する正確なモデル名を入力してください"
@@ -1032,22 +1032,22 @@
     "message": "GeminiモデルまたはカスタムURLを選択"
   },
   "openai_custom_model_placeholder": {
-    "message": "カスタムモデル名を入力"
+    "message": "モデル名を入力"
   },
   "openai_custom_model_label": {
-    "message": "カスタムモデル名"
+    "message": "モデル名"
   },
   "openrouter_custom_model_placeholder": {
-    "message": "カスタムモデル名を入力（例：provider/model-name）"
+    "message": "モデル名を入力（例：provider/model-name）"
   },
   "openrouter_custom_model_label": {
-    "message": "カスタムモデル名"
+    "message": "モデル名"
   },
   "deepseek_custom_model_placeholder": {
-    "message": "カスタムモデル名を入力"
+    "message": "モデル名を入力"
   },
   "deepseek_custom_model_label": {
-    "message": "カスタムモデル名"
+    "message": "モデル名"
   },
   "ERRORS_CIRCUIT_BREAKER_OPEN": { "message": "サーキットブレーカーが作動しました。エラーが多発したため、このプロバイダーは一時的に無効化されています。別のプロバイダーを試すか、数分後にもう一度お試しください。" },
   "ERRORS_UNKNOWN": {
