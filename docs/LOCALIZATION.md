@@ -91,3 +91,7 @@ Our maintenance scripts automatically protect dynamic keys. Avoid using these pr
 | `pnpm i18n:check` | Identifies orphaned keys that are no longer used in the code. |
 | `pnpm i18n:check:fix` | Automatically removes orphaned keys from all locale files. |
 | `pnpm i18n:purge <locale>` | Removes all "note": "UNTRANSLATED" fields for a specific language once translation is done. |
+
+---
+
+**Last Updated**: March 2026
