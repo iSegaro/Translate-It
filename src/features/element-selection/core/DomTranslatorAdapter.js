@@ -199,7 +199,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
     } catch (error) {
-      this.logger.error('Element translation failed', error);
+      this.logger.info('Element translation failed', error);
 
       // Use centralized error handling if not already handled
       if (!error.alreadyHandled) {
