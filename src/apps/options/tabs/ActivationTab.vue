@@ -50,20 +50,23 @@
       </div>
 
       <!-- Text Field Mode Options -->
-      <div class="sub-options-group">
+      <div 
+        class="sub-options-group"
+        v-if="translateOnTextFields || enableShortcutForTextFields"
+      >
         <div class="radio-group">
           <BaseRadio
             v-model="textFieldMode"
             value="copy"
             name="textFieldMode"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
+            :disabled="!extensionEnabled"
             :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
           />
           <BaseRadio
             v-model="textFieldMode"
             value="replace"
             name="textFieldMode"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
+            :disabled="!extensionEnabled"
             :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
           />
         </div>
@@ -71,7 +74,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox 
             v-model="replaceOnSpecialSites" 
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) || textFieldMode !== 'copy'"
+            :disabled="!extensionEnabled || textFieldMode !== 'copy'"
             :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
           />
         </div>
@@ -103,20 +106,23 @@
       </div>
 
       <!-- Selection Mode Options -->
-      <div class="sub-options-group">
+      <div 
+        class="sub-options-group"
+        v-if="translateOnTextSelection"
+      >
         <div class="radio-group">
           <BaseRadio
             v-model="selectionTranslationMode"
             value="immediate"
             name="selectionTranslationMode"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :disabled="!extensionEnabled"
             :label="t('options_selection_mode_immediate') || 'Immediate'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
             value="onClick"
             name="selectionTranslationMode"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :disabled="!extensionEnabled"
             :label="t('options_selection_mode_onclick') || 'On Click'"
           />
         </div>
@@ -124,7 +130,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox
             v-model="requireCtrlForTextSelection"
-            :disabled="!extensionEnabled || !translateOnTextSelection || selectionTranslationMode !== 'immediate'"
+            :disabled="!extensionEnabled || selectionTranslationMode !== 'immediate'"
             :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
           />
         </div>
@@ -132,7 +138,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox
             v-model="activeSelectionIconOnTextfields"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :disabled="!extensionEnabled"
             :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
           />
           <span class="setting-description">
@@ -143,7 +149,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox
             v-model="enhancedTripleClickDrag"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :disabled="!extensionEnabled"
             :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
           />
           <span class="setting-description">
