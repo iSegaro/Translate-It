@@ -86,7 +86,7 @@ export class TranslationHandler {
           }
         });
       } catch (sendError) {
-        this.logger.error("sendMessage failed:", sendError);
+        this.logger.info("sendMessage failed:", sendError);
         this._cleanupRequest(messageId);
         throw sendError;
       }
@@ -118,7 +118,7 @@ export class TranslationHandler {
         }
         
         if (!final || !final.translatedText) {
-          this.logger.error("Port fallback result has no translatedText:", final);
+          this.logger.info("Port fallback result has no translatedText:", final);
           this._cleanupRequest(messageId);
           throw new Error('Translation failed: No translated text received')
         }
@@ -143,7 +143,7 @@ export class TranslationHandler {
         
         // If we reach here successfully, the result should be valid
         if (!result?.translatedText) {
-          this.logger.error("resultPromise resolved but no translatedText - this should not happen");
+          this.logger.info("resultPromise resolved but no translatedText - this should not happen");
           throw new Error('Translation failed: No translated text received');
         }
 
@@ -151,7 +151,7 @@ export class TranslationHandler {
         return result;
       } catch (resultError) {
         // Preserve the specific error message from resultPromise
-        this.logger.error("resultPromise was rejected with error:", resultError.message);
+        this.logger.info("resultPromise was rejected with error:", resultError.message);
         this.logger.debug("Full error object:", resultError);
         this._cleanupRequest(messageId);
         throw resultError; // Re-throw the original error from messageListener
@@ -272,7 +272,7 @@ export class TranslationHandler {
       });
       return true;
     } else {
-      this.logger.error("Unexpected message data - no error and no translatedText", message.data);
+      this.logger.info("Unexpected message data - no error and no translatedText", message.data);
       const error = new Error('No translated text in result');
 
       // Handle through ErrorHandler for proper error management

@@ -964,7 +964,7 @@ export class WindowsManager extends ResourceTracker {
           }
         })
         .catch(async (error) => {
-          this.logger.error('Translation process failed in cross-frame mode:', error);
+          this.logger.info('Translation process failed in cross-frame mode:', error);
 
           // Use ErrorHandler to get user-friendly error message (consistent with normal mode)
           const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
@@ -984,7 +984,7 @@ export class WindowsManager extends ResourceTracker {
       this.logger.info('Cross-frame window creation event emitted successfully', { windowId, frameId: data.frameId });
       
     } catch (error) {
-      this.logger.error('Failed to create window in main document:', error);
+      this.logger.info('Failed to create window in main document:', error);
       this.crossFrameManager.notifyWindowCreated(data.frameId, false, null, error.message);
     }
   }
@@ -1069,7 +1069,7 @@ export class WindowsManager extends ResourceTracker {
     // Use ErrorHandler for type detection and centralized logging
     const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-manager-translate');
     
-    this.logger.error(`Translation error - Type: ${errorInfo.type}, Message: ${errorInfo.message}`);
+    this.logger.info(`Translation error - Type: ${errorInfo.type}, Message: ${errorInfo.message}`);
     
     // Generate unique ID for error window
     const windowId = `translation-window-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

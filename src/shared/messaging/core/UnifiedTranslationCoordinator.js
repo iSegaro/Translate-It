@@ -63,9 +63,9 @@ export class UnifiedTranslationCoordinator {
       // Don't log user cancellations as errors
       const errorType = matchErrorToType(error);
       if (errorType === ErrorTypes.USER_CANCELLED) {
-        getLogger().debug(`Translation coordination cancelled by user: ${message.messageId}`, error);
+        getLogger().info(`Translation coordination cancelled by user: ${message.messageId}`, error);
       } else {
-        getLogger().error(`Translation coordination failed: ${message.messageId}`, error);
+        getLogger().info(`Translation coordination failed: ${message.messageId}`, error);
       }
 
       // Use centralized error handling for coordination errors
@@ -178,7 +178,7 @@ export class UnifiedTranslationCoordinator {
             if (errorType === ErrorTypes.USER_CANCELLED) {
               getLogger().debug(`Streaming cancelled: ${messageId}`, error);
             } else {
-              getLogger().error(`Streaming error: ${messageId}`, error);
+              getLogger().debug(`Streaming error: ${messageId}`, error);
             }
           },
           maxProgressTimeout: streamingTimeouts.progressTimeout,
@@ -209,12 +209,12 @@ export class UnifiedTranslationCoordinator {
       }
 
     } catch (error) {
-      // Log cancellation as debug instead of error using proper error management
+      // Log cancellation as info instead of error using proper error management
       const errorType = matchErrorToType(error);
       if (errorType === ErrorTypes.USER_CANCELLED) {
-        getLogger().debug(`Streaming translation coordination cancelled: ${messageId}`, error);
+        getLogger().info(`Streaming translation coordination cancelled: ${messageId}`, error);
       } else {
-        getLogger().error(`Streaming translation coordination failed: ${messageId}`, error);
+        getLogger().info(`Streaming translation coordination failed: ${messageId}`, error);
       }
 
       // Use centralized error handling for non-cancellation errors
