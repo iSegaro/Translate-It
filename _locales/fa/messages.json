@@ -615,7 +615,7 @@
     "message": "آدرس"
   },
   "custom_api_url_placeholder": {
-    "message": "آدرس endpoint مخصوص `v1/chat/completions` مربوط به API سفارشی خود را وارد کنید."
+    "message": "(مثل: v1/chat/completions)"
   },
   "custom_api_url_example": {
     "message": "مثال:"

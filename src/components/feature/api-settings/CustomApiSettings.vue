@@ -8,7 +8,7 @@
       <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
         v-model="customApiUrl"
-        :placeholder="t('custom_api_url_placeholder') || 'Enter the base URL of your custom API'"
+        :placeholder="t('custom_api_url_placeholder') || '(e.g., v1/chat/completions)'"
         dir="ltr"
       />
       <span class="setting-help-text">

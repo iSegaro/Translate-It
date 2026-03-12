@@ -615,7 +615,7 @@
     "message": "API URL"
   },
   "custom_api_url_placeholder": {
-    "message": "カスタムAPIの `v1/chat/completions` エンドポイントのURLを入力してください。"
+    "message": "(例: v1/chat/completions)"
   },
   "custom_api_url_example": {
     "message": "例："

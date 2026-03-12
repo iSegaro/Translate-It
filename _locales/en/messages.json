@@ -380,7 +380,7 @@
   },
   "custom_api_settings_api_url_label": { "message": "API URL" },
   "custom_api_url_placeholder": {
-    "message": "Enter the URL of your custom API's `v1/chat/completions` endpoint."
+    "message": "(e.g., v1/chat/completions)"
   },
   "custom_api_url_example": { "message": "Example:" },
   "custom_api_settings_api_key_label": { "message": "API Key" },
