@@ -90,7 +90,7 @@ export function useUnifiedTranslation(context = 'popup') {
       targetLanguage.value = await findLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
       getLogger().debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
     } catch (error) {
-      getLogger().error(`[${context}] Failed to reset languages:`, error);
+      getLogger().info(`[${context}] Failed to reset languages:`, error);
       // Fallback to hardcoded defaults in case of storage error
       sourceLanguage.value = AUTO_DETECT_VALUE;
       targetLanguage.value = DEFAULT_TARGET_LANGUAGE;
@@ -161,7 +161,7 @@ export function useUnifiedTranslation(context = 'popup') {
       pendingRequests.value.delete(messageId);
     }
     
-    getLogger().error(`[${context}] Translation error:`, errorMessage);
+    getLogger().info(`[${context}] Translation error:`, errorMessage);
   };
 
   const ensureMinimumLoadingDuration = async () => {

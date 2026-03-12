@@ -441,7 +441,7 @@ export function useSidepanelActions() {
 
       const errorMsg = err.message || "Failed to revert translation";
       error.value = errorMsg;
-      getLogger().error('Error reverting translation:', err);
+      getLogger().info('Error reverting translation:', err);
       return false;
     } finally {
       isProcessing.value = false;
@@ -457,7 +457,7 @@ export function useSidepanelActions() {
         timestamp: Date.now()
       });
     } catch (err) {
-      getLogger().error('TTS stop failed (might not be active):', err,
+      getLogger().info('TTS stop failed (might not be active):', err,
       );
     }
   };
