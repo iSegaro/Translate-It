@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
@@ -139,14 +139,7 @@ export async function sendMessage(message, options = {}) {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
       // Check if this is a user cancellation or non-retryable error - if so, don't attempt fallback
-      const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED ||
-          errorType === ErrorTypes.RATE_LIMIT_REACHED ||
-          errorType === ErrorTypes.QUOTA_EXCEEDED ||
-          errorType === ErrorTypes.MODEL_OVERLOADED ||
-          errorType === ErrorTypes.SERVER_ERROR ||
-          errorType === ErrorTypes.CIRCUIT_BREAKER_OPEN ||
-          (error.message && error.message.includes('Circuit breaker is open'))) {
+      if (isFatalError(error)) {
         getLogger().debug('Translation failed with non-retryable error, not attempting fallback:', error);
         throw error; // Re-throw error without fallback
       }
@@ -269,13 +262,11 @@ export async function sendRegularMessage(message, options = {}) {
     const { promise: timeoutPromise, clear: clearTimeoutTimer } = createTimeout(actionTimeout, message.action);
 
     // Create a cancellation promise for this messageId
-    let isCancelled = false;
     let cancellationInterval;
     const cancellationPromise = new Promise((_, reject) => {
       const checkCancellation = () => {
         // Check streaming timeout manager first
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-          isCancelled = true;
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error(ErrorTypes.USER_CANCELLED);
           cancelError.type = ErrorTypes.USER_CANCELLED;
@@ -285,7 +276,6 @@ export async function sendRegularMessage(message, options = {}) {
 
         // Also check for global ESC flag (faster response to user ESC)
         if (window.selectElementHandlingESC === true) {
-          isCancelled = true;
           if (cancellationInterval) clearInterval(cancellationInterval);
           getLogger().debug('ESC flag detected, cancelling message immediately');
           const cancelError = new Error('Translation cancelled by user ESC');

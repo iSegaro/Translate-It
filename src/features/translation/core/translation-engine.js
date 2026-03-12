@@ -10,7 +10,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
@@ -888,21 +888,24 @@ export class TranslationEngine {
         errorMessages.push(errorMessage);
       }
 
-      // If translation was cancelled by user, stop all processing
-      if (errorMessage && (errorMessage.includes('Translation cancelled by user') || errorMessage.includes(ErrorTypes.USER_CANCELLED))) {
-        logger.debug('[TranslationEngine] User cancellation detected - stopping all batches');
-        if (sharedState) sharedState.isCancelled = true;
-        throw batchError; // Re-throw to stop translation completely
-      }
-
-      // If the error indicates an unsupported language pair, mark shared state and exit early
-      if (errorMessage && errorMessage.includes('Translation not available')) {
-        if (sharedState) {
-          sharedState.shouldStopDueToLanguagePairError = true;
-          sharedState.languagePairError = batchError;
-          logger.debug('[TranslationEngine] Language pair error detected - stopping all batches');
+      // If fatal error (cancellation, language pair, API key, etc.), stop all processing
+      if (isFatalError(batchError)) {
+        const errorType = batchError.type || matchErrorToType(batchError);
+        
+        // Handle specific fatal errors that require shared state updates
+        if (errorType === ErrorTypes.USER_CANCELLED) {
+          logger.debug('[TranslationEngine] User cancellation detected - stopping all batches');
+          if (sharedState) sharedState.isCancelled = true;
+        } else if (errorType === ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED) {
+          if (sharedState) {
+            sharedState.shouldStopDueToLanguagePairError = true;
+            sharedState.languagePairError = batchError;
+            logger.debug('[TranslationEngine] Language pair error detected - stopping all batches');
+          }
+        } else {
+          logger.debug(`[TranslationEngine] Fatal error detected (${errorType}) - stopping all batches`);
         }
-        throw batchError; // Re-throw to show error to user instead of silent fallback
+        throw batchError; // Re-throw to stop translation completely
       }
     }
     
@@ -964,20 +967,26 @@ export class TranslationEngine {
             errorMessages.push(errorMessage);
           }
           
-          // If translation was cancelled by user, stop all processing
-          if (errorMessage && (errorMessage.includes('Translation cancelled by user') || errorMessage.includes(ErrorTypes.USER_CANCELLED))) {
-            logger.debug('[TranslationEngine] User cancellation detected in individual translation');
-            return { idx, result: segments[idx], success: false };
-          }
-          
-          // If it's a language pair error, mark shared state and throw
-          if (errorMessage && errorMessage.includes('Translation not available')) {
-            if (sharedState) {
-              sharedState.shouldStopDueToLanguagePairError = true;
-              sharedState.languagePairError = individualError;
-              logger.debug('[TranslationEngine] Language pair error detected in individual translation - stopping all batches');
+          // If fatal error (cancellation, language pair, API key, etc.), stop processing
+          if (isFatalError(individualError)) {
+            const errorType = individualError.type || matchErrorToType(individualError);
+            
+            // Handle specific fatal errors that require shared state updates
+            if (errorType === ErrorTypes.USER_CANCELLED) {
+              logger.debug('[TranslationEngine] User cancellation detected in individual translation');
+              return { idx, result: segments[idx], success: false };
+            } else if (errorType === ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED) {
+              if (sharedState) {
+                sharedState.shouldStopDueToLanguagePairError = true;
+                sharedState.languagePairError = individualError;
+                logger.debug('[TranslationEngine] Language pair error detected in individual translation - stopping all batches');
+              }
+              throw individualError;
+            } else {
+              // Other fatal errors (e.g. Quota Exceeded) - stop retries
+              logger.debug(`[TranslationEngine] Fatal error detected in individual translation (${errorType}) - skipping retries`);
+              return { idx, result: segments[idx], success: false };
             }
-            throw individualError;
           }
           
           attempt++;

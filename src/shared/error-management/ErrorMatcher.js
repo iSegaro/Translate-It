@@ -36,13 +36,25 @@ export function isFatalError(errorOrType) {
     ErrorTypes.SERVER_ERROR,
     ErrorTypes.INVALID_REQUEST,
     ErrorTypes.MODEL_OVERLOADED,
-    ErrorTypes.CIRCUIT_BREAKER_OPEN
+    ErrorTypes.CIRCUIT_BREAKER_OPEN,
+    ErrorTypes.USER_CANCELLED,
+    ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ErrorTypes.API_RESPONSE_INVALID
   ];
 
   const isFatalStatusCode = errorOrType && typeof errorOrType === 'object' && 
     [401, 402, 403, 404, 429].includes(errorOrType.statusCode);
 
   return fatalErrorTypes.includes(type) || isFatalStatusCode;
+}
+
+/**
+ * Determines if an error should trigger a retry or fallback
+ * @param {string|Error|object} errorOrType - Error type string, Error object, or response object
+ * @returns {boolean} True if the error is retryable
+ */
+export function isRetryableError(errorOrType) {
+  return !isFatalError(errorOrType);
 }
 
 /**
