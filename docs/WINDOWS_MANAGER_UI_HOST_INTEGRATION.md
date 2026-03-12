@@ -97,17 +97,6 @@ This document describes the successful migration of the WindowsManager system to
 
 ## Migration Status
 
-### ✅ Completed Features
-- [x] Window creation and dismissal via events
-- [x] Icon creation and dismissal via events
-- [x] Translation loading, result, and error states
-- [x] Cross-frame communication for iframes
-- [x] Full feature-parity with legacy window (drag, copy, speak, close)
-- [x] Theme integration (light/dark modes)
-- [x] Fully isolated styling within Shadow DOM
-- [x] **Modern CSS Architecture (2025)**: CSS Grid layout, containment, and principled variable system
-- [x] **Fixed Width Window**: Constrained to 300px with proper content overflow handling
-- [x] **SCSS Best Practices**: Safe variable functions and mixins for future-proof development
 
 ### 🎯 Future Improvements
 - [ ] Enhanced accessibility features (ARIA attributes)
@@ -115,7 +104,27 @@ This document describes the successful migration of the WindowsManager system to
 - [ ] Advanced positioning algorithms (e.g., collision detection)
 - [ ] Performance optimizations for very high-frequency events
 
-## Usage Examples
+## Error Management Integration
+
+The WindowsManager system is fully integrated with the centralized **Error Management System**:
+
+1.  **Unified Classification**: All errors are matched to types via `ErrorMatcher` to determine if they are fatal, silent, or require settings.
+2.  **Consistent UI Messages**: Instead of manual error string building, `ErrorHandler.getErrorForUI()` is used to provide localized, user-friendly messages.
+3.  **Context-Aware Actions**: The system automatically determines if a "Retry" or "Settings" button should be displayed in the translation window based on the error type (e.g., Network Error vs. Invalid API Key).
+4.  **Silent Context Handling**: Extension reload/context errors are handled silently via `ExtensionContextManager` to prevent UI glitches.
+
+### Example: Error Event
+```javascript
+// Show error with retry/settings support
+const errorInfo = await errorHandler.getErrorForUI(error, 'windows-translation');
+
+WindowsManagerEvents.updateWindow(windowId, {
+  isError: true,
+  canRetry: errorInfo.canRetry,
+  needsSettings: errorInfo.needsSettings,
+  initialTranslatedText: errorInfo.message
+});
+```
 
 ### Basic Window Creation
 ```javascript
