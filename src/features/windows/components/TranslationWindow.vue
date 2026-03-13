@@ -135,6 +135,7 @@
         :content="translatedText"
         :is-loading="isLoading"
         :error="errorMessage"
+        :error-type="props.errorType"
         :mode="'compact'"
         :placeholder="t('window_translation_placeholder')"
         :target-language="props.targetLanguage"
@@ -177,6 +178,7 @@ const props = defineProps({
   theme: { type: String, default: 'light' },
   isLoading: { type: Boolean, default: false },
   isError: { type: Boolean, default: false },
+  errorType: { type: String, default: null },
   canRetry: { type: Boolean, default: false },
   needsSettings: { type: Boolean, default: false },
   initialSize: { type: String, default: 'normal' }, // 'small' or 'normal'

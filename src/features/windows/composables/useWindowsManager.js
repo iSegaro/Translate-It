@@ -40,6 +40,7 @@ export function useWindowsManager() {
       position: detail.position,
       theme: detail.theme || 'light',
       isError: detail.isError || false,
+      errorType: detail.errorType || null,
       canRetry: detail.canRetry || false,
       needsSettings: detail.needsSettings || false,
       isLoading: detail.isLoading || false,

@@ -19,7 +19,7 @@
           ⚠️
         </div>
         <p class="error-message">
-          {{ errorMessage }}
+          {{ displayErrorMessage }}
         </p>
         <button
           class="retry-button"
@@ -152,7 +152,16 @@ const isLoading = ref(true)
 const loadingText = ref('Initializing...')
 const hasError = ref(false)
 const errorMessage = ref('')
+const errorType = ref(null)
 const canTranslateFromForm = ref(false)
+
+// Reactive error message display
+const displayErrorMessage = computed(() => {
+  if (!errorType.value) return errorMessage.value;
+  const key = errorType.value.startsWith('ERRORS_') ? errorType.value : `ERRORS_${errorType.value}`;
+  const translated = t(key);
+  return (translated && translated !== key) ? translated : errorMessage.value;
+});
 
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
@@ -236,6 +245,9 @@ const initialize = async () => {
     if (!isSilent) {
       hasError.value = true
       errorMessage.value = error.message || 'Unknown error occurred'
+      // Extract error type for reactive translation
+      const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
+      errorType.value = matchErrorToType(error)
     }
   } finally {
     isLoading.value = false

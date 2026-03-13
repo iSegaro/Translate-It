@@ -85,6 +85,7 @@
         :target-language="currentTargetLanguage"
         :is-loading="isTranslating"
         :error="translationError"
+        :error-type="errorType"
         :mode="mode"
         :placeholder="resultPlaceholder"
         :copy-title="copyResultTitle"
@@ -289,6 +290,7 @@ const translatedText = ref('')
 const isTranslating = ref(false)
 const canTranslate = ref(false)
 const translationError = ref('')
+const errorType = ref(null)
 const hasError = ref(false)
 const sourceLanguage = ref(props.initialSourceLanguage)
 const targetLanguage = ref(props.initialTargetLanguage)

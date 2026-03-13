@@ -32,6 +32,7 @@
       :target-language="currentTargetLanguage"
       :is-loading="isTranslating"
       :error="translationError"
+      :error-type="errorType"
       :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here'"
       :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه'"
       :copy-alt="t('popup_copy_target_alt_icon') || 'Copy Result'"
@@ -99,6 +100,7 @@ const {
   translatedText,
   isTranslating,
   translationError,
+  errorType,
   canTranslate,
   triggerTranslation,
   clearTranslation,

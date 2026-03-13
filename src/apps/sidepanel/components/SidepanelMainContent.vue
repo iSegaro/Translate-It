@@ -105,6 +105,7 @@
           :target-language="currentTargetLanguage"
           :is-loading="isTranslating"
           :error="translationError"
+          :error-type="errorType"
           :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here')"
           :copy-title="t('SIDEPANEL_COPY_TARGET_TITLE_ICON', 'Copy translation')"
           :copy-alt="t('SIDEPANEL_COPY_TARGET_ALT_ICON', 'Copy Result')"
@@ -149,6 +150,7 @@ const {
   targetLanguage,
   isTranslating,
   translationError,
+  errorType,
   canTranslate,
   triggerTranslation,
   clearTranslation,

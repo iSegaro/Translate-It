@@ -75,10 +75,11 @@
       >
         <div 
           class="error-text"
-          style="display: block !important; margin: 0 !important; color: #b02a37 !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
+          style="display: block !important; margin: 0px !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
         >
-          ⚠️ {{ error }}
+          ⚠️ {{ displayErrorMessage }}
         </div>
+
         <div 
           v-if="canRetry || canOpenSettings" 
           class="error-actions"
@@ -162,6 +163,10 @@ const props = defineProps({
   error: {
     type: String,
     default: "",
+  },
+  errorType: {
+    type: String,
+    default: null,
   },
 
   // Enhanced error props
@@ -289,6 +294,18 @@ const hasContent = computed(
   () => props.content && props.content.trim().length > 0 && !props.isLoading,
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
+
+// Reactive error message display
+const displayErrorMessage = computed(() => {
+  if (!props.errorType) return props.error;
+  
+  // Construct translation key (standard ERRORS_ prefix)
+  const key = props.errorType.startsWith('ERRORS_') ? props.errorType : `ERRORS_${props.errorType}`;
+  const translated = t(key);
+  
+  // If translation exists, return it, otherwise fallback to static error prop
+  return (translated && translated !== key) ? translated : props.error;
+});
 
 // Safe language code detector for UI
 const currentUiLang = computed(() => {

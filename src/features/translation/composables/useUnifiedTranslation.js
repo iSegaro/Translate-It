@@ -348,6 +348,7 @@ export function useUnifiedTranslation(context = 'popup') {
     lastTranslation,
     // Error management
     translationError: errorManager.errorMessage,
+    errorType: errorManager.errorType,
     hasError: errorManager.hasError,
     canRetry: errorManager.canRetry,
     canOpenSettings: errorManager.canOpenSettings,

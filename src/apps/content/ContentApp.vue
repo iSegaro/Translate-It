@@ -50,6 +50,7 @@
       :theme="window.theme"
       :is-loading="window.isLoading"
       :is-error="window.isError"
+      :error-type="window.errorType"
       :can-retry="window.canRetry"
       :needs-settings="window.needsSettings"
       :initial-size="window.initialSize"

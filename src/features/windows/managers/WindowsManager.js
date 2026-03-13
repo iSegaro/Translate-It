@@ -594,6 +594,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isError: true,
+        errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
         initialTranslatedText: errorInfo.message
@@ -704,6 +705,7 @@ export class WindowsManager extends ResourceTracker {
         initialSize: 'normal',
         isLoading: false,
         isError: true,
+        errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
         initialTranslatedText: errorInfo.message
@@ -974,6 +976,7 @@ export class WindowsManager extends ResourceTracker {
             initialSize: 'normal',
             isLoading: false,
             isError: true,
+            errorType: errorInfo.type,
             initialTranslatedText: errorInfo.message
           });
         });
@@ -1086,6 +1089,7 @@ export class WindowsManager extends ResourceTracker {
       position: position,
       theme: theme,
       isError: true,
+      errorType: errorInfo.type,
       canRetry: errorInfo.canRetry,
       needsSettings: errorInfo.needsSettings
     });

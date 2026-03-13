@@ -17,7 +17,7 @@
       </div>
       <h2>{{ t('sidepanel_load_error_title') || 'Failed to Load Sidepanel' }}</h2>
       <p class="error-message">
-        {{ errorMessage }}
+        {{ displayErrorMessage }}
       </p>
       <button
         class="retry-button"
@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -80,6 +80,15 @@ const isLoading = ref(true)
 const loadingText = ref('Loading Sidepanel...')
 const hasError = ref(false)
 const errorMessage = ref('')
+const errorType = ref(null)
+
+// Reactive error message display
+const displayErrorMessage = computed(() => {
+  if (!errorType.value) return errorMessage.value;
+  const key = errorType.value.startsWith('ERRORS_') ? errorType.value : `ERRORS_${errorType.value}`;
+  const translated = t(key);
+  return (translated && translated !== key) ? translated : errorMessage.value;
+});
 
 // Lazy-loaded theme application
 const applyThemeLazy = async (theme) => {
@@ -200,6 +209,9 @@ const initialize = async () => {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
+    // Extract error type for reactive translation
+    const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
+    errorType.value = matchErrorToType(error)
   } finally {
     logger.debug('✨ SidepanelApp initialization complete')
     isLoading.value = false
