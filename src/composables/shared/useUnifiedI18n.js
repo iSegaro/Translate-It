@@ -148,16 +148,17 @@ export function useUnifiedI18n() {
     return !!locale.value
   })
 
-  // Watch for settings store changes to sync with vue-i18n
+  // Watch for settings changes to sync with vue-i18n
+  // Use settingsManager's reactive cache for immediate updates in all contexts
   watch(
-    () => settingsStore.settings?.APPLICATION_LOCALIZE,
+    () => settingsManager.get('APPLICATION_LOCALIZE'),
     async (newLang) => {
       if (newLang) {
         const normalizedLang = normalizeLocale(newLang)
         if (normalizedLang !== locale.value) {
           const { setI18nLocale } = await utilsFactory.getI18nUtils()
           setI18nLocale(normalizedLang).catch(err =>
-            logger.warn('Failed to sync locale from settings:', err)
+            logger.warn('Failed to sync locale from settings change:', err)
           )
         }
       }

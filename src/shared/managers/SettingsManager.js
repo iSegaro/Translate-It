@@ -433,6 +433,7 @@ class SettingsManager {
    */
   _initializeReactiveCache() {
     const frequentlyAccessed = [
+      'APPLICATION_LOCALIZE',
       'EXTENSION_ENABLED',
       'TRANSLATE_ON_TEXT_FIELDS',
       'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
