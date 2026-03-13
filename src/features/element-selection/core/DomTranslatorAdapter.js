@@ -16,7 +16,6 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
-import { RTL_LANGUAGES } from './DomTranslatorConstants.js';
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
 import { collectTextNodes, generateElementId } from './DomTranslatorUtils.js';
 import * as DirectionManager from './DomDirectionManager.js';
@@ -190,12 +189,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
       const result = await Promise.race([
-        directResponsePromise.then(res => (!res?.streaming && res?.success) ? this._handleDirectResponse(res, textNodes) : streamEndPromise),
+        directResponsePromise.then(res => (!res?.streaming && res?.success) ? this._handleDirectResponse(res) : streamEndPromise),
         streamEndPromise
       ]);
 
       return await this._finalizeTranslation({
-        result, element, elementId, originalHTML, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete
+        result, element, elementId, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete
       });
 
     } catch (error) {
@@ -218,7 +217,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _handleDirectResponse(response, textNodes) {
+  async _handleDirectResponse(response) {
     try {
       const parsed = JSON.parse(response.translatedText);
       const results = Array.isArray(parsed) ? parsed : [parsed];
@@ -229,16 +228,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
         try {
           contentScriptIntegration.streamingHandler.unregisterHandler(this.currentMessageId);
           this.currentMessageId = null; 
-        } catch (e) {}
+        } catch {
+          // Ignore unregistration errors
+        }
       }
       
       return { success: true, isNonStreaming: true, translatedResults: results };
-    } catch (e) {
+    } catch {
       throw new Error('Invalid translation format');
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, originalHTML, originalTextNodesData, targetLanguage, onComplete }) {
+  async _finalizeTranslation({ result, element, elementId, originalTextNodesData, targetLanguage, onComplete }) {
     if (!result?.success) {
       if (result.cancelled) {
         return { success: false, cancelled: true, element };
@@ -264,7 +265,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       try {
         contentScriptIntegration.streamingHandler.unregisterHandler(this.currentMessageId);
         this.currentMessageId = null; 
-      } catch (e) {}
+      } catch {
+        // Ignore unregistration errors
+      }
     }
 
     const finalTarget = result.targetLanguage || targetLanguage;
@@ -334,7 +337,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           // Force stop on error or cancellation
           contentScriptIntegration.streamingHandler.cancelHandler(messageId);
         }
-      } catch (e) {
+      } catch {
         // Ignore cleanup errors
       }
     }
@@ -419,7 +422,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       sendRegularMessage({
         action: MessageActions.CANCEL_SESSION,
         data: { sessionId: this.sessionMessageId }
-      }).catch(e => {});
+      }).catch(() => {});
     }
 
     if (this.hasTranslation()) await this.revertTranslation();

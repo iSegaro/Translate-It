@@ -83,7 +83,9 @@ export class PageTranslationScheduler {
       const itemsToReject = [...this.queue];
       this.queue = [];
       itemsToReject.forEach(item => {
-        try { item.resolve(item.text); } catch (_) {}
+        try { item.resolve(item.text); } catch {
+          // Ignore resolution errors
+        }
       });
     }
     this.activeFlushes = 0;
@@ -244,7 +246,9 @@ export class PageTranslationScheduler {
       if (msg !== 'Session changed or stopped' && msg !== 'Session stopped') {
         await this._handleBatchError(error, currentBatch);
       } else {
-        currentBatch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
+        currentBatch.forEach(item => { try { item.resolve(item.text); } catch {
+          // Ignore resolution errors
+        } });
       }
     } finally {
       this.activeFlushes--;
@@ -299,7 +303,9 @@ export class PageTranslationScheduler {
       });
     }
 
-    batch.forEach(item => { try { item.resolve(item.text); } catch (_) {} });
+    batch.forEach(item => { try { item.resolve(item.text); } catch {
+          // Ignore resolution errors
+        } });
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { 
       error: error.message || String(error), 
       errorType, 

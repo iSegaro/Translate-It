@@ -5,7 +5,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { TEXT_TAGS } from './DomTranslatorConstants.js';
+import DOMPurify from 'dompurify';
 
 export const globalSelectElementState = {
   translationHistory: [], // Store all translations for proper revert
@@ -62,7 +62,11 @@ export async function revertSelectElementTranslation() {
 
       // 1. Restore content (innerHTML is most reliable for restoring attributes/styles of children)
       if (originalHTML && element) {
-        element.innerHTML = originalHTML;
+        // Safe: clear content first (using literal empty string)
+        element.innerHTML = '';
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(DOMPurify.sanitize(originalHTML), 'text/html');
+        element.append(...doc.body.childNodes);
         revertedCount++;
       } else if (originalTextNodesData && originalTextNodesData.length > 0) {
         // Fallback to surgical text node restoration if HTML is not available

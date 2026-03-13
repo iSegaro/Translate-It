@@ -206,7 +206,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
     // Check 2: Validate tag syntax integrity
     const malformedPatterns = [
-      /<x\s+id[^>]*[^\/]>/gi,      // Missing closing slash: <x id="0">
+      /<x\s+id[^>]*[^/]>/gi,      // Missing closing slash: <x id="0">
       /<x\s+id=\s*[^"'][^>]*>/gi,  // Missing quotes: <x id=0/>
       /<x\s+[^i]/gi,                // Missing id attribute: <x/>
       /<\s*x/gi                     // Space after <: < x>
@@ -388,9 +388,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // This is much safer than text markers like " @ " which can confuse DeepL
     const BLANK_LINE_MARKER = '<n2/>';  // Marker for \n\n
     const SINGLE_NEWLINE_MARKER = '<n1/>';  // Marker for \n
-
-    // Store original texts for XML validation
-    const originalTextsForValidation = [...validTexts];
 
     const textsToTranslate = validTexts.map(text => {
       // CRITICAL: Sanitize text before processing to remove problematic characters

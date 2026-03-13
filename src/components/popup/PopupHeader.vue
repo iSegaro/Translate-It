@@ -57,7 +57,6 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -81,7 +80,6 @@ const tracker = useResourceTracker('popup-header');
 const sidePanelButton = ref(null)
 
 // Stores
-const settingsStore = useSettingsStore()
 
 // Composables
 const {

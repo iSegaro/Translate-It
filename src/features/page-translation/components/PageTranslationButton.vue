@@ -160,7 +160,6 @@ const {
   message,
   canTranslate,
   canRestore,
-  canCancel,
   hasError,
   translatePage,
   restorePage,

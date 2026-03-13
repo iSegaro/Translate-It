@@ -560,7 +560,6 @@ export class BaseAIProvider extends BaseProvider {
       }
       throw new Error(`Unsupported batch strategy: ${batchStrategy}`);
     } catch (error) {
-      const errorMsg = (error.message || String(error)).toLowerCase();
       const errorType = error.type || matchErrorToType(error);
 
       // CRITICAL: Check if the error is fatal (Rate Limit, Auth, Model Missing, etc.)
@@ -593,7 +592,7 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} sessionId - Session ID (optional)
    * @param {boolean} isBatch - Whether this is a batch request (optional)
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
+  async _translateSingle() {
     throw new Error(`_translateSingle must be implemented by ${this.constructor.name}`);
   }
 
@@ -609,7 +608,7 @@ export class BaseAIProvider extends BaseProvider {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
       return !session || session.history.length === 0;
-    } catch (e) {
+    } catch {
       return true;
     }
   }

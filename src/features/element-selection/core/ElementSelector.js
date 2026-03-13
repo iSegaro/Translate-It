@@ -3,7 +3,6 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ToastElementDetector } from '@/shared/toast/ToastElementDetector.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
@@ -176,9 +175,8 @@ export class ElementSelector extends ResourceTracker {
 
   /**
    * Handle mouse out event - clear highlight with timeout
-   * @param {HTMLElement} element - Element being left
    */
-  handleMouseOut(element) {
+  handleMouseOut() {
     if (!this.isActive) return;
 
     // Clear any existing timeout

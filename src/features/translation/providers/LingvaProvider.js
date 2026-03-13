@@ -55,39 +55,32 @@ export class LingvaProvider extends BaseTranslateProvider {
       textToTranslate = validTexts[0];
     }
 
-    try {
-      const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
+    const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
       
-      const result = await this._executeRequest({
-        url,
-        fetchOptions: {
-          method: "GET",
-          mode: 'cors',
-          credentials: 'omit',
-          headers: { "Accept": "application/json" }
-        },
-        extractResponse: (data) => data?.translation,
-        context: 'lingva-standard-chunk',
-        abortController
-      });
+    const result = await this._executeRequest({
+      url,
+      fetchOptions: {
+        method: "GET",
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { "Accept": "application/json" }
+      },
+      extractResponse: (data) => data?.translation,
+      context: 'lingva-standard-chunk',
+      abortController
+    });
 
-      if (!result) return chunkTexts;
+    if (!result) return chunkTexts;
 
-      // If we only translated the first one because of length
-      if (textToTranslate === validTexts[0] && chunkTexts.length > 1) {
-        return [result, ...chunkTexts.slice(1)];
-      }
-
-      // Standard splitting logic
-      const translatedParts = result.split(LingvaProvider.TEXT_DELIMITER.trim());
-      return chunkTexts.map((original, i) => {
-        return translatedParts[i]?.trim() || original;
-      });
-
-    } catch (error) {
-      // Standard error handling: BaseProvider._executeRequest already maps the error
-      // We just rethrow so the central engine handles the failure/fatal logic.
-      throw error;
+    // If we only translated the first one because of length
+    if (textToTranslate === validTexts[0] && chunkTexts.length > 1) {
+      return [result, ...chunkTexts.slice(1)];
     }
+
+    // Standard splitting logic
+    const translatedParts = result.split(LingvaProvider.TEXT_DELIMITER.trim());
+    return chunkTexts.map((original, i) => {
+      return translatedParts[i]?.trim() || original;
+    });
   }
 }

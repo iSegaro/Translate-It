@@ -3,11 +3,7 @@
  * Uses a combination of Unicode Marks (BiDi Isolation) and Surgical CSS direction.
  */
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS } from './DomTranslatorConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomDirectionManager');
 
 /**
  * Check if a language code is RTL

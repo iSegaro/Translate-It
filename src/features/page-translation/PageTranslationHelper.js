@@ -78,12 +78,12 @@ export class PageTranslationHelper {
         rect.right >= -margin &&
         rect.left <= viewportWidth + margin
       );
-    } catch (_) {
+    } catch {
       return false;
     }
   }
 
-  static isSuitableForTranslation(logger) {
+  static isSuitableForTranslation() {
     if (window === window.top) return true;
     try {
       const width = window.innerWidth;
@@ -92,7 +92,7 @@ export class PageTranslationHelper {
       const style = window.getComputedStyle(document.documentElement);
       if (style.display === 'none' || style.visibility === 'hidden') return false;
       return true;
-    } catch (e) {
+    } catch {
       return window.innerWidth > 150 && window.innerHeight > 150;
     }
   }

@@ -6,7 +6,6 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -110,7 +109,9 @@ export class RateLimitManager {
     try {
       const { registryIdToName } = await import("@/features/translation/providers/ProviderConstants.js");
       name = registryIdToName(providerName) || providerName;
-    } catch (e) { /* Fallback to raw providerName */ }
+    } catch {
+      // Fallback to raw providerName
+    }
 
     const state = this._initializeProvider(name);
     

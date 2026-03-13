@@ -5,7 +5,6 @@ import {
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
 } from "@/shared/config/config.js";
-import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

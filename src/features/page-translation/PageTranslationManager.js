@@ -295,7 +295,9 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       pageEventBus.emit(action, data);
       sendRegularMessage({ action, data, context: 'page-translation-broadcast' }).catch(() => {});
-    } catch (_) {}
+    } catch {
+      // Silent error
+    }
   }
 
   getStatus() {

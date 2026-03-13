@@ -70,7 +70,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
           MicrosoftEdgeProvider.tokenExpiry = payload.exp * 1000;
-        } catch (e) {
+        } catch {
           // Fallback to 30 second lifetime as seen in anylang
           MicrosoftEdgeProvider.tokenExpiry = Date.now() + (30 * 1000);
         }

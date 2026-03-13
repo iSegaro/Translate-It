@@ -7,7 +7,6 @@ import {
   getGeminiThinkingEnabledAsync,
   getGeminiApiUrlAsync,
 } from "@/shared/config/config.js";
-import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';

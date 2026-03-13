@@ -111,7 +111,9 @@ export class PageTranslationBridge {
       this.logger.warn('[Bridge] Restore failed:', e.message);
       // Last resort fallback directly on domTranslator
       if (this.session.domTranslator) {
-        try { this.session.domTranslator.restore(element); } catch (_) {}
+        try { this.session.domTranslator.restore(element); } catch {
+          // Silent fallback
+        }
       }
     } finally {
       this.cleanup();

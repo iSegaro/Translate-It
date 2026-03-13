@@ -359,7 +359,7 @@ class TranslationModeCoordinator {
   /**
    * Process request based on mode
    */
-  async processRequest(request, { translationEngine, backgroundService }) {
+  async processRequest(request, { translationEngine }) {
     const { mode } = request;
 
     // Update request status
@@ -413,7 +413,7 @@ class TranslationModeCoordinator {
    * Process page mode translation (Batch)
    */
   async processPageTranslation(request, { translationEngine }) {
-    const { messageId, data, sender } = request;
+    const { messageId, data } = request;
     const { text, provider, sourceLanguage, targetLanguage, priority } = data;
 
     if (!text) {
