@@ -416,7 +416,7 @@ This will configure the development environment and install any additional tools
 To generate the unpacked extension files for development, run:
 
 ```bash
-# Build for both browsers
+# Build for both browsers (Parallel)
 pnpm run build
 
 # Build for a specific browser
@@ -424,12 +424,10 @@ pnpm run build:chrome
 pnpm run build:firefox
 ```
 
-This will create the necessary files in the `dist/chrome/` and `dist/firefox/` directories, which you can load as temporary extensions in your browser.
-
-To actively develop and apply changes in real time, use one of the following commands:
+To actively develop and apply changes in real time, use the following commands:
 
 ```bash
-# Watch for changes for both browsers
+# Watch for changes
 pnpm run watch:chrome
 pnpm run watch:firefox
 ```
@@ -438,18 +436,18 @@ pnpm run watch:firefox
 
 #### Linting
 
-To ensure code quality and catch potential issues early, you can run ESLint:
+To ensure code quality and catch potential issues early, you can run ESLint and Stylelint:
 
 ```bash
-# Lint source code for both browsers
+# Lint JS source code
 pnpm run lint
 
-# Lint for specific browser
-pnpm run lint:source:chrome
-pnpm run lint:source:firefox
-```
+# Lint CSS styles
+pnpm run lint:styles
 
-This command will scan all `src/**/*.js` files and report any syntax errors or unsafe patterns.
+# Format code with Prettier
+pnpm run format
+```
 
 #### Extension Validation
 
@@ -464,7 +462,7 @@ pnpm run validate:firefox
 pnpm run validate:chrome
 ```
 
-**Note:** For Chrome validation, you need web-ext installed. If it's not available, install it with:
+**Note:** For Chrome validation, you need `web-ext` installed. If it's not available, install it with:
 
 ```bash
 pnpm run setup:chrome-validator
@@ -478,7 +476,7 @@ Before submitting your changes, run the comprehensive pre-submission check:
 pnpm run pre-submit
 ```
 
-This command runs linting, builds the extension, and validates both browser versions.
+This command runs linting (JS & Styles) and builds the extension.
 
 ### Packaging for Distribution
 
