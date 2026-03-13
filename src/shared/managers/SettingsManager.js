@@ -63,6 +63,7 @@ class SettingsManager {
 
     // Default settings from CONFIG (will be overridden by loaded settings)
     this._defaults = {
+      APPLICATION_LOCALIZE: 'English',
       EXTENSION_ENABLED: true,
       TRANSLATE_ON_TEXT_FIELDS: false,
       TRANSLATE_ON_TEXT_SELECTION: true,

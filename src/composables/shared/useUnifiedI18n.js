@@ -4,6 +4,7 @@
 import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -29,7 +30,8 @@ const LANGUAGE_MAP = {
  * @returns {string} Locale code
  */
 function normalizeLocale(lang) {
-  return LANGUAGE_MAP[lang] || lang || 'en'
+  if (!lang) return 'en'
+  return LANGUAGE_MAP[lang] || lang.toLowerCase() || 'en'
 }
 
 /**
@@ -132,9 +134,20 @@ export function useUnifiedI18n() {
    * Get current locale
    */
   const currentLocale = computed(() => {
+    // 1. Primary source: settingsManager (most reliable in content scripts)
+    const directStored = settingsManager.get('APPLICATION_LOCALIZE')
+    if (directStored) {
+      return normalizeLocale(directStored)
+    }
+
+    // 2. Fallback: store settings
     const storedLang = settingsStore.settings?.APPLICATION_LOCALIZE
-    const normalizedStored = normalizeLocale(storedLang)
-    return locale.value || normalizedStored || 'en'
+    if (storedLang) {
+      return normalizeLocale(storedLang)
+    }
+    
+    // 3. Last resort: vue-i18n locale
+    return locale.value || 'en'
   })
 
   /**

@@ -23,7 +23,11 @@ const RTL_LANGUAGES = [
   'am', // Amharic
   'ti', // Tigrinya
   'dz', // Dzongkha
-  'ks' // Kashmiri
+  'ks', // Kashmiri
+  'farsi',
+  'persian',
+  'arabic',
+  'hebrew'
 ];
 
 /**

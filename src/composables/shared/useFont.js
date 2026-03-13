@@ -55,7 +55,7 @@ const FONT_CSS_MAP = {
 }
 
 // RTL language detection
-const RTL_LANGUAGES = ['farsi', 'persian', 'fa', 'arabic', 'ar', 'hebrew', 'he', 'urdu', 'ur']
+const RTL_LANGUAGES = ['farsi', 'persian', 'fa', 'arabic', 'ar', 'hebrew', 'he', 'urdu', 'ur', 'ku', 'kurdish', 'ps', 'pashto']
 
 /**
  * Font management composable

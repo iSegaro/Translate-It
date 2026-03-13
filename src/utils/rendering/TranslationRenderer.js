@@ -58,20 +58,27 @@ export class TranslationRenderer {
   /**
    * Create DOM element with rendered content
    * @param {Object} params - Same as renderContent
+   * @param {string} params.uiDirection - Optional UI direction ('rtl' or 'ltr')
    * @returns {HTMLElement} DOM element
    */
   createContentElement(params) {
     const div = document.createElement('div')
     div.className = this._getContentClasses()
     
-    // Apply text direction BEFORE setting innerHTML to prevent layout shift
-    if (params.content) {
-      const isRtl = shouldApplyRtl(params.content)
-      div.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
-      // Check if element has style property before accessing it
-      if (div.style && typeof div.style === 'object') {
-        div.style.textAlign = isRtl ? 'right' : 'left'
-      }
+    // Apply text direction BEFORE setting content to prevent layout shift
+    let direction = 'ltr';
+    if (params.error && params.uiDirection) {
+      direction = params.uiDirection;
+    } else if (params.content) {
+      direction = shouldApplyRtl(params.content) ? 'rtl' : 'ltr';
+    } else if (params.error) {
+      // Fallback for error if no uiDirection: check if error message itself is RTL
+      direction = shouldApplyRtl(params.error) ? 'rtl' : 'ltr';
+    }
+    
+    div.setAttribute('dir', direction)
+    if (div.style && typeof div.style === 'object') {
+      div.style.textAlign = direction === 'rtl' ? 'right' : 'left'
     }
     
     // Use DOM methods instead of innerHTML for security
@@ -84,20 +91,26 @@ export class TranslationRenderer {
    * Update existing DOM element with new content
    * @param {HTMLElement} element - Target element
    * @param {Object} params - Content parameters
+   * @param {string} params.uiDirection - Optional UI direction
    */
   updateContentElement(element, params) {
     if (!element) return
     
     element.className = this._getContentClasses()
     
-    // Apply text direction BEFORE setting innerHTML to prevent layout shift
-    if (params.content) {
-      const isRtl = shouldApplyRtl(params.content)
-      element.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
-      // Check if element has style property before accessing it
-      if (element.style && typeof element.style === 'object') {
-        element.style.textAlign = isRtl ? 'right' : 'left'
-      }
+    // Apply text direction
+    let direction = 'ltr';
+    if (params.error && params.uiDirection) {
+      direction = params.uiDirection;
+    } else if (params.content) {
+      direction = shouldApplyRtl(params.content) ? 'rtl' : 'ltr';
+    } else if (params.error) {
+      direction = shouldApplyRtl(params.error) ? 'rtl' : 'ltr';
+    }
+    
+    element.setAttribute('dir', direction)
+    if (element.style && typeof element.style === 'object') {
+      element.style.textAlign = direction === 'rtl' ? 'right' : 'left'
     }
     
     // Use DOM methods instead of innerHTML for security
@@ -299,8 +312,7 @@ export function getTranslationDisplayStyles() {
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
-  direction: ltr;
-  text-align: left;
+  /* direction and text-align removed to allow dynamic or inherited direction */
 }
 
 .translation-content.selection-mode {

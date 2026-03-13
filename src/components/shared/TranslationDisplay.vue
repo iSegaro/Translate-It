@@ -129,8 +129,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
-import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
+import { shouldApplyRtl, isPersianText } from "@/shared/utils/text/textAnalysis.js";
+import { getTextDirection, isRTLLanguage } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -290,6 +290,12 @@ const hasContent = computed(
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
 
+// Safe language code detector for UI
+const currentUiLang = computed(() => {
+  const lang = locale.value || 'en';
+  return String(lang).toLowerCase();
+});
+
 // Font management with safe error handling and RTL-aware CSS variables
 let fontStyles = ref({});
 let cssVariables = ref({});
@@ -298,7 +304,7 @@ try {
   // Initialize useFont with target language (or UI language if there's an error)
   const { fontStyles: computedFontStyles, cssVariables: computedCssVariables } =
     useFont(
-      computed(() => hasError.value ? locale.value : props.targetLanguage),
+      computed(() => hasError.value ? currentUiLang.value : props.targetLanguage),
       {
         enableSmartDetection: true,
         fallbackFont: "system",
@@ -346,9 +352,10 @@ try {
 
 // Enhanced text direction computation with target language awareness
 const textDirection = computed(() => {
-  // If we have an error, follow UI language direction
+  // If we have an error, follow UI language direction strictly
   if (hasError.value) {
-    const direction = getTextDirection(locale.value);
+    const lang = currentUiLang.value;
+    const direction = isRTLLanguage(lang) ? 'rtl' : 'ltr';
     return {
       dir: direction,
       textAlign: direction === 'rtl' ? 'right' : 'left',
@@ -357,7 +364,7 @@ const textDirection = computed(() => {
 
   const textToCheck = props.content || "";
 
-  // Use new target-language-first detection following Immersive Translate pattern
+  // Use new target-language-first detection
   const direction = getTextDirection(props.targetLanguage || 'fa', textToCheck);
   const isRtl = direction === 'rtl';
 

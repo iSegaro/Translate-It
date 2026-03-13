@@ -4,6 +4,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "@/shared/config/config.js";
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { isRTLLanguage } from '@/features/element-selection/utils/textDirection.js';
+import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
 
 let logger = null;
 const getLogger = () => {
@@ -191,15 +194,36 @@ export class TranslationRenderer {
     // Create error container
     const errorContainer = document.createElement('div');
     errorContainer.className = 'error-display-container';
+    
+    // Determine UI language direction for errors
+    const uiLocale = String(settingsManager.get('APPLICATION_LOCALIZE', 'English')).toLowerCase();
+    
+    // Direct check for common language names if code map fails
+    let isRtlUI = false;
+    if (uiLocale.includes('farsi') || uiLocale.includes('persian') || uiLocale === 'fa') {
+      isRtlUI = true;
+    } else if (uiLocale.includes('arabic') || uiLocale === 'ar') {
+      isRtlUI = true;
+    } else if (uiLocale.includes('english') || uiLocale === 'en') {
+      isRtlUI = false;
+    } else {
+      // Use standard code map and isRTLLanguage check
+      const langCode = UI_LOCALE_TO_CODE_MAP[uiLocale] || 'en';
+      isRtlUI = isRTLLanguage(langCode);
+    }
+    
     errorContainer.style.cssText = `
       padding: 12px;
-      border-left: 3px solid #dc3545;
+      border-left: ${isRtlUI ? 'none' : '3px solid #dc3545'};
+      border-right: ${isRtlUI ? '3px solid #dc3545' : 'none'};
       background-color: rgba(220, 53, 69, 0.1);
       border-radius: 6px;
       line-height: 1.4;
       color: #dc3545;
       font-size: 14px;
       margin: 8px;
+      direction: ${isRtlUI ? 'rtl' : 'ltr'};
+      text-align: ${isRtlUI ? 'right' : 'left'};
     `;
     
     // Error message text
@@ -211,7 +235,11 @@ export class TranslationRenderer {
     
     container.appendChild(errorContainer);
     
-    this.logger.debug('Enhanced error message rendered', { errorMessage });
+    this.logger.debug('Enhanced error message rendered with UI direction', { 
+      errorMessage, 
+      isRtlUI, 
+      uiLocale 
+    });
   }
 
   /**
