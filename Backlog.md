@@ -1,12 +1,22 @@
-- پشتیبانی از PDF
-- اضافه کردن دکمه وویس تلفظ در کنار آیکون مترجم روی صفحه. یعنی بدون اینکه اول ترجمه بشود، بدون ترجمه هم بشود تلفظ را شنید.
+# Project Backlog
 
-https://lumetrium.com/definer/wiki/sources/ai/prompts/catalog
-https://mymemory.translated.net/
-https://www.reverso.net/text-translation#sl=eng&tl=per&text=who%2520are%2520you%253F
+List of features, enhancements, and ideas planned for future development.
 
+## Features and Enhancements
 
+- [ ] **PDF Support**: Enable direct translation of text within PDF files.
+- [ ] **Quick Voice Button**: Add a text-to-speech button next to the `Text Selection` translator icon to hear pronunciation without requiring a full translation.
 
-‌DeepL Bug:
 ---
-https://x.com/justchangingun/status/2008960525129105608
+
+## Research and Resources
+
+### Potential Translation Providers
+- [MyMemory Translated](https://mymemory.translated.net/): Free and open-source translation engine.
+- [Reverso Context](https://www.reverso.net/text-translation#sl=eng&tl=per): For examining translations in context and usage examples.
+- [LibreTranslator (Linguist JS)](https://github.com/translate-tools/linguist-translators/blob/master/translators/LibreTranslator.js): Open-source translator implementation.
+- [Baidu Translator](https://github.com/ttop32/MouseTooltipTranslator/blob/main/src/translator/baidu.js): Investigation of Baidu translator implementation.
+- [DeepSeek Model Interface](https://asmodeus.free.nf/?i=1): Custom interface/resource for DeepSeek model.
+
+### Other
+- [Lumetrium Prompt Catalog](https://lumetrium.com/definer/wiki/sources/ai/prompts/catalog): Catalog of specialized prompts for translation and dictionary services.
