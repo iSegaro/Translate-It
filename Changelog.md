@@ -1,15 +1,20 @@
-#### v1.9.0 – Released on February X, 2026
+#### v1.9.0 – Released on March X, 2026
 
 ##### Added
 
-- `Whole Page` translation feature.
-- Japanese UI localization – Special thanks to [monta-gh](https://github.com/monta-gh).
-- Microsoft Edge translation engine.
-- Lingva translator support.
+- Introduced **Whole Page Translation** to translate entire websites seamlessly.
+- Integrated **Microsoft Translator** (Edge) as a new translation engine.
+- Added **Lingva Translate** as an alternative open-source translation provider.
+- Added **Japanese** UI localization, by [@monta-gh](https://github.com/monta-gh).
 
 ##### Fixed
 
-- Improved `Select Element` functionality for better stability and precision.
+- Enhanced **Select Element** mode for significantly better stability and selection precision.
+- Resolved several critical bugs and minor UI inconsistencies across the extension.
+
+##### Changed
+
+- Refined the **User Interface (UI)** and **User Experience (UX)** for a smoother and more intuitive feel.
 
 ---
 
