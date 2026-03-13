@@ -1,9 +1,19 @@
 <!-- PageTranslationButton - Translate/Restore button or text label -->
 <template>
-  <div class="page-translation-controls" :class="{ 'text-only': textOnly, 'compact-wrapper': compact }">
+  <div
+    class="page-translation-controls"
+    :class="{ 'text-only': textOnly, 'compact-wrapper': compact }"
+  >
     <!-- Progress Bar (shown during translation, only if not textOnly) -->
-    <div v-if="showProgress && !textOnly" class="progress-bar" :class="{ compact }">
-      <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+    <div
+      v-if="showProgress && !textOnly"
+      class="progress-bar"
+      :class="{ compact }"
+    >
+      <div
+        class="progress-fill"
+        :style="{ width: `${progress}%` }"
+      />
       <span class="progress-text">{{ progressText }}</span>
     </div>
 
@@ -32,7 +42,10 @@
           class="toolbar-icon"
           alt="Translate"
         >
-        <Icon v-else icon="fa6-solid:language" />
+        <Icon
+          v-else
+          icon="fa6-solid:language"
+        />
         <span v-if="!compact">{{ translateButtonText }}</span>
       </BaseButton>
     </template>
@@ -55,14 +68,21 @@
         :class="{ 'is-compact-icon': compact, 'is-active': isAutoTranslating }"
         @click="handleCancelOrStop"
       >
-        <LoadingSpinner v-if="isTranslating || isAutoTranslating" size="sm" variant="neutral" />
+        <LoadingSpinner
+          v-if="isTranslating || isAutoTranslating"
+          size="sm"
+          variant="neutral"
+        />
         <img
           v-if="compact && !isTranslating && !isAutoTranslating"
           :src="browser.runtime.getURL('icons/ui/whole-page.png')"
           class="toolbar-icon"
           alt="Stop"
         >
-        <Icon v-else-if="!compact && !isTranslating && !isAutoTranslating" icon="fa6-solid:language" />
+        <Icon
+          v-else-if="!compact && !isTranslating && !isAutoTranslating"
+          icon="fa6-solid:language"
+        />
         <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
       </BaseButton>
     </template>
@@ -92,13 +112,19 @@
           class="toolbar-icon"
           alt="Restore"
         >
-        <Icon v-else icon="fa6-solid:rotate-left" />
+        <Icon
+          v-else
+          icon="fa6-solid:rotate-left"
+        />
         <span v-if="!compact">{{ restoreButtonText }}</span>
       </BaseButton>
     </template>
 
     <!-- Error State -->
-    <div v-if="hasError && !compact && !textOnly" class="error-message">
+    <div
+      v-if="hasError && !compact && !textOnly"
+      class="error-message"
+    >
       {{ message }}
     </div>
   </div>

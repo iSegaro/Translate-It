@@ -1,7 +1,7 @@
 <template>
   <div class="header-toolbar">
     <div class="toolbar-left-group">
-      <PageTranslationButton textOnly />
+      <PageTranslationButton text-only />
     </div>
     <div class="toolbar-right-group">
       <IconButton

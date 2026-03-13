@@ -13,7 +13,8 @@
       :title="t('translateWithTranslateIt')"
       :aria-label="t('translateWithTranslateIt')"
       role="button"
-      tabindex="0"      @click="onClick"
+      tabindex="0"
+      @click="onClick"
       @mousedown.prevent.stop
       @mouseup.prevent.stop
       @mouseenter="onMouseEnter"

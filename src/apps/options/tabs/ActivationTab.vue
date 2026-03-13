@@ -51,8 +51,8 @@
 
       <!-- Text Field Mode Options -->
       <div 
-        class="sub-options-group"
         v-if="translateOnTextFields || enableShortcutForTextFields"
+        class="sub-options-group"
       >
         <div class="radio-group">
           <BaseRadio
@@ -107,8 +107,8 @@
 
       <!-- Selection Mode Options -->
       <div 
-        class="sub-options-group"
         v-if="translateOnTextSelection"
+        class="sub-options-group"
       >
         <div class="radio-group">
           <BaseRadio
@@ -186,7 +186,10 @@
         </span>
       </div>
 
-      <div class="sub-options-group" v-if="wholePageEnabled">
+      <div
+        v-if="wholePageEnabled"
+        class="sub-options-group"
+      >
         <div class="setting-group sub-setting-group">
           <BaseCheckbox
             v-model="wholePageLazyLoading"

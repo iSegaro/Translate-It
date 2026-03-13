@@ -102,18 +102,27 @@
       </div>
 
       <!-- Loading State -->
-      <div v-else-if="isLoading" class="loading-message">
+      <div
+        v-else-if="isLoading"
+        class="loading-message"
+      >
         {{ t('SELECT_ELEMENT_TRANSLATING') }}
       </div>
 
       <!-- Placeholder State -->
-      <div v-else-if="!content" class="placeholder-message">
+      <div
+        v-else-if="!content"
+        class="placeholder-message"
+      >
         {{ placeholder }}
       </div>
 
       <!-- Normal Content with Markdown Support -->
       <!-- Safe: Content is sanitized with DOMPurify if markdown is enabled -->
-      <div v-else v-html="sanitizedContent" />
+      <div
+        v-else
+        v-html="sanitizedContent"
+      />
     </div>
   </div>
 </template>
