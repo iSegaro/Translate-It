@@ -196,21 +196,9 @@ export class TranslationRenderer {
     errorContainer.className = 'error-display-container';
     
     // Determine UI language direction for errors
-    const uiLocale = String(settingsManager.get('APPLICATION_LOCALIZE', 'English')).toLowerCase();
-    
-    // Direct check for common language names if code map fails
-    let isRtlUI = false;
-    if (uiLocale.includes('farsi') || uiLocale.includes('persian') || uiLocale === 'fa') {
-      isRtlUI = true;
-    } else if (uiLocale.includes('arabic') || uiLocale === 'ar') {
-      isRtlUI = true;
-    } else if (uiLocale.includes('english') || uiLocale === 'en') {
-      isRtlUI = false;
-    } else {
-      // Use standard code map and isRTLLanguage check
-      const langCode = UI_LOCALE_TO_CODE_MAP[uiLocale] || 'en';
-      isRtlUI = isRTLLanguage(langCode);
-    }
+    const uiLocale = settingsManager.get('APPLICATION_LOCALIZE', CONFIG.APPLICATION_LOCALIZE || 'English');
+    const langCode = UI_LOCALE_TO_CODE_MAP[uiLocale] || uiLocale;
+    const isRtlUI = isRTLLanguage(langCode);
     
     errorContainer.style.cssText = `
       padding: 12px;

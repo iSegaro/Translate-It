@@ -90,6 +90,7 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import { CONFIG } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
@@ -129,7 +130,8 @@ const toastRTL = ref(false);
 // Uses getTranslationString with explicit lang code to avoid cache issues
 const getRTLFromStorage = async () => {
   // Read locale directly from storage - bypass SettingsManager cache entirely
-  const storage = await browser.storage.local.get({ APPLICATION_LOCALIZE: 'English' });
+  // ۱. اولویت با تنظیمات کاربر
+  const storage = await browser.storage.local.get({ APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English' });
   const locale = storage.APPLICATION_LOCALIZE;
 
   // Use centralized locale to language code mapping from languageConstants.js
