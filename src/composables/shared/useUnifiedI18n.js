@@ -11,18 +11,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import browser from 'webextension-polyfill'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedI18n')
+import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js'
 
-/**
- * Map language names to locale codes
- */
-const LANGUAGE_MAP = {
-  'English': 'en',
-  'Farsi': 'fa',
-  'فارسی': 'fa',
-  'en': 'en',
-  'fa': 'fa'
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedI18n')
 
 /**
  * Convert language name to locale code
@@ -31,7 +22,7 @@ const LANGUAGE_MAP = {
  */
 function normalizeLocale(lang) {
   if (!lang) return 'en'
-  return LANGUAGE_MAP[lang] || lang.toLowerCase() || 'en'
+  return UI_LOCALE_TO_CODE_MAP[lang] || lang.toLowerCase() || 'en'
 }
 
 /**

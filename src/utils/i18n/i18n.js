@@ -6,7 +6,7 @@ import { getApplication_LocalizeAsync } from "@/shared/config/config.js";
 import { getLanguageByName } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
-// import  from "./helpers.js";
+import { UI_LOCALE_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -94,17 +94,9 @@ export async function getTranslationString(key, lang) {
   if (!langCode || langCode.length !== 2) {
     const App_Language = await getApplication_LocalizeAsync();
 
-    // Apply language mapping for common cases
-    const LANGUAGE_MAP = {
-      'English': 'en',
-      'Farsi': 'fa',
-      'فارسی': 'fa',
-      'en': 'en',
-      'fa': 'fa'
-    };
-    
-    if (LANGUAGE_MAP[App_Language]) {
-      langCode = LANGUAGE_MAP[App_Language];
+    // Apply centralized language mapping
+    if (UI_LOCALE_TO_CODE_MAP[App_Language]) {
+      langCode = UI_LOCALE_TO_CODE_MAP[App_Language];
     } else {
       // Fallback to new async logic
       const foundLang = await getLanguageByName(App_Language);

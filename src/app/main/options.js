@@ -11,6 +11,7 @@ import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
+import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
@@ -52,15 +53,8 @@ async function initializeApp() {
     try {
       const settings = await browser.storage.local.get('APPLICATION_LOCALIZE');
       if (settings && settings.APPLICATION_LOCALIZE) {
-        // Normalize locale code
-        const LANGUAGE_MAP = {
-          'English': 'en',
-          'Farsi': 'fa',
-          'فارسی': 'fa',
-          'en': 'en',
-          'fa': 'fa'
-        }
-        userLocale = LANGUAGE_MAP[settings.APPLICATION_LOCALIZE] || settings.APPLICATION_LOCALIZE || 'en';
+        // Normalize locale code using centralized mapping
+        userLocale = UI_LOCALE_TO_CODE_MAP[settings.APPLICATION_LOCALIZE] || settings.APPLICATION_LOCALIZE || 'en';
       }
     } catch (e) {
       logger.warn('Failed to get APPLICATION_LOCALIZE from storage:', e);
