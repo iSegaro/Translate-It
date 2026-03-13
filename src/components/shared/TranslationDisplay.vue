@@ -140,7 +140,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
 // Localization
-const { t } = useUnifiedI18n();
+const { t, locale } = useUnifiedI18n();
 
 // Props
 const props = defineProps({
@@ -284,15 +284,21 @@ const containerRef = ref(null);
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
+// Computed
+const hasContent = computed(
+  () => props.content && props.content.trim().length > 0 && !props.isLoading,
+);
+const hasError = computed(() => !!props.error && !props.isLoading);
+
 // Font management with safe error handling and RTL-aware CSS variables
 let fontStyles = ref({});
 let cssVariables = ref({});
 
 try {
-  // Initialize useFont with target language
+  // Initialize useFont with target language (or UI language if there's an error)
   const { fontStyles: computedFontStyles, cssVariables: computedCssVariables } =
     useFont(
-      computed(() => props.targetLanguage),
+      computed(() => hasError.value ? locale.value : props.targetLanguage),
       {
         enableSmartDetection: true,
         fallbackFont: "system",
@@ -338,15 +344,18 @@ try {
   });
 }
 
-// Computed
-const hasContent = computed(
-  () => props.content && props.content.trim().length > 0 && !props.isLoading,
-);
-const hasError = computed(() => !!props.error && !props.isLoading);
-
 // Enhanced text direction computation with target language awareness
 const textDirection = computed(() => {
-  const textToCheck = props.content || props.error || "";
+  // If we have an error, follow UI language direction
+  if (hasError.value) {
+    const direction = getTextDirection(locale.value);
+    return {
+      dir: direction,
+      textAlign: direction === 'rtl' ? 'right' : 'left',
+    };
+  }
+
+  const textToCheck = props.content || "";
 
   // Use new target-language-first detection following Immersive Translate pattern
   const direction = getTextDirection(props.targetLanguage || 'fa', textToCheck);
