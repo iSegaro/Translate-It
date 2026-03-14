@@ -36,10 +36,26 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // Persistent session ID for the duration of this adapter's life
     // This allows maintaining AI context between multiple translated elements
     this.sessionMessageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Cache for original settings to avoid frequent storage calls
+    this.originalSettings = null;
   }
 
   async initialize() {
-    // Initialization handled by ResourceTracker
+    await this._loadOriginalSettings();
+  }
+
+  /**
+   * Loads original settings (source/target) from storage once
+   */
+  async _loadOriginalSettings() {
+    const { getSourceLanguageAsync, getTargetLanguageAsync } = await import('@/shared/config/config.js');
+    const [source, target] = await Promise.all([
+      getSourceLanguageAsync(),
+      getTargetLanguageAsync()
+    ]);
+    this.originalSettings = { source, target };
+    this.logger.debug('Original settings loaded:', this.originalSettings);
   }
 
   /**
@@ -65,16 +81,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const provider = await getTranslationApiAsync();
       const targetLanguage = options.targetLanguage || await getTargetLanguageAsync();
 
-      // Get saved defaults to pass as original settings for LanguageSwapping logic
-      const { getSourceLanguageAsync } = await import('@/shared/config/config.js');
-      const originalSourceLang = await getSourceLanguageAsync();
-      const originalTargetLang = await getTargetLanguageAsync();
+      // Ensure original settings are loaded (fallback)
+      if (!this.originalSettings) await this._loadOriginalSettings();
 
       this.logger.debug('Element translation configuration:', { 
         provider, 
         targetLanguage,
-        originalSourceLang,
-        originalTargetLang
+        originalSourceLang: this.originalSettings.source,
+        originalTargetLang: this.originalSettings.target
       });
 
       // IMPORTANT: Store state BEFORE translation starts.
@@ -199,8 +213,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
           provider,
           sourceLanguage: AUTO_DETECT_VALUE,
           targetLanguage: effectiveTargetLanguage,
-          originalSourceLang,
-          originalTargetLang,
+          originalSourceLang: this.originalSettings.source,
+          originalTargetLang: this.originalSettings.target,
           mode: TranslationMode.Select_Element,
           options: { rawJsonPayload: true },
           sessionId: this.sessionMessageId, // Persists across multiple elements
