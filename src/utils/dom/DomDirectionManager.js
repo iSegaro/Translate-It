@@ -42,6 +42,21 @@ function isLayoutContainer(el) {
   return hasBlockChildren;
 }
 
+/**
+ * Checks if we should apply text-align: start to an element.
+ * Respects existing 'center' or 'justify' alignments.
+ */
+function shouldApplyStartAlignment(element) {
+  if (!BLOCK_TAGS.has(element.tagName)) return false;
+  
+  const computedStyle = window.getComputedStyle(element);
+  const textAlign = computedStyle.textAlign;
+  
+  // If the element is already centered or justified, keep it that way.
+  // These are positional intents that should persist across languages.
+  return textAlign !== 'center' && textAlign !== 'justify';
+}
+
 // --- 2. State Management (Internal) ---
 
 /**
@@ -78,9 +93,11 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     if (lastSafeContainer.style.direction !== targetDir) {
       saveOriginalStyles(lastSafeContainer);
       lastSafeContainer.style.direction = targetDir;
-      if (BLOCK_TAGS.has(lastSafeContainer.tagName)) {
+      
+      if (shouldApplyStartAlignment(lastSafeContainer)) {
         lastSafeContainer.style.textAlign = 'start';
       }
+      
       lastSafeContainer.setAttribute('data-translate-dir', targetDir);
     }
   }
@@ -99,7 +116,7 @@ export function applyElementDirection(element, targetLanguage) {
   saveOriginalStyles(element);
 
   element.style.direction = directionAttr;
-  if (BLOCK_TAGS.has(element.tagName)) {
+  if (shouldApplyStartAlignment(element)) {
     element.style.textAlign = 'start';
   }
   element.setAttribute('data-translate-dir', directionAttr);
