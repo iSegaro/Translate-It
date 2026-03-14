@@ -105,7 +105,10 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
       
-      await this._loadSettings();
+      await this._loadSettings(options);
+
+      // Pass updated settings to scheduler (includes targetLanguage, provider)
+      this.scheduler.setSettings(this.settings);
 
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === 'lingva') {
@@ -265,10 +268,10 @@ export class PageTranslationManager extends ResourceTracker {
     });
   }
 
-  async _loadSettings() {
+  async _loadSettings(options = {}) {
     this.settings = {
       translationApi: await getTranslationApiAsync(),
-      targetLanguage: await getTargetLanguageAsync(),
+      targetLanguage: options.targetLanguage || await getTargetLanguageAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
       rootMargin: await getWholePageRootMarginAsync() || '300px',
       autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),

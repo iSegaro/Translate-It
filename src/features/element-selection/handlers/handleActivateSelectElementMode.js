@@ -93,6 +93,7 @@ export async function handleActivateSelectElementMode(message, sender) {
       {
         mode: modeForContentScript,
         activate: isActivating,
+        ...(typeof message.data === 'object' ? message.data : {})
       },
       MessagingContexts.CONTENT // Context for content script
     );

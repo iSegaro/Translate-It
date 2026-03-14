@@ -287,7 +287,7 @@ export class ContentMessageHandler extends ResourceTracker {
     return false; // Message not handled
   }
 
-  async handleActivateSelectElementMode(/* message */) {
+  async handleActivateSelectElementMode(message) {
     // logger.trace(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
@@ -317,7 +317,7 @@ export class ContentMessageHandler extends ResourceTracker {
       }
 
       // Activate Select Element mode
-      const result = await this.selectElementManager.activateSelectElementMode();
+      const result = await this.selectElementManager.activateSelectElementMode(message.data || {});
       this.logger.info("SelectElementManager activated successfully");
 
       // Return success result

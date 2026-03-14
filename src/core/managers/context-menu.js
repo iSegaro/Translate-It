@@ -599,10 +599,14 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       logger.info(`Activating select mode for tab ${tab.id} via central handler`);
+      
+      const { getTargetLanguageAsync } = await import('@/shared/config/config.js');
+      const targetLanguage = await getTargetLanguageAsync();
+
       const message = {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'context-menu',
-        data: { active: true, tabId: tab.id }
+        data: { active: true, tabId: tab.id, targetLanguage }
       };
       const sender = { tab };
 

@@ -63,7 +63,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const textsToTranslate = textNodes.map(node => ({ text: node.textContent.trim() })).filter(item => item.text);
 
       const provider = await getTranslationApiAsync();
-      const targetLanguage = await getTargetLanguageAsync();
+      const targetLanguage = options.targetLanguage || await getTargetLanguageAsync();
+
+      // Get saved defaults to pass as original settings for LanguageSwapping logic
+      const { getSourceLanguageAsync } = await import('@/shared/config/config.js');
+      const originalSourceLang = await getSourceLanguageAsync();
+      const originalTargetLang = await getTargetLanguageAsync();
+
+      this.logger.debug('Element translation configuration:', { 
+        provider, 
+        targetLanguage,
+        originalSourceLang,
+        originalTargetLang
+      });
 
       // IMPORTANT: Store state BEFORE translation starts.
       // This allows Revert to work even if an error occurs during streaming
@@ -105,8 +117,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
               return;
             }
 
-            if (data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
+            // ONLY update effectiveTargetLanguage if provided by server AND not explicitly set by user options
+            if (!options.targetLanguage && data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
               effectiveTargetLanguage = data.targetLanguage;
+              this.logger.debug('Effective target language updated from stream:', effectiveTargetLanguage);
             }
 
             if (data.data && Array.isArray(data.data)) {
@@ -147,10 +161,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
               });
             }
             
+            // Again, only update if not explicitly set by options
+            const finalLang = (!options.targetLanguage && data.targetLanguage) ? data.targetLanguage : effectiveTargetLanguage;
+            
             resolve({
               success: true,
               translatedCount: translatedNodeCount,
-              targetLanguage: data.targetLanguage || effectiveTargetLanguage
+              targetLanguage: finalLang
             });
           },
           onError: async (error) => {
@@ -170,7 +187,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.logger.debug('Sending translation request:', {
         messageId,
         nodeCount: textNodes.length,
-        payload: textsToTranslate
+        payload: textsToTranslate,
+        targetLanguage: effectiveTargetLanguage
       });
 
       const directResponsePromise = sendRegularMessage({
@@ -180,7 +198,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
           text: JSON.stringify(textsToTranslate),
           provider,
           sourceLanguage: AUTO_DETECT_VALUE,
-          targetLanguage,
+          targetLanguage: effectiveTargetLanguage,
+          originalSourceLang,
+          originalTargetLang,
           mode: TranslationMode.Select_Element,
           options: { rawJsonPayload: true },
           sessionId: this.sessionMessageId, // Persists across multiple elements

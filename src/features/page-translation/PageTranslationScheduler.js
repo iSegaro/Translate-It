@@ -259,8 +259,10 @@ export class PageTranslationScheduler {
   }
 
   async _getBatchConfig() {
-    const providerRegistryId = await getTranslationApiAsync();
-    const targetLanguage = await getTargetLanguageAsync();
+    // Priority: this.settings (from Manager) -> defaults
+    const providerRegistryId = this.settings.translationApi || await getTranslationApiAsync();
+    const targetLanguage = this.settings.targetLanguage || await getTargetLanguageAsync();
+    
     const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
     const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
     const providerName = registryIdToName(providerRegistryId);

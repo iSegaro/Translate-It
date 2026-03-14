@@ -33,7 +33,7 @@
     <template v-else>
       <!-- Sticky Header Section -->
       <div class="sticky-header">
-        <PopupHeader />
+        <PopupHeader :target-language="targetLanguage" />
         <div class="language-controls">
           <!-- Provider Selector -->
           <ProviderSelector

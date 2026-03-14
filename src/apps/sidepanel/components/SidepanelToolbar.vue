@@ -39,7 +39,10 @@
         v-if="isWholePageEnabled"
         class="toolbar-page-translation"
       >
-        <PageTranslationButton compact />
+        <PageTranslationButton 
+          compact 
+          :target-language="translationStore.uiTargetLanguage"
+        />
       </div>
 
       <div class="toolbar-separator" />
@@ -87,6 +90,7 @@
 
 import { computed } from 'vue';
 import { useSelectElementTranslation, useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js';
+import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
@@ -123,6 +127,7 @@ const emit = defineEmits(['historyToggle'])
 
 // Stores
 const settingsStore = useSettingsStore();
+const translationStore = useTranslationStore();
 
 // Composables
 const { t } = useUnifiedI18n()
@@ -167,7 +172,7 @@ const handleSelectElement = async () => {
       }
     } else {
       getLogger().debug('Activating select element mode...')
-      const result = await activateSelectMode()
+      const result = await activateSelectMode({ targetLanguage: translationStore.uiTargetLanguage })
       if (result) {
         getLogger().debug('Select element mode activated successfully')
         // composable will update shared state; UI follows isSelectModeActive

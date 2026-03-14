@@ -87,7 +87,14 @@ export function useUnifiedTranslation(context = 'popup') {
         getTargetLanguageAsync()
       ]);
       sourceLanguage.value = await findLanguageCode(savedSource) || AUTO_DETECT_VALUE;
-      targetLanguage.value = await findLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
+      
+      const targetLang = await findLanguageCode(savedTarget) || DEFAULT_TARGET_LANGUAGE;
+      targetLanguage.value = targetLang;
+      // Also sync store if it's the first time
+      if (!translationStore.uiTargetLanguage) {
+        translationStore.uiTargetLanguage = targetLang;
+      }
+      
       getLogger().debug(`[${context}] Languages (re)set to defaults:`, { source: sourceLanguage.value, target: targetLanguage.value });
     } catch (error) {
       getLogger().info(`[${context}] Failed to reset languages:`, error);
@@ -96,6 +103,20 @@ export function useUnifiedTranslation(context = 'popup') {
       targetLanguage.value = DEFAULT_TARGET_LANGUAGE;
     }
   };
+
+  // Watch for local targetLanguage changes to update store
+  watch(targetLanguage, (newVal) => {
+    if (newVal) {
+      translationStore.uiTargetLanguage = newVal;
+    }
+  });
+
+  // Watch for store changes to update local targetLanguage (for cross-component sync)
+  watch(() => translationStore.uiTargetLanguage, (newVal) => {
+    if (newVal && newVal !== targetLanguage.value) {
+      targetLanguage.value = newVal;
+    }
+  });
 
   // --- Translation Logic ---
   const getTranslationMode = (text) => {

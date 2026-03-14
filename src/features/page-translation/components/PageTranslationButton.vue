@@ -147,6 +147,10 @@ const props = defineProps({
   textOnly: {
     type: Boolean,
     default: false,
+  },
+  targetLanguage: {
+    type: String,
+    default: null
   }
 });
 
@@ -218,7 +222,7 @@ const restoreButtonTitle = computed(() => {
 const handleTranslate = () => {
   if (!canTranslate.value) return;
   // User wants auto-translation enabled immediately on click
-  translatePage({ isAuto: true });
+  translatePage({ isAuto: true, targetLanguage: props.targetLanguage });
 };
 
 const handleCancelOrStop = () => {

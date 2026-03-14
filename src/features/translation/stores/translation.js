@@ -42,6 +42,7 @@ export const useTranslationStore = defineStore('translation', () => {
   const cache = ref(new Map())
   const error = ref(null)
   const providers = ref([])
+  const uiTargetLanguage = ref(null) // Shared target language for UI (popup/sidepanel)
 
   // Getters
   const recentTranslations = computed(() => 
@@ -174,6 +175,7 @@ export const useTranslationStore = defineStore('translation', () => {
     isLoading,
     selectedProvider,
     error,
+    uiTargetLanguage,
     
     // Getters
     recentTranslations,

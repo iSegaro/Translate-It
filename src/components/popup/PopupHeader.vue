@@ -4,6 +4,7 @@
       <PageTranslationButton
         v-if="isWholePageEnabled"
         text-only
+        :target-language="targetLanguage"
       />
     </div>
     <div class="toolbar-right-group">
@@ -81,6 +82,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupHeader');
 // Resource tracker for memory management
 const tracker = useResourceTracker('popup-header');
 
+// Props
+const props = defineProps({
+  targetLanguage: {
+    type: String,
+    default: null
+  }
+})
 
 // Refs
 const sidePanelButton = ref(null)
@@ -119,7 +127,7 @@ const handleSelectElement = async () => {
   
   try {
     logger.debug('[PopupHeader] Select element button clicked')
-    const success = await toggleSelectElement()
+    const success = await toggleSelectElement({ targetLanguage: props.targetLanguage })
     if (success) {
       logger.debug('[PopupHeader] Select element mode toggled successfully')
       window.close()

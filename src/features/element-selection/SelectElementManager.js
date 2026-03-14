@@ -147,13 +147,19 @@ class SelectElementManager extends ResourceTracker {
    * Activate Select Element mode
    * This is the main method that starts the interactive selection
    */
-  async activateSelectElementMode() {
+  async activateSelectElementMode(options = {}) {
     if (this.isActive) {
       this.logger.debug('SelectElement mode already active');
       return { isActive: this.isActive, instanceId: this.instanceId };
     }
 
-    this.logger.debug(`SelectElementManager.activateSelectElementMode() instanceId=${this.instanceId}`);
+    // Clean up options to ensure we only have what we need
+    const activationOptions = {
+      targetLanguage: options.targetLanguage || null,
+      ...options
+    };
+
+    this.logger.debug(`SelectElementManager.activateSelectElementMode() instanceId=${this.instanceId}`, activationOptions);
 
     // Emit event to stop conflicting features (e.g., Whole Page Translation)
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
@@ -162,6 +168,7 @@ class SelectElementManager extends ResourceTracker {
       // Reset state
       this.isActive = true;
       this.isProcessingClick = false;
+      this.currentOptions = activationOptions; // Store current options (includes targetLanguage)
 
       // Setup event listeners
       this.setupEventListeners();
@@ -522,7 +529,7 @@ class SelectElementManager extends ResourceTracker {
         this.elementSelector.deactivate();
 
         // Start translation
-        await this.startTranslation(elementToTranslate);
+        await this.startTranslation(elementToTranslate, this.currentOptions);
       } else {
         this.logger.debug('No text found in element', {
           element: elementToTranslate.tagName,
@@ -538,9 +545,9 @@ class SelectElementManager extends ResourceTracker {
   /**
    * Start translation process
    */
-  async startTranslation(targetElement) {
+  async startTranslation(targetElement, options = {}) {
     try {
-      this.logger.debug('Starting translation process');
+      this.logger.debug('Starting translation process', options);
 
       // Check if still active
       if (!this.isActive) {
@@ -555,6 +562,7 @@ class SelectElementManager extends ResourceTracker {
 
       // Perform translation via domtranslator adapter
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
+        ...options,
         onProgress: async (status) => {
           this.logger.debug('Translation progress:', status);
         },

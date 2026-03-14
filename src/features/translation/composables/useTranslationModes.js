@@ -281,17 +281,17 @@ export function useSelectElementTranslation() {
     }
   });
 
-  const activateSelectMode = async () => {
+  const activateSelectMode = async (options = {}) => {
     isActivating.value = true;
     error.value = null;
 
     try {
-      getLogger().debug('Activating select element mode');
+      getLogger().debug('Activating select element mode', options);
       const result = await sendMessage({
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
-        data: { active: true }
+        data: { active: true, ...options }
       });
       
       // Check if activation actually succeeded
@@ -350,7 +350,7 @@ export function useSelectElementTranslation() {
     }
   };
 
-  const toggleSelectElement = async () => {
+  const toggleSelectElement = async (options = {}) => {
     const originalState = isSelectModeActive.value;
     // Optimistically update the UI for a smoother experience
     sharedIsSelectModeActive.value = !originalState;
@@ -359,7 +359,7 @@ export function useSelectElementTranslation() {
       let success = false;
       if (sharedIsSelectModeActive.value) {
         // If we are activating
-        success = await activateSelectMode();
+        success = await activateSelectMode(options);
       } else {
         // If we are deactivating
         success = await deactivateSelectMode();
