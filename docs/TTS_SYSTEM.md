@@ -103,7 +103,8 @@ The messaging system has been optimized with unified actions to support the enha
 - `GOOGLE_TTS_ENDED` (completion event for proper lifecycle management)
 
 #### `background/handlers/tts/handleGoogleTTS.js`
-The background handler has been enhanced with smart stop logic, proper lifecycle management, and event-driven notifications:
+The background handler has been enhanced with centralized configuration, smart stop logic, and event-driven notifications:
+- **Centralized Configuration (v2.5)**: Now utilizes a dedicated constants file (`googleTTS.js`) for URLs, supported languages, and text cleaning logic, significantly improving maintainability.
 - **Smart Stop Handler**: `handleGoogleTTSStopAll` now handles both specific TTS stops (with `ttsId`) and global stops (without `ttsId`)
 - **Persistent TTS ID**: `currentTTSId` now persists throughout audio playback and is only cleared when audio actually ends or is explicitly stopped
 - **Completion Event Handling**: `handleGoogleTTSEnded` ensures proper cleanup when TTS audio completes naturally
@@ -327,6 +328,12 @@ const handlers = {
 - **🎯 Event-Driven Architecture**: Restored intended event-driven completion system
 
 **Status**: ✅ **Fixed in v2.4** - Event-driven completion now working properly with adaptive timeouts
+
+### Centralized Configuration & Enhanced Reliability (v2.5)
+- **🎯 Centralized Constants**: Moved all Google TTS configuration (Base URL, supported languages, offscreen path) to a dedicated `src/features/tts/constants/googleTTS.js` file.
+- **🛡️ Global Cleaning Logic**: Centralized the `TTS_CLEANING_REGEX` to ensure consistent text preprocessing across all contexts, specifically supporting Japanese, Chinese, Korean, Cyrillic, Hebrew, and Latin-accented characters.
+- **🔗 Smart URL Construction**: Implemented `getGoogleTTSUrl` helper to safely generate TTS requests with proper encoding and parameters.
+- **📏 Configurable Limits**: Added `MAX_TTS_TEXT_LENGTH` and other tuning parameters to a single location for easier system-wide adjustments.
 
 ### Major Improvements in v2.4 (Latest)
 
