@@ -351,7 +351,7 @@
     "message": "拡張機能を有効にする"
   },
   "extension_enabled_description": {
-    "message": "ポップアップを除く拡張機能全体の機能を有効または無効にします。"
+    "message": "ポップアップとサイドパネルを除く、拡張機能のすべての機能を有効／無効にします。"
   },
   "translate_on_text_fields_label": {
     "message": "テキストフィールドに翻訳アイコンを表示"

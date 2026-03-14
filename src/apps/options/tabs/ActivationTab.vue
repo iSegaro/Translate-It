@@ -9,7 +9,7 @@
         :label="t('extension_enabled_label') || 'Enable Extension'"
       />
       <span class="setting-description">
-        {{ t('extension_enabled_description') || 'Enable or disable the entire extension functionality except Popup.' }}
+        {{ t('extension_enabled_description') || 'Enable or disable the entire extension functionality except Popup and Sidepanel.' }}
       </span>
     </div>
 
