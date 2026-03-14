@@ -9,6 +9,8 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { delay } from '@/core/helpers.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+
 
 // Internal components
 import { PageTranslationHelper } from './PageTranslationHelper.js';
@@ -111,14 +113,14 @@ export class PageTranslationManager extends ResourceTracker {
       this.scheduler.setSettings(this.settings);
 
       // Show warning for Lingva provider in Whole Page Translation
-      if (this.settings.translationApi === 'lingva') {
+      if (this.settings.translationApi === ProviderRegistryIds.LINGVA) {
         const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
         this.notificationManager.show(
           warningMessage || 'Lingva may have issues with long texts during page translation.',
           'warning',
           PAGE_TRANSLATION_TIMING.WARNING_DURATION
         );
-      } else if (this.settings.translationApi === 'bing') {
+      } else if (this.settings.translationApi === ProviderRegistryIds.BING) {
         const warningMessage = await getTranslationString('BING_WPT_WARNING');
         this.notificationManager.show(
           warningMessage || 'Bing may have issues with long texts during page translation.',
