@@ -18,7 +18,7 @@ import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
 import { collectTextNodes, generateElementId } from './DomTranslatorUtils.js';
-import * as DirectionManager from './DomDirectionManager.js';
+import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Export state and revert logic for external use
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
