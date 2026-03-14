@@ -13,6 +13,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
@@ -189,7 +190,7 @@ class SelectElementManager extends ResourceTracker {
 
         // Show warning for Bing provider
         const settings = await getSettingsAsync();
-        if (settings.TRANSLATION_API === 'bing') {
+        if (settings.TRANSLATION_API === ProviderRegistryIds.BING) {
           const warningMessage = await getTranslationString('SELECT_ELEMENT_BING_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',
@@ -197,7 +198,7 @@ class SelectElementManager extends ResourceTracker {
             duration: 5000,
             id: `bing-warning-${this.instanceId}`,
           });
-        } else if (settings.TRANSLATION_API === 'lingva') {
+        } else if (settings.TRANSLATION_API === ProviderRegistryIds.LINGVA) {
           const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',
