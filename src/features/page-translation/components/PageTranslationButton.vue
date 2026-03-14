@@ -107,15 +107,10 @@
         @click="handleRestore"
       >
         <img
-          v-if="compact"
-          :src="browser.runtime.getURL('icons/ui/revert.png')"
-          class="toolbar-icon"
+          :src="browser.runtime.getURL('icons/ui/restore.svg')"
+          :class="compact ? 'toolbar-icon' : 'ti-btn__icon'"
           alt="Restore"
         >
-        <Icon
-          v-else
-          icon="fa6-solid:rotate-left"
-        />
         <span v-if="!compact">{{ restoreButtonText }}</span>
       </BaseButton>
     </template>
