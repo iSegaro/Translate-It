@@ -2,6 +2,7 @@
   <div class="side-toolbar">
     <div class="toolbar-group">
       <button
+        v-if="isSelectElementEnabled"
         id="selectElementBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
@@ -18,6 +19,7 @@
         >
       </button>
       <button
+        v-if="isSelectElementEnabled"
         id="revertActionBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_REVERT_TOOLTIP')"
@@ -33,7 +35,10 @@
       </button>
 
       <!-- Page Translation Button -->
-      <div class="toolbar-page-translation">
+      <div 
+        v-if="isWholePageEnabled"
+        class="toolbar-page-translation"
+      >
         <PageTranslationButton compact />
       </div>
 
@@ -80,10 +85,12 @@
 
 <script setup>
 
+import { computed } from 'vue';
 import { useSelectElementTranslation, useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js';
 import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -114,12 +121,24 @@ const emit = defineEmits(['historyToggle'])
 
 // Resource tracker for automatic cleanup
 
+// Stores
+const settingsStore = useSettingsStore();
+
 // Composables
 const { t } = useUnifiedI18n()
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
+
+// Computed
+const isSelectElementEnabled = computed(() => {
+  return settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true
+})
+
+const isWholePageEnabled = computed(() => {
+  return settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true
+})
 
 // Icon URLs using runtime.getURL
 const selectIcon = browser.runtime.getURL('icons/ui/select.png')

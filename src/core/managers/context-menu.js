@@ -329,23 +329,29 @@ export class ContextMenuManager extends ResourceTracker {
       // Get commands for keyboard shortcuts
       const commands = await browser.commands.getAll();
 
+      // Get settings for feature enablement
+      const settings = await storageManager.get(['TRANSLATE_WITH_SELECT_ELEMENT']);
+      const isSelectElementEnabled = settings.TRANSLATE_WITH_SELECT_ELEMENT !== false; // Default to true
+
       // --- 1. Create Page Context Menu ---
-      try {
-        let pageMenuTitle =
-          (await getTranslationString("context_menu_translate_with_selection", locale)) ||
-          "Translate Element";
-        const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
-        if (command && command.shortcut) {
-          pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
+      if (isSelectElementEnabled) {
+        try {
+          let pageMenuTitle =
+            (await getTranslationString("context_menu_translate_with_selection", locale)) ||
+            "Translate Element";
+          const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
+          if (command && command.shortcut) {
+            pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
+          }
+          await this.createMenu({
+            id: PAGE_CONTEXT_MENU_ID,
+            title: pageMenuTitle,
+            contexts: ["page", "selection", "link", "image", "video", "audio"],
+          });
+          logger.debug(`Created page context menu: "${pageMenuTitle}"`);
+        } catch (e) {
+          logger.error("Error creating page context menu:", e);
         }
-        await this.createMenu({
-          id: PAGE_CONTEXT_MENU_ID,
-          title: pageMenuTitle,
-          contexts: ["page", "selection", "link", "image", "video", "audio"],
-        });
-        logger.debug(`Created page context menu: "${pageMenuTitle}"`);
-      } catch (e) {
-        logger.error("Error creating page context menu:", e);
       }
 
       // --- 2. Create Action (Browser Action) Context Menus ---
@@ -353,19 +359,21 @@ export class ContextMenuManager extends ResourceTracker {
         logger.debug("🎯 [ContextMenuManager] Creating Action (Browser Action) menus...");
 
         // --- Translate Element Menu (First option) ---
-        let actionPageMenuTitle =
-          (await getTranslationString("context_menu_translate_with_selection", locale)) ||
-          "Translate Element";
-        const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
-        if (command && command.shortcut) {
-          actionPageMenuTitle = `${actionPageMenuTitle} (${command.shortcut})`;
+        if (isSelectElementEnabled) {
+          let actionPageMenuTitle =
+            (await getTranslationString("context_menu_translate_with_selection", locale)) ||
+            "Translate Element";
+          const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
+          if (command && command.shortcut) {
+            actionPageMenuTitle = `${actionPageMenuTitle} (${command.shortcut})`;
+          }
+          await this.createMenu({
+            id: ACTION_TRANSLATE_ELEMENT_ID,
+            title: actionPageMenuTitle,
+            contexts: ["action"],
+          });
+          logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
         }
-        await this.createMenu({
-          id: ACTION_TRANSLATE_ELEMENT_ID,
-          title: actionPageMenuTitle,
-          contexts: ["action"],
-        });
-        logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
 
         // --- API Provider Parent Menu ---
         await this.createMenu({
@@ -747,9 +755,9 @@ export class ContextMenuManager extends ResourceTracker {
   registerStorageListener() {
     if (browser?.storage?.onChanged) {
       this.storageListener = (changes, areaName) => {
-        if (areaName === "local" && changes.TRANSLATION_API) {
+        if (areaName === "local" && (changes.TRANSLATION_API || changes.TRANSLATE_WITH_SELECT_ELEMENT)) {
           logger.info(
-            "TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+            "Settings changed in storage (API or Select Element). Rebuilding context menus for synchronization."
           );
           this.setupDefaultMenus();
         }

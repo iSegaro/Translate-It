@@ -1,7 +1,10 @@
 <template>
   <div class="header-toolbar">
     <div class="toolbar-left-group">
-      <PageTranslationButton text-only />
+      <PageTranslationButton
+        v-if="isWholePageEnabled"
+        text-only
+      />
     </div>
     <div class="toolbar-right-group">
       <IconButton
@@ -11,6 +14,7 @@
         type="toolbar"
       />
       <IconButton
+        v-if="isSelectElementEnabled"
         icon="select.png"
         :alt="t('popup_select_element_alt_icon') || 'Select Element'"
         :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
@@ -26,6 +30,7 @@
         @click="handleClearStorage"
       />
       <IconButton
+        v-if="isSelectElementEnabled"
         icon="revert.png"
         :alt="t('popup_revert_alt_icon') || 'Revert'"
         :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
@@ -56,11 +61,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
@@ -80,6 +86,7 @@ const tracker = useResourceTracker('popup-header');
 const sidePanelButton = ref(null)
 
 // Stores
+const settingsStore = useSettingsStore()
 
 // Composables
 const {
@@ -92,6 +99,15 @@ const { t } = useUnifiedI18n()
 
 // State
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
+
+// Computed
+const isSelectElementEnabled = computed(() => {
+  return settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true
+})
+
+const isWholePageEnabled = computed(() => {
+  return settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true
+})
 
 // Methods
 const handleSelectElement = async () => {
