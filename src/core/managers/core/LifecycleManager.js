@@ -296,36 +296,30 @@ class LifecycleManager {
     logger.info("[LifecycleManager] Starting context menu refresh...");
 
     try {
-      logger.info("[LifecycleManager] Loading context menu manager via featureLoader...");
+      // Use featureLoader to get the singleton manager
       this.contextMenuManager = await this.featureLoader.loadContextMenuManager();
-      logger.info("[LifecycleManager] Context menu manager loaded successfully");
-
-      logger.info("[LifecycleManager] Refreshing context menus...");
-      await this.contextMenuManager.initialize(true, locale); // Force re-initialize with locale
-      logger.info("[LifecycleManager] Context menus refreshed successfully via featureLoader");
+      
+      // Only call initialize(true) if we need to force a refresh (e.g. locale change)
+      // loadContextMenuManager already calls initialize() once
+      if (locale) {
+        logger.info("[LifecycleManager] Re-initializing context menus with locale:", locale);
+        await this.contextMenuManager.initialize(true, locale);
+      } else {
+        // If no locale specified, ensuring it's at least initialized
+        // Note: loadContextMenuManager already initialized it, so this might be redundant
+        // but safe due to ContextMenuManager's internal checks.
+        // To be even safer against duplicates, we only initialize if NOT already initialized
+        if (!this.contextMenuManager.initialized) {
+           await this.contextMenuManager.initialize();
+        }
+      }
+      
+      logger.info("[LifecycleManager] Context menus refreshed successfully");
 
     } catch (error) {
-      logger.error("❌ [LifecycleManager] Failed to refresh context menus via featureLoader:", error);
-      logger.info("[LifecycleManager] Attempting fallback initialization...");
-
-      try {
-        // Fallback to direct import of new context menu manager
-        const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
-
-        // Check if we already have an instance to reuse
-        if (!this.contextMenuManager) {
-          this.contextMenuManager = new ContextMenuManager();
-        }
-
-        logger.info("[LifecycleManager] Initializing context menus via fallback...");
-        await this.contextMenuManager.initialize(true, locale); // Force re-initialize with locale
-        logger.info("[LifecycleManager] Context menus refreshed successfully via fallback");
-
-      } catch (fallbackError) {
-        logger.error("❌ [LifecycleManager] Fallback context menu initialization also failed:", fallbackError);
-        // Try one more direct approach
-        await this.createContextMenuDirectly();
-      }
+      logger.error("❌ [LifecycleManager] Failed to refresh context menus:", error);
+      // Try one more direct approach as ultimate fallback if featureLoader failed
+      await this.createContextMenuDirectly();
     }
   }
 

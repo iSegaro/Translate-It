@@ -163,24 +163,34 @@ export class FeatureLoader {
       return this.loadedFeatures.get(cacheKey);
     }
 
-    try {
-      logger.info("[FeatureLoader] Loading ContextMenuManager...");
-      const { ContextMenuManager } = await import(
-        "../managers/context-menu.js"
-      );
-      const manager = new ContextMenuManager();
-
-      // Initialize the manager immediately
-      logger.info("[FeatureLoader] Initializing ContextMenuManager...");
-      await manager.initialize();
-
-      this.loadedFeatures.set(cacheKey, manager);
-      logger.info("[FeatureLoader] ContextMenuManager loaded and initialized successfully");
-      return manager;
-    } catch (error) {
-      logger.error("Failed to load context menu manager:", error);
-      throw error;
+    if (this.loadingPromises.has(cacheKey)) {
+      return this.loadingPromises.get(cacheKey);
     }
+
+    const loadingPromise = (async () => {
+      try {
+        logger.info("[FeatureLoader] Loading ContextMenuManager...");
+        const { ContextMenuManager } = await import(
+          "../managers/context-menu.js"
+        );
+        const manager = new ContextMenuManager();
+
+        // Initialize the manager immediately
+        logger.info("[FeatureLoader] Initializing ContextMenuManager...");
+        await manager.initialize();
+
+        this.loadedFeatures.set(cacheKey, manager);
+        return manager;
+      } catch (error) {
+        logger.error("Failed to load context menu manager:", error);
+        throw error;
+      } finally {
+        this.loadingPromises.delete(cacheKey);
+      }
+    })();
+
+    this.loadingPromises.set(cacheKey, loadingPromise);
+    return loadingPromise;
   }
 
   /**

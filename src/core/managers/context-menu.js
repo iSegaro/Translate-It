@@ -458,61 +458,55 @@ export class ContextMenuManager extends ResourceTracker {
    * @returns {Promise<string>} Menu item ID
    */
   async createMenu(menuConfig) {
-    // Use browser API check instead of initialized check to avoid recursion
     if (!this.browser) {
       this.browser = browser;
     }
 
     try {
-      const menuId = await this.browser.contextMenus.create(menuConfig);
-
-      // IMPORTANT: Immediately check and clear runtime.lastError to prevent console warnings
-      // In Chrome, some errors are stored in runtime.lastError instead of being thrown
-      // We must access chrome.runtime.lastError synchronously right after the async call
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.lastError) {
-        const lastError = chrome.runtime.lastError;
-
-        // Check if this is a duplicate ID error - log at debug level and don't fail
-        if (lastError.message && lastError.message.includes('duplicate id')) {
-          logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (chrome.runtime.lastError), skipping`);
-          // Accessing lastError clears it
-          return menuConfig.id; // Return the ID without failing
+      const menuId = await new Promise((resolve, reject) => {
+        // Detect if we are in a Chromium-based browser to handle the specific lastError behavior
+        // Firefox usually doesn't have chrome.runtime.lastError warnings for unchecked callbacks
+        // but Chromium browsers do.
+        const isChromium = typeof chrome !== 'undefined' && !!chrome.runtime && !navigator.userAgent.includes('Firefox');
+        const chromeApi = isChromium ? chrome : null;
+        
+        if (chromeApi?.contextMenus?.create) {
+          // Chromium-specific: Use callback to clear lastError synchronously
+          chromeApi.contextMenus.create(menuConfig, () => {
+            const lastError = chromeApi.runtime.lastError;
+            if (lastError) {
+              const msg = lastError.message || "";
+              if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
+                logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists, skipping`);
+                resolve(menuConfig.id);
+              } else {
+                reject(new Error(msg));
+              }
+            } else {
+              resolve(menuConfig.id);
+            }
+          });
+        } else {
+          // Firefox/Standard: Use the polyfill which returns a promise
+          this.browser.contextMenus.create(menuConfig)
+            .then(id => resolve(id))
+            .catch(err => {
+              const msg = err.message || "";
+              // Handle both Chrome and Firefox error strings
+              if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
+                logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (polyfill/firefox), skipping`);
+                resolve(menuConfig.id);
+              } else {
+                reject(err);
+              }
+            });
         }
-
-        // For other errors, log them
-        logger.warn(`Context menu created but chrome.runtime.lastError was set:`, lastError);
-        // Accessing lastError clears it
-      }
-
-      // Also check browser runtime.lastError for polyfill scenarios
-      if (this.browser.runtime && this.browser.runtime.lastError) {
-        const lastError = this.browser.runtime.lastError;
-
-        // Check if this is a duplicate ID error - log at debug level and don't fail
-        if (lastError.message && lastError.message.includes('duplicate id')) {
-          logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (runtime.lastError), skipping`);
-          // lastError will be cleared automatically on next API call
-          return menuConfig.id; // Return the ID without failing
-        }
-
-        // For other errors, log them
-        logger.warn(`Context menu created but runtime.lastError was set:`, lastError);
-        // lastError will be cleared automatically on next API call
-      }
+      });
 
       this.createdMenus.add(menuConfig.id || menuId);
-
-      logger.debug(
-        `📋 Created context menu: ${menuConfig.title || menuConfig.id}`,
-      );
+      logger.debug(`📋 Created context menu: ${menuConfig.title || menuConfig.id}`);
       return menuId;
     } catch (error) {
-      // Check if this is a duplicate ID error - if so, log but don't fail
-      if (error.message && error.message.includes('duplicate id')) {
-        logger.debug(`⚠️ Context menu with duplicate ID "${menuConfig.id}" already exists (exception), skipping:`, error);
-        return menuConfig.id; // Return the ID without failing
-      }
-
       logger.error("❌ Failed to create context menu:", error);
       throw error;
     }
