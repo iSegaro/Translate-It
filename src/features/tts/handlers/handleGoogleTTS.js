@@ -6,6 +6,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { 
+  SUPPORTED_TTS_LANGUAGES, 
+  OFFSCREEN_DOCUMENT_PATH, 
+  TTS_CLEANING_REGEX, 
+  MAX_TTS_TEXT_LENGTH, 
+  DEFAULT_TTS_LANGUAGE,
+  getGoogleTTSUrl
+} from '@/features/tts/constants/googleTTS.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
@@ -53,19 +61,6 @@ let lastTTSText = null;
 let lastTTSLanguage = null;
 let currentTTSId = null;
 let currentTTSSender = null; // Store sender info for targeted event sending
-
-// Google TTS supported languages (major ones)
-const SUPPORTED_TTS_LANGUAGES = new Set([
-  'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw',
-  'ar', 'hi', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',
-  'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
-  'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',
-  'hy', 'ne', 'si', 'my', 'km', 'lo', 'gu', 'ta', 'te', 'kn', 'ml', 'pa',
-  'bn', 'ur', 'fa', 'ps', 'sd', 'ckb', 'ku', 'am', 'om', 'so', 'sw', 'rw',
-  'ny', 'mg', 'st', 'zu', 'xh', 'af', 'sq', 'eu', 'ca', 'co', 'eo', 'fy',
-  'gl', 'haw', 'hmn', 'is', 'ig', 'jw', 'kk', 'ky', 'lb', 'mi', 'mn', 'sm',
-  'gd', 'sn', 'su', 'tg', 'tt', 'to', 'uz', 'yi', 'yo'
-]);
 
 /**
  * Validate if language is supported by Google TTS
@@ -122,7 +117,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     }
     
     // Validate language support
-    const targetLanguage = language || 'en';
+    const targetLanguage = language || DEFAULT_TTS_LANGUAGE;
     if (!isLanguageSupported(targetLanguage)) {
       logger.warn('Unsupported language for TTS:', targetLanguage);
       return {
@@ -154,12 +149,12 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       .replace(/\n+/g, ' ')
       // Remove special characters that might cause issues (be more restrictive)
       // Added Japanese, Chinese, Korean, Cyrillic, Hebrew, Latin Accents and full-width ranges to prevent stripping valid characters
-      .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\uFF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g, '')
+      .replace(TTS_CLEANING_REGEX, '')
       .trim();
     
-    if (finalText.length > 200) {
+    if (finalText.length > MAX_TTS_TEXT_LENGTH) {
       // Truncate very long text to avoid 400 errors
-      finalText = finalText.substring(0, 197) + '...';
+      finalText = finalText.substring(0, MAX_TTS_TEXT_LENGTH - 3) + '...';
     }
     
     if (finalText.length < 1) {
@@ -169,7 +164,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     
     logger.debug('Cleaned text:', finalText.substring(0, 100) + (finalText.length > 100 ? '...' : ''));
     
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(finalText)}&tl=${targetLanguage}&client=tw-ob`;
+    const ttsUrl = getGoogleTTSUrl(finalText, targetLanguage);
     logger.debug('TTS URL created:', ttsUrl.substring(0, 100) + '...');
     
     // Store current request info for deduplication
@@ -246,8 +241,6 @@ const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
  * @returns {Promise}
  */
 const playWithOffscreenDocument = async (ttsUrl) => {
-  const OFFSCREEN_DOCUMENT_PATH = 'html/offscreen.html';
-
   // This function sends the message and handles the response, including timeouts.
   const sendMessageAndGetResponse = (browserAPI) => {
     return new Promise((resolve, reject) => {
