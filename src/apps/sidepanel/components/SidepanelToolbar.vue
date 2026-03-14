@@ -132,12 +132,16 @@ const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
 
 // Computed
+const isExtensionEnabledGlobal = computed(() => {
+  return settingsStore.settings?.EXTENSION_ENABLED ?? true
+})
+
 const isSelectElementEnabled = computed(() => {
-  return settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true
+  return isExtensionEnabledGlobal.value && (settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true)
 })
 
 const isWholePageEnabled = computed(() => {
-  return settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true
+  return isExtensionEnabledGlobal.value && (settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true)
 })
 
 // Icon URLs using runtime.getURL

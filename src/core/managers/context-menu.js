@@ -330,8 +330,9 @@ export class ContextMenuManager extends ResourceTracker {
       const commands = await browser.commands.getAll();
 
       // Get settings for feature enablement
-      const settings = await storageManager.get(['TRANSLATE_WITH_SELECT_ELEMENT']);
-      const isSelectElementEnabled = settings.TRANSLATE_WITH_SELECT_ELEMENT !== false; // Default to true
+      const settings = await storageManager.get(['TRANSLATE_WITH_SELECT_ELEMENT', 'EXTENSION_ENABLED']);
+      const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
+      const isSelectElementEnabled = isExtensionEnabled && (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false); // Default to true
 
       // --- 1. Create Page Context Menu ---
       if (isSelectElementEnabled) {
@@ -755,9 +756,9 @@ export class ContextMenuManager extends ResourceTracker {
   registerStorageListener() {
     if (browser?.storage?.onChanged) {
       this.storageListener = (changes, areaName) => {
-        if (areaName === "local" && (changes.TRANSLATION_API || changes.TRANSLATE_WITH_SELECT_ELEMENT)) {
+        if (areaName === "local" && (changes.TRANSLATION_API || changes.TRANSLATE_WITH_SELECT_ELEMENT || changes.EXTENSION_ENABLED)) {
           logger.info(
-            "Settings changed in storage (API or Select Element). Rebuilding context menus for synchronization."
+            "Settings changed in storage (API, Select Element or Global Enable). Rebuilding context menus for synchronization."
           );
           this.setupDefaultMenus();
         }
