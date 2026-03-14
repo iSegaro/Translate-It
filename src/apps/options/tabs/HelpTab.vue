@@ -80,6 +80,13 @@ const addTargetBlankToLinks = () => {
   })
 }
 
+const PROVIDER_URLS = {
+  gemini: 'https://aistudio.google.com/app/apikey',
+  openai: 'https://platform.openai.com/api-keys',
+  openrouter: 'https://openrouter.ai/keys',
+  deepseek: 'https://platform.deepseek.com/api_keys'
+}
+
 const toggleAccordion = (section) => {
   openAccordion.value = openAccordion.value === section ? '' : section
 }
@@ -120,10 +127,10 @@ const apiKeysHelpContent = computed(() => {
 
 ## ${t('help_api_providers_title') || 'API-Based Providers (Require API Keys)'}
 
-- ${t('help_api_providers_gemini') || '**Google Gemini** - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)'}
-- ${t('help_api_providers_openai') || '**OpenAI** - Register at [OpenAI Platform](https://platform.openai.com/api-keys)'}
-- ${t('help_api_providers_openrouter') || '**OpenRouter** - Access multiple models via [OpenRouter](https://openrouter.ai/keys)'}
-- ${t('help_api_providers_deepseek') || '**DeepSeek** - Get API access from [DeepSeek Platform](https://platform.deepseek.com/api_keys)'}
+- ${t('help_api_providers_gemini', { url: PROVIDER_URLS.gemini }) || `**Google Gemini** - Get your free API key from [Google AI Studio](${PROVIDER_URLS.gemini})`}
+- ${t('help_api_providers_openai', { url: PROVIDER_URLS.openai }) || `**OpenAI** - Register at [OpenAI Platform](${PROVIDER_URLS.openai})`}
+- ${t('help_api_providers_openrouter', { url: PROVIDER_URLS.openrouter }) || `**OpenRouter** - Access multiple models via [OpenRouter](${PROVIDER_URLS.openrouter})`}
+- ${t('help_api_providers_deepseek', { url: PROVIDER_URLS.deepseek }) || `**DeepSeek** - Get API access from [DeepSeek Platform](${PROVIDER_URLS.deepseek})`}
 
 ---
 

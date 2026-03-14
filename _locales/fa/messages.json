@@ -315,16 +315,16 @@
     "message": "ارائه‌دهندگان API (نیاز به کلید API دارند)"
   },
   "help_api_providers_gemini": {
-    "message": "Google Gemini - کلید API رایگان خود را از [Google AI Studio](https://aistudio.google.com/app/apikey) دریافت کنید"
+    "message": "Google Gemini - کلید API رایگان خود را از [Google AI Studio]({url}) دریافت کنید"
   },
   "help_api_providers_openai": {
-    "message": "OpenAI - در [OpenAI Platform](https://platform.openai.com/api-keys) ثبت‌نام کنید"
+    "message": "OpenAI - در [OpenAI Platform]({url}) ثبت‌نام کنید"
   },
   "help_api_providers_openrouter": {
-    "message": "OpenRouter - دسترسی به چندین مدل از طریق [OpenRouter](https://openrouter.ai/keys)"
+    "message": "OpenRouter - دسترسی به چندین مدل از طریق [OpenRouter]({url})"
   },
   "help_api_providers_deepseek": {
-    "message": "DeepSeek - دریافت دسترسی API از [DeepSeek Platform](https://platform.deepseek.com/api_keys)"
+    "message": "DeepSeek - دریافت دسترسی API از [DeepSeek Platform]({url})"
   },
   "help_security_notice_title": {
     "message": "🔒 نکات امنیتی"

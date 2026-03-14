@@ -315,16 +315,16 @@
     "message": "APIベースのプロバイダー（APIキー必要）"
   },
   "help_api_providers_gemini": {
-    "message": "Google Gemini - [Google AI Studio](https://aistudio.google.com/app/apikey) から無料の API キーを取得できます"
+    "message": "Google Gemini - [Google AI Studio]({url}) から無料の API キーを取得できます"
   },
   "help_api_providers_openai": {
-    "message": "OpenAI - [OpenAI Platform](https://platform.openai.com/api-keys) で登録してください"
+    "message": "OpenAI - [OpenAI Platform]({url}) で登録してください"
   },
   "help_api_providers_openrouter": {
-    "message": "OpenRouter - [OpenRouter](https://openrouter.ai/keys) を通じて複数のモデルにアクセスできます"
+    "message": "OpenRouter - [OpenRouter]({url}) を通じて複数のモデルにアクセスできます"
   },
   "help_api_providers_deepseek": {
-    "message": "DeepSeek - [DeepSeek Platform](https://platform.deepseek.com/api_keys) から API アクセスを取得できます"
+    "message": "DeepSeek - [DeepSeek Platform]({url}) から API アクセスを取得できます"
   },
   "help_security_notice_title": {
     "message": "🔒 セキュリティに関するお知らせ"
