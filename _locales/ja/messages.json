@@ -302,8 +302,35 @@
   "help_free_providers_title": {
     "message": "無料プロバイダー（APIキー不要）"
   },
+  "help_free_providers_google": {
+    "message": "Google 翻訳 - 公開されている Google 翻訳エンドポイントを使用します"
+  },
+  "help_free_providers_bing": {
+    "message": "Microsoft Bing - 公開されている Bing 翻訳エンドポイントを使用します"
+  },
+  "help_free_providers_yandex": {
+    "message": "Yandex 翻訳 - 公開されている Yandex 翻訳エンドポイントを使用します"
+  },
   "help_api_providers_title": {
     "message": "APIベースのプロバイダー（APIキー必要）"
+  },
+  "help_api_providers_gemini": {
+    "message": "Google Gemini - [Google AI Studio](https://aistudio.google.com/app/apikey) から無料の API キーを取得できます"
+  },
+  "help_api_providers_openai": {
+    "message": "OpenAI - [OpenAI Platform](https://platform.openai.com/api-keys) で登録してください"
+  },
+  "help_api_providers_openrouter": {
+    "message": "OpenRouter - [OpenRouter](https://openrouter.ai/keys) を通じて複数のモデルにアクセスできます"
+  },
+  "help_api_providers_deepseek": {
+    "message": "DeepSeek - [DeepSeek Platform](https://platform.deepseek.com/api_keys) から API アクセスを取得できます"
+  },
+  "help_security_notice_title": {
+    "message": "🔒 セキュリティに関するお知らせ"
+  },
+  "help_security_notice_content": {
+    "message": "API キーはブラウザ内にローカルに保存され、第三者と共有されることはありません。さらにセキュリティを高めるため、インポート/エクスポート機能を使用して設定をエクスポートする際に暗号化することが可能です。"
   },
   "help_shortcut_content_p2": {
     "message": "**Chrome** では操作が異なります："

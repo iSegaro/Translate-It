@@ -114,22 +114,22 @@ const apiKeysHelpContent = computed(() => {
 
 ## ${t('help_free_providers_title') || 'Free Providers (No API Key Required)'}
 
-- **Google Translate** - Uses the public Google Translate endpoint
-- **Microsoft Bing** - Uses the public Bing Translate endpoint
-- **Yandex Translate** - Uses the public Yandex Translate endpoint
+- ${t('help_free_providers_google') || '**Google Translate** - Uses the public Google Translate endpoint'}
+- ${t('help_free_providers_bing') || '**Microsoft Bing** - Uses the public Bing Translate endpoint'}
+- ${t('help_free_providers_yandex') || '**Yandex Translate** - Uses the public Yandex Translate endpoint'}
 
 ## ${t('help_api_providers_title') || 'API-Based Providers (Require API Keys)'}
 
-- **Google Gemini** - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- **OpenAI** - Register at [OpenAI Platform](https://platform.openai.com/api-keys)
-- **OpenRouter** - Access multiple models via [OpenRouter](https://openrouter.ai/keys)
-- **DeepSeek** - Get API access from [DeepSeek Platform](https://platform.deepseek.com/api_keys)
+- ${t('help_api_providers_gemini') || '**Google Gemini** - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)'}
+- ${t('help_api_providers_openai') || '**OpenAI** - Register at [OpenAI Platform](https://platform.openai.com/api-keys)'}
+- ${t('help_api_providers_openrouter') || '**OpenRouter** - Access multiple models via [OpenRouter](https://openrouter.ai/keys)'}
+- ${t('help_api_providers_deepseek') || '**DeepSeek** - Get API access from [DeepSeek Platform](https://platform.deepseek.com/api_keys)'}
 
 ---
 
-### 🔒 Security Notice
+### ${t('help_security_notice_title') || '🔒 Security Notice'}
 
-Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature.`
+${t('help_security_notice_content') || 'Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature.'}`
 
   try {
     const markdownElement = SimpleMarkdown.render(content)

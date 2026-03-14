@@ -302,8 +302,35 @@
   "help_free_providers_title": {
     "message": "ارائه‌دهندگان رایگان (بدون نیاز به کلید API)"
   },
+  "help_free_providers_google": {
+    "message": "Google Translate - از سرور عمومی گوگل ترنسلیت استفاده می‌کند"
+  },
+  "help_free_providers_bing": {
+    "message": "Microsoft Bing - از سرور عمومی بینگ ترنسلیت استفاده می‌کند"
+  },
+  "help_free_providers_yandex": {
+    "message": "Yandex Translate - از سرور عمومی یاندکس ترنسلیت استفاده می‌کند"
+  },
   "help_api_providers_title": {
     "message": "ارائه‌دهندگان API (نیاز به کلید API دارند)"
+  },
+  "help_api_providers_gemini": {
+    "message": "Google Gemini - کلید API رایگان خود را از [Google AI Studio](https://aistudio.google.com/app/apikey) دریافت کنید"
+  },
+  "help_api_providers_openai": {
+    "message": "OpenAI - در [OpenAI Platform](https://platform.openai.com/api-keys) ثبت‌نام کنید"
+  },
+  "help_api_providers_openrouter": {
+    "message": "OpenRouter - دسترسی به چندین مدل از طریق [OpenRouter](https://openrouter.ai/keys)"
+  },
+  "help_api_providers_deepseek": {
+    "message": "DeepSeek - دریافت دسترسی API از [DeepSeek Platform](https://platform.deepseek.com/api_keys)"
+  },
+  "help_security_notice_title": {
+    "message": "🔒 نکات امنیتی"
+  },
+  "help_security_notice_content": {
+    "message": "کلیدهای API شما به‌صورت محلی در مرورگر شما ذخیره می‌شوند و هرگز با اشخاص ثالث به اشتراک گذاشته نمی‌شوند. برای امنیت بیشتر، می‌توانید هنگام خروجی گرفتن از تنظیمات با استفاده از ویژگی پشتیبان گیری، آن‌ها را رمزگذاری کنید."
   },
   "help_shortcut_content_p2": {
     "message": "در **Chrome**، روند متفاوت است:"

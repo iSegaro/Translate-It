@@ -177,7 +177,16 @@
     "message": "You can find links to each API provider's website in the **API** tab. You will need to create an account on their respective platforms to generate a key."
   },
   "help_free_providers_title": { "message": "Free Providers (No API Key Required)" },
+  "help_free_providers_google": { "message": "Google Translate - Uses the public Google Translate endpoint" },
+  "help_free_providers_bing": { "message": "Microsoft Bing - Uses the public Bing Translate endpoint" },
+  "help_free_providers_yandex": { "message": "Yandex Translate - Uses the public Yandex Translate endpoint" },
   "help_api_providers_title": { "message": "API-Based Providers (Require API Keys)" },
+  "help_api_providers_gemini": { "message": "Google Gemini - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)" },
+  "help_api_providers_openai": { "message": "OpenAI - Register at [OpenAI Platform](https://platform.openai.com/api-keys)" },
+  "help_api_providers_openrouter": { "message": "OpenRouter - Access multiple models via [OpenRouter](https://openrouter.ai/keys)" },
+  "help_api_providers_deepseek": { "message": "DeepSeek - Get API access from [DeepSeek Platform](https://platform.deepseek.com/api_keys)" },
+  "help_security_notice_title": { "message": "🔒 Security Notice" },
+  "help_security_notice_content": { "message": "Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature." },
 
   "help_shortcut_content_p2": {
     "message": "In **Chrome**, the process is different:"
