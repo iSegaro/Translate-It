@@ -11,6 +11,7 @@
 
 - Enhanced **Select Element** mode for significantly better stability and selection precision.
 - Resolved several critical bugs and minor UI inconsistencies across the extension.
+- Fixed Google TTS handling of non-English languages (Japanese, Chinese, Korean, Russian, Hebrew, and European accented languages).
 
 ##### Changed
 
