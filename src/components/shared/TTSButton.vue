@@ -211,7 +211,7 @@ const handleClick = async () => {
         if (result) {
           emit('tts-started', { text: props.text, language: props.language })
         } else {
-          emit('tts-error', { error: tts.errorMessage.value })
+          emit('tts-error', new Error(tts.errorMessage.value || 'TTS retry failed'))
         }
         break
 
@@ -225,7 +225,7 @@ const handleClick = async () => {
     // logger.debug('[TTSButton] Action completed:', result)
   } catch (error) {
     logger.error('[TTSButton] Action failed:', error)
-    emit('tts-error', { error: error.message || 'TTS action failed' })
+    emit('tts-error', error instanceof Error ? error : new Error(error?.message || 'TTS action failed'))
   }
 }
 

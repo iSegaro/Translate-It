@@ -214,7 +214,8 @@ const handleCopied = (text) => {
 }
 
 const handleCopyFailed = (error) => {
-  logger.error('[ActionToolbar] Copy failed:', error)
+  const errorMessage = error?.message || error
+  logger.error(`[ActionToolbar] Copy failed: ${errorMessage}`, error)
   emit('action-failed', { action: 'copy', error })
 }
 
@@ -227,7 +228,8 @@ const handlePasted = (data) => {
 }
 
 const handlePasteFailed = (error) => {
-  logger.error('[ActionToolbar] Paste failed:', error)
+  const errorMessage = error?.message || error
+  logger.error(`[ActionToolbar] Paste failed: ${errorMessage}`, error)
   emit('action-failed', { action: 'paste', error })
 }
 
@@ -248,7 +250,12 @@ const handleTTSStopped = () => {
 }
 
 const handleTTSFailed = (error) => {
-  logger.error('[ActionToolbar] TTS failed:', error)
+  // Extract error message for the log line
+  const errorMessage = error?.error || error?.message || (typeof error === 'string' ? error : 'Unknown TTS error')
+  
+  // Log with both descriptive message and original error object
+  logger.error(`[ActionToolbar] TTS failed: ${errorMessage}`, error)
+  
   emit('tts-error', error)
   // Backward compatibility
   emit('action-failed', { action: 'tts', error })
