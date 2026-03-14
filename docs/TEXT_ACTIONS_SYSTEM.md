@@ -2,30 +2,33 @@
 
 ## Overview
 
-سیستم Text Actions یک راهکار یکپارچه برای مدیریت عملیات copy، paste و TTS در سراسر افزونه است. این سیستم شامل کامپوننت‌های Vue قابل استفاده مجدد و composable های قدرتمند است.
+The Text Actions system is an integrated solution for managing copy, paste, and TTS (Text-to-Speech) operations across the extension. This system consists of reusable Vue components and powerful composables.
 
 ## 🏗️ Architecture
 
+
 ```
+
 src/components/shared/actions/
-├── ActionToolbar.vue     # تولبار اصلی
-├── ActionGroup.vue       # گروه‌بندی اکشن‌ها
-├── CopyButton.vue        # دکمه کپی
-├── PasteButton.vue       # دکمه چسباندن
-├── TTSButton.vue         # دکمه تلفظ
-└── index.js              # Export های مشترک
+├── ActionToolbar.vue     # Main toolbar
+├── ActionGroup.vue       # Action grouping
+├── CopyButton.vue        # Copy button
+├── PasteButton.vue       # Paste button
+├── TTSButton.vue         # TTS button
+└── index.js              # Shared exports
 
 src/composables/actions/
-├── useTextActions.js     # کامپوزیبل اصلی
-├── useCopyAction.js      # عملکرد کپی
-├── usePasteAction.js     # عملکرد پیست
-├── useTTSAction.js       # عملکرد تلفظ
-└── index.js              # Export های مشترک
+├── useTextActions.js     # Main composable
+├── useCopyAction.js      # Copy logic
+├── usePasteAction.js     # Paste logic
+├── useTTSAction.js       # TTS logic
+└── index.js              # Shared exports
+
 ```
 
 ## 🚀 Quick Start
 
-### 1. استفاده ساده از ActionToolbar
+### 1. Basic usage of ActionToolbar
 
 ```vue
 <template>
@@ -59,9 +62,10 @@ const handleTtsStateChange = (event) => {
   console.log('TTS state changed:', event.newState)
 }
 </script>
+
 ```
 
-### 2. استفاده از کامپوننت‌های جداگانه
+### 2. Using individual components
 
 ```vue
 <template>
@@ -89,9 +93,10 @@ const handleTtsStateChange = (event) => {
 <script setup>
 import { ActionGroup, CopyButton, PasteButton, TTSButton } from '@/components/shared/actions'
 </script>
+
 ```
 
-### 3. استفاده از Composable
+### 3. Using the Composable
 
 ```vue
 <script setup>
@@ -139,89 +144,67 @@ const speak = async () => {
   }
 }
 </script>
+
 ```
 
 ## 📚 Component Reference
 
 ### ActionToolbar
 
-تولبار کامل با تمام عملیات:
+A complete toolbar with all operations:
 
 ```vue
 <ActionToolbar
-  :text="string"              <!-- متن برای copy/TTS -->
-  :language="string"          <!-- کد زبان -->
-  :mode="string"              <!-- 'input' | 'output' | 'inline' | 'floating' -->
-  :position="string"          <!-- 'top-right' | 'top-left' | etc. -->
-  :show-copy="boolean"        <!-- نمایش دکمه کپی -->
-  :show-paste="boolean"       <!-- نمایش دکمه پیست -->
-  :show-tts="boolean"         <!-- نمایش دکمه تلفظ -->
-  :size="string"              <!-- 'small' | 'medium' | 'large' -->
-  :auto-translate-on-paste="boolean"  <!-- ترجمه خودکار بعد پیست -->
-  @text-copied="function"     <!-- رویداد کپی -->
-  @text-pasted="function"     <!-- رویداد پیست -->
-  @tts-state-change="function" <!-- رویداد تغییر وضعیت TTS -->
-  @action-failed="function"   <!-- خطا در عملیات -->
-/>
+  :text="string"              :language="string"          :mode="string"              :position="string"          :show-copy="boolean"        :show-paste="boolean"       :show-tts="boolean"         :size="string"              :auto-translate-on-paste="boolean"  @text-copied="function"     @text-pasted="function"     @tts-state-change="function" @action-failed="function"   />
+
 ```
 
 ### CopyButton
 
 ```vue
 <CopyButton
-  :text="string"              <!-- متن برای کپی -->
-  :size="string"              <!-- اندازه دکمه -->
-  :variant="string"           <!-- 'inline' | 'standalone' | 'toolbar' -->
-  :title="string"             <!-- عنوان tooltip -->
-  :disabled="boolean"         <!-- غیرفعال -->
-  @copied="function"          <!-- رویداد کپی موفق -->
-  @copy-failed="function"     <!-- رویداد خطا -->
-/>
+  :text="string"              :size="string"              :variant="string"           :title="string"             :disabled="boolean"         @copied="function"          @copy-failed="function"     />
+
 ```
 
 ### PasteButton
 
 ```vue
 <PasteButton
-  :size="string"              <!-- اندازه دکمه -->
-  :auto-translate="boolean"   <!-- ترجمه خودکار -->
-  @pasted="function"          <!-- رویداد پیست موفق -->
-  @paste-failed="function"    <!-- رویداد خطا -->
-/>
+  :size="string"              :auto-translate="boolean"   @pasted="function"          @paste-failed="function"    />
+
 ```
 
 ### TTSButton
 
-دکمه هوشمند TTS با قابلیت نمایش وضعیت کامل پخش (Play/Pause/Resume/Stop).
+A smart TTS button capable of displaying full playback status (Play/Pause/Resume/Stop).
 
 ```vue
 <TTSButton
-  :text="string"              <!-- متن برای تلفظ -->
-  :language="string"          <!-- کد زبان -->
-  :size="string"              <!-- اندازه دکمه -->
-  @state-change="function"   <!-- رویداد تغییر وضعیت -->
-/>
+  :text="string"              :language="string"          :size="string"              @state-change="function"   />
+
 ```
 
-این کامپوننت دارای ۵ وضعیت داخلی است:
-- **Idle**: آماده برای پخش.
-- **Loading**: در حال دریافت فایل صوتی.
-- **Playing**: در حال پخش (نمایش آیکون Pause و حلقه پیشرفت).
-- **Paused**: پخش متوقف شده (نمایش آیکون Resume).
-- **Error**: بروز خطا (نمایش آیکون قرمز رنگ خطا).
+This component features 5 internal states:
+
+* **Idle**: Ready to play.
+* **Loading**: Fetching audio file.
+* **Playing**: Currently playing (displays Pause icon and progress ring).
+* **Paused**: Playback paused (displays Resume icon).
+* **Error**: An error occurred (displays red error icon).
 
 ## 🔧 Composable Reference
 
 ### useTextActions
 
-کامپوزیبل اصلی که همه عملیات را ترکیب می‌کند:
+The primary composable that combines all operations:
 
 ```javascript
 const {
   // State
-  isLoading,           // در حال انجام عملیات
-  hasError,            // وجود خطا
-  lastError,           // آخرین خطا
+  isLoading,           // Operation in progress
+  hasError,            // Error exists
+  lastError,           // Most recent error
   
   // Copy
   copyText,            // (text) => Promise<boolean>
@@ -232,7 +215,7 @@ const {
   pasteWithNotification, // (callback) => Promise<string>
   
   // TTS State & Controls (powered by useTTSSmart)
-  ttsState,            // وضعیت فعلی: ref<'idle' | 'loading' | 'playing' | 'paused' | 'error'>
+  ttsState,            // Current state: ref<'idle' | 'loading' | 'playing' | 'paused' | 'error'>
   play,                // (text, lang) => Promise<void>
   pause,               // () => Promise<void>
   resume,              // () => Promise<void>
@@ -247,24 +230,26 @@ const {
   checkSupport,        // () => {copy, paste, tts}
   createActionHandlers // (config) => {onCopy, onPaste, onTTS}
 } = useTextActions(options)
+
 ```
 
 ### Options
 
 ```javascript
 const options = {
-  enableCopy: true,          // فعال‌سازی کپی
-  enablePaste: true,         // فعال‌سازی پیست
-  enableTTS: true,           // فعال‌سازی تلفظ
-  showNotifications: true    // نمایش نوتیفیکیشن‌ها
+  enableCopy: true,          // Enable copy functionality
+  enablePaste: true,         // Enable paste functionality
+  enableTTS: true,           // Enable TTS functionality
+  showNotifications: true    // Display notifications
 }
+
 ```
 
 ## 🎨 Styling
 
 ### CSS Classes
 
-کامپوننت‌ها از CSS classes زیر استفاده می‌کنند:
+Components utilize the following CSS classes:
 
 ```css
 /* ActionToolbar */
@@ -279,11 +264,12 @@ const options = {
 
 /* States */
 .disabled, .copying, .pasting, .playing
+
 ```
 
 ### Customization
 
-برای تغییر استایل‌ها:
+To override styles:
 
 ```vue
 <style>
@@ -295,13 +281,15 @@ const options = {
   padding: 12px;
 }
 </style>
+
 ```
 
 ## 🔄 Migration Guide
 
-### از TranslationInputField به ActionToolbar
+### From TranslationInputField to ActionToolbar
 
-**قبل:**
+**Before:**
+
 ```vue
 <TranslationInputField
   v-model="text"
@@ -310,9 +298,11 @@ const options = {
   :tts-title="'Speak'"
   @copy="handleCopy"
 />
+
 ```
 
-**بعد:**
+**After:**
+
 ```vue
 <div class="input-container">
   <textarea v-model="text" />
@@ -324,11 +314,13 @@ const options = {
     @text-copied="handleCopy"
   />
 </div>
+
 ```
 
-### از TranslationDisplay به ActionToolbar
+### From TranslationDisplay to ActionToolbar
 
-**قبل:**
+**Before:**
+
 ```vue
 <TranslationDisplay
   :content="result"
@@ -336,9 +328,11 @@ const options = {
   :show-tts-button="true"
   @copy="handleCopy"
 />
+
 ```
 
-**بعد:**
+**After:**
+
 ```vue
 <div class="output-container">
   <div class="content" v-html="result" />
@@ -349,6 +343,7 @@ const options = {
     @text-copied="handleCopy"
   />
 </div>
+
 ```
 
 ## 🧪 Testing
@@ -373,52 +368,58 @@ test('ActionToolbar renders correctly', () => {
   expect(wrapper.find('.paste-button').exists()).toBe(true)
   expect(wrapper.find('.tts-button').exists()).toBe(true)
 })
+
 ```
 
 ## 🚀 Performance
 
 ### Optimizations
 
-1. **Lazy Loading**: Composable ها فقط در صورت نیاز بارگذاری می‌شوند
-2. **Event Debouncing**: رویدادهای تکراری محدود می‌شوند
-3. **Memory Management**: وضعیت‌ها به درستی پاک می‌شوند
-4. **Async Operations**: همه عملیات async هستند
+1. **Lazy Loading**: Composables are only loaded when required.
+2. **Event Debouncing**: Redundant events are throttled/debounced.
+3. **Memory Management**: States are properly cleared to prevent leaks.
+4. **Async Operations**: All operations are non-blocking (async).
 
 ### Best Practices
 
 ```javascript
-// ✅ خوب: استفاده انتخابی از ویژگی‌ها
+// ✅ Good: Selective use of features
 const { copyText, speakText } = useTextActions({
-  enablePaste: false  // پیست غیرفعال
+  enablePaste: false  // Paste disabled
 })
 
-// ✅ خوب: پاک کردن وضعیت
+// ✅ Good: Clearing state
 onUnmounted(() => {
   clearAllStates()
 })
 
-// ❌ بد: استفاده از همه ویژگی‌ها بدون نیاز
-const allActions = useTextActions() // همه ویژگی‌ها فعال
+// ❌ Bad: Enabling all features unnecessarily
+const allActions = useTextActions() // All features enabled
+
 ```
 
 ## 🐛 Troubleshooting
 
-### مشکلات رایج
+### Common Issues
 
-1. **Clipboard API کار نمی‌کند**
-   - بررسی HTTPS
-   - بررسی permissions
-   - استفاده از fallback method
+1. **Clipboard API not working**
+* Verify HTTPS environment.
+* Check browser permissions.
+* Use the fallback method.
 
-2. **TTS صدا ندارد**
-   - بررسی تنظیمات صدای سیستم
-   - بررسی language code
-   - تست با متن ساده
 
-3. **Icons نمایش داده نمی‌شوند**
-   - بررسی مسیر assets
-   - بررسی import ها
-   - تست در حالت dev
+2. **TTS has no sound**
+* Check system volume settings.
+* Verify the language code.
+* Test with simple text.
+
+
+3. **Icons not appearing**
+* Verify asset paths.
+* Check imports.
+* Test in development mode.
+
+
 
 ### Debug Mode
 
@@ -427,14 +428,15 @@ const actions = useTextActions({
   enableCopy: true,
   enablePaste: true,
   enableTTS: true,
-  debug: true  // فعال‌سازی لاگ‌ها
+  debug: true  // Enable logging
 })
+
 ```
 
 ## 📈 Future Enhancements
 
-- [ ] پشتیبانی از drag & drop
-- [ ] ذخیره history عملیات
-- [ ] تنظیمات صدای TTS
-- [ ] تم‌های بیشتر
-- [ ] اتصال به Cloud TTS services
+* [ ] Drag & drop support
+* [ ] Operation history storage
+* [ ] Custom TTS voice settings
+* [ ] Additional themes
+* [ ] Integration with Cloud TTS services

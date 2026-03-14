@@ -1,107 +1,114 @@
 # Text Selection System
 
-## نگاه کلی
+## Overview
 
-سیستم Text Selection یکی از بخش‌های کلیدی افزونه Translate-It است که مسئول تشخیص، مدیریت و پردازش انتخاب متن در صفحات وب می‌باشد. این سیستم با **معماری ساده شده (2025)** و بر اساس selectionchange events، تجربه کاربری بهینه‌ای را برای ترجمه متن‌های انتخابی فراهم می‌کند.
+The Text Selection system is a key component of the Translate-It extension, responsible for detecting, managing, and processing text selection on web pages. With a **Simplified Architecture (2025)** based on `selectionchange` events, it provides an optimized user experience for translating selected text.
 
-### ✅ آپدیت‌های 2025 - سیستم ساده شده:
-- **حذف پیچیدگی**: حذف کامل drag detection پیچیده و سیستم pendingSelection
-- **selectionchange-only**: استفاده تنها از selectionchange events برای همه scenarios
-- **جداسازی text fields**: منطق text field به ماژول text-field-interaction منتقل شد
-- **Simple Drag Prevention**: تشخیص ساده mousedown/mouseup برای جلوگیری از نمایش در حین drag
-- **Performance Boost**: 60-70% کاهش پیچیدگی کد و بهبود عملکرد
-- **Maintainability**: کد بسیار ساده‌تر و قابل نگهداری
+### ✅ 2025 Updates - Simplified System:
+- **Complexity Removal**: Complete removal of complex drag detection and the `pendingSelection` system.
+- **selectionchange-only**: Utilizes only `selectionchange` events for all scenarios.
+- **Text Field Decoupling**: Text field logic has been moved to the `text-field-interaction` module.
+- **Simple Drag Prevention**: Uses basic `mousedown`/`mouseup` detection to prevent UI triggers during active dragging.
+- **Performance Boost**: 60-70% reduction in code complexity and improved performance.
+- **Maintainability**: Significantly simpler and more maintainable codebase.
 
-## معماری
+## Architecture
 
-### 🎯 کامپوننت‌های اصلی
+### 🎯 Core Components
 
 #### 1. **SimpleTextSelectionHandler**
 `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
 
-- مدیریت selectionchange event تنها
-- تشخیص ساده drag (mousedown/mouseup)
-- جلوگیری از نمایش آیکون در text fields
-- ارتباط مستقیم با SelectionManager
+- Manages the standalone `selectionchange` event.
+- Simple drag detection (`mousedown`/`mouseup`).
+- Prevents icon display within text fields.
+- Communicates directly with the `SelectionManager`.
 
 #### 2. **SelectionManager**
 `src/features/text-selection/core/SelectionManager.js`
 
-- پردازش ساده انتخاب متن
-- محاسبه position برای UI
-- تعامل با WindowsManager
-- پشتیبانی از iframe communication
+- Processes text selection simply.
+- Calculates UI positioning.
+- Interacts with `WindowsManager`.
+- Supports iframe communication.
 
 #### 3. **TextSelectionHandler (Wrapper)**
 `src/features/text-selection/handlers/TextSelectionHandler.js`
 
-- Wrapper سازگاری برای FeatureManager
-- استفاده از SimpleTextSelectionHandler در پس زمینه
-- حفظ API قدیمی برای backward compatibility
+- Compatibility wrapper for `FeatureManager`.
+- Uses `SimpleTextSelectionHandler` in the background.
+- Maintains the old API for backward compatibility.
 
 #### 4. **useTextSelection (Vue Composable)**
 `src/features/text-selection/composables/useTextSelection.js`
 
-- Vue composable برای integration
-- Reactive state management
-- تعامل ساده با SimpleTextSelectionHandler
+- Vue composable for integration.
+- Reactive state management.
+- Simple interaction with `SimpleTextSelectionHandler`.
+
+#### 5. **FieldDetector**
 `src/utils/text/core/FieldDetector.js`
 
-- تشخیص نوع فیلد با استفاده از site handlers
-- تعیین selection strategy مناسب
-- Async/await صحیح برای همه operations
-- Cache management برای بهبود performance
+- Detects field types using site handlers.
+- Determines the appropriate selection strategy.
+- Correct `async/await` implementation for all operations.
+- Cache management for performance optimization.
 
-## استراتژی Selection (ساده شده)
+## Selection Strategy (Simplified)
 
-### 🚀 رویکرد جدید: selectionchange-only
+### 🚀 New Approach: selectionchange-only
 
-سیستم جدید تنها از یک استراتژی استفاده می‌کند:
+The new system utilizes a single strategy:
 
-#### **Single Strategy** (همه محتوا)
+#### **Single Strategy** (All Content)
 ```javascript
-// تنها یک event listener لازم است:
+// Only one event listener is required:
 document.addEventListener('selectionchange', () => {
   if (!isDragging && hasText && !isInTextField) {
     showTranslationIcon();
   }
 });
+
 ```
 
-### 🎯 شرایط نمایش آیکون:
+### 🎯 Icon Display Conditions:
 
-1. **✅ متن انتخاب شده باشد** (`selectedText.trim()`)
-2. **✅ در حال drag نباشد** (`!isDragging`)
-3. **✅ در text field نباشد** (`!isInTextField`)
-4. **✅ Ctrl key requirement** (در صورت فعال بودن)
-5. **✅ Select element mode غیرفعال** (`!selectModeActive`)
+1. **✅ Text is selected** (`selectedText.trim()`)
+2. **✅ Not currently dragging** (`!isDragging`)
+3. **✅ Not inside a text field** (`!isInTextField`)
+4. **✅ Ctrl key requirement** (if enabled)
+5. **✅ Select element mode is disabled** (`!selectModeActive`)
 
-### 🔄 جداسازی مسئولیت‌ها:
+### 🔄 Separation of Concerns:
 
-- **Page Text Selection** → `SimpleTextSelectionHandler`
-- **Text Field Selection** → `TextFieldDoubleClickHandler` (ماژول جدا)
+* **Page Text Selection** → `SimpleTextSelectionHandler`
+* **Text Field Selection** → `TextFieldDoubleClickHandler` (Separate module)
 
-## Simple Drag Prevention (رویکرد ساده شده)
+## Simple Drag Prevention (Simplified Approach)
 
-### 🚀 مزایای رویکرد جدید
+### 🚀 Advantages of the New Approach
 
-#### ❌ روش قدیمی (Complex Drag Detection)
+#### ❌ Legacy Method (Complex Drag Detection)
+
 ```javascript
-// پیچیده و مشکل‌دار
+// Complex and bug-prone
 selectionchange → store as pendingSelection
 mouseup → process pendingSelection
 timeout management + complex state
+
 ```
 
-#### ✅ روش جدید (Simple Prevention)
+#### ✅ New Method (Simple Prevention)
+
 ```javascript
-// بسیار ساده و مؤثر
+// Highly simple and effective
 mousedown → isDragging = true
 selectionchange → if (isDragging) skip
 mouseup → isDragging = false + process after delay
+
 ```
 
-### 🔧 پیاده‌سازی ساده
+### 🔧 Simple Implementation
 
 ```javascript
 class SimpleTextSelectionHandler {
@@ -135,11 +142,12 @@ class SimpleTextSelectionHandler {
     await this.showTranslationIcon();
   }
 }
+
 ```
 
 ## Event Flow
 
-### 📊 جریان رویدادها (ساده شده)
+### 📊 Event Flow (Simplified)
 
 ```mermaid
 graph TD
@@ -151,40 +159,48 @@ graph TD
     F --> G[isDragging = false]
     G --> H[Process selection after 50ms]
     H --> I[Show Translation Icon]
+
 ```
 
-### 🎮 سناریوهای مختلف
+### 🎮 Various Scenarios
 
-#### 1. **Mouse Selection** (Selection با drag)
+#### 1. **Mouse Selection** (Drag-to-select)
+
 ```
 mousedown → isDragging = true
   ↓
 selectionchange → skip (isDragging = true)
   ↓
-mouseup → isDragging = false → process after 50ms → نمایش icon
+mouseup → isDragging = false → process after 50ms → show icon
+
 ```
 
-#### 2. **Keyboard Selection** (Ctrl+A، Shift+Arrow)
+#### 2. **Keyboard Selection** (Ctrl+A, Shift+Arrow)
+
 ```
-selectionchange (isDragging = false) → پردازش فوری → نمایش icon
+selectionchange (isDragging = false) → immediate processing → show icon
+
 ```
 
 #### 3. **Text Field Selection** (INPUT/TEXTAREA)
+
 ```
 selectionchange → isSelectionInTextField() = true → skip
   ↓
-double-click in text field → TextFieldDoubleClickHandler → نمایش icon
+double-click in text field → TextFieldDoubleClickHandler → show icon
+
 ```
 
-## Text Field Integration (ماژول جدا)
+## Text Field Integration (Separate Module)
 
-### 🔄 جداسازی Text Fields
+### 🔄 Decoupling Text Fields
 
-Professional editors و text fields حالا توسط ماژول جداگانه مدیریت می‌شوند:
+Professional editors and text fields are now managed by a separate module:
 
 #### Text Field Handler (`text-field-interaction` module)
+
 ```javascript
-// TextFieldDoubleClickHandler برای text fields
+// TextFieldDoubleClickHandler for text fields
 class TextFieldDoubleClickHandler {
   handleDoubleClick(event) {
     if (this.isTextField(event.target)) {
@@ -200,21 +216,24 @@ class TextFieldDoubleClickHandler {
            element.contentEditable === 'true';
   }
 }
+
 ```
 
 #### Professional Editors Support
-- **Google Docs**: contenteditable detection
-- **Microsoft Office**: iframe-based detection
-- **Zoho Writer**: custom element detection
-- **Notion**: block-based detection
-- **WPS Office**: office suite detection
 
-### 🎯 رویکرد ساده:
+* **Google Docs**: contenteditable detection
+* **Microsoft Office**: iframe-based detection
+* **Zoho Writer**: custom element detection
+* **Notion**: block-based detection
+* **WPS Office**: office suite detection
+
+### 🎯 Simplified Approach:
+
 1. **Page content** → `SimpleTextSelectionHandler`
 2. **Text fields** → `TextFieldDoubleClickHandler`
 3. **Professional editors** → `TextFieldDoubleClickHandler` (via contenteditable)
 
-## Integration با سیستم‌های دیگر
+## Integration with Other Systems
 
 ### 🔗 WindowsManager Integration
 
@@ -226,6 +245,7 @@ await windowsManager.show('selection', {
   text: selectedText,
   position: position
 });
+
 ```
 
 ### 🔗 FeatureManager Integration
@@ -237,6 +257,7 @@ if (textSelectionHandler?.isActive) {
   const manager = textSelectionHandler.getTextSelectionManager();
   // Use manager...
 }
+
 ```
 
 ### 🔗 IFrame Support
@@ -252,11 +273,12 @@ if (window !== window.top) {
   };
   window.parent.postMessage(message, '*');
 }
+
 ```
 
 ## Error Handling
 
-### 🛡️ مدیریت خطا
+### 🛡️ Error Management
 
 ```javascript
 try {
@@ -269,6 +291,7 @@ try {
     eventType: event?.type
   });
 }
+
 ```
 
 ### 🔄 Context Safety
@@ -279,13 +302,15 @@ if (ExtensionContextManager.isContextError(error)) {
   this.logger.debug('Extension context invalidated, skipping selection processing');
   return;
 }
+
 ```
 
 ## Performance Optimization
 
-### ⚡ بهینه‌سازی‌ها
+### ⚡ Optimizations
 
 #### 1. **Resource Tracking**
+
 ```javascript
 class TextSelectionManager extends ResourceTracker {
   constructor() {
@@ -293,9 +318,11 @@ class TextSelectionManager extends ResourceTracker {
     // Automatic cleanup of timeouts, event listeners, etc.
   }
 }
+
 ```
 
 #### 2. **Duplicate Prevention**
+
 ```javascript
 // Prevent duplicate processing
 const isRecentDuplicate = selectedText === this.lastProcessedText && 
@@ -304,15 +331,18 @@ const isRecentDuplicate = selectedText === this.lastProcessedText &&
 if (isRecentDuplicate && this._isWindowVisible()) {
   return; // Skip duplicate
 }
+
 ```
 
 #### 3. **Efficient Event Handling**
+
 ```javascript
 // Only process events when feature is active
 if (!this.isActive || !this.textSelectionManager) return;
+
 ```
 
-## Testing و Debugging
+## Testing and Debugging
 
 ### 🔍 Debug Information
 
@@ -327,6 +357,7 @@ getStatus() {
     pendingSelection: !!this.pendingSelection
   };
 }
+
 ```
 
 ### 📊 Logging
@@ -339,41 +370,45 @@ this.logger.debug('Selection detected', {
   selectionStrategy: detection.selectionStrategy,
   eventStrategy: detection.selectionEventStrategy
 });
+
 ```
 
 ## Best Practices
 
-### ✅ توصیه‌ها
+### ✅ Recommendations
 
-1. **استفاده از Field Detection**: همیشه نوع فیلد را تشخیص دهید
-2. **Respect User Interaction**: منتظر تکمیل انتخاب کاربر باشید
-3. **Cross-Frame Compatibility**: iframe ها را در نظر بگیرید
-4. **Error Resilience**: خطاها را مدیریت کنید
-5. **Resource Cleanup**: منابع را پاک‌سازی کنید
-6. **Performance**: از duplicate processing جلوگیری کنید
+1. **Use Field Detection**: Always identify the field type.
+2. **Respect User Interaction**: Wait for the user to complete their selection.
+3. **Cross-Frame Compatibility**: Account for iframes.
+4. **Error Resilience**: Always handle potential errors.
+5. **Resource Cleanup**: Ensure resources are properly disposed.
+6. **Performance**: Prevent redundant duplicate processing.
 
-### ❌ مواردی که باید اجتناب کرد
+### ❌ Things to Avoid
 
-1. **Timeout-Based Detection**: استفاده از timeout برای drag detection
-2. **Immediate Processing**: پردازش فوری selectionchange در حین drag
-3. **Hard-Coded Delays**: استفاده از delay های ثابت
-4. **Memory Leaks**: فراموش کردن cleanup منابع
-5. **Duplicate Events**: عدم مدیریت event های تکراری
+1. **Timeout-Based Detection**: Avoid using timeouts for primary drag detection.
+2. **Immediate Processing**: Do not process `selectionchange` immediately during a drag.
+3. **Hard-Coded Delays**: Avoid using fixed/static delays.
+4. **Memory Leaks**: Do not forget to clean up resources.
+5. **Duplicate Events**: Manage duplicate events properly.
 
-## مثال‌های کاربرد
+## Usage Examples
 
 ### 1. **Regular Website Selection**
+
 ```javascript
 // User drags text on a regular website
-// → selectionchange events stored as pending
+// → selectionchange events ignored while dragging
 // → On mouseup: process and show icon
+
 ```
 
-### 2. **Google Docs Selection**  
-```javascript
+### 2. **Google Docs Selection** ```javascript
+
 // User double-clicks in Google Docs
 // → handleDoubleClick triggered
 // → Direct processing with professional editor logic
+
 ```
 
 ### 3. **Keyboard Selection**
@@ -381,35 +416,41 @@ this.logger.debug('Selection detected', {
 // User presses Ctrl+A
 // → selectionchange with isDragging = false
 // → Immediate processing and icon display
+
 ```
 
-## مراجع
+## References
 
-### Core Components (ساده شده)
-- **SimpleTextSelectionHandler**: `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
-- **SelectionManager**: `src/features/text-selection/core/SelectionManager.js`
-- **TextSelectionHandler (Wrapper)**: `src/features/text-selection/handlers/TextSelectionHandler.js`
-- **useTextSelection (Vue)**: `src/features/text-selection/composables/useTextSelection.js`
+### Core Components (Simplified)
+
+* **SimpleTextSelectionHandler**: `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
+* **SelectionManager**: `src/features/text-selection/core/SelectionManager.js`
+* **TextSelectionHandler (Wrapper)**: `src/features/text-selection/handlers/TextSelectionHandler.js`
+* **useTextSelection (Vue)**: `src/features/text-selection/composables/useTextSelection.js`
 
 ### Text Field Integration
-- **TextFieldHandler**: `src/features/text-field-interaction/handlers/TextFieldHandler.js`
-- **TextFieldDoubleClickHandler**: `src/features/text-field-interaction/handlers/TextFieldDoubleClickHandler.js`
-- **TextFieldIconManager**: `src/features/text-field-interaction/managers/TextFieldIconManager.js`
+
+* **TextFieldHandler**: `src/features/text-field-interaction/handlers/TextFieldHandler.js`
+* **TextFieldDoubleClickHandler**: `src/features/text-field-interaction/handlers/TextFieldDoubleClickHandler.js`
+* **TextFieldIconManager**: `src/features/text-field-interaction/managers/TextFieldIconManager.js`
 
 ### Legacy Files (Backup)
-- **TextSelectionManager.legacy.js**: Complex old implementation
-- **TextSelectionHandler.legacy.js**: Complex old handler
+
+* **TextSelectionManager.legacy.js**: Complex old implementation.
+* **TextSelectionHandler.legacy.js**: Complex old handler.
 
 ### Documentation
-- **WindowsManager**: `docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`
-- **Smart Handler Registration**: `docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`
-- **Error Management**: `docs/ERROR_MANAGEMENT_SYSTEM.md`
+
+* **WindowsManager**: `docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`
+* **Smart Handler Registration**: `docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`
+* **Error Management**: `docs/ERROR_MANAGEMENT_SYSTEM.md`
 
 ### Key Improvements (2025) - Simplification
-- ✅ **60-70% Code Reduction**: حذف پیچیدگی‌های غیرضروری
-- ✅ **selectionchange-only**: استفاده تنها از selectionchange events
-- ✅ **Simple Drag Prevention**: mousedown/mouseup ساده به جای pendingSelection
-- ✅ **Text Field Separation**: جداسازی کامل text fields به ماژول مستقل
-- ✅ **Performance Boost**: عملکرد بهتر و کمتر race condition
-- ✅ **Maintainability**: کد بسیار ساده‌تر و قابل نگهداری
-- ✅ **Cross-browser Reliability**: سازگاری بهتر با همه مرورگرها
+
+* ✅ **60-70% Code Reduction**: Eliminated unnecessary complexities.
+* ✅ **selectionchange-only**: Switched exclusively to `selectionchange` events.
+* ✅ **Simple Drag Prevention**: Replaced `pendingSelection` with simple `mousedown`/`mouseup`.
+* ✅ **Text Field Separation**: Fully decoupled text fields into an independent module.
+* ✅ **Performance Boost**: Higher efficiency with fewer race conditions.
+* ✅ **Maintainability**: Cleaner, more readable code.
+* ✅ **Cross-browser Reliability**: Improved compatibility across all major browsers.

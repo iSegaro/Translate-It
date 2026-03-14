@@ -1,109 +1,130 @@
 # Proxy System Guide
 
-راهنمای کامل سیستم پروکسی افزونه Translate-It که امکان استفاده از پروکسی برای دسترسی به سرویس‌های ترجمه با محدودیت جغرافیایی را فراهم می‌کند.
+A comprehensive guide to the Translate-It extension's proxy system, which enables the use of proxies to access translation services with geographical restrictions.
 
-**✅ Implementation Status:** **COMPLETED** (January 2025)
-**🚀 Architecture Status:** Extension-Only Proxy با Strategy Pattern
-**🔧 Compatibility:** Chrome + Firefox Extensions Verified
+**✅ Implementation Status:** **COMPLETED** (January 2025)  
+**🚀 Architecture Status:** Extension-Only Proxy with Strategy Pattern  
+**🔧 Compatibility:** Chrome + Firefox Extensions Verified  
 
-> **نکته:** این سیستم **فقط روی افزونه** تأثیر می‌گذارد و تنظیمات proxy مرورگر را تغییر نمی‌دهد.
+> **Note:** This system **only** affects the extension and does not modify the browser's global proxy settings.
+
+---
 
 ## Quick Start
 
-### فعال‌سازی Proxy
+### Proxy Activation
 
 ```javascript
-// تنظیم proxy در Options > Advanced Tab
+// Configure proxy in Options > Advanced Tab
 {
   enabled: true,
   type: 'socks',     // 'http', 'https', 'socks'
   host: '8.211.200.183',
   port: 3128,
-  auth: {            // اختیاری
+  auth: {            // Optional
     username: 'user',
     password: 'pass'
   }
 }
+
 ```
 
-### استفاده در Provider
+### Usage in Provider
 
 ```javascript
-// ProxyManager به‌طور خودکار در BaseProvider integrate شده
+// ProxyManager is automatically integrated into BaseProvider
 import { proxyManager } from '@/shared/proxy/ProxyManager.js'
 
-// درخواست‌های API خودکار از proxy استفاده می‌کنند
+// API requests automatically utilize the proxy
 const response = await proxyManager.fetch(url, options)
+
 ```
+
+---
 
 ## ⚠️ Important: Extension-Only Architecture
 
-**فقط روی افزونه اثر می‌گذارد** - سایر بخش‌های مرورگر تحت تأثیر قرار نمی‌گیرند:
+**Affects the Extension Only** — other browser activities remain unaffected:
 
 ```javascript
 // ✅ CORRECT - Extension-only proxy
 const response = await proxyManager.fetch(url, options)
 
-// ❌ WRONG - Browser-wide proxy (که حذف شده)
-chrome.proxy.settings.set({...}) // این روش استفاده نمی‌شود
+// ❌ WRONG - Browser-wide proxy (Deprecated/Removed)
+chrome.proxy.settings.set({...}) // This method is not used
+
 ```
+
+---
 
 ## Core Architecture
 
 ### Extension-Only Proxy Manager
+
 **File**: `src/shared/proxy/ProxyManager.js`
-- **Strategy Pattern**: پشتیبانی از انواع مختلف proxy
-- **Graceful Fallback**: در صورت خرابی proxy، fallback به direct connection
-- **Integration کامل** با logging و error management systems
-- **Real-time Settings**: تنظیمات بدون نیاز به restart اعمال می‌شوند
+
+* **Strategy Pattern**: Supports various proxy types.
+* **Graceful Fallback**: Reverts to a direct connection if the proxy fails.
+* **Full Integration**: Connected with logging and error management systems.
+* **Real-time Settings**: Configurations are applied without requiring a restart.
 
 ### Strategy-Based Implementation
+
 **Directory**: `src/shared/proxy/strategies/`
-- **BaseProxyStrategy**: کلاس پایه برای همه strategies
-- **HttpProxyStrategy**: پشتیبانی از HTTP proxy
-- **HttpsProxyStrategy**: پشتیبانی از HTTPS proxy
-- **SocksProxyStrategy**: پشتیبانی از SOCKS proxy
+
+* **BaseProxyStrategy**: The base class for all strategies.
+* **HttpProxyStrategy**: Support for HTTP proxies.
+* **HttpsProxyStrategy**: Support for HTTPS proxies.
+* **SocksProxyStrategy**: Support for SOCKS proxies.
 
 ### Settings Integration
+
 **Files**:
-- `src/shared/config/config.js` - تنظیمات پیش‌فرض proxy
-- `src/features/settings/stores/settings.js` - مدیریت state proxy
-- `src/apps/options/tabs/AdvanceTab.vue` - رابط کاربری proxy
+
+* `src/shared/config/config.js` - Default proxy settings.
+* `src/features/settings/stores/settings.js` - Proxy state management.
+* `src/apps/options/tabs/AdvanceTab.vue` - Proxy user interface.
+
+---
 
 ## Component Overview
 
 ### 1. ProxyManager
+
 **Location**: `src/shared/proxy/ProxyManager.js`
 
-مدیر اصلی سیستم proxy که از Strategy Pattern استفاده می‌کند:
+The main proxy system manager utilizing the Strategy Pattern:
 
 ```javascript
 class ProxyManager {
-  // تنظیم configuration
+  // Configuration setup
   setConfig(config)              // Set proxy config (enabled/disabled)
 
-  // درخواست‌های network
+  // Network requests
   async fetch(url, options)      // Proxy-aware fetch with fallback
 
-  // تست اتصال
+  // Connection testing
   async testConnection(testUrl)  // Test proxy connectivity
 
-  // وضعیت و validation
+  // Status and validation
   isEnabled()                    // Check if proxy is active
   getStatus()                    // Get detailed proxy status
 }
+
 ```
 
-**کلیدی ویژگی‌ها:**
-- **🚀 Strategy Loading**: Lazy loading strategies برای performance
-- **🛡️ Error Handling**: Integration با ErrorHandler برای مدیریت خطا
-- **📱 Settings Sync**: همگام‌سازی خودکار با تنظیمات کاربر
-- **🔍 Validation**: بررسی صحت configuration قبل از استفاده
+**Key Features:**
+
+* **🚀 Strategy Loading**: Lazy loading strategies for optimal performance.
+* **🛡️ Error Handling**: Integrated with ErrorHandler for error management.
+* **📱 Settings Sync**: Automatic synchronization with user settings.
+* **🔍 Validation**: Validates configuration integrity before use.
 
 ### 2. Strategy Classes
+
 **Location**: `src/shared/proxy/strategies/`
 
-هر strategy نحوه اتصال به نوع خاصی از proxy را مدیریت می‌کند:
+Each strategy manages the connection logic for a specific proxy type:
 
 ```javascript
 // Base Strategy
@@ -124,28 +145,32 @@ class SocksProxyStrategy extends BaseProxyStrategy {
   async _socksProxy()             // SOCKS connection handling
   async _socksConnect()           // CONNECT method for SOCKS
 }
+
 ```
 
 ### 3. BaseProvider Integration
+
 **Location**: `src/features/translation/providers/BaseProvider.js`
 
-Integration کامل با سیستم ترجمه:
+Full integration with the translation system:
 
 ```javascript
 class BaseProvider {
   async _initializeProxy()        // Load proxy settings before requests
   async _executeApiCall()         // Use proxyManager.fetch() for all requests
 }
+
 ```
 
 **Integration Flow:**
-```
-Translation Request → BaseProvider._executeApiCall() → ProxyManager.fetch() → Strategy.execute() → API Call
-```
+`Translation Request → BaseProvider._executeApiCall() → ProxyManager.fetch() → Strategy.execute() → API Call`
+
+---
 
 ## Proxy Types & Usage
 
 ### 1. HTTP Proxy
+
 ```javascript
 {
   enabled: true,
@@ -153,17 +178,21 @@ Translation Request → BaseProvider._executeApiCall() → ProxyManager.fetch() 
   host: 'proxy.example.com',
   port: 8080
 }
+
 ```
 
-**مناسب برای:**
-- HTTP URLs (کاملاً پشتیبانی می‌شود)
-- HTTPS URLs (fallback به direct connection)
-- Basic authentication
+**Best for:**
 
-**محدودیت‌ها:**
-- HTTPS over HTTP proxy پیچیده است و fallback می‌کند
+* HTTP URLs (Fully supported).
+* HTTPS URLs (Reverts to direct connection).
+* Basic authentication.
+
+**Limitations:**
+
+* HTTPS over HTTP proxy is complex and triggers a fallback.
 
 ### 2. HTTPS Proxy
+
 ```javascript
 {
   enabled: true,
@@ -171,14 +200,17 @@ Translation Request → BaseProvider._executeApiCall() → ProxyManager.fetch() 
   host: 'secure-proxy.example.com',
   port: 443
 }
+
 ```
 
-**مناسب برای:**
-- Secure proxy connections
-- HTTPS endpoints
-- Enterprise environments
+**Best for:**
 
-### 3. SOCKS Proxy ⭐ (توصیه شده)
+* Secure proxy connections.
+* HTTPS endpoints.
+* Enterprise environments.
+
+### 3. SOCKS Proxy ⭐ (Recommended)
+
 ```javascript
 {
   enabled: true,
@@ -186,25 +218,30 @@ Translation Request → BaseProvider._executeApiCall() → ProxyManager.fetch() 
   host: '8.211.200.183',
   port: 3128
 }
+
 ```
 
-**مزایا:**
-- **بهترین Performance**: سریع‌ترین نوع proxy
-- **Universal Support**: هم HTTP و هم HTTPS
-- **No Fallback**: مستقیماً proxy می‌کند
+**Advantages:**
 
-**نتایج تست:**
+* **Top Performance**: The fastest proxy type.
+* **Universal Support**: Handles both HTTP and HTTPS.
+* **No Fallback**: Proxies directly without issues.
+
+**Test Results:**
 | Proxy Type | HTTP Support | HTTPS Support | Performance |
 |------------|-------------|---------------|-------------|
-| **SOCKS** | ✅ Native | ✅ Native | **401ms** ⚡ |
-| **HTTP** | ✅ Native | ⚠️ Fallback | 1910ms |
-| **HTTPS** | ✅ Native | ✅ Native | 800ms |
+| **SOCKS** | ✅ Native    | ✅ Native      | **401ms** ⚡ |
+| **HTTP** | ✅ Native    | ⚠️ Fallback    | 1910ms      |
+| **HTTPS** | ✅ Native    | ✅ Native      | 800ms       |
+
+---
 
 ## Configuration
 
 ### Default Settings
+
 ```javascript
-// در config.js
+// In config.js
 const DEFAULT_PROXY_CONFIG = {
   PROXY_ENABLED: false,
   PROXY_TYPE: 'http',
@@ -213,21 +250,25 @@ const DEFAULT_PROXY_CONFIG = {
   PROXY_USERNAME: '',
   PROXY_PASSWORD: ''
 }
+
 ```
 
 ### UI Configuration
+
 **Location**: `src/apps/options/tabs/AdvanceTab.vue`
 
-رابط کاربری شامل:
-- **Enable/Disable Toggle**: فعال‌سازی proxy
-- **Type Selection**: HTTP, HTTPS, SOCKS
-- **Host & Port**: آدرس و پورت proxy server
-- **Authentication**: username/password (اختیاری)
-- **Test Connection**: تست اتصال proxy
+The UI includes:
+
+* **Enable/Disable Toggle**: Proxy activation.
+* **Type Selection**: HTTP, HTTPS, SOCKS.
+* **Host & Port**: Proxy server address and port.
+* **Authentication**: Username/password (Optional).
+* **Test Connection**: Button to verify proxy functionality.
 
 ### Runtime Configuration
+
 ```javascript
-// تغییر تنظیمات در runtime
+// Change settings at runtime
 import { proxyManager } from '@/shared/proxy/ProxyManager.js'
 
 proxyManager.setConfig({
@@ -236,35 +277,43 @@ proxyManager.setConfig({
   host: 'new-proxy.com',
   port: 1080
 })
+
 ```
+
+---
 
 ## Error Handling & Fallback
 
 ### Graceful Fallback Strategy
+
 ```javascript
-// در ProxyManager.fetch()
+// Inside ProxyManager.fetch()
 try {
-  // سعی کن از proxy استفاده کنی
+  // Attempt to use the proxy
   return await strategy.execute(url, options)
 } catch (error) {
-  // Log error و fallback به direct
+  // Log error and fallback to direct
   logger.warn('Proxy failed, falling back to direct connection')
   return fetch(url, options)  // Direct fallback
 }
+
 ```
 
 ### Error Types
+
 ```javascript
-// انواع خطاهای proxy
+// Proxy error types
 PROXY_CONNECTION_FAILED    // Proxy server unreachable
 PROXY_AUTH_FAILED         // Authentication failed
 PROXY_TIMEOUT             // Connection timeout
 PROXY_CONFIG_INVALID      // Invalid configuration
+
 ```
 
 ### Error Integration
+
 ```javascript
-// استفاده از ErrorHandler system
+// Utilizing the ErrorHandler system
 await errorHandler.handle(error, {
   context: 'proxy-manager-fetch',
   showToast: false,  // Silent for proxy errors
@@ -273,34 +322,44 @@ await errorHandler.handle(error, {
     url: this._sanitizeUrl(url)
   }
 })
+
 ```
+
+---
 
 ## Performance Optimization
 
 ### ✅ Optimizations Implemented
-- **Strategy Caching**: Strategies تنها یکبار load می‌شوند
-- **Config Validation**: Fast validation قبل از درخواست
-- **Lazy Loading**: Strategies به‌صورت lazy load می‌شوند
-- **Minimal Overhead**: در حالت disabled، overhead تقریباً صفر
-- **Smart Fallback**: سریع fallback در صورت خرابی
+
+* **Strategy Caching**: Strategies are loaded only once.
+* **Config Validation**: Fast pre-request validation.
+* **Lazy Loading**: Strategies load only when needed.
+* **Minimal Overhead**: Nearly zero overhead when disabled.
+* **Smart Fallback**: Rapidly falls back upon failure.
 
 ### 📊 Performance Metrics
+
 ```javascript
-// نتایج تست‌های واقعی
+// Real-world test results
 Direct Connection:    597ms  ⚡
-SOCKS Proxy:         401ms  ⚡⚡ (بهترین)
-HTTP Proxy:         1910ms  ⚠️ (با fallback)
+SOCKS Proxy:         401ms  ⚡⚡ (Best)
+HTTP Proxy:         1910ms  ⚠️ (With fallback)
 HTTPS Proxy:        800ms  ✅
+
 ```
 
 ### Memory Management
-- **Singleton Pattern**: یک instance از ProxyManager
-- **Strategy Reuse**: Strategies reuse می‌شوند
-- **Config Cleanup**: پاکسازی خودکار config قدیمی
+
+* **Singleton Pattern**: A single instance of ProxyManager.
+* **Strategy Reuse**: Reuse of existing strategy instances.
+* **Config Cleanup**: Automatic cleaning of obsolete configurations.
+
+---
 
 ## Testing
 
 ### Manual Testing
+
 ```javascript
 // Test proxy connection
 const success = await proxyManager.testConnection()
@@ -308,27 +367,31 @@ console.log('Proxy test result:', success)
 
 // Test different URLs
 const urls = [
-  'https://translate.googleapis.com',
-  'https://api.openai.com',
-  'https://httpbin.org/ip'
+  '[https://translate.googleapis.com](https://translate.googleapis.com)',
+  '[https://api.openai.com](https://api.openai.com)',
+  '[https://httpbin.org/ip](https://httpbin.org/ip)'
 ]
 
 for (const url of urls) {
   const result = await proxyManager.fetch(url)
   console.log(`${url}: ${result.status}`)
 }
+
 ```
 
 ### UI Testing
-در **Options > Advanced Tab**:
-1. **Enable Proxy** و وارد کردن تنظیمات
-2. **Test Connection** برای بررسی عملکرد
-3. **تست ترجمه** برای تأیید integration
+
+In **Options > Advanced Tab**:
+
+1. **Enable Proxy** and enter settings.
+2. Click **Test Connection** to check functionality.
+3. Perform a **Translation Test** to verify integration.
 
 ### Performance Testing
+
 ```javascript
-// مقایسه performance
-const testUrls = ['https://translate.googleapis.com/translate_a/single']
+// Compare performance
+const testUrls = ['[https://translate.googleapis.com/translate_a/single](https://translate.googleapis.com/translate_a/single)']
 
 // Direct
 const start1 = Date.now()
@@ -341,13 +404,17 @@ await proxyManager.fetch(testUrls[0])
 const proxyTime = Date.now() - start2
 
 console.log(`Direct: ${directTime}ms, Proxy: ${proxyTime}ms`)
+
 ```
+
+---
 
 ## Migration Guide
 
-### از Chrome Proxy API
+### From Chrome Proxy API
+
 ```javascript
-// ❌ OLD - Browser-wide proxy (removed)
+// ❌ OLD - Browser-wide proxy (Removed)
 chrome.proxy.settings.set({
   value: {
     mode: 'fixed_servers',
@@ -362,49 +429,59 @@ proxyManager.setConfig({
   host: 'proxy.example.com',
   port: 8080
 })
+
 ```
 
-### Integration با Providers
+### Integration with Providers
+
 ```javascript
 // ❌ OLD - Direct fetch in providers
 const response = await fetch(url, options)
 
 // ✅ NEW - Proxy-aware fetch
 const response = await proxyManager.fetch(url, options)
+
 ```
+
+---
 
 ## Best Practices
 
 ### ✅ Do's
-- **SOCKS را ترجیح دهید** برای بهترین performance
-- **Test Connection** قبل از استفاده مهم
-- **Monitor logs** برای تشخیص مشکلات
-- **Fallback را تست کنید** در سناریوهای خرابی
-- **تنظیمات را validate کنید** قبل از ذخیره
+
+* **Prefer SOCKS** for the best performance.
+* **Test Connection** before finalizing settings.
+* **Monitor logs** to diagnose issues.
+* **Test Fallback** in failure scenarios.
+* **Validate settings** before saving.
 
 ### ❌ Don'ts
-- **Browser proxy APIs استفاده نکنید** (system-wide تأثیر دارد)
-- **Error logging را ignore نکنید** برای proxy failures
-- **Invalid configs را persist نکنید**
-- **Performance overhead را نادیده نگیرید**
-- **Auth credentials را log نکنید**
+
+* **Avoid Browser Proxy APIs** (they affect the entire system).
+* **Don't ignore error logging** for proxy failures.
+* **Don't persist invalid configs**.
+* **Don't overlook performance overhead**.
+* **Never log authentication credentials**.
+
+---
 
 ## Common Use Cases
 
-### 1. دسترسی به Gemini از ایران
+### 1. Accessing Gemini from Restricted Regions (e.g., Iran)
+
 ```javascript
-// تنظیمات برای دسترسی به Gemini
 {
   enabled: true,
   type: 'socks',
   host: 'your-proxy-server.com',
   port: 1080
 }
+
 ```
 
 ### 2. Corporate Network
+
 ```javascript
-// تنظیمات برای شبکه‌های شرکتی
 {
   enabled: true,
   type: 'http',
@@ -415,84 +492,100 @@ const response = await proxyManager.fetch(url, options)
     password: 'proxy-password'
   }
 }
+
 ```
 
 ### 3. Development & Testing
+
 ```javascript
-// تنظیمات برای development
 {
   enabled: true,
   type: 'http',
   host: 'localhost',
-  port: 8888  // مثلاً Charles Proxy
+  port: 8888  // e.g., Charles Proxy
 }
+
 ```
+
+---
 
 ## Troubleshooting
 
-### مشکلات رایج
+### Common Issues
 
 **1. Proxy Connection Failed**
+
 ```javascript
-// بررسی تنظیمات
+// Check settings
 console.log(proxyManager.getStatus())
 
-// تست manual
+// Manual test
 const success = await proxyManager.testConnection()
 if (!success) {
-  // بررسی host/port/credentials
+  // Verify host/port/credentials
 }
+
 ```
 
 **2. Slow Performance**
+
 ```javascript
-// بررسی نوع proxy
+// Check proxy type
 if (config.type === 'http' && url.startsWith('https://')) {
   console.warn('HTTP proxy with HTTPS URL - consider SOCKS')
 }
+
 ```
 
 **3. Authentication Errors**
+
 ```javascript
-// بررسی credentials
+// Check credentials
 if (config.auth?.username && !config.auth?.password) {
   console.error('Username provided but no password')
 }
+
 ```
 
 ### Debug Commands
+
 ```javascript
-// در browser console
+// In browser console
 window.proxyDebug = {
   status: () => proxyManager.getStatus(),
   test: () => proxyManager.testConnection(),
   config: (newConfig) => proxyManager.setConfig(newConfig)
 }
 
-// استفاده
+// Usage
 proxyDebug.status()
 proxyDebug.test()
+
 ```
+
+---
 
 ## Future Enhancements
 
 ### Planned Features
-- **📊 Connection Analytics**: آمار استفاده از proxy
-- **🔄 Auto-Failover**: تعویض خودکار proxy در صورت خرابی
-- **🎯 Per-Provider Proxy**: proxy مخصوص هر provider
-- **📱 Mobile Support**: پشتیبانی بهتر از mobile browsers
-- **🔍 Proxy Discovery**: تشخیص خودکار proxy settings
+
+* **📊 Connection Analytics**: Proxy usage statistics.
+* **🔄 Auto-Failover**: Automatic proxy switching upon failure.
+* **🎯 Per-Provider Proxy**: Specific proxies for individual providers.
+* **📱 Mobile Support**: Enhanced support for mobile browsers.
+* **🔍 Proxy Discovery**: Automatic detection of proxy settings.
 
 ### Enhancement Ideas
-- **Load Balancing**: توزیع load بین چندین proxy
-- **Geo-Location**: انتخاب خودکار proxy بر اساس موقعیت
-- **Smart Routing**: مسیریابی هوشمند بر اساس destination
-- **Bandwidth Monitoring**: نظارت بر استفاده bandwidth
+
+* **Load Balancing**: Distributing load across multiple proxies.
+* **Geo-Location**: Automatic proxy selection based on location.
+* **Smart Routing**: Intelligent routing based on destination.
+* **Bandwidth Monitoring**: Monitoring bandwidth consumption.
 
 ---
 
 **Architecture Status**: ✅ **Extension-Only Implementation Complete**
 
-این سیستم proxy **کاملاً extension-only** است و **هیچ تأثیری روی تنظیمات مرورگر ندارد**. طراحی شده برای **performance، reliability، و ease of use** در محیط web extension.
+This proxy system is **strictly extension-only** and has **no impact on browser-wide settings**. It is engineered for **performance, reliability, and ease of use** within a web extension environment.
 
-**🎯 Key Achievement**: موفقیت در پیاده‌سازی proxy system که فقط روی افزونه اثر می‌گذارد و تجربه کاربری عالی با fallback هوشمند ارائه می‌دهد.
+**🎯 Key Achievement**: Successfully implemented a proxy system that isolates impact to the extension while providing an excellent user experience with intelligent fallback.
