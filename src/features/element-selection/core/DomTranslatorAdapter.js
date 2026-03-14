@@ -295,7 +295,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
     }
 
-    DirectionManager.applyDirection(element, finalTarget);
+    DirectionManager.applyElementDirection(element, finalTarget);
 
     // Update target language and mark as no longer partial
     if (globalSelectElementState.currentTranslation) {

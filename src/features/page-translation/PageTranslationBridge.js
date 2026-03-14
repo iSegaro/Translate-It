@@ -5,6 +5,7 @@ import {
   IntersectionScheduler
 } from 'domtranslator';
 import { createNodesFilter } from 'domtranslator/utils/nodes';
+import { applyNodeDirection, isRTL, restoreElementDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
 
 export class PageTranslationBridge {
   constructor(logger) {
@@ -26,30 +27,74 @@ export class PageTranslationBridge {
       currentSession.intersectionScheduler = new IntersectionScheduler({ rootMargin: settings.rootMargin });
     }
 
-    // Standard translator callback with context, priority score, and direction application
-    const translateWithContext = async (text, score, node) => {
-      // In domtranslator callback, the second arg is score, third is node (optional)
-      const translated = await onTranslateCallback(text, sessionContext, score);
+    /**
+     * Standard translator callback for domtranslator.
+     * Note: In domtranslator 1.x, the constructor callback ONLY receives (text, score).
+     * The 'node' argument is NOT passed here. We handle direction in the wrapped methods below.
+     */
+    const translateWithContext = async (text, score) => {
+      if (!text || !text.trim()) return text;
+
+      // 1. Capture original whitespace to preserve formatting
+      const leadingMatch = text.match(/^(\s*)/);
+      const trailingMatch = text.match(/(\s*)$/);
+      const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
+      const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
+      const trimmedText = text.trim();
+
+      // 2. Request translation for trimmed text
+      const translated = await onTranslateCallback(trimmedText, sessionContext, score);
       
-      // Post-process: Apply RTL direction if needed
-      if (translated && node && node.nodeType === Node.TEXT_NODE) {
-        const parent = node.parentElement;
-        if (parent) {
-          parent.setAttribute('data-page-translated', 'true');
-          
-          // Basic heuristic for RTL detection (can be expanded)
-          const isRTL = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(translated);
-          if (isRTL) {
-            parent.setAttribute('dir', 'rtl');
-            parent.setAttribute('data-translate-dir', 'rtl');
-          }
-        }
+      if (translated) {
+        // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
+        // This provides immediate string-level direction correction even before CSS is applied.
+        const isTargetRTL = isRTL(settings.targetLanguage);
+        const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
+        
+        return leadingWhitespace + mark + translated + trailingWhitespace;
       }
       
-      return translated;
+      return leadingWhitespace + trimmedText + trailingWhitespace;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);
+
+    /**
+     * FIX: Since domtranslator doesn't pass the node to the constructor's callback,
+     * we wrap its core methods (translate and update) to intercept the processed node.
+     * This allows us to apply container-level direction (CSS) after text is swapped.
+     */
+    const wrapWithDirection = (originalFn) => {
+      const bridge = this;
+      return function(node, callback) {
+        // Wrap the processed node callback
+        const wrappedCallback = (processedNode) => {
+          if (processedNode && processedNode.nodeType === Node.TEXT_NODE) {
+            try {
+              // Apply directional logic (Unicode marks + container alignment)
+              applyNodeDirection(processedNode, settings.targetLanguage);
+              
+              const parent = processedNode.parentElement;
+              if (parent) {
+                parent.setAttribute('data-page-translated', 'true');
+              }
+            } catch (e) {
+              bridge.logger.warn('Failed to apply direction to node', e);
+            }
+          }
+          
+          // Call original callback if provided (e.g., from PersistentDOMTranslator)
+          if (callback) callback(processedNode);
+        };
+        
+        return originalFn.call(this, node, wrappedCallback);
+      };
+    };
+
+    // Intercept both initial translations and dynamic updates
+    nodesTranslator.translate = wrapWithDirection(nodesTranslator.translate);
+    nodesTranslator.update = wrapWithDirection(nodesTranslator.update);
+
     const filter = createNodesFilter({
       ignoredSelectors: settings.excludedSelectors || ['script', 'style', 'noscript', 'code', 'pre', '[data-translate-ignore]'],
       attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
@@ -95,10 +140,13 @@ export class PageTranslationBridge {
     if (!this.session) return;
 
     try {
+      // 1. Surgical Restore: Revert all direction and alignment changes
+      restoreElementDirection(element);
+
       const pt = this.session.persistentTranslator;
       const dt = this.session.domTranslator;
 
-      // 1. Check if the node is still actively observed
+      // 2. Check if the node is still actively observed
       const isObserved = pt && pt.observedNodesStorage && pt.observedNodesStorage.has(element);
 
       if (isObserved) {

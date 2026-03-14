@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getTranslationApiAsync } from '@/config.js';
+import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -268,6 +268,7 @@ export class PageTranslationManager extends ResourceTracker {
   async _loadSettings() {
     this.settings = {
       translationApi: await getTranslationApiAsync(),
+      targetLanguage: await getTargetLanguageAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
       rootMargin: await getWholePageRootMarginAsync() || '300px',
       autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),

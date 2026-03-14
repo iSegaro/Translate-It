@@ -1,12 +1,13 @@
 /**
- * DomDirectionManager - Standardized direction management for Select Element
- * Uses a combination of Unicode Marks (BiDi Isolation) and Surgical CSS direction.
+ * DomDirectionManager - Shared logic for RTL/LTR direction management.
  */
 
 import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS } from './DomTranslatorConstants.js';
 
+// --- 1. Core Utilities (Shared) ---
+
 /**
- * Check if a language code is RTL
+ * Checks if a language code is RTL
  */
 export function isRTL(langCode) {
   if (!langCode) return false;
@@ -17,98 +18,115 @@ export function isRTL(langCode) {
 /**
  * Standard Unicode Marks for BiDi control
  */
-const RLM = '\u200F'; // Right-to-Left Mark
-const LRM = '\u200E'; // Left-to-Right Mark
+export const BIDI_MARKS = {
+  RLM: '\u200F', // Right-to-Left Mark
+  LRM: '\u200E'  // Left-to-Right Mark
+};
 
 /**
- * Universally identify Layout Containers.
- * A layout container coordinates major UI components (Avatars, Sidebars, Grids).
+ * Identifies structural layout walls (should not be flipped)
  */
 function isLayoutContainer(el) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
-  
-  // 1. Structural Tags are always layout walls
   if (LAYOUT_TAGS.has(el.tagName)) return true;
 
-  // 2. Multi-column Flex/Grid detection
   const style = window.getComputedStyle(el);
   const isLayoutDisplay = style.display === 'flex' || style.display === 'grid';
-  if (isLayoutDisplay && el.children.length > 1) {
-    // If it has multiple children, it's likely a row/column structure
-    return true;
-  }
+  if (isLayoutDisplay && el.children.length > 1) return true;
 
-  // 3. Block-level Child Check
-  // If an element contains block-level children, it's a structural wrapper, not a simple text box.
   const hasBlockChildren = Array.from(el.children).some(child => {
     const childStyle = window.getComputedStyle(child);
     return !FORMATTING_TAGS.has(child.tagName) || childStyle.display === 'block' || childStyle.display === 'flex';
   });
   
-  if (hasBlockChildren) return true;
-
-  return false;
+  return hasBlockChildren;
 }
 
+// --- 2. State Management (Internal) ---
+
 /**
- * Apply direction to a text node and its shared content context.
- * This is the most robust and universal method.
+ * Saves original styles to data-attributes before modification
+ */
+function saveOriginalStyles(element) {
+  if (!element || element.hasAttribute('data-dir-original-saved')) return;
+  element.setAttribute('data-original-direction', element.style.direction || '');
+  element.setAttribute('data-original-text-align', element.style.textAlign || '');
+  element.setAttribute('data-dir-original-saved', 'true');
+}
+
+// --- 3. Application Logic ---
+
+/**
+ * Surgical Application: Finds the smallest safe container for a text node and aligns it.
+ * Commonly used by both Select Element and Page Translation.
  */
 export function applyNodeDirection(textNode, targetLanguage, rootElement = null) {
   const isTargetRTL = isRTL(targetLanguage);
-  const mark = isTargetRTL ? RLM : LRM;
-  
-  // A. String-Level Isolation: Inject Unicode BiDi Mark (RLM/LRM)
-  // This solves punctuation jumping issues at the source.
-  if (textNode.nodeValue && !textNode.nodeValue.startsWith(mark)) {
-    // Remove any existing marks first to avoid duplication
-    const cleanValue = textNode.nodeValue.replace(/^[\u200E\u200F]/, '');
-    textNode.nodeValue = mark + cleanValue;
-  }
-
-  // B. Context-Level Alignment: Fix segment ordering (Hashtags/Links)
-  // We climb up to find the SMALLEST shared container that is NOT a layout wall.
   const targetDir = isTargetRTL ? 'rtl' : 'ltr';
+  
   let container = textNode.parentElement;
   let lastSafeContainer = null;
 
   while (container && container !== document.body) {
-    if (isLayoutContainer(container)) break; // Stop at structural boundaries
-    
+    if (isLayoutContainer(container)) break;
     lastSafeContainer = container;
-    
     if (container === rootElement) break;
     container = container.parentElement;
   }
 
-  // Apply direction ONLY to the safe content box
   if (lastSafeContainer) {
     if (lastSafeContainer.style.direction !== targetDir) {
+      saveOriginalStyles(lastSafeContainer);
       lastSafeContainer.style.direction = targetDir;
-      // Ensure text starts from the logical beginning of the box
       if (BLOCK_TAGS.has(lastSafeContainer.tagName)) {
         lastSafeContainer.style.textAlign = 'start';
       }
+      lastSafeContainer.setAttribute('data-translate-dir', targetDir);
     }
   }
 }
 
 /**
- * Apply direction to an element (used for non-streaming or full-element updates)
+ * Direct Application: Applies direction to a specific element container.
+ * Primarily used by Select Element for high-level container management.
  */
-export function applyDirection(element, targetLanguage) {
-  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
-
-  // We rely on the more granular applyNodeDirection logic which is safer.
-  // This method now acts as a guard to ensure we don't flip layouts.
-  if (isLayoutContainer(element)) return;
+export function applyElementDirection(element, targetLanguage) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE || isLayoutContainer(element)) return;
 
   const isTargetRTL = isRTL(targetLanguage);
   const directionAttr = isTargetRTL ? 'rtl' : 'ltr';
+
+  saveOriginalStyles(element);
 
   element.style.direction = directionAttr;
   if (BLOCK_TAGS.has(element.tagName)) {
     element.style.textAlign = 'start';
   }
   element.setAttribute('data-translate-dir', directionAttr);
+}
+
+// --- 4. Restoration Logic ---
+
+/**
+ * Reverts CSS direction changes using the saved original styles.
+ * Primarily used by Page Translation to restore the whole page state.
+ */
+export function restoreElementDirection(element) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+
+  const restore = (el) => {
+    if (el.hasAttribute('data-dir-original-saved')) {
+      el.style.direction = el.getAttribute('data-original-direction') || '';
+      el.style.textAlign = el.getAttribute('data-original-text-align') || '';
+      
+      el.removeAttribute('data-original-direction');
+      el.removeAttribute('data-original-text-align');
+      el.removeAttribute('data-dir-original-saved');
+      el.removeAttribute('data-translate-dir');
+      el.removeAttribute('data-page-translated');
+    }
+  };
+
+  restore(element);
+  element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
 }
