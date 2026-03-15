@@ -1613,5 +1613,11 @@
   },
   "whole_page_auto_translate_on_dom_changes_description": {
     "message": "新しいコンテンツが表示されるたびに自動的に検出して翻訳します（例：TwitterやSubstackでのスクロール時）。"
+  },
+  "whole_page_show_original_on_hover_label": {
+    "message": "ホバー時に原文を表示"
+  },
+  "whole_page_show_original_on_hover_description": {
+    "message": "翻訳されたテキストにマウスカーソルを合わせると、ツールチップで原文を表示します。"
   }
 }

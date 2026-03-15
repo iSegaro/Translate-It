@@ -211,6 +211,17 @@
             {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
           </span>
         </div>
+
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="wholePageShowOriginal"
+            :disabled="!extensionEnabled"
+            :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
+          />
+          <span class="setting-description">
+            {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
+          </span>
+        </div>
       </div>
     </BaseFieldset>
   </section>
@@ -323,6 +334,11 @@ const wholePageLazyLoading = computed({
 const wholePageAutoTranslate = computed({
   get: () => settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES ?? true,
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES', value)
+})
+
+const wholePageShowOriginal = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? true,
+  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
 })
 </script>
 

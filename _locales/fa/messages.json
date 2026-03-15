@@ -1613,5 +1613,11 @@
   },
   "whole_page_auto_translate_on_dom_changes_description": {
     "message": "تشخیص و ترجمه خودکار محتوای جدید به محض ظاهر شدن (مثلاً هنگام اسکرول در توییتر یا ساب‌استک)."
+  },
+  "whole_page_show_original_on_hover_label": {
+    "message": "نمایش متن اصلی هنگام نگه داشتن موس"
+  },
+  "whole_page_show_original_on_hover_description": {
+    "message": "هنگام نگه داشتن موس روی متن ترجمه شده، متن اصلی را در یک کادر کوچک نمایش می‌دهد."
   }
 }

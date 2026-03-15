@@ -72,7 +72,10 @@ export class PageTranslationManager extends ResourceTracker {
       await this.toastIntegration.initialize();
       await this._loadSettings();
       this.scheduler.setSettings(this.settings);
-      this.hoverManager.initialize();
+      
+      if (this.settings.showOriginalOnHover) {
+        this.hoverManager.initialize();
+      }
       
       this.isActive = true;
       this.logger.init('PageTranslationManager activated');
@@ -115,6 +118,13 @@ export class PageTranslationManager extends ResourceTracker {
       // Pass updated settings to scheduler (includes targetLanguage, provider)
       this.scheduler.setSettings(this.settings);
 
+      // Update hover manager based on current settings
+      if (this.settings.showOriginalOnHover) {
+        this.hoverManager.initialize();
+      } else {
+        this.hoverManager.destroy();
+      }
+
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === ProviderRegistryIds.LINGVA) {
         const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
@@ -132,7 +142,6 @@ export class PageTranslationManager extends ResourceTracker {
         );
       }
 
-      this.scheduler.setSettings(this.settings);
       this.scheduler.setTranslationState(true, this.translationMessageId, this.sessionContext);
 
       // Initialize bridge with fresh context and standard callback

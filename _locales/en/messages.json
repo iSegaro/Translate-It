@@ -825,5 +825,7 @@
   "whole_page_lazy_loading_label": { "message": "Lazy Loading (Performance)" },
   "whole_page_lazy_loading_description": { "message": "Only translate parts of the page that are visible or near the viewport. Highly recommended for performance." },
   "whole_page_auto_translate_on_dom_changes_label": { "message": "Auto-translate new content (Infinite Scroll)" },
-  "whole_page_auto_translate_on_dom_changes_description": { "message": "Automatically detect and translate new content as it appears (e.g., when scrolling down on Twitter or Substack)." }
+  "whole_page_auto_translate_on_dom_changes_description": { "message": "Automatically detect and translate new content as it appears (e.g., when scrolling down on Twitter or Substack)." },
+  "whole_page_show_original_on_hover_label": { "message": "Show original on hover" },
+  "whole_page_show_original_on_hover_description": { "message": "Show the original text in a tooltip when hovering over translated content." }
 }
