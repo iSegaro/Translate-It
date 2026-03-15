@@ -24,6 +24,85 @@ export const BIDI_MARKS = {
 };
 
 /**
+ * Detect text direction from actual text content (more accurate for mixed content)
+ * Uses strong directional character detection following Unicode Bidirectional Algorithm principles
+ * @param {string} text - Text to analyze
+ * @returns {string} 'rtl' or 'ltr'
+ */
+export function detectDirectionFromContent(text = '') {
+  if (!text || typeof text !== 'string') return 'ltr';
+
+  const trimmedText = text.trim();
+  if (trimmedText.length === 0) return 'ltr';
+
+  // Count RTL and LTR STRONG characters (ignore neutral/weak characters)
+  let rtlStrongCount = 0;
+  let ltrStrongCount = 0;
+
+  // Track first strong character position
+  let firstRTLIndex = -1;
+  let firstLTRIndex = -1;
+
+  for (let i = 0; i < trimmedText.length; i++) {
+    const code = trimmedText.codePointAt(i);
+    // Skip next surrogate if it's a high surrogate
+    if (code > 0xFFFF) i++;
+
+    // RTL Strong characters: Arabic, Hebrew, Syriac, Thaana, etc.
+    const isRTLStrong = (
+      (code >= 0x0590 && code <= 0x05FF) ||  // Hebrew
+      (code >= 0x0600 && code <= 0x06FF) ||  // Arabic
+      (code >= 0x0700 && code <= 0x074F) ||  // Syriac
+      (code >= 0x0750 && code <= 0x077F) ||  // Arabic Supplement
+      (code >= 0x0780 && code <= 0x07BF) ||  // Thaana
+      (code >= 0x07C0 && code <= 0x07FF) ||  // NKo
+      (code >= 0x08A0 && code <= 0x08FF) ||  // Arabic Extended
+      (code >= 0xFB1D && code <= 0xFB4F) ||  // Hebrew Presentation Forms
+      (code >= 0xFB50 && code <= 0xFDFF) ||  // Arabic Presentation Forms
+      (code >= 0xFE70 && code <= 0xFEFF) ||  // Arabic Presentation Forms-B
+      (code === 0x200F)                      // Right-to-Left Mark
+    );
+
+    // LTR Strong characters: Latin, Greek, Cyrillic, etc.
+    const isLTRStrong = (
+      (code >= 0x0041 && code <= 0x005A) ||  // Basic Latin uppercase
+      (code >= 0x0061 && code <= 0x007A) ||  // Basic Latin lowercase
+      (code >= 0x00C0 && code <= 0x00D6) ||  // Latin-1 Supplement letters
+      (code >= 0x00D8 && code <= 0x00F6) ||  // Latin-1 Supplement letters
+      (code >= 0x00F8 && code <= 0x00FF) ||  // Latin-1 Supplement letters
+      (code >= 0x0100 && code <= 0x017F) ||  // Latin Extended-A
+      (code >= 0x0180 && code <= 0x024F) ||  // Latin Extended-B
+      (code >= 0x0250 && code <= 0x02AF) ||  // IPA Extensions
+      (code >= 0x0370 && code <= 0x03FF) ||  // Greek and Coptic
+      (code >= 0x0400 && code <= 0x04FF) ||  // Cyrillic
+      (code >= 0x0500 && code <= 0x052F) ||  // Cyrillic Supplement
+      (code >= 0x1E00 && code <= 0x1EFF) ||  // Latin Extended Additional
+      (code === 0x200E)                      // Left-to-Right Mark
+    );
+
+    if (isRTLStrong) {
+      rtlStrongCount++;
+      if (firstRTLIndex === -1) firstRTLIndex = i;
+    } else if (isLTRStrong) {
+      ltrStrongCount++;
+      if (firstLTRIndex === -1) firstLTRIndex = i;
+    }
+  }
+
+  if (rtlStrongCount === 0 && ltrStrongCount === 0) return 'ltr';
+
+  const totalStrong = rtlStrongCount + ltrStrongCount;
+  const rtlRatio = rtlStrongCount / totalStrong;
+
+  // Use majority with threshold
+  if (rtlRatio >= 0.6) return 'rtl';
+  if (rtlRatio <= 0.4) return 'ltr';
+
+  // Balanced content - Follow first strong character
+  return (firstRTLIndex !== -1 && (firstLTRIndex === -1 || firstRTLIndex < firstLTRIndex)) ? 'rtl' : 'ltr';
+}
+
+/**
  * Identifies structural layout walls (should not be flipped)
  */
 function isLayoutContainer(el) {

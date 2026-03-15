@@ -1,6 +1,7 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES, PAGE_TRANSLATION_SELECTORS } from './PageTranslationConstants.js';
+import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 
 /**
  * PageTranslationHoverManager - Lightweight tooltip to show original text on hover.
@@ -148,8 +149,11 @@ export class PageTranslationHoverManager extends ResourceTracker {
     
     this.tooltip.textContent = text;
     
-    const isRtl = /[\u0591-\u07FF\u0600-\u06FF]/.test(text);
-    this.tooltip.style.direction = isRtl ? 'rtl' : 'ltr';
+    // Set direction based on content analysis using shared utility
+    const direction = detectDirectionFromContent(text);
+    const isRtl = direction === 'rtl';
+    
+    this.tooltip.style.direction = direction;
     this.tooltip.style.textAlign = isRtl ? 'right' : 'left';
 
     this.tooltip.style.display = 'block';
