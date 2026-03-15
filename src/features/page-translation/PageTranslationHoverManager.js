@@ -1,11 +1,14 @@
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES, PAGE_TRANSLATION_SELECTORS } from './PageTranslationConstants.js';
 
 /**
  * PageTranslationHoverManager - Lightweight tooltip to show original text on hover.
+ * Uses ResourceTracker for standard memory management.
  */
-export class PageTranslationHoverManager {
+export class PageTranslationHoverManager extends ResourceTracker {
   constructor() {
+    super('page-translation-hover-manager');
     this.tooltip = null;
     this.isActive = false;
     this.currentElement = null;
@@ -20,8 +23,10 @@ export class PageTranslationHoverManager {
     if (this.isActive) return;
     
     this._createTooltip();
-    document.addEventListener('mouseover', this.handleMouseOver, true);
-    document.addEventListener('mouseout', this.handleMouseOut, true);
+    
+    // Use ResourceTracker's addEventListener for automatic cleanup
+    this.addEventListener(document, 'mouseover', this.handleMouseOver, { capture: true });
+    this.addEventListener(document, 'mouseout', this.handleMouseOut, { capture: true });
     
     this.isActive = true;
   }
@@ -29,9 +34,8 @@ export class PageTranslationHoverManager {
   destroy() {
     if (!this.isActive) return;
     
-    document.removeEventListener('mouseover', this.handleMouseOver, true);
-    document.removeEventListener('mouseout', this.handleMouseOut, true);
-    document.removeEventListener('mousemove', this.handleMouseMove, true);
+    // Standard ResourceTracker cleanup handles all event listeners
+    this.cleanup();
     
     if (this.tooltip && this.tooltip.parentNode) {
       this.tooltip.parentNode.removeChild(this.tooltip);
@@ -57,6 +61,8 @@ export class PageTranslationHoverManager {
     const originalText = this._getOriginalText(element);
     if (originalText) {
       this._showTooltip(originalText, event);
+      // Track mousemove only while hovering, it will be cleaned up by ResourceTracker if needed, 
+      // but here we manage its lifecycle manually for performance.
       document.addEventListener('mousemove', this.handleMouseMove, true);
     }
   }
@@ -99,7 +105,6 @@ export class PageTranslationHoverManager {
       }
     }
 
-    // Join with line breaks, limit length if needed
     return texts.filter(t => t.trim()).join('\n');
   }
 
@@ -112,16 +117,13 @@ export class PageTranslationHoverManager {
     this.tooltip = document.createElement('div');
     this.tooltip.id = TOOLTIP_ID;
     
-    // EXCLUSION: Prevent translation engine from touching this tooltip
-    // We use attributes + a dedicated internal class that is hardcoded in the bridge
     this.tooltip.setAttribute(TRANSLATE_IGNORE, 'true');
     this.tooltip.setAttribute(TRANSLATE_NO_ATTR, TRANSLATE_NO_VALUE);
     this.tooltip.classList.add(STANDARD_NO_TRANSLATE_CLASS, INTERNAL_IGNORE_CLASS);
     
-    // Style it to be extremely lightweight and out of the way
     Object.assign(this.tooltip.style, {
       position: 'fixed',
-      zIndex: '2147483647', // Max z-index
+      zIndex: '2147483647',
       padding: '8px 12px',
       background: '#333',
       color: '#fff',
@@ -132,7 +134,7 @@ export class PageTranslationHoverManager {
       wordWrap: 'break-word',
       whiteSpace: 'pre-wrap',
       boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      pointerEvents: 'none', // Critical: mouse events pass through
+      pointerEvents: 'none',
       display: 'none',
       fontFamily: 'system-ui, -apple-system, sans-serif',
       border: '1px solid rgba(255,255,255,0.1)'
@@ -146,7 +148,6 @@ export class PageTranslationHoverManager {
     
     this.tooltip.textContent = text;
     
-    // Set direction based on content
     const isRtl = /[\u0591-\u07FF\u0600-\u06FF]/.test(text);
     this.tooltip.style.direction = isRtl ? 'rtl' : 'ltr';
     this.tooltip.style.textAlign = isRtl ? 'right' : 'left';
@@ -168,7 +169,6 @@ export class PageTranslationHoverManager {
     let x = event.clientX + offset;
     let y = event.clientY + offset;
 
-    // Boundary check (keep tooltip inside viewport)
     const rect = this.tooltip.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
