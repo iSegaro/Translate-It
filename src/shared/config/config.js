@@ -152,7 +152,7 @@ export const CONFIG = {
   WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
   WHOLE_PAGE_EXCLUDED_SELECTORS: [
-    "script", "style", "code", "pre", "noscript", "meta", "link", "textarea", "time", "kbd", "svg", "g", "ruby", "rt", "rp", "math", "d-math", "samp",
+    "script", "style", "code", "pre", "noscript", "meta", "textarea", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
     ".notranslate", "[contenteditable='true']", "[translate=no]",
     ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share",
     ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight",
@@ -160,7 +160,7 @@ export const CONFIG = {
     ".material-icons", "material-icon", "span[class^=material-symbols-]", ".google-symbols", "i.fa", "i[class^=fa-]",
     "visuallyhidden", "[data-translate-ignore]"
   ], // المنت‌هایی که ترجمه نمی‌شوند
-  WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "label", "value", "aria-label", "aria-placeholder", "aria-roledescription", "data-label", "data-title", "data-placeholder"], // Attributeهایی که ترجمه می‌شوند
+  WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "label", "value"], // Attributeهایی که بصری هستند و ترجمه می‌شوند
   WHOLE_PAGE_MAX_ELEMENTS: 10000, // حداکثر تعداد المنت برای ترجمه (برای performance)
   WHOLE_PAGE_CHUNK_SIZE: 250, // تعداد nodeها در هر batch request
   WHOLE_PAGE_MAX_CHARS: 5000, // حداکثر کاراکتر در هر درخواست معمولی
