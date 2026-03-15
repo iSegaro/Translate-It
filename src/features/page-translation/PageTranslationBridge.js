@@ -58,7 +58,8 @@ export class PageTranslationBridge {
       // 2. Request translation for trimmed text
       const translated = await onTranslateCallback(trimmedText, sessionContext, score);
       
-      if (translated) {
+      // FIX: Only apply marks if the text was actually translated (different from original)
+      if (translated && translated !== trimmedText) {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
         // This provides immediate string-level direction correction even before CSS is applied.
         const isTargetRTL = isRTL(settings.targetLanguage);
@@ -67,7 +68,7 @@ export class PageTranslationBridge {
         return leadingWhitespace + mark + translated + trailingWhitespace;
       }
       
-      return leadingWhitespace + trimmedText + trailingWhitespace;
+      return leadingWhitespace + (translated || trimmedText) + trailingWhitespace;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);
@@ -82,6 +83,7 @@ export class PageTranslationBridge {
       return function(node, callback) {
         // 1. CAPTURE: Store original text before domtranslator replaces it.
         // This is used for the "Show original on hover" feature.
+        let wasTranslated = false;
         if (bridge.showOriginalOnHover && node) {
           if (node.nodeType === Node.TEXT_NODE) {
             pageTranslationLookup.add(node, node.textContent);
@@ -94,35 +96,41 @@ export class PageTranslationBridge {
         const wrappedCallback = (processedNode) => {
           if (processedNode) {
             const { TRANSLATED_MARKER, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
+            
+            // Determine if it was actually translated by checking for the BiDi mark
+            const textContent = processedNode.nodeType === Node.TEXT_NODE ? processedNode.textContent : processedNode.value;
+            const hasMark = textContent && (textContent.includes(BIDI_MARKS.RLM) || textContent.includes(BIDI_MARKS.LRM));
 
             if (processedNode.nodeType === Node.TEXT_NODE) {
               try {
-                // Apply directional logic (Unicode marks + container alignment)
-                applyNodeDirection(processedNode, settings.targetLanguage);
-
-                const parent = processedNode.parentElement;
-                if (parent) {
-                  parent.setAttribute(TRANSLATED_MARKER, 'true');
-                  if (bridge.showOriginalOnHover) {
-                    parent.setAttribute(HAS_ORIGINAL, 'true');
+                if (hasMark) {
+                  // Apply directional logic (Unicode marks + container alignment)
+                  applyNodeDirection(processedNode, settings.targetLanguage);
+                  
+                  const parent = processedNode.parentElement;
+                  if (parent) {
+                    parent.setAttribute(TRANSLATED_MARKER, 'true');
+                    if (bridge.showOriginalOnHover) {
+                      parent.setAttribute(HAS_ORIGINAL, 'true');
+                    }
                   }
                 }
               } catch (e) {
                 bridge.logger.warn('Failed to apply direction to node', e);
               }
             } else if (processedNode.nodeType === Node.ATTRIBUTE_NODE) {
-              // For attributes, we mark the owner element
-              if (bridge.showOriginalOnHover && processedNode.ownerElement) {
+              // For attributes, we mark the owner element only if translated
+              if (hasMark && bridge.showOriginalOnHover && processedNode.ownerElement) {
                 processedNode.ownerElement.setAttribute(HAS_ORIGINAL, 'true');
                 processedNode.ownerElement.setAttribute(TRANSLATED_MARKER, 'true');
               }
             }
           }
-
+          
           // Call original callback if provided (e.g., from PersistentDOMTranslator)
           if (callback) callback(processedNode);
         };
-
+        
         return originalFn.call(this, node, wrappedCallback);
       };
     };
