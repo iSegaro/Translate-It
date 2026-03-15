@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
+import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getWholePageShowOriginalOnHoverAsync, getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -16,6 +16,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { PageTranslationBridge } from './PageTranslationBridge.js';
+import { PageTranslationHoverManager } from './PageTranslationHoverManager.js';
 import { PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
@@ -39,6 +40,7 @@ export class PageTranslationManager extends ResourceTracker {
     
     this.scheduler = new PageTranslationScheduler(this.logger);
     this.bridge = new PageTranslationBridge(this.logger);
+    this.hoverManager = new PageTranslationHoverManager();
 
     this.settings = {};
     
@@ -70,6 +72,7 @@ export class PageTranslationManager extends ResourceTracker {
       await this.toastIntegration.initialize();
       await this._loadSettings();
       this.scheduler.setSettings(this.settings);
+      this.hoverManager.initialize();
       
       this.isActive = true;
       this.logger.init('PageTranslationManager activated');
@@ -178,7 +181,10 @@ export class PageTranslationManager extends ResourceTracker {
       // 2. Use standard library restore
       this.bridge.restore(document.documentElement);
       
-      // 3. Complete reset
+      // 3. Deep clean any remaining markers
+      PageTranslationHelper.deepCleanDOM();
+
+      // 4. Complete reset
       this.resetLocalState();
 
       // Small delay for DOM to stabilize
@@ -278,7 +284,8 @@ export class PageTranslationManager extends ResourceTracker {
       rootMargin: await getWholePageRootMarginAsync() || '300px',
       autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),
       excludedSelectors: await getWholePageExcludedSelectorsAsync(),
-      attributesToTranslate: await getWholePageAttributesToTranslateAsync()
+      attributesToTranslate: await getWholePageAttributesToTranslateAsync(),
+      showOriginalOnHover: await getWholePageShowOriginalOnHoverAsync()
     };
     const { CONFIG } = await import('@/shared/config/config.js');
     Object.assign(this.settings, {
@@ -330,6 +337,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.isAutoTranslating = false;
     this.bridge.cleanup();
     this.scheduler.reset();
+    if (this.hoverManager) {
+      this.hoverManager.destroy();
+    }
     if (this.toastIntegration) {
       this.toastIntegration.shutdown();
     }

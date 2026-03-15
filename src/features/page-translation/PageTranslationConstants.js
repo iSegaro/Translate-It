@@ -16,6 +16,27 @@ export const TEXT_TAGS = new Set([
 ]);
 
 /**
+ * Attribute names used for tracking and displaying translation state
+ */
+export const PAGE_TRANSLATION_ATTRIBUTES = {
+  TRANSLATED_MARKER: 'data-page-translated',
+  HAS_ORIGINAL: 'data-has-original',
+  TRANSLATE_DIR: 'data-translate-dir',
+  TRANSLATE_IGNORE: 'data-translate-ignore',
+  TRANSLATE_NO_ATTR: 'translate',
+};
+
+/**
+ * Selector and class constants for internal UI elements
+ */
+export const PAGE_TRANSLATION_SELECTORS = {
+  TOOLTIP_ID: 'ti-original-text-tooltip',
+  INTERNAL_IGNORE_CLASS: 'ti-ignore-translation',
+  STANDARD_NO_TRANSLATE_CLASS: 'notranslate',
+  TRANSLATE_NO_VALUE: 'no',
+};
+
+/**
  * Default settings for page translation
  */
 export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {

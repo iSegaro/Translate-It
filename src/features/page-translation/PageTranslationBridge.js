@@ -6,15 +6,28 @@ import {
 } from 'domtranslator';
 import { createNodesFilter } from 'domtranslator/utils/nodes';
 import { applyNodeDirection, isRTL, restoreElementDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
+import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
+import { 
+  PAGE_TRANSLATION_ATTRIBUTES, 
+  PAGE_TRANSLATION_SELECTORS,
+  DEFAULT_PAGE_TRANSLATION_SETTINGS 
+} from './PageTranslationConstants.js';
 
 export class PageTranslationBridge {
   constructor(logger) {
     this.logger = logger;
     this.session = null;
+    this.showOriginalOnHover = true; // Initial default
   }
 
   async initialize(settings, onTranslateCallback, sessionContext = null) {
     this.cleanup();
+    
+    // Explicitly set from settings (defaulted to true if undefined)
+    this.showOriginalOnHover = settings.showOriginalOnHover ?? true;
+
+    // Reset lookup for a new session
+    pageTranslationLookup.clear();
 
     const currentSession = {
       intersectionScheduler: null,
@@ -67,26 +80,49 @@ export class PageTranslationBridge {
     const wrapWithDirection = (originalFn) => {
       const bridge = this;
       return function(node, callback) {
+        // 1. CAPTURE: Store original text before domtranslator replaces it.
+        // This is used for the "Show original on hover" feature.
+        if (bridge.showOriginalOnHover && node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            pageTranslationLookup.add(node, node.textContent);
+          } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
+            pageTranslationLookup.add(node, node.value);
+          }
+        }
+
         // Wrap the processed node callback
         const wrappedCallback = (processedNode) => {
-          if (processedNode && processedNode.nodeType === Node.TEXT_NODE) {
-            try {
-              // Apply directional logic (Unicode marks + container alignment)
-              applyNodeDirection(processedNode, settings.targetLanguage);
-              
-              const parent = processedNode.parentElement;
-              if (parent) {
-                parent.setAttribute('data-page-translated', 'true');
+          if (processedNode) {
+            const { TRANSLATED_MARKER, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
+
+            if (processedNode.nodeType === Node.TEXT_NODE) {
+              try {
+                // Apply directional logic (Unicode marks + container alignment)
+                applyNodeDirection(processedNode, settings.targetLanguage);
+
+                const parent = processedNode.parentElement;
+                if (parent) {
+                  parent.setAttribute(TRANSLATED_MARKER, 'true');
+                  if (bridge.showOriginalOnHover) {
+                    parent.setAttribute(HAS_ORIGINAL, 'true');
+                  }
+                }
+              } catch (e) {
+                bridge.logger.warn('Failed to apply direction to node', e);
               }
-            } catch (e) {
-              bridge.logger.warn('Failed to apply direction to node', e);
+            } else if (processedNode.nodeType === Node.ATTRIBUTE_NODE) {
+              // For attributes, we mark the owner element
+              if (bridge.showOriginalOnHover && processedNode.ownerElement) {
+                processedNode.ownerElement.setAttribute(HAS_ORIGINAL, 'true');
+                processedNode.ownerElement.setAttribute(TRANSLATED_MARKER, 'true');
+              }
             }
           }
-          
+
           // Call original callback if provided (e.g., from PersistentDOMTranslator)
           if (callback) callback(processedNode);
         };
-        
+
         return originalFn.call(this, node, wrappedCallback);
       };
     };
@@ -96,7 +132,11 @@ export class PageTranslationBridge {
     nodesTranslator.update = wrapWithDirection(nodesTranslator.update);
 
     const filter = createNodesFilter({
-      ignoredSelectors: settings.excludedSelectors || ['script', 'style', 'noscript', 'code', 'pre', '[data-translate-ignore]'],
+      ignoredSelectors: [
+        ...(settings.excludedSelectors || []), 
+        `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
+        `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`
+      ],
       attributesList: settings.attributesToTranslate || ['title', 'alt', 'placeholder'],
     });
 

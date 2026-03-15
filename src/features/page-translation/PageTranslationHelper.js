@@ -1,3 +1,5 @@
+import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
+
 /**
  * PageTranslationHelper - Utility methods for whole page translation
  */
@@ -28,14 +30,17 @@ export class PageTranslationHelper {
    * This is crucial for allowing re-translation and clean restoration.
    */
   static deepCleanDOM() {
+    const { TRANSLATED_MARKER, TRANSLATE_DIR, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
+
     // 1. Remove our own markers and direction attributes from all elements
-    const elementsWithDir = document.querySelectorAll('[data-page-translated], [data-translate-dir], [dir]');
+    const elementsWithDir = document.querySelectorAll(`[${TRANSLATED_MARKER}], [${TRANSLATE_DIR}], [dir], [${HAS_ORIGINAL}]`);
     elementsWithDir.forEach(el => {
-      el.removeAttribute('data-page-translated');
-      el.removeAttribute('data-translate-dir');
+      el.removeAttribute(TRANSLATED_MARKER);
+      el.removeAttribute(TRANSLATE_DIR);
+      el.removeAttribute(HAS_ORIGINAL);
       
       // Only remove 'dir' if we were the ones who set it
-      if (el.hasAttribute('data-translate-dir')) {
+      if (el.hasAttribute(TRANSLATE_DIR)) {
         el.removeAttribute('dir');
       }
     });
@@ -45,8 +50,9 @@ export class PageTranslationHelper {
     containers.forEach(tag => {
       const el = document.querySelector(tag);
       if (el) {
-        el.removeAttribute('data-page-translated');
-        el.removeAttribute('data-translate-dir');
+        el.removeAttribute(TRANSLATED_MARKER);
+        el.removeAttribute(TRANSLATE_DIR);
+        el.removeAttribute(HAS_ORIGINAL);
       }
     });
     
