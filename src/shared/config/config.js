@@ -152,7 +152,7 @@ export const CONFIG = {
   WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
   WHOLE_PAGE_EXCLUDED_SELECTORS: [
-    "script", "style", "code", "pre", "noscript", "meta", "textarea", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
+    "script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
     ".notranslate", "[contenteditable='true']", "[translate=no]",
     ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share",
     ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight",
