@@ -3,6 +3,7 @@
 
 import browser from 'webextension-polyfill'
 import { ErrorHandler } from './ErrorHandler.js'
+import { isSilentError } from './ErrorMatcher.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
@@ -25,11 +26,17 @@ export function setupWindowErrorHandlers(context) {
   const handleWindowError = async (event) => {
     const error = event.error || new Error(event.message)
     
-    // Use ExtensionContextManager for unified error detection and handling
-    if (ExtensionContextManager.isContextError(error)) {
-      logger.debug(`[${context}] Window error boundary caught extension context error:`, error.message)
-      
-      ExtensionContextManager.handleContextError(error, `${context}-window`)
+    // Check if it's an extension context error first (priority)
+    const isContext = ExtensionContextManager.isContextError(error)
+    const isSilent = isSilentError(error)
+
+    if (isContext || isSilent) {
+      if (isContext) {
+        logger.debug(`[${context}] Window error boundary caught extension context error:`, error.message)
+        ExtensionContextManager.handleContextError(error, `${context}-window`)
+      } else {
+        logger.debug(`[${context}] Window error boundary caught silent error:`, error.message)
+      }
       
       // Also handle through centralized error handler
       await errorHandler.handle(error, {
@@ -50,11 +57,17 @@ export function setupWindowErrorHandlers(context) {
   const handleUnhandledRejection = async (event) => {
     const error = event.reason
     
-    // Use ExtensionContextManager for unified error detection and handling
-    if (ExtensionContextManager.isContextError(error)) {
-      logger.debug(`[${context}] Window error boundary caught extension context promise rejection:`, error?.message || error)
-      
-      ExtensionContextManager.handleContextError(error, `${context}-promise`)
+    // Check if it's an extension context error first (priority)
+    const isContext = ExtensionContextManager.isContextError(error)
+    const isSilent = isSilentError(error)
+
+    if (isContext || isSilent) {
+      if (isContext) {
+        logger.debug(`[${context}] Window error boundary caught extension context promise rejection:`, error?.message || error)
+        ExtensionContextManager.handleContextError(error, `${context}-promise`)
+      } else {
+        logger.debug(`[${context}] Window error boundary caught silent promise rejection:`, error?.message || error)
+      }
       
       // Also handle through centralized error handler  
       await errorHandler.handle(error, {

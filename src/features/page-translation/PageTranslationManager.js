@@ -10,6 +10,7 @@ import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 
 
 // Internal components
@@ -171,6 +172,12 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
+      if (isSilentError(error)) {
+        this.logger.debug('translatePage: Silent error caught', error.message);
+        this.isTranslating = false;
+        return { success: false, reason: 'silent_error' };
+      }
+      
       this.logger.error('translatePage failed', error);
       this.isTranslating = false;
       this.isAutoTranslating = false;

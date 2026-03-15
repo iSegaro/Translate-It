@@ -15,6 +15,7 @@ export const SILENT_ERRORS = new Set([
   ErrorTypes.TAB_EXTENSION_PAGE,
   ErrorTypes.TAB_LOCAL_FILE,
   ErrorTypes.TAB_NOT_ACCESSIBLE,
+  ErrorTypes.NODE_ALREADY_TRANSLATED,
 ]);
 
 /**
@@ -260,6 +261,10 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("api response invalid") || msg.includes("invalid api response")) {
     return ErrorTypes.API_RESPONSE_INVALID;
+  }
+
+  if (msg.includes("already been translated")) {
+    return ErrorTypes.NODE_ALREADY_TRANSLATED;
   }
 
   // String-based matching fallback

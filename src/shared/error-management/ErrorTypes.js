@@ -19,6 +19,7 @@ export class ErrorTypes {
   static SCREEN_CAPTURE = "SCREEN_CAPTURE";
   static UNKNOWN = "UNKNOWN";
   static SELECT_ELEMENT = "SELECT_ELEMENT";
+  static NODE_ALREADY_TRANSLATED = "NODE_ALREADY_TRANSLATED";
 
   // Tab Accessibility errors
   static TAB_RESTRICTED = "TAB_RESTRICTED";
