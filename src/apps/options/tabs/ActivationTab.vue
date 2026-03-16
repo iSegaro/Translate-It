@@ -25,12 +25,12 @@
           <div class="mode-provider-container">
             <span 
               class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || !translateOnTextFields }"
+              :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
             >{{ t('provider_label') }}:</span>
             <ProviderSelector
               v-model="fieldProvider"
               allow-default
-              :disabled="!extensionEnabled || !translateOnTextFields"
+              :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
               variant="activation"
             />
           </div>
