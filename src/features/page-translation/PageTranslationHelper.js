@@ -89,16 +89,23 @@ export class PageTranslationHelper {
     }
   }
 
-  static isSuitableForTranslation() {
+  static isSuitableForTranslation(logger = null) {
     if (window === window.top) return true;
     try {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      if (width < 50 || height < 50) return false;
+      if (width < 50 || height < 50) {
+        if (logger) logger.debug('Frame too small for translation', { width, height });
+        return false;
+      }
       const style = window.getComputedStyle(document.documentElement);
-      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        if (logger) logger.debug('Frame hidden, skipping translation');
+        return false;
+      }
       return true;
-    } catch {
+    } catch (error) {
+      if (logger) logger.debug('Error checking frame suitability', error);
       return window.innerWidth > 150 && window.innerHeight > 150;
     }
   }

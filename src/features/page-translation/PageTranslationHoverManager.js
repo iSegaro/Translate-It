@@ -2,6 +2,8 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES, PAGE_TRANSLATION_SELECTORS } from './PageTranslationConstants.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 /**
  * PageTranslationHoverManager - Lightweight tooltip to show original text on hover.
@@ -10,6 +12,7 @@ import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 export class PageTranslationHoverManager extends ResourceTracker {
   constructor() {
     super('page-translation-hover-manager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'HoverManager');
     this.tooltip = null;
     this.isActive = false;
     this.currentElement = null;
@@ -30,6 +33,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     this.addEventListener(document, 'mouseout', this.handleMouseOut, { capture: true });
     
     this.isActive = true;
+    this.logger.init('Hover manager initialized');
   }
 
   destroy() {
@@ -45,6 +49,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     this.tooltip = null;
     this.isActive = false;
     this.currentElement = null;
+    this.logger.debug('Hover manager destroyed');
   }
 
   handleMouseOver(event) {
@@ -61,6 +66,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
 
     const originalText = this._getOriginalText(element);
     if (originalText) {
+      this.logger.debug('Hover detected, showing original text');
       this._showTooltip(originalText, event);
       // Track mousemove only while hovering using ResourceTracker
       this.addEventListener(document, 'mousemove', this.handleMouseMove, true);
