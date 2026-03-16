@@ -60,7 +60,7 @@ System constants and shared configurations.
 5.  **Smart Flush**: 
     - Flushes are scheduled using centralized delays (e.g., 50ms for high-priority Viewport content).
     - Text is sent to the background in batches of 250 (configurable) to prevent overload.
-6.  **Application**: Upon receiving the translation, text direction (RTL/LTR) is intelligently applied, and the text is replaced in the DOM.
+6.  **Application**: Upon receiving the translation, text direction (RTL/LTR) is intelligently applied using the **shared `DomDirectionManager`**, and the text is replaced in the DOM. This ensures that mixed-language pages maintain correct structural alignment.
 
 ## Smart Features
 
@@ -73,6 +73,12 @@ If the system encounters a **Fatal Error** (e.g., Rate Limit, Auth issue):
 
 ### 💤 Lazy Loading
 Using an `IntersectionScheduler` and a `rootMargin` setting (default 300px), only content that the user is currently viewing or about to reach is translated. This significantly reduces API consumption on long pages.
+
+### ↔️ RTL/LTR Directionality Management
+The system shares the same DOM-level logic as the **Select Element** feature:
+- **Surgical Application**: Uses `applyNodeDirection` to find the smallest safe container for a text node, avoiding layout breakage in complex grids or flexboxes.
+- **State Preservation**: Saves original `dir`, `textAlign`, and `direction` styles into `data-` attributes before modification, ensuring perfect restoration.
+- **Shared Logic**: Centralized in `@/utils/dom/DomDirectionManager.js`.
 
 ## Configuration
 
@@ -91,6 +97,7 @@ Core settings are managed in the `config.js` file, while internal timings are in
 -   **NotificationManager**: Used for all user-facing alerts (warnings, status updates).
 -   **ErrorHandler**: Integrated for consistent error classification and logging.
 -   **UnifiedMessaging**: All translation batches are sent to the background via a unified messaging protocol.
+-   **DomDirectionManager**: Core utility shared with Select Element for text alignment and directionality.
 
 ## Best Practices for Developers
 
