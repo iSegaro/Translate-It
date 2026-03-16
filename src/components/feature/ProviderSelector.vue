@@ -2,8 +2,16 @@
   <select
     :value="modelValue"
     class="ti-provider-select"
+    :class="{ 'variant-activation': variant === 'activation' }"
+    :disabled="disabled"
     @change="handleChange"
   >
+    <option 
+      v-if="allowDefault"
+      value="default"
+    >
+      {{ t('provider_default') || 'Default' }}
+    </option>
     <option 
       v-for="provider in availableProviders" 
       :key="provider.id" 
@@ -17,11 +25,26 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps({
   modelValue: {
     type: String,
     required: true
+  },
+  allowDefault: {
+    type: Boolean,
+    default: false
+  },
+  disabled: {
+    type: Boolean,
+    default: false
+  },
+  variant: {
+    type: String,
+    default: 'default' // 'default' or 'activation'
   }
 })
 
@@ -44,7 +67,7 @@ const handleChange = (event) => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .ti-provider-select {
   width: 100%;
   padding: 6px 8px;
@@ -54,10 +77,26 @@ const handleChange = (event) => {
   background-color: var(--color-background);
   color: var(--color-text);
   cursor: pointer;
+  transition: all 0.2s ease;
 
   &:focus {
     outline: none;
     border-color: var(--color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--color-background-soft);
+  }
+
+  // Custom styles for Activation tab
+  &.variant-activation {
+    background-color: var(--color-background-soft);
+    
+    &:disabled {
+      background-color: var(--color-background);
+    }
   }
 }
 </style>

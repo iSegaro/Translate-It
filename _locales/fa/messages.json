@@ -83,6 +83,9 @@
   "api_provider_deepl": {
     "message": "DeepL"
   },
+  "provider_default": {
+    "message": "پیش‌فرض"
+  },
   "provider_google_title": {
     "message": "مترجم گوگل (کلاسیک)"
   },
@@ -436,6 +439,9 @@
   },
   "translation_api_label": {
     "message": "ارائه‌دهنده سرویس API"
+  },
+  "provider_label": {
+    "message": "سرویس‌دهنده"
   },
   "gemini_api_settings_title": {
     "message": "تنظیمات Gemini"

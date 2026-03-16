@@ -42,6 +42,18 @@ export const CONFIG = {
   // --- API Settings ---
   TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
+  // --- Mode Specific Provider Settings ---
+  MODE_PROVIDERS: {
+    field: null, // Use global TRANSLATION_API if null
+    select_element: null,
+    selection: null,
+    page: null,
+    dictionary: null,
+    popup_translate: null,
+    sidepanel_translate: null,
+    screen_capture: null
+  },
+
   API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
   GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", // Default Gemini API URL
@@ -620,6 +632,10 @@ export const getTranslationApiAsync = async () => {
   // Translation API retrieved - logged at TRACE level for detailed debugging
   // logger.debug(`[config.js] getTranslationApiAsync - Returning: ${result}`);
   return result;
+};
+
+export const getModeProvidersAsync = async () => {
+  return getSettingValueAsync("MODE_PROVIDERS", CONFIG.MODE_PROVIDERS);
 };
 
 // WebAI Specific

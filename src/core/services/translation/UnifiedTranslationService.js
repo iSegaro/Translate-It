@@ -13,7 +13,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync } from '@/shared/config/config.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -49,12 +49,41 @@ export class UnifiedTranslationService {
   }
 
   /**
+   * Determine the effective provider based on mode and settings
+   * @private
+   */
+  async _resolveEffectiveProvider(data, context) {
+    // 1. If context is popup or sidepanel, respect the provider passed in the request
+    // (user manually chose it in the UI)
+    if (context === 'popup' || context === 'sidepanel') {
+      return data.provider;
+    }
+
+    // 2. Check for mode-specific provider in settings
+    const modeProviders = await getModeProvidersAsync();
+    const modeSpecificProvider = modeProviders ? modeProviders[data.mode] : null;
+
+    if (modeSpecificProvider && modeSpecificProvider !== 'default') {
+      logger.debug(`[UnifiedService] Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
+      return modeSpecificProvider;
+    }
+
+    // 3. Fallback to global provider (already passed in data.provider usually, but let's be sure)
+    return data.provider || await getTranslationApiAsync();
+  }
+
+  /**
    * Main entry point for all translation requests
    */
   async handleTranslationRequest(message, sender) {
-    const { messageId, data } = message;
+    const { messageId, data, context } = message;
 
-    logger.info(`[UnifiedService] Processing translation request: ${messageId} (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
+    // Resolve the effective provider based on mode settings
+    if (data) {
+      data.provider = await this._resolveEffectiveProvider(data, context);
+    }
+
+    logger.info(`[UnifiedService] Processing translation request: ${messageId} (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
     // Service availability checked silently
 
     // Check if service is initialized

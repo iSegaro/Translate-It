@@ -15,6 +15,16 @@ function getDefaultSettings() {
     APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English',
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
     TRANSLATION_API: CONFIG.TRANSLATION_API || 'google',
+    MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
+      field: null,
+      select_element: null,
+      selection: null,
+      page: null,
+      dictionary: null,
+      popup_translate: null,
+      sidepanel_translate: null,
+      screen_capture: null
+    },
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
     TIMEOUT: CONFIG.TIMEOUT || 30000,

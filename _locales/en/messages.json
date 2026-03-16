@@ -30,6 +30,7 @@
   "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "Custom (OpenAI)" },
   "api_provider_deepl": { "message": "DeepL" },
+  "provider_default": { "message": "Default" },
 
   "provider_google_title": { "message": "Google Translate (Classic)" },
   "provider_google_description": {
@@ -285,7 +286,8 @@
   },
 
   "api_section_title": { "message": "Translation API" },
-  "translation_api_label": { "message": "API Provider Choice" },
+  "translation_api_label": { "message": "API Choice" },
+  "provider_label": { "message": "Provider" },
   "gemini_api_settings_title": { "message": "Gemini Settings" },
   "gemini_api_key_info": {
     "message": "You can get your Gemini API key from Google AI Studio."

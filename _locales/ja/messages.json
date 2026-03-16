@@ -83,6 +83,9 @@
   "api_provider_deepl": {
     "message": "DeepL"
   },
+  "provider_default": {
+    "message": "デフォルト"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -436,6 +439,9 @@
   },
   "translation_api_label": {
     "message": "APIプロバイダーの選択"
+  },
+  "provider_label": {
+    "message": "プロバイダー"
   },
   "gemini_api_settings_title": {
     "message": "Gemini 設定"

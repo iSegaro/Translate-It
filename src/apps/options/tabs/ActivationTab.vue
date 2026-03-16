@@ -16,11 +16,25 @@
     <!-- Text Field Translation -->
     <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateOnTextFields"
-          :disabled="!extensionEnabled"
-          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
-        />
+        <div class="setting-row-with-provider">
+          <BaseCheckbox
+            v-model="translateOnTextFields"
+            :disabled="!extensionEnabled"
+            :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
+          />
+          <div class="mode-provider-container">
+            <span 
+              class="mode-provider-label"
+              :class="{ 'is-disabled': !extensionEnabled || !translateOnTextFields }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="fieldProvider"
+              allow-default
+              :disabled="!extensionEnabled || !translateOnTextFields"
+              variant="activation"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
         </span>
@@ -84,22 +98,50 @@
     <!-- On-Page Selection -->
     <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateWithSelectElement"
-          :disabled="!extensionEnabled"
-          :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
-        />
+        <div class="setting-row-with-provider">
+          <BaseCheckbox
+            v-model="translateWithSelectElement"
+            :disabled="!extensionEnabled"
+            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+          />
+          <div class="mode-provider-container">
+            <span 
+              class="mode-provider-label"
+              :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="selectElementProvider"
+              allow-default
+              :disabled="!extensionEnabled || !translateWithSelectElement"
+              variant="activation"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
         </span>
       </div>
 
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateOnTextSelection"
-          :disabled="!extensionEnabled"
-          :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
-        />
+        <div class="setting-row-with-provider">
+          <BaseCheckbox
+            v-model="translateOnTextSelection"
+            :disabled="!extensionEnabled"
+            :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
+          />
+          <div class="mode-provider-container">
+            <span 
+              class="mode-provider-label"
+              :class="{ 'is-disabled': !extensionEnabled || !translateOnTextSelection }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="selectionProvider"
+              allow-default
+              :disabled="!extensionEnabled || !translateOnTextSelection"
+              variant="activation"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
         </span>
@@ -162,11 +204,25 @@
     <!-- Dictionary Mode -->
     <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="enableDictionary"
-          :disabled="!extensionEnabled"
-          :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
-        />
+        <div class="setting-row-with-provider">
+          <BaseCheckbox
+            v-model="enableDictionary"
+            :disabled="!extensionEnabled"
+            :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
+          />
+          <div class="mode-provider-container">
+            <span 
+              class="mode-provider-label"
+              :class="{ 'is-disabled': !extensionEnabled || !enableDictionary }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="dictionaryProvider"
+              allow-default
+              :disabled="!extensionEnabled || !enableDictionary"
+              variant="activation"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
         </span>
@@ -176,11 +232,25 @@
     <!-- Whole Page Translation (NEW) -->
     <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="wholePageEnabled"
-          :disabled="!extensionEnabled"
-          :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
-        />
+        <div class="setting-row-with-provider">
+          <BaseCheckbox
+            v-model="wholePageEnabled"
+            :disabled="!extensionEnabled"
+            :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
+          />
+          <div class="mode-provider-container">
+            <span 
+              class="mode-provider-label"
+              :class="{ 'is-disabled': !extensionEnabled || !wholePageEnabled }"
+            >{{ t('provider_label') }}:</span>
+            <ProviderSelector
+              v-model="pageProvider"
+              allow-default
+              :disabled="!extensionEnabled || !wholePageEnabled"
+              variant="activation"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('whole_page_translation_enabled_description') || 'Allow translating the entire web page content while maintaining the layout.' }}
         </span>
@@ -235,6 +305,7 @@ import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
+import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -340,6 +411,48 @@ const wholePageShowOriginal = computed({
   get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
 })
+
+// --- Mode Specific Providers ---
+
+const fieldProvider = computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.field || 'default',
+  set: (value) => {
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, field: value === 'default' ? null : value }
+    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+  }
+})
+
+const selectElementProvider = computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.select_element || 'default',
+  set: (value) => {
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, select_element: value === 'default' ? null : value }
+    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+  }
+})
+
+const selectionProvider = computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.selection || 'default',
+  set: (value) => {
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, selection: value === 'default' ? null : value }
+    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+  }
+})
+
+const pageProvider = computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.page || 'default',
+  set: (value) => {
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, page: value === 'default' ? null : value }
+    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+  }
+})
+
+const dictionaryProvider = computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.dictionary || 'default',
+  set: (value) => {
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, dictionary: value === 'default' ? null : value }
+    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -383,6 +496,32 @@ h2 {
   align-items: center;
   gap: $spacing-md;
   width: 100%;
+}
+
+.setting-row-with-provider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  width: 100%;
+
+  .mode-provider-container {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    width: 180px;
+
+    .mode-provider-label {
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+      transition: opacity 0.2s;
+
+      &.is-disabled {
+        opacity: 0.6;
+      }
+    }
+  }
 }
 
 .shortcut-setting {
@@ -451,7 +590,7 @@ h2 {
     }
   }
 
-  .setting-row {
+  .setting-row, .setting-row-with-provider {
     flex-direction: column;
     align-items: stretch;
     gap: $spacing-sm;

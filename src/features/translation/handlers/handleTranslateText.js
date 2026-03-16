@@ -3,6 +3,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleTranslateText');
 
@@ -38,10 +39,11 @@ export async function handleTranslateText(message, sender, sendResponse) {
       throw new Error('Text is required for translation');
     }
     
-    // Format request for TranslationEngine.handleTranslateMessage
+    // Format request for UnifiedTranslationService.handleTranslationRequest
     const translationRequest = {
       action: MessageActions.TRANSLATE,
-      context: message.source || "vue-component",
+      messageId: message.messageId || `vue-${Date.now()}`,
+      context: message.source || message.context || "vue-component",
       data: {
         text,
         provider: provider || 'google',
@@ -52,8 +54,8 @@ export async function handleTranslateText(message, sender, sendResponse) {
       }
     };
     
-    // Use the translation engine's handleTranslateMessage method
-    const result = await backgroundService.translationEngine.handleTranslateMessage(translationRequest, sender);
+    // Use the unified translation service's handleTranslationRequest method
+    const result = await unifiedTranslationService.handleTranslationRequest(translationRequest, sender);
     
     logger.debug(`✅ [TRANSLATE_TEXT] Translation result:`, result);
     
