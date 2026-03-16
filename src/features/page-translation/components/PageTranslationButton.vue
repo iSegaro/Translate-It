@@ -216,8 +216,8 @@ const restoreButtonTitle = computed(() => {
 // Actions
 const handleTranslate = () => {
   if (!canTranslate.value) return;
-  // User wants auto-translation enabled immediately on click
-  translatePage({ isAuto: true, targetLanguage: props.targetLanguage });
+  // Start translation using user's configured settings
+  translatePage({ targetLanguage: props.targetLanguage });
 };
 
 const handleCancelOrStop = () => {

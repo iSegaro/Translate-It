@@ -157,16 +157,16 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslated = true;
       this.isTranslating = false;
       
-      // Force auto-translating if requested or if setting is enabled
-      if (this.settings.autoTranslateOnDOMChanges || options.isAuto) {
-        this.isAutoTranslating = true;
-      }
+      // isAutoTranslating refers to persistence (DOM Changes)
+      // We only set it to true if the setting is actually enabled
+      this.isAutoTranslating = this.settings.autoTranslateOnDOMChanges;
       
       const resultData = { 
         url: this.currentUrl, 
         translatedCount: this.scheduler.translatedCount,
         isAutoTranslating: this.isAutoTranslating,
-        isTranslated: this.isTranslated
+        isTranslated: this.isTranslated,
+        triggeredAutomatically: options.isAuto || false // New flag to distinguish source
       };
       
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);

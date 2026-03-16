@@ -160,6 +160,7 @@ export class PageTranslationBridge extends ResourceTracker {
 
     currentSession.nodesTranslator = nodesTranslator;
     currentSession.filter = filter;
+    currentSession.autoTranslateOnDOMChanges = settings.autoTranslateOnDOMChanges ?? true;
 
     currentSession.domTranslator = new DOMTranslator(nodesTranslator, {
       scheduler: currentSession.intersectionScheduler,
@@ -173,8 +174,18 @@ export class PageTranslationBridge extends ResourceTracker {
   }
 
   translate(element) {
-    if (!this.session || !this.session.persistentTranslator) return;
-    this.session.persistentTranslator.translate(element);
+    if (!this.session) return;
+    
+    // Respect auto-translate setting: 
+    // Use persistentTranslator (MutationObserver) only if enabled.
+    // Otherwise, use basic domTranslator for a single-pass translation.
+    if (this.session.autoTranslateOnDOMChanges && this.session.persistentTranslator) {
+      this.logger.debug('Starting persistent translation (Auto-translate enabled)');
+      this.session.persistentTranslator.translate(element);
+    } else if (this.session.domTranslator) {
+      this.logger.debug('Starting single-pass translation (Auto-translate disabled)');
+      this.session.domTranslator.translate(element);
+    }
   }
 
   stopPersistence() {

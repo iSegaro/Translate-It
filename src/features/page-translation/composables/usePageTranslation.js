@@ -73,7 +73,8 @@ export function usePageTranslation() {
     }
 
     isTranslating.value = true;
-    isAutoTranslating.value = data.isAuto || false;
+    // Don't set isAutoTranslating here based on data.isAuto
+    // Wait for manager response to confirm persistence state
     progress.value = 0;
     message.value = 'Starting translation...';
     error.value = null;
@@ -91,10 +92,8 @@ export function usePageTranslation() {
         translatedCount.value = result.translatedCount;
         totalNodes.value = result.totalNodes;
         
-        // Update auto-translating status if returned
-        if (result.isAutoTranslating !== undefined) {
-          isAutoTranslating.value = result.isAutoTranslating;
-        }
+        // Update auto-translating status accurately from manager response
+        isAutoTranslating.value = result.isAutoTranslating || false;
       } else {
         throw new Error(result.reason || 'Translation failed');
       }
