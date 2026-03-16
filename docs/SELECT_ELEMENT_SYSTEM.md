@@ -7,15 +7,15 @@ The Select Element system provides an intuitive way for users to translate conte
 ## Architecture
 
 ```
-User Click → SelectElementManager (~830 lines)
+User Click → SelectElementManager (~890 lines)
      ↓
-     ├─→ ElementSelector (highlight, extract, prevent nav)
+     ├─→ ElementSelector (highlighting & target detection)
      ├─→ DomTranslatorAdapter (translation orchestration)
      │       ↓
      │   Streaming/Non-Streaming Translation
      │       ↓
      │   Translation via UnifiedMessaging → Provider System
-     └─→ SelectElementNotificationManager (toast)
+     └─→ SelectElementNotificationManager (toast notification & actions)
 ```
 
 ## Core Components
@@ -85,18 +85,19 @@ Orchestrates translation between background services and DOM manipulation.
 | `hasTranslation()` | Check if translation exists |
 | `cancelTranslation()` | Cancel ongoing translation |
 
-### 4. DomDirectionManager.js
-Manages RTL/LTR direction and text alignment.
+### 4. DomDirectionManager.js (Shared Utility)
+Manages RTL/LTR direction and text alignment. This is a **shared core utility** located in `@/utils/dom/`, used by both Select Element and Whole Page Translation systems to ensure consistent DOM behavior.
 
 **Functions:**
 | Function | Description |
 |----------|-------------|
 | `isRTL(langCode)` | Checks if language is RTL |
-| `applyDirection(element, targetLanguage)` | Applies direction to element tree |
-| `applyNodeDirection(textNode, targetLanguage)` | Applies direction to single node (streaming) |
+| `applyElementDirection(element, targetLang)` | Applies direction/alignment to a specific container |
+| `applyNodeDirection(node, targetLang, root)` | Surgical application: finds the smallest safe container for a text node |
+| `detectDirectionFromContent(text)` | High-accuracy direction detection based on strong characters |
 
 **RTL Languages:**
-`ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ckb`, `dv`, `ug`, `ae`, `arc`, `xh`, `zu`
+Managed centrally in `DomTranslatorConstants.js`. Includes: `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ckb`, `dv`, `ug`, `ae`, `arc`, `xh`, `zu`.
 
 ### 5. DomTranslatorState.js
 Global translation state and revert logic.
@@ -116,7 +117,6 @@ Utility functions for text extraction and validation.
 | `hasValidTextContent(element, options)` | Validates text content |
 | `isValidTextElement(element)` | Element validation |
 | `findBestContainer(element, options)` | Finds optimal container |
-| `getDirectionFromLanguage(langCode)` | Returns 'rtl' or 'ltr' |
 
 ### 7. SelectElementNotificationManager.js
 Manages toast notifications for Select Element mode.
@@ -170,28 +170,19 @@ src/features/element-selection/
 │   ├── DomTranslatorAdapter.js          # Translation orchestrator (~210 lines)
 │   ├── DomTranslatorState.js            # Global state & revert
 │   ├── DomTranslatorUtils.js            # Text node collection utilities
-│   ├── DomTranslatorConstants.js        # RTL languages, tag sets
-│   ├── DomDirectionManager.js           # RTL/LTR direction management
 │   └── ElementSelector.js               # Selection & highlighting (~400 lines)
 │
-├── utils/                               # Utility functions
+├── utils/                               # Feature-specific utilities
 │   ├── elementHelpers.js                # Text extraction & validation (~300 lines)
-│   ├── textDirection.js                 # RTL/LTR utilities
+│   ├── textDirection.js                 # Legacy/Fallback RTL utilities
 │   ├── timeoutCalculator.js             # Dynamic timeouts
 │   └── cleanupSelectionWindows.js       # Window cleanup
 │
-├── constants/                           # Configuration
-│   └── SelectElementModes.js            # Mode definitions
-│
-├── handlers/                            # Message handlers
-│   ├── handleActivateSelectElementMode.js
-│   ├── handleDeactivateSelectElementMode.js
-│   ├── handleGetSelectElementState.js
-│   ├── handleSetSelectElementState.js
-│   └── selectElementStateManager.js
-│
-└── composables/                         # Vue composables
-    └── useElementSelectionLazy.js       # Lazy loading
+└── ... (handlers, composables, constants)
+
+src/utils/dom/                           # SHARED DOM UTILITIES
+├── DomDirectionManager.js               # Shared RTL/LTR management
+└── DomTranslatorConstants.js            # Shared translation constants
 ```
 
 ## Message Handling
@@ -308,3 +299,7 @@ The system handles iframe scenarios:
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
 - [Translation Provider System](./PROVIDERS.md)
 - [Messaging System](./MessagingSystem.md)
+
+---
+
+**Last Updated**: March 2026
