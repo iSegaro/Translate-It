@@ -2,21 +2,21 @@
 
 ##### Added
 
-- Introduced **Whole Page Translation** to translate entire websites seamlessly.
-- Integrated **Microsoft Translator** (Edge) as a new translation engine.
-- Added **Lingva Translate** as an alternative open-source translation provider.
-- Added **Japanese** UI localization, by [@monta-gh](https://github.com/monta-gh).
+- **Full Page Translation:** New engine for real-time translation of entire web pages.
+- **Provider Management:** Added settings to toggle and prioritize translation engines in the [Options](#/activation) page.
+- **New Translation Engines:** Integrated **Microsoft Translator** and **Lingva Translate** (privacy-focused).
+- **Localization:** Added full Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh)).
 
 ##### Fixed
 
-- Enhanced **Select Element** mode for significantly better stability and selection precision.
-- Resolved several critical bugs and minor UI inconsistencies across the extension.
-- Fixed Google TTS handling of non-English languages (Japanese, Chinese, Korean, Russian, Hebrew, and European accented languages).
+- **Element Selection:** Improved stability and detection accuracy in `Select Element` mode.
+- **Multilingual TTS:** Fixed phonetic issues in Google TTS for Japanese, Chinese, Korean, Russian, Hebrew, and European languages.
+- **General:** Resolved UI regressions and improved cross-browser stability.
 
 ##### Changed
 
-- Refined the **User Interface (UI)** and **User Experience (UX)** for a smoother and more intuitive feel.
-- Optimized **Select Element** features to improve translation quality by ensuring better context preservation.
+- **UI/UX:** Modernized interface layout for a more streamlined workflow.
+- **Translation Quality:** Optimized `Select Element` logic to better preserve DOM context for more accurate results.
 
 ---
 
