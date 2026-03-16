@@ -305,7 +305,7 @@ const requireCtrlForTextSelection = computed({
 })
 
 const activeSelectionIconOnTextfields = computed({
-  get: () => settingsStore.settings?.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS || false,
+  get: () => settingsStore.settings?.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
   set: (value) => settingsStore.updateSettingLocally('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', value)
 })
 
@@ -337,7 +337,7 @@ const wholePageAutoTranslate = computed({
 })
 
 const wholePageShowOriginal = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? true,
+  get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
 })
 </script>
