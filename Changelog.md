@@ -16,7 +16,7 @@
 ##### Changed
 
 - Refined the **User Interface (UI)** and **User Experience (UX)** for a smoother and more intuitive feel.
-- Optimized **Translate Page** and **Select Element** features to improve translation quality by ensuring better context preservation.
+- Optimized **Select Element** features to improve translation quality by ensuring better context preservation.
 
 ---
 
