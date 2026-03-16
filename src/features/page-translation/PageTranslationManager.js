@@ -293,11 +293,14 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   async _loadSettings(options = {}) {
+    const rawRootMargin = await getWholePageRootMarginAsync();
+    const formattedRootMargin = rawRootMargin ? (String(rawRootMargin).match(/px|%|em|rem|vh|vw$/) ? String(rawRootMargin) : `${rawRootMargin}px`) : '10px';
+
     this.settings = {
       translationApi: await getTranslationApiAsync(),
       targetLanguage: options.targetLanguage || await getTargetLanguageAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
-      rootMargin: await getWholePageRootMarginAsync() || '300px',
+      rootMargin: formattedRootMargin,
       autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),
       excludedSelectors: await getWholePageExcludedSelectorsAsync(),
       attributesToTranslate: await getWholePageAttributesToTranslateAsync(),

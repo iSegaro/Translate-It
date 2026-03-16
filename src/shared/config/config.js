@@ -165,7 +165,7 @@ export const CONFIG = {
   WHOLE_PAGE_CHUNK_SIZE: 250, // تعداد nodeها در هر batch request
   WHOLE_PAGE_MAX_CHARS: 5000, // حداکثر کاراکتر در هر درخواست معمولی
   WHOLE_PAGE_AI_MAX_CHARS: 15000, // حداکثر کاراکتر در هر درخواست برای مدل‌های AI
-  WHOLE_PAGE_ROOT_MARGIN: '300px', // حاشیه اطراف viewport برای شروع ترجمه lazy
+  WHOLE_PAGE_ROOT_MARGIN: '10px', // حاشیه اطراف viewport برای شروع ترجمه lazy
   WHOLE_PAGE_DEBOUNCE_DELAY: 500, // تاخیر برای DOM change debouncing (ms)
   WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)

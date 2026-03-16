@@ -43,7 +43,7 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   chunkSize: 250,
   maxConcurrentFlushes: 1,
   lazyLoading: true,
-  rootMargin: '300px',
+  rootMargin: '10px',
   priorityThreshold: 1,
   poolDelay: 200
 };
@@ -58,10 +58,10 @@ export const PAGE_TRANSLATION_TIMING = {
   WARNING_DURATION: 5000,
   
   // Scheduler delays
-  FIRST_BATCH_DELAY: 500,
-  HIGH_PRIORITY_DELAY: 50,
-  STANDARD_LOAD_DELAY: 200,
-  CONCURRENCY_RETRY_DELAY: 200,
+  FIRST_BATCH_DELAY: 800,
+  HIGH_PRIORITY_DELAY: 250,
+  STANDARD_LOAD_DELAY: 600,
+  CONCURRENCY_RETRY_DELAY: 300,
   
   // DOM stability delays
   DOM_STABILIZATION_DELAY: 50

@@ -17,6 +17,7 @@ function getDefaultSettings() {
     TRANSLATION_API: CONFIG.TRANSLATION_API || 'google',
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
+    TIMEOUT: CONFIG.TIMEOUT || 30000,
     selectionTranslationMode: CONFIG.selectionTranslationMode || 'onClick',
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'copy',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
@@ -25,7 +26,7 @@ function getDefaultSettings() {
     GEMINI_API_KEY: CONFIG.GEMINI_API_KEY || '',
     GEMINI_API_URL: CONFIG.GEMINI_API_URL || '',
     GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
-    GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? true,
+    GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? false,
     LINGVA_API_URL: CONFIG.LINGVA_API_URL || 'https://lingva.ml',
     WEBAI_API_URL: CONFIG.WEBAI_API_URL || 'http://localhost:6969/translate',
     WEBAI_API_MODEL: CONFIG.WEBAI_API_MODEL || 'gemini-2.5-flash',
@@ -43,6 +44,9 @@ function getDefaultSettings() {
     DEEPL_API_TIER: CONFIG.DEEPL_API_TIER || 'free',
     DEEPL_FORMALITY: CONFIG.DEEPL_FORMALITY || 'default',
     DEEPL_BETA_LANGUAGES_ENABLED: CONFIG.DEEPL_BETA_LANGUAGES_ENABLED ?? true,
+    // browser Translation API Settings
+    BROWSER_TRANSLATE_ENABLED: CONFIG.BROWSER_TRANSLATE_ENABLED ?? true,
+    BROWSER_TRANSLATE_AUTO_DOWNLOAD: CONFIG.BROWSER_TRANSLATE_AUTO_DOWNLOAD ?? true,
     TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
     ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
     TEXT_FIELD_SHORTCUT: CONFIG.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
@@ -50,7 +54,8 @@ function getDefaultSettings() {
     TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION ?? true,
     REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
-    ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? false,
+    ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
+    ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
@@ -64,17 +69,20 @@ function getDefaultSettings() {
     // Font Settings
     TRANSLATION_FONT_FAMILY: CONFIG.TRANSLATION_FONT_FAMILY || 'auto',
     TRANSLATION_FONT_SIZE: CONFIG.TRANSLATION_FONT_SIZE || '14',
-    // Whole Page Translation Settings (NEW)
+    // Whole Page Translation Settings
     WHOLE_PAGE_TRANSLATION_ENABLED: CONFIG.WHOLE_PAGE_TRANSLATION_ENABLED ?? true,
     WHOLE_PAGE_LAZY_LOADING: CONFIG.WHOLE_PAGE_LAZY_LOADING !== undefined ? CONFIG.WHOLE_PAGE_LAZY_LOADING : true,
     WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: CONFIG.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES ?? true,
-    WHOLE_PAGE_EXCLUDED_SELECTORS: CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS || ["script", "style", "code", "pre", "noscript", "[data-translate-ignore]"],
-    WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE || ["title", "alt", "placeholder", "value", "aria-label", "aria-placeholder", "aria-roledescription", "data-label", "data-title", "data-placeholder"],
+    WHOLE_PAGE_EXCLUDED_SELECTORS: CONFIG.WHOLE_PAGE_EXCLUDED_SELECTORS || ["script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp", ".notranslate", "[contenteditable='true']", "[translate=no]", ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share", ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight", "hypothesis-highlight", ".hypothesis-highlight", ".material-icons", "material-icon", "span[class^=material-symbols-]", ".google-symbols", "i.fa", "i[class^=fa-]", "visuallyhidden", "[data-translate-ignore]"],
+    WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: CONFIG.WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE || ["title", "alt", "placeholder", "label", "value"],
     WHOLE_PAGE_MAX_ELEMENTS: CONFIG.WHOLE_PAGE_MAX_ELEMENTS || 10000,
     WHOLE_PAGE_CHUNK_SIZE: CONFIG.WHOLE_PAGE_CHUNK_SIZE || 250,
+    WHOLE_PAGE_MAX_CHARS: CONFIG.WHOLE_PAGE_MAX_CHARS || 5000,
+    WHOLE_PAGE_AI_MAX_CHARS: CONFIG.WHOLE_PAGE_AI_MAX_CHARS || 15000,
     WHOLE_PAGE_DEBOUNCE_DELAY: CONFIG.WHOLE_PAGE_DEBOUNCE_DELAY || 500,
+    WHOLE_PAGE_ROOT_MARGIN: CONFIG.WHOLE_PAGE_ROOT_MARGIN || '10px',
     WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: CONFIG.WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL || 100,
-    WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? true,
+    WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
     translationHistory: []
   };
 }
