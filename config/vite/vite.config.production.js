@@ -196,11 +196,6 @@ export default defineConfig({
               return 'utils-security'
             }
 
-            // Provider utilities
-            if (id.includes('utils/providerHtmlGenerator')) {
-              return 'utils-provider-html'
-            }
-
             // UtilsFactory itself
             if (id.includes('utils/UtilsFactory')) {
               return 'utils-factory'
@@ -380,8 +375,7 @@ export default defineConfig({
       'src/utils/ui/theme.js',
       'src/utils/ui/exclusion.js',
       'src/utils/ui/html-sanitizer.js',
-      'src/utils/secureStorage.js',
-      'src/utils/providerHtmlGenerator.js'
+      'src/utils/secureStorage.js'
     ]
   },
   

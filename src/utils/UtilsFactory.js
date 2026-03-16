@@ -382,42 +382,6 @@ class UtilsFactory {
   }
 
   /**
-   * Load provider utilities lazily
-   */
-  async getProviderUtils() {
-    if (this.loadedModules.has('provider')) {
-      return this.loadedModules.get('provider');
-    }
-
-    if (this.loadingPromises.has('provider')) {
-      return await this.loadingPromises.get('provider');
-    }
-
-    const loadingPromise = this._loadProviderUtils();
-    this.loadingPromises.set('provider', loadingPromise);
-
-    const utils = await loadingPromise;
-    this.loadedModules.set('provider', utils);
-    this.loadingPromises.delete('provider');
-
-    return utils;
-  }
-
-  async _loadProviderUtils() {
-    getLogger().debug('Loading provider utils lazily');
-
-    const [
-      providerHtmlModule
-    ] = await Promise.all([
-      import('./providerHtmlGenerator.js')
-    ]);
-
-    return {
-      ...providerHtmlModule
-    };
-  }
-
-  /**
    * Load core utilities (small, frequently used)
    */
   async getCoreUtils() {

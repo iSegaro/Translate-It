@@ -243,11 +243,6 @@ export const createBaseConfig = (browser, options = {}) => {
                 return 'utils/messaging';
               }
 
-              // Provider utilities
-              if (id.includes('src/utils/providerHtmlGenerator')) {
-                return 'utils/provider';
-              }
-
               // Utils factory itself (keep separate as it's the entry point)
               if (id.includes('src/utils/UtilsFactory')) {
                 return 'utils/factory';

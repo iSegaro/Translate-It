@@ -15,17 +15,11 @@ const COMPONENT_CATEGORIES = {
     'TranslationControls'
   ],
   LAZY: [       // Load on demand
-    'SettingsPanel',
     'HistoryPanel',
-    'ProviderSettings',
     'FontSelector',
     'LanguageSelector'
   ],
-  RARELY_USED: [ // Load only when explicitly needed
-    'AdvancedSettings',
-    'DebugPanel',
-    'StatisticsPanel'
-  ]
+  RARELY_USED: [] // Load only when explicitly needed
 }
 
 // Async component with loading states
@@ -47,18 +41,9 @@ export const componentImporters = {
   TranslationResult: () => import('@/components/content/TranslationResult.vue'),
   TranslationControls: () => import('@/components/content/TranslationControls.vue'),
 
-  // Settings components
-  SettingsPanel: () => import('@/components/content/SettingsPanel.vue'),
-  ProviderSettings: () => import('@/components/settings/ProviderSettings.vue'),
-
   // UI components
   FontSelector: () => import('@/components/base/FontSelector.vue'),
-  LanguageSelector: () => import('@/components/base/LanguageSelector.vue'),
-
-  // Advanced components
-  AdvancedSettings: () => import('@/components/settings/AdvancedSettings.vue'),
-  DebugPanel: () => import('@/components/debug/DebugPanel.vue'),
-  StatisticsPanel: () => import('@/components/statistics/StatisticsPanel.vue')
+  LanguageSelector: () => import('@/components/base/LanguageSelector.vue')
 }
 
 // Preload components strategically
