@@ -46,7 +46,7 @@ export async function handleTranslateText(message, sender, sendResponse) {
       context: message.source || message.context || "vue-component",
       data: {
         text,
-        provider: provider || 'google',
+        provider: provider || 'googlev2',
         sourceLanguage: from || 'auto',
         targetLanguage: to || 'fa',
         mode: message.data.mode || 'simple',

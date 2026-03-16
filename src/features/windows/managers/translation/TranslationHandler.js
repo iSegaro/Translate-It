@@ -31,7 +31,7 @@ export class TranslationHandler {
     settings = {
         SOURCE_LANGUAGE: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
         TARGET_LANGUAGE: settingsManager.get('TARGET_LANGUAGE', 'fa'),
-        TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'google'),
+        TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'googlev2'),
         ENABLE_DICTIONARY: settingsManager.get('ENABLE_DICTIONARY', true)
       };
 
@@ -61,7 +61,7 @@ export class TranslationHandler {
         text: selectedText,
         from: AUTO_DETECT_VALUE,
         to: settings.TARGET_LANGUAGE || 'fa',
-        provider: settings.TRANSLATION_API || 'google',
+        provider: settings.TRANSLATION_API || 'googlev2',
         messageId: messageId,
         mode: translationMode,
         options: { ...options }

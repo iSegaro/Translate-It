@@ -164,7 +164,7 @@ export function useSidepanelTranslation() {
 
       // Get current provider from settings
       const settings = await getSettingsAsync();
-      const currentProvider = settings.TRANSLATION_API || 'google';
+      const currentProvider = settings.TRANSLATION_API || 'googlev2';
       const messageId = generateMessageId('sidepanel-translate');
       
       // Determine translation mode (same logic as TranslationService.sidepanelTranslate)

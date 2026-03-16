@@ -261,7 +261,7 @@ watch(targetLanguage, (value) => {
 
 // ========== API Settings ==========
 // Selected provider
-const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'googlev2')
 
 const selectedProviderInfo = computed(() => {
   return findProviderById(selectedProvider.value)

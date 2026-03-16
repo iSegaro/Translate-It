@@ -14,7 +14,7 @@ function getDefaultSettings() {
     THEME: CONFIG.THEME || 'auto',
     APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English',
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
-    TRANSLATION_API: CONFIG.TRANSLATION_API || 'google',
+    TRANSLATION_API: CONFIG.TRANSLATION_API || 'googlev2',
     MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
       field: null,
       select_element: null,

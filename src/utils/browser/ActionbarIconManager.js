@@ -49,7 +49,7 @@ class ActionbarIconManager {
     try {
       // Get current provider
       const storedProvider = await storageManager.get('TRANSLATION_API');
-      this.currentProvider = storedProvider.TRANSLATION_API || 'google';
+      this.currentProvider = storedProvider.TRANSLATION_API || 'googlev2';
 
       logger.debug(`Simple icon manager initialized for: ${this.currentProvider}`);
 
@@ -72,7 +72,7 @@ class ActionbarIconManager {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'actionbar-icon-manager', {
           fallbackAction: () => {
-            this.currentProvider = 'google';
+            this.currentProvider = 'googlev2';
             this.isInitialized = true;
           }
         });

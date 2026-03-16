@@ -9,7 +9,7 @@ import browser from "webextension-polyfill";
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useApiProvider');
 
 export function useApiProvider() {
-  const currentProvider = ref("google");
+  const currentProvider = ref("googlev2");
   const availableProviders = ref([]);
   const isDropdownOpen = ref(false);
   const isLoading = ref(false);
@@ -49,7 +49,7 @@ export function useApiProvider() {
   const loadCurrentProvider = async () => {
     try {
       await settingsStore.loadSettings();
-      const providerId = settingsStore.settings.TRANSLATION_API || "google";
+      const providerId = settingsStore.settings.TRANSLATION_API || "googlev2";
       logger.debug('Loading provider from settings:', providerId);
 
       // Check if available providers are loaded
@@ -63,14 +63,14 @@ export function useApiProvider() {
       if (provider) {
         currentProvider.value = providerId;
       } else {
-        logger.warn('Provider not found in registry, falling back to google:', providerId);
+        logger.warn('Provider not found in registry, falling back to googlev2:', providerId);
         logger.debug('Available providers:', availableProviders.value.map(p => p.id));
-        currentProvider.value = "google";
-        await settingsStore.updateSettingAndPersist("TRANSLATION_API", "google");
+        currentProvider.value = "googlev2";
+        await settingsStore.updateSettingAndPersist("TRANSLATION_API", "googlev2");
       }
     } catch (error) {
       logger.error('Error loading current provider:', error);
-      currentProvider.value = "google";
+      currentProvider.value = "googlev2";
     }
   };
 

@@ -72,7 +72,7 @@ class SettingsManager {
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
       SOURCE_LANGUAGE: 'auto',
       TARGET_LANGUAGE: 'fa',
-      TRANSLATION_API: 'google',
+      TRANSLATION_API: 'googlev2',
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false
     }

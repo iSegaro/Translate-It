@@ -40,7 +40,7 @@ export const CONFIG = {
 
 
   // --- API Settings ---
-  TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+  TRANSLATION_API: "googlev2", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   // --- Mode Specific Provider Settings ---
   MODE_PROVIDERS: {

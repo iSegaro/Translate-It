@@ -131,7 +131,7 @@ export function useUnifiedTranslation(context = 'popup') {
   };
 
   const createTranslationRequest = (sourceLang, targetLang, messageId) => {
-    const currentProvider = settingsStore.settings.TRANSLATION_API || (context === 'popup' ? 'google-translate' : 'google');
+    const currentProvider = settingsStore.settings.TRANSLATION_API || 'googlev2';
     const mode = getTranslationMode(sourceText.value);
 
     return {
