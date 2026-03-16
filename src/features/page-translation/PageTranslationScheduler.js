@@ -9,13 +9,15 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
  * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
  * Handles batching, prioritization (Viewport first), and fault tolerance.
  */
-export class PageTranslationScheduler {
+export class PageTranslationScheduler extends ResourceTracker {
   constructor(logger) {
+    super('page-translation-scheduler');
     this.logger = logger;
     this.queue = []; // Tasks: { text, score, resolve, reject, context }
     this.batchTimer = null;
@@ -151,7 +153,7 @@ export class PageTranslationScheduler {
     }
 
     this.batchTimerDelay = delay;
-    this.batchTimer = setTimeout(() => this.flush(), delay);
+    this.batchTimer = this.trackTimeout(() => this.flush(), delay);
   }
 
   async flush() {
@@ -163,7 +165,7 @@ export class PageTranslationScheduler {
     // Respect concurrency limits
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) {
       if (!this.batchTimer && this.isTranslated) {
-        this.batchTimer = setTimeout(() => this.flush(), PAGE_TRANSLATION_TIMING.CONCURRENCY_RETRY_DELAY);
+        this.batchTimer = this.trackTimeout(() => this.flush(), PAGE_TRANSLATION_TIMING.CONCURRENCY_RETRY_DELAY);
       }
       return;
     }

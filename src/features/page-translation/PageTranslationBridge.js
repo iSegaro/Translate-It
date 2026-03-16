@@ -12,9 +12,11 @@ import {
   PAGE_TRANSLATION_SELECTORS,
   DEFAULT_PAGE_TRANSLATION_SETTINGS 
 } from './PageTranslationConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class PageTranslationBridge {
+export class PageTranslationBridge extends ResourceTracker {
   constructor(logger) {
+    super('page-translation-bridge');
     this.logger = logger;
     this.session = null;
     this.showOriginalOnHover = true; // Initial default

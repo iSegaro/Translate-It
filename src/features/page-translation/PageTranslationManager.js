@@ -46,7 +46,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings = {};
     
     // Listen for progress from scheduler and forward to background
-    pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+    this.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
         data, 
@@ -55,11 +55,11 @@ export class PageTranslationManager extends ResourceTracker {
     });
 
     // Listen for fatal errors from scheduler (Circuit Breaker)
-    pageEventBus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
+    this.addEventListener(pageEventBus, 'page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
       this._handleFatalError(error, errorType, localizedMessage));
 
     // Listen for conflicting features (like Select Element Mode)
-    pageEventBus.on('STOP_CONFLICTING_FEATURES', (data) => {
+    this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
       if ((this.isTranslating || this.isTranslated) && data?.source !== 'page-translation') {
         this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
         this.restorePage(); // Fully restore if conflict happens

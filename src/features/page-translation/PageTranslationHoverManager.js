@@ -62,16 +62,15 @@ export class PageTranslationHoverManager extends ResourceTracker {
     const originalText = this._getOriginalText(element);
     if (originalText) {
       this._showTooltip(originalText, event);
-      // Track mousemove only while hovering
-      // but here we manage its lifecycle manually for performance.
-      document.addEventListener('mousemove', this.handleMouseMove, true);
+      // Track mousemove only while hovering using ResourceTracker
+      this.addEventListener(document, 'mousemove', this.handleMouseMove, true);
     }
   }
 
   handleMouseOut(event) {
     if (this.currentElement && !this.currentElement.contains(event.relatedTarget)) {
       this._hideTooltip();
-      document.removeEventListener('mousemove', this.handleMouseMove, true);
+      this.removeEventListener(document, 'mousemove', this.handleMouseMove, true);
       this.currentElement = null;
     }
   }
