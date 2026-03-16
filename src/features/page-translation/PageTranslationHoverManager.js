@@ -62,7 +62,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     const originalText = this._getOriginalText(element);
     if (originalText) {
       this._showTooltip(originalText, event);
-      // Track mousemove only while hovering, it will be cleaned up by ResourceTracker if needed, 
+      // Track mousemove only while hovering
       // but here we manage its lifecycle manually for performance.
       document.addEventListener('mousemove', this.handleMouseMove, true);
     }
@@ -138,8 +138,15 @@ export class PageTranslationHoverManager extends ResourceTracker {
       pointerEvents: 'none',
       display: 'none',
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      border: '1px solid rgba(255,255,255,0.1)'
+      border: '1px solid rgba(255,255,255,0.1)',
+      visibility: 'visible',
+      opacity: '1'
     });
+
+    // Ensure style priority
+    this.tooltip.style.setProperty('z-index', '2147483647', 'important');
+    this.tooltip.style.setProperty('position', 'fixed', 'important');
+    this.tooltip.style.setProperty('display', 'none', 'important');
 
     document.body.appendChild(this.tooltip);
   }
@@ -156,13 +163,13 @@ export class PageTranslationHoverManager extends ResourceTracker {
     this.tooltip.style.direction = direction;
     this.tooltip.style.textAlign = isRtl ? 'right' : 'left';
 
-    this.tooltip.style.display = 'block';
+    this.tooltip.style.setProperty('display', 'block', 'important');
     this._positionTooltip(event);
   }
 
   _hideTooltip() {
     if (this.tooltip) {
-      this.tooltip.style.display = 'none';
+      this.tooltip.style.setProperty('display', 'none', 'important');
     }
   }
 
@@ -170,23 +177,26 @@ export class PageTranslationHoverManager extends ResourceTracker {
     if (!this.tooltip) return;
 
     const offset = 15;
-    let x = event.clientX + offset;
-    let y = event.clientY + offset;
-
     const rect = this.tooltip.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
+    let x = event.clientX + offset;
+    // Show ABOVE the cursor to avoid native tooltips (which usually show below)
+    let y = event.clientY - rect.height - offset;
+
+    // Flip to below if there's no space above
+    if (y < 0) {
+      y = event.clientY + offset + 20; // Extra offset to clear the cursor
+    }
+
+    // Boundary check for X
     if (x + rect.width > viewportWidth) {
       x = event.clientX - rect.width - offset;
     }
 
-    if (y + rect.height > viewportHeight) {
-      y = event.clientY - rect.height - offset;
-    }
-
-    this.tooltip.style.left = `${x}px`;
-    this.tooltip.style.top = `${y}px`;
+    this.tooltip.style.setProperty('left', `${x}px`, 'important');
+    this.tooltip.style.setProperty('top', `${y}px`, 'important');
   }
 }
 
