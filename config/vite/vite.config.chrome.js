@@ -211,14 +211,12 @@ export default defineConfig({
     fixExtensionPaths(),
     webExtension({
       manifest: async () => {
-          console.log('🚀 Generating Chrome manifest...');
           const manifest = generateValidatedManifest('chrome');
           manifest.background = {
             service_worker: 'src/core/background/index.js',
             type: 'module'
           };
-          // content_scripts are already defined in manifest generator, no need to add extra ones
-          console.log('✅ Chrome manifest generated and validated');
+          console.log('✅ Chrome manifest generated');
           return manifest;
         },
       htmlViteConfig: {

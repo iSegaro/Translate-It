@@ -63,7 +63,11 @@ export default defineConfig({
     
     webExtension({
       // Generate dynamic manifest for Firefox
-      manifest: () => generateValidatedManifest('firefox'),
+      manifest: () => {
+        const manifest = generateValidatedManifest('firefox');
+        console.log('✅ Firefox manifest generated');
+        return manifest;
+      },
       
       // Firefox HTML config
       htmlViteConfig: {

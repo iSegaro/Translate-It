@@ -9,8 +9,6 @@ import pkg from '../package.json' with { type: 'json' };
  * @returns {Object} Generated manifest object
  */
 export function generateManifest(browser = 'chrome') {
-  console.log(`📋 Generating manifest for ${browser}`);
-
   // Base manifest shared across browsers
   const baseManifest = {
     name: browser === 'firefox' ? '__MSG_nameFirefox__' : '__MSG_nameChrome__',
@@ -357,7 +355,6 @@ export function generateValidatedManifest(browser) {
     console.warn(`Manifest warnings for ${browser}:`, validation.warnings);
   }
   
-  console.log(`✅ Generated valid ${browser} manifest`);
   return manifest;
 }
 
