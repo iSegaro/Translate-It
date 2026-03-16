@@ -20,3 +20,11 @@ List of features, enhancements, and ideas planned for future development.
 
 ### Other
 - [Lumetrium Prompt Catalog](https://lumetrium.com/definer/wiki/sources/ai/prompts/catalog): Catalog of specialized prompts for translation and dictionary services.
+
+
+## Documentation
+* **Update Select Element Documentation**: Revise the documentation for the `Select Element` feature to reflect recent DOM-level changes regarding text directionality (RTL/LTR support). Ensure the script paths are updated to point to the new directory structure.
+* **Update Whole Page Translation Documentation**: Update this section in alignment with the `Select Element` changes, as both features now share the same DOM logic for handling text alignment and direction.
+* **Develop Options Page Documentation**: Create a comprehensive guide for the Options page, specifically clarifying the dual-functionality of the settings application:
+    * **Instant Application**: For settings that take effect immediately without a manual save (e.g., Theme switching, UI Language).
+    * **Save-Triggered Application**: For all other configurations that require the "Save" button to be explicitly clicked before changes are applied.
