@@ -59,7 +59,7 @@ class PerformanceMonitor {
       } else if (buildTime > 15000) { // 15 seconds
         console.log('   💡 Build time good, room for improvement')
       } else {
-        console.log('   🚀 Excellent build performance!')
+        console.log('   ✅ Excellent build performance!')
       }
       
     } catch (error) {

@@ -127,7 +127,7 @@ const handleSystemThemeChange = (event) => {
 };
 
 const initialize = async () => {
-  logger.debug('🚀 SidepanelApp mounting...')
+  logger.debug('🗳️ SidepanelApp mounting...')
   try {
     // Step 1: Set loading text
     logger.debug('📝 Setting loading text...')
@@ -213,7 +213,7 @@ const initialize = async () => {
     const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
     errorType.value = matchErrorToType(error)
   } finally {
-    logger.debug('✨ SidepanelApp initialization complete')
+    logger.debug('✅ SidepanelApp initialization complete')
     isLoading.value = false
   }
 };

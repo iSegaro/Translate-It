@@ -88,7 +88,7 @@ async function buildFirefoxAsync() {
  */
 async function buildAll() {
   try {
-    console.log(createBox('🚀 BUILDING ALL EXTENSIONS') + '\n')
+    console.log(createBox('🗳️ BUILDING ALL EXTENSIONS') + '\n')
 
     const startTime = Date.now()
 

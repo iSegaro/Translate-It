@@ -67,14 +67,14 @@ export async function handleTranslateText(message, sender, sendResponse) {
         sourceLanguage: result.sourceLanguage,
         targetLanguage: result.targetLanguage
       };
-      logger.debug(`🚀 [TRANSLATE_TEXT] Returning successful response:`, response);
+      logger.debug(`✅ [TRANSLATE_TEXT] Returning successful response:`, response);
       return response;
     } else {
       const response = {
         success: false,
         error: result.error?.message || 'Translation failed'
       };
-      logger.debug(`🚀 [TRANSLATE_TEXT] Returning error response:`, response);
+      logger.debug(`✅ [TRANSLATE_TEXT] Returning error response:`, response);
       return response;
     }
     
@@ -90,7 +90,7 @@ export async function handleTranslateText(message, sender, sendResponse) {
       success: false,
       error: error.message || 'Translation failed'
     };
-    logger.debug(`🚀 [TRANSLATE_TEXT] Returning catch error response:`, errorResponse);
+    logger.debug(`✅ [TRANSLATE_TEXT] Returning catch error response:`, errorResponse);
     return errorResponse;
   }
 }

@@ -55,7 +55,7 @@ async function validateAll() {
       console.log(emptyBoxLine())
       console.log('╠════════════════════════════════════════════════════════════════╣')
       console.log(`║${centerText(`⏱️ Total validation time: ${duration}s`)}║`)
-      console.log(`║${centerText('🚀 Extensions ready for submission!')}║`)
+      console.log(`║${centerText('✅ Extensions ready for submission!')}║`)
     } else {
       console.log(`║${centerText('❌ VALIDATION FAILED')}║`)
       console.log('╠════════════════════════════════════════════════════════════════╣')

@@ -23,7 +23,7 @@ export function logStep(name) {
   const styleMap = [
     {
       keyword: "chrome",
-      icon: "🚀",
+      icon: "🕸",
       color: chalk.blue.bold,
     },
     {
@@ -47,7 +47,7 @@ export function logStep(name) {
     name.toLowerCase().includes(keyword)
   );
 
-  const icon = matched?.icon || "✨";
+  const icon = matched?.icon || "✅";
   const color = matched?.color || chalk.white.bold;
 
   console.log(color(`\n${icon} ${name}...\n`));

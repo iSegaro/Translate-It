@@ -37,8 +37,8 @@ const validateMigration = async () => {
   console.log('\n' + '='.repeat(50))
   
   if (allPassed) {
-    console.log('🎉 Migration validation successful!')
-    console.log('✨ Vue.js migration is ready for production!')
+    console.log('✅ Migration validation successful!')
+    console.log('✅ Vue.js migration is ready for production!')
     
     // Display final statistics
     displayMigrationStats()
@@ -215,7 +215,7 @@ function displayMigrationStats() {
     console.log('   (Stats calculation failed)')
   }
   
-  console.log('\n🚀 Ready for production deployment!')
+  console.log('\n✅ Ready for production deployment!')
 }
 
 // Run validation if called directly

@@ -243,7 +243,7 @@ const handleTranslate = async () => {
   }
   
   try {
-    logger.info("🚀 Starting translation process...");
+    logger.info("🗳️ Starting translation process...");
     
     // Use computed values to handle AUTO_DETECT_VALUE correctly
     await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value)    

@@ -46,7 +46,7 @@ const safeSpecificKeys = [
 
 const unusedKeys = [];
 
-console.log('🚀 Searching for unused keys across the project...');
+console.log('🗳️ Searching for unused keys across the project...');
 
 for (const key of allKeys) {
   // Skip safe patterns

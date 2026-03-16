@@ -241,7 +241,7 @@ const getProviderIcon = (iconPath) => {
 }
 
 const handleTranslate = () => {
-  logger.debug('🚀 Translate button clicked!', {
+  logger.debug('🗳️ Translate button clicked!', {
     currentProvider: currentProvider.value?.name || 'Unknown',
     isTranslating: isTranslating.value,
     mode: props.mode

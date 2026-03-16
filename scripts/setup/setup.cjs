@@ -78,7 +78,7 @@ function checkPrerequisites() {
 
 async function setupProject() {
   console.log('╔═══════════════════════════════════════════════════════════════╗');
-  console.log('║              🚀 TRANSLATE-IT PROJECT SETUP                    ║');
+  console.log('║              🗳️ TRANSLATE-IT PROJECT SETUP                    ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝\n');
   
   console.log('Welcome to Translate-It Extension setup!');
@@ -168,7 +168,7 @@ async function setupProject() {
     console.log('   Type: Cross-browser web extension');
     console.log('   browsers: Chrome & Firefox');
     
-    console.log('\n🚀 Available Commands:');
+    console.log('\n🗳️ Available Commands:');
     console.log('   Development:');
     console.log('     pnpm run watch:chrome     - Watch Chrome development');
     console.log('     pnpm run watch:firefox    - Watch Firefox development');
@@ -200,7 +200,7 @@ async function setupProject() {
       console.log('   Install Chrome validator later: pnpm run setup:chrome-validator');
     }
     
-    console.log('\n🎯 Happy coding! 🚀\n');
+    console.log('\n🎯 Happy coding! 🗳️\n');
     
   } catch (error) {
     console.error('\n❌ Setup failed:', error.message);

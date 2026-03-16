@@ -178,7 +178,7 @@ const handleTranslate = async () => {
   }
   
   try {
-    logger.info("🚀 Starting translation process...");
+    logger.info("🗳️ Starting translation process...");
     logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
     
     // Get current language values from props

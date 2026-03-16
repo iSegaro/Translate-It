@@ -49,7 +49,7 @@
  * // "Creating no-op fallback policy for vue"
  * ```
  *
- * ## 🚀 Future Considerations
+ * ## ✅ Future Considerations
  * - Monitor CSP changes in major websites
  * - Update fallback policy list as needed
  * - Consider Vue.js updates that might change Trusted Types behavior

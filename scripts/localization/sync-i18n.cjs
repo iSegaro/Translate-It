@@ -86,7 +86,7 @@ async function sync() {
     
     if (!data) {
       if (shouldFix) {
-        console.log(`✨ Creating new locale: [${locale}]`);
+        console.log(`✅ Creating new locale: [${locale}]`);
         data = {};
       } else {
         console.log(`❌ Locale folder/file missing for [${locale}].`);
@@ -133,7 +133,7 @@ async function sync() {
 
   console.log(`\n--- Summary ---`);
   if (totalIssues === 0) {
-    console.log('✨ All localization files are perfectly in sync with the manifest!');
+    console.log('✅ All localization files are perfectly in sync with the manifest!');
   } else {
     console.log(`Found issues across languages.`);
     if (!shouldFix) {

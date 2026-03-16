@@ -79,7 +79,7 @@ const isRTL = computed(() => {
 })
 
 const initialize = async () => {
-  logger.debug('🚀 OptionsApp mounting...')
+  logger.debug('🗳️ OptionsApp mounting...')
   
   try {
   // Step 1: Set loading text
@@ -107,7 +107,7 @@ const initialize = async () => {
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
-  logger.debug('✨ OptionsApp initialization complete')
+  logger.debug('✅ OptionsApp initialization complete')
     isLoading.value = false
   }
 };
