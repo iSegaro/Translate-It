@@ -180,7 +180,8 @@ export default defineConfig({
         return manifest;
       },
       // Disable automatic browser launch in dev mode to avoid connection errors
-      disableAutoLaunch: true
+      disableAutoLaunch: true,
+      skipManifestValidation: true
     })
   ],
   server: {

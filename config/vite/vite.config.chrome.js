@@ -302,7 +302,8 @@ export default defineConfig({
         await fs.writeJson(file, manifest, { spaces: 2 });
         return manifest;
       },
-      disableAutoLaunch: true
+      disableAutoLaunch: true,
+      skipManifestValidation: true
     }),
   ],
   server: {
