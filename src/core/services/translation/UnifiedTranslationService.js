@@ -454,20 +454,20 @@ class TranslationModeCoordinator {
     const segments = textsToTranslate.map(item => item.text || item);
 
     // Get the provider instance
-    const providerInstance = await translationEngine.getProvider(provider || 'google');
+    const providerInstance = await translationEngine.getProvider(provider || ProviderRegistryIds.GOOGLE_V2);
     if (!providerInstance) {
       throw new Error(`Provider '${provider}' not found or failed to initialize`);
     }
 
     // Get rate limit manager and provider info
     const { rateLimitManager } = await import('@/features/translation/core/RateLimitManager.js');
-    const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
+    const { registryIdToName, isProviderType, ProviderTypes, ProviderRegistryIds } = await import('@/features/translation/providers/ProviderConstants.js');
     const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
 
     rateLimitManager.reloadConfigurations();
 
     // AI providers need larger batches
-    const pName = registryIdToName(provider || 'google');
+    const pName = registryIdToName(provider || ProviderRegistryIds.GOOGLE_V2);
     const isAI = isProviderType(pName, ProviderTypes.AI);
     const OPTIMAL_BATCH_SIZE = globalConfig.WHOLE_PAGE_CHUNK_SIZE;
     const OPTIMAL_CHAR_LIMIT = isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS;
@@ -496,7 +496,7 @@ class TranslationModeCoordinator {
 
         try {
           const batchResult = await rateLimitManager.executeWithRateLimit(
-            provider || 'google',
+            provider || ProviderRegistryIds.GOOGLE_V2,
             () => {
               if (isAIProvider) {
                 return providerInstance._translateBatch(

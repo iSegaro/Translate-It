@@ -1,5 +1,6 @@
 // src/utils/providerHtmlGenerator.js
 import { getSupportedProviders } from "../core/provider-registry.js";
+import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -99,25 +100,26 @@ export class ProviderHtmlGenerator {
     }
 
     switch (providerId) {
-      case "google":
+      case ProviderRegistryIds.GOOGLE:
+      case ProviderRegistryIds.GOOGLE_V2:
         return this._generateGoogleSettingsHtml(provider);
-      case "bing":
+      case ProviderRegistryIds.BING:
         return this._generateBingSettingsHtml(provider);
-      case "yandex":
+      case ProviderRegistryIds.YANDEX:
         return this._generateYandexSettingsHtml(provider);
-      case "browserapi":
+      case ProviderRegistryIds.BROWSER:
         return this._generatebrowserApiSettingsHtml(provider);
-      case "gemini":
+      case ProviderRegistryIds.GEMINI:
         return this._generateGeminiSettingsHtml(provider);
-      case "openai":
+      case ProviderRegistryIds.OPENAI:
         return this._generateOpenAISettingsHtml(provider);
-      case "openrouter":
+      case ProviderRegistryIds.OPENROUTER:
         return this._generateOpenRouterSettingsHtml(provider);
-      case "deepseek":
+      case ProviderRegistryIds.DEEPSEEK:
         return this._generateDeepSeekSettingsHtml(provider);
-      case "webai":
+      case ProviderRegistryIds.WEBAI:
         return this._generateWebAISettingsHtml(provider);
-      case "custom":
+      case ProviderRegistryIds.CUSTOM:
         return this._generateCustomSettingsHtml(provider);
       default:
         return "";
@@ -133,7 +135,7 @@ export class ProviderHtmlGenerator {
   static _getProviderStatusClass(provider) {
     if (provider.features && provider.features.length > 0) {
       // For browser provider, check if available
-      if (provider.id === "browser") {
+      if (provider.id === ProviderRegistryIds.BROWSER) {
         return "provider-limited"; // Simplified check
       }
       return "provider-available";
@@ -148,7 +150,7 @@ export class ProviderHtmlGenerator {
    * @returns {string} HTML for status icon
    */
   static _getProviderStatusIcon(provider) {
-    if (provider.id === "browser") {
+    if (provider.id === ProviderRegistryIds.BROWSER) {
       // Simplified availability check for browser provider
       return '<span class="provider-status" title="Requires Chrome 138+">⚠️</span>';
     }
@@ -286,7 +288,7 @@ export class ProviderHtmlGenerator {
     }
 
     // Simplified compatibility check
-    if (provider.id === "browser") {
+    if (provider.id === ProviderRegistryIds.BROWSER) {
       return `⚠️ ${provider.name} is not available. Requires Chrome 138+ with translation features enabled.`;
     }
 
@@ -304,7 +306,7 @@ export class ProviderHtmlGenerator {
       free: allProviders.filter((p) => p.category === "free"),
       ai: allProviders.filter((p) => p.category === "ai"),
       local: allProviders.filter((p) => p.category === "local"),
-      custom: allProviders.filter((p) => p.category === "custom"),
+      custom: allProviders.filter((p) => p.category === ProviderRegistryIds.CUSTOM),
       available: allProviders,
       unavailable: [], // Simplified - all supported providers are available
     };

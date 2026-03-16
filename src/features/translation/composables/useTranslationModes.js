@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
+import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 
@@ -164,7 +165,7 @@ export function useSidepanelTranslation() {
 
       // Get current provider from settings
       const settings = await getSettingsAsync();
-      const currentProvider = settings.TRANSLATION_API || 'googlev2';
+      const currentProvider = settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
       const messageId = generateMessageId('sidepanel-translate');
       
       // Determine translation mode (same logic as TranslationService.sidepanelTranslate)

@@ -4,6 +4,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
@@ -40,7 +41,7 @@ export const CONFIG = {
 
 
   // --- API Settings ---
-  TRANSLATION_API: "googlev2", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+  TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   // --- Mode Specific Provider Settings ---
   MODE_PROVIDERS: {

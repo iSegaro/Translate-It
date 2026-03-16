@@ -30,6 +30,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -111,7 +112,14 @@ const saveAllSettings = async () => {
 // Disable prompt tab based on selected API (like original logic)
 const shouldDisablePromptTab = computed(() => {
   const provider = settingsStore.selectedProvider
-  return ['google', 'bing', 'browserapi', 'yandex', 'deepl'].includes(provider)
+  return [
+    ProviderRegistryIds.GOOGLE,
+    ProviderRegistryIds.GOOGLE_V2,
+    ProviderRegistryIds.BING,
+    ProviderRegistryIds.BROWSER,
+    ProviderRegistryIds.YANDEX,
+    ProviderRegistryIds.DEEPL
+  ].includes(provider)
 })
 
 // Apply disabled state to prompt tab

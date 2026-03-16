@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
@@ -31,7 +32,7 @@ export class TranslationHandler {
     settings = {
         SOURCE_LANGUAGE: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
         TARGET_LANGUAGE: settingsManager.get('TARGET_LANGUAGE', 'fa'),
-        TRANSLATION_API: settingsManager.get('TRANSLATION_API', 'googlev2'),
+        TRANSLATION_API: settingsManager.get('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2),
         ENABLE_DICTIONARY: settingsManager.get('ENABLE_DICTIONARY', true)
       };
 
@@ -61,7 +62,7 @@ export class TranslationHandler {
         text: selectedText,
         from: AUTO_DETECT_VALUE,
         to: settings.TARGET_LANGUAGE || 'fa',
-        provider: settings.TRANSLATION_API || 'googlev2',
+        provider: settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
         messageId: messageId,
         mode: translationMode,
         options: { ...options }

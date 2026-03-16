@@ -9,6 +9,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { ref, computed, watchEffect } from 'vue'
 
 // Lazy logger initialization to avoid TDZ issues
@@ -72,7 +73,7 @@ class SettingsManager {
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
       SOURCE_LANGUAGE: 'auto',
       TARGET_LANGUAGE: 'fa',
-      TRANSLATION_API: 'googlev2',
+      TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false
     }

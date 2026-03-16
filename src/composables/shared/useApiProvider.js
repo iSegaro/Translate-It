@@ -2,6 +2,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { getProvidersForDropdown, getProviderById } from "@/core/provider-registry.js";
+import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
@@ -9,7 +10,7 @@ import browser from "webextension-polyfill";
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useApiProvider');
 
 export function useApiProvider() {
-  const currentProvider = ref("googlev2");
+  const currentProvider = ref(ProviderRegistryIds.GOOGLE_V2);
   const availableProviders = ref([]);
   const isDropdownOpen = ref(false);
   const isLoading = ref(false);
@@ -49,7 +50,7 @@ export function useApiProvider() {
   const loadCurrentProvider = async () => {
     try {
       await settingsStore.loadSettings();
-      const providerId = settingsStore.settings.TRANSLATION_API || "googlev2";
+      const providerId = settingsStore.settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
       logger.debug('Loading provider from settings:', providerId);
 
       // Check if available providers are loaded
@@ -65,12 +66,12 @@ export function useApiProvider() {
       } else {
         logger.warn('Provider not found in registry, falling back to googlev2:', providerId);
         logger.debug('Available providers:', availableProviders.value.map(p => p.id));
-        currentProvider.value = "googlev2";
-        await settingsStore.updateSettingAndPersist("TRANSLATION_API", "googlev2");
+        currentProvider.value = ProviderRegistryIds.GOOGLE_V2;
+        await settingsStore.updateSettingAndPersist("TRANSLATION_API", ProviderRegistryIds.GOOGLE_V2);
       }
     } catch (error) {
       logger.error('Error loading current provider:', error);
-      currentProvider.value = "googlev2";
+      currentProvider.value = ProviderRegistryIds.GOOGLE_V2;
     }
   };
 

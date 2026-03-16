@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { PROVIDER_REGISTRY, PROVIDER_CATEGORIES } from '@/core/provider-registry.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 
 export const useProvidersStore = defineStore('providers', () => {
   // State
-  const selectedProvider = ref('google')
+  const selectedProvider = ref(ProviderRegistryIds.GOOGLE_V2)
   
   // Generate available providers from central registry
   const availableProviders = ref(

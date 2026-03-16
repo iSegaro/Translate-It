@@ -1,6 +1,7 @@
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
@@ -46,7 +47,7 @@ export async function handleTranslateText(message, sender, sendResponse) {
       context: message.source || message.context || "vue-component",
       data: {
         text,
-        provider: provider || 'googlev2',
+        provider: provider || ProviderRegistryIds.GOOGLE_V2,
         sourceLanguage: from || 'auto',
         targetLanguage: to || 'fa',
         mode: message.data.mode || 'simple',

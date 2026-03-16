@@ -1,5 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'provider-handler');
 /**
  * Provider Handler - Handle provider-related requests
@@ -28,7 +29,7 @@ export async function getAvailableProviders() {
     logger.error("[ProviderHandler] Error getting providers:", error);
     return [
       {
-        id: "google",
+        id: ProviderRegistryIds.GOOGLE_V2,
         name: "Google Translate",
         description: "Free Google Translate service",
         type: "free",

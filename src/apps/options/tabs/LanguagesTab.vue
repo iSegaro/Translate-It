@@ -73,6 +73,7 @@ import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { useI18n } from 'vue-i18n'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -261,7 +262,7 @@ watch(targetLanguage, (value) => {
 
 // ========== API Settings ==========
 // Selected provider
-const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'googlev2')
+const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)
 
 const selectedProviderInfo = computed(() => {
   return findProviderById(selectedProvider.value)

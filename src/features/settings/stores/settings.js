@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/shared/config/config.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -14,7 +15,7 @@ function getDefaultSettings() {
     THEME: CONFIG.THEME || 'auto',
     APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English',
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
-    TRANSLATION_API: CONFIG.TRANSLATION_API || 'googlev2',
+    TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
     MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
       field: null,
       select_element: null,

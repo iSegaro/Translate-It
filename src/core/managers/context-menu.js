@@ -7,6 +7,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/shared/config/config.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -130,18 +131,19 @@ async function getApiProviders() {
 
     // Fallback to basic provider list if dynamic loading fails
     return [
-      { id: "googlev2", defaultTitle: "Google Translate" },
-      { id: "google", defaultTitle: "Google Translate (Classic)" },
-      { id: "yandex", defaultTitle: "Yandex Translate" },
-      { id: "deepl", defaultTitle: "DeepL Translate" },
-      { id: "gemini", defaultTitle: "Google Gemini" },
-      { id: "openai", defaultTitle: "OpenAI" },
-      { id: "openrouter", defaultTitle: "OpenRouter" },
-      { id: "deepseek", defaultTitle: "DeepSeek" },
-      { id: "webai", defaultTitle: "WebAI" },
-      { id: "bing", defaultTitle: "Bing Translate" },
-      { id: "browser", defaultTitle: "Browser API" },
-      { id: "custom", defaultTitle: "Custom Provider" }
+      { id: ProviderRegistryIds.GOOGLE_V2, defaultTitle: "Google Translate" },
+      { id: ProviderRegistryIds.GOOGLE, defaultTitle: "Google Translate (Classic)" },
+      { id: ProviderRegistryIds.YANDEX, defaultTitle: "Yandex Translate" },
+      { id: ProviderRegistryIds.DEEPL, defaultTitle: "DeepL Translate" },
+      { id: ProviderRegistryIds.GEMINI, defaultTitle: "Google Gemini" },
+      { id: ProviderRegistryIds.OPENAI, defaultTitle: "OpenAI" },
+      { id: ProviderRegistryIds.OPENROUTER, defaultTitle: "OpenRouter" },
+      { id: ProviderRegistryIds.DEEPSEEK, defaultTitle: "DeepSeek" },
+      { id: ProviderRegistryIds.WEBAI, defaultTitle: "WebAI" },
+      { id: ProviderRegistryIds.BING, defaultTitle: "Bing Translate" },
+      { id: ProviderRegistryIds.LINGVA, defaultTitle: "Lingva Translate" },
+      { id: ProviderRegistryIds.BROWSER, defaultTitle: "Browser API" },
+      { id: ProviderRegistryIds.CUSTOM, defaultTitle: "Custom Provider" }
     ];
   }
 }

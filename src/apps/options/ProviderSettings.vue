@@ -41,24 +41,25 @@
 
 <script setup>
 import { ref } from 'vue'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 
 const providers = ref([
   {
-    id: 'google',
+    id: ProviderRegistryIds.GOOGLE_V2,
     name: 'Google Translate',
     type: 'Free',
     description: 'Free translation service by Google',
     requiresApiKey: false
   },
   {
-    id: 'openai',
+    id: ProviderRegistryIds.OPENAI,
     name: 'OpenAI GPT',
     type: 'AI',
     description: 'Advanced AI-powered translation',
     requiresApiKey: true
   },
   {
-    id: 'gemini',
+    id: ProviderRegistryIds.GEMINI,
     name: 'Google Gemini',
     type: 'AI',
     description: 'Google\'s advanced AI model',
