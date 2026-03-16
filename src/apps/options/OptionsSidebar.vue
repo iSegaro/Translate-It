@@ -67,7 +67,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >iSegar0</a>
-          <span>&copy; 2025</span>
+          <span>&copy; {{ copyrightYear }}</span>
         </p>
       </div>
     </div>
@@ -119,6 +119,15 @@ const selectedLanguage = computed({
       logger.error('Failed to change language:', error)
     }
   }
+})
+
+// Dynamic copyright year logic based on build time
+const copyrightYear = computed(() => {
+  const startYear = 2025
+  const buildYear = __BUILD_YEAR__ || startYear
+
+  // If build year is greater than start year, show range, otherwise just start year
+  return buildYear > startYear ? `${startYear}-${buildYear}` : `${startYear}`
 })
 
 onMounted(async () => {
