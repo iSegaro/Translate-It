@@ -105,3 +105,6 @@ Core settings are managed in the `config.js` file, while internal timings are in
 2.  **Maintain Node Tracking**: Since translation is asynchronous, nodes may move; the `NodeTrackingQueue` in the `Batcher` is designed to prevent race conditions.
 3.  **Memory Management**: Always call `cleanup()` when destroying a component so the `ResourceTracker` can clear all listeners and observers.
 
+---
+
+**Last Updated**: March 2026
