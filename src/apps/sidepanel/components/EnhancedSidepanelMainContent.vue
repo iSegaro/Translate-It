@@ -93,13 +93,6 @@ watch(() => props.provider, (newVal) => {
   }
 })
 
-// Watch for local changes to notify parent
-watch(currentProviderLocal, (newVal) => {
-  if (newVal && newVal !== props.provider) {
-    emit('update:provider', newVal)
-  }
-})
-
 // Composables
 const selectElement = useSelectElementTranslation();
 const { t } = useUnifiedI18n();

@@ -185,13 +185,6 @@ watch(() => props.provider, (newVal) => {
   }
 })
 
-// Watch for local changes to notify parent
-watch(currentProviderLocal, (newVal) => {
-  if (newVal && newVal !== props.provider) {
-    emit('update:provider', newVal)
-  }
-})
-
 // Language state management
 const autoTranslateOnPaste = ref(false)
 const canTranslateFromForm = ref(false)

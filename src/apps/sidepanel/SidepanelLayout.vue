@@ -17,12 +17,12 @@
       <SidepanelMainContent
         v-if="!useEnhancedVersion"
         ref="mainContentRef"
-        v-model:provider="currentProvider"
+        :provider="currentProvider"
       />
       <EnhancedSidepanelMainContent
         v-else
         ref="mainContentRef"
-        v-model:provider="currentProvider"
+        :provider="currentProvider"
       />
 
       <!-- History Panel -->
@@ -53,6 +53,7 @@
 </template>
 
 <script setup>
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import { useHistory } from '@/features/history/composables/useHistory.js';
@@ -68,7 +69,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelLayout');
 
 
-// Get composables to sync state
+// Get stores and composables to sync state
+const settingsStore = useSettingsStore()
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const translationStore = useTranslationStore()
 useErrorHandler()
@@ -80,12 +82,17 @@ const mainContentRef = ref(null);
 const isHistoryVisible = ref(false)
 const currentProvider = ref('')
 
-// Ensure history panel is closed on mount
-onMounted(() => {
+// Ensure history panel is closed on mount and initialize provider
+onMounted(async () => {
   isHistoryVisible.value = false
   setHistoryPanelOpen(false)
 
-  // Initialize current provider from settings if not already set
+  // Wait for settings to load if not already initialized
+  if (!settingsStore.isInitialized) {
+    await settingsStore.loadSettings()
+  }
+
+  // Initialize current provider from settings
   if (settingsStore.settings.TRANSLATION_API && !currentProvider.value) {
     currentProvider.value = settingsStore.settings.TRANSLATION_API
     logger.debug('[SidepanelLayout] Initialized local provider:', currentProvider.value)

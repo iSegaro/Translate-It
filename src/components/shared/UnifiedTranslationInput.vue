@@ -21,7 +21,9 @@
       />
       <ProviderSelector
         v-if="showProviderSelector"
+        v-model="currentProviderLocal"
         :mode="providerSelectorMode"
+        :is-global="false"
         :disabled="!canTranslate"
         @translate="handleTranslate"
       />
@@ -310,9 +312,19 @@ const {
 const statusMessage = ref('')
 const statusType = ref('')
 
+// Local provider state to handle local changes without mutating props
+const currentProviderLocal = ref(props.provider)
+
+// Keep local provider in sync with props
+watch(() => props.provider, (newVal) => {
+  if (newVal) {
+    currentProviderLocal.value = newVal
+  }
+})
+
 // Helper functions
 const triggerTranslation = async (sourceLang, targetLang) => {
-  return await triggerTranslationFromComposable(sourceLang, targetLang, props.provider)
+  return await triggerTranslationFromComposable(sourceLang, targetLang, currentProviderLocal.value)
 }
 
 const clearTranslation = () => {
