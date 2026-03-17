@@ -172,12 +172,24 @@ const props = defineProps({
   }
 })
 
+// Emits
+const emit = defineEmits(['can-translate-change', 'update:provider'])
+
 // State
 const currentProviderLocal = ref(props.provider)
 
 // Watch for prop changes to sync local state
 watch(() => props.provider, (newVal) => {
-  if (newVal) currentProviderLocal.value = newVal
+  if (newVal && newVal !== currentProviderLocal.value) {
+    currentProviderLocal.value = newVal
+  }
+})
+
+// Watch for local changes to notify parent
+watch(currentProviderLocal, (newVal) => {
+  if (newVal && newVal !== props.provider) {
+    emit('update:provider', newVal)
+  }
 })
 
 // Language state management

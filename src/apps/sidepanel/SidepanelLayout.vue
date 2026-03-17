@@ -17,12 +17,12 @@
       <SidepanelMainContent
         v-if="!useEnhancedVersion"
         ref="mainContentRef"
-        :provider="currentProvider"
+        v-model:provider="currentProvider"
       />
       <EnhancedSidepanelMainContent
         v-else
         ref="mainContentRef"
-        :provider="currentProvider"
+        v-model:provider="currentProvider"
       />
 
       <!-- History Panel -->

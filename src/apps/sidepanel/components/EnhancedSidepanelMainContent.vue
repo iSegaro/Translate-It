@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
@@ -72,7 +72,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import UnifiedTranslationInput from "@/components/shared/UnifiedTranslationInput.vue";
 
-// Props
+// Props & Emits
 const props = defineProps({
   provider: {
     type: String,
@@ -80,12 +80,24 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['can-translate-change', 'update:provider'])
+
 // State
+const translationInputRef = ref(null);
 const currentProviderLocal = ref(props.provider)
 
-// Watch for prop changes
+// Watch for prop changes to sync local state
 watch(() => props.provider, (newVal) => {
-  if (newVal) currentProviderLocal.value = newVal
+  if (newVal && newVal !== currentProviderLocal.value) {
+    currentProviderLocal.value = newVal
+  }
+})
+
+// Watch for local changes to notify parent
+watch(currentProviderLocal, (newVal) => {
+  if (newVal && newVal !== props.provider) {
+    emit('update:provider', newVal)
+  }
 })
 
 // Composables
@@ -100,7 +112,6 @@ const {
 } = useUnifiedTranslation('sidepanel');
 
 // State
-const translationInputRef = ref(null);
 const autoTranslateOnPaste = ref(false);
 const canTranslate = ref(false);
 
