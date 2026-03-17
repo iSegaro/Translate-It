@@ -74,6 +74,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     required: true
+  },
+  provider: {
+    type: String,
+    default: ''
   }
 })
 
@@ -170,7 +174,7 @@ const handleKeydown = (_event) => {
 }
 
 const handleTranslate = async () => {
-  logger.debug("🎯 Translation button clicked");
+  logger.debug("Translation button clicked");
   
   if (!canTranslate.value) {
     logger.warn("⚠️ Translation blocked - canTranslate is false");
@@ -196,8 +200,8 @@ const handleTranslate = async () => {
     }
     
     // Use composable translation function with current language values
-    logger.debug("📡 Triggering translation...");
-    await triggerTranslation(sourceLanguage, targetLanguage)    
+    logger.debug("📡 Triggering translation...", { provider: props.provider });
+    await triggerTranslation(sourceLanguage, targetLanguage, props.provider)    
     logger.info("✅ Translation completed successfully");
 
   } catch (error) {
@@ -235,12 +239,6 @@ onMounted(async () => {
   // Listen for global events from header component
   tracker.addEventListener(document, 'clear-storage', clearStorage)
   tracker.addEventListener(document, 'revert-translation', revertTranslation)
-  tracker.addEventListener(document, 'translate-request', (_event) => {
-    logger.debug("Translate request received from header");
-    if (sourceText.value.trim()) {
-      handleTranslate()
-    }
-  })
   tracker.addEventListener(document, 'languages-swapped', () => {
     // Note: We only swap languages, not text content
     // Text content should remain in their respective fields

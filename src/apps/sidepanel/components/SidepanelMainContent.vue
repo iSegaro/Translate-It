@@ -35,10 +35,11 @@
             >
           </button>
           <ProviderSelector
+            v-model="currentProviderLocal"
             mode="split"
+            :is-global="false"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
-            @provider-change="handleProviderChange"
           />
         </div>
       </div>
@@ -61,10 +62,11 @@
         </button>
         <div class="center-spacer">
           <ProviderSelector
+            v-model="currentProviderLocal"
             mode="split"
+            :is-global="false"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
-            @provider-change="handleProviderChange"
           />
         </div>
         <div class="end-spacer" />
@@ -162,6 +164,22 @@ const { handleError } = useErrorHandler()
 const sourceInputRef = ref(null)
 const translationResultRef = ref(null)
 
+// Props
+const props = defineProps({
+  provider: {
+    type: String,
+    default: ''
+  }
+})
+
+// State
+const currentProviderLocal = ref(props.provider)
+
+// Watch for prop changes to sync local state
+watch(() => props.provider, (newVal) => {
+  if (newVal) currentProviderLocal.value = newVal
+})
+
 // Language state management
 const autoTranslateOnPaste = ref(false)
 const canTranslateFromForm = ref(false)
@@ -235,7 +253,7 @@ const currentTargetLanguage = computed(() => {
 
 // Methods
 const handleTranslate = async () => {
-  logger.debug("🎯 Translation button clicked");
+  logger.debug("Translation button clicked", { provider: currentProviderLocal.value });
   
   if (!canTranslate.value) {
     logger.warn("⚠️ Translation blocked - canTranslate is false");
@@ -245,8 +263,13 @@ const handleTranslate = async () => {
   try {
     logger.info("🗳️ Starting translation process...");
     
-    // Use computed values to handle AUTO_DETECT_VALUE correctly
-    await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value)    
+    // Use ref to trigger translation if available, otherwise fallback to composable
+    if (sourceInputRef.value && typeof sourceInputRef.value.triggerTranslation === 'function') {
+      await sourceInputRef.value.triggerTranslation();
+    } else {
+      // Fallback to direct composable call (already handles languages)
+      await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value, currentProviderLocal.value);
+    }
     
     logger.info("✅ Translation completed successfully");
 
@@ -254,10 +277,6 @@ const handleTranslate = async () => {
     logger.error("❌ Translation failed:", error);
     await handleError(error, 'sidepanel-translation')
   }
-}
-
-const handleProviderChange = (provider) => {
-  logger.info("[SidepanelMainContent] 🔄 Provider changed to:", provider);
 }
 
 const clearFields = async () => {

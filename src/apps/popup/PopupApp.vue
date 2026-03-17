@@ -33,14 +33,18 @@
     <template v-else>
       <!-- Sticky Header Section -->
       <div class="sticky-header">
-        <PopupHeader :target-language="targetLanguage" />
+        <PopupHeader 
+          :target-language="targetLanguage" 
+          :provider="currentProvider"
+        />
         <div class="language-controls">
           <!-- Provider Selector -->
           <ProviderSelector
+            v-model="currentProvider"
             mode="split"
+            :is-global="false"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
-            @provider-change="handleProviderChange"
           />
 
           <!-- Language Selector -->
@@ -61,16 +65,20 @@
         <!-- Original TranslationForm -->
         <TranslationForm 
           v-if="!useEnhancedVersion"
+          ref="translationFormRef"
           :source-language="sourceLanguage"
           :target-language="targetLanguage"
+          :provider="currentProvider"
           @can-translate-change="canTranslateFromForm = $event" 
         />
         
         <!-- Enhanced TranslationForm with new ActionSystem -->
         <EnhancedTranslationForm
           v-else
+          ref="enhancedTranslationFormRef"
           :source-language="sourceLanguage"
           :target-language="targetLanguage"
+          :provider="currentProvider"
           @can-translate-change="canTranslateFromForm = $event"
         />
       </div>
@@ -154,6 +162,7 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
+const currentProvider = ref('')
 
 // Reactive error message display
 const displayErrorMessage = computed(() => {
@@ -171,19 +180,24 @@ const isDevelopment = computed(() => {
          localStorage.getItem('dev-mode') === 'true'
 })
 
-// Event Handlers
-const handleTranslate = (data) => {
-  logger.debug("[PopupApp] 🎯 Translate button clicked from ProviderSelector");
-  // Emit to translation forms
-  const event = new CustomEvent('translate-request', { detail: data })
-  document.dispatchEvent(event)
-}
+// Refs
+const translationFormRef = ref(null)
+const enhancedTranslationFormRef = ref(null)
 
-const handleProviderChange = (provider) => {
-  logger.info("[PopupApp] 🔄 Provider changed to:", provider);
-  // Emit to translation forms
-  const event = new CustomEvent('provider-changed', { detail: { provider } })
-  document.dispatchEvent(event)
+// Event Handlers
+const handleTranslate = () => {
+  logger.debug("[PopupApp] Translate requested from ProviderSelector", {
+    provider: currentProvider.value
+  });
+  
+  // Call triggerTranslation directly on the active form ref
+  const activeForm = useEnhancedVersion.value ? enhancedTranslationFormRef.value : translationFormRef.value;
+  
+  if (activeForm && typeof activeForm.triggerTranslation === 'function') {
+    activeForm.triggerTranslation();
+  } else {
+    logger.warn("[PopupApp] ⚠️ Active translation form ref not found or missing triggerTranslation method");
+  }
 }
 
 // Methods
@@ -219,9 +233,15 @@ const initialize = async () => {
       )
     ])
 
-    // Step 3: Apply theme
+    // Step 3: Apply theme and initialize local provider
     const settings = settingsStore.settings
     await applyThemeLazy(settings.THEME)
+    
+    // Initialize local provider from global settings if not already set
+    if (!currentProvider.value) {
+      currentProvider.value = settings.TRANSLATION_API
+      logger.debug('[PopupApp] Initialized local provider from settings:', currentProvider.value)
+    }
 
     // Step 4: Check for saved version preference
     const savedVersion = localStorage.getItem('popup-enhanced-version')
@@ -237,7 +257,8 @@ const initialize = async () => {
 
     logger.debug('[PopupApp] Popup initialized successfully', {
       useEnhancedVersion: useEnhancedVersion.value,
-      isDevelopment: isDevelopment.value
+      isDevelopment: isDevelopment.value,
+      provider: currentProvider.value
     })
 
   } catch (error) {

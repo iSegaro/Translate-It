@@ -12,7 +12,9 @@
         :swap-alt="'Swap'"
       />
       <ProviderSelector
+        v-model="currentProviderLocal"
         mode="button"
+        :is-global="false"
         :disabled="!canTranslate"
         @translate="handleTranslate"
       />
@@ -20,6 +22,7 @@
     
     <!-- Translation content without controls -->
     <UnifiedTranslationInput
+      ref="translationInputRef"
       mode="sidepanel"
       :enhanced="true"
       :show-controls="false"
@@ -32,6 +35,7 @@
       :is-selecting="isSelecting"
       :initial-source-language="sourceLang"
       :initial-target-language="targetLang"
+      :provider="currentProviderLocal"
       :input-label="t('SIDEPANEL_SOURCE_TEXT_LABEL', 'Source Text')"
       :result-label="t('SIDEPANEL_TARGET_TEXT_LABEL', 'Translation')"
       :input-placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Type Here')"
@@ -68,6 +72,22 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import UnifiedTranslationInput from "@/components/shared/UnifiedTranslationInput.vue";
 
+// Props
+const props = defineProps({
+  provider: {
+    type: String,
+    default: ''
+  }
+})
+
+// State
+const currentProviderLocal = ref(props.provider)
+
+// Watch for prop changes
+watch(() => props.provider, (newVal) => {
+  if (newVal) currentProviderLocal.value = newVal
+})
+
 // Composables
 const selectElement = useSelectElementTranslation();
 const { t } = useUnifiedI18n();
@@ -80,6 +100,7 @@ const {
 } = useUnifiedTranslation('sidepanel');
 
 // State
+const translationInputRef = ref(null);
 const autoTranslateOnPaste = ref(false);
 const canTranslate = ref(false);
 
@@ -92,11 +113,16 @@ const handleCanTranslateChange = (newCanTranslate) => {
 };
 
 // Event Handlers for ProviderSelector
-const handleTranslate = (data) => {
-  logger.debug("[EnhancedSidepanelMainContent] Translate requested from ProviderSelector");
-  // Emit to UnifiedTranslationInput
-  const event = new CustomEvent('translate-request', { detail: data });
-  document.dispatchEvent(event);
+const handleTranslate = () => {
+  logger.debug("[EnhancedSidepanelMainContent] Translate requested from ProviderSelector", { 
+    provider: currentProviderLocal.value 
+  });
+  
+  if (translationInputRef.value && typeof translationInputRef.value.triggerTranslation === 'function') {
+    translationInputRef.value.triggerTranslation();
+  } else {
+    logger.warn("[EnhancedSidepanelMainContent] ⚠️ UnifiedTranslationInput ref not found or missing triggerTranslation method");
+  }
 };
 
 

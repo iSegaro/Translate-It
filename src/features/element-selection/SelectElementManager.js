@@ -190,7 +190,9 @@ class SelectElementManager extends ResourceTracker {
 
         // Show warning for Bing provider
         const settings = await getSettingsAsync();
-        if (settings.TRANSLATION_API === ProviderRegistryIds.BING) {
+        const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
+        
+        if (activeProvider === ProviderRegistryIds.BING) {
           const warningMessage = await getTranslationString('SELECT_ELEMENT_BING_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',
@@ -198,7 +200,7 @@ class SelectElementManager extends ResourceTracker {
             duration: 5000,
             id: `bing-warning-${this.instanceId}`,
           });
-        } else if (settings.TRANSLATION_API === ProviderRegistryIds.LINGVA) {
+        } else if (activeProvider === ProviderRegistryIds.LINGVA) {
           const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',

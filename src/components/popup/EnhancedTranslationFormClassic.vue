@@ -18,6 +18,7 @@
     :tts-result-title="t('popup_voice_target_title_icon') || 'خواندن نتیجه ترجمه'"
     :initial-source-language="currentSourceLanguage"
     :initial-target-language="currentTargetLanguage"
+    :provider="provider"
     @can-translate-change="handleCanTranslateChange"
   />
 </template>
@@ -41,6 +42,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: 'fa'
+  },
+  provider: {
+    type: String,
+    default: ''
   }
 })
 

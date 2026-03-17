@@ -48,7 +48,9 @@
       <div class="toolbar-separator" />
 
       <ProviderSelector 
+        v-model="currentProviderLocal"
         mode="icon-only"
+        :is-global="true"
         @provider-change="handleProviderChange"
       />
       <button
@@ -117,11 +119,21 @@ const props = defineProps({
   isHistoryVisible: {
     type: Boolean,
     default: false
+  },
+  currentProvider: {
+    type: String,
+    default: ''
   }
 })
 
 // Emits
-const emit = defineEmits(['historyToggle'])
+const emit = defineEmits(['historyToggle', 'update:currentProvider'])
+
+// State
+const currentProviderLocal = computed({
+  get: () => props.currentProvider,
+  set: (value) => emit('update:currentProvider', value)
+})
 
 // Resource tracker for automatic cleanup
 
@@ -172,7 +184,10 @@ const handleSelectElement = async () => {
       }
     } else {
       getLogger().debug('Activating select element mode...')
-      const result = await activateSelectMode({ targetLanguage: translationStore.uiTargetLanguage })
+      const result = await activateSelectMode({ 
+        targetLanguage: translationStore.uiTargetLanguage,
+        provider: props.currentProvider
+      })
       if (result) {
         getLogger().debug('Select element mode activated successfully')
         // composable will update shared state; UI follows isSelectModeActive

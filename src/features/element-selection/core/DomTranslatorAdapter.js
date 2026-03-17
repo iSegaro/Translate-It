@@ -78,7 +78,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalTextNodesData = textNodes.map(node => ({ node, originalText: node.textContent }));
       const textsToTranslate = textNodes.map(node => ({ text: node.textContent.trim() })).filter(item => item.text);
 
-      const provider = await getTranslationApiAsync();
+      const provider = options.provider || await getTranslationApiAsync();
       const targetLanguage = options.targetLanguage || await getTargetLanguageAsync();
 
       // Ensure original settings are loaded (fallback)

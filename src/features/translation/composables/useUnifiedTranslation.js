@@ -131,8 +131,8 @@ export function useUnifiedTranslation(context = 'popup') {
     return baseMode;
   };
 
-  const createTranslationRequest = (sourceLang, targetLang, messageId) => {
-    const currentProvider = settingsStore.settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+  const createTranslationRequest = (sourceLang, targetLang, messageId, overrideProvider = null) => {
+    const currentProvider = overrideProvider || settingsStore.settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
     const mode = getTranslationMode(sourceText.value);
 
     return {
@@ -197,7 +197,7 @@ export function useUnifiedTranslation(context = 'popup') {
     }
   };
 
-  const triggerTranslation = async (sourceLang = null, targetLang = null) => {
+  const triggerTranslation = async (sourceLang = null, targetLang = null, overrideProvider = null) => {
     if (!canTranslate.value) return false;
 
     isTranslating.value = true;
@@ -211,7 +211,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
     try {
       const messageId = generateMessageId(context);
-      const requestData = createTranslationRequest(sourceLang, targetLang, messageId);
+      const requestData = createTranslationRequest(sourceLang, targetLang, messageId, overrideProvider);
       
       getLogger().debug(`[${context}] Translation request:`, requestData.data);
 

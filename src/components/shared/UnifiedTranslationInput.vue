@@ -112,6 +112,7 @@
 import { ref, computed, onMounted, nextTick, watch, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 
 // Components - Lazy loaded for performance
 const LanguageSelector = defineAsyncComponent(() =>
@@ -194,6 +195,12 @@ const props = defineProps({
   initialTargetLanguage: {
     type: String,
     default: 'fa'
+  },
+  
+  // Provider Props
+  provider: {
+    type: String,
+    default: ''
   },
   
   // Labels and Text (i18n)
@@ -280,29 +287,32 @@ const emit = defineEmits([
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
+const translation = useUnifiedTranslation(props.mode)
 
 // Refs
 const sourceInputRef = ref(null)
 
-// State from store
-const sourceText = ref('')
-const translatedText = ref('')
-const isTranslating = ref(false)
-const canTranslate = ref(false)
-const translationError = ref('')
-const errorType = ref(null)
-const hasError = ref(false)
-const sourceLanguage = ref(props.initialSourceLanguage)
-const targetLanguage = ref(props.initialTargetLanguage)
+// State from composable
+const {
+  sourceText,
+  translatedText,
+  isTranslating,
+  canTranslate,
+  translationError,
+  errorType,
+  hasError,
+  sourceLanguage,
+  targetLanguage,
+  triggerTranslation: triggerTranslationFromComposable
+} = translation
 
 // Status state
 const statusMessage = ref('')
 const statusType = ref('')
 
 // Helper functions
-const triggerTranslation = async (_sourceLang, _targetLang) => {
-  // Implementation would go here
-  return true
+const triggerTranslation = async (sourceLang, targetLang) => {
+  return await triggerTranslationFromComposable(sourceLang, targetLang, props.provider)
 }
 
 const clearTranslation = () => {

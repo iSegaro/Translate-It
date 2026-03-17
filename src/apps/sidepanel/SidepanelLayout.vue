@@ -5,6 +5,7 @@
   >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
+      v-model:current-provider="currentProvider"
       :is-history-visible="isHistoryVisible"
       @history-toggle="handleHistoryToggle"
       @clear-fields="handleClearFields"
@@ -16,10 +17,12 @@
       <SidepanelMainContent
         v-if="!useEnhancedVersion"
         ref="mainContentRef"
+        :provider="currentProvider"
       />
       <EnhancedSidepanelMainContent
         v-else
         ref="mainContentRef"
+        :provider="currentProvider"
       />
 
       <!-- History Panel -->
@@ -75,11 +78,26 @@ const mainContentRef = ref(null);
 
 // Shared state between components
 const isHistoryVisible = ref(false)
+const currentProvider = ref('')
 
 // Ensure history panel is closed on mount
 onMounted(() => {
   isHistoryVisible.value = false
   setHistoryPanelOpen(false)
+
+  // Initialize current provider from settings if not already set
+  if (settingsStore.settings.TRANSLATION_API && !currentProvider.value) {
+    currentProvider.value = settingsStore.settings.TRANSLATION_API
+    logger.debug('[SidepanelLayout] Initialized local provider:', currentProvider.value)
+  }
+})
+
+// Watch for settings changes to keep local provider in sync when global setting changes
+watch(() => settingsStore.settings.TRANSLATION_API, (newVal) => {
+  if (newVal && newVal !== currentProvider.value) {
+    currentProvider.value = newVal
+    logger.debug('[SidepanelLayout] Local provider synced with global change:', newVal)
+  }
 })
 
 // Enhanced version toggle

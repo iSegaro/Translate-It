@@ -87,6 +87,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: null
+  },
+  provider: {
+    type: String,
+    default: ''
   }
 })
 
@@ -126,8 +130,11 @@ const handleSelectElement = async () => {
   logger.debug('Select Element button clicked!')
   
   try {
-    logger.debug('[PopupHeader] Select element button clicked')
-    const success = await toggleSelectElement({ targetLanguage: props.targetLanguage })
+    logger.debug('[PopupHeader] Select element button clicked', { provider: props.provider })
+    const success = await toggleSelectElement({ 
+      targetLanguage: props.targetLanguage,
+      provider: props.provider
+    })
     if (success) {
       logger.debug('[PopupHeader] Select element mode toggled successfully')
       window.close()

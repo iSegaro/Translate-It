@@ -192,14 +192,22 @@ const props = defineProps({
     default: 'split', // split, button, icon-only, compact
     validator: (value) => ['split', 'button', 'icon-only', 'compact'].includes(value)
   },
+  modelValue: {
+    type: String,
+    default: ''
+  },
   disabled: {
     type: Boolean,
     default: false
+  },
+  isGlobal: {
+    type: Boolean,
+    default: true
   }
 })
 
 // Emits
-const emit = defineEmits(['translate', 'provider-change'])
+const emit = defineEmits(['translate', 'provider-change', 'update:modelValue'])
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -212,7 +220,10 @@ const isTranslating = ref(false)
 const availableProviders = ref([])
 
 // Computed
-const currentProvider = computed(() => settingsStore.settings.TRANSLATION_API)
+const currentProvider = computed(() => {
+  if (props.modelValue) return props.modelValue
+  return settingsStore.settings.TRANSLATION_API
+})
 
 const currentProviderIcon = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
@@ -242,7 +253,7 @@ const getProviderIcon = (iconPath) => {
 
 const handleTranslate = () => {
   logger.debug('🗳️ Translate button clicked!', {
-    currentProvider: currentProvider.value?.name || 'Unknown',
+    currentProvider: currentProvider.value,
     isTranslating: isTranslating.value,
     mode: props.mode
   })
@@ -280,11 +291,19 @@ const selectProvider = async (provider) => {
   logger.debug('🔧 Provider selected!', {
     providerId: provider.id,
     providerName: provider.name || 'Unknown',
-    mode: props.mode
+    mode: props.mode,
+    isGlobal: props.isGlobal
   })
+
   try {
-    await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
-    logger.debug('✅ Provider updated successfully:', provider.id)
+    if (props.isGlobal) {
+      await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
+      logger.debug('✅ Global provider updated successfully:', provider.id)
+    } else {
+      logger.debug('✅ Local provider selected:', provider.id)
+    }
+    
+    emit('update:modelValue', provider.id)
     emit('provider-change', provider.id)
     isDropdownOpen.value = false
   } catch (error) {
