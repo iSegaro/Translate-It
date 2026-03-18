@@ -819,6 +819,7 @@
   "action_stop_speaking": { "message": "Stop speaking" },
   "action_retry": { "message": "Try Again" },
   "action_settings": { "message": "Settings" },
+  "retry_button": { "message": "Retry" },
 
   "translateSelectedText": { "message": "Translate selected text" },
   "translateWithTranslateIt": { "message": "Translate with Translate-It" },

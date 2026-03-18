@@ -1592,6 +1592,9 @@
   "action_settings": {
     "message": "設定"
   },
+  "retry_button": {
+    "message": "再試行"
+  },
   "translateSelectedText": {
     "message": "選択したテキストを翻訳"
   },

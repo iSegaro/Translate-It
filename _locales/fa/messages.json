@@ -1592,6 +1592,9 @@
   "action_settings": {
     "message": "تنظیمات"
   },
+  "retry_button": {
+    "message": "تلاش مجدد"
+  },
   "translateSelectedText": {
     "message": "ترجمه متن انتخاب شده"
   },
