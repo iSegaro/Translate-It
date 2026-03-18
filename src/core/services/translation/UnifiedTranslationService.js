@@ -14,7 +14,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync } from '@/shared/config/config.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
@@ -54,7 +54,13 @@ export class UnifiedTranslationService {
    */
   async _resolveEffectiveProvider(data, context) {
     // 1. If context is from UI, specific tools, or content (for batch page translation), respect the provider passed in the request
-    const uiContexts = ['popup', 'sidepanel', 'select-element', 'page-translation-batch', 'content'];
+    const uiContexts = [
+      MessageContexts.POPUP,
+      MessageContexts.SIDEPANEL,
+      MessageContexts.SELECT_ELEMENT,
+      MessageContexts.PAGE_TRANSLATION_BATCH,
+      MessageContexts.CONTENT
+    ];
     if (uiContexts.includes(context) && data.provider) {
       return data.provider;
     }

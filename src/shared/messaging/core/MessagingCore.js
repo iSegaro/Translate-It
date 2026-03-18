@@ -127,13 +127,14 @@ export class MessageContexts {
   static SIDEPANEL = "sidepanel";
   static OPTIONS = "options";
   static BACKGROUND = "background";
-  static SELECT_ELEMENT = "select_element";
+  static SELECT_ELEMENT = "select-element";
   static CONTENT = "content";
   static OFFSCREEN = "offscreen";
   static EVENT_HANDLER = "event-handler";
   static TTS_MANAGER = "tts-manager";
   static CAPTURE_MANAGER = "capture-manager";
   static SELECTION_MANAGER = "selection-manager";
+  static PAGE_TRANSLATION_BATCH = "page-translation-batch";
   
   // Additional contexts for specialized services
   static TTS_MANAGER_BACKGROUND = "tts-manager-background";
