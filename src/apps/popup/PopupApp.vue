@@ -1,5 +1,6 @@
 <template>
   <div class="popup-wrapper">
+    <!-- Initial Loading State -->
     <div
       v-if="isLoading"
       class="popup-container"
@@ -10,6 +11,7 @@
       </div>
     </div>
     
+    <!-- Error State Display -->
     <div
       v-else-if="hasError"
       class="popup-container"
@@ -30,15 +32,16 @@
       </div>
     </div>
     
+    <!-- Main Popup Content -->
     <template v-else>
-      <!-- Sticky Header Section -->
+      <!-- Sticky Header: Contains Toolbar and Language/Provider Selectors -->
       <div class="sticky-header">
         <PopupHeader 
           :target-language="targetLanguage" 
           :provider="currentProvider"
         />
         <div class="language-controls">
-          <!-- Provider Selector -->
+          <!-- Provider Selector: Manages temporary session-based provider overrides -->
           <ProviderSelector
             v-model="currentProvider"
             mode="split"
@@ -48,7 +51,7 @@
             @translate="handleTranslate"
           />
 
-          <!-- Language Selector -->
+          <!-- Language Selector: Handles source and target language selection -->
           <LanguageSelector
             v-model:source-language="sourceLanguage"
             v-model:target-language="targetLanguage"
@@ -61,9 +64,8 @@
         </div>
       </div>
       
-      <!-- Scrollable Content Section -->
+      <!-- Scrollable Translation Area: Contains the main translation form -->
       <div class="translation-container">
-        <!-- Translation Form -->
         <TranslationForm
           ref="translationFormRef"
           :source-language="sourceLanguage"
@@ -95,18 +97,21 @@ import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 
+// --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
-// Resource tracker for automatic cleanup
+// Resource tracker for automatic cleanup of timeouts and listeners
 const tracker = useResourceTracker('popup-app')
 
-// Language preloading utility
+/**
+ * Preload languages in parallel with other initialization tasks
+ * to ensure LanguageSelector has cached values immediately
+ */
 const usePreloadLanguages = async () => {
   const { useLanguages } = await import('@/composables/shared/useLanguages.js')
   const { loadLanguages } = useLanguages()
-  // Preload languages in parallel with other initialization tasks
   return loadLanguages()
 }
 
@@ -121,13 +126,13 @@ const {
   clearTranslation
 } = useUnifiedTranslation('popup');
 
-// TTS Global Manager for lifecycle management
+// TTS Global Manager for cross-context lifecycle management
 const ttsGlobal = useTTSGlobal({ 
   type: 'popup', 
   name: 'PopupApp'
 })
 
-// State
+// --- Reactive State ---
 const isLoading = ref(true)
 const loadingText = ref('Initializing...')
 const hasError = ref(false)
@@ -136,7 +141,7 @@ const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const currentProvider = ref('')
 
-// Reactive error message display
+// Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {
   if (!errorType.value) return errorMessage.value;
   const key = errorType.value.startsWith('ERRORS_') ? errorType.value : `ERRORS_${errorType.value}`;
@@ -144,41 +149,41 @@ const displayErrorMessage = computed(() => {
   return (translated && translated !== key) ? translated : errorMessage.value;
 });
 
-// Refs
+// Refs for child component communication
 const translationFormRef = ref(null)
 
-// Event Handlers
+// --- Event Handlers ---
+
+/**
+ * Handle translation requests emitted from ProviderSelector
+ */
 const handleTranslate = () => {
-  logger.debug("[PopupApp] Translate requested from ProviderSelector", {
-    provider: currentProvider.value
-  });
-  
-  // Call triggerTranslation directly on the active form ref
   const activeForm = translationFormRef.value;
-  
   if (activeForm && typeof activeForm.triggerTranslation === 'function') {
     activeForm.triggerTranslation();
-  } else {
-    logger.warn("[PopupApp] ⚠️ Active translation form ref not found or missing triggerTranslation method");
   }
 }
 
-// Lazy-loaded theme application
+/**
+ * Lazy-loaded theme application to reduce initial bundle size
+ */
 const applyThemeLazy = async (theme) => {
   const { applyTheme } = await utilsFactory.getUIUtils();
   return applyTheme(theme);
 };
 
+/**
+ * Main initialization sequence for the popup
+ */
 const initialize = async () => {
   try {
-    // Step 1: Set loading text
+    // Step 1: Set localized loading text
     loadingText.value = t('popup_loading') || 'Loading Popup...'
 
-    // Step 2: Load settings store and preload essential data
+    // Step 2: Load settings and preload languages in parallel with timeout safety
     await Promise.race([
       Promise.all([
         settingsStore.loadSettings(),
-        // Preload languages to ensure LanguageSelector has cached values
         usePreloadLanguages()
       ]),
       new Promise((_, reject) =>
@@ -186,118 +191,107 @@ const initialize = async () => {
       )
     ])
 
-    // Step 3: Apply theme and initialize local provider
+    // Step 3: Apply user's theme preference
     const settings = settingsStore.settings
     await applyThemeLazy(settings.THEME)
     
-    // Initialize local provider from global settings if not already set
+    // Step 4: Initialize session provider from global settings
     if (!currentProvider.value) {
       currentProvider.value = settings.TRANSLATION_API
-      logger.debug('[PopupApp] Initialized local provider from settings:', currentProvider.value)
     }
 
-    // Add clear-storage event listener to reset languages using ResourceTracker
+    // Step 5: Global Event Listeners (e.g., clearing fields from other components)
     tracker.addEventListener(document, 'clear-storage', async () => {
-      logger.debug("🔄 Clear storage event - resetting languages via composable");
       await clearTranslation();
     })
 
-    logger.debug('[PopupApp] Popup initialized successfully', {
-      provider: currentProvider.value
-    })
+    logger.debug('[PopupApp] Popup initialized successfully')
 
   } catch (error) {
     const isSilent = await handleError(error, 'popup-initialization')
     if (!isSilent) {
       hasError.value = true
       errorMessage.value = error.message || 'Unknown error occurred'
-      // Extract error type for reactive translation
-      const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
-      errorType.value = matchErrorToType(error)
+      
+      // Attempt to identify error type for better UI feedback
+      try {
+        const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
+        errorType.value = matchErrorToType(error)
+      } catch (e) {
+        logger.warn('Failed to load ErrorMatcher during initialization failure');
+      }
     }
   } finally {
     isLoading.value = false
   }
 }
 
-// Lifecycle
+// --- Lifecycle Hooks ---
+
 onMounted(() => {
-  // Register TTS instance with stop callback
+  /**
+   * Register with TTS Global Manager. 
+   * This ensures that if the popup closes, any ongoing TTS is stopped.
+   */
   ttsGlobal.register(async () => {
-    logger.debug('[PopupApp] TTS cleanup callback - stopping TTS due to popup lifecycle')
-    // Use TTS_STOP action like useTTSSmart composable does
     try {
-      await sendMessage({
-        action: MessageActions.TTS_STOP,
-        data: { source: 'popup-cleanup' }
-      })
+      await sendMessage({ action: MessageActions.TTS_STOP, data: { source: 'popup-cleanup' } })
     } catch (error) {
       logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
     }
   })
 
-  // Create a port connection to detect popup close via port disconnect
+  /**
+   * Establish a port connection to the background script.
+   * Disconnection of this port is the most reliable way to detect popup closure.
+   */
   const port = browser.runtime.connect({ name: 'popup-lifecycle' })
+  port.postMessage({ action: 'POPUP_OPENED', data: { timestamp: Date.now() } })
   
-  // Send initial ping to background to register popup as active
-  port.postMessage({ 
-    action: 'POPUP_OPENED',
-    data: { timestamp: Date.now() }
-  })
-  
-  // Handle port disconnect (popup closed)
-  port.onDisconnect.addListener(() => {
-    logger.debug('[PopupApp] Port disconnected - popup closing detected')
-    // Port disconnect means popup is closing - background will handle TTS stop
-  })
-  
-  // Store port reference for cleanup
   window.__popupPort = port
   
+  // Start the initialization sequence
   initialize()
 })
 
-// Cleanup TTS when popup is unmounted/closed
 onUnmounted(() => {
-  logger.debug('[PopupApp] Popup unmounting - cleaning up port and TTS')
+  logger.debug('[PopupApp] Popup unmounting - cleaning up resources')
   
-  // Disconnect port
+  // Explicitly disconnect lifecycle port
   if (window.__popupPort) {
-    try {
-      window.__popupPort.disconnect()
-    } catch (error) {
-      logger.debug('[PopupApp] Port already disconnected:', error.message)
-    }
+    try { window.__popupPort.disconnect() } catch (e) {}
     delete window.__popupPort
   }
   
-  // Just unregister - the cleanup callback will handle TTS stopping
+  // Unregister from TTS manager
   ttsGlobal.unregister()
 })
 
+/**
+ * Handle manual retry attempt on failure
+ */
 const retryLoading = () => {
   logger.debug('🔄 Retry button clicked! Retrying popup initialization...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
   
-  // Reset store state
-  settingsStore.$reset && settingsStore.$reset()
+  // Reset settings store state before retrying
+  if (settingsStore.$reset) {
+    settingsStore.$reset()
+  }
   
-  // Retry mounting logic using ResourceTracker
-  tracker.trackTimeout(() => {
-    initialize()
-  }, 100)
+  tracker.trackTimeout(() => { initialize() }, 100)
 }
 </script>
 
 <style scoped>
-/* Main popup wrapper using Flexbox */
+/* Main popup wrapper using Flexbox for adaptive sizing */
 .popup-wrapper {
   width: 100%;
-  height: 100vh; /* Full viewport height */
-  max-height: 600px; /* Popup maximum height */
-  min-height: 350px; /* Popup minimum height */
+  height: 100vh;
+  max-height: 600px;
+  min-height: 350px;
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
@@ -307,10 +301,8 @@ const retryLoading = () => {
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
   font-size: 15px;
   color: var(--text-color);
-  transition: height 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
-/* Legacy container for loading/error states */
 .popup-container {
   width: 100%;
   height: 100%;
@@ -318,9 +310,9 @@ const retryLoading = () => {
   flex-direction: column;
 }
 
-/* Sticky header section - flex shrink */
+/* Header section remains visible during scroll */
 .sticky-header {
-  flex-shrink: 0; /* Don't shrink */
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -328,15 +320,14 @@ const retryLoading = () => {
   border-bottom: 1px solid var(--header-border-color);
 }
 
-/* Scrollable content section - flex grow and scroll */
-.scrollable-content {
-  flex: 1; /* Take remaining space */
+/* Main form area that can scroll if content exceeds max-height */
+.translation-container {
+  flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0; /* Important: allows flex item to shrink */
+  min-height: 0;
 }
 
-.loading-container {
+.loading-container, .error-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -348,29 +339,14 @@ const retryLoading = () => {
 
 .loading-text {
   font-size: 14px;
-  color: var(--text-color);
   opacity: 0.7;
-}
-
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 2rem;
-  text-align: center;
-  min-height: 200px;
-}
-
-.error-icon {
-  font-size: 2rem;
 }
 
 .error-message {
   color: var(--text-color);
   opacity: 0.8;
   margin: 0;
+  text-align: center;
 }
 
 .retry-button {
@@ -381,11 +357,6 @@ const retryLoading = () => {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.retry-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color);
 }
 
 .language-controls {
@@ -393,43 +364,16 @@ const retryLoading = () => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  margin: 0;
   gap: 8px;
   background: var(--language-controls-bg-color);
   min-height: 40px;
-  box-sizing: border-box;
 }
 </style>
 
 <style scoped lang="scss">
 @use '@/assets/styles/base/variables' as *;
 
-.extension-popup {
-  width: $popup-width;
-  max-height: $popup-max-height;
-  overflow-y: auto;
-}
-
-.retry-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color);
-}
-
-.language-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  margin: 0;
-  gap: 8px;
-  background: var(--language-controls-bg-color);
-  min-height: 40px;
-  box-sizing: border-box;
-}
-</style>
-
-<style scoped lang="scss">
-@use '@/assets/styles/base/variables' as *;
-
+/* Legacy support for extension popup width/height from variables */
 .extension-popup {
   width: $popup-width;
   max-height: $popup-max-height;
