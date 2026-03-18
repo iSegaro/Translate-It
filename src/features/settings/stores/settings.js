@@ -277,13 +277,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
       // 2. Run the centralized migration logic on the imported data
       // This handles MODE_PROVIDERS (underscore to hyphen), API_KEY, etc.
-      const { updates, migrationLog } = await runSettingsMigrations(mergedSettings);
+      const { updates, logs } = await runSettingsMigrations(mergedSettings);
 
       // 3. Apply all migrated updates to our final settings object
       Object.assign(mergedSettings, updates);
       
-      if (migrationLog.length > 0) {
-        logger.info('[Import] Migrations applied:', migrationLog);
+      if (logs && logs.length > 0) {
+        logger.info('[Import] Migrations applied:', logs);
       }
 
       // Temporarily remove storage listener to prevent interference during import
