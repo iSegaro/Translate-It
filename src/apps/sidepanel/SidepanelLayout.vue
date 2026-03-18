@@ -110,8 +110,7 @@ watch(() => settingsStore.settings.TRANSLATION_API, (newVal) => {
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
 const isDevelopment = computed(() => {
-  return import.meta.env.MODE === 'development' || 
-         window.location.hostname === 'localhost' ||
+  return import.meta.env.DEV || 
          localStorage.getItem('dev-mode') === 'true'
 })
 

@@ -39,7 +39,7 @@ export function detectMemoryLeaks() {
 }
 
 // Development console commands (only in development)
-if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.memoryManager = {
     getStats: getMemoryStats,
     generateReport: generateMemoryReport,

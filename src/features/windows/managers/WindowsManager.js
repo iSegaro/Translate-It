@@ -197,7 +197,7 @@ export class WindowsManager extends ResourceTracker {
   _shouldUseEnhancedRenderer() {
     // Check for development mode
     const isDevelopment = (
-      window.location.hostname === 'localhost' ||
+      import.meta.env.DEV ||
       window.location.hostname.includes('dev') ||
       localStorage.getItem('dev-mode') === 'true'
     );
@@ -220,7 +220,7 @@ export class WindowsManager extends ResourceTracker {
     // Determine current preference
     const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
     const isDevelopment = (
-      window.location.hostname === 'localhost' ||
+      import.meta.env.DEV ||
       window.location.hostname.includes('dev') ||
       localStorage.getItem('dev-mode') === 'true'
     );
