@@ -1,9 +1,11 @@
 <template>
   <div>
-    <h3>{{ t('custom_api_settings_title') || 'Custom API Settings' }}</h3>
-    <span class="setting-description">
-      {{ t('custom_api_settings_description') || 'Use any API service that is compatible with the OpenAI chat completions format.' }}
-    </span>
+    <div class="api-info">
+      <h3>{{ t('custom_api_settings_title') || 'Custom OpenAI Compatible Settings' }}</h3>
+      <p class="setting-description">
+        {{ t('custom_api_settings_description') || 'Use any service that is compatible with the OpenAI chat completions format.' }}
+      </p>
+    </div>
     <div class="setting-group">
       <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput

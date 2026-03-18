@@ -1,8 +1,8 @@
 <template>
   <div class="api-info">
-    <h3>{{ t('browser_api_settings_title') || 'browser Translation' }}</h3>
+    <h3>{{ t('browser_api_settings_title') || 'Browser Settings' }}</h3>
     <p class="setting-description">
-      {{ t('browser_api_description') || 'Built-in Chrome translation API. Requires Chrome 138+ and works offline.' }}
+      {{ t('browser_api_description') || 'Private translations using the built-in browser engine.' }}
     </p>
     <div class="browser-api-requirements">
       <p><strong>{{ t('browser_api_requirements') || 'Requirements:' }}</strong></p>

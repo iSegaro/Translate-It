@@ -385,7 +385,7 @@
     "message": "Enable support for beta languages. Beta languages do not support formality settings."
   },
 
-  "custom_api_settings_title": { "message": "Custom API Settings" },
+  "custom_api_settings_title": { "message": "Custom OpenAI Compatible API Settings" },
   "custom_api_settings_description": {
     "message": "Use any service that is compatible with the OpenAI chat completions format."
   },
@@ -565,8 +565,8 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "Save failed :("
   },
-  "browser_api_settings_title": {"message": "Browser Translation"},
-  "browser_api_description": {"message": "Built-in Chrome translation API. Requires Chrome 138+ and works offline."},
+  "browser_api_settings_title": {"message": "Browser Settings"},
+  "browser_api_description": {"message": "Private translations using the built-in browser engine. No external server requests are required."},
   "browser_api_requirements": { "message": "Requirements:" },
   "browser_api_requirements_chrome": {
     "message": "Chrome 138+ (Desktop Only)"

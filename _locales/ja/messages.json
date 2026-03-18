@@ -639,7 +639,7 @@
     "message": "ベータ言語のサポートを有効にします。ベータ言語は丁寧さの設定に対応していません。"
   },
   "custom_api_settings_title": {
-    "message": "カスタムAPI設定"
+    "message": "OpenAI互換API設定"
   },
   "custom_api_settings_description": {
     "message": "OpenAIのチャット補完形式と互換性のあるサービスを使用できます。"
@@ -1037,10 +1037,10 @@
     "message": "保存に失敗しました :("
   },
   "browser_api_settings_title": {
-    "message": "ブラウザ翻訳"
+    "message": "ブラウザ設定"
   },
   "browser_api_description": {
-    "message": "Chrome内蔵の翻訳API。Chrome 138以降が必要で、オフラインでも動作します。"
+    "message": "内蔵ブラウザエンジンによる高速でプライベートな翻訳です。外部サーバーへのリクエストは不要です。"
   },
   "browser_api_requirements": {
     "message": "動作要件："
