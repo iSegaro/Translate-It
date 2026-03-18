@@ -5,7 +5,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
-import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { INPUT_TYPES, NOTIFICATION_TIME } from '@/shared/config/constants.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -569,7 +569,7 @@ export class ShortcutHandler extends ResourceTracker {
         pageEventBus.emit('show-notification', {
           message: `Press ${this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl'}+/ in a text field or with selected text to translate`,
           type: 'info',
-          duration: 3000
+          duration: NOTIFICATION_TIME.HINT
         });
       }).catch(() => {
         // Could not show hint - logged at TRACE level for detailed debugging

@@ -13,6 +13,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 
@@ -198,7 +199,7 @@ class SelectElementManager extends ResourceTracker {
           pageEventBus.emit('show-notification', {
             type: 'warning',
             message: warningMessage || 'Bing may have issues with Select Element. Try another provider.',
-            duration: 5000,
+            duration: NOTIFICATION_TIME.WARNING,
             id: `bing-warning-${this.instanceId}`,
           });
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
@@ -206,7 +207,7 @@ class SelectElementManager extends ResourceTracker {
           pageEventBus.emit('show-notification', {
             type: 'warning',
             message: warningMessage || 'Lingva may have issues with long texts. Try another provider.',
-            duration: 5000,
+            duration: NOTIFICATION_TIME.WARNING,
             id: `lingva-warning-${this.instanceId}`,
           });
         }

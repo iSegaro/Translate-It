@@ -48,14 +48,16 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   poolDelay: 200
 };
 
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
+
 /**
  * Timing and duration constants for page translation
  */
 export const PAGE_TRANSLATION_TIMING = {
   // Toast durations
-  TOAST_DURATION: 5000,
-  FATAL_ERROR_DURATION: 5000,
-  WARNING_DURATION: 5000,
+  TOAST_DURATION: NOTIFICATION_TIME.WARNING,
+  FATAL_ERROR_DURATION: NOTIFICATION_TIME.FATAL,
+  WARNING_DURATION: NOTIFICATION_TIME.WARNING,
   
   // Scheduler delays
   FIRST_BATCH_DELAY: 800,

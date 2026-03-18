@@ -7,6 +7,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'VueBridgeManager');
@@ -202,7 +203,7 @@ class ContentScriptVueBridge extends ResourceTracker {
     errorDiv.appendChild(closeButton);
 
     errorContainer.appendChild(errorDiv);
-    setTimeout(() => errorContainer.remove(), 5000);
+    setTimeout(() => errorContainer.remove(), NOTIFICATION_TIME.WARNING);
   }
 
   handleAdvancedScreenCapture = async (data, sendResponse) => {

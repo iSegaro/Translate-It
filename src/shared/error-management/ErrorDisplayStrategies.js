@@ -3,6 +3,7 @@
 
 import { ErrorTypes } from './ErrorTypes.js'
 import { isSilentError, needsSettings } from './ErrorMatcher.js'
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js'
 
 /**
  * Error display strategies for different contexts
@@ -13,7 +14,7 @@ export const ErrorDisplayStrategies = {
     showToast: true,
     showInUI: false,
     errorLevel: 'detailed',
-    defaultDuration: 6000,
+    defaultDuration: NOTIFICATION_TIME.ERROR,
     position: 'top-right'
   },
 
@@ -69,7 +70,7 @@ export const ErrorDisplayStrategies = {
     showToast: true,
     showInUI: false,
     errorLevel: 'detailed',
-    defaultDuration: 6000,
+    defaultDuration: NOTIFICATION_TIME.ERROR,
     supportRetry: false,
     supportSettings: true
   },
@@ -79,7 +80,7 @@ export const ErrorDisplayStrategies = {
     showToast: true,
     showInUI: false,
     errorLevel: 'generic',
-    defaultDuration: 4000
+    defaultDuration: NOTIFICATION_TIME.DEFAULT,
   }
 }
 

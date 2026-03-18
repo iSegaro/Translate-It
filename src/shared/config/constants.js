@@ -6,9 +6,16 @@ export const DEFAULT_TARGET_LANGUAGE = "fa";
 
 export const NOTIFICATION_TIME = {
   REVERT: 1500,
-  PERSISTENT: 5000,
+  FAST: 1500,
+  SUCCESS: 4000,
+  INFO: 4000,
   DEFAULT: 4000,
-  ERROR: 6000
+  WARNING: 5000,
+  ERROR: 6000,
+  FATAL: 10000,
+  LONG: 8000,
+  HINT: 3000,
+  PERSISTENT: 0
 }
 
 // HTML Input Types for text field detection
