@@ -13,16 +13,16 @@ import { ProviderNames, ProviderRegistryIds, ProviderTypes } from './ProviderCon
 export const ProviderCategories = {
   FREE: "free",
   AI: "ai", 
-  BROWSER: "browser",
-  LOCAL: "local",
-  CUSTOM: "custom",
+  LOCAL: "local"
 };
 
 /**
  * The Central Manifest
  * Each entry defines everything the system needs to know about a provider.
+ * Sorted by category to ensure proper grouping in UI (Context Menus, Dropdowns)
  */
 const RAW_MANIFEST = [
+  // --- Group: FREE ---
   {
     id: ProviderRegistryIds.GOOGLE_V2,
     name: ProviderNames.GOOGLE_TRANSLATE_V2,
@@ -72,6 +72,44 @@ const RAW_MANIFEST = [
     supported: true,
   },
   {
+    id: ProviderRegistryIds.GOOGLE,
+    name: ProviderNames.GOOGLE_TRANSLATE,
+    displayName: "Google Translate (Classic)",
+    type: ProviderTypes.TRANSLATE,
+    category: ProviderCategories.FREE,
+    icon: "google.png",
+    importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
+    features: ["text", "autoDetect", "bulk", "dictionary"],
+    needsApiKey: false,
+    supported: true,
+  },
+  {
+    id: ProviderRegistryIds.LINGVA,
+    name: ProviderNames.LINGVA,
+    displayName: "Lingva",
+    type: ProviderTypes.TRANSLATE,
+    category: ProviderCategories.FREE,
+    icon: "lingva.png",
+    importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
+    features: ["text", "autoDetect"],
+    needsApiKey: false,
+    supported: true,
+  },
+  {
+    id: ProviderRegistryIds.BING,
+    name: ProviderNames.BING_TRANSLATE,
+    displayName: "Bing Translate",
+    type: ProviderTypes.TRANSLATE,
+    category: ProviderCategories.FREE,
+    icon: "bing.png",
+    importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
+    features: ["text", "autoDetect"],
+    needsApiKey: false,
+    supported: true,
+  },
+
+  // --- Group: AI ---
+  {
     id: ProviderRegistryIds.GEMINI,
     name: ProviderNames.GEMINI,
     displayName: "Google Gemini",
@@ -120,6 +158,20 @@ const RAW_MANIFEST = [
     supported: true,
   },
   {
+    id: ProviderRegistryIds.CUSTOM,
+    name: ProviderNames.CUSTOM,
+    displayName: "OpenAI Compatible",
+    type: ProviderTypes.CUSTOM,
+    category: ProviderCategories.AI,
+    icon: "custom.png",
+    importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
+    features: ["text", "context", "configurable"],
+    needsApiKey: true,
+    supported: true,
+  },
+
+  // --- Group: LOCAL ---
+  {
     id: ProviderRegistryIds.WEBAI,
     name: ProviderNames.WEBAI,
     displayName: "WebAI Local Server",
@@ -132,63 +184,15 @@ const RAW_MANIFEST = [
     supported: true,
   },
   {
-    id: ProviderRegistryIds.GOOGLE,
-    name: ProviderNames.GOOGLE_TRANSLATE,
-    displayName: "Google Translate (Classic)",
-    type: ProviderTypes.TRANSLATE,
-    category: ProviderCategories.FREE,
-    icon: "google.png",
-    importFunction: () => import("./GoogleTranslate.js").then(m => ({ default: m.GoogleTranslateProvider })),
-    features: ["text", "autoDetect", "bulk", "dictionary"],
-    needsApiKey: false,
-    supported: true,
-  },
-  {
-    id: ProviderRegistryIds.LINGVA,
-    name: ProviderNames.LINGVA,
-    displayName: "Lingva",
-    type: ProviderTypes.TRANSLATE,
-    category: ProviderCategories.FREE,
-    icon: "lingva.png",
-    importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
-    features: ["text", "autoDetect"],
-    needsApiKey: false,
-    supported: true,
-  },
-  {
-    id: ProviderRegistryIds.BING,
-    name: ProviderNames.BING_TRANSLATE,
-    displayName: "Bing Translate",
-    type: ProviderTypes.TRANSLATE,
-    category: ProviderCategories.FREE,
-    icon: "bing.png",
-    importFunction: () => import("./BingTranslate.js").then(m => ({ default: m.BingTranslateProvider })),
-    features: ["text", "autoDetect"],
-    needsApiKey: false,
-    supported: true,
-  },
-  {
     id: ProviderRegistryIds.BROWSER,
     name: ProviderNames.BROWSER_API,
     displayName: "Browser Translation",
     type: ProviderTypes.NATIVE,
-    category: ProviderCategories.BROWSER,
+    category: ProviderCategories.LOCAL,
     icon: "chrome-translate.png",
     importFunction: () => import("./BrowserAPI.js").then(m => ({ default: m.browserTranslateProvider })),
     features: ["text", "autoDetect", "offline"],
     needsApiKey: false,
-    supported: true,
-  },
-  {
-    id: ProviderRegistryIds.CUSTOM,
-    name: ProviderNames.CUSTOM,
-    displayName: "Custom Provider",
-    type: ProviderTypes.CUSTOM,
-    category: ProviderCategories.CUSTOM,
-    icon: "custom.png",
-    importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
-    features: ["text", "context", "configurable"],
-    needsApiKey: true,
     supported: true,
   },
 ];
