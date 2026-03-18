@@ -18,14 +18,14 @@ function getDefaultSettings() {
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
     TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
     MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
-      field: null,
-      select_element: null,
-      selection: null,
-      page: null,
-      dictionary: null,
-      popup_translate: null,
-      sidepanel_translate: null,
-      screen_capture: null
+      'content': null,
+      'select-element': null,
+      'selection': null,
+      'page-translation-batch': null,
+      'dictionary': null,
+      'popup': null,
+      'sidepanel': null,
+      'screen-capture': null
     },
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
@@ -273,7 +273,16 @@ export const useSettingsStore = defineStore('settings', () => {
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
 
       // 1. Merge imported settings with default settings to ensure no missing keys
-      const mergedSettings = { ...getDefaultSettings(), ...processedSettings };
+      const defaultSettings = getDefaultSettings();
+      const mergedSettings = { ...defaultSettings, ...processedSettings };
+      
+      // Special handling for nested MODE_PROVIDERS to ensure deep merge
+      if (processedSettings.MODE_PROVIDERS) {
+        mergedSettings.MODE_PROVIDERS = {
+          ...defaultSettings.MODE_PROVIDERS,
+          ...processedSettings.MODE_PROVIDERS
+        };
+      }
 
       // 2. Run the centralized migration logic on the imported data
       // This handles MODE_PROVIDERS (underscore to hyphen), API_KEY, etc.

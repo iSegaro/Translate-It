@@ -37,14 +37,18 @@ function migrateModeProviderKeys(currentSettings, updates, migrationLog) {
   };
 
   Object.entries(MAPPING).forEach(([oldKey, newKey]) => {
-    if (oldKey in providers && providers[oldKey] !== undefined) {
-      // Move value to new key if new key doesn't already have a custom value
+    if (oldKey in providers && providers[oldKey] !== undefined && providers[oldKey] !== null) {
+      // Always migrate old value to new key if new key is missing or null
       if (!(newKey in providers) || providers[newKey] === null) {
         providers[newKey] = providers[oldKey];
         migrationLog.push(`Migrated MODE_PROVIDERS.${oldKey} to ${newKey}`);
         changed = true;
       }
-      // Delete old key
+      // Always delete the old legacy key regardless
+      delete providers[oldKey];
+      changed = true;
+    } else if (oldKey in providers) {
+      // Just delete the old key if it's undefined or null
       delete providers[oldKey];
       changed = true;
     }
