@@ -21,17 +21,17 @@ export function isDevelopmentMode() {
     }
   } catch { /* Safe fallback */ }
   
-  // Method 3: Check Chrome extension development mode (Unpacked)
+  // Method 3: Check Extension development mode (Unpacked)
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
-      const manifest = chrome.runtime.getManifest();
-      // Unpacked extensions usually don't have update_url
-      if (manifest && !manifest.update_url) {
-        return true; 
-      }
+    // Works for both Chrome (chrome) and Firefox (browser) namespaces
+    const manifest = (globalThis.chrome || globalThis.browser)?.runtime?.getManifest?.();
+
+    // Unpacked extensions usually don't have update_url
+    if (manifest && !manifest.update_url) {
+      return true; 
     }
   } catch {
-    // Ignore errors
+    // Safe fallback for non-extension environments
   }
   
   return false;
