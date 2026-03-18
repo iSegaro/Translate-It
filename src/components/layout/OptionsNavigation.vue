@@ -47,11 +47,11 @@ const settingsStore = useSettingsStore()
 // Navigation items, labels are reactive to language changes
 const navigationItems = ref([
   { name: 'languages', labelKey: 'languages_tab_title' },
-  { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'prompt', labelKey: 'prompt_tab_title' },
-  { name: 'import-export', labelKey: 'import_export_tab_title' },
+  { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'advance', labelKey: 'advance_tab_title' },
+  { name: 'import-export', labelKey: 'import_export_tab_title' },
   { name: 'help', labelKey: 'help_tab_title' },
   { name: 'about', labelKey: 'about_tab_title' }
 ])

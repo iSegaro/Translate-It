@@ -122,11 +122,11 @@ async function initializeApp() {
           return initialRoute;
         }},
         { path: '/languages', component: LanguagesTab, name: 'languages' },
-        { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/activation', component: ActivationTab, name: 'activation' },
         { path: '/prompt', component: PromptTab, name: 'prompt' },
-        { path: '/import-export', component: ImportExportTab, name: 'import-export' },
+        { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/advance', component: AdvanceTab, name: 'advance' },
+        { path: '/import-export', component: ImportExportTab, name: 'import-export' },
         { path: '/help', component: HelpTab, name: 'help' },
         { path: '/about', component: About, name: 'about' }
       ]
