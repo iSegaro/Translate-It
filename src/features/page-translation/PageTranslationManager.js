@@ -12,6 +12,7 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
+import { getErrorToastType } from '@/shared/error-management/ErrorDisplayStrategies.js';
 
 
 // Internal components
@@ -284,9 +285,12 @@ export class PageTranslationManager extends ResourceTracker {
     const displayError = localizedMessage || error.message || String(error);
     const finalMessage = stopMessage.replace('{error}', displayError).replace('$1', displayError);
 
+    // Determine the toast level (error, warning, info) based on error type
+    const toastType = getErrorToastType(errorType);
+
     this.notificationManager.show(
       finalMessage,
-      'warning',
+      toastType,
       PAGE_TRANSLATION_TIMING.FATAL_ERROR_DURATION
     );
 

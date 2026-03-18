@@ -168,7 +168,18 @@ export function getErrorToastType(errorType) {
     ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
     ErrorTypes.TEXT_EMPTY,
     ErrorTypes.TEXT_TOO_LONG,
-    ErrorTypes.PROMPT_INVALID
+    ErrorTypes.PROMPT_INVALID,
+    // Critical config errors are shown as warnings to suggest user action
+    ErrorTypes.API_KEY_MISSING,
+    ErrorTypes.API_KEY_INVALID,
+    ErrorTypes.API_URL_MISSING,
+    ErrorTypes.MODEL_MISSING,
+    ErrorTypes.INSUFFICIENT_BALANCE,
+    ErrorTypes.FORBIDDEN_ERROR,
+    ErrorTypes.INVALID_REQUEST,
+    ErrorTypes.RATE_LIMIT_REACHED,
+    ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+    ErrorTypes.CIRCUIT_BREAKER_OPEN
   ]);
 
   return warningTypes.has(errorType) ? "warning" : "error";
