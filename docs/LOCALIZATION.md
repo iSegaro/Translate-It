@@ -12,21 +12,23 @@ Translate-It uses a **Manifest-Driven Architecture** for localization. Instead o
 
 ---
 
-## 🚀 Workflow: Adding a New Language
+## Workflow: Adding a New Language
 
 Follow these 4 steps to add a new language to the extension:
 
 ### 1. Update the Manifest (`src/shared/config/LocaleManifest.js`)
-Add your language to the `UI_LOCALES` array. This automatically enables the language in the Options UI and Sidebar.
+Add your language to the `UI_LOCALES` array. This automatically enables the language in the Options UI, Sidebar, and initializes the dynamic mapping system.
 
 ```javascript
 { 
   code: 'de',          // ISO 639-1 language code
   name: 'Deutsch',     // Native name of the language
   flag: 'de',          // Flag icon name (references icons/flags/de.svg)
-  dir: 'ltr'           // 'ltr' (Left-to-Right) or 'rtl' (Right-to-Left)
+  dir: 'ltr',          // 'ltr' (Left-to-Right) or 'rtl' (Right-to-Left)
+  aliases: ['Deutsch', 'German', 'de'] // Used for dynamic mapping (English/Native/Code)
 }
 ```
+*Note: The `aliases` field is critical as it's used to dynamically generate the `UI_LOCALE_TO_CODE_MAP`, ensuring the language is recognized correctly across all extension services.*
 
 ### 2. Synchronize Files
 Run the synchronization script to automatically create the new folder and populate it with all required keys from the English reference.
@@ -52,7 +54,7 @@ pnpm i18n:purge de    # Replace 'de' with your language code
 
 ---
 
-## ✅ Best Practices & Standards
+## Best Practices & Standards
 
 ### 1. The English Reference
 Always add new keys to `_locales/en/messages.json` first. The `i18n:sync` script uses English as the master template.
