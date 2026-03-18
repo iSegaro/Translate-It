@@ -220,6 +220,12 @@ src/utils/dom/                           # SHARED DOM UTILITIES
 - **Action Buttons**: Cancel and Revert buttons
 - **Cross-Context**: Works in all contexts and iframes
 
+### Provider Selection Behavior
+Select Element mode is **UI-Aware**. It dynamically follows the provider selected in the Popup or Sidepanel dropdown if its specific setting is set to `default`.
+
+- **Inheritance**: Follows the active session provider from the UI.
+- **Reference**: See [Translation Provider Logic](./TRANSLATION_PROVIDER_LOGIC.md) for detailed waterfall logic.
+
 ## Integration Points
 
 ### FeatureManager Integration

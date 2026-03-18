@@ -80,6 +80,13 @@ The system shares the same DOM-level logic as the **Select Element** feature:
 - **State Preservation**: Saves original `dir`, `textAlign`, and `direction` styles into `data-` attributes before modification, ensuring perfect restoration.
 - **Shared Logic**: Centralized in `@/utils/dom/DomDirectionManager.js`.
 
+### Provider Selection Behavior
+Whole Page Translation is **Settings-Isolated**. It strictly follows the setting in `MODE_PROVIDERS.page` and ignores any temporary dropdown selection in the Popup or Sidepanel.
+
+- **Inheritance**: Falls back directly to the Global Default (`TRANSLATION_API`) if the mode setting is `default`.
+- **Reasoning**: Ensures stable performance for batch translations.
+- **Reference**: See [Translation Provider Logic](./TRANSLATION_PROVIDER_LOGIC.md) for detailed waterfall logic.
+
 ## Configuration
 
 Core settings are managed in the `config.js` file, while internal timings are in `PageTranslationConstants.js`:
