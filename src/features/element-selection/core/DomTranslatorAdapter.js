@@ -11,6 +11,7 @@ import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
@@ -219,7 +220,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           options: { rawJsonPayload: true },
           sessionId: this.sessionMessageId, // Persists across multiple elements
         },
-        context: 'select-element',
+        context: MessageContexts.SELECT_ELEMENT,
       });
 
       const result = await Promise.race([
@@ -392,7 +393,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           // Send cancellation to background
           await sendRegularMessage({
             action: MessageActions.CANCEL_TRANSLATION,
-            data: { messageId, reason: 'user_cancelled', context: 'select-element' }
+            data: { messageId, reason: 'user_cancelled', context: MessageContexts.SELECT_ELEMENT }
           });
           this.logger.debug(`Sent CANCEL_TRANSLATION to background for ${messageId}`);
         } catch (error) {

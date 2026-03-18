@@ -4,6 +4,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
 
@@ -41,7 +42,7 @@ export function usePageTranslation() {
     try {
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE_GET_STATUS,
-        context: 'page-translation-ui',
+        context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
       if (result && result.success) {
@@ -95,7 +96,7 @@ export function usePageTranslation() {
           ...data,
           provider: syncedProvider // اضافه کردن پرووایدرِ همگام‌سازی شده
         },
-        context: 'page-translation-ui',
+        context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
       if (result.success) {
@@ -134,7 +135,7 @@ export function usePageTranslation() {
     try {
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_RESTORE,
-        context: 'page-translation-ui',
+        context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
       if (result.success) {
@@ -160,7 +161,7 @@ export function usePageTranslation() {
     try {
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE_STOP_AUTO,
-        context: 'page-translation-ui',
+        context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
       if (result.success) {
@@ -180,7 +181,7 @@ export function usePageTranslation() {
       sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE,
         data: { cancel: true },
-        context: 'page-translation-ui',
+        context: MessageContexts.PAGE_TRANSLATION_UI,
       });
       isTranslating.value = false;
       isAutoTranslating.value = false;

@@ -125,6 +125,7 @@ import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
@@ -141,7 +142,7 @@ const usePreloadLanguages = async () => {
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
-const { sendMessage } = useMessaging('popup')
+const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
 const { 

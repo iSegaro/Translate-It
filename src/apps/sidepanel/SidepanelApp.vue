@@ -48,6 +48,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSGlobalManager } from '@/features/tts/core/TTSGlobalManager.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 

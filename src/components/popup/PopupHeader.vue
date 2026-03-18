@@ -108,7 +108,7 @@ const {
   toggleSelectElement
 } = useSelectElementTranslation()
 const { handleError } = useErrorHandler()
-const { sendMessage } = useMessaging('popup')
+const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const { t } = useUnifiedI18n()
 
 // State
