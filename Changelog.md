@@ -5,7 +5,7 @@
 - **Full Page Translation:** New engine for real-time translation of entire web pages.
 - **Provider Management:** Added settings to toggle and prioritize translation engines in the [Options](#/activation) page.
 - **New Translation Engines:** Integrated **Microsoft Translator** and **Lingva Translate** (privacy-focused).
-- **Ephemeral Provider Sync:** Added `Sync Page Translation` and `Sync Select Element` toggles to the provider dropdown, allowing temporary synchronization of the UI's active provider with specific features without changing permanent settings.
+- **Ephemeral Provider Sync:** Added `Sync Page Translation` and `Sync Select Element` toggles to the provider dropdown (Sidepanel/Popup), allowing temporary synchronization of the UI's active provider with specific features without changing permanent settings.
 - **Localization:** Added full Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh)).
 
 ##### Fixed
