@@ -88,20 +88,22 @@ export function usePageTranslation() {
 
       if (result.success) {
         isTranslated.value = true;
-        message.value = `Translated ${result.translatedCount} elements`;
-        translatedCount.value = result.translatedCount;
+        translatedCount.value = result.translatedCount || 0;
         totalNodes.value = result.totalNodes;
-        
-        // Update auto-translating status accurately from manager response
-        isAutoTranslating.value = result.isAutoTranslating || false;
+        // Only update if the result explicitly tells us the state
+        if (result.isAutoTranslating !== undefined) {
+          isAutoTranslating.value = !!result.isAutoTranslating;
+        }
       } else {
         throw new Error(result.reason || 'Translation failed');
       }
-    } catch {
-      error.value = 'Translation failed';
-      message.value = 'Translation failed';
-      isTranslated.value = false;
-      isAutoTranslating.value = false;
+    } catch (e) {
+      // Only reset if it's a real failure, not just a state transition
+      if (e.message !== 'silent_error') {
+        error.value = e.message || 'Translation failed';
+        isTranslated.value = false;
+        isAutoTranslating.value = false;
+      }
     } finally {
       isTranslating.value = false;
     }
@@ -199,18 +201,14 @@ export function usePageTranslation() {
     isTranslating.value = false;
     isTranslated.value = true;
     
-    // Check if auto-translating is active from data
-    if (data.isAutoTranslating !== undefined) {
-      isAutoTranslating.value = data.isAutoTranslating;
-    } else {
-      // Fallback: refresh to be sure
-      refreshStatus();
+    // Only update isAutoTranslating if it's explicitly provided in the message
+    if (data && data.isAutoTranslating !== undefined) {
+      isAutoTranslating.value = !!data.isAutoTranslating;
     }
     
     progress.value = 100;
-    translatedCount.value = data.translatedCount || 0;
-    totalNodes.value = data.totalNodes || 0;
-    message.value = `Translation complete! ${translatedCount.value} elements translated`;
+    if (data.translatedCount !== undefined) translatedCount.value = data.translatedCount;
+    if (data.totalNodes !== undefined) totalNodes.value = data.totalNodes;
   }
 
   /**
@@ -275,7 +273,9 @@ export function usePageTranslation() {
       case MessageActions.PAGE_TRANSLATE_START:
         isTranslating.value = true;
         isTranslated.value = false;
-        isAutoTranslating.value = false;
+        if (message.data && message.data.isAutoTranslating !== undefined) {
+          isAutoTranslating.value = message.data.isAutoTranslating;
+        }
         progress.value = 0;
         break;
       case MessageActions.PAGE_TRANSLATE_PROGRESS:

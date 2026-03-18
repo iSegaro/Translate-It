@@ -131,7 +131,7 @@ const initialize = async () => {
   try {
     // Step 1: Set loading text
     logger.debug('📝 Setting loading text...')
-    loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
+    loadingText.value = (browser.i18n?.getMessage ? browser.i18n.getMessage('sidepanel_loading') : null) || 'Loading Sidepanel...'
     logger.debug('✅ Loading text set')
 
     // Step 2: Load settings store and preload essential data

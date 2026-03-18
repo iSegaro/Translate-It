@@ -112,11 +112,18 @@ export class PageTranslationManager extends ResourceTracker {
     this.sessionContext = Symbol('translation-session');
 
     try {
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { url: this.currentUrl, messageId: this.translationMessageId });
-      
       await this._loadSettings(options);
 
-      // Pass updated settings to scheduler (includes targetLanguage, provider)
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { 
+        url: this.currentUrl, 
+        messageId: this.translationMessageId,
+        isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
+      });
+
+      this.isTranslated = false;
+      this.isTranslating = true;
+      this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
+
       this.scheduler.setSettings(this.settings);
 
       // Update hover manager based on current settings
@@ -156,17 +163,14 @@ export class PageTranslationManager extends ResourceTracker {
       
       this.isTranslated = true;
       this.isTranslating = false;
-      
-      // isAutoTranslating refers to persistence (DOM Changes)
-      // We only set it to true if the setting is actually enabled
-      this.isAutoTranslating = this.settings.autoTranslateOnDOMChanges;
-      
+      this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
+
       const resultData = { 
         url: this.currentUrl, 
         translatedCount: this.scheduler.translatedCount,
         isAutoTranslating: this.isAutoTranslating,
         isTranslated: this.isTranslated,
-        triggeredAutomatically: options.isAuto || false // New flag to distinguish source
+        triggeredAutomatically: options.isAuto || false 
       };
       
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);
@@ -273,7 +277,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.cancelTranslation();
     
     // Get localized message for "Whole-page translation stopped"
-    const stopMessage = browser.i18n.getMessage('ERRORS_PAGE_TRANSLATION_STOPPED') || '$1';
+    const stopMessage = (browser.i18n?.getMessage ? browser.i18n.getMessage('ERRORS_PAGE_TRANSLATION_STOPPED') : null) || '{error}';
     
     // Use the provided localized message from scheduler if available, fallback to error message
     const displayError = localizedMessage || error.message || String(error);

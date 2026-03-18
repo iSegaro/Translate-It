@@ -83,7 +83,7 @@
           v-else-if="!compact && !isTranslating && !isAutoTranslating"
           icon="fa6-solid:language"
         />
-        <span v-if="!compact">{{ isTranslating ? translatingText : autoTranslatingText }}</span>
+        <span v-if="!compact">{{ isTranslating ? translatingText : stopTranslatingText }}</span>
       </BaseButton>
     </template>
 
@@ -186,7 +186,7 @@ const translatingText = computed(() => {
   return t('popup_string_during_translate') || 'Translating...';
 });
 
-const autoTranslatingText = computed(() => {
+const stopTranslatingText = computed(() => {
   return t('page_translation_btn_stop') || 'Stop Translating';
 });
 
@@ -221,10 +221,10 @@ const handleTranslate = () => {
 };
 
 const handleCancelOrStop = () => {
-  if (isTranslating.value) {
-    cancelTranslation();
-  } else if (isAutoTranslating.value) {
+  if (isAutoTranslating.value) {
     stopAutoTranslation();
+  } else if (isTranslating.value) {
+    cancelTranslation();
   }
 };
 
