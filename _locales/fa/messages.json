@@ -895,7 +895,9 @@
   },
   "page_translation_btn_translate": { "message": "ترجمه صفحه" },
   "page_translation_btn_stop": { "message": "توقف ترجمه" },
-  "page_translation_btn_restore": { "message": "بازگرداندن نسخه اصلی" },
+  "page_translation_btn_restore": { "message": "بازگشت به اصلی" },
+  "sync_page_label": { "message": "همگام صفحه" },
+  "sync_element_label": { "message": "همگام المان" },
   "api_key_show": {
     "message": "نمایش"
   },

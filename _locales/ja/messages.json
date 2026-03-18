@@ -893,9 +893,11 @@
   "popup_open_side_panel_title": {
     "message": "サイドパネル"
   },
-  "page_translation_btn_translate": { "message": "ページを翻訳" },
+  "page_translation_btn_translate": { "message": "ページ翻訳" },
   "page_translation_btn_stop": { "message": "翻訳を停止" },
-  "page_translation_btn_restore": { "message": "原文を表示" },
+  "page_translation_btn_restore": { "message": "原文に戻す" },
+  "sync_page_label": { "message": "ページ同期" },
+  "sync_element_label": { "message": "要素同期" },
   "api_key_show": {
     "message": "表示"
   },

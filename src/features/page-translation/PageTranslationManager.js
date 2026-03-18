@@ -301,7 +301,7 @@ export class PageTranslationManager extends ResourceTracker {
     const formattedRootMargin = rawRootMargin ? (String(rawRootMargin).match(/px|%|em|rem|vh|vw$/) ? String(rawRootMargin) : `${rawRootMargin}px`) : '10px';
 
     this.settings = {
-      translationApi: await getTranslationApiAsync(),
+      translationApi: options.provider || await getTranslationApiAsync(),
       targetLanguage: options.targetLanguage || await getTargetLanguageAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
       rootMargin: formattedRootMargin,

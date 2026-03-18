@@ -38,6 +38,7 @@
             v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
+            :show-sync="true"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
           />
@@ -65,6 +66,7 @@
             v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
+            :show-sync="true"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
           />

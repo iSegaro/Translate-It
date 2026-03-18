@@ -184,12 +184,17 @@ const handleSelectElement = async () => {
       }
     } else {
       getLogger().debug('Activating select element mode...')
+      
+      const effectiveProvider = translationStore.ephemeralSync.element && translationStore.selectedProvider
+        ? translationStore.selectedProvider
+        : props.currentProvider;
+
       const result = await activateSelectMode({ 
         targetLanguage: translationStore.uiTargetLanguage,
-        provider: props.currentProvider
+        provider: effectiveProvider
       })
       if (result) {
-        getLogger().debug('Select element mode activated successfully')
+        getLogger().debug('Select element mode activated successfully', { provider: effectiveProvider })
         // composable will update shared state; UI follows isSelectModeActive
         showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
       } else {

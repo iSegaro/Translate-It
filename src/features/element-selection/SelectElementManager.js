@@ -565,6 +565,7 @@ class SelectElementManager extends ResourceTracker {
 
       // Perform translation via domtranslator adapter
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
+        ...this.currentOptions, // Pass stored activation options (provider, targetLanguage)
         ...options,
         onProgress: async (status) => {
           this.logger.debug('Translation progress:', status);

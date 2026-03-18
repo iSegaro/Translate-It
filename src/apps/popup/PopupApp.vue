@@ -43,6 +43,7 @@
             v-model="currentProvider"
             mode="split"
             :is-global="false"
+            :show-sync="true"
             :disabled="!canTranslateFromForm"
             @translate="handleTranslate"
           />

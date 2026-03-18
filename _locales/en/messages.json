@@ -492,6 +492,8 @@
   "page_translation_btn_translate": { "message": "Translate Page" },
   "page_translation_btn_stop": { "message": "Stop Translating" },
   "page_translation_btn_restore": { "message": "Restore Original" },
+  "sync_page_label": { "message": "Sync Page" },
+  "sync_element_label": { "message": "Sync Element" },
 
   "api_key_show": { "message": "Show" },
   "api_key_hide": { "message": "Hide" },

@@ -40,6 +40,11 @@ export const useTranslationStore = defineStore('translation', () => {
   const history = ref([])
   const isLoading = ref(false)
   const selectedProvider = ref(ProviderRegistryIds.GOOGLE_V2)
+  const uiActiveProvider = ref(null) // Tracks currently selected provider in UI (local)
+  const ephemeralSync = ref({
+    page: false,
+    element: false
+  })
   const cache = ref(new Map())
   const error = ref(null)
   const providers = ref([])
@@ -175,6 +180,8 @@ export const useTranslationStore = defineStore('translation', () => {
     history,
     isLoading,
     selectedProvider,
+    uiActiveProvider,
+    ephemeralSync,
     error,
     uiTargetLanguage,
     

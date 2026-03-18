@@ -292,7 +292,11 @@ export function useSelectElementTranslation() {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
-        data: { active: true, ...options }
+        data: { 
+          active: true, 
+          provider: options.provider, // اضافه کردن پرووایدر به پیام
+          ...options 
+        }
       });
       
       // Check if activation actually succeeded

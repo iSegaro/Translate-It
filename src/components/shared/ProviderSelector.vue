@@ -53,6 +53,31 @@
         >
         <span>{{ provider.name }}</span>
       </div>
+
+      <!-- Ephemeral Sync Footer -->
+      <div v-if="showSync" class="ti-provider-dropdown-footer">
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+            <Icon 
+              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+        
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+            <Icon 
+              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+      </div>
     </div>
   </div>
   
@@ -100,6 +125,31 @@
         >
         <span>{{ provider.name }}</span>
       </div>
+
+      <!-- Ephemeral Sync Footer -->
+      <div v-if="showSync" class="ti-provider-dropdown-footer">
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+            <Icon 
+              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+        
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+            <Icon 
+              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+      </div>
     </div>
   </div>
   
@@ -140,6 +190,31 @@
         >
         <span>{{ provider.name }}</span>
       </div>
+
+      <!-- Ephemeral Sync Footer -->
+      <div v-if="showSync" class="ti-provider-dropdown-footer">
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+            <Icon 
+              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+        
+        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
+          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+            <Icon 
+              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+          </button>
+          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+        </div>
+      </div>
     </div>
   </div>
   
@@ -165,13 +240,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
-import { getProvidersForDropdown } from '@/core/provider-registry.js'
+import { getProvidersForDropdown, getProviderById } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
+import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -203,6 +280,10 @@ const props = defineProps({
   isGlobal: {
     type: Boolean,
     default: true
+  },
+  showSync: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -211,6 +292,7 @@ const emit = defineEmits(['translate', 'provider-change', 'update:modelValue'])
 
 // Stores
 const settingsStore = useSettingsStore()
+const translationStore = useTranslationStore()
 const { handleError } = useErrorHandler()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
@@ -218,6 +300,9 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 const isDropdownOpen = ref(false)
 const isTranslating = ref(false)
 const availableProviders = ref([])
+
+// Ephemeral Sync State from store
+const ephemeralSync = computed(() => translationStore.ephemeralSync)
 
 // Computed
 const currentProvider = computed(() => {
@@ -249,6 +334,36 @@ const getProviderIcon = (iconPath) => {
     return browser.runtime.getURL(`icons/${iconPath}`)
   }
   return browser.runtime.getURL(`icons/providers/${iconPath}`)
+}
+
+const getEffectiveIcon = (type) => {
+  const isSynced = ephemeralSync.value[type]
+  let providerId;
+
+  if (isSynced) {
+    // Show UI provider if synced
+    providerId = currentProvider.value
+  } else {
+    // Show default from settings
+    if (type === 'page') {
+      providerId = settingsStore.settings?.MODE_PROVIDERS?.page || settingsStore.settings.TRANSLATION_API
+    } else {
+      providerId = settingsStore.settings?.MODE_PROVIDERS?.select_element || settingsStore.settings.TRANSLATION_API
+    }
+  }
+
+  const provider = getProviderById(providerId)
+  return getProviderIcon(provider?.icon || 'providers/google.svg')
+}
+
+const toggleSync = (type) => {
+  translationStore.ephemeralSync[type] = !translationStore.ephemeralSync[type]
+  
+  // Also update translationStore.selectedProvider to match current UI selection
+  // This ensures UnifiedTranslationService knows WHICH provider to use when synced
+  translationStore.selectedProvider = currentProvider.value
+  
+  logger.debug(`[ProviderSelector] Toggled sync for ${type}:`, translationStore.ephemeralSync[type])
 }
 
 const handleTranslate = () => {
@@ -296,6 +411,9 @@ const selectProvider = async (provider) => {
   })
 
   try {
+    // Always update the store's active provider so other components (and sync logic) use the latest selection
+    translationStore.selectedProvider = provider.id
+
     if (props.isGlobal) {
       await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
       logger.debug('✅ Global provider updated successfully:', provider.id)
@@ -641,6 +759,79 @@ onUnmounted(() => {
   color: var(--text-color);
   font-size: 14px;
   white-space: nowrap;
+}
+
+/* Ephemeral Sync Footer Styles */
+.ti-provider-dropdown-footer {
+  position: sticky;
+  bottom: 0;
+  background-color: var(--color-surface, #ffffff);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  padding: 6px;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  z-index: 10;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.ti-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  flex: 1;
+  border: 1px solid transparent;
+  
+  &.is-active {
+    background-color: var(--color-primary-subtle, #eef6ff);
+    border-color: var(--color-primary-light, #d1e9ff);
+    
+    .ti-sync-toggle {
+      color: var(--color-primary, #3b82f6);
+      font-weight: 600;
+    }
+    
+    .ti-sync-icon {
+      color: var(--color-primary, #3b82f6);
+    }
+  }
+}
+
+.ti-sync-toggle {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 11px;
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  
+  &:hover {
+    color: var(--color-primary, #3b82f6);
+  }
+}
+
+.ti-sync-icon {
+  font-size: 12px;
+  color: var(--color-text-muted, #9ca3af);
+  transition: color 0.2s ease;
+}
+
+.ti-sync-provider-icon {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+  opacity: 0.8;
+  flex-shrink: 0;
 }
 
 /* Context-specific adjustments for popup vs sidepanel */

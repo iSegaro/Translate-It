@@ -53,9 +53,9 @@ export class UnifiedTranslationService {
    * @private
    */
   async _resolveEffectiveProvider(data, context) {
-    // 1. If context is popup or sidepanel, respect the provider passed in the request
-    // (user manually chose it in the UI)
-    if (context === 'popup' || context === 'sidepanel') {
+    // 1. If context is from UI, specific tools, or content (for batch page translation), respect the provider passed in the request
+    const uiContexts = ['popup', 'sidepanel', 'select-element', 'page-translation-batch', 'content'];
+    if (uiContexts.includes(context) && data.provider) {
       return data.provider;
     }
 

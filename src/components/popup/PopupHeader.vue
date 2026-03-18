@@ -68,6 +68,7 @@ import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
@@ -99,6 +100,7 @@ const sidePanelButton = ref(null)
 
 // Stores
 const settingsStore = useSettingsStore()
+const translationStore = useTranslationStore()
 
 // Composables
 const {
@@ -130,10 +132,19 @@ const handleSelectElement = async () => {
   logger.debug('Select Element button clicked!')
   
   try {
-    logger.debug('[PopupHeader] Select element button clicked', { provider: props.provider })
+    const translationStore = useTranslationStore();
+    const effectiveProvider = translationStore.ephemeralSync.element && translationStore.selectedProvider
+      ? translationStore.selectedProvider
+      : props.provider;
+
+    logger.debug('[PopupHeader] Select element button clicked', { 
+      provider: effectiveProvider,
+      isSynced: translationStore.ephemeralSync.element 
+    })
+    
     const success = await toggleSelectElement({ 
       targetLanguage: props.targetLanguage,
-      provider: props.provider
+      provider: effectiveProvider
     })
     if (success) {
       logger.debug('[PopupHeader] Select element mode toggled successfully')

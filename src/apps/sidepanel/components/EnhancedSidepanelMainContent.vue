@@ -15,6 +15,7 @@
         v-model="currentProviderLocal"
         mode="button"
         :is-global="false"
+        :show-sync="true"
         :disabled="!canTranslate"
         @translate="handleTranslate"
       />

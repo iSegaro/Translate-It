@@ -7,11 +7,15 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
 
+import { useTranslationStore } from '@/features/translation/stores/translation.js';
+
 /**
  * Composable for page translation UI
  * @returns {Object} Page translation state and actions
  */
 export function usePageTranslation() {
+  const translationStore = useTranslationStore();
+  
   // State
   const isTranslating = ref(false);
   const isTranslated = ref(false);
@@ -80,9 +84,17 @@ export function usePageTranslation() {
     error.value = null;
 
     try {
+      // Determine synced provider if any
+      const syncedProvider = translationStore.ephemeralSync.page && translationStore.selectedProvider
+        ? translationStore.selectedProvider
+        : null;
+
       const result = await sendRegularMessage({
         action: MessageActions.PAGE_TRANSLATE,
-        data: data,
+        data: { 
+          ...data,
+          provider: syncedProvider // اضافه کردن پرووایدرِ همگام‌سازی شده
+        },
         context: 'page-translation-ui',
       });
 
