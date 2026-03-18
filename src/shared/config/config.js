@@ -5,10 +5,26 @@ import { storageManager } from '../storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
 logger.info('Config module initialized');
+
+/**
+ * Translation Modes synchronized with MessageContexts for architectural consistency
+ */
+export const TranslationMode = {
+  Field: MessageContexts.CONTENT,
+  Select_Element: MessageContexts.SELECT_ELEMENT,
+  Selection: MessageContexts.SELECTION_MANAGER,
+  Dictionary_Translation: MessageContexts.DICTIONARY,
+  Popup_Translate: MessageContexts.POPUP,
+  Sidepanel_Translate: MessageContexts.SIDEPANEL,
+  ScreenCapture: MessageContexts.CAPTURE_MANAGER,
+  Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+};
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -43,17 +59,10 @@ export const CONFIG = {
   // --- API Settings ---
   TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
-  // --- Mode Specific Provider Settings ---
-  MODE_PROVIDERS: {
-    field: null, // Use global TRANSLATION_API if null
-    select_element: null,
-    selection: null,
-    page: null,
-    dictionary: null,
-    popup_translate: null,
-    sidepanel_translate: null,
-    screen_capture: null
-  },
+  // --- Mode Specific Provider Settings (Generated Dynamically) ---
+  MODE_PROVIDERS: Object.fromEntries(
+    Object.values(TranslationMode).map(mode => [mode, null])
+  ),
 
   API_KEY: "", // Gemini specific (deprecated, use GEMINI_API_KEY)
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
@@ -417,18 +426,6 @@ $_{TEXT}
 - If the input is in any other language, translate it into $_{TARGET}, focusing on readability, tone, and meaning rather than literal translation.
 - If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
   /*--- End PROMPT_TEMPLATE ---*/
-};
-
-// --- Enums & State ---
-export const TranslationMode = {
-  Field: "field",
-  Select_Element: "select_element",
-  Selection: "selection",
-  Dictionary_Translation: "dictionary",
-  Popup_Translate: "popup_translate",
-  Sidepanel_Translate: "sidepanel_translate",
-  ScreenCapture: "screen_capture",
-  Page: "page",  // Whole page translation (NEW)
 };
 
 export const state = {

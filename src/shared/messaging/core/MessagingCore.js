@@ -136,6 +136,7 @@ export class MessageContexts {
   static SELECTION_MANAGER = "selection-manager";
   static PAGE_TRANSLATION_BATCH = "page-translation-batch";
   static PAGE_TRANSLATION_UI = "page-translation-ui";
+  static DICTIONARY = "dictionary";
   
   // Additional contexts for specialized services
   static TTS_MANAGER_BACKGROUND = "tts-manager-background";

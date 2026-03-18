@@ -18,11 +18,52 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
 /**
+ * Migrate MODE_PROVIDERS keys from old format (underscore) to new format (hyphenated/MessageContexts)
+ */
+function migrateModeProviderKeys(currentSettings, updates, migrationLog) {
+  if (!currentSettings.MODE_PROVIDERS) return;
+
+  const providers = { ...currentSettings.MODE_PROVIDERS };
+  let changed = false;
+
+  // Mapping of old keys to new keys
+  const MAPPING = {
+    'select_element': 'select-element',
+    'popup_translate': 'popup',
+    'sidepanel_translate': 'sidepanel',
+    'screen_capture': 'screen-capture',
+    'field': 'content',
+    'page': 'page-translation-batch'
+  };
+
+  Object.entries(MAPPING).forEach(([oldKey, newKey]) => {
+    if (oldKey in providers && providers[oldKey] !== undefined) {
+      // Move value to new key if new key doesn't already have a custom value
+      if (!(newKey in providers) || providers[newKey] === null) {
+        providers[newKey] = providers[oldKey];
+        migrationLog.push(`Migrated MODE_PROVIDERS.${oldKey} to ${newKey}`);
+        changed = true;
+      }
+      // Delete old key
+      delete providers[oldKey];
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    updates.MODE_PROVIDERS = providers;
+  }
+}
+
+/**
  * Main migration function - handles all settings updates
  */
 function runMainMigration(currentSettings) {
   const updates = {};
   const migrationLog = [];
+
+  // Migrate Mode Provider keys first to ensure new structure is used
+  migrateModeProviderKeys(currentSettings, updates, migrationLog);
 
   // List of settings that should NOT be auto-migrated
   // Note: API_KEY is intentionally NOT in this list to allow migration to GEMINI_API_KEY
