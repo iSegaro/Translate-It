@@ -8,6 +8,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationRequestTracker');
 
@@ -240,7 +241,7 @@ export class TranslationRequestTracker {
   /**
    * Cancel a request
    */
-  cancelRequest(messageId, reason = 'user_cancelled') {
+  cancelRequest(messageId, reason = ActionReasons.USER_CANCELLED) {
     const request = this.requests.get(messageId);
     if (!request) {
       return { success: false, error: 'Request not found' };

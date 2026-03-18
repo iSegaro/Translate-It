@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getWholePageShowOriginalOnHoverAsync, getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -100,8 +101,8 @@ export class PageTranslationManager extends ResourceTracker {
       this.currentUrl = window.location.href;
     }
 
-    if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: 'busy_or_done' };
-    if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: 'not_suitable' };
+    if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: ActionReasons.BUSY_OR_DONE };
+    if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: ActionReasons.NOT_SUITABLE };
 
     // Emit event to stop conflicting features (e.g., Select Element Mode)
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
@@ -179,7 +180,7 @@ export class PageTranslationManager extends ResourceTracker {
       if (isSilentError(error)) {
         this.logger.debug('translatePage: Silent error caught', error.message);
         this.isTranslating = false;
-        return { success: false, reason: 'silent_error' };
+        return { success: false, reason: ActionReasons.SILENT_ERROR };
       }
       
       this.logger.error('translatePage failed', error);
@@ -234,7 +235,7 @@ export class PageTranslationManager extends ResourceTracker {
    * Stop auto-translation (persistence) without restoring
    */
   async stopAutoTranslation() {
-    if (!this.isAutoTranslating) return { success: false, reason: 'not_auto_translating' };
+    if (!this.isAutoTranslating) return { success: false, reason: ActionReasons.NOT_AUTO_TRANSLATING };
 
     try {
       this.bridge.stopPersistence();

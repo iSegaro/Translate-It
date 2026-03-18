@@ -203,3 +203,30 @@ export { MessageActions };
 
 // Maintain backward compatibility
 export const MessagingContexts = MessageContexts;
+
+/**
+ * Common reasons for actions, cancellations, and state changes
+ */
+export class ActionReasons {
+  // Cancellation Reasons
+  static USER_CANCELLED = "user_cancelled";
+  static ESC_KEY_PRESSED = "esc_key_pressed";
+  static USER_TYPING = "user_typing";
+  static USER_ACTION = "user_action";
+  static USER_STOPPED_PAGE_TRANSLATION = "user_stopped_page_translation";
+  
+  // System & Logic Reasons
+  static BUSY_OR_DONE = "busy_or_done";
+  static NOT_SUITABLE = "not_suitable";
+  static DUPLICATE = "duplicate";
+  static ALREADY_EXECUTING = "already_executing";
+  static NOT_AUTO_TRANSLATING = "not_auto_translating";
+  static NO_REQUEST_FOUND = "no-request-found";
+  static SILENT_ERROR = "silent_error";
+  
+  // UI & Viewport Reasons
+  static SCROLL_STARTED = "scroll-started";
+  static VIEWPORT_EXIT = "viewport-exit";
+  static VIEWPORT_ENTER = "viewport-enter";
+  static POSITION_UPDATE = "position-update";
+}

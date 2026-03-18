@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
@@ -70,7 +70,7 @@ export class PageTranslationScheduler extends ResourceTracker {
           action: MessageActions.CANCEL_TRANSLATION,
           data: { 
             messageId: this.translationSessionId,
-            reason: 'user_stopped_page_translation'
+            reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
           }
         }).catch(() => {});
       });
