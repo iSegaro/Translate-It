@@ -62,43 +62,15 @@
       </div>
       
       <!-- Scrollable Content Section -->
-      <div class="scrollable-content">
-        <!-- Original TranslationForm -->
-        <TranslationForm 
-          v-if="!useEnhancedVersion"
+      <div class="translation-container">
+        <!-- Translation Form -->
+        <TranslationForm
           ref="translationFormRef"
           :source-language="sourceLanguage"
           :target-language="targetLanguage"
           :provider="currentProvider"
           @can-translate-change="canTranslateFromForm = $event" 
         />
-        
-        <!-- Enhanced TranslationForm with new ActionSystem -->
-        <EnhancedTranslationForm
-          v-else
-          ref="enhancedTranslationFormRef"
-          :source-language="sourceLanguage"
-          :target-language="targetLanguage"
-          :provider="currentProvider"
-          @can-translate-change="canTranslateFromForm = $event"
-        />
-      </div>
-      
-      <!-- Development Toggle -->
-      <div
-        v-if="isDevelopment"
-        class="enhanced-version-toggle"
-        @click="toggleEnhancedVersion"
-      >
-        <Icon
-          v-if="useEnhancedVersion"
-          icon="fa6-solid:toggle-on"
-        />
-        <Icon
-          v-else
-          icon="fa6-solid:toggle-off"
-        />
-        <span>{{ useEnhancedVersion ? 'Enhanced' : 'Classic' }}</span>
       </div>
     </template>
   </div>
@@ -114,8 +86,6 @@ import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
-import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
-import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -174,14 +144,8 @@ const displayErrorMessage = computed(() => {
   return (translated && translated !== key) ? translated : errorMessage.value;
 });
 
-// Enhanced version toggle
-const useEnhancedVersion = ref(false) // Default to original version
-import { isDevelopmentMode } from '@/shared/utils/environment.js'
-const isDevelopment = computed(() => isDevelopmentMode())
-
 // Refs
 const translationFormRef = ref(null)
-const enhancedTranslationFormRef = ref(null)
 
 // Event Handlers
 const handleTranslate = () => {
@@ -190,23 +154,13 @@ const handleTranslate = () => {
   });
   
   // Call triggerTranslation directly on the active form ref
-  const activeForm = useEnhancedVersion.value ? enhancedTranslationFormRef.value : translationFormRef.value;
+  const activeForm = translationFormRef.value;
   
   if (activeForm && typeof activeForm.triggerTranslation === 'function') {
     activeForm.triggerTranslation();
   } else {
     logger.warn("[PopupApp] ⚠️ Active translation form ref not found or missing triggerTranslation method");
   }
-}
-
-// Methods
-const toggleEnhancedVersion = () => {
-  logger.debug('🔄 Enhanced Version toggle clicked! Current:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
-  useEnhancedVersion.value = !useEnhancedVersion.value
-  logger.debug('[PopupApp] Switched to version:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
-
-  // Store preference
-  localStorage.setItem('popup-enhanced-version', useEnhancedVersion.value.toString())
 }
 
 // Lazy-loaded theme application
@@ -242,12 +196,6 @@ const initialize = async () => {
       logger.debug('[PopupApp] Initialized local provider from settings:', currentProvider.value)
     }
 
-    // Step 4: Check for saved version preference
-    const savedVersion = localStorage.getItem('popup-enhanced-version')
-    if (savedVersion !== null) {
-      useEnhancedVersion.value = savedVersion === 'true'
-    }
-
     // Add clear-storage event listener to reset languages using ResourceTracker
     tracker.addEventListener(document, 'clear-storage', async () => {
       logger.debug("🔄 Clear storage event - resetting languages via composable");
@@ -255,8 +203,6 @@ const initialize = async () => {
     })
 
     logger.debug('[PopupApp] Popup initialized successfully', {
-      useEnhancedVersion: useEnhancedVersion.value,
-      isDevelopment: isDevelopment.value,
       provider: currentProvider.value
     })
 
@@ -442,40 +388,6 @@ const retryLoading = () => {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-.enhanced-version-toggle {
-  position: fixed;
-  top: 8px;
-  right: 8px;
-  background: rgba(var(--color-bg-secondary-rgb), 0.9);
-  border: 1px solid rgba(var(--color-border-rgb), 0.3);
-  border-radius: 12px;
-  padding: 4px 8px;
-  font-size: 10px;
-  cursor: pointer;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  backdrop-filter: blur(4px);
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: rgba(var(--color-bg-secondary-rgb), 1);
-    border-color: rgba(var(--color-border-rgb), 0.5);
-    transform: scale(1.05);
-  }
-  
-  span {
-    font-weight: 500;
-    color: var(--color-text-secondary);
-  }
-  
-  .iconify {
-    font-size: 12px;
-    color: var(--color-primary);
-  }
-}
-
 .language-controls {
   display: flex;
   align-items: center;
@@ -500,40 +412,6 @@ const retryLoading = () => {
 
 .retry-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
-}
-
-.enhanced-version-toggle {
-  position: fixed;
-  top: 8px;
-  right: 8px;
-  background: rgba(var(--color-bg-secondary-rgb), 0.9);
-  border: 1px solid rgba(var(--color-border-rgb), 0.3);
-  border-radius: 12px;
-  padding: 4px 8px;
-  font-size: 10px;
-  cursor: pointer;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  backdrop-filter: blur(4px);
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: rgba(var(--color-bg-secondary-rgb), 1);
-    border-color: rgba(var(--color-border-rgb), 0.5);
-    transform: scale(1.05);
-  }
-  
-  span {
-    font-weight: 500;
-    color: var(--color-text-secondary);
-  }
-  
-  .iconify {
-    font-size: 12px;
-    color: var(--color-primary);
-  }
 }
 
 .language-controls {

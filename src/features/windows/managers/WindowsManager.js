@@ -196,35 +196,8 @@ export class WindowsManager extends ResourceTracker {
    * Determine if enhanced renderer should be used
    */
   _shouldUseEnhancedRenderer() {
-    // Check for development mode
-    const isDevelopment = isDevelopmentMode();
-    
-    // Check for saved preference
-    const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
-    
-    if (savedPreference !== null) {
-      return savedPreference === 'true';
-    }
-    
-    // Default to enhanced in development, classic in production
-    return isDevelopment;
-  }
-
-  /**
-   * Toggle renderer preference - now just saves preference for Vue components
-   */
-  toggleEnhancedRenderer() {
-    // Determine current preference
-    const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
-    const isDevelopment = isDevelopmentMode();
-    
-    const currentState = savedPreference !== null ? savedPreference === 'true' : isDevelopment;
-    const newState = !currentState;
-    
-    localStorage.setItem('windows-manager-enhanced-version', newState.toString());
-    this.logger.info(`Renderer preference toggled to: ${newState ? 'Enhanced' : 'Classic'} (handled by Vue UI Host)`);
-    
-    return newState;
+    // Standardized to always use enhanced renderer (Vue UI Host in Shadow DOM)
+    return true;
   }
 
   /**

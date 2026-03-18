@@ -302,6 +302,12 @@ watch(isTranslating, (newLoading, oldLoading) => {
     popupResize.resetLayout()
   }
 })
+
+// Expose methods to parent
+defineExpose({
+  triggerTranslation: handleTranslate,
+  clearFields: clearStorage
+})
 </script>
 
 <style scoped>

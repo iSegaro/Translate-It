@@ -5,7 +5,7 @@ import { storageManager } from '../storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.

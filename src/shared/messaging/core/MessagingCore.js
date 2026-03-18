@@ -7,6 +7,7 @@
 import { MessageActions } from './MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MessageContexts, ActionReasons } from './MessagingConstants.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -17,217 +18,71 @@ function getLogger() {
   return logger;
 }
 
-
 /**
- * Standard message format interface
+ * Message Format Utility
+ * Provides methods for creating and validating message objects
  */
-export class MessageFormat {
+export const MessageFormat = {
   /**
-   * Create a standardized message format
-   * @param {string} action - Message action
-   * @param {*} data - Message data
-   * @param {string} context - Sender context
-   * @param {Object} options - Additional options
-   * @returns {Object} Standardized message object
+   * Create a standard message object
+   * @param {string} action - Message action from MessageActions
+   * @param {Object} data - Payload data
+   * @param {string} context - Execution context from MessageContexts
+   * @param {string|null} messageId - Optional message ID
+   * @returns {Object} Formatted message object
    */
-  static create(action, data, context, options = {}) {
+  create(action, data = {}, context = MessageContexts.CONTENT, messageId = null) {
     return {
       action,
       data,
       context,
-      messageId:
-        options.messageId ||
-        `${context}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
-      timestamp: Date.now(),
-      version: "2.0",
-      ...options,
+      messageId: messageId || `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: Date.now()
     };
-  }
+  },
 
   /**
-   * Validate message format
+   * Create a standard error response
+   * @param {Error|string} error - Error object or message
+   * @param {string|null} messageId - Original message ID
+   * @returns {Object} Error response object
+   */
+  createErrorResponse(error, messageId = null) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : error,
+      messageId,
+      timestamp: Date.now()
+    };
+  },
+
+  /**
+   * Validate a message object
    * @param {Object} message - Message to validate
    * @returns {boolean} True if message is valid
    */
-  static validate(message) {
-    if (!message || typeof message !== "object") {
-  getLogger().warn('Invalid message type or null', message);
-      return false;
-    }
-
-    const isValid = Boolean(
-      message.action &&
-        typeof message.action === "string" &&
-        message.context &&
-        typeof message.context === "string" &&
-        message.messageId &&
-        typeof message.messageId === "string"
-    );
-
-    if (!isValid) {
-  getLogger().warn('Validation failed for message', {
-        message,
-        actionValid: message.action && typeof message.action === "string",
-        contextValid: message.context && typeof message.context === "string",
-        messageIdValid: message.messageId && typeof message.messageId === "string"
-      });
-    }
-
-    return isValid;
+  validate(message) {
+    if (!message || typeof message !== 'object') return false;
+    if (!message.action) return false;
+    return true;
   }
-
-  /**
-   * Create success response format
-   * @param {*} data - Response data
-   * @param {string} originalMessageId - Original message ID
-   * @param {Object} options - Additional options
-   * @returns {Object} Success response object
-   */
-  static createSuccessResponse(data, originalMessageId, options = {}) {
-    return {
-      success: true,
-      data,
-      messageId: originalMessageId,
-      timestamp: Date.now(),
-      ...options,
-    };
-  }
-
-  /**
-   * Create error response format
-   * @param {string|Error} error - Error message or Error object
-   * @param {string} originalMessageId - Original message ID
-   * @param {Object} options - Additional options
-   * @returns {Object} Error response object
-   */
-  static createErrorResponse(error, originalMessageId, options = {}) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorType = error?.type || "UNKNOWN_ERROR";
-    const statusCode = error?.statusCode || 500;
-
-    return {
-      success: false,
-      error: {
-        message: errorMessage,
-        type: errorType,
-        statusCode,
-      },
-      messageId: originalMessageId,
-      timestamp: Date.now(),
-      ...options,
-    };
-  }
-}
+};
 
 /**
- * Context definitions for different extension contexts
- */
-export class MessageContexts {
-  static POPUP = "popup";
-  static SIDEPANEL = "sidepanel";
-  static OPTIONS = "options";
-  static BACKGROUND = "background";
-  static SELECT_ELEMENT = "select-element";
-  static CONTENT = "content";
-  static OFFSCREEN = "offscreen";
-  static EVENT_HANDLER = "event-handler";
-  static TTS_MANAGER = "tts-manager";
-  static CAPTURE_MANAGER = "capture-manager";
-  static SELECTION_MANAGER = "selection-manager";
-  static PAGE_TRANSLATION_BATCH = "page-translation-batch";
-  static PAGE_TRANSLATION_UI = "page-translation-ui";
-  static DICTIONARY = "dictionary";
-  
-  // Additional contexts for specialized services
-  static TTS_MANAGER_BACKGROUND = "tts-manager-background";
-  static API_PROVIDER = "api-provider";
-  static TRANSLATION_SERVICE = "translation-service";
-  static TTS_SMART = "tts-smart";
-  static BACKGROUND_WARMUP = "background-warmup";
-  static VUE_GENERIC = "vue-generic";
-
-  /**
-   * Get all available contexts
-   * @returns {Array<string>} Array of context names
-   */
-  static getAllContexts() {
-    return [
-      this.POPUP,
-      this.SIDEPANEL,
-      this.OPTIONS,
-      this.BACKGROUND,
-      this.SELECT_ELEMENT,
-      this.CONTENT,
-      this.OFFSCREEN,
-      this.EVENT_HANDLER,
-      this.TTS_MANAGER,
-      this.CAPTURE_MANAGER,
-      this.SELECTION_MANAGER,
-      this.TTS_MANAGER_BACKGROUND,
-      this.API_PROVIDER,
-      this.TRANSLATION_SERVICE,
-      this.TTS_SMART,
-      this.BACKGROUND_WARMUP,
-      this.VUE_GENERIC,
-    ];
-  }
-
-  /**
-   * Validate context name
-   * @param {string} context - Context to validate
-   * @returns {boolean} True if context is valid
-   */
-  static isValidContext(context) {
-    return this.getAllContexts().includes(context);
-  }
-}
-
-/**
- * Messaging utility functions
- */
-
-/**
- * Generate unique message ID
- * @param {string} context - Context identifier
+ * Unique ID generator for messages
  * @returns {string} Unique message ID
  */
-export function generateMessageId(context) {
+export function generateMessageId() {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  return `${context}-${timestamp}-${random}`;
+  const random = Math.random().toString(36).substring(2, 9);
+  return `msg-${timestamp}-${random}`;
 }
 
 // Export constants for easy access
+export { MessageContexts, ActionReasons };
 export { MessageContexts as Contexts };
 export { MessageActions as Actions };
 export { MessageActions };
 
 // Maintain backward compatibility
 export const MessagingContexts = MessageContexts;
-
-/**
- * Common reasons for actions, cancellations, and state changes
- */
-export class ActionReasons {
-  // Cancellation Reasons
-  static USER_CANCELLED = "user_cancelled";
-  static ESC_KEY_PRESSED = "esc_key_pressed";
-  static USER_TYPING = "user_typing";
-  static USER_ACTION = "user_action";
-  static USER_STOPPED_PAGE_TRANSLATION = "user_stopped_page_translation";
-  
-  // System & Logic Reasons
-  static BUSY_OR_DONE = "busy_or_done";
-  static NOT_SUITABLE = "not_suitable";
-  static DUPLICATE = "duplicate";
-  static ALREADY_EXECUTING = "already_executing";
-  static NOT_AUTO_TRANSLATING = "not_auto_translating";
-  static NO_REQUEST_FOUND = "no-request-found";
-  static SILENT_ERROR = "silent_error";
-  
-  // UI & Viewport Reasons
-  static SCROLL_STARTED = "scroll-started";
-  static VIEWPORT_EXIT = "viewport-exit";
-  static VIEWPORT_ENTER = "viewport-enter";
-  static POSITION_UPDATE = "position-update";
-}
