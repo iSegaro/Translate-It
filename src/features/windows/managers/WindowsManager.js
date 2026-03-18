@@ -1,6 +1,7 @@
 // src/managers/content/windows/NewWindowsManager.js
 
-import { getScopedLogger } from "@/shared/logging/logger.js";
+import { isDevelopmentMode } from '@/shared/utils/environment.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
@@ -196,11 +197,7 @@ export class WindowsManager extends ResourceTracker {
    */
   _shouldUseEnhancedRenderer() {
     // Check for development mode
-    const isDevelopment = (
-      import.meta.env.DEV ||
-      window.location.hostname.includes('dev') ||
-      localStorage.getItem('dev-mode') === 'true'
-    );
+    const isDevelopment = isDevelopmentMode();
     
     // Check for saved preference
     const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
@@ -219,11 +216,7 @@ export class WindowsManager extends ResourceTracker {
   toggleEnhancedRenderer() {
     // Determine current preference
     const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
-    const isDevelopment = (
-      import.meta.env.DEV ||
-      window.location.hostname.includes('dev') ||
-      localStorage.getItem('dev-mode') === 'true'
-    );
+    const isDevelopment = isDevelopmentMode();
     
     const currentState = savedPreference !== null ? savedPreference === 'true' : isDevelopment;
     const newState = !currentState;

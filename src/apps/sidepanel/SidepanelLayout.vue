@@ -107,12 +107,10 @@ watch(() => settingsStore.settings.TRANSLATION_API, (newVal) => {
   }
 })
 
+import { isDevelopmentMode } from '@/shared/utils/environment.js'
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
-const isDevelopment = computed(() => {
-  return import.meta.env.DEV || 
-         localStorage.getItem('dev-mode') === 'true'
-})
+const isDevelopment = computed(() => isDevelopmentMode())
 
 const toggleEnhancedVersion = () => {
   useEnhancedVersion.value = !useEnhancedVersion.value
