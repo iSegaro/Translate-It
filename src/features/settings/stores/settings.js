@@ -5,6 +5,7 @@ import { CONFIG } from '@/shared/config/config.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
@@ -271,16 +272,18 @@ export const useSettingsStore = defineStore('settings', () => {
       logger.info('[Import] Starting');
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
 
-      // Handle legacy API_KEY → GEMINI_API_KEY migration
-      if ('API_KEY' in processedSettings && processedSettings.API_KEY && processedSettings.API_KEY.trim() !== '') {
-        // Only migrate if GEMINI_API_KEY doesn't exist or is empty
-        if (!processedSettings.GEMINI_API_KEY || processedSettings.GEMINI_API_KEY.trim() === '') {
-          processedSettings.GEMINI_API_KEY = processedSettings.API_KEY
-          logger.info('[Import] Migrated API_KEY to GEMINI_API_KEY')
-        }
+      // 1. Merge imported settings with default settings to ensure no missing keys
+      const mergedSettings = { ...getDefaultSettings(), ...processedSettings };
 
-        // Always remove the old API_KEY
-        delete processedSettings.API_KEY
+      // 2. Run the centralized migration logic on the imported data
+      // This handles MODE_PROVIDERS (underscore to hyphen), API_KEY, etc.
+      const { updates, migrationLog } = await runSettingsMigrations(mergedSettings);
+
+      // 3. Apply all migrated updates to our final settings object
+      Object.assign(mergedSettings, updates);
+      
+      if (migrationLog.length > 0) {
+        logger.info('[Import] Migrations applied:', migrationLog);
       }
 
       // Temporarily remove storage listener to prevent interference during import
@@ -289,7 +292,10 @@ export const useSettingsStore = defineStore('settings', () => {
         storageListener = null;
       }
 
-      Object.assign(settings.value, processedSettings);
+      // 4. Update local state with the fully migrated and merged settings
+      // We replace the entire settings object to ensure no stale old keys remain
+      Object.keys(settings.value).forEach(k => delete settings.value[k]);
+      Object.assign(settings.value, mergedSettings);
 
       // Normalize possible empty regex placeholders
       if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
