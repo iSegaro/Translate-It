@@ -2,22 +2,22 @@
 
 ##### Added
 
-- **Full Page Translation:** New engine for real-time translation of entire web pages.
-- **Provider Management:** Added settings to toggle and prioritize translation engines in the [Options](#/activation) page.
-- **New Translation Engines:** Integrated **Microsoft Translator** and **Lingva Translate** (privacy-focused).
-- **Ephemeral Provider Sync:** Added `Sync Page Translation` and `Sync Select Element` toggles to the provider dropdown (Sidepanel/Popup), allowing temporary synchronization of the UI's active provider with specific features without changing permanent settings.
-- **Localization:** Added full Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh)).
+- Full Page Translation: New engine for real-time translation of entire web pages.
+- Provider Management: Added settings to toggle and prioritize translation engines in the [Options](#/activation) page.
+- New Translation Engines: Integrated **Microsoft Translator** and **Lingva Translate** (privacy-focused).
+- Ephemeral Provider Sync: Added `Sync Page Translation` and `Sync Select Element` toggles to the provider dropdown (Sidepanel/Popup), allowing temporary synchronization of the UI's active provider with specific features without changing permanent settings.
+- Localization: Added full Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh)).
 
 ##### Fixed
 
-- **Element Selection:** Improved stability and detection accuracy in `Select Element` mode.
-- **Multilingual TTS:** Fixed phonetic issues in Google TTS for Japanese, Chinese, Korean, Russian, Hebrew, and European languages.
-- **General:** Resolved UI regressions and improved cross-browser stability.
+- Element Selection: Improved stability and detection accuracy in `Select Element` mode.
+- Multilingual TTS: Fixed phonetic issues in **Google TTS** for Japanese, Chinese, Korean, Russian, Hebrew, and European languages.
+- General: Resolved UI regressions and improved cross-browser stability.
 
 ##### Changed
 
-- **UI/UX:** Modernized interface layout for a more streamlined workflow.
-- **Translation Quality:** Optimized `Select Element` logic to better preserve DOM context for more accurate results. و مصرف کمتر Token API.
+- UI/UX: Modernized interface layout for a more streamlined workflow.
+- Translation Quality: Improved `Select Element` logic to better preserve DOM context, resulting in more accurate translations and reduced API token usage.
 
 ---
 
