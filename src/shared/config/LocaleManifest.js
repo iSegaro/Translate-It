@@ -8,19 +8,22 @@ export const UI_LOCALES = [
     code: 'en', 
     name: 'English', 
     flag: 'gb', // References icons/flags/gb.svg
-    dir: 'ltr'
+    dir: 'ltr',
+    aliases: ['English', 'en']
   },
   { 
     code: 'fa', 
     name: 'فارسی', 
     flag: 'ir', // References icons/flags/ir.svg
-    dir: 'rtl'
+    dir: 'rtl',
+    aliases: ['فارسی', 'Farsi', 'fa']
   },
   { 
     code: 'ja', 
     name: '日本語', 
     flag: 'jp', // References icons/flags/jp.svg
-    dir: 'ltr'
+    dir: 'ltr',
+    aliases: ['日本語', 'Japanese', 'ja']
   }
 ];
 
