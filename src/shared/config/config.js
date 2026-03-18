@@ -90,8 +90,8 @@ export const CONFIG = {
 
     { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
   ],
-  GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
-  LINGVA_API_URL: "https://lingva.ml", // Lingva Translate API URL
+  GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single",
+  LINGVA_API_URL: "https://lingva.ml",
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.5-flash",
   OPENAI_API_KEY: "",
