@@ -24,7 +24,7 @@ We welcome contributions of all kinds! While we have a recommended workflow to k
 
 If you'd like to localize **Translate It!** into your language.
 
-We have a dedicated **[Translation Guide](./docs/guides/LOCALIZATION_GUIDE.md)** that explains:
+We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explains:
 - How to translate strings without any coding knowledge.
 - How to use simple commands to sync translation keys.
 
@@ -149,7 +149,7 @@ After running, the `dist/Publish` directory will contain:
 ## Technical Documentation
 
 For a deeper dive into the architecture and system design, please refer to:
-- [Architecture Overview](./docs/technical/ARCHITECTURE.md)
-- [Translation Provider Logic](./docs/technical/TRANSLATION_PROVIDER_LOGIC.md)
-- [Messaging System](./docs/technical/MessagingSystem.md)
-- [And more in the docs folder...](./docs/technical/)
+- [Architecture Overview](../technical/ARCHITECTURE.md)
+- [Translation Provider Logic](../technical/TRANSLATION_PROVIDER_LOGIC.md)
+- [Messaging System](../technical/MessagingSystem.md)
+- [And more in the docs folder...](../technical/)
