@@ -562,10 +562,10 @@
     "message": "Export history data"
   },
   "SIDEPANEL_EXPORT_JSON_CLEAN": {
-    "message": "JSON (Clean)"
+    "message": "Export as JSON (Clean)"
   },
   "SIDEPANEL_EXPORT_JSON_RAW": {
-    "message": "JSON (Raw)"
+    "message": "Export as JSON (Raw)"
   },
   "SIDEPANEL_EXPORT_CSV": {
     "message": "Export as CSV"

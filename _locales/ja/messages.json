@@ -1034,10 +1034,10 @@
     "message": "履歴データをエクスポート"
   },
   "SIDEPANEL_EXPORT_JSON_CLEAN": {
-    "message": "JSON (クリーン)"
+    "message": "JSONとしてエクスポート (クリーン)"
   },
   "SIDEPANEL_EXPORT_JSON_RAW": {
-    "message": "JSON (生データ)"
+    "message": "JSONとしてエクスポート (生データ)"
   },
   "SIDEPANEL_EXPORT_CSV": {
     "message": "CSVとしてエクスポート"

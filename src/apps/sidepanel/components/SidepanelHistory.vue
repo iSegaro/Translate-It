@@ -99,10 +99,10 @@
         
         <template #default="{ close }">
           <button class="dropdown-item" @click="handleExportHistory('json_clean'); close()">
-            {{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'JSON (Clean)' }}
+            {{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'Export as JSON (Clean)' }}
           </button>
           <button class="dropdown-item" @click="handleExportHistory('json_raw'); close()">
-            {{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'JSON (Raw)' }}
+            {{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'Export as JSON (Raw)' }}
           </button>
           <button class="dropdown-item" @click="handleExportHistory('csv'); close()">
             {{ t('SIDEPANEL_EXPORT_CSV') || 'Export as CSV' }}
