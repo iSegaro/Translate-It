@@ -1033,8 +1033,11 @@
   "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
     "message": "گرفتن خروجی از تاریخچه"
   },
-  "SIDEPANEL_EXPORT_JSON": {
-    "message": "خروجی JSON"
+  "SIDEPANEL_EXPORT_JSON_CLEAN": {
+    "message": "خروجی JSON (تمیز)"
+  },
+  "SIDEPANEL_EXPORT_JSON_RAW": {
+    "message": "خروجی JSON (خام)"
   },
   "SIDEPANEL_EXPORT_CSV": {
     "message": "خروجی CSV"

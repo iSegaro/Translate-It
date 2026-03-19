@@ -168,13 +168,17 @@ export function useHistory() {
       let mimeType = "text/plain";
       let extension = "txt";
 
-      if (format === "json") {
+      if (format === "json_clean") {
         const cleanItems = items.map(item => ({
           ...item,
           sourceText: SimpleMarkdown.strip(item.sourceText),
           translatedText: SimpleMarkdown.strip(item.translatedText)
         }));
         content = JSON.stringify(cleanItems, null, 2);
+        mimeType = "application/json";
+        extension = "json";
+      } else if (format === "json_raw") {
+        content = JSON.stringify(items, null, 2);
         mimeType = "application/json";
         extension = "json";
       } else if (format === "csv") {

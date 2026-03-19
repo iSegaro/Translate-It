@@ -561,8 +561,11 @@
   "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
     "message": "Export history data"
   },
-  "SIDEPANEL_EXPORT_JSON": {
-    "message": "Export as JSON"
+  "SIDEPANEL_EXPORT_JSON_CLEAN": {
+    "message": "JSON (Clean)"
+  },
+  "SIDEPANEL_EXPORT_JSON_RAW": {
+    "message": "JSON (Raw)"
   },
   "SIDEPANEL_EXPORT_CSV": {
     "message": "Export as CSV"
