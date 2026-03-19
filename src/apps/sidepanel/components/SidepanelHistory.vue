@@ -455,11 +455,13 @@ onUnmounted(() => {
 }
 
 .history-footer {
-  padding: $spacing-base $spacing-lg;
+  padding: $spacing-base;
   border-top: $border-width $border-style var(--color-border);
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
+  gap: $spacing-sm;
 }
 
 .export-btn {
@@ -475,6 +477,7 @@ onUnmounted(() => {
   font-size: $font-size-base;
   font-weight: $font-weight-medium;
   transition: all $transition-fast;
+  white-space: nowrap;
 
   &:hover {
     background-color: var(--color-background);
@@ -501,6 +504,7 @@ onUnmounted(() => {
   font-size: $font-size-base;
   font-weight: $font-weight-medium;
   transition: background-color $transition-fast;
+  white-space: nowrap;
 
   &:hover {
     background-color: #d32f2f; /* Darker red for hover */
