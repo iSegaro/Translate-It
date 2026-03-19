@@ -78,7 +78,9 @@
           <div 
             class="error-text"
             style="display: block !important; width: 100% !important; margin: 0px !important; text-align: center !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
-          >⚠️ {{ displayErrorMessage }}</div>
+          >
+            ⚠️ {{ displayErrorMessage }}
+          </div>
 
           <div 
             v-if="canRetry || canOpenSettings" 

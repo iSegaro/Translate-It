@@ -31,11 +31,11 @@
     <!-- Provider Selector positioned absolutely to avoid header overflow clipping -->
     <ProviderSelector
       v-if="props.provider"
-      :modelValue="props.provider"
+      :model-value="props.provider"
       mode="icon-only"
-      :isGlobal="false"
+      :is-global="false"
       class="ti-window-provider-selector"
-      @update:modelValue="handleProviderChange"
+      @update:model-value="handleProviderChange"
       @mousedown.stop
     />
     <div
@@ -44,7 +44,10 @@
     >
       <div class="ti-header-actions">
         <!-- ProviderSelector moved to window root for better dropdown positioning -->
-        <div class="ti-provider-placeholder" style="width: 28px; height: 28px; flex: 0 0 28px;"></div>
+        <div
+          class="ti-provider-placeholder"
+          style="width: 28px; height: 28px; flex: 0 0 28px;"
+        />
         <button
           class="ti-action-btn"
           :title="t('window_copy_translation')"

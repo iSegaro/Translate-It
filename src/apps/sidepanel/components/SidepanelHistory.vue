@@ -98,16 +98,28 @@
         </template>
         
         <template #default="{ close }">
-          <button class="dropdown-item" @click="handleExportHistory('json_clean'); close()">
+          <button
+            class="dropdown-item"
+            @click="handleExportHistory('json_clean'); close()"
+          >
             {{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'Export as JSON (Clean)' }}
           </button>
-          <button class="dropdown-item" @click="handleExportHistory('json_raw'); close()">
+          <button
+            class="dropdown-item"
+            @click="handleExportHistory('json_raw'); close()"
+          >
             {{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'Export as JSON (Raw)' }}
           </button>
-          <button class="dropdown-item" @click="handleExportHistory('csv'); close()">
+          <button
+            class="dropdown-item"
+            @click="handleExportHistory('csv'); close()"
+          >
             {{ t('SIDEPANEL_EXPORT_CSV') || 'Export as CSV' }}
           </button>
-          <button class="dropdown-item" @click="handleExportHistory('anki'); close()">
+          <button
+            class="dropdown-item"
+            @click="handleExportHistory('anki'); close()"
+          >
             {{ t('SIDEPANEL_EXPORT_ANKI') || 'Export for Anki' }}
           </button>
         </template>

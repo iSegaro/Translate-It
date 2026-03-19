@@ -57,7 +57,10 @@
       </div>
 
       <!-- Ephemeral Sync Footer -->
-      <div v-if="showSync" class="ti-provider-dropdown-footer">
+      <div
+        v-if="showSync"
+        class="ti-provider-dropdown-footer"
+      >
         <button 
           class="ti-sync-row" 
           :class="{ 'is-active': ephemeralSync.page }"
@@ -70,7 +73,11 @@
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
           </div>
-          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('page')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
         
         <button 
@@ -85,7 +92,11 @@
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
           </div>
-          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('element')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
       </div>
     </div>
@@ -139,7 +150,10 @@
       </div>
 
       <!-- Ephemeral Sync Footer -->
-      <div v-if="showSync" class="ti-provider-dropdown-footer">
+      <div
+        v-if="showSync"
+        class="ti-provider-dropdown-footer"
+      >
         <button 
           class="ti-sync-row" 
           :class="{ 'is-active': ephemeralSync.page }"
@@ -152,7 +166,11 @@
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
           </div>
-          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('page')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
         
         <button 
@@ -167,7 +185,11 @@
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
           </div>
-          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('element')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
       </div>
     </div>
@@ -214,7 +236,10 @@
       </div>
 
       <!-- Ephemeral Sync Footer -->
-      <div v-if="showSync" class="ti-provider-dropdown-footer">
+      <div
+        v-if="showSync"
+        class="ti-provider-dropdown-footer"
+      >
         <button 
           class="ti-sync-row" 
           :class="{ 'is-active': ephemeralSync.page }"
@@ -227,7 +252,11 @@
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
           </div>
-          <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('page')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
         
         <button 
@@ -242,7 +271,11 @@
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
           </div>
-          <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
+          <img
+            :src="getEffectiveIcon('element')"
+            class="ti-sync-provider-icon"
+            alt="Target Provider"
+          >
         </button>
       </div>
     </div>
