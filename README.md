@@ -230,20 +230,11 @@ You can enter **multiple API keys** for each provider (one per line). The extens
    - Press the `ESC` key.
    - Click the `Revert` button from within the extension popup.
 
-5. **Translation Cache**
-
-   When you translate and then revert a piece of text, its translation is cached. On subsequent translations, the cached result will be shown instantly.
-   A small "From Cache" label will appear temporarily in the top-right corner of the page.
-
-6. **Clear the Translation Cache**
-
-   To force a fresh translation from the server, click the "From Cache" label. This will clear the cached entry for that element.
-
 ---
 
 ### <div id="keyboard-shortcuts">Keyboard Shortcuts</div>
 
-To quickly activate `Element Selection Mode`, you can use configurable keyboard shortcuts.
+To quickly activate `Select Element` mode, you can use configurable keyboard shortcuts.
 We recommend setting them manually to avoid conflicts with browser or system shortcuts.
 
 #### Customize Shortcuts:
@@ -272,7 +263,7 @@ You can modify the default shortcuts as needed:
 
 This section documents known limitations and issues that users may encounter when using the extension.
 
-### Bing Translator - Select Element Mode Issues
+#### Bing Translator
 
 When using **Bing Translator** with the **Select Element** feature on complex or lengthy pages, the translated text may not maintain proper positioning and can appear in incorrect locations. This is a known limitation of the Bing service that doesn't align well with the extension's current architecture.
 
@@ -280,7 +271,7 @@ When using **Bing Translator** with the **Select Element** feature on complex or
 
 ---
 
-### Translation Quality in Select Element Mode on Complex Pages
+#### Translation Quality in Select Element Mode on Complex Pages
 
 To maximize efficiency and minimize token usage/API requests from translation providers, the extension heavily optimizes text before sending it for translation. This optimization strategy, while necessary for cost and performance efficiency, can result in reduced translation quality when using **Select Element** mode on complex web pages.
 
