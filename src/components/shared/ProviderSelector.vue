@@ -871,6 +871,13 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+.sidepanel-wrapper .ti-provider-dropdown-menu {
+  left: 50%;
+  transform: translateX(-50%);
+  right: auto;
+  min-width: 180px;
+}
+
 .sidepanel-wrapper .ti-split-translate-button {
   height: 28px;
   min-width: 100px;
