@@ -24,6 +24,33 @@ export class TranslationHandler {
   }
 
   /**
+   * Get the provider that would be used for a given text
+   * @param {string} selectedText 
+   * @param {object} options 
+   * @returns {string}
+   */
+  getEffectiveProvider(selectedText, options = {}) {
+    const settings = {
+      TRANSLATION_API: settingsManager.get('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2),
+      MODE_PROVIDERS: settingsManager.get('MODE_PROVIDERS', {}),
+      ENABLE_DICTIONARY: settingsManager.get('ENABLE_DICTIONARY', true)
+    };
+
+    let translationMode = TranslationMode.Selection;
+    const isDictionaryCandidate = isSingleWordOrShortPhrase(selectedText);
+    if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+      translationMode = TranslationMode.Dictionary_Translation;
+    }
+
+    let modeSpecificProvider = settings.MODE_PROVIDERS?.[translationMode];
+    if (!options.provider && !modeSpecificProvider && translationMode === TranslationMode.Dictionary_Translation) {
+      modeSpecificProvider = settings.MODE_PROVIDERS?.[TranslationMode.Selection];
+    }
+
+    return options.provider || modeSpecificProvider || settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+  }
+
+  /**
    * Perform translation request
    */
   async performTranslation(selectedText, options = {}) {
@@ -33,6 +60,7 @@ export class TranslationHandler {
         SOURCE_LANGUAGE: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
         TARGET_LANGUAGE: settingsManager.get('TARGET_LANGUAGE', 'fa'),
         TRANSLATION_API: settingsManager.get('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2),
+        MODE_PROVIDERS: settingsManager.get('MODE_PROVIDERS', {}),
         ENABLE_DICTIONARY: settingsManager.get('ENABLE_DICTIONARY', true)
       };
 
@@ -43,11 +71,37 @@ export class TranslationHandler {
         translationMode = TranslationMode.Dictionary_Translation;
       }
 
+      // Determine the best provider to use
+      // Priority: 
+      // 1. Manual override (from UI toggle)
+      // 2. Mode-specific setting (dictionary or selection)
+      // 3. Fallback: If dictionary mode and no specific provider, try selection provider
+      // 4. Global default
+      
+      let modeSpecificProvider = settings.MODE_PROVIDERS?.[translationMode];
+      
+      // Smart fallback: Dictionary often shares the same user preference as Selection
+      if (!options.provider && !modeSpecificProvider && translationMode === TranslationMode.Dictionary_Translation) {
+        modeSpecificProvider = settings.MODE_PROVIDERS?.[TranslationMode.Selection];
+        this.logger.debug('Dictionary mode fallback to Selection provider:', modeSpecificProvider);
+      }
+
+      const finalProvider = options.provider || modeSpecificProvider || settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+
+      this.logger.debug('Provider resolution details:', {
+        mode: translationMode,
+        modeSpecificProvider,
+        globalDefault: settings.TRANSLATION_API,
+        manualOverride: options.provider,
+        finalProvider
+      });
+
       this.logger.debug('Translation mode determination:', {
         text: selectedText?.substring(0, 30) + '...',
         isDictionaryCandidate,
         enableDictionary: settings.ENABLE_DICTIONARY,
-        finalMode: translationMode
+        finalMode: translationMode,
+        finalProvider
       });
 
       // Generate unique messageId
@@ -62,7 +116,7 @@ export class TranslationHandler {
         text: selectedText,
         from: AUTO_DETECT_VALUE,
         to: settings.TARGET_LANGUAGE || 'fa',
-        provider: settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
+        provider: finalProvider,
         messageId: messageId,
         mode: translationMode,
         options: { ...options }
@@ -103,7 +157,8 @@ export class TranslationHandler {
         
         return { 
           translatedText: ackOrResult.translatedText,
-          targetLanguage: payload.to 
+          targetLanguage: payload.to,
+          provider: payload.provider
         };
       }
       
@@ -127,7 +182,11 @@ export class TranslationHandler {
         
         this._cleanupRequest(messageId);
         
-        return { translatedText: final.translatedText }
+        return { 
+          translatedText: final.translatedText,
+          targetLanguage: payload.to,
+          provider: payload.provider
+        }
       }
 
       // Otherwise wait for the translation result via messaging (TRANSLATION_RESULT_UPDATE)
@@ -149,7 +208,10 @@ export class TranslationHandler {
         }
 
         this.logger.operation("Translation completed successfully");
-        return result;
+        return {
+          ...result,
+          provider: payload.provider
+        };
       } catch (resultError) {
         // Preserve the specific error message from resultPromise
         this.logger.info("resultPromise was rejected with error:", resultError.message);

@@ -40,6 +40,7 @@ export class WindowsState {
     this.mainDocumentWindowId = null;
     this.activeWindowId = null;
     this.isProcessing = false;
+    this.provider = null;
 
     // Click tracking
     this._lastClickWasInsideWindow = false;
@@ -72,6 +73,10 @@ export class WindowsState {
   // Translation management
   setOriginalText(text) {
     this.originalText = text;
+  }
+  
+  setProvider(provider) {
+    this.provider = provider;
   }
 
   setTranslationCancelled(cancelled) {

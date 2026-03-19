@@ -159,6 +159,7 @@ export class WindowsManager extends ResourceTracker {
       };
       this._speakRequestHandler = this._handleSpeakRequest.bind(this);
       this._retryRequestHandler = this._handleRetryRequest.bind(this);
+      this._changeProviderRequestHandler = this._handleChangeProviderRequest.bind(this);
       
       // Remove any existing listener first to prevent duplicates
       this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
@@ -169,6 +170,9 @@ export class WindowsManager extends ResourceTracker {
       
       this.pageEventBus.off('translation-window-retry', this._retryRequestHandler);
       this.pageEventBus.on('translation-window-retry', this._retryRequestHandler);
+
+      this.pageEventBus.off('translation-window-change-provider', this._changeProviderRequestHandler);
+      this.pageEventBus.on('translation-window-change-provider', this._changeProviderRequestHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
@@ -242,6 +246,12 @@ export class WindowsManager extends ResourceTracker {
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
     const isOnClickMode = selectionTranslationMode === 'onClick';
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
+    
+    // Clear manual provider override for completely new selections
+    if (!this._isIconToWindowTransition) {
+      this.state.setProvider(null);
+    }
+    
     await this.dismiss(false, preserveSelection);
     
     // Reset the transition flag after using it
@@ -549,11 +559,75 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isError: false,
-        initialTranslatedText: translationResult.translatedText
+        initialTranslatedText: translationResult.translatedText,
+        provider: translationResult.provider
       });
       
     } catch (error) {
       this.logger.error('Error during translation retry:', error);
+      
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+      const fallbackProvider = this.translationHandler.getEffectiveProvider(textToTranslate, { provider: this.state.provider });
+      
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isError: true,
+        errorType: errorInfo.type,
+        canRetry: errorInfo.canRetry,
+        needsSettings: errorInfo.needsSettings,
+        initialTranslatedText: errorInfo.message,
+        provider: fallbackProvider
+      });
+    }
+  }
+
+  /**
+   * Handle provider change request from translation window
+   * @private
+   */
+  async _handleChangeProviderRequest(detail) {
+    this.logger.info('Provider change request received from translation window', detail);
+    
+    const windowId = detail.id || this.state.activeWindowId;
+    const newProvider = detail.provider;
+    const textToTranslate = this.state.originalText;
+
+    if (!windowId || !textToTranslate || !newProvider) {
+      this.logger.warn('Cannot change provider: missing windowId, textToTranslate, or provider');
+      return;
+    }
+
+    // Update state
+    this.state.setProvider(newProvider);
+
+    // Set loading state in window
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true,
+      isError: false,
+      initialTranslatedText: '',
+      provider: newProvider
+    });
+
+    try {
+      const translationResult = await this._startTranslationProcess(textToTranslate);
+
+      if (!translationResult) {
+        this.logger.info('Provider change translation cancelled by user');
+        return;
+      }
+
+      // Update window with result
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isError: false,
+        initialTranslatedText: translationResult.translatedText,
+        targetLanguage: translationResult.targetLanguage,
+        provider: translationResult.provider
+      });
+      
+    } catch (error) {
+      this.logger.error('Error during provider change translation:', error);
+
       
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');
       
@@ -563,7 +637,8 @@ export class WindowsManager extends ResourceTracker {
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
-        initialTranslatedText: errorInfo.message
+        initialTranslatedText: errorInfo.message,
+        provider: newProvider
       });
     }
   }
@@ -655,8 +730,12 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
-        initialTranslatedText: translationResult.translatedText
+        initialTranslatedText: translationResult.translatedText,
+        targetLanguage: translationResult.targetLanguage,
+        provider: translationResult.provider
       });
+      
+      this.state.setProvider(translationResult.provider);
       
       this.logger.info('Window updated with translation result', { windowId });
       
@@ -665,6 +744,7 @@ export class WindowsManager extends ResourceTracker {
       
       // Use ErrorHandler to get robust, user-friendly error message
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+      const fallbackProvider = this.translationHandler.getEffectiveProvider(selectedText, { provider: this.state.provider });
       
       // Update window with user-friendly error message
       WindowsManagerEvents.updateWindow(windowId, {
@@ -674,7 +754,8 @@ export class WindowsManager extends ResourceTracker {
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
         needsSettings: errorInfo.needsSettings,
-        initialTranslatedText: errorInfo.message
+        initialTranslatedText: errorInfo.message,
+        provider: fallbackProvider
       });
     }
   }
@@ -684,8 +765,12 @@ export class WindowsManager extends ResourceTracker {
    */
   async _startTranslationProcess(selectedText) {
     try {
+      const options = {};
+      if (this.state.provider) {
+        options.provider = this.state.provider;
+      }
       // Perform translation
-      const result = await this.translationHandler.performTranslation(selectedText);
+      const result = await this.translationHandler.performTranslation(selectedText, options);
       
       if (this.state.isTranslationCancelled) return null;
       
@@ -760,8 +845,11 @@ export class WindowsManager extends ResourceTracker {
         position: position,
         theme: theme,
         isLoading: false,
-        targetLanguage: result.targetLanguage || 'auto'
+        targetLanguage: result.targetLanguage || 'auto',
+        provider: result.provider
       };
+      
+      this.state.setProvider(result.provider);
       
       this.logger.debug('[WindowsManager] About to emit showWindow with:', windowPayload);
       WindowsManagerEvents.showWindow(windowPayload);
@@ -1046,6 +1134,7 @@ export class WindowsManager extends ResourceTracker {
 
     // Get current theme
     const theme = await this.themeManager.getCurrentTheme();
+    const fallbackProvider = this.translationHandler.getEffectiveProvider(selectedText, { provider: this.state.provider });
 
     // Emit event to create error window through Vue UI Host
     WindowsManagerEvents.showWindow({
@@ -1057,7 +1146,8 @@ export class WindowsManager extends ResourceTracker {
       isError: true,
       errorType: errorInfo.type,
       canRetry: errorInfo.canRetry,
-      needsSettings: errorInfo.needsSettings
+      needsSettings: errorInfo.needsSettings,
+      provider: fallbackProvider
     });
     
     // Use centralized error handler but keep silent to avoid double notifications

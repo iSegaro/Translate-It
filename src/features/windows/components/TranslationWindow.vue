@@ -34,6 +34,15 @@
       @mousedown="handleStartDrag"
     >
       <div class="ti-header-actions">
+        <ProviderSelector
+          v-if="props.provider"
+          :modelValue="props.provider"
+          mode="icon-only"
+          :isGlobal="false"
+          class="ti-provider-selector-btn"
+          @update:modelValue="handleProviderChange"
+          @mousedown.stop
+        />
         <button
           class="ti-action-btn"
           :title="t('window_copy_translation')"
@@ -161,6 +170,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
+import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -182,7 +192,8 @@ const props = defineProps({
   canRetry: { type: Boolean, default: false },
   needsSettings: { type: Boolean, default: false },
   initialSize: { type: String, default: 'normal' }, // 'small' or 'normal'
-  targetLanguage: { type: String, default: 'auto' } // Add target language prop
+  targetLanguage: { type: String, default: 'auto' }, // Add target language prop
+  provider: { type: String, default: '' } // Add provider prop
 });
 
 const emit = defineEmits(['close', 'speak']);
@@ -276,6 +287,15 @@ const handleOpenSettings = () => {
   logger.info('Open settings requested for translation window:', props.id);
   pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS, { section: 'languages' });
 };
+
+const handleProviderChange = (newProvider) => {
+  logger.info('Provider change requested for translation window:', props.id, newProvider);
+  pageEventBus.emit('translation-window-change-provider', {
+    id: props.id,
+    provider: newProvider
+  });
+};
+
 const showOriginal = ref(false);
 
 // Computed dimensions for positioning - now handled by CSS classes
@@ -548,6 +568,74 @@ const handleStartDrag = (event) => {
 .ti-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Provider Selector Styles */
+.ti-provider-selector-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.ti-provider-selector-btn :deep(.ti-provider-icon-only-container) {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ti-provider-selector-btn :deep(.ti-provider-icon-button) {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.translation-window.light .ti-provider-selector-btn :deep(.ti-provider-icon-button) {
+  background-color: #f0f0f0 !important;
+}
+
+.translation-window.light .ti-provider-selector-btn :deep(.ti-provider-icon-button:hover) {
+  background-color: #e5e5e5 !important;
+}
+
+.translation-window.dark .ti-provider-selector-btn :deep(.ti-provider-icon-button) {
+  background-color: #424242 !important;
+}
+
+.translation-window.dark .ti-provider-selector-btn :deep(.ti-provider-icon-button:hover) {
+  background-color: #555555 !important;
+}
+
+.ti-provider-selector-btn :deep(.ti-provider-icon-only) {
+  width: 16px !important;
+  height: 16px !important;
+  filter: grayscale(100%) opacity(0.7);
+  transition: filter 0.2s ease;
+}
+
+.ti-provider-selector-btn :deep(.ti-provider-icon-button:hover .ti-provider-icon-only),
+.ti-provider-selector-btn :deep(.ti-provider-icon-button.ti-active .ti-provider-icon-only) {
+  filter: grayscale(0%) opacity(1);
+}
+
+.ti-provider-selector-btn :deep(.ti-provider-dropdown-menu) {
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: auto !important;
+  transform: none !important;
 }
 
 /* Original button visibility indicator */

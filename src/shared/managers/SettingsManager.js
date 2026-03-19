@@ -74,6 +74,8 @@ class SettingsManager {
       SOURCE_LANGUAGE: 'auto',
       TARGET_LANGUAGE: 'fa',
       TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2,
+      MODE_PROVIDERS: {},
+      ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false
     }

@@ -55,6 +55,7 @@
       :needs-settings="window.needsSettings"
       :initial-size="window.initialSize"
       :target-language="window.targetLanguage || 'auto'"
+      :provider="window.provider"
       @close="onTranslationWindowClose"
       @speak="onTranslationWindowSpeak"
     />

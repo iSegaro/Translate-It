@@ -45,7 +45,8 @@ export function useWindowsManager() {
       needsSettings: detail.needsSettings || false,
       isLoading: detail.isLoading || false,
       initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal'),
-      targetLanguage: detail.targetLanguage || detail.to || 'auto' // Add target language support
+      targetLanguage: detail.targetLanguage || detail.to || 'auto', // Add target language support
+      provider: detail.provider || '' // Add provider support
     };
 
     if (existingWindowIndex >= 0) {
