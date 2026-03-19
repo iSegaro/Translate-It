@@ -11,7 +11,7 @@
  * Migration is triggered only on extension update via InstallHandler
  */
 
-import { CONFIG } from './config.js';
+import { CONFIG, TranslationMode } from './config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -26,14 +26,16 @@ function migrateModeProviderKeys(currentSettings, updates, migrationLog) {
   const providers = { ...currentSettings.MODE_PROVIDERS };
   let changed = false;
 
-  // Mapping of old keys to new keys
+  // Mapping of old keys to new keys using standard TranslationMode constants
   const MAPPING = {
-    'select_element': 'select-element',
-    'popup_translate': 'popup',
-    'sidepanel_translate': 'sidepanel',
-    'screen_capture': 'screen-capture',
-    'field': 'content',
-    'page': 'page-translation-batch'
+    'select_element': TranslationMode.Select_Element,
+    'popup_translate': TranslationMode.Popup_Translate,
+    'sidepanel_translate': TranslationMode.Sidepanel_Translate,
+    'screen_capture': TranslationMode.ScreenCapture,
+    'screen-capture': TranslationMode.ScreenCapture,
+    'selection': TranslationMode.Selection,
+    'field': TranslationMode.Field,
+    'page': TranslationMode.Page
   };
 
   Object.entries(MAPPING).forEach(([oldKey, newKey]) => {

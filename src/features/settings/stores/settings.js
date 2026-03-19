@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
-import { CONFIG } from '@/shared/config/config.js'
+import { CONFIG, TranslationMode } from '@/shared/config/config.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
@@ -18,14 +18,14 @@ function getDefaultSettings() {
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
     TRANSLATION_API: CONFIG.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
     MODE_PROVIDERS: CONFIG.MODE_PROVIDERS || {
-      'content': null,
-      'select-element': null,
-      'selection': null,
-      'page-translation-batch': null,
-      'dictionary': null,
-      'popup': null,
-      'sidepanel': null,
-      'screen-capture': null
+      [TranslationMode.Field]: null,
+      [TranslationMode.Select_Element]: null,
+      [TranslationMode.Selection]: null,
+      [TranslationMode.Page]: null,
+      [TranslationMode.Dictionary_Translation]: null,
+      [TranslationMode.Popup_Translate]: null,
+      [TranslationMode.Sidepanel_Translate]: null,
+      [TranslationMode.ScreenCapture]: null
     },
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',

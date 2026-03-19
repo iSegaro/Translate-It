@@ -12,7 +12,7 @@ When a translation request is initiated, the provider is resolved based on this 
 
 1.  **Direct UI Override (Highest Priority):** If the request explicitly carries a `provider` field (e.g., from Popup/Sidepanel direct translation).
 2.  **Ephemeral Sync (New):** If the user has enabled "Sync Page" or "Sync Element" in the UI dropdown. This session-based toggle forces the feature to use the currently selected UI provider, bypassing stored settings.
-3.  **Feature-Specific Setting (`MODE_PROVIDERS`):** If a specific mode (e.g., `select_element`, `page`) has an explicit provider set in settings (and Sync is OFF).
+3.  **Feature-Specific Setting (`MODE_PROVIDERS`):** If a specific mode (e.g., `select-element`, `page-translation-batch`) has an explicit provider set in settings (and Sync is OFF).
 4.  **Global Default (`TRANSLATION_API`):** The system-wide default provider.
 
 ---
@@ -23,18 +23,18 @@ When a translation request is initiated, the provider is resolved based on this 
 *   **Behavior:** UI-Aware (Enhanced by Sync).
 *   **Logic:** 
     *   If **Sync Element** is ON: It strictly uses the UI's active provider.
-    *   If **Sync Element** is OFF: It checks `MODE_PROVIDERS.select_element`. If set to `default`, it inherits the UI's active provider (legacy behavior).
+    *   If **Sync Element** is OFF: It checks `MODE_PROVIDERS['select-element']`. If set to `default` or null, it inherits the UI's active provider (legacy behavior).
 
 ### Whole Page Translation (WPT)
 *   **Behavior:** Settings-Driven (Syncable).
 *   **Logic:** 
     *   If **Sync Page** is ON: It uses the UI's active provider (bypasses settings).
-    *   If **Sync Page** is OFF: It strictly follows `MODE_PROVIDERS.page`.
+    *   If **Sync Page** is OFF: It strictly follows `MODE_PROVIDERS['page-translation-batch']`.
     *   *Reason:* Allows users to temporarily use a high-tier provider for a specific page without changing permanent settings.
 
 ### Text Selection & Field Translation
 *   **Behavior:** Feature-Locked or Global.
-*   **Logic:** Follows `MODE_PROVIDERS.selection` or `MODE_PROVIDERS.field`. If null/default, uses the Global Default.
+*   **Logic:** Follows `MODE_PROVIDERS['selection-manager']` or `MODE_PROVIDERS['content']`. If null/default, uses the Global Default.
 
 ---
 

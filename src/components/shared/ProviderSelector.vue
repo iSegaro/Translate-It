@@ -254,6 +254,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
+import { TranslationMode } from '@/shared/config/config.js'
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
 
 // Resource tracker for automatic cleanup
@@ -346,9 +348,11 @@ const getEffectiveIcon = (type) => {
   } else {
     // Show default from settings
     if (type === 'page') {
-      providerId = settingsStore.settings?.MODE_PROVIDERS?.page || settingsStore.settings.TRANSLATION_API
+      const pageKey = TranslationMode.Page
+      providerId = settingsStore.settings?.MODE_PROVIDERS?.[pageKey] || settingsStore.settings.TRANSLATION_API
     } else {
-      providerId = settingsStore.settings?.MODE_PROVIDERS?.select_element || settingsStore.settings.TRANSLATION_API
+      const elementKey = TranslationMode.Select_Element
+      providerId = settingsStore.settings?.MODE_PROVIDERS?.[elementKey] || settingsStore.settings.TRANSLATION_API
     }
   }
 

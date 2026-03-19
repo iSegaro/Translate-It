@@ -412,44 +412,46 @@ const wholePageShowOriginal = computed({
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
 })
 
+import { TranslationMode } from '@/shared/config/config.js'
+
 // --- Mode Specific Providers ---
 
 const fieldProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.['content'] || 'default',
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Field] || 'default',
   set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, 'content': value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Field]: value === 'default' ? null : value }
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })
 
 const selectElementProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.['select-element'] || 'default',
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Select_Element] || 'default',
   set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, 'select-element': value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Select_Element]: value === 'default' ? null : value }
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })
 
 const selectionProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.['selection'] || 'default',
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Selection] || 'default',
   set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, 'selection': value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Selection]: value === 'default' ? null : value }
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })
 
 const pageProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.['page-translation-batch'] || 'default',
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Page] || 'default',
   set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, 'page-translation-batch': value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Page]: value === 'default' ? null : value }
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })
 
 const dictionaryProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.['dictionary'] || 'default',
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Dictionary_Translation] || 'default',
   set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, 'dictionary': value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Dictionary_Translation]: value === 'default' ? null : value }
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })

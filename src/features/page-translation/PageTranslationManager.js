@@ -5,7 +5,18 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
-import { getWholePageLazyLoadingAsync, getWholePageAutoTranslateOnDOMChangesAsync, getWholePageRootMarginAsync, getWholePageExcludedSelectorsAsync, getWholePageAttributesToTranslateAsync, getWholePageShowOriginalOnHoverAsync, getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
+import { 
+  getWholePageLazyLoadingAsync, 
+  getWholePageAutoTranslateOnDOMChangesAsync, 
+  getWholePageRootMarginAsync, 
+  getWholePageExcludedSelectorsAsync, 
+  getWholePageAttributesToTranslateAsync, 
+  getWholePageShowOriginalOnHoverAsync, 
+  getTranslationApiAsync, 
+  getTargetLanguageAsync,
+  getModeProvidersAsync,
+  TranslationMode
+} from '@/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -305,8 +316,15 @@ export class PageTranslationManager extends ResourceTracker {
     const rawRootMargin = await getWholePageRootMarginAsync();
     const formattedRootMargin = rawRootMargin ? (String(rawRootMargin).match(/px|%|em|rem|vh|vw$/) ? String(rawRootMargin) : `${rawRootMargin}px`) : '10px';
 
+    // Get mode-specific provider if not explicitly provided in options
+    let effectiveProvider = options.provider;
+    if (!effectiveProvider) {
+      const modeProviders = await getModeProvidersAsync();
+      effectiveProvider = modeProviders?.[TranslationMode.Page] || await getTranslationApiAsync();
+    }
+
     this.settings = {
-      translationApi: options.provider || await getTranslationApiAsync(),
+      translationApi: effectiveProvider,
       targetLanguage: options.targetLanguage || await getTargetLanguageAsync(),
       lazyLoading: await getWholePageLazyLoadingAsync(),
       rootMargin: formattedRootMargin,

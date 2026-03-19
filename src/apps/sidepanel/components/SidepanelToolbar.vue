@@ -97,6 +97,7 @@ import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
+import { TranslationMode } from '@/shared/config/config.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -185,9 +186,18 @@ const handleSelectElement = async () => {
     } else {
       getLogger().debug('Activating select element mode...')
       
-      const effectiveProvider = translationStore.ephemeralSync.element && translationStore.selectedProvider
-        ? translationStore.selectedProvider
-        : props.currentProvider;
+      // Resolve provider based on hierarchy:
+      // 1. If Sync is ON, use UI's active provider
+      // 2. If Sync is OFF, use setting from MODE_PROVIDERS (if not null)
+      // 3. Fallback to UI's active provider (legacy behavior)
+      let effectiveProvider;
+      if (translationStore.ephemeralSync.element && translationStore.selectedProvider) {
+        effectiveProvider = translationStore.selectedProvider;
+      } else {
+        const modeKey = TranslationMode.Select_Element;
+        const settingProvider = settingsStore.settings?.MODE_PROVIDERS?.[modeKey];
+        effectiveProvider = settingProvider || props.currentProvider;
+      }
 
       const result = await activateSelectMode({ 
         targetLanguage: translationStore.uiTargetLanguage,
