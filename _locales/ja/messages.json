@@ -1027,6 +1027,24 @@
   "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
     "message": "翻訳履歴をすべて削除"
   },
+  "SIDEPANEL_EXPORT_HISTORY": {
+    "message": "エクスポート"
+  },
+  "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
+    "message": "履歴データをエクスポート"
+  },
+  "SIDEPANEL_EXPORT_JSON_CLEAN": {
+    "message": "JSON (クリーン)"
+  },
+  "SIDEPANEL_EXPORT_JSON_RAW": {
+    "message": "JSON (生データ)"
+  },
+  "SIDEPANEL_EXPORT_CSV": {
+    "message": "CSVとしてエクスポート"
+  },
+  "SIDEPANEL_EXPORT_ANKI": {
+    "message": "Anki用にエクスポート"
+  },
   "CONFIRM_CLEAR_ALL_HISTORY": {
     "message": "翻訳履歴をすべてクリアしますか？"
   },
