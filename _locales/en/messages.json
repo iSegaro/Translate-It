@@ -1,167 +1,298 @@
 {
-  "options_loading": { "message": "Loading Settings..." },
-  "app_welcome": { "message": "Welcome to Translate It!" },
-  "IsRTL": { "message": "false" },
-
-  "name": { "message": "Translate It" },
-  "nameChrome": { "message": "Translate It" },
-  "nameFirefox": { "message": "Translate It" },
-  "description": { "message": "Translate Everywhere. Simply." },
-
-  "theme_section_title": { "message": "Theme" },
-  "localization_section_title": { "message": "Extension Language" },
-
-  "context_menu_options": { "message": "Options" },
-  "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
-  "context_menu_help": { "message": "Useful Help" },
-  "context_menu_translate_screen": { "message": "Translate Screen (Capture)" },
-  "context_menu_reload_extension": { "message": "Reload Extension (Debug)" },
-  "context_menu_translate_with_selection": { "message": "Translate Element" },
-  "context_menu_api_provider": { "message": "API Provider" },
-  "api_provider_google": { "message": "Google Translate (Classic)" },
-  "api_provider_gemini": { "message": "Gemini" },
-  "api_provider_webai": { "message": "WebAI" },
-  "api_provider_openai": { "message": "OpenAI" },
-  "api_provider_openrouter": { "message": "OpenRouter" },
-  "api_provider_deepseek": { "message": "DeepSeek" },
-  "api_provider_bing": { "message": "Microsoft Bing" },
-  "api_provider_browser": { "message": "Browser API" },
-  "api_provider_yandex": { "message": "Yandex Translate" },
-  "api_provider_browserapi": { "message": "Browser Translator" },
-  "api_provider_custom": { "message": "Custom (OpenAI)" },
-  "api_provider_deepl": { "message": "DeepL" },
-  "provider_default": { "message": "Default" },
-
-  "provider_google_title": { "message": "Google Translate (Classic)" },
+  "options_loading": {
+    "message": "Loading Settings..."
+  },
+  "app_welcome": {
+    "message": "Welcome to Translate It!"
+  },
+  "IsRTL": {
+    "message": "false"
+  },
+  "name": {
+    "message": "Translate It"
+  },
+  "nameChrome": {
+    "message": "Translate It"
+  },
+  "nameFirefox": {
+    "message": "Translate It"
+  },
+  "description": {
+    "message": "Translate Everywhere. Simply."
+  },
+  "theme_section_title": {
+    "message": "Theme"
+  },
+  "localization_section_title": {
+    "message": "Extension Language"
+  },
+  "context_menu_options": {
+    "message": "Options"
+  },
+  "context_menu_shortcuts": {
+    "message": "Keyboard Shortcut"
+  },
+  "context_menu_help": {
+    "message": "Useful Help"
+  },
+  "context_menu_translate_screen": {
+    "message": "Translate Screen (Capture)"
+  },
+  "context_menu_reload_extension": {
+    "message": "Reload Extension (Debug)"
+  },
+  "context_menu_translate_with_selection": {
+    "message": "Translate Element"
+  },
+  "context_menu_api_provider": {
+    "message": "API Provider"
+  },
+  "api_provider_google": {
+    "message": "Google Translate (Classic)"
+  },
+  "api_provider_gemini": {
+    "message": "Gemini"
+  },
+  "api_provider_webai": {
+    "message": "WebAI"
+  },
+  "api_provider_openai": {
+    "message": "OpenAI"
+  },
+  "api_provider_openrouter": {
+    "message": "OpenRouter"
+  },
+  "api_provider_deepseek": {
+    "message": "DeepSeek"
+  },
+  "api_provider_bing": {
+    "message": "Microsoft Bing"
+  },
+  "api_provider_browser": {
+    "message": "Browser API"
+  },
+  "api_provider_yandex": {
+    "message": "Yandex Translate"
+  },
+  "api_provider_browserapi": {
+    "message": "Browser Translator"
+  },
+  "api_provider_custom": {
+    "message": "Custom (OpenAI)"
+  },
+  "api_provider_deepl": {
+    "message": "DeepL"
+  },
+  "provider_default": {
+    "message": "Default"
+  },
+  "provider_google_title": {
+    "message": "Google Translate (Classic)"
+  },
   "provider_google_description": {
     "message": "Uses the free, public Google Translate endpoint. No API key is required."
   },
-
-  "provider_googlev2_title": { "message": "Google Translate" },
+  "provider_googlev2_title": {
+    "message": "Google Translate"
+  },
   "provider_googlev2_description": {
     "message": "Robust version of Google Translate using secure tokens and browser-like headers. More stable for large texts. No API key required."
   },
-
-  "provider_yandex_title": { "message": "Yandex Translate" },
+  "provider_yandex_title": {
+    "message": "Yandex Translate"
+  },
   "provider_yandex_description": {
     "message": "Uses the free, public Yandex Translate endpoint. No API key is required."
   },
-
-  "provider_deepl_title": { "message": "DeepL Translate" },
+  "provider_deepl_title": {
+    "message": "DeepL Translate"
+  },
   "provider_deepl_description": {
     "message": "AI-powered translation service by DeepL. Requires an API key."
   },
-
-  "provider_bing_title": { "message": "Microsoft Bing Translator" },
+  "provider_bing_title": {
+    "message": "Microsoft Bing Translator"
+  },
   "provider_bing_description": {
     "message": "Uses the free, public Microsoft Bing Translator endpoint. No API key is required."
   },
-
-  "provider_edge_title": { "message": "Microsoft Edge Translator" },
+  "provider_edge_title": {
+    "message": "Microsoft Edge Translator"
+  },
   "provider_edge_description": {
     "message": "Official Microsoft Edge browser translation service. Faster and more stable. No API key required."
   },
-
-  "provider_lingva_title": { "message": "Lingva Translator" },
+  "provider_lingva_title": {
+    "message": "Lingva Translator"
+  },
   "provider_lingva_description": {
     "message": "Free open-source Google Translate front-end. Privacy-focused and decentralized. No API key required."
   },
-
-  "provider_gemini_title": { "message": "Google Gemini" },
+  "provider_gemini_title": {
+    "message": "Google Gemini"
+  },
   "provider_gemini_description": {
     "message": "AI-powered translation with context understanding. Requires an API key."
   },
-
-  "provider_openai_title": { "message": "OpenAI GPT" },
+  "provider_openai_title": {
+    "message": "OpenAI GPT"
+  },
   "provider_openai_description": {
     "message": "AI translation using GPT models. Requires an API key."
   },
-
-  "provider_openrouter_title": { "message": "OpenRouter" },
+  "provider_openrouter_title": {
+    "message": "OpenRouter"
+  },
   "provider_openrouter_description": {
     "message": "Access to multiple AI models via OpenRouter. Requires an API key."
   },
-
-  "provider_deepseek_title": { "message": "DeepSeek" },
+  "provider_deepseek_title": {
+    "message": "DeepSeek"
+  },
   "provider_deepseek_description": {
     "message": "DeepSeek AI models for translation. Fast and efficient. Requires an API key."
   },
-
-  "provider_webai_title": { "message": "WebAI Local Server" },
+  "provider_webai_title": {
+    "message": "WebAI Local Server"
+  },
   "provider_webai_description": {
     "message": "Local server for AI model access. No API key required for local instances."
   },
-
-  "provider_browser_title": { "message": "Browser Translation" },
+  "provider_browser_title": {
+    "message": "Browser Translation"
+  },
   "provider_browser_description": {
     "message": "Built-in browser translation API (Chrome 138+). Supports offline translation."
   },
-
-  "provider_custom_title": { "message": "Custom Provider" },
+  "provider_custom_title": {
+    "message": "Custom Provider"
+  },
   "provider_custom_description": {
     "message": "Custom OpenAI-compatible API endpoint. Configure your own URL and key."
   },
-
-  "options_page_title": { "message": "Settings" },
-  "options_description": { "message": "Translate Everywhere. Simply." },
-  "options_changelog_loading": { "message": "Loading changelog..." },
-  "github_link_title": { "message": "View on GitHub" },
-
+  "options_page_title": {
+    "message": "Settings"
+  },
+  "options_description": {
+    "message": "Translate Everywhere. Simply."
+  },
+  "options_changelog_loading": {
+    "message": "Loading changelog..."
+  },
+  "github_link_title": {
+    "message": "View on GitHub"
+  },
   "options_error_same_languages": {
     "message": "Source and target languages cannot be the same."
   },
   "options_error_empty_language": {
     "message": "Language fields cannot be empty."
   },
-
-  "popup_loading": { "message": "Loading Popup..." },
-  "popup_translate_button_text": { "message": "Translate" },
-
+  "popup_loading": {
+    "message": "Loading Popup..."
+  },
+  "popup_translate_button_text": {
+    "message": "Translate"
+  },
   "export_settings_description": {
     "message": "Export your current settings to a JSON file for backup or sharing."
   },
   "import_settings_description": {
     "message": "Importing will overwrite your current settings. The page will reload after a successful import."
   },
-
-  "languages_tab_title": { "message": "Languages" },
-  "appearance_tab_title": { "message": "Appearance" },
-  "activation_tab_title": { "message": "Activation" },
-  "prompt_tab_title": { "message": "Prompt" },
-  "api_tab_title": { "message": "API Settings" },
-  "import_export_tab_title": { "message": "Import/Export" },
-  "advance_tab_title": { "message": "Advance" },
-  "import_success": { "message": "Settings imported successfully." },
-
-  "prompt_reset_button": { "message": "Reset" },
-
-  "activation_group_general_title": { "message": "General Switch" },
-  "activation_group_text_fields_title": { "message": "Text Field Translation" },
-  "activation_group_page_selection_title": { "message": "On-Page Selection" },
-  "activation_group_dictionary_title": { "message": "Dictionary Mode" },  "import_export_export_title": { "message": "Export Settings" },
-  "import_export_import_title": { "message": "Import Settings" },
-
-  "notification_update_title": { "message": "Extension Updated" },
+  "languages_tab_title": {
+    "message": "Languages"
+  },
+  "appearance_tab_title": {
+    "message": "Appearance"
+  },
+  "activation_tab_title": {
+    "message": "Activation"
+  },
+  "prompt_tab_title": {
+    "message": "Prompt"
+  },
+  "api_tab_title": {
+    "message": "API Settings"
+  },
+  "import_export_tab_title": {
+    "message": "Import/Export"
+  },
+  "advance_tab_title": {
+    "message": "Advance"
+  },
+  "import_success": {
+    "message": "Settings imported successfully."
+  },
+  "prompt_reset_button": {
+    "message": "Reset"
+  },
+  "activation_group_general_title": {
+    "message": "General Switch"
+  },
+  "activation_group_text_fields_title": {
+    "message": "Text Field Translation"
+  },
+  "activation_group_page_selection_title": {
+    "message": "On-Page Selection"
+  },
+  "activation_group_dictionary_title": {
+    "message": "Dictionary Mode"
+  },
+  "import_export_export_title": {
+    "message": "Export Settings"
+  },
+  "import_export_import_title": {
+    "message": "Import Settings"
+  },
+  "notification_update_title": {
+    "message": "Extension Updated"
+  },
   "notification_update_message": {
     "message": "{appName} has been successfully updated to version {version}."
   },
-
-  "ERRORS_TRANSLATION_TIMEOUT": { "message": "Translation timed out. Please try again." },
-  "ERRORS_SETTINGS_LOADING_TIMEOUT": { "message": "Settings loading timed out. Please try again." },
-  "sidepanel_load_error_title": { "message": "Failed to Load Sidepanel" },
-  "popup_load_error_title": { "message": "Failed to Load Popup" },
-  "options_load_error_title": { "message": "Failed to Load Options" },
-
-  "languages_section_title": { "message": "Languages" },
-  "source_language_label": { "message": "Source Language" },
-  "target_language_label": { "message": "Target Language" },
-
-  "help_tab_title": { "message": "Help" },
-  "about_tab_title": { "message": "What's New" },
-  "help_section_title": { "message": "Help & Documentation" },
-  "about_section_title": { "message": "Changelog" },
-  "options_changelog_error": { "message": "Failed to load changelog." },
-  "help_shortcut_title": { "message": "How to change keyboard shortcuts ?" },
+  "ERRORS_TRANSLATION_TIMEOUT": {
+    "message": "Translation timed out. Please try again."
+  },
+  "ERRORS_SETTINGS_LOADING_TIMEOUT": {
+    "message": "Settings loading timed out. Please try again."
+  },
+  "sidepanel_load_error_title": {
+    "message": "Failed to Load Sidepanel"
+  },
+  "popup_load_error_title": {
+    "message": "Failed to Load Popup"
+  },
+  "options_load_error_title": {
+    "message": "Failed to Load Options"
+  },
+  "languages_section_title": {
+    "message": "Languages"
+  },
+  "source_language_label": {
+    "message": "Source Language"
+  },
+  "target_language_label": {
+    "message": "Target Language"
+  },
+  "help_tab_title": {
+    "message": "Help"
+  },
+  "about_tab_title": {
+    "message": "What's New"
+  },
+  "help_section_title": {
+    "message": "Help & Documentation"
+  },
+  "about_section_title": {
+    "message": "Changelog"
+  },
+  "options_changelog_error": {
+    "message": "Failed to load changelog."
+  },
+  "help_shortcut_title": {
+    "message": "How to change keyboard shortcuts ?"
+  },
   "help_shortcut_content_p1": {
     "message": "In Firefox, shortcuts are managed through the Add-ons page:"
   },
@@ -177,22 +308,45 @@
   "help_shortcut_content_li4": {
     "message": "Find **Translate It** and set your desired shortcut."
   },
-  "help_api_keys_title": { "message": "Where do I get API keys?" },
+  "help_api_keys_title": {
+    "message": "Where do I get API keys?"
+  },
   "help_api_keys_content": {
     "message": "You can find links to each API provider's website in the **API** tab. You will need to create an account on their respective platforms to generate a key."
   },
-  "help_free_providers_title": { "message": "Free Providers (No API Key Required)" },
-  "help_free_providers_google": { "message": "Google Translate - Uses the public Google Translate endpoint" },
-  "help_free_providers_bing": { "message": "Microsoft Bing - Uses the public Bing Translate endpoint" },
-  "help_free_providers_yandex": { "message": "Yandex Translate - Uses the public Yandex Translate endpoint" },
-  "help_api_providers_title": { "message": "API-Based Providers (Require API Keys)" },
-  "help_api_providers_gemini": { "message": "Google Gemini - Get your free API key from [Google AI Studio]({url})" },
-  "help_api_providers_openai": { "message": "OpenAI - Register at [OpenAI Platform]({url})" },
-  "help_api_providers_openrouter": { "message": "OpenRouter - Access multiple models via [OpenRouter]({url})" },
-  "help_api_providers_deepseek": { "message": "DeepSeek - Get API access from [DeepSeek Platform]({url})" },
-  "help_security_notice_title": { "message": "🔒 Security Notice" },
-  "help_security_notice_content": { "message": "Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature." },
-
+  "help_free_providers_title": {
+    "message": "Free Providers (No API Key Required)"
+  },
+  "help_free_providers_google": {
+    "message": "Google Translate - Uses the public Google Translate endpoint"
+  },
+  "help_free_providers_bing": {
+    "message": "Microsoft Bing - Uses the public Bing Translate endpoint"
+  },
+  "help_free_providers_yandex": {
+    "message": "Yandex Translate - Uses the public Yandex Translate endpoint"
+  },
+  "help_api_providers_title": {
+    "message": "API-Based Providers (Require API Keys)"
+  },
+  "help_api_providers_gemini": {
+    "message": "Google Gemini - Get your free API key from [Google AI Studio]({url})"
+  },
+  "help_api_providers_openai": {
+    "message": "OpenAI - Register at [OpenAI Platform]({url})"
+  },
+  "help_api_providers_openrouter": {
+    "message": "OpenRouter - Access multiple models via [OpenRouter]({url})"
+  },
+  "help_api_providers_deepseek": {
+    "message": "DeepSeek - Get API access from [DeepSeek Platform]({url})"
+  },
+  "help_security_notice_title": {
+    "message": "🔒 Security Notice"
+  },
+  "help_security_notice_content": {
+    "message": "Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature."
+  },
   "help_shortcut_content_p2": {
     "message": "In **Chrome**, the process is different:"
   },
@@ -205,11 +359,12 @@
   "help_shortcut_content_chrome_li3": {
     "message": "Click the pencil icon (✏️) next to **Translate It** and type your new shortcut."
   },
-
   "translation_activation_section_title": {
     "message": "Translation Activation Methods"
   },
-  "extension_enabled_label": { "message": "Enable Extension" },
+  "extension_enabled_label": {
+    "message": "Enable Extension"
+  },
   "extension_enabled_description": {
     "message": "Enable or disable the entire extension functionality except Popup and Sidepanel."
   },
@@ -276,9 +431,12 @@
   "enable_dictionary_translation_description": {
     "message": "When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations."
   },
-
-  "prompt_section_title": { "message": "Prompt Template" },
-  "prompt_template_label": { "message": "Prompt Template" },
+  "prompt_section_title": {
+    "message": "Prompt Template"
+  },
+  "prompt_template_label": {
+    "message": "Prompt Template"
+  },
   "prompt_template_info": {
     "message": "Use keywords to customize your prompt..."
   },
@@ -288,11 +446,18 @@
   "prompt_template_help": {
     "message": "You can use the following keywords in your prompt template:"
   },
-
-  "api_section_title": { "message": "Translation API" },
-  "translation_api_label": { "message": "API Choice" },
-  "provider_label": { "message": "Provider" },
-  "gemini_api_settings_title": { "message": "Gemini Settings" },
+  "api_section_title": {
+    "message": "Translation API"
+  },
+  "translation_api_label": {
+    "message": "API Choice"
+  },
+  "provider_label": {
+    "message": "Provider"
+  },
+  "gemini_api_settings_title": {
+    "message": "Gemini Settings"
+  },
   "gemini_api_key_info": {
     "message": "You can get your Gemini API key from Google AI Studio."
   },
@@ -308,182 +473,429 @@
   "webai_api_key_info": {
     "message": "You can get and run your locally hosted WebAI API server."
   },
-  "gemini_api_key_link": { "message": "Get Your Free API Key" },
-  "openai_api_key_link": { "message": "Get Your API Key" },
-  "deepseek_api_key_link": { "message": "Get Your API Key" },
-  "openrouter_api_key_link": { "message": "Get Your API Key" },
-  "webai_api_key_link": { "message": "Run Your API Server Locally" },
-  "gemini_api_settings_api_key_label": { "message": "API Key" },
-  "gemini_api_key_placeholder": { "message": "Paste your API key here" },
-  "gemini_api_settings_api_url_label": { "message": "API URL" },
-  "gemini_api_url_placeholder": { "message": "Default Gemini API URL" },
-  "gemini_api_url_info": { "message": "Leave empty to use the default Gemini API endpoint" },
-  "gemini_custom_model_label": { "message": "Model Name" },
-  "gemini_custom_model_placeholder": { "message": "Enter model name" },
-  "gemini_custom_model_info": { "message": "Enter the exact model name as provided by Google" },
-  "gemini_custom_api_url_info": { "message": "Enter the complete API URL including the model name" },
-  "webai_api_settings_title": { "message": "WebAI Settings" },
-  "webai_api_url_label": { "message": "API URL" },
-  "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
-  "webai_api_model_label": { "message": "Model" },
-  "webai_api_model_placeholder": { "message": "Enter WebAI API model" },
-  "lingva_api_settings_title": { "message": "Lingva API Settings" },
-  "lingva_api_url_label": { "message": "API URL" },
-  "lingva_api_url_placeholder": { "message": "Enter Lingva API URL (e.g., https://lingva.ml)" },
-  "lingva_api_url_info": { "message": "You can use public Lingva instances or host your own." },
-  "lingva_instances_link": { "message": "Find public Lingva instances." },
-  "openai_api_settings_title": { "message": "OpenAI Settings" },
-  "openai_api_settings_api_key_label": { "message": "API Key" },
-  "openai_api_key_placeholder": { "message": "Paste your API key here" },
-  "openai_api_settings_model_label": { "message": "Model" },
-  "openai_api_model_placeholder": { "message": "Enter OpenAI model" },
-  "openrouter_api_settings_title": { "message": "OpenRouter Settings" },
-  "openrouter_api_settings_api_key_label": { "message": "API Key" },
+  "gemini_api_key_link": {
+    "message": "Get Your Free API Key"
+  },
+  "openai_api_key_link": {
+    "message": "Get Your API Key"
+  },
+  "deepseek_api_key_link": {
+    "message": "Get Your API Key"
+  },
+  "openrouter_api_key_link": {
+    "message": "Get Your API Key"
+  },
+  "webai_api_key_link": {
+    "message": "Run Your API Server Locally"
+  },
+  "gemini_api_settings_api_key_label": {
+    "message": "API Key"
+  },
+  "gemini_api_key_placeholder": {
+    "message": "Paste your API key here"
+  },
+  "gemini_api_settings_api_url_label": {
+    "message": "API URL"
+  },
+  "gemini_api_url_placeholder": {
+    "message": "Default Gemini API URL"
+  },
+  "gemini_api_url_info": {
+    "message": "Leave empty to use the default Gemini API endpoint"
+  },
+  "gemini_custom_model_label": {
+    "message": "Model Name"
+  },
+  "gemini_custom_model_placeholder": {
+    "message": "Enter model name"
+  },
+  "gemini_custom_model_info": {
+    "message": "Enter the exact model name as provided by Google"
+  },
+  "gemini_custom_api_url_info": {
+    "message": "Enter the complete API URL including the model name"
+  },
+  "webai_api_settings_title": {
+    "message": "WebAI Settings"
+  },
+  "webai_api_url_label": {
+    "message": "API URL"
+  },
+  "webai_api_url_placeholder": {
+    "message": "Enter WebAI API URL"
+  },
+  "webai_api_model_label": {
+    "message": "Model"
+  },
+  "webai_api_model_placeholder": {
+    "message": "Enter WebAI API model"
+  },
+  "lingva_api_settings_title": {
+    "message": "Lingva API Settings"
+  },
+  "lingva_api_url_label": {
+    "message": "API URL"
+  },
+  "lingva_api_url_placeholder": {
+    "message": "Enter Lingva API URL (e.g., https://lingva.ml)"
+  },
+  "lingva_api_url_info": {
+    "message": "You can use public Lingva instances or host your own."
+  },
+  "lingva_instances_link": {
+    "message": "Find public Lingva instances."
+  },
+  "openai_api_settings_title": {
+    "message": "OpenAI Settings"
+  },
+  "openai_api_settings_api_key_label": {
+    "message": "API Key"
+  },
+  "openai_api_key_placeholder": {
+    "message": "Paste your API key here"
+  },
+  "openai_api_settings_model_label": {
+    "message": "Model"
+  },
+  "openai_api_model_placeholder": {
+    "message": "Enter OpenAI model"
+  },
+  "openrouter_api_settings_title": {
+    "message": "OpenRouter Settings"
+  },
+  "openrouter_api_settings_api_key_label": {
+    "message": "API Key"
+  },
   "openrouter_api_key_placeholder": {
     "message": "Paste your OpenRouter API key here"
   },
-  "openrouter_api_settings_model_label": { "message": "Model" },
+  "openrouter_api_settings_model_label": {
+    "message": "Model"
+  },
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
   },
-  "deepseek_api_settings_title": { "message": "DeepSeek Settings" },
-  "deepseek_api_settings_api_key_label": { "message": "API Key" },
+  "deepseek_api_settings_title": {
+    "message": "DeepSeek Settings"
+  },
+  "deepseek_api_settings_api_key_label": {
+    "message": "API Key"
+  },
   "deepseek_api_key_placeholder": {
     "message": "Paste your DeepSeek API key here"
   },
-  "deepseek_api_settings_model_label": { "message": "Model" },
+  "deepseek_api_settings_model_label": {
+    "message": "Model"
+  },
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model (e.g., deepseek-chat)"
   },
-
-  "deepl_api_settings_title": { "message": "DeepL API Settings" },
+  "deepl_api_settings_title": {
+    "message": "DeepL API Settings"
+  },
   "deepl_api_key_info": {
     "message": "You can get your DeepL API key from"
   },
-  "deepl_api_key_link": { "message": "DeepL API" },
+  "deepl_api_key_link": {
+    "message": "DeepL API"
+  },
   "deepl_free_api_info": {
     "message": "Free tier available with 500,000 characters/month."
   },
-  "deepl_api_key_label": { "message": "API Key" },
-  "deepl_api_key_placeholder": { "message": "Paste your DeepL API key here" },
-  "deepl_api_tier_label": { "message": "API Tier" },
-  "deepl_api_tier_free": { "message": "Free API (api-free.deepl.com)" },
-  "deepl_api_tier_pro": { "message": "Pro API (api.deepl.com)" },
+  "deepl_api_key_label": {
+    "message": "API Key"
+  },
+  "deepl_api_key_placeholder": {
+    "message": "Paste your DeepL API key here"
+  },
+  "deepl_api_tier_label": {
+    "message": "API Tier"
+  },
+  "deepl_api_tier_free": {
+    "message": "Free API (api-free.deepl.com)"
+  },
+  "deepl_api_tier_pro": {
+    "message": "Pro API (api.deepl.com)"
+  },
   "deepl_free_tier_description": {
     "message": "Free API endpoint with 500,000 characters/month limit. Uses api-free.deepl.com"
   },
   "deepl_pro_tier_description": {
     "message": "Pro API endpoint with higher limits based on your subscription. Uses api.deepl.com"
   },
-  "deepl_formality_label": { "message": "Translation Formality" },
+  "deepl_formality_label": {
+    "message": "Translation Formality"
+  },
   "deepl_formality_description": {
     "message": "Control the formality level of translations. Some languages may not support all options."
   },
-  "deepl_formality_default": { "message": "Default (Automatic)" },
-  "deepl_formality_more": { "message": "More Formal" },
-  "deepl_formality_less": { "message": "Less Formal" },
-  "deepl_formality_prefer_more": { "message": "Prefer More Formal" },
-  "deepl_formality_prefer_less": { "message": "Prefer Less Formal" },
-  "deepl_beta_languages_label": { "message": "Enable Beta Languages" },
+  "deepl_formality_default": {
+    "message": "Default (Automatic)"
+  },
+  "deepl_formality_more": {
+    "message": "More Formal"
+  },
+  "deepl_formality_less": {
+    "message": "Less Formal"
+  },
+  "deepl_formality_prefer_more": {
+    "message": "Prefer More Formal"
+  },
+  "deepl_formality_prefer_less": {
+    "message": "Prefer Less Formal"
+  },
+  "deepl_beta_languages_label": {
+    "message": "Enable Beta Languages"
+  },
   "deepl_beta_languages_description": {
     "message": "Enable support for beta languages. Beta languages do not support formality settings."
   },
-
-  "custom_api_settings_title": { "message": "Custom OpenAI Compatible API Settings" },
+  "custom_api_settings_title": {
+    "message": "Custom OpenAI Compatible API Settings"
+  },
   "custom_api_settings_description": {
     "message": "Use any service that is compatible with the OpenAI chat completions format."
   },
-  "custom_api_settings_api_url_label": { "message": "API URL" },
+  "custom_api_settings_api_url_label": {
+    "message": "API URL"
+  },
   "custom_api_url_placeholder": {
     "message": "(e.g., v1/chat/completions)"
   },
-  "custom_api_url_example": { "message": "Example:" },
-  "custom_api_settings_api_key_label": { "message": "API Key" },
-  "custom_api_key_placeholder": { "message": "Paste your custom API key here" },
-  "custom_api_settings_model_label": { "message": "Model" },
-  "custom_api_model_placeholder": { "message": "Enter the model name" },
-
-  "import_export_section_title": { "message": "Import/Export Settings" },
-  "export_settings_button": { "message": "Export Settings" },
-  "export_password_label": { "message": "🔐 Export Password (Recommended for Security)" },
-  "export_password_placeholder": { "message": "Create a strong password to protect your API keys" },
-  "import_settings_label": { "message": "Import Settings" },
-  "import_settings_button": { "message": "Import Settings" },
-  "import_password_label": { "message": "🔑 Import Password Required" },
-  "import_password_placeholder": { "message": "Enter the password used during export" },
-  "security_warning_title": { "message": "⚠️ SECURITY WARNING ⚠️" },
-  "security_warning_message": { 
+  "custom_api_url_example": {
+    "message": "Example:"
+  },
+  "custom_api_settings_api_key_label": {
+    "message": "API Key"
+  },
+  "custom_api_key_placeholder": {
+    "message": "Paste your custom API key here"
+  },
+  "custom_api_settings_model_label": {
+    "message": "Model"
+  },
+  "custom_api_model_placeholder": {
+    "message": "Enter the model name"
+  },
+  "import_export_section_title": {
+    "message": "Import/Export Settings"
+  },
+  "export_settings_button": {
+    "message": "Export Settings"
+  },
+  "export_password_label": {
+    "message": "🔐 Export Password (Recommended for Security)"
+  },
+  "export_password_placeholder": {
+    "message": "Create a strong password to protect your API keys"
+  },
+  "import_settings_label": {
+    "message": "Import Settings"
+  },
+  "import_settings_button": {
+    "message": "Import Settings"
+  },
+  "import_password_label": {
+    "message": "🔑 Import Password Required"
+  },
+  "import_password_placeholder": {
+    "message": "Enter the password used during export"
+  },
+  "security_warning_title": {
+    "message": "⚠️ SECURITY WARNING ⚠️"
+  },
+  "security_warning_message": {
     "message": "You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it's STRONGLY recommended to use a password."
   },
-  "security_warning_question": { "message": "Do you want to continue without password protection?" },
-  "save_settings_button": { "message": "Save Settings" },
+  "security_warning_question": {
+    "message": "Do you want to continue without password protection?"
+  },
+  "save_settings_button": {
+    "message": "Save Settings"
+  },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
   },
-
-  "advance_debug_mode_label": { "message": "Debug Mode" },
-
-  "proxy_section_title": { "message": "Proxy Settings" },
-  "proxy_section_description": { "message": "Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)" },
-  "proxy_enabled_label": { "message": "Enable Proxy" },
-  "proxy_type_label": { "message": "Proxy Type" },
-  "proxy_host_label": { "message": "Host" },
-  "proxy_port_label": { "message": "Port" },
-  "proxy_username_label": { "message": "Username (Optional)" },
-  "proxy_password_label": { "message": "Password (Optional)" },
-  "proxy_testing": { "message": "Testing..." },
-  "proxy_test_direct": { "message": "Test Direct Connection" },
-  "proxy_test_proxy": { "message": "Test Proxy Connection" },
-  "proxy_test_success": { "message": "Proxy connection successful!" },
-  "proxy_test_failed": { "message": "Proxy connection failed. Check your settings." },
-  "proxy_test_error": { "message": "Test failed with an error." },
-  "proxy_warning_title": { "message": "Browser Extension Limitation" },
-  "proxy_warning_message": { "message": "Browser extensions cannot directly use proxy servers due to security restrictions. This setting configures the intent, but actual proxy usage may require additional setup or may work differently than expected." },
-  "proxy_config_invalid": { "message": "Invalid proxy configuration. Please check your settings." },
-  "proxy_host_invalid": { "message": "Invalid hostname. Please enter a valid domain name or IP address." },
-
-  "theme_auto": { "message": "Auto (System)" },
-  "theme_light": { "message": "Light" },
-  "theme_dark": { "message": "Dark" },
-  "theme_toggle_title": { "message": "Toggle Theme" },
-
-  "popup_page_title": { "message": "Translate It!" },
-  "popup_translate_page_link": { "message": "Translate Page" },
-  "popup_translate_page_link_title": { "message": "Open translate in new tab" },
-  "popup_select_element_alt_icon": { "message": "Select Element" },
-  "popup_select_element_title_icon": { "message": "Select Element Mode" },
-  "popup_revert_alt_icon": { "message": "Revert" },
-  "popup_revert_title_icon": { "message": "Revert (Esc Key)" },
-  "popup_clear_storage_alt_icon": { "message": "Clear" },
-  "popup_clear_storage_title_icon": { "message": "Clear fields" },
-  "popup_settings_alt_icon": { "message": "Settings" },
-  "popup_settings_title_icon": { "message": "Settings" },
-  "popup_target_language_title": { "message": "Target language" },
-  "popup_target_language_placeholder": { "message": "Target language" },
-  "popup_clear_target_language_title": { "message": "Clear target language" },
-  "popup_swap_languages_title": { "message": "Swap languages" },
-  "popup_swap_languages_alt_icon": { "message": "Swap" },
-  "popup_source_language_placeholder": { "message": "Source language" },
-  "popup_source_language_title": { "message": "Source language" },
-  "popup_clear_source_language_title": { "message": "Clear source language" },
-  "popup_translate_button_title": { "message": "Translate" },
-  "popup_translate_button_alt_icon": { "message": "Translate" },
-  "popup_exclude_toggle_title": { "message": "Enable/Disable on this site" },
-  "popup_copy_source_alt_icon": { "message": "Copy" },
-  "popup_copy_source_title_icon": { "message": "Copy source text" },
-  "popup_voice_source_alt_icon": { "message": "Speak source" },
-  "popup_voice_source_title_icon": { "message": "Speak" },
-  "popup_paste_source_alt_icon": { "message": "Paste" },
-  "popup_paste_source_title_icon": { "message": "Paste from clipboard" },
-  "popup_target_text_placeholder": { "message": "Translation result will appear here" },
-  "popup_source_text_placeholder": { "message": "Type Here" },
-  "popup_copy_target_alt_icon": { "message": "Copy target" },
-  "popup_copy_target_title_icon": { "message": "Copy target text" },
-  "popup_voice_target_alt_icon": { "message": "Speak target" },
-  "popup_voice_target_title_icon": { "message": "Speak" },
-  "popup_string_during_translate": { "message": "translating..." },
-  "popup_string_error_sending": { "message": "Error sending request." },
-  "popup_string_error_response_empty": { "message": "(translation is empty)" },
+  "advance_debug_mode_label": {
+    "message": "Debug Mode"
+  },
+  "proxy_section_title": {
+    "message": "Proxy Settings"
+  },
+  "proxy_section_description": {
+    "message": "Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)"
+  },
+  "proxy_enabled_label": {
+    "message": "Enable Proxy"
+  },
+  "proxy_type_label": {
+    "message": "Proxy Type"
+  },
+  "proxy_host_label": {
+    "message": "Host"
+  },
+  "proxy_port_label": {
+    "message": "Port"
+  },
+  "proxy_username_label": {
+    "message": "Username (Optional)"
+  },
+  "proxy_password_label": {
+    "message": "Password (Optional)"
+  },
+  "proxy_testing": {
+    "message": "Testing..."
+  },
+  "proxy_test_direct": {
+    "message": "Test Direct Connection"
+  },
+  "proxy_test_proxy": {
+    "message": "Test Proxy Connection"
+  },
+  "proxy_test_success": {
+    "message": "Proxy connection successful!"
+  },
+  "proxy_test_failed": {
+    "message": "Proxy connection failed. Check your settings."
+  },
+  "proxy_test_error": {
+    "message": "Test failed with an error."
+  },
+  "proxy_warning_title": {
+    "message": "Browser Extension Limitation"
+  },
+  "proxy_warning_message": {
+    "message": "Browser extensions cannot directly use proxy servers due to security restrictions. This setting configures the intent, but actual proxy usage may require additional setup or may work differently than expected."
+  },
+  "proxy_config_invalid": {
+    "message": "Invalid proxy configuration. Please check your settings."
+  },
+  "proxy_host_invalid": {
+    "message": "Invalid hostname. Please enter a valid domain name or IP address."
+  },
+  "theme_auto": {
+    "message": "Auto (System)"
+  },
+  "theme_light": {
+    "message": "Light"
+  },
+  "theme_dark": {
+    "message": "Dark"
+  },
+  "theme_toggle_title": {
+    "message": "Toggle Theme"
+  },
+  "popup_page_title": {
+    "message": "Translate It!"
+  },
+  "popup_translate_page_link": {
+    "message": "Translate Page"
+  },
+  "popup_translate_page_link_title": {
+    "message": "Open translate in new tab"
+  },
+  "popup_select_element_alt_icon": {
+    "message": "Select Element"
+  },
+  "popup_select_element_title_icon": {
+    "message": "Select Element Mode"
+  },
+  "popup_revert_alt_icon": {
+    "message": "Revert"
+  },
+  "popup_revert_title_icon": {
+    "message": "Revert (Esc Key)"
+  },
+  "popup_clear_storage_alt_icon": {
+    "message": "Clear"
+  },
+  "popup_clear_storage_title_icon": {
+    "message": "Clear fields"
+  },
+  "popup_settings_alt_icon": {
+    "message": "Settings"
+  },
+  "popup_settings_title_icon": {
+    "message": "Settings"
+  },
+  "popup_target_language_title": {
+    "message": "Target language"
+  },
+  "popup_target_language_placeholder": {
+    "message": "Target language"
+  },
+  "popup_clear_target_language_title": {
+    "message": "Clear target language"
+  },
+  "popup_swap_languages_title": {
+    "message": "Swap languages"
+  },
+  "popup_swap_languages_alt_icon": {
+    "message": "Swap"
+  },
+  "popup_source_language_placeholder": {
+    "message": "Source language"
+  },
+  "popup_source_language_title": {
+    "message": "Source language"
+  },
+  "popup_clear_source_language_title": {
+    "message": "Clear source language"
+  },
+  "popup_translate_button_title": {
+    "message": "Translate"
+  },
+  "popup_translate_button_alt_icon": {
+    "message": "Translate"
+  },
+  "popup_exclude_toggle_title": {
+    "message": "Enable/Disable on this site"
+  },
+  "popup_copy_source_alt_icon": {
+    "message": "Copy"
+  },
+  "popup_copy_source_title_icon": {
+    "message": "Copy source text"
+  },
+  "popup_voice_source_alt_icon": {
+    "message": "Speak source"
+  },
+  "popup_voice_source_title_icon": {
+    "message": "Speak"
+  },
+  "popup_paste_source_alt_icon": {
+    "message": "Paste"
+  },
+  "popup_paste_source_title_icon": {
+    "message": "Paste from clipboard"
+  },
+  "popup_target_text_placeholder": {
+    "message": "Translation result will appear here"
+  },
+  "popup_source_text_placeholder": {
+    "message": "Type Here"
+  },
+  "popup_copy_target_alt_icon": {
+    "message": "Copy target"
+  },
+  "popup_copy_target_title_icon": {
+    "message": "Copy target text"
+  },
+  "popup_voice_target_alt_icon": {
+    "message": "Speak target"
+  },
+  "popup_voice_target_title_icon": {
+    "message": "Speak"
+  },
+  "popup_string_during_translate": {
+    "message": "translating..."
+  },
+  "popup_string_error_sending": {
+    "message": "Error sending request."
+  },
+  "popup_string_error_response_empty": {
+    "message": "(translation is empty)"
+  },
   "popup_string_translate_error_trigger": {
     "message": "Error on translation trigger."
   },
@@ -493,57 +905,135 @@
   "popup_open_side_panel_title": {
     "message": "Sidepanel"
   },
-  "page_translation_btn_translate": { "message": "Translate Page" },
-  "page_translation_btn_stop": { "message": "Stop Translating" },
-  "page_translation_btn_restore": { "message": "Restore Original" },
-  "sync_page_label": { "message": "Sync Page" },
-  "sync_element_label": { "message": "Sync Element" },
-
-  "api_key_show": { "message": "Show" },
-  "api_key_hide": { "message": "Hide" },
-
-  "SIDEPANEL_SOURCE_TEXT_LABEL": { "message": "Source Text" },
-  "SIDEPANEL_TARGET_TEXT_LABEL": { "message": "Translation" },
-  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Type Here" },
-  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": { "message": "Translation result will appear here" },
-  "SIDEPANEL_SELECT_ELEMENT_MESSAGE": { "message": "Click on any element on the webpage to translate..." },
-  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "Translate" },
-  "SIDEPANEL_SETTINGS_TITLE_ICON": { "message": "Options" },
-  "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "Clear fields" },
-  "SIDEPANEL_REVERT_TOOLTIP": { "message": "Revert (Esc Key)" },
-  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": { "message": "Select Element" },
-  "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": { "message": "Input (Auto)" },
-  "SIDEPANEL_SWAP_LANGUAGES_TITLE": { "message": "Swap languages" },
-  "SIDEPANEL_SWAP_LANGUAGES_ALT": { "message": "Swap" },
-  "SIDEPANEL_SOURCE_LANGUAGE_TITLE": { "message": "Source Language" },
-  "SIDEPANEL_TARGET_LANGUAGE_TITLE": { "message": "Target Language" },
-  "SIDEPANEL_COPY_SOURCE_ALT_ICON": { "message": "Copy" },
-  "SIDEPANEL_VOICE_SOURCE_ALT_ICON": { "message": "Voice Source" },
-  "SIDEPANEL_PASTE_SOURCE_ALT_ICON": { "message": "Paste" },
-  "SIDEPANEL_COPY_TARGET_ALT_ICON": { "message": "Copy Result" },
-  "SIDEPANEL_VOICE_TARGET_ALT_ICON": { "message": "Voice Target" },
-  "SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": { "message": "Target Language" },
-  "SIDEPANEL_VOICE_TARGET_TITLE_ICON": { "message": "Speak" },
-  "SIDEPANEL_VOICE_SOURCE_TITLE_ICON": { "message": "Speak" },
-  "SIDEPANEL_COPY_SOURCE_TITLE_ICON": { "message": "Copy" },
-  "SIDEPANEL_COPY_TARGET_TITLE_ICON": { "message": "Copy" },
-  "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": { "message": "Paste" },
-
-  "history_delete": { "message": "Delete" },
-  "history_delete_item": { "message": "Delete this item" },
-
-  "STATUS_TRANSLATING_CTRLSLASH": { "message": "translating..." },
-  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "translating..." },
-  "STATUS_TRANSLATING_ICON": { "message": "translating..." },
-  "STATUS_Revert_Number": { "message": "Reverted" },
-  "STATUS_REVERT_NOT_FOUND": { "message": "No text found to revert." },
-  "STATUS_FROM_MEMORY": { "message": "From Memory" },
-  "STATUS_REMOVE_MEMORY": { "message": "Memory Cleared" },
+  "page_translation_btn_translate": {
+    "message": "Translate Page"
+  },
+  "page_translation_btn_stop": {
+    "message": "Stop Translating"
+  },
+  "page_translation_btn_restore": {
+    "message": "Restore Original"
+  },
+  "sync_page_label": {
+    "message": "Sync Page"
+  },
+  "sync_element_label": {
+    "message": "Sync Element"
+  },
+  "api_key_show": {
+    "message": "Show"
+  },
+  "api_key_hide": {
+    "message": "Hide"
+  },
+  "SIDEPANEL_SOURCE_TEXT_LABEL": {
+    "message": "Source Text"
+  },
+  "SIDEPANEL_TARGET_TEXT_LABEL": {
+    "message": "Translation"
+  },
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
+    "message": "Type Here"
+  },
+  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
+    "message": "Translation result will appear here"
+  },
+  "SIDEPANEL_SELECT_ELEMENT_MESSAGE": {
+    "message": "Click on any element on the webpage to translate..."
+  },
+  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": {
+    "message": "Translate"
+  },
+  "SIDEPANEL_SETTINGS_TITLE_ICON": {
+    "message": "Options"
+  },
+  "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": {
+    "message": "Clear fields"
+  },
+  "SIDEPANEL_REVERT_TOOLTIP": {
+    "message": "Revert (Esc Key)"
+  },
+  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
+    "message": "Select Element"
+  },
+  "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
+    "message": "Input (Auto)"
+  },
+  "SIDEPANEL_SWAP_LANGUAGES_TITLE": {
+    "message": "Swap languages"
+  },
+  "SIDEPANEL_SWAP_LANGUAGES_ALT": {
+    "message": "Swap"
+  },
+  "SIDEPANEL_SOURCE_LANGUAGE_TITLE": {
+    "message": "Source Language"
+  },
+  "SIDEPANEL_TARGET_LANGUAGE_TITLE": {
+    "message": "Target Language"
+  },
+  "SIDEPANEL_COPY_SOURCE_ALT_ICON": {
+    "message": "Copy"
+  },
+  "SIDEPANEL_VOICE_SOURCE_ALT_ICON": {
+    "message": "Voice Source"
+  },
+  "SIDEPANEL_PASTE_SOURCE_ALT_ICON": {
+    "message": "Paste"
+  },
+  "SIDEPANEL_COPY_TARGET_ALT_ICON": {
+    "message": "Copy Result"
+  },
+  "SIDEPANEL_VOICE_TARGET_ALT_ICON": {
+    "message": "Voice Target"
+  },
+  "SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": {
+    "message": "Target Language"
+  },
+  "SIDEPANEL_VOICE_TARGET_TITLE_ICON": {
+    "message": "Speak"
+  },
+  "SIDEPANEL_VOICE_SOURCE_TITLE_ICON": {
+    "message": "Speak"
+  },
+  "SIDEPANEL_COPY_SOURCE_TITLE_ICON": {
+    "message": "Copy"
+  },
+  "SIDEPANEL_COPY_TARGET_TITLE_ICON": {
+    "message": "Copy"
+  },
+  "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": {
+    "message": "Paste"
+  },
+  "history_delete": {
+    "message": "Delete"
+  },
+  "history_delete_item": {
+    "message": "Delete this item"
+  },
+  "STATUS_TRANSLATING_CTRLSLASH": {
+    "message": "translating..."
+  },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": {
+    "message": "translating..."
+  },
+  "STATUS_TRANSLATING_ICON": {
+    "message": "translating..."
+  },
+  "STATUS_Revert_Number": {
+    "message": "Reverted"
+  },
+  "STATUS_REVERT_NOT_FOUND": {
+    "message": "No text found to revert."
+  },
+  "STATUS_FROM_MEMORY": {
+    "message": "From Memory"
+  },
+  "STATUS_REMOVE_MEMORY": {
+    "message": "Memory Cleared"
+  },
   "STATUS_SMARTTRANSLATE_COPIED": {
     "message": "Translation copied to clipboard (Ctrl+V)."
   },
-  
-
   "SIDEPANEL_API_PROVIDER_TOOLTIP": {
     "message": "Change API Provider"
   },
@@ -580,25 +1070,33 @@
   "CONFIRM_CLEAR_ALL_HISTORY": {
     "message": "Are you sure you want to clear all translation history?"
   },
-
   "OPTIONS_STATUS_SAVED_SUCCESS": {
     "message": "Saved successfully :)"
   },
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "Save failed :("
   },
-  "browser_api_settings_title": {"message": "Browser Settings"},
-  "browser_api_description": {"message": "Private translations using the built-in browser engine. No external server requests are required."},
-  "browser_api_requirements": { "message": "Requirements:" },
+  "browser_api_settings_title": {
+    "message": "Browser Settings"
+  },
+  "browser_api_description": {
+    "message": "Private translations using the built-in browser engine. No external server requests are required."
+  },
+  "browser_api_requirements": {
+    "message": "Requirements:"
+  },
   "browser_api_requirements_chrome": {
     "message": "Chrome 138+ (Desktop Only)"
   },
-  "browser_api_requirements_gpu": { "message": "GPU with 4GB+ VRAM" },
-  "browser_api_requirements_storage": { "message": "A large free storage space (at least 22 GB)" },
+  "browser_api_requirements_gpu": {
+    "message": "GPU with 4GB+ VRAM"
+  },
+  "browser_api_requirements_storage": {
+    "message": "A large free storage space (at least 22 GB)"
+  },
   "browser_api_requirements_internet": {
     "message": "Unmetered network connection for initial download"
   },
-
   "PROVIDER_MODEL_LABEL": {
     "message": "Model"
   },
@@ -608,24 +1106,39 @@
   "openai_custom_model_placeholder": {
     "message": "Enter model name"
   },
-  "openai_custom_model_label": { "message": "Model Name" },
+  "openai_custom_model_label": {
+    "message": "Model Name"
+  },
   "openrouter_custom_model_placeholder": {
     "message": "Enter model name (e.g., provider/model-name)"
   },
-  "openrouter_custom_model_label": { "message": "Model Name" },
+  "openrouter_custom_model_label": {
+    "message": "Model Name"
+  },
   "deepseek_custom_model_placeholder": {
     "message": "Enter model name"
   },
-  "deepseek_custom_model_label": { "message": "Model Name" },
-
-  "ERRORS_CIRCUIT_BREAKER_OPEN": { "message": "Circuit breaker is open. This provider is temporarily disabled due to too many failures. Please try another provider or try again in a few minutes." },
-  "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },
+  "deepseek_custom_model_label": {
+    "message": "Model Name"
+  },
+  "ERRORS_CIRCUIT_BREAKER_OPEN": {
+    "message": "Circuit breaker is open. This provider is temporarily disabled due to too many failures. Please try another provider or try again in a few minutes."
+  },
+  "ERRORS_UNKNOWN": {
+    "message": "An unknown error occurred."
+  },
   "ERRORS_INVALID_CONTEXT": {
     "message": "Extension context invalid. Please refresh the page to continue."
   },
-  "ERRORS_CONTEXT_LOST": { "message": "Extension context lost." },
-  "ERRORS_TAB_AVAILABILITY": { "message": "Tab is not available." },
-  "ERRORS_EMPTY_PROMPT": { "message": "Invalid or missing prompt text." },
+  "ERRORS_CONTEXT_LOST": {
+    "message": "Extension context lost."
+  },
+  "ERRORS_TAB_AVAILABILITY": {
+    "message": "Tab is not available."
+  },
+  "ERRORS_EMPTY_PROMPT": {
+    "message": "Invalid or missing prompt text."
+  },
   "ERRORS_NETWORK_ERROR": {
     "message": "Network Error. Please check your internet connection."
   },
@@ -635,11 +1148,15 @@
   "ERRORS_BROWSER_API_UNAVAILABLE": {
     "message": "Chrome Translation API is not available. This feature requires Chrome 138 or newer."
   },
-  "ERRORS_API_KEY_MISSING": { "message": "API Key is missing." },
+  "ERRORS_API_KEY_MISSING": {
+    "message": "API Key is missing."
+  },
   "ERRORS_API_KEY_INVALID": {
     "message": "API Key is invalid or unauthorized."
   },
-  "ERRORS_API_URL_MISSING": { "message": "Invalid API address (404 error)." },
+  "ERRORS_API_URL_MISSING": {
+    "message": "Invalid API address (404 error)."
+  },
   "ERRORS_MODEL_MISSING": {
     "message": "The selected AI Model is missing or invalid."
   },
@@ -690,169 +1207,467 @@
   },
   "gemini_thinking_description": {
     "message": "Allow the model to think step-by-step before responding."
-  },  "advance_section_title": { "message": "Advanced Settings" },
-  "prompt_source_help": { "message": "Select the source language for your prompt." },
-  "prompt_target_help": { "message": "Select the target language for your prompt." },
-  "prompt_text_help": { "message": "Enter the text you want to translate or process." },
-  "export_success_plaintext": { "message": "Settings exported successfully (API keys saved in plain text)." },
-  "import_error_generic": { "message": "Failed to import settings." },
-  "import_error_password": { "message": "Import failed: Incorrect password." },
-
-  "appearance_section_title": { "message": "Appearance" },
-  "font_settings_title": { "message": "Font Settings" },
-  "font_settings_description": { "message": "Customize the font and size for translation display" },
-  "font_family_label": { "message": "Font Family" },
-  "font_size_label": { "message": "Font Size" },
-  "font_preview_label": { "message": "Preview" },
-  "font_family_required": { "message": "Font family is required" },
-  "font_size_invalid": { "message": "Font size must be a valid number" },
-  "font_size_range_error": { "message": "Font size must be between 10 and 30 pixels" },
-  "font_family_update_error": { "message": "Failed to update font family" },
-  "font_size_update_error": { "message": "Failed to update font size" },
-  "font_validation_failed": { "message": "Font settings validation failed" },
-  "search_fonts_placeholder": { "message": "Search fonts..." },
-  "loading_fonts": { "message": "Loading fonts..." },
-  "no_fonts_found": { "message": "No fonts found" },
-  "system_font": { "message": "System" },
-  "font_loading_error": { "message": "Failed to load fonts" },
-
-  "SELECT_ELEMENT_MODE_ACTIVATED": { "message": "Select Element mode activated. Click on any text element to translate." },
-  "SELECT_ELEMENT_TRANSLATING": { "message": "Translating..." },
-  "SELECT_ELEMENT_CANCEL": { "message": "Cancel" },
-  "SELECT_ELEMENT_REVERT": { "message": "Revert" },
-  "SELECT_ELEMENT_BING_WARNING": { "message": "Bing may have issues with long or complex texts. If you encounter errors, try using another provider." },
-  "LINGVA_WPT_WARNING": { "message": "Lingva provider may have issues with long texts during page translation. If you encounter errors, try using another provider." },
-  "BING_WPT_WARNING": { "message": "Bing provider may have issues with long or complex texts during page translation. If you encounter errors, try using another provider." },
-
-  "click_to_set_shortcut": { "message": "Click to set shortcut" },
-  "shortcut_recording_title": { "message": "Press Your Shortcut" },
-  "shortcut_recording_instruction": { "message": "Press the keys you want to use for this shortcut." },
-  "shortcut_waiting": { "message": "Waiting for keys..." },
-  "cancel": { "message": "Cancel" },
-  "clear": { "message": "Clear" },
-  "confirm": { "message": "Confirm" },
-
-  "api_test_button": { "message": "Test Keys" },
-  "api_test_testing": { "message": "Testing..." },
-  "api_test_no_keys": { "message": "No keys to test" },
-  "api_test_result_partial": { "message": "Found {valid} valid key(s), {invalid} invalid key(s)" },
-  "api_test_result_all_invalid": { "message": "All {count} key(s) are invalid" },
-  "api_test_unknown_provider": { "message": "Unknown provider: {provider}" },
-  "api_test_failed": { "message": "Failed to test keys: {error}" },
-  "api_key_tips": { "message": "💡 Enter one API key per line" },
-
-  "validation_source_language_empty": { "message": "Source language cannot be empty." },
-  "validation_target_language_empty": { "message": "Target language cannot be empty." },
-  "validation_same_languages": { "message": "Source and target languages cannot be the same." },
-  "validation_api_key_empty": { "message": "API key for {provider} cannot be empty." },
-  "validation_api_key_too_short": { "message": "API key appears to be too short." },
-  "validation_api_key_invalid": { "message": "API key must be at least 10 characters with no spaces" },
-  "validation_prompt_template_empty": { "message": "Prompt template cannot be empty." },
-  "validation_prompt_template_missing_placeholders": { "message": "Prompt template must include: {placeholders}" },
-  "validation_invalid_domains": { "message": "Invalid domain(s): {domains}" },
-  "validation_import_file_required": { "message": "Please select a file to import." },
-  "validation_import_file_json_only": { "message": "Only JSON files are supported." },
-  "validation_import_file_too_large": { "message": "File size must be less than 5MB." },
-  "validation_field_required": { "message": "This field is required" },
-  "validation_min_length": { "message": "Must be at least {min} characters" },
-  "validation_max_length": { "message": "Must be no more than {max} characters" },
-  "validation_invalid_email": { "message": "Must be a valid email address" },
-  "validation_invalid_url": { "message": "Must be a valid URL" },
-
-  "history_title": { "message": "Translation History" },
-  "history_items_count": { "message": "{count} items" },
-  "history_search_placeholder": { "message": "Search history..." },
-  "history_filter": { "message": "Filter" },
-  "history_filter_tooltip": { "message": "Filter options" },
-  "history_filter_by_provider": { "message": "Filter by Provider" },
-  "history_all_providers": { "message": "All Providers" },
-  "history_filter_by_type": { "message": "Filter by Type" },
-  "history_text_translations": { "message": "Text Translations" },
-  "history_image_translations": { "message": "Image Translations" },
-  "history_time_period": { "message": "Time Period" },
-  "history_time_all": { "message": "All Time" },
-  "history_time_today": { "message": "Today" },
-  "history_time_week": { "message": "This Week" },
-  "history_time_month": { "message": "This Month" },
-  "history_sort": { "message": "Sort" },
-  "history_sort_tooltip": { "message": "Sort options" },
-  "history_sort_by_date": { "message": "By Date" },
-  "history_sort_by_provider": { "message": "By Provider" },
-  "history_sort_by_length": { "message": "By Text Length" },
-  "history_sort_newest": { "message": "Newest First" },
-  "history_sort_oldest": { "message": "Oldest First" },
-  "history_clear_all": { "message": "Clear All" },
-  "history_clear_all_tooltip": { "message": "Clear all history" },
-  "history_loading": { "message": "Loading history..." },
-  "history_no_results": { "message": "No results found" },
-  "history_no_history": { "message": "No translation history yet" },
-  "history_no_results_hint": { "message": "Try adjusting your search or filters" },
-  "history_no_history_hint": { "message": "Your translations will appear here" },
-  "history_type_image": { "message": "Image" },
-  "history_type_text": { "message": "Text" },
-  "history_label_source": { "message": "Source:" },
-  "history_label_translation": { "message": "Translation:" },
-  "history_label_confidence": { "message": "Confidence:" },
-  "history_retranslate_tooltip": { "message": "Retranslate" },
-  "history_more_actions_tooltip": { "message": "More actions" },
-  "history_action_edit": { "message": "Edit" },
-  "history_action_favorite": { "message": "Favorite" },
-  "history_action_unfavorite": { "message": "Unfavorite" },
-  "history_action_export": { "message": "Export" },
-  "history_action_delete": { "message": "Delete" },
-  "history_page_first": { "message": "First page" },
-  "history_page_previous": { "message": "Previous page" },
-  "history_page_next": { "message": "Next page" },
-  "history_page_last": { "message": "Last page" },
-  "history_page_info": { "message": "Page {current} of {total}" },
-  "history_items_selected": { "message": "{count} item selected" },
-  "history_items_selected_plural": { "message": "{count} items selected" },
-  "history_bulk_export": { "message": "Export" },
-  "history_bulk_delete": { "message": "Delete" },
-  "history_bulk_cancel": { "message": "Cancel" },
-  "history_copy_all_selected_tooltip": { "message": "Copy all selected" },
-  "history_clear_confirm_title": { "message": "Clear History" },
-  "history_clear_confirm_message": { "message": "Are you sure you want to clear all translation history?" },
-  "history_clear_confirm_warning": { "message": "This action cannot be undone." },
-  "history_clear_confirm_button": { "message": "Clear All" },
-  "history_copied_feedback": { "message": "{count} items copied to clipboard!" },
-  "history_cleared_feedback": { "message": "History cleared" },
-  "history_deleted_feedback": { "message": "Deleted {count} translations" },
-  "history_delete_confirm_message": { "message": "Are you sure you want to delete this translation?" },
-  "history_bulk_delete_confirm_message": { "message": "Are you sure you want to delete {count} translations?" },
-
-  "window_copy_translation": { "message": "Copy translation" },
-  "window_close": { "message": "Close" },
-  "window_tts_no_text": { "message": "No text available for speech" },
-  "window_tts_stop": { "message": "Stop speaking (Click to stop)" },
-  "window_tts_speak_original": { "message": "🔊 Speak ORIGINAL text (Current mode: Orginal)" },
-  "window_tts_speak_translation": { "message": "🔊 Speak TRANSLATION (Current mode: Translation)" },
-  "window_show_original": { "message": "Show Original Text (Then use speaker button to listen to original)" },
-  "window_hide_original": { "message": "Hide Original Text (TTS button now speaks original text)" },
-  "window_loading_alt": { "message": "Loading..." },
-  "window_translation_placeholder": { "message": "Translation will appear here..." },
-
-  "error_prefix": { "message": "Error" },
-
-  "action_copy_text": { "message": "Copy text" },
-  "action_copy_to_clipboard": { "message": "Copy text to clipboard" },
-  "action_paste_from_clipboard": { "message": "Paste from clipboard" },
-  "action_speak_text": { "message": "Speak text" },
-  "action_stop_speaking": { "message": "Stop speaking" },
-  "action_retry": { "message": "Try Again" },
-  "action_settings": { "message": "Settings" },
-  "retry_button": { "message": "Retry" },
-
-  "translateSelectedText": { "message": "Translate selected text" },
-  "translateWithTranslateIt": { "message": "Translate with Translate-It" },
-  "click_to_translate": { "message": "Click to translate" },
-  "whole_page_translation_section_title": { "message": "Whole Page Translation" },
-  "whole_page_translation_enabled_label": { "message": "Enable Whole Page Translation" },
-  "whole_page_translation_enabled_description": { "message": "Allow translating the entire web page content while maintaining the layout." },
-  "whole_page_lazy_loading_label": { "message": "Lazy Loading (Performance)" },
-  "whole_page_lazy_loading_description": { "message": "Only translate parts of the page that are visible or near the viewport. Highly recommended for performance." },
-  "whole_page_auto_translate_on_dom_changes_label": { "message": "Auto-translate new content (Infinite Scroll)" },
-  "whole_page_auto_translate_on_dom_changes_description": { "message": "Automatically detect and translate new content as it appears (e.g., when scrolling down on Twitter or Substack)." },
-  "whole_page_show_original_on_hover_label": { "message": "Show original on hover" },
-  "whole_page_show_original_on_hover_description": { "message": "Show the original text in a tooltip when hovering over translated content." }
+  },
+  "advance_section_title": {
+    "message": "Advanced Settings"
+  },
+  "prompt_source_help": {
+    "message": "Select the source language for your prompt."
+  },
+  "prompt_target_help": {
+    "message": "Select the target language for your prompt."
+  },
+  "prompt_text_help": {
+    "message": "Enter the text you want to translate or process."
+  },
+  "export_success_plaintext": {
+    "message": "Settings exported successfully (API keys saved in plain text)."
+  },
+  "import_error_generic": {
+    "message": "Failed to import settings."
+  },
+  "import_error_password": {
+    "message": "Import failed: Incorrect password."
+  },
+  "appearance_section_title": {
+    "message": "Appearance"
+  },
+  "font_settings_title": {
+    "message": "Font Settings"
+  },
+  "font_settings_description": {
+    "message": "Customize the font and size for translation display"
+  },
+  "font_family_label": {
+    "message": "Font Family"
+  },
+  "font_size_label": {
+    "message": "Font Size"
+  },
+  "font_preview_label": {
+    "message": "Preview"
+  },
+  "font_family_required": {
+    "message": "Font family is required"
+  },
+  "font_size_invalid": {
+    "message": "Font size must be a valid number"
+  },
+  "font_size_range_error": {
+    "message": "Font size must be between 10 and 30 pixels"
+  },
+  "font_family_update_error": {
+    "message": "Failed to update font family"
+  },
+  "font_size_update_error": {
+    "message": "Failed to update font size"
+  },
+  "font_validation_failed": {
+    "message": "Font settings validation failed"
+  },
+  "search_fonts_placeholder": {
+    "message": "Search fonts..."
+  },
+  "loading_fonts": {
+    "message": "Loading fonts..."
+  },
+  "no_fonts_found": {
+    "message": "No fonts found"
+  },
+  "system_font": {
+    "message": "System"
+  },
+  "font_loading_error": {
+    "message": "Failed to load fonts"
+  },
+  "SELECT_ELEMENT_MODE_ACTIVATED": {
+    "message": "Select Element mode activated. Click on any text element to translate."
+  },
+  "SELECT_ELEMENT_TRANSLATING": {
+    "message": "Translating..."
+  },
+  "SELECT_ELEMENT_CANCEL": {
+    "message": "Cancel"
+  },
+  "SELECT_ELEMENT_REVERT": {
+    "message": "Revert"
+  },
+  "SELECT_ELEMENT_BING_WARNING": {
+    "message": "Bing may have issues with long or complex texts. If you encounter errors, try using another provider."
+  },
+  "LINGVA_WPT_WARNING": {
+    "message": "Lingva provider may have issues with long texts during page translation. If you encounter errors, try using another provider."
+  },
+  "BING_WPT_WARNING": {
+    "message": "Bing provider may have issues with long or complex texts during page translation. If you encounter errors, try using another provider."
+  },
+  "click_to_set_shortcut": {
+    "message": "Click to set shortcut"
+  },
+  "shortcut_recording_title": {
+    "message": "Press Your Shortcut"
+  },
+  "shortcut_recording_instruction": {
+    "message": "Press the keys you want to use for this shortcut."
+  },
+  "shortcut_waiting": {
+    "message": "Waiting for keys..."
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "clear": {
+    "message": "Clear"
+  },
+  "confirm": {
+    "message": "Confirm"
+  },
+  "api_test_button": {
+    "message": "Test Keys"
+  },
+  "api_test_testing": {
+    "message": "Testing..."
+  },
+  "api_test_no_keys": {
+    "message": "No keys to test"
+  },
+  "api_test_result_partial": {
+    "message": "Found {valid} valid key(s), {invalid} invalid key(s)"
+  },
+  "api_test_result_all_invalid": {
+    "message": "All {count} key(s) are invalid"
+  },
+  "api_test_unknown_provider": {
+    "message": "Unknown provider: {provider}"
+  },
+  "api_test_failed": {
+    "message": "Failed to test keys: {error}"
+  },
+  "api_key_tips": {
+    "message": "💡 Enter one API key per line"
+  },
+  "validation_source_language_empty": {
+    "message": "Source language cannot be empty."
+  },
+  "validation_target_language_empty": {
+    "message": "Target language cannot be empty."
+  },
+  "validation_same_languages": {
+    "message": "Source and target languages cannot be the same."
+  },
+  "validation_api_key_empty": {
+    "message": "API key for {provider} cannot be empty."
+  },
+  "validation_api_key_too_short": {
+    "message": "API key appears to be too short."
+  },
+  "validation_api_key_invalid": {
+    "message": "API key must be at least 10 characters with no spaces"
+  },
+  "validation_prompt_template_empty": {
+    "message": "Prompt template cannot be empty."
+  },
+  "validation_prompt_template_missing_placeholders": {
+    "message": "Prompt template must include: {placeholders}"
+  },
+  "validation_invalid_domains": {
+    "message": "Invalid domain(s): {domains}"
+  },
+  "validation_import_file_required": {
+    "message": "Please select a file to import."
+  },
+  "validation_import_file_json_only": {
+    "message": "Only JSON files are supported."
+  },
+  "validation_import_file_too_large": {
+    "message": "File size must be less than 5MB."
+  },
+  "validation_field_required": {
+    "message": "This field is required"
+  },
+  "validation_min_length": {
+    "message": "Must be at least {min} characters"
+  },
+  "validation_max_length": {
+    "message": "Must be no more than {max} characters"
+  },
+  "validation_invalid_email": {
+    "message": "Must be a valid email address"
+  },
+  "validation_invalid_url": {
+    "message": "Must be a valid URL"
+  },
+  "history_title": {
+    "message": "Translation History"
+  },
+  "history_items_count": {
+    "message": "{count} items"
+  },
+  "history_search_placeholder": {
+    "message": "Search history..."
+  },
+  "history_filter": {
+    "message": "Filter"
+  },
+  "history_filter_tooltip": {
+    "message": "Filter options"
+  },
+  "history_filter_by_provider": {
+    "message": "Filter by Provider"
+  },
+  "history_all_providers": {
+    "message": "All Providers"
+  },
+  "history_filter_by_type": {
+    "message": "Filter by Type"
+  },
+  "history_text_translations": {
+    "message": "Text Translations"
+  },
+  "history_image_translations": {
+    "message": "Image Translations"
+  },
+  "history_time_period": {
+    "message": "Time Period"
+  },
+  "history_time_all": {
+    "message": "All Time"
+  },
+  "history_time_today": {
+    "message": "Today"
+  },
+  "history_time_week": {
+    "message": "This Week"
+  },
+  "history_time_month": {
+    "message": "This Month"
+  },
+  "history_sort": {
+    "message": "Sort"
+  },
+  "history_sort_tooltip": {
+    "message": "Sort options"
+  },
+  "history_sort_by_date": {
+    "message": "By Date"
+  },
+  "history_sort_by_provider": {
+    "message": "By Provider"
+  },
+  "history_sort_by_length": {
+    "message": "By Text Length"
+  },
+  "history_sort_newest": {
+    "message": "Newest First"
+  },
+  "history_sort_oldest": {
+    "message": "Oldest First"
+  },
+  "history_clear_all": {
+    "message": "Clear All"
+  },
+  "history_clear_all_tooltip": {
+    "message": "Clear all history"
+  },
+  "history_loading": {
+    "message": "Loading history..."
+  },
+  "history_no_results": {
+    "message": "No results found"
+  },
+  "history_no_history": {
+    "message": "No translation history yet"
+  },
+  "history_no_results_hint": {
+    "message": "Try adjusting your search or filters"
+  },
+  "history_no_history_hint": {
+    "message": "Your translations will appear here"
+  },
+  "history_type_image": {
+    "message": "Image"
+  },
+  "history_type_text": {
+    "message": "Text"
+  },
+  "history_label_source": {
+    "message": "Source:"
+  },
+  "history_label_translation": {
+    "message": "Translation:"
+  },
+  "history_label_confidence": {
+    "message": "Confidence:"
+  },
+  "history_retranslate_tooltip": {
+    "message": "Retranslate"
+  },
+  "history_more_actions_tooltip": {
+    "message": "More actions"
+  },
+  "history_action_edit": {
+    "message": "Edit"
+  },
+  "history_action_favorite": {
+    "message": "Favorite"
+  },
+  "history_action_unfavorite": {
+    "message": "Unfavorite"
+  },
+  "history_action_export": {
+    "message": "Export"
+  },
+  "history_action_delete": {
+    "message": "Delete"
+  },
+  "history_page_first": {
+    "message": "First page"
+  },
+  "history_page_previous": {
+    "message": "Previous page"
+  },
+  "history_page_next": {
+    "message": "Next page"
+  },
+  "history_page_last": {
+    "message": "Last page"
+  },
+  "history_page_info": {
+    "message": "Page {current} of {total}"
+  },
+  "history_items_selected": {
+    "message": "{count} item selected"
+  },
+  "history_items_selected_plural": {
+    "message": "{count} items selected"
+  },
+  "history_bulk_export": {
+    "message": "Export"
+  },
+  "history_bulk_delete": {
+    "message": "Delete"
+  },
+  "history_bulk_cancel": {
+    "message": "Cancel"
+  },
+  "history_copy_all_selected_tooltip": {
+    "message": "Copy all selected"
+  },
+  "history_clear_confirm_title": {
+    "message": "Clear History"
+  },
+  "history_clear_confirm_message": {
+    "message": "Are you sure you want to clear all translation history?"
+  },
+  "history_clear_confirm_warning": {
+    "message": "This action cannot be undone."
+  },
+  "history_clear_confirm_button": {
+    "message": "Clear All"
+  },
+  "history_copied_feedback": {
+    "message": "{count} items copied to clipboard!"
+  },
+  "history_cleared_feedback": {
+    "message": "History cleared"
+  },
+  "history_deleted_feedback": {
+    "message": "Deleted {count} translations"
+  },
+  "history_delete_confirm_message": {
+    "message": "Are you sure you want to delete this translation?"
+  },
+  "history_bulk_delete_confirm_message": {
+    "message": "Are you sure you want to delete {count} translations?"
+  },
+  "window_copy_translation": {
+    "message": "Copy translation"
+  },
+  "window_close": {
+    "message": "Close"
+  },
+  "window_tts_no_text": {
+    "message": "No text available for speech"
+  },
+  "window_tts_stop": {
+    "message": "Stop speaking (Click to stop)"
+  },
+  "window_tts_speak_original": {
+    "message": "🔊 Speak ORIGINAL text (Current mode: Orginal)"
+  },
+  "window_tts_speak_translation": {
+    "message": "🔊 Speak TRANSLATION (Current mode: Translation)"
+  },
+  "window_show_original": {
+    "message": "Show Original Text (Then use speaker button to listen to original)"
+  },
+  "window_hide_original": {
+    "message": "Hide Original Text (TTS button now speaks original text)"
+  },
+  "window_loading_alt": {
+    "message": "Loading..."
+  },
+  "window_translation_placeholder": {
+    "message": "Translation will appear here..."
+  },
+  "action_copy_text": {
+    "message": "Copy text"
+  },
+  "action_copy_to_clipboard": {
+    "message": "Copy text to clipboard"
+  },
+  "action_paste_from_clipboard": {
+    "message": "Paste from clipboard"
+  },
+  "action_speak_text": {
+    "message": "Speak text"
+  },
+  "action_stop_speaking": {
+    "message": "Stop speaking"
+  },
+  "action_retry": {
+    "message": "Try Again"
+  },
+  "action_settings": {
+    "message": "Settings"
+  },
+  "retry_button": {
+    "message": "Retry"
+  },
+  "translateSelectedText": {
+    "message": "Translate selected text"
+  },
+  "translateWithTranslateIt": {
+    "message": "Translate with Translate-It"
+  },
+  "click_to_translate": {
+    "message": "Click to translate"
+  },
+  "whole_page_translation_section_title": {
+    "message": "Whole Page Translation"
+  },
+  "whole_page_translation_enabled_label": {
+    "message": "Enable Whole Page Translation"
+  },
+  "whole_page_translation_enabled_description": {
+    "message": "Allow translating the entire web page content while maintaining the layout."
+  },
+  "whole_page_lazy_loading_label": {
+    "message": "Lazy Loading (Performance)"
+  },
+  "whole_page_lazy_loading_description": {
+    "message": "Only translate parts of the page that are visible or near the viewport. Highly recommended for performance."
+  },
+  "whole_page_auto_translate_on_dom_changes_label": {
+    "message": "Auto-translate new content (Infinite Scroll)"
+  },
+  "whole_page_auto_translate_on_dom_changes_description": {
+    "message": "Automatically detect and translate new content as it appears (e.g., when scrolling down on Twitter or Substack)."
+  },
+  "whole_page_show_original_on_hover_label": {
+    "message": "Show original on hover"
+  },
+  "whole_page_show_original_on_hover_description": {
+    "message": "Show the original text in a tooltip when hovering over translated content."
+  }
 }
