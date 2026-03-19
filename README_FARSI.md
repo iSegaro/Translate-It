@@ -89,15 +89,16 @@
 ✅ **پشتیبانی از ارائه‌دهندگان ترجمه متنوع:**
 این افزونه از چندین سرویس ترجمه هوش مصنوعی پشتیبانی می‌کند تا بهترین گزینه را مطابق نیازهای خود انتخاب کنید:
 
-- [Google Translate][google-translate-url] (✔ رایگان)
-- [DeepL Translate][deepl-url] (✔ رایگان)
-- [Gemini][gemini-url] (✔ رایگان)
-- [Yandex Translate][yandex-url] (✔ رایگان)
-- [Microsoft Bing Translator][bing-url] (✔ رایگان)
-- [Browser Translator][browserapi-url] (✔ رایگان)
-- [WebAI to API][webai-to-api-url] (✔ رایگان)
-- [OpenAI][openai-url]
+- [Google Translate][google-translate-url]
+- [DeepL Translate][deepl-url]
+- [Gemini][gemini-url]
+- [Microsoft Translator][bing-url]
+- [Yandex Translate][yandex-url]
+- [Lingva Translate][lingva-url]
+- [Browser Translator][browserapi-url]
+- [WebAI to API][webai-to-api-url]
 - [OpenRouter][openrouter-url]
+- [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
 - Custom OpenAI Compatible (به [تنظیمات پیش‌رفته](#advanced-settings) رجوع کنید)
 
@@ -105,12 +106,6 @@
 
 🔑 **چندین کلید API با سوئیچ خودکار:**
 می‌توانید برای هر ارائه‌دهنده، چندین کلید API وارد کنید. اگر یکی از کلیدها به سقف quota خود برسد یا کار نکند، افزونه به‌طور خودکار به کلید بعدی سوییچ می‌کند. کلیدهای موفق برای درخواست‌های بعدی اولویت دارند.
-
-<br>
-## 📋 نیازمندی‌ها
-
-- مرورگر مدرن مبتنی بر Chromium یا Firefox (Chrome، Edge، Brave و غیره)
-- یک کلید API معتبر (در صورت عدم استفاده از [Google Translate][google-translate-url] یا [WebAI to API][webai-to-api-url])
 
 <br>
 
@@ -173,22 +168,23 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 برای استفاده از ترجمه با هوش مصنوعی، باید از یکی از سرویس‌های زیر یک API Key بگیرید:
 
-| ارائه‌دهنده      | دریافت کلید API                                  | هزینه  |
-| ---------------- | ------------------------------------------------ | ------ |
-| Google Translate | _نیازی نیست_                                     | رایگان |
-| Yandex Translate | _نیازی نیست_                                     | رایگان |
-| Bing Translate   | _نیازی نیست_                                     | رایگان |
-| DeepL            | [کلیدهای API DeepL][deepl-api-key-url]           | رایگان |
-| Google Gemini    | [Google AI Studio][gemini-api-key-url]           | رایگان |
-| WebAI to API     | _[سرور محلی][webai-to-api-url]_                  | رایگان |
-| OpenRouter       | [کلیدهای API OpenRouter][openrouter-api-key-url] | رایگان |
-| OpenAI           | [کلیدهای API OpenAI][openai-api-key-url]         | پولی   |
-| DeepSeek         | [کلیدهای API DeepSeek][deepseek-api-key-url]     | پولی   |
-| Custom OpenAI    | -                                                | -      |
+| ارائه‌دهنده      | دریافت کلید API                                  |
+| ---------------- | ------------------------------------------------ |
+| Google Translate | _نیازی نیست_                                     |
+| Yandex Translate | _نیازی نیست_                                     |
+| Bing Translate   | _نیازی نیست_                                     |
+| Lingva Translate | _نیازی نیست_                                     |
+| DeepL            | [کلیدهای API DeepL][deepl-api-key-url]           |
+| Google Gemini    | [Google AI Studio][gemini-api-key-url]           |
+| WebAI to API     | _[سرور محلی][webai-to-api-url]_                  |
+| OpenRouter       | [کلیدهای API OpenRouter][openrouter-api-key-url] |
+| OpenAI           | [کلیدهای API OpenAI][openai-api-key-url]         |
+| DeepSeek         | [کلیدهای API DeepSeek][deepseek-api-key-url]     |
+| Custom OpenAI    | -                                                |
 
-**توجه:** **`WebAI to API`** یک سرور python است که بدون نیاز به API میتونید API Local داشته باشید.
+**توجه:** **[`WebAI to API`][webai-to-api-url]** یک سرور محلی python است که بدون نیاز به API میتونید ترجمه هوش مصنوعی داشته باشید.
 
-**توجه:** برای بچه‌های داخل ایران، احتمالا برای دریافت `API Key` رایگان مجبور باشید VPN استفاده کنید.
+**توجه:** برای بچه‌های داخل ایران یا چین، احتمالا برای دریافت `API Key` رایگان مجبور باشید VPN استفاده کنید.
 
 ### پشتیبانی از چندین کلید API
 
@@ -273,13 +269,13 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 هنگام استفاده از **مترجم Bing** با قابلیت **Select Element** در صفحات پیچیده یا طولانی، متن ترجمه شده ممکن است موقعیت صحیح خود را حفظ نکند و در مکان‌های نادرست ظاهر شود. این یک محدودیت شناخته‌شده سرویس Bing است که با معماری فعلی افزونه همخوانی ندارد.
 
-**راه حل:** برای بهترین نتایج در حالت Select Element، از سایر پرووایدرها مانند Google Translate، Gemini یا DeepL استفاده کنید که ساختارهای پیچیده صفحه را بهتر مدیریت می‌کنند.
+**راه حل:** برای بهترین نتایج در حالت `Select Element` از سایر پرووایدرها مانند `Microsoft Translator` استفاده کنید.
 
 ---
 
 ### کیفیت ترجمه در حالت انتخاب المنت در صفحات پیچیده
 
-برای به حداکثر رساندن کارایی و به حداقل رساندن استفاده از Token و درخواست‌های API از سمت پرووایدرهای ترجمه، افزونه قبل از ارسال متن برای ترجمه، به شدت آن را بهینه می‌کند. این استراتژی بهینه‌سازی، اگرچه برای کارایی و هزینه لازم است، می‌تواند منجر به کاهش کیفیت ترجمه هنگام استفاده از **حالت Select Element** در صفحات وب پیچیده شود.
+برای به حداکثر رساندن کارایی و به حداقل رساندن استفاده از Token و درخواست‌های API از سمت پرووایدرهای ترجمه، افزونه قبل از ارسال متن برای ترجمه، به شدت آن را بهینه می‌کند. این استراتژی بهینه‌سازی، اگرچه برای کارایی و هزینه لازم است، می‌تواند منجر به کاهش کیفیت ترجمه هنگام استفاده از **Select Element** در صفحات وب پیچیده شود.
 
 **جزئیات فنی:** افزونه متن‌ها را گروه‌بندی و تکه‌تکه می‌کند تا تعداد درخواست‌های API را به حداقل برساند. در صفحات با چیدمان‌های پیچیده یا انواع محتوای ترکیبی، این بهینه‌سازی ممکن است اطلاعات سیاقی را به شکلی تقسیم کند که بر دقت ترجمه تاثیر بگذارد.
 
@@ -289,7 +285,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 - ✅ مصرف کمتر منابع
 - ❌ کاهش احتمالی کیفیت ترجمه در سناریوهای پیچیده
 
-**توصیه:** برای محتوای حساس که کیفیت ترجمه در آن در اولویت است، به جای حالت Select Element از ترجمه `Popup/Sidepanel` یا `Select Text` استفاده کنید، زیرا حفظ سیاق بهتری دارند.
+**توصیه:** برای محتوای حساس که کیفیت ترجمه در آن در اولویت است، به جای حالت `Select Element` از ترجمه `Popup/Sidepanel` یا `Select Text` استفاده کنید، زیرا حفظ سیاق بهتری دارند.
 
 </details>
 
@@ -328,6 +324,10 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
   این نرم‌افزار، یک API محلی (local) و رایگان است که نیازی به کلید ندارد. می‌توانید مدل‌های دلخواه خود را در تنظیمات آن تعریف کنید. برای آشنایی با نحوه پیکربندی و مدل‌های قابل استفاده، به [مستندات WebAI to API][webai-to-api-url-docs] مراجعه نمایید.
 
+- **Lingva Translate**
+
+  لینگوا یک رابط کاربری متن‌باز برای مترجم گوگل است که بر حریم خصوصی و تمرکززدایی تمرکز دارد. می‌توانید از اینستنس‌های عمومی (مانند `https://lingva.ml`) استفاده کنید یا اینستنس خود را میزبانی کنید. نیازی به کلید API ندارد. برای جزئیات بیشتر به [مخزن گیت‌هاب Lingva Translate][lingva-url-docs] مراجعه کنید.
+
 - **سفارشی (سازگار با OpenAI)**
 
   این گزینه برای ایجاد حداکثر انعطاف‌پذیری طراحی شده و به شما امکان می‌دهد تا به هر سرویس API که با ساختار `chat completions` در OpenAI سازگار است، متصل شوید. کافیست مقادیر سفارشی `API URL`، `API Key` و `Model Name` را در تنظیمات وارد کنید. این قابلیت برای استفاده از مدل‌های شخصی (self-hosted)، مدل‌های زبان بزرگ محلی (مانند استفاده از Ollama) یا سایر ارائه‌دهندگان شخص ثالث که با این ساختار سازگار هستند، ایده‌آل است. برای اطلاع از ساختار مورد نیاز، به [مستندات API در OpenAI][openai-url-docs] مراجعه کنید.
@@ -359,28 +359,6 @@ _نکته:_ برای `DeepSeek` مدل پیش‌فرض `deepseek-chat` است.
 
 ---
 
-<details>
-<summary>
-  <h3>☕ مهمونم کنید</h3>
-</summary>
-
-اگر این پروژه براتون مفید بود، یه قهوه مهمونم کنید : )
-
-<br>
-
-| روش‌های دونیت       | 🔗 لینک                                                                                                                                                                                                                 |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **BuyMeACoffee**    | <a href="https://www.buymeacoffee.com/m_khani" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/arial-yellow.png" alt="Buy Me A Coffee" style="height: 30px !important;width: 117px !important;" ></a> |
-| **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                                                                            |
-| **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                                                                            |
-| **PayPal**          | [![کمک مالی PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)                                                      |
-
-</details>
-
-<br>
-
-با تشکر از حمایت شما!
-
 <br>
 
 ---
@@ -398,7 +376,7 @@ _نکته:_ برای `DeepSeek` مدل پیش‌فرض `deepseek-chat` است.
 
 <details>
 <summary>
-  <h3>🥤 توسعه</h3>
+  <h2>Development Notes</h2>
 </summary>
 
 ### پیش‌نیازها
@@ -460,11 +438,9 @@ pnpm run watch:firefox
 
 ### کیفیت کد و اعتبارسنجی
 
-#### بررسی کد
+#### بررسی کد (Linting)
 
-برای اطمینان از کیفیت کد و شناسایی سریع مشکلات احتمالی، می‌توانید دستورات زیر را اجرا کنید:
-
-<div dir="rtl" style="text-align: right;">
+برای اطمینان از کیفیت کد و شناسایی سریع مشکلات احتمالی، می‌توانید ESLint و Stylelint را اجرا کنید:
 
 <div dir="ltr" style="text-align: left;">
 
@@ -508,7 +484,7 @@ pnpm run setup:chrome-validator
 
 </div>
 
-#### فرآیند پیش از ارسال
+#### فرآیند پیش از ارسال (Pre-submission)
 
 قبل از ارسال تغییرات، بررسی جامع پیش از ارسال را اجرا کنید:
 
@@ -627,6 +603,7 @@ pnpm run publish
 [browserapi-url]: https://developer.chrome.com/docs/ai/translator-api/
 [bing-url]: https://www.bing.com/translator/
 [yandex-url]: https://translate.yandex.com/en/
+[lingva-url]: https://lingva.ml/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
 [firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/dist/Publish/
@@ -648,6 +625,7 @@ pnpm run publish
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/
+[lingva-url-docs]: https://github.com/thedaviddelta/lingva-translate/
 [webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
 [pnpm-url]: https://pnpm.io/
 [node-js-url]: https://nodejs.org/

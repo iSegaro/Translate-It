@@ -87,13 +87,14 @@ When selecting a word, you'll not only get a translation but also helpful inform
 ✅ **Supports Multiple Translation Providers:**  
 You can choose from several AI-powered translation providers:
 
-- [Google Translate][google-translate-url] (✔ Free)
-- [DeepL Translate][deepl-url] (✔ Free)
-- [Gemini][gemini-url] (✔ Free)
-- [Microsoft Bing Translator][bing-url] (✔ Free)
-- [Yandex Translate][yandex-url] (✔ Free)
-- [Browser Translator][browserapi-url] (✔ Free)
-- [WebAI to API][webai-to-api-url] (✔ Free)
+- [Google Translate][google-translate-url]
+- [DeepL Translate][deepl-url]
+- [Gemini][gemini-url]
+- [Microsoft Translator][bing-url]
+- [Yandex Translate][yandex-url]
+- [Lingva Translate][lingva-url]
+- [Browser Translator][browserapi-url]
+- [WebAI to API][webai-to-api-url]
 - [OpenRouter][openrouter-url]
 - [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
@@ -172,22 +173,23 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 
 To use AI-based translation, you’ll need an API key from one of the providers listed below:
 
-| Provider         | How to Get API Key                            | Cost |
-| ---------------- | --------------------------------------------- | ---- |
-| Google Translate | _Dont Need_                                   | Free |
-| Yandex Translate | _Dont Need_                                   | Free |
-| Bing Translate   | _Dont Need_                                   | Free |
-| DeepL            | [DeepL API Keys][deepl-api-key-url]           | Free |
-| Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free |
-| WebAI to API     | _[Local Server][webai-to-api-url]_            | Free |
-| OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free |
-| OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid |
-| DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid |
-| Custom OpenAI    | -                                             | -    |
+| Provider         | How to Get API Key                            |
+| ---------------- | --------------------------------------------- |
+| Google Translate | _Dont Need_                                   |
+| Yandex Translate | _Dont Need_                                   |
+| Bing Translate   | _Dont Need_                                   |
+| Lingva Translate | _Dont Need_                                   |
+| DeepL            | [DeepL API Keys][deepl-api-key-url]           |
+| Google Gemini    | [Google AI Studio][gemini-api-key-url]        |
+| WebAI to API     | _[Local Server][webai-to-api-url]_            |
+| OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] |
+| OpenAI           | [OpenAI API Keys][openai-api-key-url]         |
+| DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     |
+| Custom OpenAI    | -                                             |
 
-**Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
+**Note:** [`WebAI to API`][webai-to-api-url] is a local Python-based server that allows you to use AI translation without an API key.
 
-**Important:** If you're in Iran, you may need a VPN to access and register for free API keys.
+**Important:** If you're in Iran or China, you may need a VPN to access and register for free API keys.
 
 ### Multiple API Keys Support
 
@@ -274,13 +276,13 @@ This section documents known limitations and issues that users may encounter whe
 
 When using **Bing Translator** with the **Select Element** feature on complex or lengthy pages, the translated text may not maintain proper positioning and can appear in incorrect locations. This is a known limitation of the Bing service that doesn't align well with the extension's current architecture.
 
-**Workaround:** For best results with Select Element mode, consider using other providers like Google Translate, Gemini, or DeepL which handle complex page structures more reliably.
+**Workaround:** For best results with `Select Element` mode, consider using other providers like `Microsoft Translator`.
 
 ---
 
 ### Translation Quality in Select Element Mode on Complex Pages
 
-To maximize efficiency and minimize token usage/API requests from translation providers, the extension heavily optimizes text before sending it for translation. This optimization strategy, while necessary for cost and performance efficiency, can result in reduced translation quality when using **Select Element mode** on complex web pages.
+To maximize efficiency and minimize token usage/API requests from translation providers, the extension heavily optimizes text before sending it for translation. This optimization strategy, while necessary for cost and performance efficiency, can result in reduced translation quality when using **Select Element** mode on complex web pages.
 
 **Technical Details:** The extension groups and chunks text content to minimize the number of API calls. On pages with intricate layouts or mixed content types, this optimization may split contextual information in ways that affect translation accuracy.
 
@@ -290,7 +292,7 @@ To maximize efficiency and minimize token usage/API requests from translation pr
 - ✅ Lower resource consumption
 - ❌ Potentially reduced translation quality in complex scenarios
 
-**Recommendation:** For critical content where translation quality is paramount, consider using `Popup/Sidepanel` or `Select Text` translation instead of Select Element mode, as it provides better context preservation.
+**Recommendation:** For critical content where translation quality is paramount, consider using `Popup/Sidepanel` or `Select Text` translation instead of `Select Element` mode, as it provides better context preservation.
 
 </details>
 
@@ -329,6 +331,10 @@ In the API Settings page of the extension, each provider has customizable option
 
   This is a free local backend for translation. You can configure your own model in the settings. For setup, see [WebAI to API GitHub repo][webai-to-api-url-docs].
 
+- **Lingva Translate**
+
+  Lingva is an open-source front-end for Google Translate that focuses on privacy and decentralization. You can use public instances (like `https://lingva.ml`) or host your own. No API key is required. See the [Lingva Translate GitHub repo][lingva-url-docs] for more details.
+
 - **Custom (OpenAI Compatible)**
 
   For maximum flexibility, this option lets you connect to any API service that uses the OpenAI chat completions format. Simply enter the custom `API URL`, `API Key`, and `Model Name` in the settings. This is ideal for using self-hosted models, local LLMs (e.g., through Ollama), or other compatible third-party providers. For the required format, see the [OpenAI API reference][openai-url-docs].
@@ -352,31 +358,6 @@ In the API Settings page of the extension, each provider has customizable option
 
 ---
 
-<details>
-<summary>
-  <h2>☕ Buy Me a Coffee</h2>
-</summary>
-
-If this project helped you and you’d like to support it, you can buy me a coffee ☕
-
-<br>
-
-| Donation Method     | 🔗 Link                                                                                                                                                                                                                 |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **BuyMeACoffee**    | <a href="https://www.buymeacoffee.com/m_khani" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/arial-yellow.png" alt="Buy Me A Coffee" style="height: 30px !important;width: 117px !important;" ></a> |
-| **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                                                                            |
-| **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                                                                            |
-| **PayPal**          | [![کمک مالی PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)                                                      |
-
-</details>
-
-<br>
-Thank you for your support!
-
-<br>
-
----
-
 ### 👥 Contributors
 
 - iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
@@ -388,7 +369,7 @@ Thank you for your support!
 
 <details>
 <summary>
-  <h2>🥤 Development Notes</h2>
+  <h2>Development Notes</h2>
 </summary>
 
 ### Prerequisites
@@ -576,6 +557,7 @@ year 2025
 [browserapi-url]: https://developer.chrome.com/docs/ai/translator-api/
 [bing-url]: https://www.bing.com/translator/
 [yandex-url]: https://translate.yandex.com/en/
+[lingva-url]: https://lingva.ml/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
@@ -598,6 +580,7 @@ year 2025
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/
+[lingva-url-docs]: https://github.com/thedaviddelta/lingva-translate/
 [webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
 [pnpm-url]: https://pnpm.io/
 [node-js-url]: https://nodejs.org/
