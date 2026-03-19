@@ -344,7 +344,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   flex-shrink: 0;
   position: relative;
-  z-index: 5; /* Lowered from 10 to let form tooltips show over it */
+  z-index: 10; /* Restored to original priority */
 }
 
 /* Wide layout: Translate button alongside language selectors */
@@ -500,8 +500,6 @@ onUnmounted(() => {
   gap: 0;
   height: 100%;
   flex: 1;
-  position: relative;
-  z-index: 10; /* Higher than language-controls to allow tooltips to overlap */
 }
 
 /* Sidepanel-specific adjustments (similar to popup) */
