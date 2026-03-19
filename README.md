@@ -75,7 +75,7 @@ Most providers require an API key (e.g., Gemini, OpenAI, DeepSeek).
 We welcome contributions! To set up the project locally and start developing:
 - Read the [**CONTRIBUTING.md**](./CONTRIBUTING.md) for setup and build instructions.
 - Follow the [**Localization Guide**](./docs/guides/LOCALIZATION_GUIDE.md) to add or update translations.
-- Explore the [**Architecture Overview**](./docs/ARCHITECTURE.md) to understand the project structure.
+- Explore the [**Architecture Overview**](./docs/technical/ARCHITECTURE.md) to understand the project structure.
 
 ---
 

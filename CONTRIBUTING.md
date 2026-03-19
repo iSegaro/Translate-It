@@ -149,7 +149,7 @@ After running, the `dist/Publish` directory will contain:
 ## Technical Documentation
 
 For a deeper dive into the architecture and system design, please refer to:
-- [Architecture Overview](./docs/ARCHITECTURE.md)
-- [Translation Provider Logic](./docs/TRANSLATION_PROVIDER_LOGIC.md)
-- [Messaging System](./docs/MessagingSystem.md)
-- [And more in the docs folder...](./docs/)
+- [Architecture Overview](./docs/technical/ARCHITECTURE.md)
+- [Translation Provider Logic](./docs/technical/TRANSLATION_PROVIDER_LOGIC.md)
+- [Messaging System](./docs/technical/MessagingSystem.md)
+- [And more in the docs folder...](./docs/technical/)

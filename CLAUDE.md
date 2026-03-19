@@ -44,7 +44,7 @@ The system utilizes a provider hierarchy pattern:
 - **`RateLimitManager`**: Manages rate limits and the Circuit Breaker.
 - **`StreamingManager`**: Manages real-time translation streaming.
 
-To implement a new provider, refer to the `docs/PROVIDERS.md` documentation.
+To implement a new provider, refer to the `docs/technical/PROVIDERS.md` documentation.
 
 ## New Project Structure (Feature-Based Architecture)
 
@@ -113,32 +113,32 @@ To implement a new provider, refer to the `docs/PROVIDERS.md` documentation.
 Comprehensive documentation is available in the `docs/` folder for a deep dive into each system:
 
 ### Core Documentation
-- **`docs/ARCHITECTURE.md`**: Full project architecture and integration guide.
-- **`docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`**: Smart handler registration system with dynamic lifecycle management.
-- **`docs/MessagingSystem.md`**: **Unified Messaging System (2025)** – UnifiedMessaging with streaming coordination, smart timeout management, and an integration layer for content scripts.
-- **`docs/TRANSLATION_SYSTEM.md`**: Translation engine and providers.
-- **`docs/PROVIDERS.md`**: Complete guide to implementing providers with BaseProvider, RateLimitManager, and Circuit Breaker.
-- **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: Error management and context safety.
-- **`docs/STORAGE_MANAGER.md`**: Storage management with caching.
-- **`docs/LOGGING_SYSTEM.md`**: Structured logging system.
-- **`docs/MEMORY_GARBAGE_COLLECTOR.md`**: Advanced memory management with Critical Protection System.
-- **`docs/PROXY_SYSTEM.md`**: Extension-only proxy system using the Strategy Pattern to access geo-restricted translation services.
+- **`docs/technical/ARCHITECTURE.md`**: Full project architecture and integration guide.
+- **`docs/technical/SMART_HANDLER_REGISTRATION_SYSTEM.md`**: Smart handler registration system with dynamic lifecycle management.
+- **`docs/technical/MessagingSystem.md`**: **Unified Messaging System (2025)** – UnifiedMessaging with streaming coordination, smart timeout management, and an integration layer for content scripts.
+- **`docs/technical/TRANSLATION_SYSTEM.md`**: Translation engine and providers.
+- **`docs/technical/PROVIDERS.md`**: Complete guide to implementing providers with BaseProvider, RateLimitManager, and Circuit Breaker.
+- **`docs/technical/ERROR_MANAGEMENT_SYSTEM.md`**: Error management and context safety.
+- **`docs/technical/STORAGE_MANAGER.md`**: Storage management with caching.
+- **`docs/technical/LOGGING_SYSTEM.md`**: Structured logging system.
+- **`docs/technical/MEMORY_GARBAGE_COLLECTOR.md`**: Advanced memory management with Critical Protection System.
+- **`docs/technical/PROXY_SYSTEM.md`**: Extension-only proxy system using the Strategy Pattern to access geo-restricted translation services.
 
 ### Feature Documentation
-- **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: Integration guide for WindowsManager and UI Host.
-- **`docs/TEXT_ACTIONS_SYSTEM.md`**: Copy/paste/TTS operations.
-- **`docs/TTS_SYSTEM.md`**: **Unified TTS System (2025)** – Single source of truth with auto-language fallback and cross-context coordination.
-- **`docs/TEXT_SELECTION_SYSTEM.md`**: **Modular Text Selection System (2025)** – Modern architecture with SiteHandlerRegistry, static imports, and full support for professional editors (Google Docs, Zoho Writer, WPS Office, Notion).
-- **`docs/TOAST_INTEGRATION_SYSTEM.md`**: **Unified Notification System (2025)** – Toast Integration architecture with ToastEventHandler, ToastElementDetector, and action button support.
-- **`docs/CSS_ARCHITECTURE.md`**: **Modern CSS Architecture (2025)** – Principled CSS with Grid layout, containment, safe variable functions, future-proof SCSS patterns, and Shadow DOM isolation strategies using strategic `!important` usage.
+- **`docs/technical/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: Integration guide for WindowsManager and UI Host.
+- **`docs/technical/TEXT_ACTIONS_SYSTEM.md`**: Copy/paste/TTS operations.
+- **`docs/technical/TTS_SYSTEM.md`**: **Unified TTS System (2025)** – Single source of truth with auto-language fallback and cross-context coordination.
+- **`docs/technical/TEXT_SELECTION_SYSTEM.md`**: **Modular Text Selection System (2025)** – Modern architecture with SiteHandlerRegistry, static imports, and full support for professional editors (Google Docs, Zoho Writer, WPS Office, Notion).
+- **`docs/technical/TOAST_INTEGRATION_SYSTEM.md`**: **Unified Notification System (2025)** – Toast Integration architecture with ToastEventHandler, ToastElementDetector, and action button support.
+- **`docs/technical/CSS_ARCHITECTURE.md`**: **Modern CSS Architecture (2025)** – Principled CSS with Grid layout, containment, safe variable functions, future-proof SCSS patterns, and Shadow DOM isolation strategies using strategic `!important` usage.
 - **`src/assets/styles/README-CSS-VARIABLES.md`**: **CSS Variables Guide (2025)** – Best practices, mixins, and functions to prevent interpolation issues.
-- **`docs/UI_HOST_SYSTEM.md`**: UI Host architecture for centralized component management.
-- **`docs/SELECT_ELEMENT_SYSTEM.md`**: **Redesigned Element Selection System (2025)** – Unified architecture with specific notification management, event propagation prevention, and streaming coordination support.
+- **`docs/technical/UI_HOST_SYSTEM.md`**: UI Host architecture for centralized component management.
+- **`docs/technical/SELECT_ELEMENT_SYSTEM.md`**: **Redesigned Element Selection System (2025)** – Unified architecture with specific notification management, event propagation prevention, and streaming coordination support.
 
 ### Additional Resources
 - **`docs/Images/`**: Architectural images and diagrams.
-- **`docs/Introduce.mp4`**: Introduction video.
-- **`docs/HowToGet-APIKey.mp4`**: Guide for API configuration.
+- **`docs/guides/Introduce.mp4`**: Introduction video.
+- **`docs/guides/HowToGet-APIKey.mp4`**: Guide for API configuration.
 
 ## Benefits of the New Architecture
 

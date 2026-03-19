@@ -64,10 +64,10 @@
 - **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
 
 ### Media Assets
-- **[Video Tutorials](Introduce.mp4)** - Introduction and feature overview
-- **[API Key Tutorial](HowToGet-APIKey.mp4)** - Step-by-step API configuration
-- **[Screenshots](Images/)** - Interface screenshots and architectural diagrams
-- **[Store Assets](Store/)** - Chrome and Firefox store promotional materials
+- **[Video Tutorials](../guides/Introduce.mp4)** - Introduction and feature overview
+- **[API Key Tutorial](../guides/HowToGet-APIKey.mp4)** - Step-by-step API configuration
+- **[Screenshots](../Images/)** - Interface screenshots and architectural diagrams
+- **[Store Assets](../Store/)** - Chrome and Firefox store promotional materials
 
 ### Getting Started
 1. **New Developers**: Start with [Architecture](ARCHITECTURE.md) → [Messaging System](MessagingSystem.md)
