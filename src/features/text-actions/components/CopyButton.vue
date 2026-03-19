@@ -38,6 +38,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
 import { useCopyAction } from '@/features/text-actions/composables/useCopyAction.js'
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'CopyButton')
@@ -88,6 +89,10 @@ const props = defineProps({
   disabled: {
     type: Boolean,
     default: false
+  },
+  clean: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -124,17 +129,20 @@ const iconSrc = computed(() => {
 const handleCopy = async () => {
   if (!canCopy.value || !hasTextToCopy.value) return
   
+  // Clean text if requested
+  const textToCopy = props.clean ? SimpleMarkdown.strip(props.text) : props.text
+  
   // Log click event
-  const safeText = props.text || ''
   logger.debug('📋 Copy button clicked!', {
-    text: safeText.slice(0, 20) + (safeText.length > 20 ? '...' : ''),
-    source: 'Vue CopyButton'
+    text: textToCopy.slice(0, 20) + (textToCopy.length > 20 ? '...' : ''),
+    source: 'Vue CopyButton',
+    cleaned: props.clean
   })
 
   try {
-    logger.debug('[CopyButton] Copying text:', safeText.substring(0, 50) + '...')
+    logger.debug('[CopyButton] Copying text:', textToCopy.substring(0, 50) + '...')
     
-    const success = await copyText(safeText)
+    const success = await copyText(textToCopy)
     
     if (success) {
       // Show feedback
