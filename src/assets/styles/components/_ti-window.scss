@@ -111,9 +111,22 @@
     height: max-content; // Height based on content
     min-height: #{css-var('normal-window-min-height', 120px)};
     max-height: #{css-var('normal-window-max-height', 400px)}; // Add max height for scrolling
-    overflow: hidden; // Establish containment context
+    overflow: visible; // Allow dropdowns to go outside the window
     display: flex;
     flex-direction: column; // Ensure proper layout for scrollable content
+  }
+
+  // Absolute position for provider selector to escape header clipping
+  .ti-window-provider-selector {
+    position: absolute !important;
+    top: 8px !important;
+    left: 12px !important;
+    z-index: 10001 !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   &.visible {
@@ -191,6 +204,114 @@
   align-items: center;
   gap: $spacing-sm;
   flex: 1;
+}
+
+// Provider Selector Integration (Shadow DOM Compatible)
+.ti-window .ti-window-provider-selector .ti-provider-selector-btn,
+.ti-window-provider-selector .ti-provider-selector-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  flex: 0 0 28px !important;
+}
+
+.ti-window .ti-window-provider-selector .ti-provider-icon-button,
+.ti-window-provider-selector .ti-provider-icon-button {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+  line-height: 0 !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+
+.ti-window.light .ti-window-provider-selector .ti-provider-icon-button {
+  background-color: var(--toolbar-link-hover-bg-color, #f0f0f0) !important;
+}
+
+.ti-window.light .ti-window-provider-selector .ti-provider-icon-button:hover {
+  background-color: var(--bg-color, #e5e5e5) !important;
+}
+
+.ti-window.dark .ti-window-provider-selector .ti-provider-icon-button {
+  background-color: var(--toolbar-link-hover-bg-color, #424242) !important;
+}
+
+.ti-window.dark .ti-window-provider-selector .ti-provider-icon-button:hover {
+  background-color: var(--border-color, #555555) !important;
+}
+
+.ti-window-provider-selector .ti-provider-icon-only {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  object-fit: contain !important;
+  display: block !important;
+  filter: none !important;
+  opacity: 1 !important;
+  margin: 0 !important;
+}
+
+.ti-window .ti-window-provider-selector .ti-provider-dropdown-menu,
+.ti-window-provider-selector .ti-provider-dropdown-menu {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: auto !important;
+  transform: none !important;
+  min-width: 190px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  background-color: var(--header-bg-color, #ffffff) !important;
+  border: 1px solid var(--header-border-color, #e8e8e8) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+  z-index: 10002 !important;
+  padding: 6px 0 !important;
+  display: block;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 10px; }
+}
+
+.ti-window.dark .ti-window-provider-selector .ti-provider-dropdown-menu {
+  background-color: #2c2c2c !important;
+  border-color: #444 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+  &::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
+}
+
+.ti-window-provider-selector .ti-dropdown-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 12px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-color) !important;
+  font-size: 13px !important;
+  text-align: left !important;
+
+  &:hover { background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important; }
+  &.ti-active { background-color: var(--language-controls-bg-color, rgba(59, 130, 246, 0.1)) !important; font-weight: 600 !important; }
+  img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
+  span { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex: 1 !important; }
 }
 
 // Header close section with increased specificity

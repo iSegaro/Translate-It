@@ -2,7 +2,9 @@
   <!-- Split Button Mode for Popup -->
   <div
     v-if="mode === 'split'"
+    ref="selectorRef"
     class="ti-split-translate-button-container"
+    v-bind="$attrs"
   >
     <div class="ti-split-translate-button">
       <button
@@ -92,7 +94,9 @@
   <!-- Regular Button Mode for Sidepanel -->
   <div
     v-else-if="mode === 'button'"
+    ref="selectorRef"
     class="ti-provider-button-container"
+    v-bind="$attrs"
   >
     <button
       class="ti-provider-button"
@@ -172,7 +176,9 @@
   <!-- Icon Only Mode for Sidepanel Toolbar -->
   <div
     v-else-if="mode === 'icon-only'"
+    ref="selectorRef"
     class="ti-provider-icon-only-container"
+    v-bind="$attrs"
   >
     <button
       class="ti-provider-icon-button"
@@ -246,6 +252,7 @@
   <div
     v-else
     class="ti-provider-compact-container"
+    v-bind="$attrs"
   >
     <select
       :value="currentProvider"
@@ -323,8 +330,25 @@ const { handleError } = useErrorHandler()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // State
+const selectorRef = ref(null)
 const isDropdownOpen = ref(false)
 const isTranslating = ref(false)
+
+// Handle click outside to close dropdown
+const handleClickOutside = (event) => {
+  if (isDropdownOpen.value && selectorRef.value && !selectorRef.value.contains(event.target)) {
+    isDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutside)
+})
+
 const availableProviders = ref([])
 
 // Ephemeral Sync State from store

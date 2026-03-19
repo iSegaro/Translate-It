@@ -29,20 +29,23 @@
     @mousedown.stop
     @click.stop
   >
+    <!-- Provider Selector positioned absolutely to avoid header overflow clipping -->
+    <ProviderSelector
+      v-if="props.provider"
+      :modelValue="props.provider"
+      mode="icon-only"
+      :isGlobal="false"
+      class="ti-window-provider-selector"
+      @update:modelValue="handleProviderChange"
+      @mousedown.stop
+    />
     <div
       class="ti-window-header"
       @mousedown="handleStartDrag"
     >
       <div class="ti-header-actions">
-        <ProviderSelector
-          v-if="props.provider"
-          :modelValue="props.provider"
-          mode="icon-only"
-          :isGlobal="false"
-          class="ti-provider-selector-btn"
-          @update:modelValue="handleProviderChange"
-          @mousedown.stop
-        />
+        <!-- ProviderSelector moved to window root for better dropdown positioning -->
+        <div class="ti-provider-placeholder" style="width: 28px; height: 28px; flex: 0 0 28px;"></div>
         <button
           class="ti-action-btn"
           :title="t('window_copy_translation')"
@@ -568,74 +571,6 @@ const handleStartDrag = (event) => {
 .ti-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* Provider Selector Styles */
-.ti-provider-selector-btn {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.ti-provider-selector-btn :deep(.ti-provider-icon-only-container) {
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.ti-provider-selector-btn :deep(.ti-provider-icon-button) {
-  width: 28px !important;
-  height: 28px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 6px !important;
-  transition: background-color 0.2s ease !important;
-}
-
-.translation-window.light .ti-provider-selector-btn :deep(.ti-provider-icon-button) {
-  background-color: #f0f0f0 !important;
-}
-
-.translation-window.light .ti-provider-selector-btn :deep(.ti-provider-icon-button:hover) {
-  background-color: #e5e5e5 !important;
-}
-
-.translation-window.dark .ti-provider-selector-btn :deep(.ti-provider-icon-button) {
-  background-color: #424242 !important;
-}
-
-.translation-window.dark .ti-provider-selector-btn :deep(.ti-provider-icon-button:hover) {
-  background-color: #555555 !important;
-}
-
-.ti-provider-selector-btn :deep(.ti-provider-icon-only) {
-  width: 16px !important;
-  height: 16px !important;
-  filter: grayscale(100%) opacity(0.7);
-  transition: filter 0.2s ease;
-}
-
-.ti-provider-selector-btn :deep(.ti-provider-icon-button:hover .ti-provider-icon-only),
-.ti-provider-selector-btn :deep(.ti-provider-icon-button.ti-active .ti-provider-icon-only) {
-  filter: grayscale(0%) opacity(1);
-}
-
-.ti-provider-selector-btn :deep(.ti-provider-dropdown-menu) {
-  top: calc(100% + 4px) !important;
-  left: 0 !important;
-  right: auto !important;
-  transform: none !important;
 }
 
 /* Original button visibility indicator */
