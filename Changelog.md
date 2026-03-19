@@ -2,12 +2,13 @@
 
 ##### Added
 
-- Added Full Page Translation engine for real-time translation of entire web pages
+- Added Full `Page Translation` engine for real-time translation of entire web pages
 - Added [Provider Management](#/activation) settings to toggle and prioritize translation engines
 - Added **Microsoft Translator** and **Lingva Translate** as new translation providers
 - Added `Sync Page Translation` and `Sync Select Element` toggles to the provider dropdown for ephemeral synchronization
 - Added `History Export` feature to the side panel (anki, csv, json)
-- Added full Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh))
+- Added a `Provider Selector` to floating translation windows for switching providers
+- Added Japanese UI support (thanks to [@monta-gh](https://github.com/monta-gh))
 
 ##### Fixed
 
