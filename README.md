@@ -36,7 +36,8 @@
 ## Key Features
 
 - **Text Selection:** Instant translation box or icon appears right where you select text.
-- **Element Selection:** Click any part of the page (e.g., paragraph, button) to translate it entirely.
+- **Select Element:** Click any part of the page (e.g., paragraph, button) to translate it entirely.
+- **Whole Page Translation:** Automatically translate all text content on the current page with smart lazy-loading to optimize performance and API costs.
 - **In-Field Translation:** Press `Ctrl + /` to instantly translate content inside text fields before sending.
 - **Advanced Popup & Sidepanel:** Multi-accent pronunciation, dictionary support, and translation history.
 - **Audio Playback:** High-quality pronunciation for words and sentences.
