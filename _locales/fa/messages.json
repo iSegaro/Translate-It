@@ -1598,9 +1598,6 @@
   "window_translation_placeholder": {
     "message": "ترجمه اینجا نمایش داده می‌شود"
   },
-  "error_prefix": {
-    "message": "خطا"
-  },
   "action_copy_text": {
     "message": "کپی متن"
   },
