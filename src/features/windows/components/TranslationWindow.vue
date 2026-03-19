@@ -10,12 +10,11 @@
     @mousedown.stop
     @click.stop
   >
-    <img
-      :src="loadingGifUrl"
-      :alt="t('window_loading_alt')"
-      class="loading-gif"
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
-    >
+    <LoadingSpinner
+      :type="'animated'"
+      size="lg"
+      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+    />
   </div>
 
   <!-- Normal translation window -->
@@ -174,6 +173,7 @@ import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
+import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -374,16 +374,6 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   }
 });
 
-
-// Loading GIF URL using browser extension API
-const loadingGifUrl = computed(() => {
-  try {
-    return browser.runtime.getURL('icons/ui/loading.gif');
-  } catch (error) {
-    logger.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
-    return '';
-  }
-});
 
 // Computed Style for positioning only - dimensions handled by CSS classes
 const windowStyle = computed(() => {

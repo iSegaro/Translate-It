@@ -17,111 +17,107 @@
     ]"
     :style="cssVariables || {}"
   >
-    <!-- Enhanced Actions Toolbar -->
-    <ActionToolbar
-      v-show="showToolbar && hasContent"
-      :text="content"
-      :language="targetLanguage"
-      :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
-      class="ti-display-toolbar"
-      :show-copy="showCopyButton"
-      :show-paste="false"
-      :show-tts="showTTSButton"
-      :copy-title="copyTitle"
-      :tts-title="ttsTitle"
-      @text-copied="handleTextCopied"
-      @tts-started="handleTTSStarted"
-      @tts-stopped="handleTTSStopped"
-      @tts-speaking="handleTTSSpeaking"
-      @action-failed="handleActionFailed"
-    />
-
-    <!-- Loading Spinner -->
+    <!-- Simplified Loading State -->
     <div
       v-if="isLoading"
-      class="ti-loading-overlay"
+      style="display: flex; align-items: center; justify-content: center; min-height: 100px; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 100; background: var(--bg-result-color, #ffffff); border-radius: 8px; direction: ltr;"
     >
-      <div class="ti-loading-spinner">
-        <div class="ti-spinner" />
-      </div>
-    </div>
-
-    <!-- Content Display -->
-    <div
-      ref="contentRef"
-      class="ti-translation-content"
-      :class="[
-        {
-          'fade-in': false /* Animation disabled */,
-          /* 'loading-dim': isLoading */
-          'has-error': hasError
-        },
-        contentClass,
-        { 'rtl-content': textDirection?.dir === 'rtl' },
-      ]"
-      :dir="textDirection?.dir || 'ltr'"
-      :style="{
-        ...(fontStyles || {}),
-        ...(cssVariables || {}),
-        direction: textDirection?.dir || 'ltr',
-        textAlign: textDirection?.textAlign || 'left',
-      }"
-    >
-      <div 
-        v-if="hasError" 
-        class="error-message"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 12px 8px !important; box-sizing: border-box !important; margin: 4px auto !important; white-space: normal !important;"
-      >
-        <div 
-          class="error-text"
-          style="display: block !important; width: 100% !important; margin: 0px !important; text-align: center !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
-        >⚠️ {{ displayErrorMessage }}</div>
-
-        <div 
-          v-if="canRetry || canOpenSettings" 
-          class="error-actions"
-          style="display: flex !important; gap: 8px !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin-top: 4px !important;"
-        >
-          <button 
-            v-if="canRetry" 
-            class="error-action retry-btn" 
-            @click="handleRetry"
-          >
-            🔄 {{ t('action_retry') }}
-          </button>
-          <button 
-            v-if="canOpenSettings" 
-            class="error-action settings-btn" 
-            @click="handleSettings"
-          >
-            ⚙️ {{ t('action_settings') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      <div
-        v-else-if="isLoading"
-        class="loading-message"
-      >
-        {{ t('SELECT_ELEMENT_TRANSLATING') }}
-      </div>
-
-      <!-- Placeholder State -->
-      <div
-        v-else-if="!content"
-        class="placeholder-message"
-      >
-        {{ placeholder }}
-      </div>
-
-      <!-- Normal Content with Markdown Support -->
-      <!-- Safe: Content is sanitized with DOMPurify if markdown is enabled -->
-      <div
-        v-else
-        v-html="sanitizedContent"
+      <LoadingSpinner
+        type="animated"
+        size="lg"
       />
     </div>
+
+    <!-- Main Content State -->
+    <template v-else>
+      <!-- Enhanced Actions Toolbar -->
+      <ActionToolbar
+        v-show="showToolbar && hasContent"
+        :text="content"
+        :language="targetLanguage"
+        :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
+        class="ti-display-toolbar"
+        :show-copy="showCopyButton"
+        :show-paste="false"
+        :show-tts="showTTSButton"
+        :copy-title="copyTitle"
+        :tts-title="ttsTitle"
+        @text-copied="handleTextCopied"
+        @tts-started="handleTTSStarted"
+        @tts-stopped="handleTTSStopped"
+        @tts-speaking="handleTTSSpeaking"
+        @action-failed="handleActionFailed"
+      />
+
+      <!-- Content Display -->
+      <div
+        ref="contentRef"
+        class="ti-translation-content"
+        :class="[
+          {
+            'fade-in': false /* Animation disabled */,
+            /* 'loading-dim': isLoading */
+            'has-error': hasError
+          },
+          contentClass,
+          { 'rtl-content': textDirection?.dir === 'rtl' },
+        ]"
+        :dir="textDirection?.dir || 'ltr'"
+        :style="{
+          ...(fontStyles || {}),
+          ...(cssVariables || {}),
+          direction: textDirection?.dir || 'ltr',
+          textAlign: textDirection?.textAlign || 'left',
+        }"
+      >
+        <div 
+          v-if="hasError" 
+          class="error-message"
+          style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 12px 8px !important; box-sizing: border-box !important; margin: 4px auto !important; white-space: normal !important;"
+        >
+          <div 
+            class="error-text"
+            style="display: block !important; width: 100% !important; margin: 0px !important; text-align: center !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
+          >⚠️ {{ displayErrorMessage }}</div>
+
+          <div 
+            v-if="canRetry || canOpenSettings" 
+            class="error-actions"
+            style="display: flex !important; gap: 8px !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin-top: 4px !important;"
+          >
+            <button 
+              v-if="canRetry" 
+              class="error-action retry-btn" 
+              @click="handleRetry"
+            >
+              🔄 {{ t('action_retry') }}
+            </button>
+            <button 
+              v-if="canOpenSettings" 
+              class="error-action settings-btn" 
+              @click="handleSettings"
+            >
+              ⚙️ {{ t('action_settings') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Placeholder State -->
+        <div
+          v-else-if="!content"
+          class="placeholder-message"
+        >
+          {{ placeholder }}
+        </div>
+
+        <!-- Normal Content with Markdown Support -->
+        <!-- Safe: Content is sanitized with DOMPurify if markdown is enabled -->
+        <div
+          v-else
+          v-html="sanitizedContent"
+        />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -132,6 +128,7 @@ import { getTextDirection, isRTLLanguage } from "@/features/element-selection/ut
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
+import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
 import { useFont } from "@/composables/shared/useFont.js";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -481,6 +478,30 @@ onMounted(() => {
   border: 1px solid var(--color-border, #dee2e6);
   border-radius: 8px;
   background-color: var(--bg-result-color, #ffffff);
+  transition: min-height 0.2s ease;
+}
+
+/* Ensure container has height during loading for the overlay to center properly */
+.ti-translation-display.is-loading {
+  min-height: 120px !important;
+}
+
+/* Perfect Centered Overlay */
+.ti-loading-overlay {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: var(--bg-result-color, #ffffff) !important;
+  z-index: 30 !important;
+  border-radius: 8px !important;
+  direction: ltr !important; /* Prevent RTL shifting */
 }
 
 /* Mode-specific containers */
@@ -754,13 +775,14 @@ onMounted(() => {
 
 .ti-translation-content .loading-message {
   color: var(--accent-color, #1967d2);
-  font-style: italic;
-  opacity: 0.8;
   text-align: center;
   padding: 16px;
   font-family: var(--translation-font-family, inherit);
   font-size: var(--translation-font-size, 14px);
-  animation: pulse 1.5s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .ti-translation-content :deep(.placeholder-message) {
@@ -859,22 +881,7 @@ onMounted(() => {
   justify-content: center;
 }
 
-.ti-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--header-border-color, #dee2e6);
-  border-top: 3px solid var(--accent-color, #1967d2);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
 /* Animations */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes pulse {
   0%,
   100% {
