@@ -5,7 +5,7 @@
     :disabled="disabled"
     :title="title"
     :aria-label="ariaLabel"
-    @click="$emit('click')"
+    @click="$emit('click', $event)"
   >
     <slot name="icon" />
     <span

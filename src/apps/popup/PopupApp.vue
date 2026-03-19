@@ -295,7 +295,8 @@ const retryLoading = () => {
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
@@ -305,7 +306,7 @@ const retryLoading = () => {
 
 .popup-container {
   width: 100%;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
 }
@@ -323,7 +324,7 @@ const retryLoading = () => {
 /* Main form area that can scroll if content exceeds max-height */
 .translation-container {
   flex: 1;
-  overflow-y: auto;
+  overflow: visible !important;
   min-height: 0;
 }
 

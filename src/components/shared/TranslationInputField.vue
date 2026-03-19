@@ -208,6 +208,7 @@ onMounted(async () => {
   border-radius: 8px;
   background-color: var(--input-bg-color, #ffffff);
   box-sizing: border-box;
+  overflow: visible !important; /* برای جلوگیری از بریدگی فیدبک دکمه‌ها */
 }
 
 .ti-translation-textarea {
@@ -252,6 +253,7 @@ onMounted(async () => {
   backdrop-filter: blur(4px);
   border-radius: 6px;
   padding: 2px;
+  overflow: visible !important;
 }
 
 .ti-textarea-container:hover .ti-input-toolbar {
