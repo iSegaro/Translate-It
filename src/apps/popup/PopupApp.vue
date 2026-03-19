@@ -20,6 +20,7 @@
         <div class="error-icon">
           ⚠️
         </div>
+        <h2>{{ t('popup_load_error_title') || 'Failed to Load Popup' }}</h2>
         <p class="error-message">
           {{ displayErrorMessage }}
         </p>

@@ -374,6 +374,16 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
+  /**
+   * Resets the store to its default state.
+   * Required for setup-style Pinia stores to support $reset().
+   */
+  function $reset() {
+    settings.value = getDefaultSettings()
+    isInitialized.value = false
+    isLoading.value = false
+    isSaving.value = false
+  }
     
   // Storage change listener
   let storageListener = null
@@ -494,7 +504,8 @@ export const useSettingsStore = defineStore('settings', () => {
     exportSettings,
     importSettings,
     getSetting,
-    validateSettings
+    validateSettings,
+    $reset
   }
 })
 

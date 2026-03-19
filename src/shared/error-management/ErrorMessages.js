@@ -13,6 +13,7 @@ export const errorMessages = {
   [ErrorTypes.TRANSLATION_NOT_FOUND]: "Translation not found",
   [ErrorTypes.TRANSLATION_FAILED]: "Translation failed",
   [ErrorTypes.TRANSLATION_TIMEOUT]: "Translation timed out",
+  [ErrorTypes.SETTINGS_LOADING_TIMEOUT]: "Settings loading timed out",
   [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]:
     "Language pair not supported by the selected translation service",
   [ErrorTypes.USER_CANCELLED]: "Translation cancelled by user",

@@ -254,6 +254,18 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "翻訳がタイムアウトしました。もう一度お試しください。"
   },
+  "ERRORS_SETTINGS_LOADING_TIMEOUT": {
+    "message": "設定の読み込みがタイムアウトしました。もう一度お試しください。"
+  },
+  "sidepanel_load_error_title": {
+    "message": "サイドパネルの読み込みに失敗しました"
+  },
+  "popup_load_error_title": {
+    "message": "ポップアップの読み込みに失敗しました"
+  },
+  "options_load_error_title": {
+    "message": "設定の読み込みに失敗しました"
+  },
   "languages_section_title": {
     "message": "言語"
   },
@@ -1569,7 +1581,7 @@
     "message": "読み上げを停止（クリックして停止）"
   },
   "window_tts_speak_original": {
-    "message": "🔊 原文を読み上げ（まず原文を表示してからこのボタンをクリック）"
+    "message": "🔊 原文を読み上げ（現在のモード：原文）"
   },
   "window_tts_speak_translation": {
     "message": "🔊 翻訳を読み上げ（現在のモード：翻訳）"

@@ -254,6 +254,18 @@
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "ترجمه با زمان‌انتظار مواجه شد. لطفا دوباره تلاش کنید."
   },
+  "ERRORS_SETTINGS_LOADING_TIMEOUT": {
+    "message": "زمان بارگذاری تنظیمات به پایان رسید. لطفا دوباره تلاش کنید."
+  },
+  "sidepanel_load_error_title": {
+    "message": "خطا در بارگذاری پنل کناری"
+  },
+  "popup_load_error_title": {
+    "message": "خطا در بارگذاری پنجره کوچک"
+  },
+  "options_load_error_title": {
+    "message": "خطا در بارگذاری تنظیمات"
+  },
   "languages_section_title": {
     "message": "زبان‌ها"
   },
@@ -1569,7 +1581,7 @@
     "message": "توقف خواندن (برای توقف کلیک کنید)"
   },
   "window_tts_speak_original": {
-    "message": "🔊 خواندن متن اصلی (ابتدا متن اصلی را نمایش دهید، سپس این دکمه را کلیک کنید)"
+    "message": "🔊 خواندن متن اصلی (حالت فعلی: متن اصلی)"
   },
   "window_tts_speak_translation": {
     "message": "🔊 خواندن ترجمه (حالت فعلی: ترجمه)"

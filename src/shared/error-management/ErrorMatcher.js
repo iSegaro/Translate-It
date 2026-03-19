@@ -99,7 +99,8 @@ export const FATAL_ERRORS = new Set([
   ErrorTypes.TRANSLATION_ERROR,
   ErrorTypes.USER_CANCELLED,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
-  ErrorTypes.API_RESPONSE_INVALID
+  ErrorTypes.API_RESPONSE_INVALID,
+  ErrorTypes.SETTINGS_LOADING_TIMEOUT
 ]);
 
 /**
@@ -268,6 +269,7 @@ export function matchErrorToType(rawOrError = "") {
   }
 
   // String-based matching fallback
+  if (msg.includes('settings loading timeout')) return ErrorTypes.SETTINGS_LOADING_TIMEOUT;
   if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('time out')) return ErrorTypes.TRANSLATION_TIMEOUT;
   if (msg.includes("text is empty")) return ErrorTypes.TEXT_EMPTY;
   if (msg.includes("prompt is invalid")) return ErrorTypes.PROMPT_INVALID;

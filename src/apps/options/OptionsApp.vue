@@ -19,9 +19,9 @@
       <div class="error-icon">
         ⚠️
       </div>
-      <h2>Failed to Load Options</h2>
+      <h2>{{ t('options_load_error_title') || 'Failed to Load Options' }}</h2>
       <p class="error-message">
-        {{ errorMessage }}
+        {{ displayErrorMessage }}
       </p>
       <button
         class="retry-button"
@@ -66,6 +66,15 @@ watch(() => locale.value, () => {
 })
 const hasError = ref(false)
 const errorMessage = ref('')
+const errorType = ref(null)
+
+// Reactive error message display with i18n support
+const displayErrorMessage = computed(() => {
+  if (!errorType.value) return errorMessage.value;
+  const key = errorType.value.startsWith('ERRORS_') ? errorType.value : `ERRORS_${errorType.value}`;
+  const translated = t(key);
+  return (translated && translated !== key) ? translated : errorMessage.value;
+})
 
 // RTL detection using unified i18n (reactive to language changes)
 const isRTL = computed(() => {
@@ -106,6 +115,13 @@ const initialize = async () => {
   logger.error('❌ Failed to initialize options:', error)
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
+    // Extract error type for reactive translation
+    try {
+      const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
+      errorType.value = matchErrorToType(error)
+    } catch (e) {
+      logger.warn('Failed to load ErrorMatcher during initialization failure');
+    }
   } finally {
   logger.debug('✅ OptionsApp initialization complete')
     isLoading.value = false
