@@ -303,5 +303,38 @@ export class SimpleMarkdown {
 
     return span;
   }
+
+  /**
+   * Strip common markdown patterns to return "clean" plain text
+   * @param {string} text - Markdown text to clean
+   * @returns {string} Plain text
+   */
+  static strip(text) {
+    if (!text || typeof text !== "string") {
+      return "";
+    }
+
+    return text
+      // Strip bold/italic markers (**bold**, __bold__, *italic*, _italic_)
+      .replace(/(\*\*|__|\*|_)/g, "")
+      // Strip markdown links [text](url) keeping only text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      // Strip blockquotes (> quote)
+      .replace(/^>\s?/gm, "")
+      // Strip headers (# header)
+      .replace(/^#+\s?/gm, "")
+      // Strip code markers (`code`)
+      .replace(/`([^`]+)`/g, "$1")
+      // Strip code blocks (```code```)
+      .replace(/```[\s\S]*?```/g, (match) => {
+        // Remove the backticks and potential language identifier
+        return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+      })
+      // Strip horizontal rules (---, ***, ___)
+      .replace(/^([-*_])\1{2,}$/gm, "")
+      // Optional: Normalize multiple newlines to single newlines
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
 }
 

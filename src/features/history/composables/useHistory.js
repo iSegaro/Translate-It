@@ -40,26 +40,6 @@ function getLogger() {
 
 const MAX_HISTORY_ITEMS = 100;
 
-// Helper to strip common markdown patterns for a "clean" text export
-const stripMarkdown = (text) => {
-  if (!text) return "";
-  return text
-    // Strip bold/italic markers
-    .replace(/(\*\*|__|__|\*)/g, "")
-    // Strip markdown links [text](url) keeping only text
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    // Strip blockquotes
-    .replace(/^>\s?/gm, "")
-    // Strip headers
-    .replace(/^#+\s?/gm, "")
-    // Strip code markers
-    .replace(/`([^`]+)`/g, "$1")
-    // Strip horizontal rules
-    .replace(/^---$/gm, "")
-    // Optional: Trim excess whitespace
-    .trim();
-};
-
 export function useHistory() {
   // State
   const historyItems = ref([]);
@@ -191,8 +171,8 @@ export function useHistory() {
       if (format === "json") {
         const cleanItems = items.map(item => ({
           ...item,
-          sourceText: stripMarkdown(item.sourceText),
-          translatedText: stripMarkdown(item.translatedText)
+          sourceText: SimpleMarkdown.strip(item.sourceText),
+          translatedText: SimpleMarkdown.strip(item.translatedText)
         }));
         content = JSON.stringify(cleanItems, null, 2);
         mimeType = "application/json";
@@ -204,8 +184,8 @@ export function useHistory() {
           // Escape quotes and commas
           const escapeCsv = (str) => `"${String(str || "").replace(/"/g, '""')}"`;
           return [
-            escapeCsv(stripMarkdown(item.sourceText)),
-            escapeCsv(stripMarkdown(item.translatedText)),
+            escapeCsv(SimpleMarkdown.strip(item.sourceText)),
+            escapeCsv(SimpleMarkdown.strip(item.translatedText)),
             escapeCsv(item.sourceLanguage),
             escapeCsv(item.targetLanguage),
             escapeCsv(date),
@@ -217,8 +197,8 @@ export function useHistory() {
       } else if (format === "anki") {
         // Anki TSV format: Source \t Translated
         const rows = items.map((item) => {
-          const cleanSource = stripMarkdown(item.sourceText);
-          const cleanTranslated = stripMarkdown(item.translatedText);
+          const cleanSource = SimpleMarkdown.strip(item.sourceText);
+          const cleanTranslated = SimpleMarkdown.strip(item.translatedText);
           const escapeTsv = (str) => String(str || "").replace(/\n/g, "<br>").replace(/\t/g, " ");
           return `${escapeTsv(cleanSource)}\t${escapeTsv(cleanTranslated)}`;
         });
