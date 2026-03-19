@@ -28,6 +28,7 @@ This document describes the successful migration of the WindowsManager system to
 - `translation-loading` - Show loading state in window
 - `translation-result` - Display translation result
 - `translation-error` - Display error message
+- `translation-window-change-provider` - User requested to change translation provider
 
 #### Icon Management Events
 - `show-icon` - Request to show a translation icon
@@ -42,7 +43,9 @@ This document describes the successful migration of the WindowsManager system to
   id: 'unique-window-id',
   selectedText: 'text to translate',
   position: { x: 100, y: 200 },
-  mode: 'window' // or 'icon'
+  mode: 'window', // or 'icon'
+  provider: 'google_v2', // Optional: Current provider ID
+  targetLanguage: 'fa' // Optional: Target language code
 }
 ```
 
@@ -155,13 +158,34 @@ WindowsManagerEvents.translationLoading('window-123');
 // Show result
 WindowsManagerEvents.translationResult('window-123', {
   translatedText: 'سلام دنیا',
-  originalText: 'Hello world'
+  originalText: 'Hello world',
+  provider: 'google_v2',
+  targetLanguage: 'fa'
 });
 
 // Show error
 WindowsManagerEvents.translationError('window-123', {
   message: 'Translation failed',
-  error: errorObject
+  error: errorObject,
+  provider: 'google_v2'
+});
+```
+
+## Provider Selection Integration
+
+The WindowsManager now supports per-window provider selection:
+
+1.  **UI Interaction**: The `TranslationWindow.vue` component includes a `ProviderSelector`.
+2.  **Event Flow**: When a user changes the provider in the window, it emits a `translation-window-change-provider` event.
+3.  **State Management**: `WindowsManager` listens for this event, updates its internal state (`WindowsState.provider`), and triggers a re-translation.
+4.  **Smart Resolution**: `TranslationHandler` uses a prioritized resolution logic to determine the best provider (Manual Override > Mode-Specific Setting > Global Default).
+
+### Example: Provider Change Event
+```javascript
+// Emitted from Vue UI Host
+pageEventBus.emit('translation-window-change-provider', {
+  id: 'window-123',
+  provider: 'bing'
 });
 ```
 

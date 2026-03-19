@@ -32,9 +32,13 @@ When a translation request is initiated, the provider is resolved based on this 
     *   If **Sync Page** is OFF: It strictly follows `MODE_PROVIDERS['page-translation-batch']`.
     *   *Reason:* Allows users to temporarily use a high-tier provider for a specific page without changing permanent settings.
 
-### Text Selection & Field Translation
-*   **Behavior:** Feature-Locked or Global.
-*   **Logic:** Follows `MODE_PROVIDERS['selection-manager']` or `MODE_PROVIDERS['content']`. If null/default, uses the Global Default.
+### Text Selection (WindowsManager)
+*   **Behavior:** UI-Interactive (Persistent per-window).
+*   **Logic:** 
+    *   **Manual Override:** If the user manually changes the provider via the dropdown in the translation window, that provider is used for all subsequent translations *within that specific window's lifecycle* (e.g., when clicking "Retry" or changing target language).
+    *   **Initial Selection:** Uses `MODE_PROVIDERS['selection-manager']` (or `selection-translation` depending on internal mapping).
+    *   **Dictionary Fallback:** If the selected text is a single word and `ENABLE_DICTIONARY` is ON, it uses `MODE_PROVIDERS['dictionary-translation']`. If no specific provider is set for dictionary mode, it falls back to the Selection provider.
+    *   **Global Default:** Uses `TRANSLATION_API` if no mode-specific provider is found.
 
 ---
 
