@@ -67,18 +67,15 @@
         textAlign: textDirection?.textAlign || 'left',
       }"
     >
-      <!-- Error State with Actions -->
       <div 
         v-if="hasError" 
         class="error-message"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 8px !important; box-sizing: border-box !important; margin: 4px 0 !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 12px 8px !important; box-sizing: border-box !important; margin: 4px auto !important; white-space: normal !important;"
       >
         <div 
           class="error-text"
-          style="display: block !important; margin: 0px !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
-        >
-          ⚠️ {{ displayErrorMessage }}
-        </div>
+          style="display: block !important; width: 100% !important; margin: 0px !important; text-align: center !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
+        >⚠️ {{ displayErrorMessage }}</div>
 
         <div 
           v-if="canRetry || canOpenSettings" 
