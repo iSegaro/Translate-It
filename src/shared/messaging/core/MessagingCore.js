@@ -5,18 +5,7 @@
  */
 
 import { MessageActions } from './MessageActions.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts, ActionReasons } from './MessagingConstants.js';
-
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessagingCore');
-  }
-  return logger;
-}
 
 /**
  * Message Format Utility

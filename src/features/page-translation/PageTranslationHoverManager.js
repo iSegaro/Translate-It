@@ -184,7 +184,6 @@ export class PageTranslationHoverManager extends ResourceTracker {
     const offset = 15;
     const rect = this.tooltip.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
 
     let x = event.clientX + offset;
     // Show ABOVE the cursor to avoid native tooltips (which usually show below)

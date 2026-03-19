@@ -175,7 +175,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['can-translate-change', 'update:provider'])
+defineEmits(['can-translate-change', 'update:provider'])
 
 // State
 const currentProviderLocal = ref(props.provider)

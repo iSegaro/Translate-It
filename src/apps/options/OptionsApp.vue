@@ -119,7 +119,7 @@ const initialize = async () => {
     try {
       const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
       errorType.value = matchErrorToType(error)
-    } catch (e) {
+    } catch {
       logger.warn('Failed to load ErrorMatcher during initialization failure');
     }
   } finally {

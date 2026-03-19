@@ -178,7 +178,6 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
-import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';

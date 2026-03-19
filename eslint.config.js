@@ -47,6 +47,7 @@ export default [
         __IS_DEVELOPMENT__: "readonly",
         __IS_PRODUCTION__: "readonly",
         __BROWSER__: "readonly",
+        __BUILD_YEAR__: "readonly",
       },
     },
     plugins: {
@@ -91,6 +92,7 @@ export default [
         __IS_DEVELOPMENT__: "readonly",
         __IS_PRODUCTION__: "readonly",
         __BROWSER__: "readonly",
+        __BUILD_YEAR__: "readonly",
       },
     },
     rules: {

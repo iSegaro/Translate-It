@@ -9,8 +9,7 @@ import { applyNodeDirection, isRTL, restoreElementDirection, BIDI_MARKS } from '
 import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
 import { 
   PAGE_TRANSLATION_ATTRIBUTES, 
-  PAGE_TRANSLATION_SELECTORS,
-  DEFAULT_PAGE_TRANSLATION_SETTINGS 
+  PAGE_TRANSLATION_SELECTORS
 } from './PageTranslationConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
@@ -85,7 +84,6 @@ export class PageTranslationBridge extends ResourceTracker {
       return function(node, callback) {
         // 1. CAPTURE: Store original text before domtranslator replaces it.
         // This is used for the "Show original on hover" feature.
-        let wasTranslated = false;
         if (bridge.showOriginalOnHover && node) {
           if (node.nodeType === Node.TEXT_NODE) {
             pageTranslationLookup.add(node, node.textContent);

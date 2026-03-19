@@ -84,7 +84,7 @@ export async function setI18nLocale(localeCode) {
     const userLocale = settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE || 'English';
     const langCode = UI_LOCALE_TO_CODE_MAP[userLocale] || 'en';
     await setI18nLocale(langCode);
-  } catch (error) {
+  } catch {
     // Fail silently in non-extension environments (like tests)
     if (typeof console !== 'undefined') {
       console.debug('[i18n-plugin] Storage initialization skipped or failed');

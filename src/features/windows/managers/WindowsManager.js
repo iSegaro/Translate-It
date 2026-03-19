@@ -1,6 +1,5 @@
 // src/managers/content/windows/NewWindowsManager.js
 
-import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";

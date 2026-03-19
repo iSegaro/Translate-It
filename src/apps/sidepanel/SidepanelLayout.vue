@@ -34,7 +34,7 @@
 <script setup>
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
-import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useHistory } from '@/features/history/composables/useHistory.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';

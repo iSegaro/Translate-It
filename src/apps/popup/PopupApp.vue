@@ -218,7 +218,7 @@ const initialize = async () => {
       try {
         const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
         errorType.value = matchErrorToType(error)
-      } catch (e) {
+      } catch {
         logger.warn('Failed to load ErrorMatcher during initialization failure');
       }
     }
@@ -260,7 +260,9 @@ onUnmounted(() => {
   
   // Explicitly disconnect lifecycle port
   if (window.__popupPort) {
-    try { window.__popupPort.disconnect() } catch (e) {}
+    try { window.__popupPort.disconnect() } catch {
+      // Ignore disconnect errors as the port might already be closed
+    }
     delete window.__popupPort
   }
   

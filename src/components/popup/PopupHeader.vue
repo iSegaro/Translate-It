@@ -133,8 +133,6 @@ const handleSelectElement = async () => {
   logger.debug('Select Element button clicked!')
   
   try {
-    const translationStore = useTranslationStore();
-    
     // Resolve provider based on hierarchy:
     // 1. If Sync is ON, use UI's active provider
     // 2. If Sync is OFF, use setting from MODE_PROVIDERS (if not null)

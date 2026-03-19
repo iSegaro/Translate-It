@@ -47,7 +47,7 @@ const props = defineProps({
 const loadingGifUrl = computed(() => {
   try {
     return browser.runtime.getURL('icons/ui/loading.gif')
-  } catch (error) {
+  } catch {
     return ''
   }
 })

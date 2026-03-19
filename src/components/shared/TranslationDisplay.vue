@@ -125,7 +125,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
-import { shouldApplyRtl, isPersianText } from "@/shared/utils/text/textAnalysis.js";
+import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection, isRTLLanguage } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
