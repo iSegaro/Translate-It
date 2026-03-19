@@ -26,6 +26,7 @@
         v-if="isOpen"
         class="dropdown-menu"
         :class="[`position-${position}`, `size-${size}`]"
+        :dir="props.dir"
         @keydown.escape="close"
         @keydown.arrow-down.prevent="focusNext"
         @keydown.arrow-up.prevent="focusPrevious"
@@ -66,6 +67,11 @@ const props = defineProps({
   disabled: {
     type: Boolean,
     default: false
+  },
+  dir: {
+    type: String,
+    default: 'ltr',
+    validator: (value) => ['ltr', 'rtl', 'auto'].includes(value)
   }
 })
 
@@ -208,11 +214,13 @@ onUnmounted(() => {
 .dropdown-wrapper {
   position: relative;
   display: inline-block;
+  z-index: 1001;
 }
 
 .dropdown-trigger {
   cursor: pointer;
   outline: none;
+  display: block;
   
   &:focus {
     box-shadow: 0 0 0 2px var(--color-primary), 0 0 0 4px rgba(25, 118, 210, 0.1);
@@ -220,7 +228,7 @@ onUnmounted(() => {
   }
   
   &.active {
-    z-index: 1001;
+    z-index: 1002;
   }
 }
 
@@ -232,34 +240,54 @@ onUnmounted(() => {
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   padding: 5px;
-  z-index: 200;
-  display: none; /* Managed by JS */
+  z-index: 2000;
+  display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.dropdown-menu :deep(.dropdown-item) {
+  width: 100%;
+  text-align: start;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  display: block;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: var(--color-background);
+    color: var(--color-primary);
+  }
 }
 
 /* Positioning */
 .position-top-start {
   bottom: 100%;
-  left: 0;
+  left: 0 !important;
   margin-bottom: 4px;
 }
 
 .position-top-end {
   bottom: 100%;
-  right: 0;
+  right: 0 !important;
   margin-bottom: 4px;
 }
 
 .position-bottom-start {
   top: 100%;
-  left: 0;
+  left: 0 !important;
   margin-top: 4px;
 }
 
 .position-bottom-end {
   top: 100%;
-  right: 0;
+  right: 0 !important;
   margin-top: 4px;
 }
 
@@ -347,19 +375,8 @@ onUnmounted(() => {
   
   .position-top-start, .position-top-end,
   .position-bottom-start, .position-bottom-end {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .position-left-start, .position-left-end,
-  .position-right-start, .position-right-end {
-    top: 100%;
     left: 0;
     right: auto;
-    bottom: auto;
-    margin-top: 4px;
-    margin-left: 0;
-    margin-right: 0;
   }
 }
 

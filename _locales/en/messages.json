@@ -555,6 +555,21 @@
   "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
     "message": "Delete all translation history"
   },
+  "SIDEPANEL_EXPORT_HISTORY": {
+    "message": "Export"
+  },
+  "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
+    "message": "Export history data"
+  },
+  "SIDEPANEL_EXPORT_JSON": {
+    "message": "Export as JSON"
+  },
+  "SIDEPANEL_EXPORT_CSV": {
+    "message": "Export as CSV"
+  },
+  "SIDEPANEL_EXPORT_ANKI": {
+    "message": "Export for Anki"
+  },
   "CONFIRM_CLEAR_ALL_HISTORY": {
     "message": "Are you sure you want to clear all translation history?"
   },

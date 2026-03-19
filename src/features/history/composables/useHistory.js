@@ -40,6 +40,26 @@ function getLogger() {
 
 const MAX_HISTORY_ITEMS = 100;
 
+// Helper to strip common markdown patterns for a "clean" text export
+const stripMarkdown = (text) => {
+  if (!text) return "";
+  return text
+    // Strip bold/italic markers
+    .replace(/(\*\*|__|__|\*)/g, "")
+    // Strip markdown links [text](url) keeping only text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    // Strip blockquotes
+    .replace(/^>\s?/gm, "")
+    // Strip headers
+    .replace(/^#+\s?/gm, "")
+    // Strip code markers
+    .replace(/`([^`]+)`/g, "$1")
+    // Strip horizontal rules
+    .replace(/^---$/gm, "")
+    // Optional: Trim excess whitespace
+    .trim();
+};
+
 export function useHistory() {
   // State
   const historyItems = ref([]);
@@ -155,6 +175,78 @@ export function useHistory() {
     }
   };
 
+  // Export history based on format
+  const exportHistory = (format) => {
+    try {
+      const items = historyItems.value;
+      if (!items || items.length === 0) {
+        getLogger().warn("No history items to export");
+        return;
+      }
+
+      let content = "";
+      let mimeType = "text/plain";
+      let extension = "txt";
+
+      if (format === "json") {
+        const cleanItems = items.map(item => ({
+          ...item,
+          sourceText: stripMarkdown(item.sourceText),
+          translatedText: stripMarkdown(item.translatedText)
+        }));
+        content = JSON.stringify(cleanItems, null, 2);
+        mimeType = "application/json";
+        extension = "json";
+      } else if (format === "csv") {
+        const headers = ["Source Text", "Translated Text", "Source Language", "Target Language", "Timestamp"];
+        const rows = items.map((item) => {
+          const date = new Date(item.timestamp).toISOString();
+          // Escape quotes and commas
+          const escapeCsv = (str) => `"${String(str || "").replace(/"/g, '""')}"`;
+          return [
+            escapeCsv(stripMarkdown(item.sourceText)),
+            escapeCsv(stripMarkdown(item.translatedText)),
+            escapeCsv(item.sourceLanguage),
+            escapeCsv(item.targetLanguage),
+            escapeCsv(date),
+          ].join(",");
+        });
+        content = [headers.join(","), ...rows].join("\n");
+        mimeType = "text/csv";
+        extension = "csv";
+      } else if (format === "anki") {
+        // Anki TSV format: Source \t Translated
+        const rows = items.map((item) => {
+          const cleanSource = stripMarkdown(item.sourceText);
+          const cleanTranslated = stripMarkdown(item.translatedText);
+          const escapeTsv = (str) => String(str || "").replace(/\n/g, "<br>").replace(/\t/g, " ");
+          return `${escapeTsv(cleanSource)}\t${escapeTsv(cleanTranslated)}`;
+        });
+        content = rows.join("\n");
+        mimeType = "text/tab-separated-values";
+        extension = "txt";
+      } else {
+        getLogger().warn("Unknown export format:", format);
+        return;
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `translation_history_${new Date().toISOString().split("T")[0]}.${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      getLogger().info(`Exported history as ${format}`);
+    } catch (error) {
+      getLogger().error("Error exporting history", error);
+      historyError.value = "Failed to export history";
+    }
+  };
+
   // Format timestamp for display
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
@@ -258,6 +350,7 @@ export function useHistory() {
     addToHistory,
     deleteHistoryItem,
     clearAllHistory,
+    exportHistory,
     selectHistoryItem,
 
     // Panel Management

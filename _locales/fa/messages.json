@@ -1027,6 +1027,21 @@
   "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
     "message": "پاک کردن تمام تاریخچه"
   },
+  "SIDEPANEL_EXPORT_HISTORY": {
+    "message": "خروجی گرفتن"
+  },
+  "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
+    "message": "گرفتن خروجی از تاریخچه"
+  },
+  "SIDEPANEL_EXPORT_JSON": {
+    "message": "خروجی JSON"
+  },
+  "SIDEPANEL_EXPORT_CSV": {
+    "message": "خروجی CSV"
+  },
+  "SIDEPANEL_EXPORT_ANKI": {
+    "message": "خروجی انکی (Anki)"
+  },
   "CONFIRM_CLEAR_ALL_HISTORY": {
     "message": "تاریخچه پاک شود؟"
   },
