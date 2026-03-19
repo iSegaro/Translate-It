@@ -56,27 +56,35 @@
 
       <!-- Ephemeral Sync Footer -->
       <div v-if="showSync" class="ti-provider-dropdown-footer">
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.page }"
+          @click.stop="toggleSync('page')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
         
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.element }"
+          @click.stop="toggleSync('element')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -128,27 +136,35 @@
 
       <!-- Ephemeral Sync Footer -->
       <div v-if="showSync" class="ti-provider-dropdown-footer">
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.page }"
+          @click.stop="toggleSync('page')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
         
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.element }"
+          @click.stop="toggleSync('element')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -193,27 +209,35 @@
 
       <!-- Ephemeral Sync Footer -->
       <div v-if="showSync" class="ti-provider-dropdown-footer">
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.page }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('page')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.page }"
+          @click.stop="toggleSync('page')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('page')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
         
-        <div class="ti-sync-row" :class="{ 'is-active': ephemeralSync.element }">
-          <button class="ti-sync-toggle" @click.stop="toggleSync('element')">
+        <button 
+          class="ti-sync-row" 
+          :class="{ 'is-active': ephemeralSync.element }"
+          @click.stop="toggleSync('element')"
+        >
+          <div class="ti-sync-info">
             <Icon 
               :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
               class="ti-sync-icon"
             />
             <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </button>
+          </div>
           <img :src="getEffectiveIcon('element')" class="ti-sync-provider-icon" alt="Target Provider">
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -784,20 +808,29 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   flex: 1;
   border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-muted, #6b7280);
+  
+  &:hover {
+    background-color: var(--toolbar-link-hover-bg-color);
+    color: var(--color-primary, #3b82f6);
+    
+    .ti-sync-icon {
+      color: var(--color-primary, #3b82f6);
+    }
+  }
   
   &.is-active {
     background-color: var(--color-primary-subtle, #eef6ff);
     border-color: var(--color-primary-light, #d1e9ff);
-    
-    .ti-sync-toggle {
-      color: var(--color-primary, #3b82f6);
-      font-weight: 600;
-    }
+    color: var(--color-primary, #3b82f6);
+    font-weight: 600;
     
     .ti-sync-icon {
       color: var(--color-primary, #3b82f6);
@@ -805,23 +838,12 @@ onUnmounted(() => {
   }
 }
 
-.ti-sync-toggle {
-  background: none;
-  border: none;
+.ti-sync-info {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0;
-  cursor: pointer;
-  color: var(--color-text-muted, #6b7280);
+  gap: 6px;
   font-size: 11px;
-  flex: 1;
-  text-align: left;
   white-space: nowrap;
-  
-  &:hover {
-    color: var(--color-primary, #3b82f6);
-  }
 }
 
 .ti-sync-icon {
