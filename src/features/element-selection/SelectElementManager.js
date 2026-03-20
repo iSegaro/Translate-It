@@ -15,6 +15,7 @@ import { getSettingsAsync } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
@@ -109,6 +110,14 @@ class SelectElementManager extends ResourceTracker {
 
       // Setup cross-frame communication
       this.setupCrossFrameCommunication();
+
+      // Listen for activation from PageEventBus (Mobile Dashboard)
+      pageEventBus.on(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (data) => {
+        this.logger.info('Activation requested via PageEventBus');
+        this.activateSelectElementMode(data || {}).catch(err => {
+          this.logger.error('Failed to activate from PageEventBus:', err);
+        });
+      });
 
       // Listen for conflicting features (like Whole Page Translation)
       pageEventBus.on('STOP_CONFLICTING_FEATURES', (data) => {
@@ -473,18 +482,20 @@ class SelectElementManager extends ResourceTracker {
     const isOurUI = path.some(el => this.elementSelector && this.elementSelector.isOurElement(el));
     
     if (isOurUI) {
-      // Let it pass to our own buttons/UI (Toast, etc.)
+      // Let it pass to our own buttons/UI (Toast, Exit button, etc.)
       return;
     }
 
-    // BLOCK EVERYTHING ELSE to prevent site navigation or actions
-    // Using stopImmediatePropagation to ensure no other listeners fire
+    // BLOCK EVERYTHING ELSE to prevent site navigation or other extension handlers from firing
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    // Only trigger translation logic on click event
-    if (event.type === 'click') {
+    // Trigger translation logic on 'click' OR 'touchend' (for mobile speed)
+    const isTriggerEvent = event.type === 'click' || (event.type === 'touchend' && deviceDetector.isMobile());
+    
+    if (isTriggerEvent && !this.isProcessingClick) {
+      this.logger.info(`Triggering selection via ${event.type}`);
       this.handleClick(event).catch(err => {
         this.logger.error('Error in handleClick:', err);
       });
