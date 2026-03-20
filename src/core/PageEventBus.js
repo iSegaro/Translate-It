@@ -83,6 +83,9 @@ export const WINDOWS_MANAGER_EVENTS = {
   DISMISS_WINDOW: 'windows-manager-dismiss-window',
   DISMISS_ICON: 'windows-manager-dismiss-icon',
   
+  // Mobile specific
+  SHOW_MOBILE_SHEET: 'windows-manager-show-mobile-sheet',
+  
   // Settings
   OPEN_SETTINGS: 'open-options-page',
   
@@ -98,6 +101,7 @@ export const WindowsManagerEvents = {
   showIcon: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_ICON, detail),
   dismissWindow: (id, withAnimation = true) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id, withAnimation }),
   dismissIcon: (id) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, { id }),
+  showMobileSheet: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_MOBILE_SHEET, detail),
   
   // Icon interactions
   iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail)

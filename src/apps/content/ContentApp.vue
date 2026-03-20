@@ -73,6 +73,29 @@
     
     <!-- Select Element Overlays -->
     <ElementHighlightOverlay />
+
+    <!-- Mobile Bottom Sheet -->
+    <MobileSheet />
+
+    <!-- Mobile Floating Action Button (FAB) -->
+    <div 
+      v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
+      class="mobile-fab"
+      style="position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: #339af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4); z-index: 2147483647; pointer-events: auto !important; cursor: pointer;"
+      @click="mobileStore.openSheet('dashboard', 'peek')"
+    >
+      <img src="@/icons/ui/translate.png" alt="Translate" style="width: 28px; height: 28px; filter: brightness(0) invert(1);" />
+    </div>
+
+    <!-- Mobile-specific Exit Select Mode button -->
+    <div 
+      v-if="isSelectModeActive && deviceDetector.isMobile()" 
+      class="mobile-exit-selection"
+      @click="onCancelClick"
+    >
+      <img src="@/icons/ui/close.png" alt="Exit" />
+      <span>Exit Select Mode</span>
+    </div>
   </div>
 </template>
 
@@ -80,11 +103,14 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
+import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
+import MobileSheet from './components/mobile/MobileSheet.vue';
+import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -121,9 +147,42 @@ let toastIntegration = null;
 // SelectElement Notification Manager
 let selectElementNotificationManager = null;
 
+// Mobile Store
+const mobileStore = useMobileStore();
+
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
 let cancelTimeout = null;
+
+const onCancelClick = () => {
+  logger.info('Cancel Select Element mode requested');
+
+  // Prevent multiple cancel requests in quick succession
+  if (isCancelInProgress) {
+    logger.debug('Cancel already in progress, ignoring duplicate request');
+    return;
+  }
+
+  isCancelInProgress = true;
+
+  // Emit event only once with proper error handling
+  try {
+    if (pageEventBus) {
+      pageEventBus.emit('cancel-select-element-mode');
+      logger.debug('cancel-select-element-mode event emitted successfully');
+    }
+  } catch (error) {
+    logger.warn('Error emitting cancel-select-element-mode event:', error);
+  }
+
+  // Reset flag after a delay to prevent event loops
+  if (cancelTimeout) clearTimeout(cancelTimeout);
+  cancelTimeout = setTimeout(() => {
+    isCancelInProgress = false;
+    cancelTimeout = null;
+    logger.debug('Cancel request flag reset');
+  }, 1000); // 1 second debounce
+};
 
 // Reactive RTL value for toasts (sync access - optimal performance)
 const toastRTL = ref(false);
@@ -202,6 +261,13 @@ onMounted(async () => {
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
   logger.info(`ContentApp mounted in ${executionMode} mode`);
+  logger.info('Device Detection:', { 
+    isMobile: deviceDetector.isMobile(), 
+    shouldEnableUI: deviceDetector.shouldEnableMobileUI(),
+    innerWidth: window.innerWidth, 
+    touchPoints: navigator.maxTouchPoints,
+    userAgent: navigator.userAgent
+  });
 
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
@@ -211,35 +277,7 @@ onMounted(async () => {
   try {
     toastIntegration = ToastIntegration.createSingleton(pageEventBus);
     toastIntegration.initialize({
-      onCancelClick: () => {
-        logger.info('Cancel button clicked via ToastIntegration');
-
-        // Prevent multiple cancel requests in quick succession
-        if (isCancelInProgress) {
-          logger.debug('Cancel already in progress, ignoring duplicate request');
-          return;
-        }
-
-        isCancelInProgress = true;
-
-        // Emit event only once with proper error handling
-        try {
-          if (pageEventBus) {
-            pageEventBus.emit('cancel-select-element-mode');
-            logger.debug('cancel-select-element-mode event emitted successfully');
-          }
-        } catch (error) {
-          logger.warn('Error emitting cancel-select-element-mode event:', error);
-        }
-
-        // Reset flag after a delay to prevent event loops
-        if (cancelTimeout) clearTimeout(cancelTimeout);
-        cancelTimeout = setTimeout(() => {
-          isCancelInProgress = false;
-          cancelTimeout = null;
-          logger.debug('Cancel request flag reset');
-        }, 1000); // 1 second debounce
-      }
+      onCancelClick: onCancelClick
     });
     // ToastIntegration initialized successfully
   } catch (error) {
@@ -404,6 +442,65 @@ onMounted(async () => {
     logger.info('Received dismiss_all_notifications event');
     // Dismiss all notifications except select-element ones
     toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
+  });
+
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.SHOW_MOBILE_SHEET, (detail) => {
+    logger.info('Received SHOW_MOBILE_SHEET event:', detail);
+    
+    if (detail.isOpen === false) {
+      mobileStore.closeSheet();
+      return;
+    }
+
+    // Update selection data if provided
+    if (detail.text !== undefined) {
+      mobileStore.updateSelectionData({
+        text: detail.text,
+        translation: detail.translation || '',
+        sourceLang: detail.sourceLang || 'auto',
+        targetLang: detail.targetLang || 'en',
+        isLoading: detail.isLoading || false,
+        isError: detail.isError || false,
+        error: detail.error || null
+      });
+    }
+
+    // Open sheet with requested view/state
+    mobileStore.openSheet(detail.view || 'selection', detail.state || 'peek');
+  });
+
+  // Page Translation Events for Mobile
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, () => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.setPageTranslation({ isTranslating: true, status: 'translating', progress: 0 });
+      mobileStore.openSheet('page_translation', 'peek');
+    }
+  });
+
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.setPageTranslation({ 
+        progress: detail.progress || 0,
+        translatedCount: detail.translatedCount || 0
+      });
+    }
+  });
+
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.setPageTranslation({ 
+        isTranslating: false, 
+        status: 'completed', 
+        progress: 100,
+        translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount
+      });
+    }
+  });
+
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, (detail) => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.setPageTranslation({ isTranslating: false, status: 'error' });
+    }
   });
 
   // Handle open-options-page requests from translation windows and notifications
@@ -599,18 +696,79 @@ onUnmounted(async () => {
 <style>
 /* Since this is in a Shadow DOM, these styles are completely isolated. */
 .content-app-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 2147483647; /* Max z-index */
-  pointer-events: none !important; /* Allow clicks to pass through the container */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  display: block !important;
 }
 
 /* Individual components inside will override this (e.g., toaster, toolbars) */
 .content-app-container > * {
   pointer-events: all !important; /* Re-enable pointer events for children */
+}
+
+.mobile-exit-selection {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fa5252;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(250, 82, 82, 0.4);
+  font-weight: 600;
+  font-size: 16px;
+  z-index: 2147483647;
+  pointer-events: auto !important;
+  cursor: pointer;
+  animation: slide-up 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.mobile-exit-selection img {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+}
+
+.mobile-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  background: #339af0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4);
+  z-index: 2147483647;
+  pointer-events: auto !important;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.mobile-fab:active {
+  transform: scale(0.85);
+}
+
+.mobile-fab img {
+  width: 28px;
+  height: 28px;
+  filter: brightness(0) invert(1);
+}
+
+@keyframes slide-up {
+  from { transform: translate(-50%, 100px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
 /* CRITICAL: Toast text direction for RTL/LTR support */

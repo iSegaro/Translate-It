@@ -345,6 +345,9 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('mouseover', this.handleMouseOver, true);
       window.addEventListener('mouseout', this.handleMouseOut, true);
 
+      // Touch support for highlighting (Mobile)
+      window.addEventListener('touchstart', this.handleTouchStart, true);
+
       // Block ALL interaction events in capture phase to prevent any site logic from firing
       // This is the core fix for site navigation/actions interfering with selection
       const interactionEvents = [
@@ -386,6 +389,7 @@ class SelectElementManager extends ResourceTracker {
     // Remove mouseover/mouseout
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
+    window.removeEventListener('touchstart', this.handleTouchStart, true);
     
     // Remove all interaction event blockers
     const interactionEvents = [
@@ -423,6 +427,23 @@ class SelectElementManager extends ResourceTracker {
     }
 
     this.elementSelector.handleMouseOver(event.target);
+  }
+
+  /**
+   * Handle touch start event for mobile highlighting
+   */
+  handleTouchStart(event) {
+    if (!this.isActive || this.isProcessingClick) return;
+    
+    // We only care about the first touch
+    const target = event.touches[0].target;
+    
+    // Skip our own elements
+    if (this.elementSelector && this.elementSelector.isOurElement(target)) {
+      return;
+    }
+
+    this.elementSelector.handleMouseOver(target);
   }
 
   /**

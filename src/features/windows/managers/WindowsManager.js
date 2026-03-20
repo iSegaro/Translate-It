@@ -20,6 +20,7 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -234,6 +235,13 @@ export class WindowsManager extends ResourceTracker {
       text: selectedText ? selectedText.substring(0, 30) + '...' : 'null',
       position
     });
+
+    // Mobile specific: Show bottom sheet instead of icon/window
+    if (deviceDetector.shouldEnableMobileUI()) {
+      this.logger.info('Mobile environment detected, showing mobile sheet');
+      await this._showMobileSheet(selectedText);
+      return;
+    }
     
     // Prevent showing same text multiple times
     if (this._shouldSkipShow(selectedText)) {
@@ -268,6 +276,58 @@ export class WindowsManager extends ResourceTracker {
       }
     } finally {
       this.state.setProcessing(false);
+    }
+  }
+
+  /**
+   * Show mobile-specific bottom sheet
+   * @param {string} selectedText - Selected text to translate
+   */
+  async _showMobileSheet(selectedText) {
+    if (!selectedText) return;
+
+    this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length });
+
+    this.state.setOriginalText(selectedText);
+    this.state.setVisible(true);
+
+    // Emit event to open mobile sheet in loading state
+    WindowsManagerEvents.showMobileSheet({
+      text: selectedText,
+      view: 'selection',
+      state: 'peek',
+      isLoading: true
+    });
+
+    try {
+      // Start translation process
+      const translationResult = await this._startTranslationProcess(selectedText);
+
+      if (!translationResult) {
+        this.logger.info('Mobile translation cancelled');
+        return;
+      }
+
+      // Update mobile sheet with result
+      WindowsManagerEvents.showMobileSheet({
+        text: selectedText,
+        translation: translationResult.translatedText,
+        sourceLang: translationResult.sourceLanguage || 'auto',
+        targetLang: translationResult.targetLanguage,
+        isLoading: false
+      });
+      
+    } catch (error) {
+      this.logger.error('Error during mobile translation:', error);
+      
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'mobile-translation');
+      
+      WindowsManagerEvents.showMobileSheet({
+        text: selectedText,
+        isLoading: false,
+        isError: true,
+        error: errorInfo.message
+      });
     }
   }
 
@@ -1434,6 +1494,11 @@ export class WindowsManager extends ResourceTracker {
     
     if (windowId) {
       WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
+    }
+
+    // Mobile sheet dismissal
+    if (deviceDetector.shouldEnableMobileUI()) {
+      WindowsManagerEvents.showMobileSheet({ isOpen: false });
     }
 
     // Cancel any ongoing translation when dismissing
