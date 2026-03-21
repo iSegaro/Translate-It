@@ -26,14 +26,18 @@ export const PAGE_TRANSLATION_ATTRIBUTES = {
   TRANSLATE_NO_ATTR: 'translate',
 };
 
+import { NOTIFICATION_TIME, UI_HOST_IDS, TRANSLATION_HTML } from '@/shared/config/constants.js';
+
 /**
  * Selector and class constants for internal UI elements
  */
 export const PAGE_TRANSLATION_SELECTORS = {
-  TOOLTIP_ID: 'ti-original-text-tooltip',
-  INTERNAL_IGNORE_CLASS: 'ti-ignore-translation',
-  STANDARD_NO_TRANSLATE_CLASS: 'notranslate',
-  TRANSLATE_NO_VALUE: 'no',
+  TOOLTIP_ID: UI_HOST_IDS.TOOLTIP,
+  INTERNAL_IGNORE_CLASS: TRANSLATION_HTML.IGNORE_CLASS,
+  STANDARD_NO_TRANSLATE_CLASS: TRANSLATION_HTML.NO_TRANSLATE_CLASS,
+  TRANSLATE_NO_VALUE: TRANSLATION_HTML.NO_TRANSLATE_VALUE,
+  UI_HOST_MAIN: UI_HOST_IDS.MAIN,
+  UI_HOST_IFRAME: UI_HOST_IDS.IFRAME
 };
 
 /**
@@ -47,8 +51,6 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   priorityThreshold: 1,
   poolDelay: 200
 };
-
-import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 
 /**
  * Timing and duration constants for page translation

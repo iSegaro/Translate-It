@@ -6,6 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
+import { TRANSLATION_HTML } from './constants.js';
 
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
@@ -175,7 +176,7 @@ export const CONFIG = {
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
   WHOLE_PAGE_EXCLUDED_SELECTORS: [
     "script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
-    ".notranslate", "[contenteditable='true']", "[translate=no]",
+    `.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}`, "[contenteditable='true']", `[translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`,
     ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share",
     ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight",
     "hypothesis-highlight", ".hypothesis-highlight",

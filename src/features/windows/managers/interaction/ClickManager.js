@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
 
 /**
  * Manages click events and outside click detection for WindowsManager
@@ -139,8 +140,8 @@ export class ClickManager extends ResourceTracker {
     
     // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
     // Try both possible host IDs (main and iframe)
-    const vueUIHostMain = document.getElementById('translate-it-host-main');
-    const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
+    const vueUIHostMain = document.getElementById(UI_HOST_IDS.MAIN);
+    const vueUIHostIframe = document.getElementById(UI_HOST_IDS.IFRAME);
     const vueUIHost = vueUIHostMain || vueUIHostIframe;
     
     this.logger.debug('Outside click check:', { 

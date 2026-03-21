@@ -4,6 +4,7 @@ import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
 
 /**
  * SelectionManager - Simplified text selection management
@@ -318,8 +319,8 @@ export class SelectionManager extends ResourceTracker {
     }
 
     // Fallback: check shadow DOM
-    const shadowHost = document.getElementById('translate-it-host-main') ||
-                      document.getElementById('translate-it-host-iframe');
+    const shadowHost = document.getElementById(UI_HOST_IDS.MAIN) ||
+                      document.getElementById(UI_HOST_IDS.IFRAME);
 
     if (shadowHost && shadowHost.shadowRoot) {
       const activeWindows = shadowHost.shadowRoot.querySelectorAll('.translation-window');

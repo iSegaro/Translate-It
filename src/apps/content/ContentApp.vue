@@ -1,5 +1,5 @@
 <template>
-  <div class="content-app-container notranslate" translate="no">
+  <div :class="['content-app-container', TRANSLATION_HTML.NO_TRANSLATE_CLASS]" :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE">
     <!-- نمونه استفاده از ترجمه -->
     <!--{{ $t('app_welcome') }} -->
     
@@ -111,6 +111,7 @@ import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { TRANSLATION_HTML } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';

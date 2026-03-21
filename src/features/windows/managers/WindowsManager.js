@@ -21,6 +21,7 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { UI_HOST_IDS, TRANSLATION_HTML } from '@/shared/config/constants.js';
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -431,17 +432,17 @@ export class WindowsManager extends ResourceTracker {
 
       // Use the same logic as ClickManager for consistency
       // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
-      const vueUIHostMain = document.getElementById('translate-it-host-main');
-      const vueUIHostIframe = document.getElementById('translate-it-host-iframe');
+      const vueUIHostMain = document.getElementById(UI_HOST_IDS.MAIN);
+      const vueUIHostIframe = document.getElementById(UI_HOST_IDS.IFRAME);
       const vueUIHost = vueUIHostMain || vueUIHostIframe;
 
       const isInsideVueUIHost = vueUIHost && vueUIHost.contains(target);
 
       // Also check legacy elements for compatibility
-      const iconElement = document.getElementById('translate-it-icon'); // WindowsConfig.IDS.ICON
+      const iconElement = document.getElementById(TRANSLATION_HTML.ICON_ID);
       const isInsideLegacyIcon = iconElement && iconElement.contains(target);
 
-      const windowElements = document.querySelectorAll('.translation-window');
+      const windowElements = document.querySelectorAll(`.${TRANSLATION_HTML.WINDOW_CLASS}`);
       const isInsideLegacyWindow = Array.from(windowElements).some(element =>
         element.contains(target)
       );

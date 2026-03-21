@@ -1,5 +1,6 @@
 // ToastElementDetector - Centralized Vue Sonner element detection
 import { TOAST_SELECTORS, TOAST_ELEMENT_QUERIES, EXTENSION_SELECTORS } from './constants.js';
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
 
 export class ToastElementDetector {
   /**
@@ -110,7 +111,7 @@ export class ToastElementDetector {
     if (!element || typeof element.hasAttribute !== 'function') return false;
     
     // Check if element is our UI Host
-    if (element.id === 'translate-it-host-main' || element.id === 'translate-it-host-iframe') {
+    if (element.id === UI_HOST_IDS.MAIN || element.id === UI_HOST_IDS.IFRAME) {
       return true;
     }
 
@@ -138,7 +139,7 @@ export class ToastElementDetector {
     // Check if element is inside our Shadow DOM
     let currentElement = element;
     while (currentElement) {
-      if (currentElement.id === 'translate-it-host-main' || currentElement.id === 'translate-it-host-iframe') {
+      if (currentElement.id === UI_HOST_IDS.MAIN || currentElement.id === UI_HOST_IDS.IFRAME) {
         return true;
       }
 
@@ -151,7 +152,7 @@ export class ToastElementDetector {
       const root = currentElement.getRootNode();
       if (root instanceof ShadowRoot) {
         const host = root.host;
-        if (host && (host.id === 'translate-it-host-main' || host.id === 'translate-it-host-iframe')) {
+        if (host && (host.id === UI_HOST_IDS.MAIN || host.id === UI_HOST_IDS.IFRAME)) {
           return true;
         }
       }

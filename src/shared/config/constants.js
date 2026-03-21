@@ -45,6 +45,23 @@ export const INPUT_TYPES = {
   ]
 }
 
+// ===== UI HOST CONSTANTS =====
+export const UI_HOST_IDS = {
+  MAIN: 'translate-it-host-main',
+  IFRAME: 'translate-it-host-iframe',
+  APP_CONTAINER: 'translate-it-app-container',
+  TOOLTIP: 'ti-original-text-tooltip'
+};
+
+// ===== TRANSLATION HTML CONSTANTS =====
+export const TRANSLATION_HTML = {
+  IGNORE_CLASS: 'ti-ignore-translation',
+  NO_TRANSLATE_CLASS: 'notranslate',
+  NO_TRANSLATE_VALUE: 'no',
+  ICON_ID: 'translate-it-icon',
+  WINDOW_CLASS: 'translation-window'
+};
+
 // ===== TEXT FIELD DETECTION CONSTANTS =====
 export const FIELD_DETECTION = {
   // Field types classification

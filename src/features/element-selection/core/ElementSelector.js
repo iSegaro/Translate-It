@@ -4,6 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
 
 /**
  * Element selection and highlighting functionality
@@ -92,7 +93,7 @@ export class ElementSelector extends ResourceTracker {
     if (!element || !element.classList) return false;
     
     // 1. Check for our UI Host (Shadow DOM root)
-    if (element.id && (element.id === 'translate-it-host-main' || element.id === 'translate-it-host-iframe')) {
+    if (element.id && (element.id === UI_HOST_IDS.MAIN || element.id === UI_HOST_IDS.IFRAME)) {
       return true;
     }
 
@@ -117,7 +118,7 @@ export class ElementSelector extends ResourceTracker {
     // We traverse up to see if it's inside our UI host
     let current = element;
     while (current && current !== document.body) {
-      if (current.id === 'translate-it-host-main' || current.id === 'translate-it-host-iframe') {
+      if (current.id === UI_HOST_IDS.MAIN || current.id === UI_HOST_IDS.IFRAME) {
         return true;
       }
       // If it's inside a toast/notification container

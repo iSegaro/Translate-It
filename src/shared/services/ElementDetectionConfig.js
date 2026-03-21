@@ -29,13 +29,15 @@ export const ICON_SELECTORS = [
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
+
 /**
  * Host/container selectors
  * These selectors identify UI host containers that contain translation elements
  */
 export const HOST_SELECTORS = [
-  '#translate-it-host-main',
-  '#translate-it-host-iframe',
+  `#${UI_HOST_IDS.MAIN}`,
+  `#${UI_HOST_IDS.IFRAME}`,
   '#translate-it-host',
   '.aiwc-selection-popup-host',
   '.popup-container'

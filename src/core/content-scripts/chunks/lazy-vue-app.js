@@ -5,6 +5,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { UI_HOST_IDS } from '@/shared/config/constants.js';
 
 // Import Vue and dependencies (these will be chunked separately by Vite)
 import { createApp } from 'vue';
@@ -166,7 +167,7 @@ async function createMountPoint() {
   }
 
   const isInIframe = window !== window.top;
-  const hostId = `translate-it-host-${isInIframe ? 'iframe' : 'main'}`;
+  const hostId = isInIframe ? UI_HOST_IDS.IFRAME : UI_HOST_IDS.MAIN;
 
   // Check if host already exists
   let hostElement = document.getElementById(hostId);
@@ -181,7 +182,7 @@ async function createMountPoint() {
 
     // Create container for Vue app
     const appContainer = document.createElement('div');
-    appContainer.id = 'translate-it-app-container';
+    appContainer.id = UI_HOST_IDS.APP_CONTAINER;
 
     // Add default styles
     const resetStyles = document.createElement('style');
@@ -198,13 +199,13 @@ async function createMountPoint() {
         z-index: 2147483647;
       }
 
-      #translate-it-app-container {
+      #${UI_HOST_IDS.APP_CONTAINER} {
         width: 100%;
         height: 100%;
         pointer-events: none;
       }
 
-      #translate-it-app-container > * {
+      #${UI_HOST_IDS.APP_CONTAINER} > * {
         pointer-events: auto;
       }
     `;
@@ -225,7 +226,7 @@ async function createMountPoint() {
   }
 
   // Return the app container within shadow root
-  const appContainer = hostElement.shadowRoot.getElementById('translate-it-app-container');
+  const appContainer = hostElement.shadowRoot.getElementById(UI_HOST_IDS.APP_CONTAINER);
 
   if (!appContainer) {
     throw new Error('Failed to create app container in shadow root');
@@ -245,8 +246,8 @@ export function cleanupVueApp() {
       pinia = null;
 
       // Remove mount point
-      const hostElement = document.getElementById('translate-it-host-main') ||
-                         document.getElementById('translate-it-host-iframe');
+      const hostElement = document.getElementById(UI_HOST_IDS.MAIN) ||
+                         document.getElementById(UI_HOST_IDS.IFRAME);
       if (hostElement) {
         hostElement.remove();
       }
