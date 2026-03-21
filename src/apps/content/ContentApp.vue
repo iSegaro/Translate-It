@@ -124,6 +124,7 @@ import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
@@ -169,6 +170,7 @@ let selectElementNotificationManager = null;
 
 // Mobile Store
 const mobileStore = useMobileStore();
+const { getErrorForDisplay } = useErrorHandler();
 
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
@@ -558,7 +560,8 @@ onMounted(async () => {
         isAutoTranslating: detail.isAutoTranslating || false,
         status: 'translating', 
         translatedCount: 0,
-        totalCount: 0
+        totalCount: 0,
+        errorMessage: null // Clear any previous error message
       });
       mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK);
@@ -586,15 +589,25 @@ onMounted(async () => {
     }
   });
 
-  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, (detail) => {
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
     if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ isTranslating: false, isTranslated: false, status: 'error' });
+      const errorInfo = await getErrorForDisplay(detail.error || 'Translation failed', 'page-translation-mobile');
+      mobileStore.setPageTranslation({ 
+        isTranslating: false, 
+        isTranslated: false, 
+        isAutoTranslating: false, // Ensure auto-translate flag is cleared on error
+        status: 'error',
+        errorMessage: errorInfo.message
+      });
     }
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
     if (deviceDetector.isMobile()) {
-      mobileStore.resetPageTranslation();
+      // Keep error state visible so user can see what happened
+      if (mobileStore.pageTranslationData.status !== 'error') {
+        mobileStore.resetPageTranslation();
+      }
     }
   });
 

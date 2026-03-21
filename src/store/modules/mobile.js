@@ -26,7 +26,8 @@ export const useMobileStore = defineStore('mobile', () => {
     isAutoTranslating: false,
     translatedCount: 0,
     totalCount: 0,
-    status: 'idle' // 'idle' | 'translating' | 'completed' | 'error'
+    status: 'idle', // 'idle' | 'translating' | 'completed' | 'error'
+    errorMessage: null
   })
 
   // Getters
@@ -96,7 +97,8 @@ export const useMobileStore = defineStore('mobile', () => {
       isAutoTranslating: false,
       translatedCount: 0,
       totalCount: 0,
-      status: 'idle'
+      status: 'idle',
+      errorMessage: null
     }
   }
 

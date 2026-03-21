@@ -23,25 +23,56 @@
     </div>
 
     <!-- Progress Card -->
-    <div class="progress-card" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+    <div 
+      class="progress-card" 
+      :style="{
+        background: pageTranslationData.status === 'error' ? '#fff5f5' : '#f8f9fa',
+        border: `1px solid ${pageTranslationData.status === 'error' ? '#ffe3e3' : '#e9ecef'}`,
+        borderRadius: '16px',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        transition: 'all 0.3s ease'
+      }"
+    >
       <div style="display: flex; justify-content: space-between; align-items: flex-end;">
         <div style="display: flex; flex-direction: column; gap: 2px;">
-          <span style="font-size: 10px; font-weight: 800; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.5px;">Translation Progress</span>
-          <span style="font-size: 20px; font-weight: 800; color: #339af0;">
-            {{ computedProgress }}%
+          <span 
+            style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;"
+            :style="{ color: pageTranslationData.status === 'error' ? '#fa5252' : '#adb5bd' }"
+          >
+            {{ pageTranslationData.status === 'error' ? 'Error Encountered' : 'Translation Progress' }}
+          </span>
+          <span 
+            style="font-size: 20px; font-weight: 800;"
+            :style="{ color: pageTranslationData.status === 'error' ? '#fa5252' : '#339af0' }"
+          >
+            {{ pageTranslationData.status === 'error' ? 'Failed' : computedProgress + '%' }}
           </span>
         </div>
-        <div style="font-size: 12px; font-weight: 600; color: #868e96; background: #fff; padding: 4px 10px; border-radius: 10px; border: 1px solid #eee;">
+        <div 
+          v-if="pageTranslationData.status !== 'error'"
+          style="font-size: 12px; font-weight: 600; color: #868e96; background: #fff; padding: 4px 10px; border-radius: 10px; border: 1px solid #eee;"
+        >
           {{ pageTranslationData.translatedCount }} / {{ pageTranslationData.totalCount || '?' }}
         </div>
       </div>
 
-      <div class="progress-bar-container" style="height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; position: relative;">
+      <!-- Error Message in Progress Card -->
+      <div v-if="pageTranslationData.status === 'error'" style="font-size: 13px; color: #fa5252; font-weight: 600; line-height: 1.4;">
+        {{ pageTranslationData.errorMessage || 'Unknown translation error' }}
+      </div>
+
+      <div class="progress-bar-container" style="height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; position: relative;" :style="{ background: pageTranslationData.status === 'error' ? '#ffe3e3' : '#e9ecef' }">
         <div 
           class="progress-bar-fill" 
-          :style="{ width: `${computedProgress}%` }"
+          :style="{ 
+            width: pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%`,
+            background: pageTranslationData.status === 'error' ? '#fa5252' : 'linear-gradient(90deg, #339af0, #22b8cf)'
+          }"
           :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
-          style="height: 100%; background: linear-gradient(90deg, #339af0, #22b8cf); transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(51, 154, 240, 0.3);"
+          style="height: 100%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(51, 154, 240, 0.3);"
         ></div>
       </div>
     </div>
@@ -116,25 +147,39 @@ const statusMessage = computed(() => {
 
 // Unified Button Configuration
 const primaryAction = computed(() => {
-  // 1. ACTIVE State: Currently Translating OR Auto-Translating
-  // Clicking this should STOP further translations but KEEP existing ones
+  const isError = pageTranslationData.value.status === 'error';
+
+  // 1. ERROR State (Highest Priority)
+  // Even if some flags are lingering, we want to show Retry if we're in error state
+  if (isError) {
+    return {
+      label: 'Retry Translation',
+      icon: wholePageIcon,
+      bgColor: '#fa5252',
+      textColor: 'white',
+      border: 'none',
+      iconFilter: 'brightness(0) invert(1)',
+      handler: startTranslation
+    }
+  }
+
+  // 2. ACTIVE State: Currently Translating OR Auto-Translating
   if (pageTranslationData.value.isTranslating || pageTranslationData.value.isAutoTranslating) {
     const isInitialPass = pageTranslationData.value.isTranslating;
     return {
       label: isInitialPass ? 'Stop Translation' : 'Stop Auto-Translation',
       icon: isInitialPass ? closeIcon : eyeHideIcon,
-      bgColor: '#fff4e6', // Use orange/warning color for "Stop without Restore"
+      bgColor: '#fff4e6',
       textColor: '#d9480f',
       border: '1px solid #ffe8cc',
       iconFilter: isInitialPass 
         ? 'invert(38%) sepia(88%) saturate(1212%) hue-rotate(335deg) brightness(98%) contrast(98%)'
         : 'invert(36%) sepia(84%) saturate(1212%) hue-rotate(351deg) brightness(91%) contrast(92%)',
-      handler: stopAutoTranslation // Use the non-restoring stop method
+      handler: stopAutoTranslation
     }
   }
 
-  // 2. DONE State: Already translated but process is stopped
-  // Clicking this should RESTORE the original page
+  // 3. DONE State: Already translated
   if (pageTranslationData.value.isTranslated) {
     return {
       label: 'Restore Original Page',
@@ -147,7 +192,7 @@ const primaryAction = computed(() => {
     }
   }
 
-  // 3. READY State: Initial state
+  // 4. READY State: Initial state
   return {
     label: 'Start Translation',
     icon: wholePageIcon,

@@ -46,16 +46,17 @@
     </div>
 
     <!-- Result Card -->
-    <div v-if="resultText" class="result-card" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
+    <div v-if="resultText" class="result-card" :class="{ 'is-error': isError }" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
       <!-- Rendered Markdown Content -->
       <div 
         class="result-content markdown-body" 
         :dir="detectedDir"
         style="font-size: 16px; color: #1c7ed6; line-height: 1.5; margin-bottom: 12px; text-align: start;"
+        :style="{ color: isError ? '#fa5252' : '#1c7ed6' }"
         v-html="sanitizedResult"
       ></div>
       
-      <div style="display: flex; gap: 10px;">
+      <div v-if="!isError" style="display: flex; gap: 10px;">
         <button class="action-btn" @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <img src="@/icons/ui/copy.png" style="width: 16px; height: 16px;" />
         </button>
@@ -77,15 +78,18 @@ import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import DOMPurify from "dompurify";
 
 const mobileStore = useMobileStore()
 const { sendMessage, createMessage } = useMessaging('mobile-input')
+const { getErrorForDisplay } = useErrorHandler()
 
 const inputText = ref('')
 const targetLang = ref('en')
 const isLoading = ref(false)
 const resultText = ref('')
+const isError = ref(false)
 
 const inputDir = computed(() => {
   if (!inputText.value) return 'ltr'
@@ -124,9 +128,9 @@ const handleTranslate = async () => {
   
   isLoading.value = true
   resultText.value = '' // Clear previous result immediately
+  isError.value = false
   
   try {
-    // Standardize message sending with explicit string ID
     const payload = {
       text: inputText.value,
       sourceLanguage: 'auto',
@@ -135,7 +139,6 @@ const handleTranslate = async () => {
 
     const message = createMessage(MessageActions.TRANSLATE, payload);
     
-    // Ensure messageId is a string if it got populated as an object by any middleware
     if (typeof message.messageId !== 'string') {
       message.messageId = `input-${Date.now()}`;
     }
@@ -143,7 +146,6 @@ const handleTranslate = async () => {
     const response = await sendMessage(message);
 
     if (response && response.success) {
-      // Robust response parsing
       const translated = response.translatedText || 
                          (response.data && response.data.translatedText) || 
                          (response.result && response.result.translatedText);
@@ -154,12 +156,15 @@ const handleTranslate = async () => {
         resultText.value = "No translation found. Please try again.";
       }
     } else {
-      const errorMsg = response?.error?.message || response?.error || "Translation failed.";
-      resultText.value = `Error: ${errorMsg}`;
+      isError.value = true;
+      const errorInfo = await getErrorForDisplay(response?.error || "Translation failed.", 'mobile-input');
+      resultText.value = errorInfo.message;
     }
   } catch (error) {
     console.error('[MobileInput] Unexpected error:', error);
-    resultText.value = "Service temporarily unavailable.";
+    isError.value = true;
+    const errorInfo = await getErrorForDisplay(error, 'mobile-input');
+    resultText.value = errorInfo.message;
   } finally {
     isLoading.value = false;
   }
@@ -184,6 +189,12 @@ const speakResult = () => {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.result-card.is-error {
+  background: #fff5f5 !important;
+  border-color: #ffe3e3 !important;
+}
+
 .result-content.markdown-body { word-wrap: break-word; }
 .result-content.markdown-body p { margin-bottom: 8px; }
 .result-content.markdown-body strong { font-weight: bold; }
@@ -197,11 +208,19 @@ const speakResult = () => {
   
   select { background-color: #2d2d2d !important; color: #dee2e6 !important; border-color: #444 !important; }
   
-  .result-card { 
+  .result-card:not(.is-error) { 
     background: rgba(28, 126, 214, 0.15) !important; 
     border-color: rgba(28, 126, 214, 0.3) !important; 
   }
-  .result-content { color: #74c0fc !important; }
+  
+  .result-card.is-error {
+    background: rgba(250, 82, 82, 0.15) !important;
+    border-color: rgba(250, 82, 82, 0.3) !important;
+  }
+
+  .result-content:not(.is-error) { color: #74c0fc !important; }
+  .result-content.is-error { color: #ff8787 !important; }
+  
   .result-content.markdown-body code { background: rgba(255,255,255,0.1); }
   
   .action-btn { background: #2d2d2d !important; border-color: #444 !important; }
