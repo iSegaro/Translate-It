@@ -431,7 +431,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
     switch (translationMode) {
       case TranslationMode.Select_Element:
-      case 'SelectElement': // Handle both enum and hardcoded string for robustness
+      case TranslationMode.LEGACY_SELECT_ELEMENT: // Handle both enum and legacy string for robustness
         this.logger.info('Forwarding to StreamingHandler via ContentScriptIntegration');
         try {
           const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
@@ -442,7 +442,7 @@ export class ContentMessageHandler extends ResourceTracker {
         }
 
       case TranslationMode.Field:
-      case 'field': // Handle both enum and string for robustness
+      case TranslationMode.LEGACY_FIELD: // Handle both enum and legacy string for robustness
         this.logger.info('Processing Text Field translation result');
         
         // Check if translation failed at background level
@@ -532,7 +532,7 @@ export class ContentMessageHandler extends ResourceTracker {
         return false;
     }
 
-    // This part is reached if the 'SelectElement' case is hit but selectElementManager is null
+    // This part is reached if the Select_Element case is hit but selectElementManager is null
     this.logger.warn(`Handler for ${translationMode} was not properly configured.`);
     return false;
   }
@@ -587,7 +587,7 @@ export class ContentMessageHandler extends ResourceTracker {
   async handleIFrameCoordinateOperation(data) {
     this.logger.info('IFrame coordinate operation request');
     // Delegate to appropriate manager based on operation type
-    if (data.operation === 'select-element' && this.selectElementManager) {
+    if (data.operation === TranslationMode.Select_Element && this.selectElementManager) {
       return await this.handleIFrameActivateSelectElement(data);
     }
     return { success: false, error: 'Unsupported operation or manager not available' };

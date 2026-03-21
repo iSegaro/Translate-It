@@ -80,9 +80,9 @@ export async function handleTranslationResult(message) {
       // No request found, check if this is a broadcast-only result
       // Skip field mode results as they're handled via direct response
       const needsBroadcast = message.data?.needsBroadcast ||
-                            message.data?.context === 'select-element' ||
+                            message.data?.context === TranslationMode.Select_Element ||
                             (message.data?.translatedText && message.data?.translatedText.length > 2000) &&
-                            !(message.data?.translationMode === 'field' || message.data?.translationMode === TranslationMode.Field);
+                            !(message.data?.translationMode === TranslationMode.LEGACY_FIELD || message.data?.translationMode === TranslationMode.Field);
 
       if (needsBroadcast) {
         // Broadcast to all tabs

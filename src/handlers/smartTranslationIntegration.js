@@ -538,7 +538,7 @@ async function processTranslationToTextField(translatedText, originalText, trans
   }
 
   // Small delay to ensure pending data is stored (for field mode)
-  if (!toastId && translationMode === 'field') {
+  if (!toastId && (translationMode === TranslationMode.Field || translationMode === TranslationMode.LEGACY_FIELD)) {
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 
@@ -666,8 +666,8 @@ async function processTranslationToTextField(translatedText, originalText, trans
     clearPendingNotificationData('applyTranslationToTextField-success');
     
     // For dictionary mode (text selection), we don't need an editable target
-    const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === 'dictionary';
-    const isSelectElementMode = mode === TranslationMode.Select_Element || mode === 'select_element';
+    const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === TranslationMode.LEGACY_DICTIONARY;
+    const isSelectElementMode = mode === TranslationMode.Select_Element || mode === TranslationMode.LEGACY_SELECT_ELEMENT_UNDERSCORE;
 
     if (!isDictionaryMode && (!target || !isEditableElement(target))) {
       logger.warn('Invalid target for non-dictionary mode', {
@@ -740,7 +740,7 @@ async function processTranslationToTextField(translatedText, originalText, trans
     if (isDictionaryMode) {
       logger.debug('Dictionary mode translation completed');
       clearPendingTranslationData(toastId);
-      return { applied: true, mode: 'dictionary' };
+      return { applied: true, mode: TranslationMode.Dictionary_Translation };
     }
     
     const isReplaceMode = await determineReplaceMode(mode, platform);
@@ -991,7 +991,7 @@ async function determineReplaceMode(mode, platform) {
   logger.debug('Determining replace mode', { mode, platform });
 
   // For Select Element mode, always replace
-  if (mode === TranslationMode.Select_Element || mode === 'select_element') {
+  if (mode === TranslationMode.Select_Element || mode === TranslationMode.LEGACY_SELECT_ELEMENT_UNDERSCORE) {
     logger.debug('SelectElement mode detected, using replace mode');
     return true;
   }
@@ -1008,7 +1008,7 @@ async function determineReplaceMode(mode, platform) {
   }
 
   // For Field mode, check the COPY_REPLACE setting
-  if (mode === TranslationMode.Field || mode === 'field') {
+  if (mode === TranslationMode.Field || mode === TranslationMode.LEGACY_FIELD) {
     logger.debug('Field mode detected, checking COPY_REPLACE setting');
     const isCopy = await getCOPY_REPLACEAsync();
     logger.debug('COPY_REPLACE setting for Field mode', { setting: isCopy });

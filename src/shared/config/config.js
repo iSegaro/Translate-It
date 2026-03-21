@@ -25,6 +25,12 @@ export const TranslationMode = {
   Sidepanel_Translate: MessageContexts.SIDEPANEL,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+  
+  // Legacy aliases for backward compatibility
+  LEGACY_FIELD: 'field',
+  LEGACY_SELECT_ELEMENT: 'SelectElement',
+  LEGACY_SELECT_ELEMENT_UNDERSCORE: 'select_element',
+  LEGACY_DICTIONARY: 'dictionary'
 };
 
 export const TRANSLATION_ERRORS = {
