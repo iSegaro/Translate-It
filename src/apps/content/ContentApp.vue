@@ -83,16 +83,16 @@
       class="mobile-fab"
       :style="{
         position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        width: '56px',
-        height: '56px',
-        background: '#339af0',
+        bottom: '20px',
+        right: '20px',
+        width: '44px',
+        height: '44px',
+        background: 'transparent',
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 4px 16px rgba(51, 154, 240, 0.4)',
+        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.15)',
         zIndex: '2147483647',
         pointerEvents: 'auto',
         cursor: 'pointer',
@@ -103,7 +103,7 @@
       @click="onMobileFabClick"
       @touchstart="startFabIdleTimer"
     >
-      <img src="@/icons/ui/translate.png" alt="Translate" style="width: 28px; height: 28px; filter: brightness(0) invert(1);" />
+      <img src="@/icons/extension/extension_icon_64.svg" alt="Translate" style="width: 70%; height: 70%; object-fit: contain;" />
     </div>
 
     <!-- Mobile-specific Exit Select Mode button -->
