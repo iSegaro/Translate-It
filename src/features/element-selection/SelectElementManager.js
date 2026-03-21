@@ -355,7 +355,8 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('mouseout', this.handleMouseOut, true);
 
       // Touch support for highlighting (Mobile)
-      window.addEventListener('touchstart', this.handleTouchStart, true);
+      // Use passive: false to allow preventDefault()
+      window.addEventListener('touchstart', this.handleTouchStart, { capture: true, passive: false });
 
       // Block ALL interaction events in capture phase to prevent any site logic from firing
       // This is the core fix for site navigation/actions interfering with selection
@@ -366,7 +367,9 @@ class SelectElementManager extends ResourceTracker {
       ];
       
       interactionEvents.forEach(eventType => {
-        window.addEventListener(eventType, this.handleInteraction, true);
+        // Critical: Set passive: false for touch/drag events to allow blocking navigation
+        const options = { capture: true, passive: false };
+        window.addEventListener(eventType, this.handleInteraction, options);
       });
 
       // Handle Escape key in capture phase for highest reliability
@@ -398,7 +401,7 @@ class SelectElementManager extends ResourceTracker {
     // Remove mouseover/mouseout
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
-    window.removeEventListener('touchstart', this.handleTouchStart, true);
+    window.removeEventListener('touchstart', this.handleTouchStart, { capture: true, passive: false });
     
     // Remove all interaction event blockers
     const interactionEvents = [
@@ -408,7 +411,7 @@ class SelectElementManager extends ResourceTracker {
     ];
     
     interactionEvents.forEach(eventType => {
-      window.removeEventListener(eventType, this.handleInteraction, true);
+      window.removeEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
     });
 
     // Remove Escape key handler
