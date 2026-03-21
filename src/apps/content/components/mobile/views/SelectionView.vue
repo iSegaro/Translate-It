@@ -143,7 +143,6 @@ const goBack = () => {
 
 const closeView = () => {
   mobileStore.closeSheet()
-  mobileStore.resetSelectionData()
 }
 
 const speak = () => {

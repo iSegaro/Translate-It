@@ -266,9 +266,16 @@ const onMobileFabClick = () => {
       window.windowsManagerInstance._showMobileSheet(selectedText);
     }
   } else {
-    logger.info('FAB clicked without selection, opening DashboardView');
-    // Open default dashboard view (current view or dashboard)
-    mobileStore.openSheet(mobileStore.activeView || 'dashboard', 'peek');
+    // Smart view recovery (Last View behavior):
+    let viewToOpen = mobileStore.activeView || 'dashboard';
+    
+    // Fallback ONLY if selection view is active but has no data
+    if (viewToOpen === 'selection' && !mobileStore.selectionData.text) {
+      viewToOpen = 'dashboard';
+    }
+    
+    logger.info(`FAB clicked without selection, restoring last view: ${viewToOpen}`);
+    mobileStore.openSheet(viewToOpen, 'peek');
   }
 };
 
