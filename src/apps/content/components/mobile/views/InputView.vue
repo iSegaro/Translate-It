@@ -46,7 +46,6 @@
 
     <!-- Result Card -->
     <div v-if="resultText" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
-      
       <!-- Rendered Markdown Content -->
       <div 
         class="result-content markdown-body" 
@@ -86,14 +85,12 @@ const targetLang = ref('en')
 const isLoading = ref(false)
 const resultText = ref('')
 
-// Computed direction
 const detectedDir = computed(() => {
   if (!resultText.value) return 'ltr'
   const direction = getTextDirection(targetLang.value, resultText.value)
   return direction === 'rtl' || shouldApplyRtl(resultText.value) ? 'rtl' : 'ltr'
 })
 
-// Sanitized and Rendered Markdown
 const sanitizedResult = computed(() => {
   if (!resultText.value) return ''
   try {
@@ -117,33 +114,51 @@ const onFocus = () => {
 
 const handleTranslate = async () => {
   if (!inputText.value || isLoading.value) return
+  
   isLoading.value = true
-  resultText.value = ''
+  resultText.value = '' // Clear previous result immediately
   
   try {
-    const response = await sendMessage(
-      createMessage(MessageActions.TRANSLATE, {
-        text: inputText.value,
-        sourceLanguage: 'auto',
-        targetLanguage: targetLang.value
-      })
-    );
+    // Standardize message sending with explicit string ID
+    const payload = {
+      text: inputText.value,
+      sourceLanguage: 'auto',
+      targetLanguage: targetLang.value
+    };
+
+    const message = createMessage(MessageActions.TRANSLATE, payload);
+    
+    // Ensure messageId is a string if it got populated as an object by any middleware
+    if (typeof message.messageId !== 'string') {
+      message.messageId = `input-${Date.now()}`;
+    }
+
+    const response = await sendMessage(message);
 
     if (response && response.success) {
-      resultText.value = response.translatedText || (response.data && response.data.translatedText) || "No translation found.";
+      // Robust response parsing
+      const translated = response.translatedText || 
+                         (response.data && response.data.translatedText) || 
+                         (response.result && response.result.translatedText);
+                         
+      if (translated) {
+        resultText.value = translated;
+      } else {
+        resultText.value = "No translation found. Please try again.";
+      }
     } else {
-      resultText.value = "Translation failed. Please try again.";
+      const errorMsg = response?.error?.message || response?.error || "Translation failed.";
+      resultText.value = `Error: ${errorMsg}`;
     }
   } catch (error) {
-    console.error('[MobileInput] Translation error:', error);
-    resultText.value = "Error connecting to service.";
+    console.error('[MobileInput] Unexpected error:', error);
+    resultText.value = "Service temporarily unavailable.";
   } finally {
     isLoading.value = false;
   }
 }
 
 const copyResult = () => {
-  // Use plain text for clipboard (stripping markdown)
   const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(resultText.value) : resultText.value;
   navigator.clipboard.writeText(plainText)
   pageEventBus.emit('show-notification', { message: 'Copied', type: 'success' })
@@ -162,18 +177,10 @@ const speakResult = () => {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-/* Base Markdown Styles for the result area */
-.result-content.markdown-body {
-  word-wrap: break-word;
-}
+.result-content.markdown-body { word-wrap: break-word; }
 .result-content.markdown-body p { margin-bottom: 8px; }
 .result-content.markdown-body strong { font-weight: bold; }
-.result-content.markdown-body em { font-style: italic; }
 .result-content.markdown-body ul, .result-content.markdown-body ol { padding-inline-start: 20px; margin-bottom: 8px; }
-.result-content.markdown-body li { margin-bottom: 4px; }
-.result-content.markdown-body code { background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; font-family: monospace; }
-
 @media (prefers-color-scheme: dark) {
   .result-content.markdown-body code { background: rgba(255,255,255,0.1); }
 }
