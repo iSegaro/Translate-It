@@ -51,6 +51,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.translationMessageId = null;
     this.sessionContext = null;
     this.isFatalErrorHandling = false;
+    this._isCancelling = false;
     
     this.scheduler = new PageTranslationScheduler(this.logger);
     this.bridge = new PageTranslationBridge(this.logger);
@@ -364,12 +365,19 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   cancelTranslation() {
-    this._cleanupSession();
-    this.restorePage(); // Use full restore for cancel
-    
-    if (this.abortController) {
-      this.abortController.abort();
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
+    if (this._isCancelling) return;
+    this._isCancelling = true;
+
+    try {
+      this._cleanupSession();
+      this.restorePage(); // Use full restore for cancel
+      
+      if (this.abortController) {
+        this.abortController.abort();
+        this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
+      }
+    } finally {
+      this._isCancelling = false;
     }
   }
 
@@ -378,7 +386,11 @@ export class PageTranslationManager extends ResourceTracker {
     this.isFatalErrorHandling = true;
 
     this.logger.error('Fatal error. Stopping page translation.', error);
-    this.cancelTranslation();
+    
+    // Check if cancellation is already handled to avoid loop
+    if (!this._isCancelling) {
+      this.cancelTranslation();
+    }
     
     // Get localized message for "Whole-page translation stopped"
     const stopMessage = (browser.i18n?.getMessage ? browser.i18n.getMessage('ERRORS_PAGE_TRANSLATION_STOPPED') : null) || '{error}';
