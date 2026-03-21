@@ -152,7 +152,7 @@ export class StreamingManager extends ResourceTracker {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       console.log('[StreamingManager.streamStreamUpdate] Sending stream update:', {
@@ -207,7 +207,7 @@ export class StreamingManager extends ResourceTracker {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       // Send to content script
@@ -265,7 +265,7 @@ export class StreamingManager extends ResourceTracker {
           ...additionalData
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       if (senderInfo && senderInfo.tab?.id) {

@@ -59,11 +59,14 @@ export function useMessaging(context) {
    * Create a standardized message
    * @param {string} action - Message action
    * @param {*} data - Message data
-   * @param {Object} options - Additional options
+   * @param {Object} options - Additional options (may include messageId)
    * @returns {Object} Standardized message
    */
   const createMessage = (action, data, options = {}) => {
-    return MessageFormat.create(action, data, context, options);
+    // MessageFormat.create expects: action, data, context, messageId
+    // Extract messageId from options if available
+    const messageId = options.messageId || null;
+    return MessageFormat.create(action, data, context, messageId);
   };
 
   /**

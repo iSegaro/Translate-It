@@ -432,11 +432,14 @@ export class ContentMessageHandler extends ResourceTracker {
     switch (translationMode) {
       case TranslationMode.Select_Element:
       case 'SelectElement': // Handle both enum and hardcoded string for robustness
-        if (this.selectElementManager) {
-          this.logger.info('Forwarding to SelectElementHandler');
-          return this.selectElementManager.handleTranslationResult(message);
+        this.logger.info('Forwarding to StreamingHandler via ContentScriptIntegration');
+        try {
+          const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+          return contentScriptIntegration.streamingHandler.handleMessage(message);
+        } catch (error) {
+          this.logger.error('Failed to delegate translation result to ContentScriptIntegration:', error);
+          return false;
         }
-        break;
 
       case TranslationMode.Field:
       case 'field': // Handle both enum and string for robustness

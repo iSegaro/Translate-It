@@ -437,7 +437,7 @@ export class BaseAIProvider extends BaseProvider {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       // Get sender info from engine's active translations
@@ -477,7 +477,7 @@ export class BaseAIProvider extends BaseProvider {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       const senderInfo = engine.getStreamingSender?.(messageId);
@@ -513,7 +513,7 @@ export class BaseAIProvider extends BaseProvider {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
       const senderInfo = engine.getStreamingSender?.(messageId);
       if (senderInfo && senderInfo.tab?.id) {
@@ -900,7 +900,7 @@ export class BaseAIProvider extends BaseProvider {
           timestamp: Date.now()
         },
         'background-streaming',
-        { messageId }
+        messageId
       );
 
       const senderInfo = engine.getStreamingSender?.(messageId);

@@ -554,7 +554,7 @@ export class TranslationEngine {
                           translationMode: mode,
                         },
                         'background-stream',
-                        { messageId: messageId }
+                        messageId
                       );
                       if (tabId) {
                         browser.tabs.sendMessage(tabId, streamUpdateMessage).then(response => {
@@ -599,7 +599,7 @@ export class TranslationEngine {
                           originalData: batch,
                         },
                         'background-stream',
-                        { messageId: messageId }
+                        messageId
                     );
                     if (tabId) {
                         browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(err => {
@@ -633,7 +633,7 @@ export class TranslationEngine {
                   targetLanguage: effectiveTarget
                 },
                 'background-stream',
-                { messageId: messageId }
+                messageId
               );
               if (tabId) {
                 browser.tabs.sendMessage(tabId, streamEndMessage).catch(error => {

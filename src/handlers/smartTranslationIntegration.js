@@ -406,7 +406,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         }
       },
       MessagingContexts.CONTENT,
-      { messageId } // Pass our custom messageId
+      messageId
     );
     
     // Use ExtensionContextManager for safe message sending
