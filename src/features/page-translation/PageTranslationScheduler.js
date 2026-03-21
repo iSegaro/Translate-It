@@ -36,6 +36,11 @@ export class PageTranslationScheduler extends ResourceTracker {
       poolDelay: 150, // Time to wait for collecting more items (AnyLang style)
       priorityThreshold: 1, // Any score >= this is considered high priority (Viewport)
     };
+
+    // Throttling state for progress reporting
+    this._lastReportTime = 0;
+    this._reportInterval = 300; // ms
+    this._reportPending = false;
   }
 
   setSettings(settings) {
@@ -58,12 +63,15 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.fatalErrorOccurred = false;
     this.translationSessionId = null;
     this.sessionContext = null;
+    this._lastReportTime = 0;
+    this._reportPending = false;
   }
 
   stop() {
     const wasTranslating = this.isTranslated;
     this.isTranslated = false;
     this.sessionContext = null;
+    this._reportPending = false;
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
@@ -330,10 +338,30 @@ export class PageTranslationScheduler extends ResourceTracker {
     });
   }
 
-  _reportProgress() {
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
-      translatedCount: this.translatedCount, 
-      totalCount: this.totalTasks
-    });
+  _reportProgress(force = false) {
+    const now = Date.now();
+    const timeSinceLastReport = now - this._lastReportTime;
+
+    // Final report (100%) or large jumps should probably be forced, but for now 
+    // simple interval throttling is enough.
+    
+    if (force || timeSinceLastReport >= this._reportInterval) {
+      this._lastReportTime = now;
+      this._reportPending = false;
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
+        translatedCount: this.translatedCount, 
+        totalCount: this.totalTasks
+      });
+      return;
+    }
+
+    if (!this._reportPending) {
+      this._reportPending = true;
+      this.trackTimeout(() => {
+        if (this._reportPending) {
+          this._reportProgress(true);
+        }
+      }, this._reportInterval - timeSinceLastReport);
+    }
   }
 }
