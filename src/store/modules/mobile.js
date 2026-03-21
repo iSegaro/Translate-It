@@ -22,6 +22,8 @@ export const useMobileStore = defineStore('mobile', () => {
   // Page Translation State
   const pageTranslationData = ref({
     isTranslating: false,
+    isTranslated: false,
+    isAutoTranslating: false,
     translatedCount: 0,
     totalCount: 0,
     status: 'idle' // 'idle' | 'translating' | 'completed' | 'error'
@@ -90,6 +92,8 @@ export const useMobileStore = defineStore('mobile', () => {
   const resetPageTranslation = () => {
     pageTranslationData.value = {
       isTranslating: false,
+      isTranslated: false,
+      isAutoTranslating: false,
       translatedCount: 0,
       totalCount: 0,
       status: 'idle'

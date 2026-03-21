@@ -554,6 +554,8 @@ onMounted(async () => {
       logger.info('Mobile: Page translation started, switching view');
       mobileStore.setPageTranslation({ 
         isTranslating: true, 
+        isTranslated: false,
+        isAutoTranslating: detail.isAutoTranslating || false,
         status: 'translating', 
         translatedCount: 0,
         totalCount: 0
@@ -575,6 +577,8 @@ onMounted(async () => {
     if (deviceDetector.isMobile()) {
       mobileStore.setPageTranslation({ 
         isTranslating: false, 
+        isTranslated: true,
+        isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
         status: 'completed', 
         translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
         totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
@@ -584,7 +588,23 @@ onMounted(async () => {
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, (detail) => {
     if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ isTranslating: false, status: 'error' });
+      mobileStore.setPageTranslation({ isTranslating: false, isTranslated: false, status: 'error' });
+    }
+  });
+
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.resetPageTranslation();
+    }
+  });
+
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
+    if (deviceDetector.isMobile()) {
+      mobileStore.setPageTranslation({ 
+        isTranslating: false,
+        isAutoTranslating: false,
+        isTranslated: true
+      });
     }
   });
 

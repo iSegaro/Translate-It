@@ -4,7 +4,7 @@
       <!-- Translate Page Button -->
       <button class="action-card" @click="translatePage">
         <div class="icon-container translate-page">
-          <img src="@/icons/ui/whole-page.png" alt="Translate Page" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+          <img :src="wholePageIcon" alt="Translate Page" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
         </div>
         <span class="action-label">Page</span>
       </button>
@@ -12,7 +12,7 @@
       <!-- Select Element Button -->
       <button class="action-card" @click="activateSelectElement">
         <div class="icon-container select-element">
-          <img src="@/icons/ui/select.png" alt="Select Element" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+          <img :src="selectIcon" alt="Select Element" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
         </div>
         <span class="action-label">Select</span>
       </button>
@@ -20,7 +20,7 @@
       <!-- Manual Translation Button -->
       <button class="action-card" @click="goToInputView">
         <div class="icon-container manual-input">
-          <img src="@/icons/ui/translate.png" alt="Manual Translation" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+          <img :src="translateIcon" alt="Manual Translation" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
         </div>
         <span class="action-label">Input</span>
       </button>
@@ -28,7 +28,7 @@
       <!-- Settings Button -->
       <button class="action-card" @click="openSettings">
         <div class="icon-container settings">
-          <img src="@/icons/ui/settings.png" alt="Settings" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+          <img :src="settingsIcon" alt="Settings" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
         </div>
         <span class="action-label">Settings</span>
       </button>
@@ -42,6 +42,12 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
+// Import icons for dynamic usage and correct resolution in content scripts
+import wholePageIcon from '@/icons/ui/whole-page.png';
+import selectIcon from '@/icons/ui/select.png';
+import translateIcon from '@/icons/ui/translate.png';
+import settingsIcon from '@/icons/ui/settings.png';
+
 const mobileStore = useMobileStore()
 const pageEventBus = window.pageEventBus
 
@@ -54,11 +60,13 @@ const translatePage = (event) => {
   // Set view so it's ready when user re-opens the sheet
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
   
-  // Close sheet so user can see the translation on the actual page
+  // Close sheet IMMEDIATELY for instant feedback
   mobileStore.closeSheet()
   
-  // Trigger translation
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+  // Defer the heavy translation start logic to the next tick
+  setTimeout(() => {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+  }, 0)
 }
 
 const activateSelectElement = () => {

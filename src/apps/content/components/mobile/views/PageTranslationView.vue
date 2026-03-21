@@ -8,17 +8,6 @@
         <span class="status-text" style="font-weight: 800; font-size: 16px; color: #343a40;">{{ statusMessage }}</span>
       </div>
       <div class="header-actions" style="display: flex; align-items: center; gap: 8px;">
-        <!-- Restore Button in Header (Visible when completed) -->
-        <button 
-          v-if="pageTranslationData.status === 'completed'"
-          class="header-action-btn restore-small" 
-          @click="restorePage" 
-          style="background: #ebfbee; border: none; padding: 0 12px; height: 28px; border-radius: 20px; color: #2b8a3e; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1;"
-        >
-          <img src="@/icons/ui/restore.svg" style="width: 12px; height: 12px; filter: invert(36%) sepia(51%) saturate(541%) hue-rotate(86deg) brightness(94%) contrast(88%); display: block; position: relative; top: -0.5px;" />
-          <span style="display: block;">Restore</span>
-        </button>
-
         <button 
           class="header-action-btn dashboard-link" 
           @click="goToDashboard" 
@@ -51,22 +40,44 @@
         <div 
           class="progress-bar-fill" 
           :style="{ width: `${computedProgress}%` }"
-          :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.status === 'translating' }"
+          :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
           style="height: 100%; background: linear-gradient(90deg, #339af0, #22b8cf); transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(51, 154, 240, 0.3);"
         ></div>
       </div>
     </div>
 
-    <!-- Bottom Actions Area -->
-    <div class="action-row" style="margin-top: auto; padding-top: 10px;">
+    <!-- Unified Action Area -->
+    <div class="action-column" style="margin-top: auto; padding-top: 10px;">
+      
+      <!-- Single Multi-state Button -->
       <button 
-        v-if="pageTranslationData.status === 'translating'" 
-        class="cancel-btn" 
-        @click="cancelTranslation"
-        style="width: 100%; background: #fff5f5; border: 1px solid #ffc9c9; padding: 14px; border-radius: 12px; color: #fa5252; font-weight: 700; font-size: 14px; cursor: pointer;"
+        @click.stop="primaryAction.handler"
+        class="primary-action-btn"
+        :style="{
+          width: '100%',
+          background: primaryAction.bgColor,
+          border: primaryAction.border,
+          padding: '14px',
+          borderRadius: '12px',
+          color: primaryAction.textColor,
+          fontWeight: '700',
+          fontSize: '14px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          transition: 'all 0.2s ease'
+        }"
       >
-        Stop Translation
+        <img 
+          :src="primaryAction.icon" 
+          style="width: 18px; height: 18px;" 
+          :style="{ filter: primaryAction.iconFilter }"
+        />
+        {{ primaryAction.label }}
       </button>
+
     </div>
   </div>
 </template>
@@ -79,6 +90,12 @@ import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
+// Import icons for dynamic usage
+import wholePageIcon from '@/icons/ui/whole-page.png';
+import closeIcon from '@/icons/ui/close.png';
+import eyeHideIcon from '@/icons/ui/eye-hide.svg';
+import restoreIcon from '@/icons/ui/restore.svg';
+
 const mobileStore = useMobileStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 
@@ -89,11 +106,56 @@ const computedProgress = computed(() => {
 })
 
 const statusMessage = computed(() => {
-  switch (pageTranslationData.value.status) {
-    case 'translating': return 'Translating Page...'
-    case 'completed': return 'Page Translated'
-    case 'error': return 'Translation Failed'
-    default: return 'Initializing...'
+  if (pageTranslationData.value.isTranslating) return 'Translating Page...';
+  if (pageTranslationData.value.isTranslated) {
+    return pageTranslationData.value.isAutoTranslating ? 'Auto-Translating' : 'Page Translated';
+  }
+  if (pageTranslationData.value.status === 'error') return 'Translation Failed';
+  return 'Ready to Translate';
+})
+
+// Unified Button Configuration
+const primaryAction = computed(() => {
+  // 1. ACTIVE State: Currently Translating OR Auto-Translating
+  // Clicking this should STOP further translations but KEEP existing ones
+  if (pageTranslationData.value.isTranslating || pageTranslationData.value.isAutoTranslating) {
+    const isInitialPass = pageTranslationData.value.isTranslating;
+    return {
+      label: isInitialPass ? 'Stop Translation' : 'Stop Auto-Translation',
+      icon: isInitialPass ? closeIcon : eyeHideIcon,
+      bgColor: '#fff4e6', // Use orange/warning color for "Stop without Restore"
+      textColor: '#d9480f',
+      border: '1px solid #ffe8cc',
+      iconFilter: isInitialPass 
+        ? 'invert(38%) sepia(88%) saturate(1212%) hue-rotate(335deg) brightness(98%) contrast(98%)'
+        : 'invert(36%) sepia(84%) saturate(1212%) hue-rotate(351deg) brightness(91%) contrast(92%)',
+      handler: stopAutoTranslation // Use the non-restoring stop method
+    }
+  }
+
+  // 2. DONE State: Already translated but process is stopped
+  // Clicking this should RESTORE the original page
+  if (pageTranslationData.value.isTranslated) {
+    return {
+      label: 'Restore Original Page',
+      icon: restoreIcon,
+      bgColor: '#f8f9fa',
+      textColor: '#495057',
+      border: '1px solid #dee2e6',
+      iconFilter: 'none',
+      handler: restorePage
+    }
+  }
+
+  // 3. READY State: Initial state
+  return {
+    label: 'Start Translation',
+    icon: wholePageIcon,
+    bgColor: '#339af0',
+    textColor: 'white',
+    border: 'none',
+    iconFilter: 'brightness(0) invert(1)',
+    handler: startTranslation
   }
 })
 
@@ -105,16 +167,25 @@ const closeView = () => {
   mobileStore.closeSheet()
 }
 
+const startTranslation = () => {
+  mobileStore.closeSheet()
+  
+  // Defer heavy logic
+  setTimeout(() => {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+  }, 0)
+}
+
+const stopAutoTranslation = () => {
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
+}
+
 const restorePage = () => {
   pageEventBus.emit(MessageActions.PAGE_RESTORE)
-  mobileStore.resetPageTranslation()
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const cancelTranslation = () => {
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE_CANCELLED)
-  mobileStore.resetPageTranslation()
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 </script>
 
@@ -158,7 +229,7 @@ const cancelTranslation = () => {
   100% { transform: translateX(100%) scaleX(0.2); }
 }
 
-.cancel-btn:active, .dashboard-link:active, .header-action-btn:active {
+button:active {
   transform: scale(0.98);
   opacity: 0.8;
 }
@@ -168,8 +239,6 @@ const cancelTranslation = () => {
   .status-header { border-bottom-color: #333 !important; }
   .status-text { color: #dee2e6 !important; }
   .dashboard-link { background: #2d2d2d !important; color: #adb5bd !important; }
-  .restore-small { background: rgba(43, 138, 62, 0.2) !important; color: #51cf66 !important; }
-  .restore-small img { filter: invert(68%) sepia(43%) saturate(432%) hue-rotate(82deg) brightness(92%) contrast(88%) !important; }
   .close-btn img { filter: invert(0.8); }
   
   .progress-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
@@ -177,6 +246,8 @@ const cancelTranslation = () => {
   .progress-card > div > div:last-child { background: #1a1a1a !important; border-color: #333 !important; color: #868e96 !important; }
   .progress-bar-container { background: #1a1a1a !important; }
   
-  .cancel-btn { background: rgba(250, 82, 82, 0.1) !important; border-color: rgba(250, 82, 82, 0.2) !important; }
+  .primary-action-btn[style*="background: #f8f9fa"] { background: #2d2d2d !important; border-color: #444 !important; color: #adb5bd !important; }
+  .primary-action-btn[style*="background: #fff4e6"] { background: rgba(217, 72, 15, 0.15) !important; border-color: rgba(217, 72, 15, 0.3) !important; color: #ffa94d !important; }
+  .primary-action-btn[style*="background: #fff5f5"] { background: rgba(250, 82, 82, 0.15) !important; border-color: rgba(250, 82, 82, 0.3) !important; color: #ff8787 !important; }
 }
 </style>

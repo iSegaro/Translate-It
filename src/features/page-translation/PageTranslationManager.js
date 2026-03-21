@@ -137,6 +137,11 @@ export class PageTranslationManager extends ResourceTracker {
       this.cancelTranslation();
     });
 
+    bus.on(MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {
+      this.logger.info('Page stop auto-translation/pass requested via PageEventBus');
+      this.stopAutoTranslation().catch(() => {});
+    });
+
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
       this.logger.info('Page translation complete event received in Manager');
       this.isTranslating = false;
@@ -324,26 +329,32 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Stop auto-translation (persistence) without restoring
+   * Stop auto-translation (persistence) or current pass without restoring
    */
   async stopAutoTranslation() {
-    if (!this.isAutoTranslating) return { success: false, reason: ActionReasons.NOT_AUTO_TRANSLATING };
+    // Allow stopping if either we are in initial pass OR auto-translating changes
+    if (!this.isAutoTranslating && !this.isTranslating) {
+      return { success: false, reason: ActionReasons.NOT_AUTO_TRANSLATING };
+    }
 
     try {
+      this.logger.info('Stopping page translation/persistence without restoring');
+      
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
-      this.isTranslated = true; // KEEP TRUE: The page IS still translated!
+      this.isTranslating = false;
+      this.isTranslated = true; // Keep true as existing translations remain
       
-      // Notify batcher to stop and clear any pending timers/queues
-      // This stops the background loop but we keep the manager's isTranslated=true
+      // Stop the scheduler from processing more batches
       this.scheduler.setTranslationState(false);
 
       const resultData = {
         url: this.currentUrl, 
         translatedCount: this.scheduler.translatedCount,
-        isTranslated: true, // Tell background/UI we are still in translated state
+        isTranslated: true, 
         isAutoTranslating: false
       };
+      
       this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
@@ -393,26 +404,48 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   async _loadSettings(options = {}) {
-    const rawRootMargin = await getWholePageRootMarginAsync();
+    // Load all settings in parallel to eliminate sequential await delays
+    const [
+      rawRootMargin,
+      modeProviders,
+      globalTranslationApi,
+      targetLanguage,
+      lazyLoading,
+      autoTranslateOnDOMChanges,
+      excludedSelectors,
+      attributesToTranslate,
+      showOriginalOnHover
+    ] = await Promise.all([
+      getWholePageRootMarginAsync(),
+      getModeProvidersAsync(),
+      getTranslationApiAsync(),
+      getTargetLanguageAsync(),
+      getWholePageLazyLoadingAsync(),
+      getWholePageAutoTranslateOnDOMChangesAsync(),
+      getWholePageExcludedSelectorsAsync(),
+      getWholePageAttributesToTranslateAsync(),
+      getWholePageShowOriginalOnHoverAsync()
+    ]);
+
     const formattedRootMargin = rawRootMargin ? (String(rawRootMargin).match(/px|%|em|rem|vh|vw$/) ? String(rawRootMargin) : `${rawRootMargin}px`) : '10px';
 
     // Get mode-specific provider if not explicitly provided in options
     let effectiveProvider = options.provider;
     if (!effectiveProvider) {
-      const modeProviders = await getModeProvidersAsync();
-      effectiveProvider = modeProviders?.[TranslationMode.Page] || await getTranslationApiAsync();
+      effectiveProvider = modeProviders?.[TranslationMode.Page] || globalTranslationApi;
     }
 
     this.settings = {
       translationApi: effectiveProvider,
-      targetLanguage: options.targetLanguage || await getTargetLanguageAsync(),
-      lazyLoading: await getWholePageLazyLoadingAsync(),
+      targetLanguage: options.targetLanguage || targetLanguage,
+      lazyLoading: lazyLoading,
       rootMargin: formattedRootMargin,
-      autoTranslateOnDOMChanges: await getWholePageAutoTranslateOnDOMChangesAsync(),
-      excludedSelectors: await getWholePageExcludedSelectorsAsync(),
-      attributesToTranslate: await getWholePageAttributesToTranslateAsync(),
-      showOriginalOnHover: await getWholePageShowOriginalOnHoverAsync()
+      autoTranslateOnDOMChanges: autoTranslateOnDOMChanges,
+      excludedSelectors: excludedSelectors,
+      attributesToTranslate: attributesToTranslate,
+      showOriginalOnHover: showOriginalOnHover
     };
+
     const { CONFIG } = await import('@/shared/config/config.js');
     Object.assign(this.settings, {
       chunkSize: CONFIG.WHOLE_PAGE_CHUNK_SIZE,
