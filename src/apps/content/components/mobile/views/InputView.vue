@@ -5,21 +5,22 @@
     <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
       <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0;">
         <img src="@/icons/ui/dropdown-arrow.svg" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
-        <span style="font-weight: bold; font-size: 16px; color: #333;">Manual Input</span>
+        <span style="font-weight: bold; font-size: 16px; color: #333;" class="header-title">Manual Input</span>
       </button>
     </div>
 
     <!-- Input Card -->
-    <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+    <div class="input-card" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
       <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">Source Text</div>
       <textarea
         v-model="inputText"
         placeholder="Type here..."
-        style="width: 100%; min-height: 80px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 0;"
+        :dir="inputDir"
+        style="width: 100%; min-height: 80px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 0; text-align: start;"
         @focus="onFocus"
       ></textarea>
       <div v-if="inputText" style="display: flex; justify-content: flex-end;">
-        <button @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666;">Clear</button>
+        <button class="clear-btn" @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666; cursor: pointer;">Clear</button>
       </div>
     </div>
 
@@ -45,7 +46,7 @@
     </div>
 
     <!-- Result Card -->
-    <div v-if="resultText" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
+    <div v-if="resultText" class="result-card" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
       <!-- Rendered Markdown Content -->
       <div 
         class="result-content markdown-body" 
@@ -55,10 +56,10 @@
       ></div>
       
       <div style="display: flex; gap: 10px;">
-        <button @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <button class="action-btn" @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <img src="@/icons/ui/copy.png" style="width: 16px; height: 16px;" />
         </button>
-        <button @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <button class="action-btn" @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <img src="@/icons/ui/speaker.png" style="width: 16px; height: 16px;" />
         </button>
       </div>
@@ -84,6 +85,11 @@ const inputText = ref('')
 const targetLang = ref('en')
 const isLoading = ref(false)
 const resultText = ref('')
+
+const inputDir = computed(() => {
+  if (!inputText.value) return 'ltr'
+  return shouldApplyRtl(inputText.value) ? 'rtl' : 'ltr'
+})
 
 const detectedDir = computed(() => {
   if (!resultText.value) return 'ltr'
@@ -181,7 +187,23 @@ const speakResult = () => {
 .result-content.markdown-body p { margin-bottom: 8px; }
 .result-content.markdown-body strong { font-weight: bold; }
 .result-content.markdown-body ul, .result-content.markdown-body ol { padding-inline-start: 20px; margin-bottom: 8px; }
+
 @media (prefers-color-scheme: dark) {
+  .header-title { color: #adb5bd !important; }
+  .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
+  .input-card textarea { color: #dee2e6 !important; }
+  .clear-btn { background: #3d3d3d !important; color: #adb5bd !important; }
+  
+  select { background-color: #2d2d2d !important; color: #dee2e6 !important; border-color: #444 !important; }
+  
+  .result-card { 
+    background: rgba(28, 126, 214, 0.15) !important; 
+    border-color: rgba(28, 126, 214, 0.3) !important; 
+  }
+  .result-content { color: #74c0fc !important; }
   .result-content.markdown-body code { background: rgba(255,255,255,0.1); }
+  
+  .action-btn { background: #2d2d2d !important; border-color: #444 !important; }
+  .action-btn img { filter: invert(0.8); }
 }
 </style>
