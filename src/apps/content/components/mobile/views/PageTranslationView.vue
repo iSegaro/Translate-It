@@ -13,13 +13,19 @@
           v-if="pageTranslationData.status === 'completed'"
           class="header-action-btn restore-small" 
           @click="restorePage" 
-          style="background: #ebfbee; border: none; padding: 6px 12px; border-radius: 20px; color: #2b8a3e; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+          style="background: #ebfbee; border: none; padding: 0 12px; height: 28px; border-radius: 20px; color: #2b8a3e; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1;"
         >
-          <img src="@/icons/ui/history.svg" style="width: 12px; filter: invert(36%) sepia(51%) saturate(541%) hue-rotate(86deg) brightness(94%) contrast(88%);" />
-          Restore
+          <img src="@/icons/ui/restore.svg" style="width: 12px; height: 12px; filter: invert(36%) sepia(51%) saturate(541%) hue-rotate(86deg) brightness(94%) contrast(88%); display: block; position: relative; top: -0.5px;" />
+          <span style="display: block;">Restore</span>
         </button>
 
-        <button class="dashboard-link" @click="goToDashboard" style="background: #f1f3f5; border: none; padding: 6px 12px; border-radius: 20px; color: #495057; font-size: 11px; font-weight: 800; cursor: pointer;">Dashboard</button>
+        <button 
+          class="header-action-btn dashboard-link" 
+          @click="goToDashboard" 
+          style="background: #f1f3f5; border: none; padding: 0 12px; height: 28px; border-radius: 20px; color: #495057; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;"
+        >
+          Dashboard
+        </button>
         
         <button class="close-btn" @click="closeView" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
           <img src="@/icons/ui/close.png" alt="Close" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
