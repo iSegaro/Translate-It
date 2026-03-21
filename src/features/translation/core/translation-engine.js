@@ -266,11 +266,27 @@ export class TranslationEngine {
 
     const providerClass = providerInstance?.constructor;
 
-    // Downgrade dictionary mode if provider does not support it
-    if (mode === TranslationMode.Dictionary_Translation && !providerClass?.supportsDictionary) {
+    // Strict Dictionary Override: If enableDictionary is explicitly false, 
+    // prevent any auto-switching to dictionary mode regardless of text length.
+    // This is vital for Select Element, Field and Page modes.
+    const isDictionaryForbidden = data.enableDictionary === false || 
+                                 (data.options && data.options.enableDictionary === false) ||
+                                 mode === TranslationMode.Select_Element ||
+                                 mode === TranslationMode.Field ||
+                                 mode === TranslationMode.Page;
+    
+    if (isDictionaryForbidden && (mode === TranslationMode.Dictionary_Translation || mode === TranslationMode.Selection)) {
+      if (mode === TranslationMode.Dictionary_Translation) {
+        logger.debug(`[TranslationEngine] Dictionary mode forbidden by request flags. Forcing selection mode.`);
+      }
+      // Force selection mode
+      mode = TranslationMode.Selection;
+      data.mode = TranslationMode.Selection;
+    } else if (mode === TranslationMode.Dictionary_Translation && !providerClass?.supportsDictionary) {
+      // Standard downgrade if provider simply doesn't support dictionary
       logger.debug(`Provider ${provider} does not support dictionary mode. Downgrading to selection mode.`);
       mode = TranslationMode.Selection;
-      data.mode = TranslationMode.Selection; // Ensure data object is also updated
+      data.mode = TranslationMode.Selection;
     }
 
     // Check for text length limits in non-SelectElement modes

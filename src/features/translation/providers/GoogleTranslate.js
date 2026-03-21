@@ -53,8 +53,14 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
     // Add key info log for translation start
     logger.info(`[Google] Starting translation: ${chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER).length} chars`);
-    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
-    const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
+    // Dictionary should only be enabled for single-segment translations and NOT in Field, Select Element or Page mode.
+    const isExcludedMode = translateMode === TranslationMode.Field || 
+                          translateMode === TranslationMode.Page || 
+                          translateMode === TranslationMode.Select_Element;
+
+    const shouldIncludeDictionary = isDictionaryEnabled && 
+                                    chunkTexts.length === 1 && 
+                                    !isExcludedMode;
 
     const apiUrl = await getGoogleTranslateUrlAsync();
     

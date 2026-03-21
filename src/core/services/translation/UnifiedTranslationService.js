@@ -404,7 +404,7 @@ class TranslationModeCoordinator {
     const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
     let priority = TranslationPriority.NORMAL;
 
-    // Map modes to priorities using TranslationMode constants
+    // Priority mapping based on TranslationMode constants
     const highPriorityModes = new Set([
       TranslationMode.Field,
       TranslationMode.Selection,
@@ -428,7 +428,7 @@ class TranslationModeCoordinator {
     // Attach priority to request data for downstream use
     request.data.priority = priority;
 
-    // Route to appropriate handler
+    // Route to appropriate handler using TranslationMode constants
     switch (mode) {
       case TranslationMode.Field:
         return await this.processFieldTranslation(request, { translationEngine });
@@ -577,25 +577,36 @@ class TranslationModeCoordinator {
   }
 
   /**
-   * Process field mode translation
+   * Process Field mode translation
    */
   async processFieldTranslation(request, { translationEngine }) {
+    const { messageId, data } = request;
+
     // Use translation engine directly
     if (!translationEngine) {
       throw new Error('Translation engine not available');
     }
 
+    // Ensure dictionary is disabled for field mode
+    const enhancedData = {
+      ...data,
+      mode: TranslationMode.Field,
+      enableDictionary: false,
+      options: {
+        ...(data.options || {}),
+        enableDictionary: false
+      }
+    };
+
     // Create the expected message format for translation engine
     const messageForEngine = {
       action: MessageActions.TRANSLATE,
-      messageId: request.messageId,
-      context: 'content', // Add required context
-      data: request.data
+      messageId: messageId,
+      context: 'content', 
+      data: enhancedData
     };
 
-    const result = await translationEngine.handleTranslateMessage(messageForEngine, request.sender);
-
-    return result;
+    return await translationEngine.handleTranslateMessage(messageForEngine, request.sender);
   }
 
   /**
@@ -605,17 +616,18 @@ class TranslationModeCoordinator {
     // For select-element, always use streaming for better UX
     const enhancedData = {
       ...request.data,
+      enableDictionary: false,
       options: {
         ...request.data.options,
         forceStreaming: true,
-        enableDictionary: false // Force disable dictionary for Select Element mode
+        enableDictionary: false
       }
     };
 
     const result = await translationEngine.handleTranslateMessage({
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
-      context: 'content', // Add required context
+      context: 'content', 
       data: enhancedData
     }, request.sender);
 

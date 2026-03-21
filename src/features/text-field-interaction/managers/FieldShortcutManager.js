@@ -164,7 +164,7 @@ export class FieldShortcutManager {
           provider: settingsManager.get('TRANSLATION_API', 'google-translate'),
           sourceLanguage: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
           targetLanguage: settingsManager.get('TARGET_LANGUAGE', 'fa'),
-          mode: 'field',
+          mode: TranslationMode.Field,
           options: {
             element: activeElement.tagName,
             fieldType: activeElement.type || 'text'

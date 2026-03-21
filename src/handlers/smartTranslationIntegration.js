@@ -327,13 +327,13 @@ function getPendingTranslationData(fallbackTarget, toastId) {
 }
 
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId }) {
-  logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
-  
+  logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? TranslationMode.Select_Element : TranslationMode.Field });
+
   if (!text) {
     logger.warn('No text provided for translation');
     return;
   }
-  
+
   // Check extension context before proceeding
   if (!ExtensionContextManager.isValidSync()) {
     const contextError = new Error('Extension context invalidated');
@@ -341,8 +341,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
-  const mode = 'field';
+  const mode = TranslationMode.Field;
   const platform = detectPlatform(target);
+
   const timestamp = Date.now();
 
   try {

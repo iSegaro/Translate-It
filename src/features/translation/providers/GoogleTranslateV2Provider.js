@@ -85,8 +85,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const tl = this._getLangCode(targetLang);
 
     const isDictionaryEnabled = await getEnableDictionaryAsync();
-    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
-    const shouldIncludeDictionary = isDictionaryEnabled && chunkTexts.length === 1 && translateMode !== TranslationMode.Field;
+    // Dictionary should only be enabled for single-segment translations and NOT in Field, Select Element or Page mode.
+    const isExcludedMode = translateMode === TranslationMode.Field || 
+                          translateMode === TranslationMode.Page || 
+                          translateMode === TranslationMode.Select_Element;
+
+    const shouldIncludeDictionary = isDictionaryEnabled && 
+                                    chunkTexts.length === 1 && 
+                                    !isExcludedMode;
 
     const url = new URL("https://translate.google.com/translate_a/single");
     const params = {

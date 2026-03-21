@@ -217,7 +217,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
           originalSourceLang: this.originalSettings.source,
           originalTargetLang: this.originalSettings.target,
           mode: TranslationMode.Select_Element,
-          options: { rawJsonPayload: true },
+          options: { 
+            rawJsonPayload: true,
+            enableDictionary: false // Always disable dictionary for Select Element context
+          },
           sessionId: this.sessionMessageId, // Persists across multiple elements
         },
         context: MessageContexts.SELECT_ELEMENT,
