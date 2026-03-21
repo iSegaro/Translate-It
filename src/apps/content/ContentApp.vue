@@ -81,8 +81,27 @@
     <div 
       v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
       class="mobile-fab"
-      style="position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: #339af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4); z-index: 2147483647; pointer-events: auto !important; cursor: pointer;"
+      :style="{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        width: '56px',
+        height: '56px',
+        background: '#339af0',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 16px rgba(51, 154, 240, 0.4)',
+        zIndex: '2147483647',
+        pointerEvents: 'auto',
+        cursor: 'pointer',
+        transition: 'opacity 0.5s ease, transform 0.2s ease',
+        opacity: isFabIdle ? '0.35' : '1',
+        transform: 'scale(1)'
+      }"
       @click="onMobileFabClick"
+      @touchstart="startFabIdleTimer"
     >
       <img src="@/icons/ui/translate.png" alt="Translate" style="width: 28px; height: 28px; filter: brightness(0) invert(1);" />
     </div>
@@ -297,6 +316,25 @@ const setupOutsideClickHandler = () => {
   // translation windows to close when clicked inside them.
 };
 
+// Mobile FAB behavior state
+const isFabVisible = ref(true);
+const isFabIdle = ref(false);
+let lastScrollY = window.scrollY;
+let fabIdleTimer = null;
+
+const startFabIdleTimer = () => {
+  if (fabIdleTimer) clearTimeout(fabIdleTimer);
+  isFabIdle.value = false;
+  fabIdleTimer = setTimeout(() => {
+    isFabIdle.value = true;
+  }, 3000); // 3 seconds of inactivity to become semi-transparent
+};
+
+const handleScroll = () => {
+  // Reset idle timer on scroll to ensure FAB stays opaque while interacting
+  startFabIdleTimer();
+};
+
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
@@ -311,6 +349,12 @@ onMounted(async () => {
     touchPoints: navigator.maxTouchPoints,
     userAgent: navigator.userAgent
   });
+
+  // Mobile scroll handling
+  if (deviceDetector.isMobile()) {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    startFabIdleTimer();
+  }
 
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
@@ -702,6 +746,11 @@ onMounted(async () => {
 
 onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
+
+  if (deviceDetector.isMobile()) {
+    window.removeEventListener('scroll', handleScroll);
+    if (fabIdleTimer) clearTimeout(fabIdleTimer);
+  }
 
   // Clean up settings listener
   if (tracker._toastSettingsCleanup) {
