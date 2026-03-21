@@ -190,6 +190,17 @@ export class StreamingResponseHandler {
   _handleTranslationResult(handler, message) {
     const { messageId, data } = message;
 
+    // If this is just a streaming acknowledgement, don't complete or cleanup
+    if (data?.streaming) {
+      console.log('[StreamingResponseHandler._handleTranslationResult] Streaming acknowledgement received, keeping handler active');
+      try {
+        handler.onTranslationResult(data);
+      } catch (error) {
+        logger.info(`Error in translation result callback for ${messageId}:`, error);
+      }
+      return true;
+    }
+
     handler.isCompleted = true;
 
     // Call handler callback

@@ -208,9 +208,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
         targetLanguage: effectiveTargetLanguage
       });
 
-      const directResponsePromise = sendRegularMessage({
+      // 1. Send initial message
+      const response = await sendRegularMessage({
         action: MessageActions.TRANSLATE,
-        messageId, // ID for this specific element (streaming coordination)
+        messageId, 
         data: {
           text: JSON.stringify(textsToTranslate),
           provider,
@@ -221,17 +222,25 @@ export class DomTranslatorAdapter extends ResourceTracker {
           mode: TranslationMode.Select_Element,
           options: { 
             rawJsonPayload: true,
-            enableDictionary: false // Always disable dictionary for Select Element context
+            enableDictionary: false 
           },
-          sessionId: this.sessionMessageId, // Persists across multiple elements
+          sessionId: this.sessionMessageId, 
         },
         context: MessageContexts.SELECT_ELEMENT,
       });
 
-      const result = await Promise.race([
-        directResponsePromise.then(res => (!res?.streaming && res?.success) ? this._handleDirectResponse(res) : streamEndPromise),
-        streamEndPromise
-      ]);
+      // 2. Decide how to wait for results
+      let result;
+      if (response?.streaming) {
+        this.logger.debug('Response is streaming, waiting for streamEndPromise');
+        result = await streamEndPromise;
+      } else if (response?.success) {
+        this.logger.debug('Response is direct (non-streaming), handling immediately');
+        result = await this._handleDirectResponse(response);
+      } else {
+        this.logger.error('Initial translation request failed', response?.error);
+        throw new Error(response?.error || 'Translation failed');
+      }
 
       return await this._finalizeTranslation({
         result, element, elementId, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete
