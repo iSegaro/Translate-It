@@ -53,7 +53,19 @@ export class ErrorHandler {
     this.handling = true;
     
     try {
-      const raw = err instanceof Error ? err.message : String(err);
+      // Safely extract raw error message without triggering infinite recursion or stack depth
+      let raw = 'Unknown Error';
+      try {
+        if (err instanceof Error) {
+          raw = err.message || err.name || 'Error object';
+        } else if (typeof err === 'object' && err !== null) {
+          raw = typeof err.message === 'string' ? err.message : (err.type || err.code || 'Object error');
+        } else {
+          raw = String(err || 'Unknown error');
+        }
+      } catch (e) {
+        raw = 'Error processing failed';
+      }
 
       // Handle extension context errors silently
       if (ExtensionContextManager.isContextError(err)) {

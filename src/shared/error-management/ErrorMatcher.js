@@ -245,12 +245,17 @@ export function matchErrorToType(rawOrError = "") {
   }
 
   // Normalize input to a lowercase string for message-based matching
-  const rawMsg = !rawOrError ? "" : 
-                 (rawOrError instanceof Error ? rawOrError.message : 
-                 (typeof rawOrError === 'string' ? rawOrError : 
-                 (rawOrError.message || String(rawOrError))));
-  
-  const msg = (rawMsg || "").toLowerCase().trim();
+  let msg = "";
+  try {
+    const rawMsg = !rawOrError ? "" : 
+                   (rawOrError instanceof Error ? rawOrError.message : 
+                   (typeof rawOrError === 'string' ? rawOrError : 
+                   (typeof rawOrError.message === 'string' ? rawOrError.message : 
+                   (rawOrError.code || rawOrError.status || ""))));
+    msg = String(rawMsg || "").toLowerCase().trim();
+  } catch (e) {
+    msg = "unknown error";
+  }
 
   // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا
   if (typeof rawOrError === "string") {
