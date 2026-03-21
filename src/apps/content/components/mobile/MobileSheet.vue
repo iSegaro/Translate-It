@@ -22,7 +22,15 @@
       </div>
 
       <!-- Main Content Container -->
-      <div class="sheet-content" style="flex: 1 !important; overflow-y: auto !important; background: white !important; padding: 20px !important;">
+      <div 
+        class="sheet-content" 
+        :style="{ 
+          flex: '1 !important', 
+          overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
+          background: 'white !important', 
+          padding: '20px !important' 
+        }"
+      >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
         <SelectionView v-if="activeView === MOBILE_CONSTANTS.VIEWS.SELECTION" />
         <InputView v-if="activeView === MOBILE_CONSTANTS.VIEWS.INPUT" />
@@ -88,7 +96,9 @@ const sheetStyle = computed(() => {
     transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
     boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
-    height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL ? '90vh' : '40vh',
+    height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
+      ? '90vh' 
+      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '25vh' : '40vh'),
     maxHeight: '90vh'
   }
 })

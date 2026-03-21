@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 10px 0;">
-    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 100%; margin: 0 auto; justify-items: center;">
+  <div class="dashboard-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0;">
+    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 100%; margin: 0 auto; justify-items: center; padding: 10px 0;">
       <!-- Translate Page Button -->
       <button class="action-card" @click="translatePage">
         <div class="icon-container translate-page">
