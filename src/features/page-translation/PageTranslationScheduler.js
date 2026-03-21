@@ -22,6 +22,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.queue = []; // Tasks: { text, score, resolve, reject, context }
     this.batchTimer = null;
     this.translatedCount = 0;
+    this.totalTasks = 0;
     this.activeFlushes = 0;
     this.fatalErrorOccurred = false;
     this.isFirstBatch = true;
@@ -53,6 +54,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   reset() {
     this.stop();
     this.translatedCount = 0;
+    this.totalTasks = 0;
     this.fatalErrorOccurred = false;
     this.translationSessionId = null;
     this.sessionContext = null;
@@ -105,6 +107,9 @@ export class PageTranslationScheduler extends ResourceTracker {
     if (context && context !== this.sessionContext) return text;
     if (!this.isTranslated || this.fatalErrorOccurred || !text || !text.trim()) return text;
     if (!PageTranslationHelper.shouldTranslate(text)) return text;
+
+    this.totalTasks++;
+    this._reportProgress();
 
     return new Promise((resolve, reject) => {
       this.queue.push({ 
@@ -326,6 +331,9 @@ export class PageTranslationScheduler extends ResourceTracker {
   }
 
   _reportProgress() {
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { translated: this.translatedCount, progress: -1 });
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
+      translatedCount: this.translatedCount, 
+      totalCount: this.totalTasks
+    });
   }
 }

@@ -137,6 +137,23 @@ export class PageTranslationManager extends ResourceTracker {
       this.cancelTranslation();
     });
 
+    bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
+      this.logger.info('Page translation complete event received in Manager');
+      this.isTranslating = false;
+      this.isTranslated = true;
+      
+      // Forward to background
+      sendRegularMessage({ 
+        action: MessageActions.PAGE_TRANSLATE_COMPLETE, 
+        data: {
+          ...data,
+          url: this.currentUrl,
+          isAutoTranslating: this.isAutoTranslating
+        }, 
+        context: 'page-translation-complete-forward' 
+      }).catch(() => {});
+    });
+
     // Listen for conflicting features (like Select Element Mode)
     bus.on('STOP_CONFLICTING_FEATURES', (data) => {
       if ((this.isTranslating || this.isTranslated) && data?.source !== 'page-translation') {
@@ -243,20 +260,14 @@ export class PageTranslationManager extends ResourceTracker {
       
       this.bridge.translate(document.documentElement);
       
+      // We are now officially translating. 
+      // We do NOT set isTranslating = false or broadcast COMPLETE here anymore, 
+      // because domtranslator discovery/scheduler is asynchronous and just started.
       this.isTranslated = true;
-      this.isTranslating = false;
+      this.isTranslating = true;
       this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
 
-      const resultData = { 
-        url: this.currentUrl, 
-        translatedCount: this.scheduler.translatedCount,
-        isAutoTranslating: this.isAutoTranslating,
-        isTranslated: this.isTranslated,
-        triggeredAutomatically: options.isAuto || false 
-      };
-      
-      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, resultData);
-      return { success: true, ...resultData };
+      return { success: true, url: this.currentUrl, messageId: this.translationMessageId };
     } catch (error) {
       if (isSilentError(error)) {
         this.logger.debug('translatePage: Silent error caught', error.message);

@@ -51,8 +51,13 @@ const translatePage = (event) => {
     event.stopPropagation();
   }
   
+  // Set view so it's ready when user re-opens the sheet
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+  
+  // Close sheet so user can see the translation on the actual page
+  mobileStore.closeSheet()
+  
+  // Trigger translation
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
 }
 

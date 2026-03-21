@@ -317,9 +317,7 @@ const setupOutsideClickHandler = () => {
 };
 
 // Mobile FAB behavior state
-const isFabVisible = ref(true);
 const isFabIdle = ref(false);
-let lastScrollY = window.scrollY;
 let fabIdleTimer = null;
 
 const startFabIdleTimer = () => {
@@ -328,11 +326,6 @@ const startFabIdleTimer = () => {
   fabIdleTimer = setTimeout(() => {
     isFabIdle.value = true;
   }, 3000); // 3 seconds of inactivity to become semi-transparent
-};
-
-const handleScroll = () => {
-  // Reset idle timer on scroll to ensure FAB stays opaque while interacting
-  startFabIdleTimer();
 };
 
 logger.debug('ContentApp script setup executed.');
@@ -350,9 +343,8 @@ onMounted(async () => {
     userAgent: navigator.userAgent
   });
 
-  // Mobile scroll handling
+  // Mobile idle timer handling
   if (deviceDetector.isMobile()) {
-    window.addEventListener('scroll', handleScroll, { passive: true });
     startFabIdleTimer();
   }
 
@@ -563,8 +555,8 @@ onMounted(async () => {
       mobileStore.setPageTranslation({ 
         isTranslating: true, 
         status: 'translating', 
-        progress: 0,
-        translatedCount: 0 
+        translatedCount: 0,
+        totalCount: 0
       });
       mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK);
@@ -573,20 +565,19 @@ onMounted(async () => {
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
     if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ 
-        progress: detail.progress || 0,
-        translatedCount: detail.translatedCount || 0
+      mobileStore.setPageTranslation({
+        translatedCount: detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount,
+        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount
       });
     }
   });
-
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
     if (deviceDetector.isMobile()) {
       mobileStore.setPageTranslation({ 
         isTranslating: false, 
         status: 'completed', 
-        progress: 100,
-        translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount
+        translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
+        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
       });
     }
   });
@@ -748,7 +739,6 @@ onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
 
   if (deviceDetector.isMobile()) {
-    window.removeEventListener('scroll', handleScroll);
     if (fabIdleTimer) clearTimeout(fabIdleTimer);
   }
 
