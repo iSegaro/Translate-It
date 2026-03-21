@@ -53,6 +53,9 @@ export class WindowsManager extends ResourceTracker {
 
     // Store singleton instance
     windowsManagerInstance = this;
+    if (typeof window !== 'undefined') {
+      window.windowsManagerInstance = this;
+    }
     
     // Initialize cross-frame communication first to get frameId
     this.crossFrameManager = new CrossFrameManager({
@@ -255,10 +258,17 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    // Mobile specific: Show bottom sheet instead of icon/window
+    // Mobile specific: Do NOT show bottom sheet automatically on selection
+    // to preserve native browser selection menu.
+    // Instead, we just store the selected text in state and wait for manual trigger
     if (deviceDetector.shouldEnableMobileUI()) {
-      this.logger.info('Mobile environment detected, showing mobile sheet');
-      await this._showMobileSheet(selectedText);
+      this.logger.info('Mobile environment detected, skipping automatic mobile sheet to preserve native menu');
+      this.state.setOriginalText(selectedText);
+      
+      // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
+      // this ensures that clicking the FAB later won't translate "old" selection
+      this.clickManager.addOutsideClickListener();
+      
       return;
     }
     
@@ -990,7 +1000,13 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    await this.dismiss(true);
+    // In mobile, if we have stored original text but no visible UI elements, 
+    // we still need to dismiss/reset state when clicking outside
+    const hasStoredMobileText = deviceDetector.shouldEnableMobileUI() && this.state.originalText;
+
+    if (this.state.hasActiveElements || hasStoredMobileText) {
+      await this.dismiss(true);
+    }
   }
 
   /**
@@ -1588,8 +1604,7 @@ export class WindowsManager extends ResourceTracker {
    * Reset state
    */
   _resetState() {
-    this.state.setPendingTranslationWindow(false);
-    this.state.setIconMode(false);
+    this.state.reset();
 
     // Reset selection preservation flag
     this._isIconToWindowTransition = false;

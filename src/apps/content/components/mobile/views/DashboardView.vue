@@ -50,13 +50,8 @@ const translatePage = (event) => {
     event.stopPropagation();
   }
   
-  console.log('[Dashboard] Translate Page clicked');
-  
-  // Switch view immediately
   mobileStore.setView('page_translation')
   mobileStore.setSheetState('peek')
-  
-  // Start translation process
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
 }
 
@@ -87,6 +82,7 @@ const openSettings = () => {
 .manual-input { background: #ebfbee; }
 .settings { background: #fff4e6; }
 .action-label { font-size: 14px; font-weight: 600; color: #495057; text-align: center; }
+
 @media (prefers-color-scheme: dark) {
   .action-card { background: #2d2d2d; border-color: #444; }
   .action-label { color: #e0e0e0; }

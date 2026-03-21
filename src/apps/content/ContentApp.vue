@@ -82,7 +82,7 @@
       v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
       class="mobile-fab"
       style="position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: #339af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4); z-index: 2147483647; pointer-events: auto !important; cursor: pointer;"
-      @click="mobileStore.openSheet(mobileStore.activeView, 'peek')"
+      @click="onMobileFabClick"
     >
       <img src="@/icons/ui/translate.png" alt="Translate" style="width: 28px; height: 28px; filter: brightness(0) invert(1);" />
     </div>
@@ -235,6 +235,41 @@ const setIconRef = (iconId, el) => {
 
 const getIconRef = (iconId) => {
   return iconRefs.value.get(iconId);
+};
+
+const onMobileFabClick = () => {
+  // 1. Check for active DOM selection
+  const selection = window.getSelection();
+  let selectedText = selection ? selection.toString().trim() : '';
+
+  // 2. Fallback: check WindowsManager state if DOM selection is empty 
+  // (sometimes selection is lost when clicking the FAB)
+  if (!selectedText && window.windowsManagerInstance && window.windowsManagerInstance.state) {
+    selectedText = window.windowsManagerInstance.state.originalText || '';
+  }
+
+  if (selectedText) {
+    logger.info('FAB clicked with selection, opening SelectionView');
+    
+    // Setup selection data
+    mobileStore.updateSelectionData({
+      text: selectedText,
+      isLoading: true,
+      translation: ''
+    });
+    
+    // Open sheet in selection view
+    mobileStore.openSheet('selection', 'peek');
+    
+    // Trigger actual translation via WindowsManager
+    if (window.windowsManagerInstance) {
+      window.windowsManagerInstance._showMobileSheet(selectedText);
+    }
+  } else {
+    logger.info('FAB clicked without selection, opening DashboardView');
+    // Open default dashboard view (current view or dashboard)
+    mobileStore.openSheet(mobileStore.activeView || 'dashboard', 'peek');
+  }
 };
 
 const onIconClick = (id) => {
