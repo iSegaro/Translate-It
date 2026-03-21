@@ -174,6 +174,18 @@ export class WindowsManager extends ResourceTracker {
 
       this.pageEventBus.off('translation-window-change-provider', this._changeProviderRequestHandler);
       this.pageEventBus.on('translation-window-change-provider', this._changeProviderRequestHandler);
+
+      // Listen for dismissal events from the UI to sync state
+      this._dismissRequestHandler = (payload) => {
+        this.logger.debug('Dismiss request received from UI', payload);
+        this.dismiss(false); // UI already handled animation/removal
+      };
+      
+      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
+      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
+      
+      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
+      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
@@ -237,15 +249,16 @@ export class WindowsManager extends ResourceTracker {
       position
     });
 
+    // Prevent showing same text multiple times
+    if (this._shouldSkipShow(selectedText)) {
+      this.logger.debug('Skipping show() - same text already visible');
+      return;
+    }
+
     // Mobile specific: Show bottom sheet instead of icon/window
     if (deviceDetector.shouldEnableMobileUI()) {
       this.logger.info('Mobile environment detected, showing mobile sheet');
       await this._showMobileSheet(selectedText);
-      return;
-    }
-    
-    // Prevent showing same text multiple times
-    if (this._shouldSkipShow(selectedText)) {
       return;
     }
     
@@ -290,6 +303,7 @@ export class WindowsManager extends ResourceTracker {
     this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length });
 
     this.state.setOriginalText(selectedText);
+    this.state.setTranslationCancelled(false);
     this.state.setVisible(true);
 
     // Emit event to open mobile sheet in loading state

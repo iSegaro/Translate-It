@@ -136,9 +136,20 @@ export class SelectionManager extends ResourceTracker {
    * Check if this is a duplicate selection
    */
   isDuplicateSelection(selectedText, currentTime) {
-    return selectedText === this.lastProcessedText &&
-           (currentTime - this.lastProcessedTime) < this.processingCooldown &&
-           this.isWindowVisible();
+    if (!selectedText || !this.lastProcessedText) return false;
+
+    const isSameText = selectedText === this.lastProcessedText;
+    const withinCooldown = (currentTime - this.lastProcessedTime) < this.processingCooldown;
+    const uiVisible = this.isWindowVisible();
+
+    // If UI is already visible and text is same, it's ALWAYS a duplicate regardless of time
+    // This prevents re-triggering when user is interacting with the sheet/window
+    if (uiVisible && isSameText) {
+      return true;
+    }
+
+    // Otherwise use the standard cooldown logic
+    return isSameText && withinCooldown;
   }
 
   /**

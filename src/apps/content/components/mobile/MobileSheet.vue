@@ -40,6 +40,7 @@ import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useMobileGestures } from '@/composables/ui/useMobileGestures.js'
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 
 // Import Mobile Views
 import DashboardView from './views/DashboardView.vue'
@@ -49,6 +50,13 @@ import PageTranslationView from './views/PageTranslationView.vue'
 
 const mobileStore = useMobileStore()
 const { isOpen, activeView, sheetState } = storeToRefs(mobileStore)
+
+// Watch for isOpen changes to sync state with WindowsManager
+watch(isOpen, (newVal) => {
+  if (!newVal) {
+    pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id: 'mobile-sheet' });
+  }
+});
 
 const {
   isDragging,
