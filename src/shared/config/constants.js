@@ -199,3 +199,18 @@ export const FIELD_DETECTION = {
     'url', 'week'
   ]
 };
+
+// ===== MOBILE SYSTEM CONSTANTS =====
+export const MOBILE_CONSTANTS = {
+  VIEWS: {
+    DASHBOARD: 'dashboard',
+    SELECTION: 'selection',
+    INPUT: 'input',
+    PAGE_TRANSLATION: 'page_translation'
+  },
+  SHEET_STATE: {
+    PEEK: 'peek',
+    FULL: 'full',
+    CLOSED: 'closed'
+  }
+};

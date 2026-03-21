@@ -111,7 +111,7 @@ import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
-import { TRANSLATION_HTML } from '@/shared/config/constants.js';
+import { TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -259,7 +259,7 @@ const onMobileFabClick = () => {
     });
     
     // Open sheet in selection view
-    mobileStore.openSheet('selection', 'peek');
+    mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
     
     // Trigger actual translation via WindowsManager
     if (window.windowsManagerInstance) {
@@ -267,15 +267,15 @@ const onMobileFabClick = () => {
     }
   } else {
     // Smart view recovery (Last View behavior):
-    let viewToOpen = mobileStore.activeView || 'dashboard';
+    let viewToOpen = mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD;
     
     // Fallback ONLY if selection view is active but has no data
-    if (viewToOpen === 'selection' && !mobileStore.selectionData.text) {
-      viewToOpen = 'dashboard';
+    if (viewToOpen === MOBILE_CONSTANTS.VIEWS.SELECTION && !mobileStore.selectionData.text) {
+      viewToOpen = MOBILE_CONSTANTS.VIEWS.DASHBOARD;
     }
     
     logger.info(`FAB clicked without selection, restoring last view: ${viewToOpen}`);
-    mobileStore.openSheet(viewToOpen, 'peek');
+    mobileStore.openSheet(viewToOpen, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
   }
 };
 
@@ -509,7 +509,7 @@ onMounted(async () => {
     }
 
     // Open sheet with requested view/state
-    mobileStore.openSheet(detail.view || 'selection', detail.state || 'peek');
+    mobileStore.openSheet(detail.view || MOBILE_CONSTANTS.VIEWS.SELECTION, detail.state || MOBILE_CONSTANTS.SHEET_STATE.PEEK);
   });
 
   // Page Translation Events for Mobile
@@ -522,8 +522,8 @@ onMounted(async () => {
         progress: 0,
         translatedCount: 0 
       });
-      mobileStore.setView('page_translation');
-      mobileStore.setSheetState('peek');
+      mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
+      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK);
     }
   });
 

@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 export const useMobileStore = defineStore('mobile', () => {
   // State
   const isOpen = ref(false)
-  const activeView = ref('dashboard') // 'dashboard' | 'selection' | 'input'
-  const sheetState = ref('peek') // 'peek' (35vh) | 'full' (90vh) | 'closed' (0)
+  const activeView = ref(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
+  const sheetState = ref(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
   const isKeyboardVisible = ref(false)
   
   // Selection Specific State
@@ -33,7 +34,7 @@ export const useMobileStore = defineStore('mobile', () => {
   const currentSheetState = computed(() => sheetState.value)
   
   // Actions
-  const openSheet = (view = 'dashboard', state = 'peek') => {
+  const openSheet = (view = MOBILE_CONSTANTS.VIEWS.DASHBOARD, state = MOBILE_CONSTANTS.SHEET_STATE.PEEK) => {
     activeView.value = view
     sheetState.value = state
     isOpen.value = true
@@ -41,7 +42,7 @@ export const useMobileStore = defineStore('mobile', () => {
 
   const closeSheet = () => {
     isOpen.value = false
-    sheetState.value = 'closed'
+    sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED
   }
 
   const toggleSheet = () => {
@@ -64,7 +65,7 @@ export const useMobileStore = defineStore('mobile', () => {
     isKeyboardVisible.value = visible
     // Automatically expand to full when keyboard is visible
     if (visible && isOpen.value) {
-      sheetState.value = 'full'
+      sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.FULL
     }
   }
 

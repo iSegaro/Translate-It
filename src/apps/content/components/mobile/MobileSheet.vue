@@ -23,10 +23,10 @@
 
       <!-- Main Content Container -->
       <div class="sheet-content" style="flex: 1 !important; overflow-y: auto !important; background: white !important; padding: 20px !important;">
-        <DashboardView v-if="activeView === 'dashboard'" />
-        <SelectionView v-if="activeView === 'selection'" />
-        <InputView v-if="activeView === 'input'" />
-        <PageTranslationView v-if="activeView === 'page_translation'" />
+        <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
+        <SelectionView v-if="activeView === MOBILE_CONSTANTS.VIEWS.SELECTION" />
+        <InputView v-if="activeView === MOBILE_CONSTANTS.VIEWS.INPUT" />
+        <PageTranslationView v-if="activeView === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION" />
       </div>
 
       <!-- Footer/Safe Area -->
@@ -41,6 +41,7 @@ import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useMobileGestures } from '@/composables/ui/useMobileGestures.js'
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // Import Mobile Views
 import DashboardView from './views/DashboardView.vue'
@@ -66,8 +67,8 @@ const {
   onDragEnd
 } = useMobileGestures({
   onClose: () => mobileStore.closeSheet(),
-  onExpand: () => mobileStore.setSheetState('full'),
-  onPeek: () => mobileStore.setSheetState('peek'),
+  onExpand: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL),
+  onPeek: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK),
   initialState: sheetState.value
 })
 
@@ -87,7 +88,7 @@ const sheetStyle = computed(() => {
     transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
     boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
-    height: sheetState.value === 'full' ? '90vh' : '40vh',
+    height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL ? '90vh' : '40vh',
     maxHeight: '90vh'
   }
 })

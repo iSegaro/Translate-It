@@ -21,7 +21,7 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
-import { UI_HOST_IDS, TRANSLATION_HTML } from '@/shared/config/constants.js';
+import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -319,8 +319,8 @@ export class WindowsManager extends ResourceTracker {
     // Emit event to open mobile sheet in loading state
     WindowsManagerEvents.showMobileSheet({
       text: selectedText,
-      view: 'selection',
-      state: 'peek',
+      view: MOBILE_CONSTANTS.VIEWS.SELECTION,
+      state: MOBILE_CONSTANTS.SHEET_STATE.PEEK,
       isLoading: true
     });
 

@@ -40,6 +40,7 @@
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 const mobileStore = useMobileStore()
 const pageEventBus = window.pageEventBus
@@ -50,8 +51,8 @@ const translatePage = (event) => {
     event.stopPropagation();
   }
   
-  mobileStore.setView('page_translation')
-  mobileStore.setSheetState('peek')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
 }
 
@@ -61,8 +62,8 @@ const activateSelectElement = () => {
 }
 
 const goToInputView = () => {
-  mobileStore.setView('input')
-  mobileStore.setSheetState('full')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
 }
 
 const openSettings = () => {

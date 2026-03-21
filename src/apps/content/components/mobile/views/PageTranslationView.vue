@@ -46,6 +46,7 @@ import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 const mobileStore = useMobileStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
@@ -60,7 +61,7 @@ const statusMessage = computed(() => {
 })
 
 const goToDashboard = () => {
-  mobileStore.setView('dashboard')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const closeView = () => {
@@ -70,13 +71,13 @@ const closeView = () => {
 const restorePage = () => {
   pageEventBus.emit(MessageActions.PAGE_RESTORE)
   mobileStore.resetPageTranslation()
-  mobileStore.setView('dashboard')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const cancelTranslation = () => {
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE_CANCELLED)
   mobileStore.resetPageTranslation()
-  mobileStore.setView('dashboard')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 </script>
 

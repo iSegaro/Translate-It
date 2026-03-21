@@ -93,6 +93,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import DOMPurify from "dompurify";
 
 const mobileStore = useMobileStore()
@@ -100,8 +101,8 @@ const { selectionData, sheetState } = storeToRefs(mobileStore)
 
 // Automatically expand to full if content is long
 watch(() => selectionData.value.translation, (newTranslation) => {
-  if (newTranslation && newTranslation.length > 200 && sheetState.value === 'peek') {
-    mobileStore.setSheetState('full')
+  if (newTranslation && newTranslation.length > 200 && sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
+    mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
   }
 }, { immediate: true })
 
@@ -131,14 +132,14 @@ const sanitizedResult = computed(() => {
 })
 
 const expandSheet = () => {
-  if (sheetState.value === 'peek') {
-    mobileStore.setSheetState('full')
+  if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
+    mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
   }
 }
 
 const goBack = () => {
-  mobileStore.setView('dashboard')
-  mobileStore.setSheetState('peek')
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
 }
 
 const closeView = () => {
