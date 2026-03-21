@@ -63,11 +63,12 @@ export class PageTranslationManager extends ResourceTracker {
     // Bind handlers to this instance for reliable removal
     this._handlers = {
       progress: (data) => {
+        // High-frequency event: send to background but skip logging if possible
         sendRegularMessage({ 
           action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
           data, 
           context: 'page-translation-progress-forward' 
-        }).catch(() => {});
+        }, { silent: true }).catch(() => {});
       },
       fatalError: ({ error, errorType, localizedMessage }) => this._handleFatalError(error, errorType, localizedMessage),
       translate: (options) => {
@@ -109,11 +110,12 @@ export class PageTranslationManager extends ResourceTracker {
 
     // Listen for progress from scheduler and forward to background
     bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+      // Use silent option to prevent high-frequency logging in UnifiedMessaging
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
         data, 
         context: 'page-translation-progress-forward' 
-      }).catch(() => {});
+      }, { silent: true }).catch(() => {});
     });
 
     // Listen for fatal errors from scheduler (Circuit Breaker)
@@ -148,7 +150,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslating = false;
       this.isTranslated = true;
       
-      // Forward to background
+      // Forward to background - also silent to reduce noise
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_COMPLETE, 
         data: {
@@ -157,7 +159,7 @@ export class PageTranslationManager extends ResourceTracker {
           isAutoTranslating: this.isAutoTranslating
         }, 
         context: 'page-translation-complete-forward' 
-      }).catch(() => {});
+      }, { silent: true }).catch(() => {});
     });
 
     // Listen for conflicting features (like Select Element Mode)

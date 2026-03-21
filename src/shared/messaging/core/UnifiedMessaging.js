@@ -236,10 +236,12 @@ export async function sendMessage(message, options = {}) {
  * Send regular (non-streaming) message
  */
 export async function sendRegularMessage(message, options = {}) {
-  const { timeout: customTimeout } = options;
+  const { timeout: customTimeout, silent = false } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
 
-  getLogger().debug(`📤 Sending ${message.action} to background (${actionTimeout}ms timeout)`);
+  if (!silent) {
+    getLogger().debug(`Sending ${message.action} to background (${actionTimeout}ms timeout)`);
+  }
 
   try {
     if (!ExtensionContextManager.isValidSync()) {
@@ -250,7 +252,9 @@ export async function sendRegularMessage(message, options = {}) {
 
     // Check if streaming operation was cancelled before sending the message
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-      getLogger().debug('Streaming operation was cancelled, not sending message');
+      if (!silent) {
+        getLogger().debug('Streaming operation was cancelled, not sending message');
+      }
       const cancelError = new Error(ErrorTypes.USER_CANCELLED);
       cancelError.type = ErrorTypes.USER_CANCELLED;
       throw cancelError;
@@ -277,7 +281,9 @@ export async function sendRegularMessage(message, options = {}) {
         // Also check for global ESC flag (faster response to user ESC)
         if (window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
-          getLogger().debug('ESC flag detected, cancelling message immediately');
+          if (!silent) {
+            getLogger().debug('ESC flag detected, cancelling message immediately');
+          }
           const cancelError = new Error('Translation cancelled by user ESC');
           cancelError.type = 'USER_CANCELLED';
           reject(cancelError);
@@ -308,17 +314,21 @@ export async function sendRegularMessage(message, options = {}) {
 
     if (response.success === false) {
       // Simplified logging to avoid console noise from large partialResults
-      getLogger().debug(`Response with success=false received for ${message.action}:`, {
-        error: response.error?.message || response.error || 'Unknown error',
-        hasPartialResults: !!response.partialResults
-      });
+      if (!silent) {
+        getLogger().debug(`Response with success=false received for ${message.action}:`, {
+          error: response.error?.message || response.error || 'Unknown error',
+          hasPartialResults: !!response.partialResults
+        });
+      }
 
       // Import tabPermissions utilities to check for restricted pages
       const { isRestrictedUrl } = await import('@/core/tabPermissions.js');
 
       // Check if this is a restricted page error - if so, return the response instead of throwing
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
-        getLogger().debug('Restricted page detected, returning response without throwing error');
+        if (!silent) {
+          getLogger().debug('Restricted page detected, returning response without throwing error');
+        }
         return response;
       }
 
@@ -340,7 +350,9 @@ export async function sendRegularMessage(message, options = {}) {
       throw error;
     }
 
-    getLogger().debug(`✅ Regular message response received: ${message.action}`);
+    if (!silent) {
+      getLogger().debug(`Regular message response received: ${message.action}`);
+    }
 
     return response;
   } catch (error) {
