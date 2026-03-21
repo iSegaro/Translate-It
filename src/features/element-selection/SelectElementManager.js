@@ -93,12 +93,14 @@ class SelectElementManager extends ResourceTracker {
     this.logger.debug('SelectElementManager.initialize() started');
 
     try {
-      // Initialize services
-      await this.domTranslatorAdapter.initialize();
-      await this.elementSelector.initialize();
+      // Initialize services in parallel
+      const [NotificationManagerModule] = await Promise.all([
+        import('@/core/managers/core/NotificationManager.js'),
+        this.domTranslatorAdapter.initialize(),
+        this.elementSelector.initialize()
+      ]);
 
       // Get notification manager instance
-      const NotificationManagerModule = await import('@/core/managers/core/NotificationManager.js');
       const baseNotificationManager = new NotificationManagerModule.default();
       this.notificationManager = await getSelectElementNotificationManager(baseNotificationManager);
 
@@ -198,23 +200,27 @@ class SelectElementManager extends ResourceTracker {
       if (window === window.top) {
         this.showNotification();
 
-        // Show warning for Bing provider
-        const settings = await getSettingsAsync();
+        // Show warning for Bing/Lingva providers if needed
+        // Load settings and potentially translation strings in parallel
+        const [settings, bingWarning, lingvaWarning] = await Promise.all([
+          getSettingsAsync(),
+          getTranslationString('SELECT_ELEMENT_BING_WARNING'),
+          getTranslationString('LINGVA_WPT_WARNING')
+        ]);
+
         const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
         
         if (activeProvider === ProviderRegistryIds.BING) {
-          const warningMessage = await getTranslationString('SELECT_ELEMENT_BING_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',
-            message: warningMessage || 'Bing may have issues with Select Element. Try another provider.',
+            message: bingWarning || 'Bing may have issues with Select Element. Try another provider.',
             duration: NOTIFICATION_TIME.WARNING,
             id: `bing-warning-${this.instanceId}`,
           });
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
-          const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
           pageEventBus.emit('show-notification', {
             type: 'warning',
-            message: warningMessage || 'Lingva may have issues with long texts. Try another provider.',
+            message: lingvaWarning || 'Lingva may have issues with long texts. Try another provider.',
             duration: NOTIFICATION_TIME.WARNING,
             id: `lingva-warning-${this.instanceId}`,
           });
