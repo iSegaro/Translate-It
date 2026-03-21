@@ -13,25 +13,20 @@
       <!-- Drag Handle Header -->
       <div 
         class="sheet-header" 
-        style="width: 100% !important; height: 40px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: #eee !important; cursor: grab !important; touch-action: none !important;"
+        style="width: 100% !important; height: 40px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
       >
-        <div style="width: 40px !important; height: 6px !important; background: #999 !important; border-radius: 3px !important;"></div>
+        <div style="width: 40px !important; height: 6px !important; background: #e0e0e0 !important; border-radius: 3px !important;"></div>
       </div>
 
       <!-- Main Content Container -->
-      <div class="sheet-content" style="flex: 1 !important; overflow-y: auto !important; background: white !important; padding: 20px !important; display: block !important;">
-        <!-- Debug Info -->
-        <div style="background: #fff3bf; padding: 5px; font-size: 10px; border: 1px solid #fab005; margin-bottom: 10px; color: black;">
-          View: {{ activeView }} | State: {{ sheetState }}
-        </div>
-        
+      <div class="sheet-content" style="flex: 1 !important; overflow-y: auto !important; background: white !important; padding: 20px !important;">
         <DashboardView v-if="activeView === 'dashboard'" />
-        <SelectionView v-else-if="activeView === 'selection'" />
-        <InputView v-else-if="activeView === 'input'" />
-        <PageTranslationView v-else-if="activeView === 'page_translation'" />
+        <SelectionView v-if="activeView === 'selection'" />
+        <InputView v-if="activeView === 'input'" />
+        <PageTranslationView v-if="activeView === 'page_translation'" />
       </div>
 
       <!-- Footer/Safe Area -->
@@ -69,7 +64,6 @@ const {
 })
 
 const sheetStyle = computed(() => {
-  // Temporarily reduce transform influence to see if it fixes visibility
   const y = isDragging.value ? sheetTranslation.value : 0;
   return {
     transform: `translateY(${y}px)`,
@@ -82,8 +76,8 @@ const sheetStyle = computed(() => {
     zIndex: '2147483647',
     display: 'flex',
     flexDirection: 'column',
-    transition: isDragging.value ? 'none' : 'transform 0.3s ease-out',
-    boxShadow: '0 -5px 25px rgba(0,0,0,0.3)',
+    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+    boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === 'full' ? '90vh' : '40vh',
     maxHeight: '90vh'
@@ -93,16 +87,25 @@ const sheetStyle = computed(() => {
 const closeSheet = () => {
   mobileStore.closeSheet()
 }
-
-// Log for debugging
-watch(isOpen, (newVal) => {
-  console.log('[MobileSheet] Visibility changed:', newVal, 'View:', activeView.value);
-})
 </script>
 
 <style>
-/* Cleaned up styles for maximum compatibility */
 .mobile-sheet-overlay * {
   box-sizing: border-box !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mobile-sheet {
+    background-color: #1a1a1a !important;
+  }
+  .sheet-header div {
+    background-color: #444 !important;
+  }
+  .sheet-content {
+    background-color: #1a1a1a !important;
+  }
+  .sheet-footer-area {
+    background-color: #1a1a1a !important;
+  }
 }
 </style>

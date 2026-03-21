@@ -5,9 +5,12 @@
         <span class="status-dot" :class="pageTranslationData.status"></span>
         <span class="status-text">{{ statusMessage }}</span>
       </div>
-      <button class="close-btn" @click="closeView">
-        <img src="@/icons/ui/close.png" alt="Close" style="width: 20px !important; height: 20px !important;" />
-      </button>
+      <div class="header-actions">
+        <button class="action-link" @click="goToDashboard">Dashboard</button>
+        <button class="close-btn" @click="closeView">
+          <img src="@/icons/ui/close.png" alt="Close" style="width: 20px !important; height: 20px !important;" />
+        </button>
+      </div>
     </div>
 
     <div class="progress-container">
@@ -18,7 +21,7 @@
         ></div>
       </div>
       <div class="progress-stats">
-        <span>{{ pageTranslationData.translatedCount }} elements translated</span>
+        <span>{{ pageTranslationData.translatedCount }} elements</span>
         <span>{{ Math.round(pageTranslationData.progress) }}%</span>
       </div>
     </div>
@@ -49,19 +52,19 @@ const { pageTranslationData } = storeToRefs(mobileStore)
 
 const statusMessage = computed(() => {
   switch (pageTranslationData.value.status) {
-    case 'translating': return 'Translating Page...'
-    case 'completed': return 'Translation Complete'
-    case 'error': return 'Translation Failed'
-    default: return 'Initializing...'
+    case 'translating': return 'Translating...'
+    case 'completed': return 'Translated'
+    case 'error': return 'Failed'
+    default: return 'Starting...'
   }
 })
 
+const goToDashboard = () => {
+  mobileStore.setView('dashboard')
+}
+
 const closeView = () => {
-  if (pageTranslationData.value.status === 'completed' || pageTranslationData.value.status === 'error') {
-     mobileStore.setView('dashboard')
-  } else {
-     mobileStore.setSheetState('peek')
-  }
+  mobileStore.closeSheet()
 }
 
 const restorePage = () => {
@@ -78,116 +81,30 @@ const cancelTranslation = () => {
 </script>
 
 <style>
-.page-translation-view {
-  padding: 8px 0;
-}
-
-.status-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.status-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #adb5bd;
-}
-
+.page-translation-view { padding: 8px 0; }
+.status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.status-info { display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #adb5bd; }
 .status-dot.translating { background: #339af0; animation: pulse 1s infinite; }
 .status-dot.completed { background: #51cf66; }
 .status-dot.error { background: #fa5252; }
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-.status-text {
-  font-weight: 600;
-  font-size: 16px;
-  color: #212529;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  padding: 4px;
-}
-
-.close-btn img {
-  width: 20px;
-  height: 20px;
-  opacity: 0.5;
-}
-
-.progress-container {
-  margin-bottom: 24px;
-}
-
-.progress-bar-bg {
-  height: 8px;
-  background: #f1f3f5;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: #339af0;
-  transition: width 0.3s ease;
-}
-
-.progress-stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #868e96;
-}
-
-.action-row {
-  display: flex;
-  gap: 12px;
-}
-
-.restore-btn, .cancel-btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.restore-btn {
-  background: #f1f3f5;
-  border: 1px solid #dee2e6;
-  color: #495057;
-}
-
-.cancel-btn {
-  background: #fff5f5;
-  border: 1px solid #ffc9c9;
-  color: #fa5252;
-}
-
-/* Dark Mode */
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+.status-text { font-weight: 600; font-size: 16px; color: #212529; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.action-link { background: none; border: none; color: #339af0; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; }
+.close-btn { background: none; border: none; padding: 4px; display: flex; align-items: center; }
+.progress-container { margin-bottom: 24px; }
+.progress-bar-bg { height: 8px; background: #f1f3f5; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.progress-bar-fill { height: 100%; background: #339af0; transition: width 0.3s ease; }
+.progress-stats { display: flex; justify-content: space-between; font-size: 12px; color: #868e96; }
+.action-row { display: flex; gap: 12px; }
+.restore-btn, .cancel-btn { flex: 1; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.restore-btn { background: #f1f3f5; border: 1px solid #dee2e6; color: #495057; }
+.cancel-btn { background: #fff5f5; border: 1px solid #ffc9c9; color: #fa5252; }
 @media (prefers-color-scheme: dark) {
   .status-text { color: #f8f9fa; }
   .close-btn img { filter: invert(1); }
   .progress-bar-bg { background: #333; }
-  .progress-stats { color: #adb5bd; }
   .restore-btn { background: #2d2d2d; border-color: #444; color: #adb5bd; }
-  .cancel-btn { background: #2b1d1d; border-color: #441d1d; color: #fa5252; }
 }
 </style>

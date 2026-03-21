@@ -57,9 +57,57 @@ export class PageTranslationManager extends ResourceTracker {
     this.hoverManager = new PageTranslationHoverManager();
 
     this.settings = {};
+    this._listenersInitialized = false;
     
+    // Bind handlers to this instance for reliable removal
+    this._handlers = {
+      progress: (data) => {
+        sendRegularMessage({ 
+          action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
+          data, 
+          context: 'page-translation-progress-forward' 
+        }).catch(() => {});
+      },
+      fatalError: ({ error, errorType, localizedMessage }) => this._handleFatalError(error, errorType, localizedMessage),
+      translate: (options) => {
+        this.logger.info('Page translation requested via PageEventBus');
+        this.translatePage(options || {}).catch(err => {
+          this.logger.error('Failed to translate page from PageEventBus:', err);
+        });
+      },
+      restore: () => {
+        this.logger.info('Page restore requested via PageEventBus');
+        this.restorePage().catch(() => {});
+      },
+      cancel: () => {
+        this.logger.info('Page translation cancel requested via PageEventBus');
+        this.cancelTranslation();
+      },
+      stopConflicts: (data) => {
+        if ((this.isTranslating || this.isTranslated) && data?.source !== 'page-translation') {
+          this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
+          this.restorePage();
+        }
+      }
+    };
+
+    this._setupPageEventBusListeners();
+  }
+
+  _setupPageEventBusListeners() {
+    const bus = window.pageEventBus;
+    if (!bus) return;
+
+    // Use a unique global flag to prevent multiple registrations in the same page
+    if (window._translateItPageTranslationListenersSet) {
+      this.logger.debug('Listeners already registered globally, skipping');
+      return;
+    }
+
+    this.logger.info('Setting up GLOBAL PageEventBus listeners for PageTranslationManager');
+
     // Listen for progress from scheduler and forward to background
-    this.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+    bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
         data, 
@@ -68,16 +116,37 @@ export class PageTranslationManager extends ResourceTracker {
     });
 
     // Listen for fatal errors from scheduler (Circuit Breaker)
-    this.addEventListener(pageEventBus, 'page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
+    bus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
       this._handleFatalError(error, errorType, localizedMessage));
 
+    // Listen for activation from PageEventBus (Mobile Dashboard)
+    bus.on(MessageActions.PAGE_TRANSLATE, (options) => {
+      this.logger.info('Page translation requested via PageEventBus');
+      this.translatePage(options || {}).catch(err => {
+        this.logger.error('Failed to translate page from PageEventBus:', err);
+      });
+    });
+
+    bus.on(MessageActions.PAGE_RESTORE, () => {
+      this.logger.info('Page restore requested via PageEventBus');
+      this.restorePage().catch(() => {});
+    });
+
+    bus.on(MessageActions.PAGE_TRANSLATE_CANCELLED, () => {
+      this.logger.info('Page translation cancel requested via PageEventBus');
+      this.cancelTranslation();
+    });
+
     // Listen for conflicting features (like Select Element Mode)
-    this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
+    bus.on('STOP_CONFLICTING_FEATURES', (data) => {
       if ((this.isTranslating || this.isTranslated) && data?.source !== 'page-translation') {
         this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
         this.restorePage(); // Fully restore if conflict happens
       }
     });
+
+    window._translateItPageTranslationListenersSet = true;
+    this._listenersInitialized = true;
   }
 
   async activate() {

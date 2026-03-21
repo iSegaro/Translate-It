@@ -82,7 +82,7 @@
       v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
       class="mobile-fab"
       style="position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: #339af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4); z-index: 2147483647; pointer-events: auto !important; cursor: pointer;"
-      @click="mobileStore.openSheet('dashboard', 'peek')"
+      @click="mobileStore.openSheet(mobileStore.activeView, 'peek')"
     >
       <img src="@/icons/ui/translate.png" alt="Translate" style="width: 28px; height: 28px; filter: brightness(0) invert(1);" />
     </div>
@@ -470,10 +470,17 @@ onMounted(async () => {
   });
 
   // Page Translation Events for Mobile
-  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, () => {
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, (detail) => {
     if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ isTranslating: true, status: 'translating', progress: 0 });
-      mobileStore.openSheet('page_translation', 'peek');
+      logger.info('Mobile: Page translation started, switching view');
+      mobileStore.setPageTranslation({ 
+        isTranslating: true, 
+        status: 'translating', 
+        progress: 0,
+        translatedCount: 0 
+      });
+      mobileStore.setView('page_translation');
+      mobileStore.setSheetState('peek');
     }
   });
 

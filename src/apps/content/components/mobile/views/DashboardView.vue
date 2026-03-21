@@ -38,15 +38,26 @@
 
 <script setup>
 import { useMobileStore } from '@/store/modules/mobile.js'
-import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 
 const mobileStore = useMobileStore()
+const pageEventBus = window.pageEventBus
 
-const translatePage = () => {
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+const translatePage = (event) => {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
+  console.log('[Dashboard] Translate Page clicked');
+  
+  // Switch view immediately
+  mobileStore.setView('page_translation')
   mobileStore.setSheetState('peek')
+  
+  // Start translation process
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
 }
 
 const activateSelectElement = () => {
