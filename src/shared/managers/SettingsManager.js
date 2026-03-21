@@ -77,7 +77,22 @@ class SettingsManager {
       MODE_PROVIDERS: {},
       ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
-      ENHANCED_TRIPLE_CLICK_DRAG: false
+      ENHANCED_TRIPLE_CLICK_DRAG: false,
+      // Whole Page Translation Defaults
+      WHOLE_PAGE_TRANSLATION_ENABLED: true,
+      WHOLE_PAGE_LAZY_LOADING: true,
+      WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true,
+      WHOLE_PAGE_EXCLUDED_SELECTORS: [],
+      WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "label", "value"],
+      WHOLE_PAGE_MAX_ELEMENTS: 10000,
+      WHOLE_PAGE_CHUNK_SIZE: 250,
+      WHOLE_PAGE_MAX_CHARS: 5000,
+      WHOLE_PAGE_AI_MAX_CHARS: 15000,
+      WHOLE_PAGE_DEBOUNCE_DELAY: 500,
+      WHOLE_PAGE_ROOT_MARGIN: '10px',
+      WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1,
+      WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100,
+      WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false
     }
 
     // Lazy debug call to avoid TDZ
@@ -175,6 +190,22 @@ class SettingsManager {
 
       this._initialized = true
       return this
+    }
+  }
+
+  /**
+   * Warm up the cache by loading all settings at once
+   * This is recommended to be called early in the lifecycle
+   */
+  async warmup() {
+    try {
+      const keys = Object.keys(this._defaults);
+      await storageManager.get(keys);
+      getLogger().debug(`Cache warmed up with ${keys.length} keys`);
+      return this;
+    } catch (error) {
+      getLogger().error('Failed to warmup SettingsManager:', error);
+      return this;
     }
   }
 

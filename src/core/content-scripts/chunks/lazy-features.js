@@ -446,7 +446,8 @@ export async function loadCoreFeatures() {
     logger.debug('Initializing SettingsManager...');
     const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
     await SettingsManager.initialize();
-    logger.debug('SettingsManager initialized successfully');
+    await SettingsManager.warmup(); // Warm up cache for all features
+    logger.debug('SettingsManager initialized and warmed up successfully');
   } catch (error) {
     logger.warn('[FeatureManager] ⚠️ Failed to initialize SettingsManager:', error);
     // Don't fail feature loading if SettingsManager fails

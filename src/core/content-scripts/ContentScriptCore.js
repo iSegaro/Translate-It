@@ -92,6 +92,15 @@ export function ContentScriptCore() {
       // Initialize core infrastructure
       await this.initializeCore();
 
+      // Pre-warm settings cache early to eliminate latency during feature usage
+      try {
+        const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
+        // Initializing and warming up in parallel with other tasks
+        void SettingsManager.initialize().then(() => SettingsManager.warmup());
+      } catch {
+        // Non-critical error
+      }
+
       // Initialize DebugModeBridge for content script
       try {
         const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
