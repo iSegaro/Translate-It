@@ -1,5 +1,5 @@
 <template>
-  <div class="content-app-container">
+  <div class="content-app-container notranslate" translate="no">
     <!-- نمونه استفاده از ترجمه -->
     <!--{{ $t('app_welcome') }} -->
     

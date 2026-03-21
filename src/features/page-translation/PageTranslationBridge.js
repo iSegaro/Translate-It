@@ -150,6 +150,8 @@ export class PageTranslationBridge extends ResourceTracker {
     const filter = createNodesFilter({
       ignoredSelectors: [
         ...(settings.excludedSelectors || []), 
+        '#translate-it-host-main',
+        '#translate-it-host-iframe',
         `#${PAGE_TRANSLATION_SELECTORS.TOOLTIP_ID}`,
         `.${PAGE_TRANSLATION_SELECTORS.INTERNAL_IGNORE_CLASS}`
       ],
