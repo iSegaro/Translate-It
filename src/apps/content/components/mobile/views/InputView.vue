@@ -46,14 +46,20 @@
 
     <!-- Result Card -->
     <div v-if="resultText" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
-      <div style="font-size: 11px; font-weight: 800; color: #1864ab; text-transform: uppercase; margin-bottom: 8px;">Translation</div>
-      <div style="font-size: 17px; color: #1c7ed6; line-height: 1.5; margin-bottom: 12px; white-space: pre-wrap;">{{ resultText }}</div>
+      
+      <!-- Rendered Markdown Content -->
+      <div 
+        class="result-content markdown-body" 
+        :dir="detectedDir"
+        style="font-size: 16px; color: #1c7ed6; line-height: 1.5; margin-bottom: 12px; text-align: start;"
+        v-html="sanitizedResult"
+      ></div>
       
       <div style="display: flex; gap: 10px;">
-        <button @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center;">
+        <button @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <img src="@/icons/ui/copy.png" style="width: 16px; height: 16px;" />
         </button>
-        <button @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center;">
+        <button @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <img src="@/icons/ui/speaker.png" style="width: 16px; height: 16px;" />
         </button>
       </div>
@@ -62,11 +68,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
+import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
+import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
+import DOMPurify from "dompurify";
 
 const mobileStore = useMobileStore()
 const { sendMessage, createMessage } = useMessaging('mobile-input')
@@ -75,6 +85,26 @@ const inputText = ref('')
 const targetLang = ref('en')
 const isLoading = ref(false)
 const resultText = ref('')
+
+// Computed direction
+const detectedDir = computed(() => {
+  if (!resultText.value) return 'ltr'
+  const direction = getTextDirection(targetLang.value, resultText.value)
+  return direction === 'rtl' || shouldApplyRtl(resultText.value) ? 'rtl' : 'ltr'
+})
+
+// Sanitized and Rendered Markdown
+const sanitizedResult = computed(() => {
+  if (!resultText.value) return ''
+  try {
+    const markdownElement = SimpleMarkdown.render(resultText.value)
+    const htmlContent = markdownElement ? markdownElement.innerHTML : resultText.value.replace(/\n/g, '<br>')
+    return DOMPurify.sanitize(htmlContent)
+  } catch (error) {
+    console.error('[InputView] Markdown error:', error)
+    return DOMPurify.sanitize(resultText.value.replace(/\n/g, '<br>'))
+  }
+})
 
 const goBack = () => {
   mobileStore.setView('dashboard')
@@ -100,10 +130,9 @@ const handleTranslate = async () => {
     );
 
     if (response && response.success) {
-      // Structural fix: translation can be in response directly or in response.data
       resultText.value = response.translatedText || (response.data && response.data.translatedText) || "No translation found.";
     } else {
-      resultText.value = "Translation failed. Please check your settings.";
+      resultText.value = "Translation failed. Please try again.";
     }
   } catch (error) {
     console.error('[MobileInput] Translation error:', error);
@@ -114,7 +143,9 @@ const handleTranslate = async () => {
 }
 
 const copyResult = () => {
-  navigator.clipboard.writeText(resultText.value)
+  // Use plain text for clipboard (stripping markdown)
+  const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(resultText.value) : resultText.value;
+  navigator.clipboard.writeText(plainText)
   pageEventBus.emit('show-notification', { message: 'Copied', type: 'success' })
 }
 
@@ -130,5 +161,20 @@ const speakResult = () => {
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Base Markdown Styles for the result area */
+.result-content.markdown-body {
+  word-wrap: break-word;
+}
+.result-content.markdown-body p { margin-bottom: 8px; }
+.result-content.markdown-body strong { font-weight: bold; }
+.result-content.markdown-body em { font-style: italic; }
+.result-content.markdown-body ul, .result-content.markdown-body ol { padding-inline-start: 20px; margin-bottom: 8px; }
+.result-content.markdown-body li { margin-bottom: 4px; }
+.result-content.markdown-body code { background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+
+@media (prefers-color-scheme: dark) {
+  .result-content.markdown-body code { background: rgba(255,255,255,0.1); }
 }
 </style>
