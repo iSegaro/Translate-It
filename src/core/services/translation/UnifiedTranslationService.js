@@ -270,7 +270,7 @@ class TranslationResultDispatcher {
     // Dispatch based on mode
     if (request.mode === TranslationMode.Field) {
       await this.dispatchFieldResult({ messageId, result, request, originalMessage });
-    } else if (request.mode === 'select-element') {
+    } else if (request.mode === TranslationMode.Select_Element) {
       await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
     } else {
       // For other modes, return directly
@@ -607,7 +607,8 @@ class TranslationModeCoordinator {
       ...request.data,
       options: {
         ...request.data.options,
-        forceStreaming: true
+        forceStreaming: true,
+        enableDictionary: false // Force disable dictionary for Select Element mode
       }
     };
 
