@@ -1,57 +1,60 @@
 <template>
-  <div class="input-view">
-    <div class="input-header">
-      <button class="back-btn" @click="goBack">
-        <img src="@/icons/ui/dropdown-arrow.svg" class="back-icon" alt="Back" style="width: 20px !important; height: 20px !important; transform: rotate(90deg) !important;" />
-        <span>Manual Translation</span>
+  <div class="input-view" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 15px;">
+    
+    <!-- Header -->
+    <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+      <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0;">
+        <img src="@/icons/ui/dropdown-arrow.svg" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
+        <span style="font-weight: bold; font-size: 16px; color: #333;">Manual Input</span>
       </button>
     </div>
 
-    <div class="input-container">
+    <!-- Input Card -->
+    <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">Source Text</div>
       <textarea
         v-model="inputText"
-        placeholder="Type or paste text to translate..."
-        class="text-input"
+        placeholder="Type here..."
+        style="width: 100%; min-height: 80px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 0;"
         @focus="onFocus"
-        ref="inputRef"
       ></textarea>
-      
-      <div class="input-actions" v-if="inputText">
-        <button class="clear-btn" @click="inputText = ''">
-          <img src="@/icons/ui/clear.png" alt="Clear" style="width: 12px !important; height: 12px !important;" />
-        </button>
+      <div v-if="inputText" style="display: flex; justify-content: flex-end;">
+        <button @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666;">Clear</button>
       </div>
     </div>
 
-    <div class="translate-bar">
-      <div class="target-lang-selector">
-        <span>To: </span>
-        <select v-model="targetLang" class="lang-select">
+    <!-- Controls -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 14px; color: #868e96;">To:</span>
+        <select v-model="targetLang" style="padding: 5px 10px; border-radius: 8px; border: 1px solid #ced4da; background: white; font-size: 14px;">
           <option value="en">English</option>
           <option value="fa">Persian</option>
-          <option value="ja">Japanese</option>
+          <option value="de">German</option>
+          <option value="fr">French</option>
         </select>
       </div>
       
       <button 
-        class="translate-btn" 
-        :disabled="!inputText || isLoading"
         @click="handleTranslate"
+        :disabled="!inputText || isLoading"
+        style="background: #339af0; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: (isLoading || !inputText) ? 0.6 : 1;"
       >
-        <span v-if="!isLoading">Translate</span>
-        <div v-else class="mini-spinner"></div>
+        {{ isLoading ? '...' : 'Translate' }}
       </button>
     </div>
 
-    <div v-if="resultText" class="result-area">
-      <div class="result-label">Result:</div>
-      <div class="result-content">{{ resultText }}</div>
-      <div class="result-actions">
-        <button class="mini-icon-btn" @click="copyResult">
-          <img src="@/icons/ui/copy.png" alt="Copy" style="width: 16px !important; height: 16px !important;" />
+    <!-- Result Card -->
+    <div v-if="resultText" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
+      <div style="font-size: 11px; font-weight: 800; color: #1864ab; text-transform: uppercase; margin-bottom: 8px;">Translation</div>
+      <div style="font-size: 17px; color: #1c7ed6; line-height: 1.5; margin-bottom: 12px; white-space: pre-wrap;">{{ resultText }}</div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center;">
+          <img src="@/icons/ui/copy.png" style="width: 16px; height: 16px;" />
         </button>
-        <button class="mini-icon-btn" @click="speakResult">
-          <img src="@/icons/ui/speaker.png" alt="Speak" style="width: 16px !important; height: 16px !important;" />
+        <button @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center;">
+          <img src="@/icons/ui/speaker.png" style="width: 16px; height: 16px;" />
         </button>
       </div>
     </div>
@@ -59,17 +62,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 const mobileStore = useMobileStore()
+const { sendMessage, createMessage } = useMessaging('mobile-input')
+
 const inputText = ref('')
 const targetLang = ref('en')
 const isLoading = ref(false)
 const resultText = ref('')
-const inputRef = ref(null)
 
 const goBack = () => {
   mobileStore.setView('dashboard')
@@ -81,30 +86,36 @@ const onFocus = () => {
 }
 
 const handleTranslate = async () => {
-  if (!inputText.value) return
+  if (!inputText.value || isLoading.value) return
   isLoading.value = true
+  resultText.value = ''
   
-  pageEventBus.emit(MessageActions.TRANSLATE_TEXT, {
-    text: inputText.value,
-    targetLang: targetLang.value,
-    callback: (response) => {
-      isLoading.value = false
-      if (response && response.translation) {
-        resultText.value = response.translation
-      }
+  try {
+    const response = await sendMessage(
+      createMessage(MessageActions.TRANSLATE, {
+        text: inputText.value,
+        sourceLanguage: 'auto',
+        targetLanguage: targetLang.value
+      })
+    );
+
+    if (response && response.success) {
+      // Structural fix: translation can be in response directly or in response.data
+      resultText.value = response.translatedText || (response.data && response.data.translatedText) || "No translation found.";
+    } else {
+      resultText.value = "Translation failed. Please check your settings.";
     }
-  });
-  
-  setTimeout(() => {
-    if (isLoading.value) {
-      isLoading.value = false
-      resultText.value = "This is a simulated translation."
-    }
-  }, 1000)
+  } catch (error) {
+    console.error('[MobileInput] Translation error:', error);
+    resultText.value = "Error connecting to service.";
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 const copyResult = () => {
   navigator.clipboard.writeText(resultText.value)
+  pageEventBus.emit('show-notification', { message: 'Copied', type: 'success' })
 }
 
 const speakResult = () => {
@@ -116,33 +127,8 @@ const speakResult = () => {
 </script>
 
 <style>
-.input-view { display: flex; flex-direction: column; height: 100%; }
-.input-header { margin-bottom: 16px; }
-.back-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; font-size: 16px; font-weight: 600; color: #212529; cursor: pointer; }
-.input-container { position: relative; flex: 1; min-height: 120px; max-height: 200px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef; margin-bottom: 16px; overflow: hidden; }
-.text-input { width: 100%; height: 100%; border: none; background: transparent; padding: 12px; font-size: 16px; resize: none; outline: none; color: #495057; }
-.input-actions { position: absolute; top: 8px; right: 8px; }
-.clear-btn { background: #e9ecef; border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.translate-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
-.target-lang-selector { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #868e96; }
-.lang-select { border: 1px solid #ced4da; border-radius: 6px; padding: 4px 8px; font-size: 14px; background: #fff; }
-.translate-btn { background: #339af0; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
-.translate-btn:disabled { background: #adb5bd; cursor: not-allowed; }
-.result-area { background: #e7f5ff; border-radius: 12px; padding: 16px; margin-top: auto; }
-.result-label { font-size: 12px; font-weight: 700; color: #1864ab; text-transform: uppercase; margin-bottom: 8px; }
-.result-content { font-size: 16px; color: #212529; line-height: 1.5; margin-bottom: 12px; }
-.result-actions { display: flex; gap: 12px; }
-.mini-icon-btn { background: #fff; border: 1px solid #d0ebff; border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: center; }
-.mini-spinner { width: 16px; height: 16px; border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@media (prefers-color-scheme: dark) {
-  .back-btn { color: #f8f9fa; }
-  .input-container { background: #2d2d2d; border-color: #444; }
-  .text-input { color: #e0e0e0; }
-  .lang-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
-  .result-area { background: #1864ab22; }
-  .result-label { color: #74c0fc; }
-  .result-content { color: #f8f9fa; }
-  .mini-icon-btn { background: #2d2d2d; border-color: #444; }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
