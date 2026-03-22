@@ -5,18 +5,18 @@
     <div class="selection-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f1f3f5;">
       <div style="display: flex; align-items: center; gap: 8px;">
         <button class="back-btn" @click="goBack" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-          <img src="@/icons/ui/dropdown-arrow.svg" alt="Back" style="width: 18px !important; height: 18px !important; transform: rotate(90deg); opacity: 0.6;" />
+          <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 18px !important; height: 18px !important; transform: rotate(90deg); opacity: 0.6;" />
         </button>
         <div class="lang-pair" style="display: flex; align-items: center; gap: 6px; background: #f1f3f5; padding: 4px 12px; border-radius: 20px;">
           <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #495057;">{{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}</span>
-          <img src="@/icons/ui/swap.png" class="swap-icon" alt="to" style="width: 12px !important; height: 12px !important; opacity: 0.5;" />
+          <img src="@/icons/ui/swap.png" class="swap-icon" :alt="t('mobile_swap_languages_alt') || 'to'" style="width: 12px !important; height: 12px !important; opacity: 0.5;" />
           <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #339af0;">{{ selectionData.targetLang }}</span>
         </div>
       </div>
       
       <div style="display: flex; align-items: center; gap: 10px;">
         <button class="close-btn" @click="closeView" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-          <img src="@/icons/ui/close.png" alt="Close" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
+          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
         </button>
       </div>
     </div>
@@ -53,13 +53,13 @@
           <!-- Quick Actions In Card -->
           <div style="display: flex; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(51, 154, 240, 0.1);" @click.stop>
             <button class="action-btn" @click="speak" :title="t('mobile_selection_speak_tooltip') || 'Speak'">
-              <img src="@/icons/ui/speaker.png" alt="Speak" style="width: 16px !important; height: 16px !important;" />
+              <img src="@/icons/ui/speaker.png" :alt="t('mobile_speak_button_alt') || 'Speak'" style="width: 16px !important; height: 16px !important;" />
             </button>
             <button class="action-btn" @click="copy" :title="t('mobile_selection_copy_tooltip') || 'Copy'">
-              <img src="@/icons/ui/copy.png" alt="Copy" style="width: 16px !important; height: 16px !important;" />
+              <img src="@/icons/ui/copy.png" :alt="t('mobile_copy_button_alt') || 'Copy'" style="width: 16px !important; height: 16px !important;" />
             </button>
             <button class="action-btn" @click="toggleHistory" :title="t('mobile_selection_history_tooltip') || 'History'">
-              <img src="@/icons/ui/history.svg" alt="History" style="width: 16px !important; height: 16px !important;" />
+              <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 16px !important; height: 16px !important;" />
             </button>
           </div>
         </div>

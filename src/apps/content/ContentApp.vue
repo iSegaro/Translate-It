@@ -97,8 +97,9 @@
       }"
       @click="onMobileFabClick"
       @touchstart="startFabIdleTimer"
+      :title="t('mobile_fab_alt') || 'Translate'"
     >
-      <img src="@/icons/extension/extension_icon_64.svg" alt="Translate" style="width: 70%; height: 70%; object-fit: contain;" />
+      <img src="@/icons/extension/extension_icon_64.svg" :alt="t('mobile_fab_alt') || 'Translate'" style="width: 70%; height: 70%; object-fit: contain;" />
     </div>
 
     <!-- Mobile-specific Exit Select Mode button -->
@@ -108,8 +109,8 @@
       translate="no"
       @click="onCancelClick"
     >
-      <img src="@/icons/ui/close.png" alt="Exit" />
-      <span>Exit Select Mode</span>
+      <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Exit'" />
+      <span>{{ t('mobile_exit_select_mode') || 'Exit Select Mode' }}</span>
     </div>
   </div>
 </template>

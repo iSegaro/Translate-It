@@ -5,7 +5,7 @@
       <!-- Translate Page Button -->
       <button class="action-btn" @click="translatePage" :style="btnStyle">
         <div class="icon-container translate-page" :style="[iconContainerStyle, { background: '#e7f5ff' }]">
-          <img :src="wholePageIcon" alt="Page" :style="iconImageStyle" width="24" height="24" />
+          <img :src="wholePageIcon" :alt="t('mobile_dashboard_page_label') || 'Page'" :style="iconImageStyle" width="24" height="24" />
         </div>
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
       </button>
@@ -13,7 +13,7 @@
       <!-- Select Element Button -->
       <button class="action-btn" @click="activateSelectElement" :style="btnStyle">
         <div class="icon-container select-element" :style="[iconContainerStyle, { background: '#f3f0ff' }]">
-          <img :src="selectIcon" alt="Select" :style="iconImageStyle" width="24" height="24" />
+          <img :src="selectIcon" :alt="t('mobile_dashboard_select_label') || 'Select'" :style="iconImageStyle" width="24" height="24" />
         </div>
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
       </button>
@@ -21,7 +21,7 @@
       <!-- Manual Translation Button -->
       <button class="action-btn" @click="goToInputView" :style="btnStyle">
         <div class="icon-container manual-input" :style="[iconContainerStyle, { background: '#ebfbee' }]">
-          <img :src="translateIcon" alt="Input" :style="iconImageStyle" width="24" height="24" />
+          <img :src="translateIcon" :alt="t('mobile_dashboard_input_label') || 'Input'" :style="iconImageStyle" width="24" height="24" />
         </div>
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
       </button>
@@ -29,7 +29,7 @@
       <!-- Settings Button -->
       <button class="action-btn" @click="openSettings" :style="btnStyle">
         <div class="icon-container settings" :style="[iconContainerStyle, { background: '#fff4e6' }]">
-          <img :src="settingsIcon" alt="Settings" :style="iconImageStyle" width="24" height="24" />
+          <img :src="settingsIcon" :alt="t('mobile_dashboard_settings_label') || 'Settings'" :style="iconImageStyle" width="24" height="24" />
         </div>
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
       </button>
@@ -37,7 +37,7 @@
       <!-- Revert Element Translations (Dynamic) -->
       <button v-if="hasElementTranslations" class="action-btn revert-btn" @click="revertTranslations" :style="btnStyle">
         <div class="icon-container revert" :style="[iconContainerStyle, { background: '#fff5f5' }]">
-          <img :src="revertIcon" alt="Revert" :style="iconImageStyle" width="24" height="24" />
+          <img :src="revertIcon" :alt="t('mobile_dashboard_revert_label') || 'Revert'" :style="iconImageStyle" width="24" height="24" />
         </div>
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
       </button>

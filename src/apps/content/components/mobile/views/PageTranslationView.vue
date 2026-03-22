@@ -17,7 +17,7 @@
         </button>
         
         <button class="close-btn" @click="closeView" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-          <img src="@/icons/ui/close.png" alt="Close" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
+          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
         </button>
       </div>
     </div>

@@ -51,17 +51,16 @@
     </Transition>
 
     <!-- Main Button -->
-    <div 
+    <div
       class="desktop-fab-button"
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
       @mousedown="startDrag"
       @click.stop="toggleMenu"
-      title="Quick Actions"
+      :title="t('desktop_fab_tooltip') || 'Quick Actions'"
       :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
     >
-      <img src="@/icons/extension/extension_icon_64.svg" alt="Translate Actions" class="fab-icon" />
-    </div>
-  </div>
+      <img src="@/icons/extension/extension_icon_64.svg" :alt="t('desktop_fab_alt') || 'Translate Actions'" class="fab-icon" />
+    </div>  </div>
 </template>
 
 <script setup>

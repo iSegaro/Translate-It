@@ -500,6 +500,36 @@
   "mobile_page_start_btn": {
     "message": "Start Translation"
   },
+  "mobile_fab_alt": {
+    "message": "Translate"
+  },
+  "mobile_exit_select_mode": {
+    "message": "Exit Select Mode"
+  },
+  "mobile_back_button_alt": {
+    "message": "Back"
+  },
+  "mobile_close_button_alt": {
+    "message": "Close"
+  },
+  "mobile_swap_languages_alt": {
+    "message": "To"
+  },
+  "mobile_speak_button_alt": {
+    "message": "Speak"
+  },
+  "mobile_copy_button_alt": {
+    "message": "Copy"
+  },
+  "mobile_history_button_alt": {
+    "message": "History"
+  },
+  "desktop_fab_tooltip": {
+    "message": "Quick Actions"
+  },
+  "desktop_fab_alt": {
+    "message": "Translate Actions"
+  },
   "mobile_input_header_title": {
     "message": "Manual Input"
   },

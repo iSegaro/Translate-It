@@ -4,7 +4,7 @@
     <!-- Header -->
     <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
       <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0;">
-        <img src="@/icons/ui/dropdown-arrow.svg" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
+        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
         <span style="font-weight: bold; font-size: 16px; color: #333;" class="header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
@@ -58,11 +58,11 @@
       ></div>
       
       <div v-if="!isError" style="display: flex; gap: 10px;">
-        <button class="action-btn" @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-          <img src="@/icons/ui/copy.png" style="width: 16px; height: 16px;" />
+        <button class="action-btn" @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" :title="t('mobile_selection_copy_tooltip') || 'Copy'">
+          <img src="@/icons/ui/copy.png" :alt="t('mobile_copy_button_alt') || 'Copy'" style="width: 16px; height: 16px;" />
         </button>
-        <button class="action-btn" @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-          <img src="@/icons/ui/speaker.png" style="width: 16px; height: 16px;" />
+        <button class="action-btn" @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" :title="t('mobile_selection_speak_tooltip') || 'Speak'">
+          <img src="@/icons/ui/speaker.png" :alt="t('mobile_speak_button_alt') || 'Speak'" style="width: 16px; height: 16px;" />
         </button>
       </div>
     </div>
