@@ -58,10 +58,6 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 <style lang="scss">
 @use "@/assets/styles/base/variables" as *;
 @use "@/assets/styles/components/ui-transitions" as *;
-</style>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/base/variables" as *;
 
 .options-layout {
   display: flex;
@@ -90,20 +86,20 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   background-color: var(--color-background);
   border-radius: 0 $border-radius-lg $border-radius-lg 0;
   min-width: 0;
+  width: 100%;
   box-sizing: border-box;
-  width: 100%; /* Changed from fixed width to 100% of available space */
 }
 
 .tab-content-container {
   flex: 1;
   padding: $spacing-xl;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   scroll-behavior: smooth;
   box-sizing: border-box;
-  max-width: 100%; /* Ensure it doesn't overflow its parent */
+  max-width: 100%;
 
-  // Better scrollbar styling
   &::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -117,14 +113,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   &::-webkit-scrollbar-thumb {
     background-color: var(--color-border);
     border-radius: 4px;
-
-    &:hover {
-      background-color: var(--color-text-secondary);
-    }
-  }
-
-  &::-webkit-scrollbar-corner {
-    background-color: var(--color-surface);
+    &:hover { background-color: var(--color-text-secondary); }
   }
 
   // Ensure all child content respects container width
@@ -132,33 +121,17 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     max-width: 100%;
     box-sizing: border-box;
     overflow-wrap: break-word;
-    word-wrap: break-word;
   }
 
   // Global styles for all tab content
   :global(.tab-content) {
     max-width: 100%;
     box-sizing: border-box;
+    padding-bottom: 20px; /* Default desktop padding */
 
-    // Ensure all form elements and content respect container width
     * {
       max-width: 100%;
       box-sizing: border-box;
-    }
-
-    // Specific handling for wide elements
-    table,
-    pre,
-    code {
-      overflow-x: auto;
-    }
-
-    // Handle long text content
-    p,
-    div,
-    span {
-      word-wrap: break-word;
-      overflow-wrap: break-word;
     }
   }
 }
@@ -170,7 +143,6 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     height: 90vh;
     margin-top: 20px;
   }
-
   .options-main {
     flex-direction: column;
   }
@@ -179,35 +151,45 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .options-layout {
-    flex-direction: column;
-    height: 100vh;
-    width: 100vw;
-    margin: 0;
-    border-radius: 0;
-    border: none;
-    max-width: none;
-    min-width: 0;
+    flex-direction: column !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    max-width: none !important;
+    min-width: 0 !important;
   }
 
   .options-main {
-    flex-direction: column;
-    height: calc(100% - 100px); /* Leave space for sidebar if it becomes a header */
-    border-radius: 0;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 0 !important; /* Force flex child to respect container height */
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .tab-content-container {
-    padding: $spacing-lg $spacing-md ($spacing-xxl * 3); /* Ensure last items are visible above fixed footer */
+    flex: 1 !important;
+    padding: 0 !important; /* Reset padding to handle it in children */
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+
+    // Apply padding to the actual content rendered by router-view
+    > * {
+      padding: $spacing-lg $spacing-md 140px !important; /* Large 140px padding at the bottom */
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
   }
 }
 
 // Small mobile responsive
 @media (max-width: #{$breakpoint-sm}) {
   .tab-content-container {
-    padding: $spacing-base;
+    padding: $spacing-base $spacing-sm !important;
   }
 }
-</style>
-
-<style scoped>
-/* Scoped overrides if necessary, but preferred to keep logic in SCSS block */
 </style>

@@ -320,12 +320,14 @@ const saveAllSettings = async () => {
       bottom: 0;
       left: 0;
       right: 0;
+      height: 60px; /* Explicit height */
       background: var(--color-surface);
       border-top: $border-width $border-style var(--color-border);
       border-left: none;
-      padding: $spacing-sm $spacing-md;
+      padding: 0 $spacing-md; /* Reduce padding for smaller height */
       z-index: 100;
       flex-direction: row;
+      align-items: center; /* Center vertically */
       justify-content: space-between;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
       margin: 0;
@@ -335,12 +337,15 @@ const saveAllSettings = async () => {
       .save-button {
         width: auto;
         padding: $spacing-xs $spacing-lg;
+        margin-bottom: 0; /* Override any margin */
       }
 
       #status {
         width: auto;
         order: 0;
         font-size: $font-size-xs;
+        margin: 0;
+        padding-inline-end: $spacing-sm;
       }
     }
   }

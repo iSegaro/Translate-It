@@ -472,8 +472,9 @@ h2 {
     }
     
     .language-dropdown {
-      min-width: auto;
-      width: 100%;
+      min-width: auto !important;
+      width: 100% !important;
+      flex: none !important; /* Reset flex-basis to avoid huge height in column layout */
     }
   }
 }
