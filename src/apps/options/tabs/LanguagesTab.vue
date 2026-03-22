@@ -379,22 +379,22 @@ defineExpose({
 }
 
 .setting-group {
-  display: flex !important;
-  flex-direction: row !important; /* Force row on desktop */
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: $spacing-md !important;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
   
   label {
-    margin-bottom: 0 !important;
-    flex: 1 !important;
-    white-space: nowrap !important;
+    margin-bottom: 0;
+    flex: 1;
+    white-space: nowrap;
   }
   
   .language-dropdown {
-    flex: 0 0 250px !important;
-    height: auto !important;
+    flex: 0 0 250px;
+    height: auto;
   }
 }
 
@@ -413,21 +413,22 @@ defineExpose({
   }
 }
 
-// Mobile responsive
-@media (max-width: #{$breakpoint-md}) {
+// Tablet & Mobile responsive
+@media (max-width: #{$breakpoint-lg}) {
   .setting-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: $spacing-sm;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: $spacing-sm !important;
     
     label {
-      min-width: auto;
+      min-width: auto !important;
+      margin-bottom: $spacing-xs !important;
     }
     
     .language-dropdown {
       min-width: auto !important;
       width: 100% !important;
-      flex: none !important; /* Reset flex-basis to avoid huge height in column layout */
+      flex: none !important;
     }
   }
 }
