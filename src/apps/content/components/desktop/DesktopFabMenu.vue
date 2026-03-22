@@ -4,13 +4,15 @@
     translate="no"
     ref="fabContainerRef"
     :style="containerStyle"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
   >
     <!-- Menu -->
     <Transition name="fab-menu">
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        style="position: absolute !important; bottom: 65px !important; right: 0 !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; padding: 8px 0 !important; min-width: 200px !important; width: max-content !important; border: 1px solid #ddd !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        style="position: absolute !important; bottom: 0px !important; right: 45px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; padding: 8px 0 !important; min-width: 200px !important; width: max-content !important; border: 1px solid #ddd !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
       >
         <div 
           v-for="item in menuItems" 
@@ -23,7 +25,7 @@
             v-if="item.icon" 
             :src="item.icon" 
             :alt="item.label" 
-            style="width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; max-width: 20px !important; max-height: 20px !important; margin-right: 12px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; margin-left: 0 !important;"
+            style="width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; max-width: 20px !important; max-height: 20px !important; margin-right: 12px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; margin: 0 !important;"
           />
           <span style="font-size: 14px !important; font-weight: 600 !important; white-space: nowrap !important; font-family: sans-serif !important; line-height: 1.2 !important;">{{ item.label }}</span>
         </div>
@@ -37,6 +39,7 @@
       @mousedown="startDrag"
       @click.stop="toggleMenu"
       title="Quick Actions"
+      :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
     >
       <img src="@/icons/extension/extension_icon_64.svg" alt="Translate Actions" class="fab-icon" />
     </div>
@@ -57,6 +60,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
 
 const isMenuOpen = ref(false);
+const isFaded = ref(false);
+const isHovered = ref(false);
 const fabContainerRef = ref(null);
 
 const menuItems = ref([
@@ -82,29 +87,30 @@ const menuItems = ref([
   }
 ]);
 
-const position = ref({ x: -1, y: -1 });
+const verticalPos = ref(-1);
 const isDragging = ref(false);
-let startPos = { x: 0, y: 0 };
+let startY = 0;
 
 const containerStyle = computed(() => {
-  if (position.value.x === -1) {
-    return {
-      position: 'fixed !important',
-      bottom: '30px !important',
-      right: '30px !important',
-      left: 'auto !important',
-      top: 'auto !important',
-      zIndex: 2147483647
-    };
+  // Determine Opacity logic
+  let opacityValue = 1;
+  if (isFaded.value && !isHovered.value && !isMenuOpen.value) {
+    opacityValue = 0.2; // 80% transparent when idle after 2s
   }
-  return {
+
+  const baseStyle = {
     position: 'fixed !important',
-    left: `${position.value.x}px !important`,
-    top: `${position.value.y}px !important`,
-    right: 'auto !important',
-    bottom: 'auto !important',
-    zIndex: 2147483647
+    right: '-25px !important',
+    zIndex: 2147483647,
+    transition: 'opacity 0.8s ease, transform 0.3s ease !important',
+    opacity: `${opacityValue} !important`,
+    left: 'auto !important'
   };
+
+  if (verticalPos.value === -1) {
+    return { ...baseStyle, bottom: '150px !important', top: 'auto !important' };
+  }
+  return { ...baseStyle, top: `${verticalPos.value}px !important`, bottom: 'auto !important' };
 });
 
 const toggleMenu = () => {
@@ -121,28 +127,30 @@ const handleMenuItemClick = async (item) => {
 
 const startDrag = (e) => {
   if (e.button !== 0) return;
-  if (position.value.x === -1) {
+  if (verticalPos.value === -1) {
     const rect = fabContainerRef.value.getBoundingClientRect();
-    position.value = { x: rect.left, y: rect.top };
+    verticalPos.value = rect.top;
   }
   isDragging.value = false;
-  startPos = { x: e.clientX - position.value.x, y: e.clientY - position.value.y };
+  startY = e.clientY - verticalPos.value;
   window.addEventListener('mousemove', onDrag);
   window.addEventListener('mouseup', stopDrag);
 };
 
 const onDrag = (e) => {
   if (!isDragging.value) {
-    const dx = e.clientX - startPos.x - position.value.x;
-    const dy = e.clientY - startPos.y - position.value.y;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+    const dy = e.clientY - startY - verticalPos.value;
+    if (Math.abs(dy) > 5) {
       isDragging.value = true;
       isMenuOpen.value = false;
     }
   }
   if (isDragging.value) {
     e.preventDefault();
-    position.value = { x: e.clientX - startPos.x, y: e.clientY - startPos.y };
+    let newY = e.clientY - startY;
+    const maxY = window.innerHeight - 60;
+    newY = Math.max(10, Math.min(newY, maxY));
+    verticalPos.value = newY;
   }
 };
 
@@ -153,10 +161,12 @@ const stopDrag = () => {
 };
 
 onMounted(() => {
+  setTimeout(() => {
+    isFaded.value = true;
+  }, 2000);
+
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
-    
-    // Check if the click path includes our container (important for Shadow DOM)
     const path = e.composedPath ? e.composedPath() : [];
     if (!path.includes(fabContainerRef.value)) {
       isMenuOpen.value = false;
@@ -164,10 +174,14 @@ onMounted(() => {
   };
 
   window.addEventListener('click', handleClickOutside);
-  
   onUnmounted(() => {
     window.removeEventListener('click', handleClickOutside);
   });
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onDrag);
+  window.removeEventListener('mouseup', stopDrag);
 });
 </script>
 
@@ -184,18 +198,26 @@ onMounted(() => {
   height: 50px;
   border-radius: 50%;
   background-color: #4A90E2;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   pointer-events: auto;
   user-select: none;
-  transition: transform 0.2s ease;
-  opacity: 0.8;
+  transition: transform 0.3s ease, background-color 0.2s ease;
 }
 
-.desktop-fab-button:hover { opacity: 1; transform: scale(1.05); }
-.fab-icon { width: 28px; height: 28px; pointer-events: none; }
+.desktop-fab-button.is-open {
+  background-color: #357ABD;
+}
+
+.fab-icon { 
+  width: 28px; 
+  height: 28px; 
+  pointer-events: none;
+  margin-right: 15px; 
+}
+
 .fab-menu-item:hover { background-color: #f5f5f5 !important; }
 </style>
