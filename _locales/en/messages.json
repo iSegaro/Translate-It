@@ -368,6 +368,12 @@
   "extension_enabled_description": {
     "message": "Enable or disable the entire extension functionality except Popup and Sidepanel."
   },
+  "show_desktop_fab_label": {
+    "message": "Show Desktop Quick Action Button (FAB)"
+  },
+  "show_desktop_fab_description": {
+    "message": "Display a floating action button on desktop to quickly access tools like Translate Page and Select Element."
+  },
   "translate_on_text_fields_label": {
     "message": "Showing translation Icon on text fields"
   },

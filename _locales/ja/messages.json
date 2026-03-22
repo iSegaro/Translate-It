@@ -368,6 +368,12 @@
   "extension_enabled_description": {
     "message": "ポップアップとサイドパネルを除く、拡張機能のすべての機能を有効／無効にします。"
   },
+  "show_desktop_fab_label": {
+    "message": "デスクトップのクイックアクションボタン (FAB) を表示する"
+  },
+  "show_desktop_fab_description": {
+    "message": "デスクトップにフローティングアクションボタンを表示し、ページ翻訳や要素選択などのツールにすばやくアクセスできるようにします。"
+  },
   "translate_on_text_fields_label": {
     "message": "テキストフィールドに翻訳アイコンを表示"
   },

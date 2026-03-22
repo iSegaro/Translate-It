@@ -165,6 +165,7 @@ export const CONFIG = {
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
+  SHOW_DESKTOP_FAB: false, // نمایش دکمه دسترسی سریع در دسکتاپ
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
@@ -719,6 +720,13 @@ export const getOpenRouterApiModelAsync = async () => {
 };
 
 // --- New Activation Settings Getters ---
+export const getShowDesktopFabAsync = async () => {
+  return getSettingValueAsync(
+    "SHOW_DESKTOP_FAB",
+    CONFIG.SHOW_DESKTOP_FAB
+  );
+};
+
 export const getTranslateOnTextFieldsAsync = async () => {
   return getSettingValueAsync(
     "TRANSLATE_ON_TEXT_FIELDS",

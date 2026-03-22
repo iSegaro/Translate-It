@@ -77,6 +77,11 @@
     <!-- Mobile Bottom Sheet -->
     <MobileSheet />
 
+    <!-- Desktop FAB Menu -->
+    <DesktopFabMenu 
+      v-if="!deviceDetector.isMobile() && showDesktopFab" 
+    />
+
     <!-- Mobile Floating Action Button (FAB) -->
     <div 
       v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
@@ -121,6 +126,7 @@ import TranslationWindow from '@/features/windows/components/TranslationWindow.v
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
+import DesktopFabMenu from './components/desktop/DesktopFabMenu.vue';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -130,7 +136,7 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
-import { CONFIG } from '@/shared/config/config.js';
+import { CONFIG, getShowDesktopFabAsync } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
@@ -233,8 +239,14 @@ const updateToastRTL = async () => {
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
+const showDesktopFab = ref(false);
 const activeIcons = ref([]); // Stores { id, position, visible, targetElement, attachmentMode } for each icon
 const iconRefs = ref(new Map()); // Stores Vue component references
+
+// Fetch desktop FAB setting
+const fetchDesktopFabSetting = async () => {
+  showDesktopFab.value = await getShowDesktopFabAsync();
+};
 
 // Icon reference management
 const setIconRef = (iconId, el) => {
@@ -324,6 +336,8 @@ const startFabIdleTimer = () => {
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
+  await fetchDesktopFabSetting();
+  
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
@@ -376,12 +390,18 @@ onMounted(async () => {
   // 2. Listen for storage changes directly (fires AFTER storage is updated)
   if (browser.storage?.onChanged) {
     const storageListener = (changes, areaName) => {
-      if (areaName === 'local' && changes.APPLICATION_LOCALIZE) {
-        const newLocale = changes.APPLICATION_LOCALIZE.newValue;
-        logger.info('[Toast] Language changed in storage:', newLocale);
-
-        // Update RTL immediately
-        updateToastRTL();
+      if (areaName === 'local') {
+        if (changes.APPLICATION_LOCALIZE) {
+          const newLocale = changes.APPLICATION_LOCALIZE.newValue;
+          logger.info('[Toast] Language changed in storage:', newLocale);
+          // Update RTL immediately
+          updateToastRTL();
+        }
+        
+        if (changes.SHOW_DESKTOP_FAB !== undefined) {
+          showDesktopFab.value = changes.SHOW_DESKTOP_FAB.newValue || false;
+          logger.info('[Desktop FAB] Setting changed in storage:', showDesktopFab.value);
+        }
       }
     };
 

@@ -368,6 +368,12 @@
   "extension_enabled_description": {
     "message": "فعال‌سازی یا غیرفعال‌سازی تمام عملکردهای افزونه به جز پاپ‌آپ و سایدپنل."
   },
+  "show_desktop_fab_label": {
+    "message": "نمایش دکمه دسترسی سریع در دسکتاپ (FAB)"
+  },
+  "show_desktop_fab_description": {
+    "message": "نمایش یک دکمه شناور در دسکتاپ برای دسترسی سریع به ابزارهایی مانند انتخاب المان و ترجمه صفحه."
+  },
   "translate_on_text_fields_label": {
     "message": "نمایش آیکون در فیلدهای متنی"
   },

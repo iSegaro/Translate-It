@@ -13,6 +13,18 @@
       </span>
     </div>
 
+    <!-- Desktop FAB Menu -->
+    <div class="setting-group">
+      <BaseCheckbox
+        v-model="showDesktopFab"
+        :disabled="!extensionEnabled"
+        :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
+      />
+      <span class="setting-description" style="margin-left: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;">
+        {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
+      </span>
+    </div>
+
     <!-- Text Field Translation -->
     <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
@@ -320,8 +332,17 @@ const { t } = useI18n()
 const extensionEnabled = computed({
   get: () => settingsStore.settings?.EXTENSION_ENABLED ?? true,
   set: (value) => {
-    logger.debug('⚡ Extension enabled changed:', value)
+    logger.debug('📝 Extension enabled changed:', value)
     settingsStore.updateSettingLocally('EXTENSION_ENABLED', value)
+  }
+})
+
+// Desktop FAB settings
+const showDesktopFab = computed({
+  get: () => settingsStore.settings?.SHOW_DESKTOP_FAB || false,
+  set: (value) => {
+    logger.debug('📝 Show Desktop FAB changed:', value)
+    settingsStore.updateSettingLocally('SHOW_DESKTOP_FAB', value)
   }
 })
 
