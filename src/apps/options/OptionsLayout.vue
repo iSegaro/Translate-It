@@ -72,10 +72,9 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   box-sizing: border-box;
   
   /* Robust height for both desktop and mobile/emulators */
-  height: calc(100vh - 40px);
-  height: calc(100svh - 40px); 
+  height: calc(100vh - 20px);
+  height: calc(100svh - 20px); 
   
-  margin: 20px auto;
   overflow: hidden;
 }
 
@@ -96,7 +95,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 
 .tab-content-container {
   flex: 1;
-  padding: $spacing-xl;
+  padding: $spacing-sm $spacing-xl $spacing-xl; /* Increased top padding to 10px (spacing-sm) */
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;

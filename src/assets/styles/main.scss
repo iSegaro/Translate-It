@@ -38,7 +38,7 @@ body.options-context {
   overflow: hidden !important;
   display: flex !important;
   justify-content: center !important;
-  align-items: center !important;
+  align-items: center !important; /* Restore centering at body level */
   padding: 0 !important;
   margin: 0; 
 }

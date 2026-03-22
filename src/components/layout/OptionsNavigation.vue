@@ -115,7 +115,7 @@ const saveAllSettings = async () => {
 .vertical-tabs {
   flex: 0 0 200px;
   border-right: $border-width $border-style var(--color-border);
-  padding: $spacing-md 0 0 0;
+  padding: $spacing-sm 0 0 0; /* Restored to 10px (spacing-sm) */
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface);

@@ -185,9 +185,9 @@ onMounted(async () => {
 }
 
 .sidebar-header {
-  padding: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   text-align: center;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
 
   h1 {
     font-size: var(--font-size-xxl);

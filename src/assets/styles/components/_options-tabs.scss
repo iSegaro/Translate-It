@@ -66,6 +66,7 @@
 // Global mobile overrides for all tabs
 @media (max-width: 768px) {
   .options-tab-content {
+    padding-top: $spacing-sm !important; /* Bring content closer to top */
     padding-bottom: 140px !important; // Match the overlap fix
 
     h2 {

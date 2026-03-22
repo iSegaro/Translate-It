@@ -158,15 +158,14 @@ const retryLoading = () => {
 
 <style scoped>
 .extension-options {
-  /* انتقال استایل‌های عمومی به اینجا */
   width: 100vw;
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start !important; /* This was the key fix */
   background-color: var(--color-background) !important;
   box-sizing: border-box;
-  padding: 20px;
+  padding: 10px; /* Restored small padding for better aesthetics */
 }
 
 .extension-options.rtl {
