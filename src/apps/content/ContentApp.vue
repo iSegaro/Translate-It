@@ -128,7 +128,7 @@ import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
 import DesktopFabMenu from './components/desktop/DesktopFabMenu.vue';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
-import { TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { TRANSLATION_HTML, MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -567,7 +567,7 @@ onMounted(async () => {
       isTranslating: true, 
       isTranslated: false,
       isAutoTranslating: detail.isAutoTranslating || false,
-      status: 'translating', 
+      status: TRANSLATION_STATUS.TRANSLATING, 
       translatedCount: 0,
       totalCount: 0,
       errorMessage: null
@@ -592,7 +592,7 @@ onMounted(async () => {
       isTranslating: false, 
       isTranslated: true,
       isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
-      status: 'completed', 
+      status: TRANSLATION_STATUS.COMPLETED, 
       translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
       totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
     });
@@ -604,14 +604,14 @@ onMounted(async () => {
       isTranslating: false, 
       isTranslated: false, 
       isAutoTranslating: false, 
-      status: 'error',
+      status: TRANSLATION_STATUS.ERROR,
       errorMessage: errorInfo.message
     });
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
     // Keep error state visible so user can see what happened
-    if (mobileStore.pageTranslationData.status !== 'error') {
+    if (mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.ERROR) {
       mobileStore.resetPageTranslation();
     }
   });
@@ -621,7 +621,7 @@ onMounted(async () => {
       isTranslating: false,
       isAutoTranslating: false,
       isTranslated: detail.translatedCount > 0,
-      status: 'completed'
+      status: TRANSLATION_STATUS.COMPLETED
     });
   });
 

@@ -12,7 +12,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
-import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
+import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
@@ -742,7 +742,7 @@ class SelectElementManager extends ResourceTracker {
 
   updateNotificationForTranslation() {
     pageEventBus.emit('update-select-element-notification', {
-      status: 'translating',
+      status: TRANSLATION_STATUS.TRANSLATING,
     });
 
     this.logger.debug('Select Element notification updated for translation');

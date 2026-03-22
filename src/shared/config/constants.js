@@ -214,3 +214,11 @@ export const MOBILE_CONSTANTS = {
     CLOSED: 'closed'
   }
 };
+
+// ===== TRANSLATION STATUS CONSTANTS =====
+export const TRANSLATION_STATUS = {
+  IDLE: 'idle',
+  TRANSLATING: 'translating',
+  COMPLETED: 'completed',
+  ERROR: 'error'
+};

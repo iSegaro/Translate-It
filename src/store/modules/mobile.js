@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js'
 
 export const useMobileStore = defineStore('mobile', () => {
   // State
@@ -26,7 +26,7 @@ export const useMobileStore = defineStore('mobile', () => {
     isAutoTranslating: false,
     translatedCount: 0,
     totalCount: 0,
-    status: 'idle', // 'idle' | 'translating' | 'completed' | 'error'
+    status: TRANSLATION_STATUS.IDLE, // 'idle' | 'translating' | 'completed' | 'error'
     errorMessage: null
   })
 
@@ -100,7 +100,7 @@ export const useMobileStore = defineStore('mobile', () => {
       isAutoTranslating: false,
       translatedCount: 0,
       totalCount: 0,
-      status: 'idle',
+      status: TRANSLATION_STATUS.IDLE,
       errorMessage: null
     }
   }

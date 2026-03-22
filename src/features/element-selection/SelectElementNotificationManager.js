@@ -4,6 +4,7 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
 
@@ -171,7 +172,7 @@ class SelectElementNotificationManager extends ResourceTracker {
 
     try {
       // Update notification based on status
-      if (data.status === 'translating') {
+      if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const { getTranslationString } = await utilsFactory.getI18nUtils();
         // Update the current notification with translation status but keep cancel button
         const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';

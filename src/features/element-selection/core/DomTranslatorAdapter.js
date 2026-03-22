@@ -7,7 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
+import { AUTO_DETECT_VALUE, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
@@ -68,7 +68,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     try {
       this.isTranslating = true;
-      if (onProgress) await onProgress({ status: 'translating', message: 'Translating...' });
+      if (onProgress) await onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' });
 
       const originalHTML = element.innerHTML;
       const elementId = generateElementId();
@@ -258,7 +258,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       }
 
-      if (onError) await onError({ status: 'error', error });
+      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error });
       throw error;
     } finally {
       // Cleanup with success flag based on whether an error occurred
@@ -352,7 +352,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       globalSelectElementState.currentTranslation.partial = false;
     }
 
-    if (onComplete) await onComplete({ status: 'completed', elementId, translated: true });
+    if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
     return { success: true, elementId, element };
   }
 
