@@ -248,7 +248,7 @@ onMounted(async () => {
 }
 
 /* Tablet responsive */
-@media (max-width: 1024px) {
+@media (max-width: #{$breakpoint-lg}) {
   .options-sidebar {
     flex: none;
     width: 100%;

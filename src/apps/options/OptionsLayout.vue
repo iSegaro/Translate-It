@@ -139,12 +139,16 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 // Tablet responsive
 @media (max-width: #{$breakpoint-lg}) {
   .options-layout {
+    flex-direction: column !important; /* Force stack layout for sidebar header */
     width: 95vw;
     height: 90vh;
     margin-top: 20px;
   }
+  
   .options-main {
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
   }
 }
 
