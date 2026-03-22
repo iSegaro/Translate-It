@@ -1,5 +1,5 @@
 <template>
-  <section class="languages-tab">
+  <section class="options-tab-content">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
 
     <div
@@ -338,38 +338,9 @@ defineExpose({
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.languages-tab {
-  max-width: 800px;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
-// Separator between sections
-.section-separator {
-  border-top: 2px solid var(--color-border);
-  margin: $spacing-xl 0;
-}
-
 // API Settings Section
 .api-settings-section {
   margin-top: $spacing-xl;
-
-  h3 {
-    font-size: $font-size-lg;
-    font-weight: $font-weight-medium;
-    margin: 0 0 $spacing-base 0;
-    padding-bottom: $spacing-base;
-    border-bottom: $border-width $border-style var(--color-border);
-    color: var(--color-text);
-  }
 
   .provider-settings {
     margin-top: $spacing-lg;
@@ -408,24 +379,13 @@ h2 {
 }
 
 .setting-group {
-  margin-bottom: $spacing-lg;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: $spacing-md;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  
-  &:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
   
   label {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
     margin-bottom: 0;
     flex: 1;
     white-space: nowrap;
@@ -449,15 +409,6 @@ h2 {
     margin: 0 0 $spacing-base 0;
     color: var(--color-text);
   }
-}
-
-.validation-error {
-  background-color: var(--color-error);
-  color: white;
-  padding: $spacing-base;
-  border-radius: $border-radius-base;
-  margin-top: $spacing-base;
-  font-size: $font-size-sm;
 }
 
 // Mobile responsive

@@ -1,5 +1,5 @@
 <template>
-  <section class="appearance-tab">
+  <section class="options-tab-content">
     <h2>{{ t('appearance_section_title') || 'Appearance' }}</h2>
     
     <!-- Font Settings -->
@@ -92,40 +92,8 @@ const validateFonts = () => {
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.appearance-tab {
-  max-width: 800px;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
 .setting-group {
-  margin-bottom: $spacing-lg;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  h3 {
-    font-size: $font-size-lg;
-    font-weight: $font-weight-medium;
-    margin: 0 0 $spacing-base 0;
-    padding-bottom: $spacing-base;
-    border-bottom: $border-width $border-style var(--color-border);
-    color: var(--color-text);
-  }
-
   .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
     margin: 0 0 $spacing-lg 0;
   }
 }
@@ -143,15 +111,6 @@ h2 {
     border: none;
     color: var(--color-text);
   }
-}
-
-.validation-error {
-  background-color: var(--color-error);
-  color: white;
-  padding: $spacing-base;
-  border-radius: $border-radius-base;
-  margin-top: $spacing-base;
-  font-size: $font-size-sm;
 }
 
 // Mobile responsive

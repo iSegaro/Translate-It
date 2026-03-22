@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <section class="help-tab">
+  <section class="options-tab-content">
     <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
     
     <div class="accordion">
@@ -201,24 +201,6 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
-
-.help-tab {
-  max-width: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
 
 .accordion {
   .accordion-item {

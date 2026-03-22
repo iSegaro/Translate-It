@@ -1,5 +1,5 @@
 <template>
-  <section class="activation-tab">
+  <section class="options-tab-content">
     <h2>{{ t('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
 
     <!-- Extension Enable/Disable -->
@@ -460,39 +460,6 @@ const dictionaryProvider = computed({
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.activation-tab {
-  max-width: 800px;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
-.setting-group {
-  margin-bottom: $spacing-lg;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-
-  &:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-
-  label {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-  }
-}
-
 .setting-row {
   display: flex;
   align-items: center;
@@ -552,9 +519,6 @@ h2 {
 }
 
 .setting-description {
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  flex-basis: 100%;
   padding-left: $spacing-xl;
   margin-top: $spacing-xs;
 }
@@ -582,20 +546,14 @@ h2 {
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .setting-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: $spacing-sm;
-
-    .setting-description {
-      padding-left: 0;
-    }
-  }
-
   .setting-row, .setting-row-with-provider {
     flex-direction: column;
     align-items: stretch;
     gap: $spacing-sm;
+  }
+
+  .setting-description {
+    padding-left: 0;
   }
   
   .sub-options-group {

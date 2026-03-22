@@ -1,5 +1,5 @@
 <template>
-  <section class="import-export-tab">
+  <section class="options-tab-content">
     <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
 
     <!-- Export Settings -->
@@ -303,42 +303,14 @@ const importSettings = async () => {
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.import-export-tab {
-  max-width: 800px;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
 .setting-group {
-  margin-bottom: $spacing-lg;
-  
-  &:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-  
   label {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
     margin-bottom: $spacing-sm;
     display: block;
   }
 }
 
 .setting-description {
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-
   &.export-info {
     flex-basis: auto;
     padding-left: 0;

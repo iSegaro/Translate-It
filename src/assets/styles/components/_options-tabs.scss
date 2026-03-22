@@ -1,0 +1,80 @@
+@use "../base/variables" as *;
+
+// Standard Layout for Options Page Tabs
+.options-tab-content {
+  max-width: 800px;
+  width: 100%;
+  box-sizing: border-box;
+  animation: tab-fade-in 0.3s ease-out;
+
+  h2 {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-medium;
+    margin-top: 0;
+    margin-bottom: $spacing-lg;
+    padding-bottom: $spacing-base;
+    border-bottom: $border-width $border-style var(--color-border);
+    color: var(--color-text);
+  }
+
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    margin: $spacing-lg 0 $spacing-base 0;
+    color: var(--color-text);
+  }
+
+  .setting-group {
+    margin-bottom: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    
+    label {
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      color: var(--color-text);
+    }
+
+    .setting-description {
+      font-size: $font-size-sm;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+  }
+
+  .section-separator {
+    border-top: 2px solid var(--color-border);
+    margin: $spacing-xl 0;
+  }
+
+  .validation-error {
+    background-color: var(--color-error);
+    color: white;
+    padding: $spacing-base;
+    border-radius: $border-radius-base;
+    margin-top: $spacing-base;
+    font-size: $font-size-sm;
+  }
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+// Global mobile overrides for all tabs
+@media (max-width: 768px) {
+  .options-tab-content {
+    padding-bottom: 140px !important; // Match the overlap fix
+
+    h2 {
+      font-size: $font-size-lg;
+      margin-bottom: $spacing-md;
+    }
+
+    .setting-group {
+      gap: $spacing-sm;
+    }
+  }
+}

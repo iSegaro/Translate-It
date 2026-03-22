@@ -1,5 +1,5 @@
 <template>
-  <section class="advance-tab">
+  <section class="options-tab-content">
     <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
     
     <div class="setting-group">
@@ -355,43 +355,12 @@ const testProxyConnection = async () => {
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.advance-tab {
-  max-width: 600px;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
 .setting-group {
-  margin-bottom: $spacing-lg;
-  display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-
-  &:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-
-  // Remove border-bottom when followed by a setting-section
-  & + .setting-section {
-    border-top: none;
-  }
 
   label {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
     margin-bottom: 0;
     flex-grow: 1;
     min-width: 200px;
@@ -407,10 +376,6 @@ h2 {
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .setting-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: $spacing-sm;
-    
     label {
       min-width: auto;
     }
@@ -430,14 +395,6 @@ h2 {
   &.proxy-section {
     margin-top: $spacing-lg;
     padding-top: $spacing-lg;
-  }
-
-  h3 {
-    font-size: $font-size-lg;
-    font-weight: $font-weight-medium;
-    margin-top: 0;
-    margin-bottom: $spacing-sm;
-    color: var(--color-text);
   }
 
   .section-description {

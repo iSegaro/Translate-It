@@ -1,5 +1,5 @@
 <template>
-  <section class="prompt-tab">
+  <section class="options-tab-content">
     <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
     
     <div class="setting-group prompt-template-group">
@@ -120,30 +120,6 @@ const resetPrompt = async () => {
 
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
-
-.prompt-tab {
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-h2 {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-medium;
-  margin-top: 0;
-  margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-base;
-  border-bottom: $border-width $border-style var(--color-border);
-  color: var(--color-text);
-}
-
-.setting-group {
-  margin-bottom: $spacing-lg;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
 
 .prompt-label-with-button {
   display: flex;
@@ -268,12 +244,6 @@ h2 {
     flex-direction: column;
     align-items: stretch;
     gap: $spacing-sm;
-  }
-  
-  .prompt-template-help {
-    max-width: 100%;
-    margin-left: 0;
-    margin-right: 0;
   }
 }
 </style>
