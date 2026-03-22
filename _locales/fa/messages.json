@@ -383,6 +383,12 @@
   "translating_label": {
     "message": "در حال ترجمه"
   },
+  "select_element_label": {
+    "message": "انتخاب المان"
+  },
+  "translate_page_label": {
+    "message": "ترجمه صفحه"
+  },
   "translate_on_text_fields_label": {
     "message": "نمایش آیکون در فیلدهای متنی"
   },

@@ -383,6 +383,12 @@
   "translating_label": {
     "message": "翻訳中"
   },
+  "select_element_label": {
+    "message": "要素を選択"
+  },
+  "translate_page_label": {
+    "message": "ページを翻訳"
+  },
   "translate_on_text_fields_label": {
     "message": "テキストフィールドに翻訳アイコンを表示"
   },

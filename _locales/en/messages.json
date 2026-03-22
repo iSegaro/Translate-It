@@ -383,6 +383,12 @@
   "translating_label": {
     "message": "Translating"
   },
+  "select_element_label": {
+    "message": "Select Element"
+  },
+  "translate_page_label": {
+    "message": "Translate Page"
+  },
   "translate_on_text_fields_label": {
     "message": "Showing translation Icon on text fields"
   },
