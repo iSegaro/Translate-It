@@ -80,7 +80,8 @@
     <!-- Mobile Floating Action Button (FAB) -->
     <div 
       v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
-      class="mobile-fab"
+      class="mobile-fab notranslate"
+      translate="no"
       :style="{
         position: 'fixed',
         bottom: '20px',
@@ -109,7 +110,8 @@
     <!-- Mobile-specific Exit Select Mode button -->
     <div 
       v-if="isSelectModeActive && deviceDetector.isMobile()" 
-      class="mobile-exit-selection"
+      class="mobile-exit-selection notranslate"
+      translate="no"
       @click="onCancelClick"
     >
       <img src="@/icons/ui/close.png" alt="Exit" />

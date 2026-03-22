@@ -176,6 +176,8 @@ async function createMountPoint() {
     // Create shadow host for isolation
     hostElement = document.createElement('div');
     hostElement.id = hostId;
+    hostElement.classList.add('notranslate');
+    hostElement.setAttribute('translate', 'no');
 
     // Create shadow root
     const shadowRoot = hostElement.attachShadow({ mode: 'open' });
@@ -183,6 +185,8 @@ async function createMountPoint() {
     // Create container for Vue app
     const appContainer = document.createElement('div');
     appContainer.id = UI_HOST_IDS.APP_CONTAINER;
+    appContainer.classList.add('notranslate');
+    appContainer.setAttribute('translate', 'no');
 
     // Add default styles
     const resetStyles = document.createElement('style');
@@ -193,8 +197,8 @@ async function createMountPoint() {
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        right: 0;
+        bottom: 0;
         pointer-events: none;
         z-index: 2147483647;
       }

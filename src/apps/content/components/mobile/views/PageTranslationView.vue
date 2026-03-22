@@ -1,5 +1,5 @@
 <template>
-  <div class="page-translation-view" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 15px;">
+  <div class="page-translation-view notranslate" translate="no" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 15px;">
     
     <!-- Header -->
     <div class="status-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f1f3f5;">

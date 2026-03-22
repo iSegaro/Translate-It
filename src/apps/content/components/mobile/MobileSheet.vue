@@ -1,12 +1,14 @@
 <template>
   <div 
     v-if="isOpen"
-    class="mobile-sheet-overlay"
+    class="mobile-sheet-overlay notranslate"
+    translate="no"
     style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; background: rgba(0, 0, 0, 0.5) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
     @click.self="closeSheet"
   >
     <div 
-      class="mobile-sheet"
+      class="mobile-sheet notranslate"
+      translate="no"
       :class="[`state-${sheetState}`]"
       :style="[sheetStyle, activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? { touchAction: 'none !important' } : {}]"
       @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
@@ -41,7 +43,7 @@
       </div>
 
       <!-- Footer/Safe Area -->
-      <div style="height: env(safe-area-inset-bottom); min-height: 20px; background: white;"></div>
+      <div class="notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px; background: white;"></div>
     </div>
   </div>
 </template>
@@ -99,7 +101,6 @@ const sheetStyle = computed(() => {
     bottom: '0',
     left: '0',
     right: '0',
-    width: '100%',
     backgroundColor: 'white',
     zIndex: '2147483647',
     display: 'flex',

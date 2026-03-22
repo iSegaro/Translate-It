@@ -1,5 +1,5 @@
 <template>
-  <div class="selection-view" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 12px;">
+  <div class="selection-view notranslate" translate="no" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 12px;">
     
     <!-- Header -->
     <div class="selection-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f1f3f5;">
