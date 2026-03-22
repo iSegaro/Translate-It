@@ -276,10 +276,25 @@ onMounted(async () => {
   .sidebar-section {
     margin: 0;
     padding: var(--spacing-sm);
-    box-shadow: none;
-    border: none;
-    background: transparent;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
     h2 { display: none; }
+    
+    /* Remove click/tap highlight effects on mobile header */
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
+    
+    &:hover {
+      box-shadow: none !important;
+      border: none !important;
+    }
+
+    // Target the specific control groups within sections
+    :deep(*) {
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
   }
 
   .sidebar-footer {
