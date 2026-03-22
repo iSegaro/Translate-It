@@ -70,9 +70,16 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   border: $border-width $border-style var(--color-border);
   margin: 0 auto;
   box-sizing: border-box;
+  
+  /* Robust height for both desktop and mobile/emulators */
   height: calc(100vh - 40px);
+  height: calc(100svh - 40px); 
+  
   margin-bottom: 40px;
   overflow: hidden;
+  
+  /* Fix for Waydroid/Android Nav Bar overlap in all layouts */
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
 }
 
 /* RTL layout adjustments */
@@ -93,6 +100,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 .tab-content-container {
   flex: 1;
   padding: $spacing-xl;
+  padding-bottom: calc($spacing-xl + env(safe-area-inset-bottom, 0px)); /* Added safety padding for desktop layout in emulators */
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
@@ -157,12 +165,14 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   .options-layout {
     flex-direction: column !important;
     height: 100vh !important;
+    height: 100svh !important; /* Use Small Viewport Height for mobile browsers */
     width: 100vw !important;
     margin: 0 !important;
     border-radius: 0 !important;
     border: none !important;
     max-width: none !important;
     min-width: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 20px) !important; /* Respect Android Nav Bar */
   }
 
   .options-main {
@@ -177,6 +187,11 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     padding: 0 !important;
     flex: 1 !important;
     overflow-y: auto !important;
+    
+    // Additional padding for the content itself
+    :global(.tab-content) {
+      padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+    }
   }
 }
 

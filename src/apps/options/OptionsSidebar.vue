@@ -161,6 +161,19 @@ onMounted(async () => {
   z-index: 1;
   box-sizing: border-box;
   box-shadow: inset -1px 0 0 var(--color-border);
+  
+  /* Add scroll support for the entire sidebar if content is too tall */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar for sidebar */
+.options-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.options-sidebar::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
 }
 
 .sidebar-content {
@@ -168,6 +181,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: var(--spacing-md);
   flex-grow: 1;
+  min-height: min-content; /* Ensure items don't squash */
 }
 
 .sidebar-header {
@@ -281,6 +295,11 @@ onMounted(async () => {
     background: transparent !important;
     h2 { display: none; }
     
+    /* Limit list height even more in horizontal header mode */
+    .language-list {
+      max-height: 100px !important;
+    }
+    
     /* Remove click/tap highlight effects on mobile header */
     -webkit-tap-highlight-color: transparent !important;
     outline: none !important;
@@ -349,8 +368,12 @@ onMounted(async () => {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 200px;
+    max-height: 160px; /* Slightly smaller to save space */
     overflow-y: auto;
+    
+    /* Better scrollbar for the list */
+    &::-webkit-scrollbar { width: 3px; }
+    &::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
   }
   .language-list-item {
     cursor: pointer;

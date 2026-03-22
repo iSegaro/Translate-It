@@ -34,11 +34,12 @@ body.popup-context {
 /* Options context - only applied in options.js */
 body.options-context {
   min-height: 100vh !important;
+  min-height: 100svh !important;
   overflow: hidden !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  padding: 0 !important; /* No padding on body */
+  padding: 0 0 env(safe-area-inset-bottom, 0px) 0 !important; /* Safety padding for Android Nav Bar */
   margin: 0; /* Ensure no default margin */
 }
 
