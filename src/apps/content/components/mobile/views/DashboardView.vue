@@ -1,72 +1,122 @@
 <template>
-  <div class="dashboard-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0;">
-    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 100%; margin: 0 auto; justify-items: center; padding: 10px 0;">
+  <div class="dashboard-view" style="width: 100% !important; margin: 0 !important; padding: 0 !important; background: transparent !important; display: block !important; overflow: hidden !important;">
+    <div class="dashboard-scroll-container" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; overflow-x: auto !important; overflow-y: hidden !important; width: 100% !important; padding: 15px 10px !important; gap: 8px !important; box-sizing: border-box !important; -webkit-overflow-scrolling: touch !important;">
+      
       <!-- Translate Page Button -->
-      <button class="action-card" @click="translatePage">
-        <div class="icon-container translate-page">
-          <img :src="wholePageIcon" alt="Translate Page" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+      <button class="action-btn" @click="translatePage" :style="btnStyle">
+        <div class="icon-container translate-page" :style="[iconContainerStyle, { background: '#e7f5ff' }]">
+          <img :src="wholePageIcon" alt="Page" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label">Page</span>
+        <span class="action-label" :style="labelStyle">Page</span>
       </button>
 
       <!-- Select Element Button -->
-      <button class="action-card" @click="activateSelectElement">
-        <div class="icon-container select-element">
-          <img :src="selectIcon" alt="Select Element" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+      <button class="action-btn" @click="activateSelectElement" :style="btnStyle">
+        <div class="icon-container select-element" :style="[iconContainerStyle, { background: '#f3f0ff' }]">
+          <img :src="selectIcon" alt="Select" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label">Select</span>
+        <span class="action-label" :style="labelStyle">Select</span>
       </button>
 
       <!-- Manual Translation Button -->
-      <button class="action-card" @click="goToInputView">
-        <div class="icon-container manual-input">
-          <img :src="translateIcon" alt="Manual Translation" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+      <button class="action-btn" @click="goToInputView" :style="btnStyle">
+        <div class="icon-container manual-input" :style="[iconContainerStyle, { background: '#ebfbee' }]">
+          <img :src="translateIcon" alt="Input" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label">Input</span>
+        <span class="action-label" :style="labelStyle">Input</span>
       </button>
 
       <!-- Settings Button -->
-      <button class="action-card" @click="openSettings">
-        <div class="icon-container settings">
-          <img :src="settingsIcon" alt="Settings" style="width: 24px !important; height: 24px !important; object-fit: contain !important;" />
+      <button class="action-btn" @click="openSettings" :style="btnStyle">
+        <div class="icon-container settings" :style="[iconContainerStyle, { background: '#fff4e6' }]">
+          <img :src="settingsIcon" alt="Settings" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label">Settings</span>
+        <span class="action-label" :style="labelStyle">Settings</span>
+      </button>
+
+      <!-- Revert Element Translations (Dynamic) -->
+      <button v-if="hasElementTranslations" class="action-btn revert-btn" @click="revertTranslations" :style="btnStyle">
+        <div class="icon-container revert" :style="[iconContainerStyle, { background: '#fff5f5' }]">
+          <img :src="revertIcon" alt="Revert" :style="iconImageStyle" width="24" height="24" />
+        </div>
+        <span class="action-label" :style="labelStyle">Revert</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
-// Import icons for dynamic usage and correct resolution in content scripts
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
 import translateIcon from '@/icons/ui/translate.png';
 import settingsIcon from '@/icons/ui/settings.png';
+import revertIcon from '@/icons/ui/revert.png';
 
 const mobileStore = useMobileStore()
+const { hasElementTranslations } = storeToRefs(mobileStore)
 const pageEventBus = window.pageEventBus
 
+// NEW: Minimal Button Style (No card background/border)
+const btnStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  border: 'none',
+  padding: '8px 0',
+  cursor: 'pointer',
+  outline: 'none',
+  minWidth: '72px',
+  maxWidth: '72px',
+  flex: '0 0 72px',
+  boxSizing: 'border-box',
+  WebkitTapHighlightColor: 'transparent'
+};
+
+const iconContainerStyle = {
+  width: '48px',
+  height: '48px',
+  borderRadius: '14px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: '6px',
+  flexShrink: '0',
+  transition: 'transform 0.1s ease'
+};
+
+const iconImageStyle = {
+  width: '24px !important',
+  height: '24px !important',
+  minWidth: '24px !important',
+  minHeight: '24px !important',
+  maxWidth: '24px !important',
+  maxHeight: '24px !important',
+  objectFit: 'contain',
+  display: 'block'
+};
+
+const labelStyle = {
+  fontSize: '11px',
+  fontWeight: '600',
+  color: '#495057',
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  width: '100%'
+};
+
 const translatePage = (event) => {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
-  // Set view so it's ready when user re-opens the sheet
+  if (event) { event.preventDefault(); event.stopPropagation(); }
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  
-  // Close sheet IMMEDIATELY for instant feedback
   mobileStore.closeSheet()
-  
-  // Defer the heavy translation start logic to the next tick
-  setTimeout(() => {
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
-  }, 0)
+  setTimeout(() => { pageEventBus.emit(MessageActions.PAGE_TRANSLATE) }, 0)
 }
 
 const activateSelectElement = () => {
@@ -82,39 +132,28 @@ const goToInputView = () => {
 const openSettings = () => {
   pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS)
 }
+
+const revertTranslations = () => {
+  pageEventBus.emit('revert-translations')
+}
 </script>
 
-<style>
-.action-card { 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center; 
-  background: #f8f9fa; 
-  border: 1px solid #e9ecef; 
-  border-radius: 12px; 
-  padding: 12px 4px; 
-  cursor: pointer; 
-  transition: all 0.2s ease; 
-  outline: none; 
-  -webkit-tap-highlight-color: transparent; 
-  width: 100%;
+<style scoped>
+.dashboard-scroll-container::-webkit-scrollbar { display: none !important; }
+.dashboard-scroll-container { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+
+/* Visual feedback on the icon container instead of the whole card */
+.action-btn:active .icon-container { 
+  transform: scale(0.92) !important;
+  filter: brightness(0.9);
 }
-.action-card:active { background: #e9ecef; transform: scale(0.96); }
-.icon-container { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
-.icon-container img { width: 24px; height: 24px; object-fit: contain; }
-.translate-page { background: #e7f5ff; }
-.select-element { background: #f3f0ff; }
-.manual-input { background: #ebfbee; }
-.settings { background: #fff4e6; }
-.action-label { font-size: 11px; font-weight: 700; color: #495057; text-align: center; white-space: nowrap; }
 
 @media (prefers-color-scheme: dark) {
-  .action-card { background: #2d2d2d !important; border-color: #444 !important; }
   .action-label { color: #e0e0e0 !important; }
-  .translate-page { background: #1864ab22; }
-  .select-element { background: #5f3dc422; }
-  .manual-input { background: #2b8a3e22; }
-  .settings { background: #d9480f22; }
+  .translate-page { background-color: #1864ab33 !important; }
+  .select-element { background-color: #5f3dc433 !important; }
+  .manual-input { background-color: #2b8a3e33 !important; }
+  .settings { background-color: #d9480f33 !important; }
+  .revert { background-color: #c92a2a33 !important; }
 }
 </style>

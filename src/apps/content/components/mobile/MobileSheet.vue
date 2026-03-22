@@ -8,7 +8,10 @@
     <div 
       class="mobile-sheet"
       :class="[`state-${sheetState}`]"
-      :style="sheetStyle"
+      :style="[sheetStyle, activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? { touchAction: 'none !important' } : {}]"
+      @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
+      @touchmove="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragMove($event) : null"
+      @touchend="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragEnd($event) : null"
     >
       <!-- Drag Handle Header -->
       <div 
@@ -28,7 +31,7 @@
           flex: '1 !important', 
           overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
           background: 'white !important', 
-          padding: '20px !important' 
+          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '20px !important' 
         }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
@@ -72,13 +75,21 @@ const {
   sheetTranslation,
   onDragStart,
   onDragMove,
-  onDragEnd
+  onDragEnd,
+  syncState
 } = useMobileGestures({
   onClose: () => mobileStore.closeSheet(),
   onExpand: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL),
   onPeek: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK),
   initialState: sheetState.value
 })
+
+// Sync internal gesture state with store state changes
+watch(sheetState, (newVal) => {
+  if (typeof syncState === 'function') {
+    syncState(newVal);
+  }
+}, { immediate: true });
 
 const sheetStyle = computed(() => {
   const y = isDragging.value ? sheetTranslation.value : 0;
@@ -98,7 +109,7 @@ const sheetStyle = computed(() => {
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
       ? '90vh' 
-      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '25vh' : '40vh'),
+      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '22vh' : '40vh'),
     maxHeight: '90vh'
   }
 })

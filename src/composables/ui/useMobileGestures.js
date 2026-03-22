@@ -49,9 +49,9 @@ export function useMobileGestures(options = {}) {
 
   const onDragEnd = () => {
     if (!isDragging.value) return
-    isDragging.value = false
+    isDragging.value = false;
 
-    const threshold = 100 // Pixel threshold to trigger state change
+    const threshold = 60; // Pixel threshold to trigger state change (reduced from 100)
     
     if (dragY.value > threshold) {
       // Dragged down
@@ -59,18 +59,23 @@ export function useMobileGestures(options = {}) {
         currentSheetState.value = MOBILE_CONSTANTS.SHEET_STATE.PEEK
         onPeek()
       } else {
+        // Already in PEEK or other, so close
         currentSheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED
         onClose()
       }
     } else if (dragY.value < -threshold) {
       // Dragged up
-      if (currentSheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
+      if (currentSheetState.value !== MOBILE_CONSTANTS.SHEET_STATE.FULL) {
         currentSheetState.value = MOBILE_CONSTANTS.SHEET_STATE.FULL
         onExpand()
       }
     }
     
     dragY.value = 0
+  }
+
+  const syncState = (newState) => {
+    currentSheetState.value = newState
   }
 
   return {
@@ -80,6 +85,7 @@ export function useMobileGestures(options = {}) {
     onDragStart,
     onDragMove,
     onDragEnd,
-    currentSheetState
+    currentSheetState,
+    syncState
   }
 }

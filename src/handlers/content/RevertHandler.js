@@ -5,6 +5,8 @@ import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
+import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { useMobileStore } from '@/store/modules/mobile.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
@@ -17,6 +19,14 @@ export class RevertHandler extends ResourceTracker {
     super('revert-handler')
     this.context = 'content-revert';
     this.isExecuting = false; // Prevent duplicate executions
+
+    // Listen for revert requests from the PageEventBus (used by mobile dashboard and notifications)
+    pageEventBus.on('revert-translations', () => {
+      logger.info('Revert requested via PageEventBus');
+      this.executeRevert().catch(err => {
+        logger.error('Failed to execute revert from PageEventBus:', err);
+      });
+    });
   }
 
   /**
@@ -132,6 +142,13 @@ export class RevertHandler extends ResourceTracker {
 
       if (selectElementReverted) {
         logger.debug('Reverted Select Element translation via global state');
+        
+        // Update mobile store if on mobile
+        if (deviceDetector.isMobile()) {
+          const mobileStore = useMobileStore();
+          mobileStore.setHasElementTranslations(false);
+        }
+        
         return 1;
       }
 

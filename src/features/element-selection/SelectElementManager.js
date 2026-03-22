@@ -16,6 +16,7 @@ import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { useMobileStore } from '@/store/modules/mobile.js';
 
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
@@ -625,6 +626,12 @@ class SelectElementManager extends ResourceTracker {
       if (result.success) {
         this.logger.info('Translation completed successfully');
 
+        // Update mobile store to show Revert button if on mobile
+        if (deviceDetector.isMobile()) {
+          const mobileStore = useMobileStore();
+          mobileStore.setHasElementTranslations(true);
+        }
+
         // Hide translation overlay
         pageEventBus.emit('hide-translation', { element: targetElement });
 
@@ -711,6 +718,12 @@ class SelectElementManager extends ResourceTracker {
 
     // Revert via domtranslator adapter (returns count of reverted translations)
     const revertedCount = await this.domTranslatorAdapter.revertTranslation();
+
+    // Reset mobile store status if on mobile
+    if (deviceDetector.isMobile()) {
+      const mobileStore = useMobileStore();
+      mobileStore.setHasElementTranslations(false);
+    }
 
     this.logger.info('Translation revert completed', { revertedCount });
 

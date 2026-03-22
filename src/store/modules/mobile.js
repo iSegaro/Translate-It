@@ -30,6 +30,9 @@ export const useMobileStore = defineStore('mobile', () => {
     errorMessage: null
   })
 
+  // Select Element State
+  const hasElementTranslations = ref(false)
+
   // Getters
   const isSheetOpen = computed(() => isOpen.value)
   const currentView = computed(() => activeView.value)
@@ -102,6 +105,10 @@ export const useMobileStore = defineStore('mobile', () => {
     }
   }
 
+  const setHasElementTranslations = (value) => {
+    hasElementTranslations.value = value
+  }
+
   return {
     // State
     isOpen,
@@ -110,6 +117,7 @@ export const useMobileStore = defineStore('mobile', () => {
     isKeyboardVisible,
     selectionData,
     pageTranslationData,
+    hasElementTranslations,
     
     // Getters
     isSheetOpen,
@@ -126,6 +134,7 @@ export const useMobileStore = defineStore('mobile', () => {
     updateSelectionData,
     resetSelectionData,
     setPageTranslation,
-    resetPageTranslation
+    resetPageTranslation,
+    setHasElementTranslations
   }
 })
