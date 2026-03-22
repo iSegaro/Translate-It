@@ -16,12 +16,12 @@
       <!-- Drag Handle Header -->
       <div 
         class="sheet-header" 
-        style="width: 100% !important; height: 40px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
+        style="width: 100% !important; height: 24px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
       >
-        <div style="width: 40px !important; height: 6px !important; background: #e0e0e0 !important; border-radius: 3px !important;"></div>
+        <div style="width: 36px !important; height: 4px !important; background: #e0e0e0 !important; border-radius: 2px !important;"></div>
       </div>
 
       <!-- Main Content Container -->
@@ -109,7 +109,7 @@ const sheetStyle = computed(() => {
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
       ? '90vh' 
-      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '22vh' : '40vh'),
+      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '18vh' : '40vh'),
     maxHeight: '90vh'
   }
 })

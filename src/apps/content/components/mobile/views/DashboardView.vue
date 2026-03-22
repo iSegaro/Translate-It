@@ -81,13 +81,13 @@ const btnStyle = {
 };
 
 const iconContainerStyle = {
-  width: '48px',
-  height: '48px',
-  borderRadius: '14px',
+  width: '42px',
+  height: '42px',
+  borderRadius: '12px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  marginBottom: '6px',
+  marginBottom: '4px',
   flexShrink: '0',
   transition: 'transform 0.1s ease'
 };
