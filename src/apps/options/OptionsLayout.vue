@@ -74,12 +74,9 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   border: $border-width $border-style var(--color-border);
   margin: 0 auto;
   box-sizing: border-box;
-  height: calc(
-    100vh - 40px
-  ) !important; /* Force height to leave space at the bottom */
-  margin-bottom: 40px !important; /* Force spacing at the bottom */
-
-  /* Debug outline removed */
+  height: calc(100vh - 40px);
+  margin-bottom: 40px;
+  overflow: hidden;
 }
 
 /* RTL layout adjustments */
@@ -93,21 +90,18 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   background-color: var(--color-background);
   border-radius: 0 $border-radius-lg $border-radius-lg 0;
   min-width: 0;
-  width: 900px; // 200px navigation + 700px content
-  max-width: 900px;
   box-sizing: border-box;
+  width: 100%; /* Changed from fixed width to 100% of available space */
 }
 
 .tab-content-container {
   flex: 1;
-  width: 700px;
-  // min-width: 700px;
-  max-width: 700px;
   padding: $spacing-xl;
   overflow-y: auto;
   position: relative;
   scroll-behavior: smooth;
   box-sizing: border-box;
+  max-width: 100%; /* Ensure it doesn't overflow its parent */
 
   // Better scrollbar styling
   &::-webkit-scrollbar {
@@ -173,20 +167,12 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 @media (max-width: #{$breakpoint-lg}) {
   .options-layout {
     width: 95vw;
-    height: auto;
-    min-height: 90vh;
+    height: 90vh;
+    margin-top: 20px;
   }
 
   .options-main {
-    width: auto;
-    max-width: none;
-  }
-
-  .tab-content-container {
-    width: auto;
-    min-width: 300px;
-    max-width: none;
-    padding: $spacing-lg;
+    flex-direction: column;
   }
 }
 
@@ -194,67 +180,34 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 @media (max-width: #{$breakpoint-md}) {
   .options-layout {
     flex-direction: column;
-    height: auto;
-    width: 98vw;
-    min-height: 95vh;
+    height: 100vh;
+    width: 100vw;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    max-width: none;
+    min-width: 0;
   }
 
   .options-main {
     flex-direction: column;
-    width: 100%;
-    max-width: none;
+    height: calc(100% - 100px); /* Leave space for sidebar if it becomes a header */
+    border-radius: 0;
   }
 
   .tab-content-container {
-    width: 100%;
-    min-width: auto;
-    max-width: none;
-    padding: $spacing-md;
+    padding: $spacing-lg $spacing-md ($spacing-xxl * 3); /* Ensure last items are visible above fixed footer */
   }
 }
 
 // Small mobile responsive
 @media (max-width: #{$breakpoint-sm}) {
-  .options-layout {
-    border-radius: 0;
-    min-height: 100vh;
-    width: 100vw;
-  }
-
   .tab-content-container {
     padding: $spacing-base;
-  }
-}
-
-/* Tab content transition styles */
-.tab-content {
-  opacity: 0;
-  display: none;
-  transition: opacity 300ms ease;
-
-  &.active {
-    display: block;
-    opacity: 1;
   }
 }
 </style>
 
 <style scoped>
-.options-layout {
-  height: 100vh; /* ارتفاع کاملاً ثابت */
-  max-height: 100vh; /* جلوگیری از افزایش ارتفاع */
-  overflow: hidden; /* جلوگیری از اسکرول داخلی */
-}
-
-.tab-content-container {
-  flex: 1; /* Allow the container to grow and fill available space */
-  height: calc(
-    100% - var(--options-main-padding, 20px)
-  ); /* Dynamically adjust based on options-main height */
-  max-height: calc(
-    100% - var(--options-main-padding, 20px)
-  ); /* Ensure it fits within options-main */
-  overflow-y: auto; /* Enable vertical scrolling */
-  overflow-x: hidden; /* Prevent horizontal scrolling */
-}
+/* Scoped overrides if necessary, but preferred to keep logic in SCSS block */
 </style>

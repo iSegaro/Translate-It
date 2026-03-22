@@ -251,20 +251,38 @@ const saveAllSettings = async () => {
     border-bottom: $border-width $border-style var(--color-border);
     flex-direction: row;
     overflow-x: auto;
-    padding: $spacing-sm 0;
+    padding: $spacing-xs 0;
     width: 100%;
     max-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--color-surface);
     
     .tab-button {
       border-left: none;
-      border-bottom: 4px solid transparent;
+      border-bottom: 3px solid transparent;
       white-space: nowrap;
-      min-width: 120px;
+      padding: $spacing-sm $spacing-md;
+      min-width: auto;
       
       &.active {
         border-left: none;
         border-bottom-color: var(--color-primary);
+        
+        &::before {
+          display: none;
+        }
       }
+    }
+
+    .tabs-action-area {
+      display: flex;
+      flex-direction: row;
+      margin-top: 0;
+      border-top: none;
+      padding: 0 $spacing-md;
+      border-left: $border-width $border-style var(--color-border);
     }
   }
 }
@@ -277,16 +295,19 @@ const saveAllSettings = async () => {
     border-bottom: $border-width $border-style var(--color-border);
     flex-direction: row;
     overflow-x: auto;
-    padding: $spacing-sm 0;
+    padding: 0;
     width: 100%;
     max-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
     
     .tab-button {
       flex-shrink: 0;
       border-left: none;
-      border-bottom: 4px solid transparent;
-      padding: $spacing-sm $spacing-md;
-      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      padding: $spacing-md $spacing-md;
+      font-size: $font-size-xs;
       
       &.active {
         border-left-color: transparent;
@@ -295,7 +316,32 @@ const saveAllSettings = async () => {
     }
     
     .tabs-action-area {
-      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--color-surface);
+      border-top: $border-width $border-style var(--color-border);
+      border-left: none;
+      padding: $spacing-sm $spacing-md;
+      z-index: 100;
+      flex-direction: row;
+      justify-content: space-between;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      margin: 0;
+      width: 100%;
+      box-sizing: border-box;
+
+      .save-button {
+        width: auto;
+        padding: $spacing-xs $spacing-lg;
+      }
+
+      #status {
+        width: auto;
+        order: 0;
+        font-size: $font-size-xs;
+      }
     }
   }
 }

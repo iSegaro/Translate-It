@@ -160,8 +160,6 @@ onMounted(async () => {
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-
-  /* Better visual hierarchy */
   box-shadow: inset -1px 0 0 var(--color-border);
 }
 
@@ -198,16 +196,16 @@ onMounted(async () => {
 
 .sidebar-section {
   border: var(--border-width) var(--border-style) var(--color-border);
-  border-radius: var(--border-radius-lg); /* Add rounded corners */
+  border-radius: var(--border-radius-lg);
   padding: var(--spacing-md);
   background: var(--color-background);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add subtle shadow for better appearance */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
-  margin: 10px; /* Add space between sections */
+  margin: 10px;
 
   &:hover {
     border-color: var(--color-primary);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Enhance shadow on hover */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
 
   h2 {
@@ -250,28 +248,73 @@ onMounted(async () => {
 }
 
 /* Tablet responsive */
-@media (max-width: var(--breakpoint-lg)) {
+@media (max-width: 1024px) {
   .options-sidebar {
     flex: none;
+    width: 100%;
     border-right: none;
     border-bottom: var(--border-width) var(--border-style) var(--color-border);
+    flex-direction: row;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .sidebar-content {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    gap: var(--spacing-lg);
+  }
+
+  .sidebar-header {
+    margin-bottom: 0;
+    text-align: left;
+    p, span { display: none; }
+    h1 { font-size: var(--font-size-xl); margin: 0; }
+  }
+
+  .sidebar-section {
+    margin: 0;
+    padding: var(--spacing-sm);
+    box-shadow: none;
+    border: none;
+    background: transparent;
+    h2 { display: none; }
+  }
+
+  .sidebar-footer {
+    display: none;
   }
 }
 
 /* Mobile responsive */
-@media (max-width: var(--breakpoint-md)) {
+@media (max-width: 768px) {
   .options-sidebar {
-    flex: none;
-    padding: var(--spacing-base);
-    border-right: none;
-    border-bottom: var(--border-width) var(--border-style) var(--color-border);
+    padding: var(--spacing-sm);
+    min-height: 60px;
+  }
 
-    .sidebar-header {
-      text-align: left;
+  .sidebar-content {
+    gap: var(--spacing-sm);
+    justify-content: space-between;
+  }
 
-      h1 {
-        font-size: var(--font-size-lg);
-      }
+  .sidebar-header {
+    h1 {
+      font-size: var(--font-size-lg);
+    }
+  }
+  
+  .sidebar-section {
+    padding: 0;
+  }
+}
+
+/* Small mobile responsive */
+@media (max-width: 480px) {
+  .sidebar-header {
+    h1 {
+      font-size: var(--font-size-base);
     }
   }
 }
