@@ -256,6 +256,11 @@ export class PageTranslationScheduler extends ResourceTracker {
       });
 
       this._reportProgress();
+
+      // Check if we are done with all current tasks
+      if (this.queue.length === 0 && this.activeFlushes === 1) {
+        this._checkCompletion();
+      }
     } catch (error) {
       const msg = error.message;
       if (msg !== 'Session changed or stopped' && msg !== 'Session stopped') {
@@ -363,5 +368,26 @@ export class PageTranslationScheduler extends ResourceTracker {
         }
       }, this._reportInterval - timeSinceLastReport);
     }
+  }
+
+  /**
+   * Check if translation is complete and emit event
+   */
+  _checkCompletion() {
+    // Small delay to ensure no more immediate tasks are coming
+    this.trackTimeout(() => {
+      if (this.isTranslated && this.queue.length === 0 && this.activeFlushes === 0) {
+        if (this.totalTasks > 0 && this.translatedCount >= this.totalTasks) {
+          this.logger.info('Scheduler detected completion', { 
+            translated: this.translatedCount, 
+            total: this.totalTasks 
+          });
+          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+            translatedCount: this.translatedCount,
+            totalCount: this.totalTasks
+          });
+        }
+      }
+    }, 500);
   }
 }

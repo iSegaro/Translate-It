@@ -374,6 +374,15 @@
   "show_desktop_fab_description": {
     "message": "デスクトップにフローティングアクションボタンを表示し、ページ翻訳や要素選択などのツールにすばやくアクセスできるようにします。"
   },
+  "restore_original_label": {
+    "message": "原文を表示"
+  },
+  "stop_auto_translating_label": {
+    "message": "自動翻訳を停止"
+  },
+  "translating_label": {
+    "message": "翻訳中"
+  },
   "translate_on_text_fields_label": {
     "message": "テキストフィールドに翻訳アイコンを表示"
   },

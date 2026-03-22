@@ -13,7 +13,7 @@
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
         @click.stop="handleRevert"
-        title="Revert Translations"
+        title="Revert Element Translations"
         style="position: absolute !important; bottom: 55px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
@@ -34,8 +34,10 @@
           v-for="item in menuItems" 
           :key="item.id" 
           class="fab-menu-item"
-          @click.stop="handleMenuItemClick(item)"
+          :class="{ 'is-disabled': item.disabled }"
+          @click.stop="item.disabled ? null : handleMenuItemClick(item)"
           style="display: flex !important; align-items: center !important; padding: 12px 16px !important; cursor: pointer !important; color: #333 !important; width: 100% !important; box-sizing: border-box !important; transition: background 0.2s !important;"
+          :style="item.disabled ? 'opacity: 0.6 !important; cursor: default !important; pointer-events: none !important;' : ''"
         >
           <img 
             v-if="item.icon" 
@@ -64,6 +66,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -73,10 +76,13 @@ import { useMobileStore } from '@/store/modules/mobile.js';
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
 import IconRevert from '@/icons/ui/revert.png';
+import IconRestore from '@/icons/ui/restore.svg';
+import IconClear from '@/icons/ui/clear.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
 const mobileStore = useMobileStore();
+const { t } = useI18n();
 
 const isMenuOpen = ref(false);
 const isFaded = ref(false);
@@ -84,28 +90,62 @@ const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const fabContainerRef = ref(null);
 
-const menuItems = ref([
-  {
-    id: 'select_element',
-    label: 'Select Element',
-    icon: IconSelectElement,
-    action: async () => {
-      try {
-        await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
-      } catch (err) {
-        logger.error('Failed to trigger select element from FAB:', err);
+const menuItems = computed(() => {
+  const items = [
+    {
+      id: 'select_element',
+      label: t('select_element_label') || 'Select Element',
+      icon: IconSelectElement,
+      action: async () => {
+        try {
+          await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+        } catch (err) {
+          logger.error('Failed to trigger select element from FAB:', err);
+        }
       }
     }
-  },
-  {
-    id: 'translate_page',
-    label: 'Translate Page',
-    icon: IconTranslatePage,
-    action: () => {
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE);
-    }
+  ];
+
+  const pageData = mobileStore.pageTranslationData;
+  const isDone = pageData.totalCount > 0 && pageData.translatedCount >= pageData.totalCount;
+  const isTranslating = pageData.status === 'translating' && !isDone;
+
+  if (isTranslating) {
+    const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
+    items.push({
+      id: 'page_translating',
+      label: `${t('translating_label') || 'Translating'} (${percent}%)`,
+      icon: IconTranslatePage,
+      disabled: true
+    });
+  } else if (pageData.isAutoTranslating) {
+    // If auto-translating, primary action is to STOP it
+    items.push({
+      id: 'stop_auto',
+      label: t('stop_auto_translating_label') || 'Stop Auto Translating',
+      icon: IconClear,
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
+    });
+  } else if (pageData.isTranslated || isDone) {
+    // If translated but NOT auto-translating, show Restore
+    items.push({
+      id: 'restore_page',
+      label: t('restore_original_label') || 'Restore Original',
+      icon: IconRestore,
+      action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
+    });
+  } else {
+    // Default state: Translate Page
+    items.push({
+      id: 'translate_page',
+      label: t('translate_page_label') || 'Translate Page',
+      icon: IconTranslatePage,
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+    });
   }
-]);
+
+  return items;
+});
 
 const verticalPos = ref(-1);
 const isDragging = ref(false);
@@ -147,10 +187,7 @@ const handleMenuItemClick = async (item) => {
 const handleRevert = async () => {
   logger.info('Triggering Revert from Desktop FAB badge');
   try {
-    // Set to false immediately for better UX
     mobileStore.setHasElementTranslations(false);
-    
-    // Send revert message
     await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
   } catch (err) {
     logger.error('Failed to revert translations from FAB:', err);

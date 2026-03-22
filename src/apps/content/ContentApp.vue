@@ -561,75 +561,67 @@ onMounted(async () => {
     mobileStore.openSheet(detail.view || MOBILE_CONSTANTS.VIEWS.SELECTION, detail.state || MOBILE_CONSTANTS.SHEET_STATE.PEEK);
   });
 
-  // Page Translation Events for Mobile
+  // Page Translation Events (Synced globally for Mobile Sheet and Desktop FAB)
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, (detail) => {
+    mobileStore.setPageTranslation({ 
+      isTranslating: true, 
+      isTranslated: false,
+      isAutoTranslating: detail.isAutoTranslating || false,
+      status: 'translating', 
+      translatedCount: 0,
+      totalCount: 0,
+      errorMessage: null
+    });
+
     if (deviceDetector.isMobile()) {
       logger.info('Mobile: Page translation started, switching view');
-      mobileStore.setPageTranslation({ 
-        isTranslating: true, 
-        isTranslated: false,
-        isAutoTranslating: detail.isAutoTranslating || false,
-        status: 'translating', 
-        translatedCount: 0,
-        totalCount: 0,
-        errorMessage: null // Clear any previous error message
-      });
       mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK);
     }
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
-    if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({
-        translatedCount: detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount,
-        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount
-      });
-    }
+    mobileStore.setPageTranslation({
+      translatedCount: detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount,
+      totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount
+    });
   });
+
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
-    if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ 
-        isTranslating: false, 
-        isTranslated: true,
-        isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
-        status: 'completed', 
-        translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
-        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
-      });
-    }
+    mobileStore.setPageTranslation({ 
+      isTranslating: false, 
+      isTranslated: true,
+      isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
+      status: 'completed', 
+      translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
+      totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
+    });
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
-    if (deviceDetector.isMobile()) {
-      const errorInfo = await getErrorForDisplay(detail.error || 'Translation failed', 'page-translation-mobile');
-      mobileStore.setPageTranslation({ 
-        isTranslating: false, 
-        isTranslated: false, 
-        isAutoTranslating: false, // Ensure auto-translate flag is cleared on error
-        status: 'error',
-        errorMessage: errorInfo.message
-      });
-    }
+    const errorInfo = await getErrorForDisplay(detail.error || 'Translation failed', 'page-translation-content');
+    mobileStore.setPageTranslation({ 
+      isTranslating: false, 
+      isTranslated: false, 
+      isAutoTranslating: false, 
+      status: 'error',
+      errorMessage: errorInfo.message
+    });
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
-    if (deviceDetector.isMobile()) {
-      // Keep error state visible so user can see what happened
-      if (mobileStore.pageTranslationData.status !== 'error') {
-        mobileStore.resetPageTranslation();
-      }
+    // Keep error state visible so user can see what happened
+    if (mobileStore.pageTranslationData.status !== 'error') {
+      mobileStore.resetPageTranslation();
     }
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
-    if (deviceDetector.isMobile()) {
-      mobileStore.setPageTranslation({ 
-        isTranslating: false,
-        isAutoTranslating: false,
-        isTranslated: true
-      });
-    }
+    mobileStore.setPageTranslation({ 
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: true
+    });
   });
 
   // Handle open-options-page requests from translation windows and notifications

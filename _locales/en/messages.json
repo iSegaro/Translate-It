@@ -374,6 +374,15 @@
   "show_desktop_fab_description": {
     "message": "Display a floating action button on desktop to quickly access tools like Translate Page and Select Element."
   },
+  "restore_original_label": {
+    "message": "Restore Original"
+  },
+  "stop_auto_translating_label": {
+    "message": "Stop Auto Translating"
+  },
+  "translating_label": {
+    "message": "Translating"
+  },
   "translate_on_text_fields_label": {
     "message": "Showing translation Icon on text fields"
   },

@@ -374,6 +374,15 @@
   "show_desktop_fab_description": {
     "message": "نمایش یک دکمه شناور در دسکتاپ برای دسترسی سریع به ابزارهایی مانند انتخاب المان و ترجمه صفحه."
   },
+  "restore_original_label": {
+    "message": "مشاهده متن اصلی"
+  },
+  "stop_auto_translating_label": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "translating_label": {
+    "message": "در حال ترجمه"
+  },
   "translate_on_text_fields_label": {
     "message": "نمایش آیکون در فیلدهای متنی"
   },
