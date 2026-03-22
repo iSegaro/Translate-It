@@ -159,31 +159,20 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     border: none !important;
     max-width: none !important;
     min-width: 0 !important;
-    overflow: auto !important; /* Fix for dropdown position */
   }
 
   .options-main {
     flex: 1 !important;
-    display: flex !important;
     flex-direction: column !important;
-    height: 0 !important; /* Force flex child to respect container height */
+    height: auto !important;
     min-height: 0 !important;
-    overflow: hidden !important;
+    border-radius: 0 !important;
   }
 
   .tab-content-container {
+    padding: 0 !important;
     flex: 1 !important;
-    padding: 0 !important; /* Reset padding to handle it in children */
     overflow-y: auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-
-    // Apply padding to the actual content rendered by router-view
-    > * {
-      padding: $spacing-lg $spacing-md 140px !important; /* Large 140px padding at the bottom */
-      width: 100% !important;
-      box-sizing: border-box !important;
-    }
   }
 }
 

@@ -379,20 +379,22 @@ defineExpose({
 }
 
 .setting-group {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-md;
+  display: flex !important;
+  flex-direction: row !important; /* Force row on desktop */
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: $spacing-md !important;
   
   label {
-    margin-bottom: 0;
-    flex: 1;
-    white-space: nowrap;
+    margin-bottom: 0 !important;
+    flex: 1 !important;
+    white-space: nowrap !important;
   }
   
   .language-dropdown {
-    flex: 0 0 250px;
+    flex: 0 0 250px !important;
+    height: auto !important;
   }
 }
 
