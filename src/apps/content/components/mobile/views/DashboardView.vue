@@ -7,7 +7,7 @@
         <div class="icon-container translate-page" :style="[iconContainerStyle, { background: '#e7f5ff' }]">
           <img :src="wholePageIcon" alt="Page" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label" :style="labelStyle">Page</span>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
       </button>
 
       <!-- Select Element Button -->
@@ -15,7 +15,7 @@
         <div class="icon-container select-element" :style="[iconContainerStyle, { background: '#f3f0ff' }]">
           <img :src="selectIcon" alt="Select" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label" :style="labelStyle">Select</span>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
       </button>
 
       <!-- Manual Translation Button -->
@@ -23,7 +23,7 @@
         <div class="icon-container manual-input" :style="[iconContainerStyle, { background: '#ebfbee' }]">
           <img :src="translateIcon" alt="Input" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label" :style="labelStyle">Input</span>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
       </button>
 
       <!-- Settings Button -->
@@ -31,7 +31,7 @@
         <div class="icon-container settings" :style="[iconContainerStyle, { background: '#fff4e6' }]">
           <img :src="settingsIcon" alt="Settings" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label" :style="labelStyle">Settings</span>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
       </button>
 
       <!-- Revert Element Translations (Dynamic) -->
@@ -39,7 +39,7 @@
         <div class="icon-container revert" :style="[iconContainerStyle, { background: '#fff5f5' }]">
           <img :src="revertIcon" alt="Revert" :style="iconImageStyle" width="24" height="24" />
         </div>
-        <span class="action-label" :style="labelStyle">Revert</span>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
       </button>
     </div>
   </div>
@@ -47,6 +47,7 @@
 
 <script setup>
 import { storeToRefs } from 'pinia'
+import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
@@ -60,6 +61,7 @@ import revertIcon from '@/icons/ui/revert.png';
 
 const mobileStore = useMobileStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
+const { t } = useI18n()
 const pageEventBus = window.pageEventBus
 
 // NEW: Minimal Button Style (No card background/border)

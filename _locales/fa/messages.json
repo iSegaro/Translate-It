@@ -413,6 +413,123 @@
   "translate_on_text_selection_description": {
     "message": "امکان فعال شدن ترجمه به‌صورت خودکار یا با آیکون پس از انتخاب متن در صفحه را فراهم می‌کند."
   },
+  "translate_on_text_selection_description": {
+    "message": "امکان فعال‌سازی ترجمه به صورت خودکار یا از طریق آیکون پس از انتخاب متن در صفحه."
+  },
+  "mobile_dashboard_page_label": {
+    "message": "صفحه"
+  },
+  "mobile_dashboard_select_label": {
+    "message": "انتخاب"
+  },
+  "mobile_dashboard_input_label": {
+    "message": "ورودی"
+  },
+  "mobile_dashboard_settings_label": {
+    "message": "تنظیمات"
+  },
+  "mobile_dashboard_revert_label": {
+    "message": "بازگشت"
+  },
+  "mobile_selection_auto_label": {
+    "message": "خودکار"
+  },
+  "mobile_selection_translating_label": {
+    "message": "در حال ترجمه..."
+  },
+  "mobile_selection_translation_title": {
+    "message": "ترجمه"
+  },
+  "mobile_selection_source_text_title": {
+    "message": "متن اصلی"
+  },
+  "mobile_selection_speak_tooltip": {
+    "message": "پخش صدا"
+  },
+  "mobile_selection_copy_tooltip": {
+    "message": "کپی"
+  },
+  "mobile_selection_history_tooltip": {
+    "message": "تاریخچه"
+  },
+  "mobile_selection_copied_message": {
+    "message": "ترجمه در کلیپ‌بورد کپی شد"
+  },
+  "mobile_selection_history_unavailable": {
+    "message": "ویژگی تاریخچه به زودی به موبایل اضافه می‌شود"
+  },
+  "mobile_page_dashboard_btn": {
+    "message": "داشبورد"
+  },
+  "mobile_page_error_encountered": {
+    "message": "خطایی رخ داد"
+  },
+  "mobile_page_translation_progress": {
+    "message": "پیشرفت ترجمه"
+  },
+  "mobile_page_failed_status": {
+    "message": "ناموفق"
+  },
+  "mobile_page_unknown_error": {
+    "message": "خطای ناشناخته در ترجمه"
+  },
+  "mobile_page_translating_status": {
+    "message": "در حال ترجمه صفحه..."
+  },
+  "mobile_page_auto_translating_status": {
+    "message": "ترجمه خودکار فعال"
+  },
+  "mobile_page_translated_status": {
+    "message": "صفحه ترجمه شد"
+  },
+  "mobile_page_translation_failed": {
+    "message": "ترجمه ناموفق بود"
+  },
+  "mobile_page_ready_status": {
+    "message": "آماده برای ترجمه"
+  },
+  "mobile_page_retry_btn": {
+    "message": "تلاش مجدد"
+  },
+  "mobile_page_stop_btn": {
+    "message": "توقف ترجمه"
+  },
+  "mobile_page_stop_auto_btn": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "mobile_page_restore_btn": {
+    "message": "بازگرداندن صفحه اصلی"
+  },
+  "mobile_page_start_btn": {
+    "message": "شروع ترجمه"
+  },
+  "mobile_input_header_title": {
+    "message": "ورودی دستی"
+  },
+  "mobile_input_source_text_label": {
+    "message": "متن مبدأ"
+  },
+  "mobile_input_placeholder": {
+    "message": "اینجا تایپ کنید..."
+  },
+  "mobile_input_clear_btn": {
+    "message": "پاک کردن"
+  },
+  "mobile_input_to_label": {
+    "message": "به:"
+  },
+  "mobile_input_translate_btn": {
+    "message": "ترجمه"
+  },
+  "mobile_input_no_result_error": {
+    "message": "ترجمه‌ای یافت نشد. دوباره تلاش کنید."
+  },
+  "mobile_input_default_error": {
+    "message": "ترجمه با خطا مواجه شد."
+  },
+  "mobile_input_copied_message": {
+    "message": "کپی شد"
+  },
   "options_textField_mode_copy": {
     "message": "کپی در حافظه"
   },

@@ -413,6 +413,123 @@
   "translate_on_text_selection_description": {
     "message": "ページ上でテキストを選択したとき、自動またはアイコン経由で翻訳を呼び出せます。"
   },
+  "translate_on_text_selection_description": {
+    "message": "ページ上のテキストを選択した後、自動的またはアイコンを介して翻訳をトリガーできるようにします。"
+  },
+  "mobile_dashboard_page_label": {
+    "message": "ページ"
+  },
+  "mobile_dashboard_select_label": {
+    "message": "選択"
+  },
+  "mobile_dashboard_input_label": {
+    "message": "入力"
+  },
+  "mobile_dashboard_settings_label": {
+    "message": "設定"
+  },
+  "mobile_dashboard_revert_label": {
+    "message": "元に戻す"
+  },
+  "mobile_selection_auto_label": {
+    "message": "自動"
+  },
+  "mobile_selection_translating_label": {
+    "message": "翻訳中..."
+  },
+  "mobile_selection_translation_title": {
+    "message": "翻訳結果"
+  },
+  "mobile_selection_source_text_title": {
+    "message": "原文"
+  },
+  "mobile_selection_speak_tooltip": {
+    "message": "読み上げ"
+  },
+  "mobile_selection_copy_tooltip": {
+    "message": "コピー"
+  },
+  "mobile_selection_history_tooltip": {
+    "message": "履歴"
+  },
+  "mobile_selection_copied_message": {
+    "message": "翻訳結果をクリップボードにコピーしました"
+  },
+  "mobile_selection_history_unavailable": {
+    "message": "履歴機能は近日公開予定です"
+  },
+  "mobile_page_dashboard_btn": {
+    "message": "ダッシュボード"
+  },
+  "mobile_page_error_encountered": {
+    "message": "エラーが発生しました"
+  },
+  "mobile_page_translation_progress": {
+    "message": "翻訳の進捗"
+  },
+  "mobile_page_failed_status": {
+    "message": "失敗"
+  },
+  "mobile_page_unknown_error": {
+    "message": "不明な翻訳エラー"
+  },
+  "mobile_page_translating_status": {
+    "message": "ページを翻訳中..."
+  },
+  "mobile_page_auto_translating_status": {
+    "message": "自動翻訳中"
+  },
+  "mobile_page_translated_status": {
+    "message": "翻訳完了"
+  },
+  "mobile_page_translation_failed": {
+    "message": "翻訳に失敗しました"
+  },
+  "mobile_page_ready_status": {
+    "message": "翻訳の準備完了"
+  },
+  "mobile_page_retry_btn": {
+    "message": "再試行"
+  },
+  "mobile_page_stop_btn": {
+    "message": "翻訳を停止"
+  },
+  "mobile_page_stop_auto_btn": {
+    "message": "自動翻訳を停止"
+  },
+  "mobile_page_restore_btn": {
+    "message": "原文に戻す"
+  },
+  "mobile_page_start_btn": {
+    "message": "翻訳を開始"
+  },
+  "mobile_input_header_title": {
+    "message": "手動入力"
+  },
+  "mobile_input_source_text_label": {
+    "message": "原文"
+  },
+  "mobile_input_placeholder": {
+    "message": "ここに入力..."
+  },
+  "mobile_input_clear_btn": {
+    "message": "クリア"
+  },
+  "mobile_input_to_label": {
+    "message": "翻訳先:"
+  },
+  "mobile_input_translate_btn": {
+    "message": "翻訳"
+  },
+  "mobile_input_no_result_error": {
+    "message": "翻訳結果が見つかりませんでした。もう一度お試しください。"
+  },
+  "mobile_input_default_error": {
+    "message": "翻訳に失敗しました。"
+  },
+  "mobile_input_copied_message": {
+    "message": "コピーしました"
+  },
   "options_textField_mode_copy": {
     "message": "クリップボードにコピー"
   },

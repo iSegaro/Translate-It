@@ -5,34 +5,35 @@
     <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
       <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0;">
         <img src="@/icons/ui/dropdown-arrow.svg" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
-        <span style="font-weight: bold; font-size: 16px; color: #333;" class="header-title">Manual Input</span>
+        <span style="font-weight: bold; font-size: 16px; color: #333;" class="header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
 
     <!-- Input Card -->
     <div class="input-card" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
-      <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">Source Text</div>
+      <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
       <textarea
         v-model="inputText"
-        placeholder="Type here..."
+        :placeholder="t('mobile_input_placeholder') || 'Type here...'"
         :dir="inputDir"
         style="width: 100%; min-height: 80px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 0; text-align: start;"
         @focus="onFocus"
       ></textarea>
       <div v-if="inputText" style="display: flex; justify-content: flex-end;">
-        <button class="clear-btn" @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666; cursor: pointer;">Clear</button>
+        <button class="clear-btn" @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666; cursor: pointer;">{{ t('mobile_input_clear_btn') || 'Clear' }}</button>
       </div>
     </div>
 
     <!-- Controls -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 14px; color: #868e96;">To:</span>
+        <span style="font-size: 14px; color: #868e96;">{{ t('mobile_input_to_label') || 'To:' }}</span>
         <select v-model="targetLang" style="padding: 5px 10px; border-radius: 8px; border: 1px solid #ced4da; background: white; font-size: 14px;">
           <option value="en">English</option>
           <option value="fa">Persian</option>
           <option value="de">German</option>
           <option value="fr">French</option>
+          <option value="ja">Japanese</option>
         </select>
       </div>
       
@@ -41,7 +42,7 @@
         :disabled="!inputText || isLoading"
         style="background: #339af0; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: (isLoading || !inputText) ? 0.6 : 1;"
       >
-        {{ isLoading ? '...' : 'Translate' }}
+        {{ isLoading ? '...' : (t('mobile_input_translate_btn') || 'Translate') }}
       </button>
     </div>
 
@@ -70,6 +71,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
@@ -82,6 +84,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import DOMPurify from "dompurify";
 
 const mobileStore = useMobileStore()
+const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging('mobile-input')
 const { getErrorForDisplay } = useErrorHandler()
 
@@ -153,11 +156,11 @@ const handleTranslate = async () => {
       if (translated) {
         resultText.value = translated;
       } else {
-        resultText.value = "No translation found. Please try again.";
+        resultText.value = t('mobile_input_no_result_error') || "No translation found. Please try again.";
       }
     } else {
       isError.value = true;
-      const errorInfo = await getErrorForDisplay(response?.error || "Translation failed.", 'mobile-input');
+      const errorInfo = await getErrorForDisplay(response?.error || (t('mobile_input_default_error') || "Translation failed."), 'mobile-input');
       resultText.value = errorInfo.message;
     }
   } catch (error) {
@@ -173,7 +176,10 @@ const handleTranslate = async () => {
 const copyResult = () => {
   const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(resultText.value) : resultText.value;
   navigator.clipboard.writeText(plainText)
-  pageEventBus.emit('show-notification', { message: 'Copied', type: 'success' })
+  pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
+    message: t('mobile_input_copied_message') || 'Copied', 
+    type: 'success' 
+  })
 }
 
 const speakResult = () => {

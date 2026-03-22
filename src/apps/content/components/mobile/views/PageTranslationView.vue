@@ -13,7 +13,7 @@
           @click="goToDashboard" 
           style="background: #f1f3f5; border: none; padding: 0 12px; height: 28px; border-radius: 20px; color: #495057; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;"
         >
-          Dashboard
+          {{ t('mobile_page_dashboard_btn') || 'Dashboard' }}
         </button>
         
         <button class="close-btn" @click="closeView" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
@@ -42,13 +42,13 @@
             style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;"
             :style="{ color: pageTranslationData.status === 'error' ? '#fa5252' : '#adb5bd' }"
           >
-            {{ pageTranslationData.status === 'error' ? 'Error Encountered' : 'Translation Progress' }}
+            {{ pageTranslationData.status === 'error' ? (t('mobile_page_error_encountered') || 'Error Encountered') : (t('mobile_page_translation_progress') || 'Translation Progress') }}
           </span>
           <span 
             style="font-size: 20px; font-weight: 800;"
             :style="{ color: pageTranslationData.status === 'error' ? '#fa5252' : '#339af0' }"
           >
-            {{ pageTranslationData.status === 'error' ? 'Failed' : computedProgress + '%' }}
+            {{ pageTranslationData.status === 'error' ? (t('mobile_page_failed_status') || 'Failed') : computedProgress + '%' }}
           </span>
         </div>
         <div 
@@ -61,7 +61,7 @@
 
       <!-- Error Message in Progress Card -->
       <div v-if="pageTranslationData.status === 'error'" style="font-size: 13px; color: #fa5252; font-weight: 600; line-height: 1.4;">
-        {{ pageTranslationData.errorMessage || 'Unknown translation error' }}
+        {{ pageTranslationData.errorMessage || (t('mobile_page_unknown_error') || 'Unknown translation error') }}
       </div>
 
       <div class="progress-bar-container" style="height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; position: relative;" :style="{ background: pageTranslationData.status === 'error' ? '#ffe3e3' : '#e9ecef' }">
@@ -116,6 +116,7 @@
 <script setup>
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -129,6 +130,7 @@ import restoreIcon from '@/icons/ui/restore.svg';
 
 const mobileStore = useMobileStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
+const { t } = useI18n()
 
 const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'completed') return 100;
@@ -137,12 +139,14 @@ const computedProgress = computed(() => {
 })
 
 const statusMessage = computed(() => {
-  if (pageTranslationData.value.isTranslating) return 'Translating Page...';
+  if (pageTranslationData.value.isTranslating) return t('mobile_page_translating_status') || 'Translating Page...';
   if (pageTranslationData.value.isTranslated) {
-    return pageTranslationData.value.isAutoTranslating ? 'Auto-Translating' : 'Page Translated';
+    return pageTranslationData.value.isAutoTranslating 
+      ? (t('mobile_page_auto_translating_status') || 'Auto-Translating') 
+      : (t('mobile_page_translated_status') || 'Page Translated');
   }
-  if (pageTranslationData.value.status === 'error') return 'Translation Failed';
-  return 'Ready to Translate';
+  if (pageTranslationData.value.status === 'error') return t('mobile_page_translation_failed') || 'Translation Failed';
+  return t('mobile_page_ready_status') || 'Ready to Translate';
 })
 
 // Unified Button Configuration
@@ -150,10 +154,9 @@ const primaryAction = computed(() => {
   const isError = pageTranslationData.value.status === 'error';
 
   // 1. ERROR State (Highest Priority)
-  // Even if some flags are lingering, we want to show Retry if we're in error state
   if (isError) {
     return {
-      label: 'Retry Translation',
+      label: t('mobile_page_retry_btn') || 'Retry Translation',
       icon: wholePageIcon,
       bgColor: '#fa5252',
       textColor: 'white',
@@ -167,7 +170,7 @@ const primaryAction = computed(() => {
   if (pageTranslationData.value.isTranslating || pageTranslationData.value.isAutoTranslating) {
     const isInitialPass = pageTranslationData.value.isTranslating;
     return {
-      label: isInitialPass ? 'Stop Translation' : 'Stop Auto-Translation',
+      label: isInitialPass ? (t('mobile_page_stop_btn') || 'Stop Translation') : (t('mobile_page_stop_auto_btn') || 'Stop Auto-Translation'),
       icon: isInitialPass ? closeIcon : eyeHideIcon,
       bgColor: '#fff4e6',
       textColor: '#d9480f',
@@ -182,7 +185,7 @@ const primaryAction = computed(() => {
   // 3. DONE State: Already translated
   if (pageTranslationData.value.isTranslated) {
     return {
-      label: 'Restore Original Page',
+      label: t('mobile_page_restore_btn') || 'Restore Original Page',
       icon: restoreIcon,
       bgColor: '#f8f9fa',
       textColor: '#495057',
@@ -194,7 +197,7 @@ const primaryAction = computed(() => {
 
   // 4. READY State: Initial state
   return {
-    label: 'Start Translation',
+    label: t('mobile_page_start_btn') || 'Start Translation',
     icon: wholePageIcon,
     bgColor: '#339af0',
     textColor: 'white',

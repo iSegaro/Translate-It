@@ -8,7 +8,7 @@
           <img src="@/icons/ui/dropdown-arrow.svg" alt="Back" style="width: 18px !important; height: 18px !important; transform: rotate(90deg); opacity: 0.6;" />
         </button>
         <div class="lang-pair" style="display: flex; align-items: center; gap: 6px; background: #f1f3f5; padding: 4px 12px; border-radius: 20px;">
-          <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #495057;">{{ selectionData.sourceLang || 'Auto' }}</span>
+          <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #495057;">{{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}</span>
           <img src="@/icons/ui/swap.png" class="swap-icon" alt="to" style="width: 12px !important; height: 12px !important; opacity: 0.5;" />
           <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #339af0;">{{ selectionData.targetLang }}</span>
         </div>
@@ -25,7 +25,7 @@
       <!-- Loading State -->
       <div v-if="selectionData.isLoading" class="loading-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; color: #adb5bd; gap: 10px;">
         <div class="spinner"></div>
-        <span style="font-size: 14px; font-weight: 500;">Translating...</span>
+        <span style="font-size: 14px; font-weight: 500;">{{ t('mobile_selection_translating_label') || 'Translating...' }}</span>
       </div>
       
       <!-- Error State -->
@@ -42,7 +42,7 @@
           @click="expandSheet"
           style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease; display: flex; flex-direction: column; gap: 8px; cursor: pointer;"
         >
-          <div style="font-size: 10px; font-weight: 800; color: #74c0fc; text-transform: uppercase; letter-spacing: 0.5px;">Translation</div>
+          <div style="font-size: 10px; font-weight: 800; color: #74c0fc; text-transform: uppercase; letter-spacing: 0.5px;">{{ t('mobile_selection_translation_title') || 'Translation' }}</div>
           <div 
             class="translated-text markdown-body" 
             :dir="detectedDir"
@@ -52,13 +52,13 @@
           
           <!-- Quick Actions In Card -->
           <div style="display: flex; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(51, 154, 240, 0.1);" @click.stop>
-            <button class="action-btn" @click="speak" title="Speak">
+            <button class="action-btn" @click="speak" :title="t('mobile_selection_speak_tooltip') || 'Speak'">
               <img src="@/icons/ui/speaker.png" alt="Speak" style="width: 16px !important; height: 16px !important;" />
             </button>
-            <button class="action-btn" @click="copy" title="Copy">
+            <button class="action-btn" @click="copy" :title="t('mobile_selection_copy_tooltip') || 'Copy'">
               <img src="@/icons/ui/copy.png" alt="Copy" style="width: 16px !important; height: 16px !important;" />
             </button>
-            <button class="action-btn" @click="toggleHistory" title="History">
+            <button class="action-btn" @click="toggleHistory" :title="t('mobile_selection_history_tooltip') || 'History'">
               <img src="@/icons/ui/history.svg" alt="History" style="width: 16px !important; height: 16px !important;" />
             </button>
           </div>
@@ -70,7 +70,7 @@
           @click="expandSheet"
           style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; cursor: pointer;"
         >
-          <div style="font-size: 10px; font-weight: 800; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.5px;">Source Text</div>
+          <div style="font-size: 10px; font-weight: 800; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.5px;">{{ t('mobile_selection_source_text_title') || 'Source Text' }}</div>
           <div 
             class="original-text" 
             :dir="originalDir"
@@ -87,6 +87,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -98,6 +99,7 @@ import DOMPurify from "dompurify";
 
 const mobileStore = useMobileStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
+const { t } = useI18n()
 
 // Automatically expand to full if content is long
 watch(() => selectionData.value.translation, (newTranslation) => {
@@ -157,14 +159,14 @@ const copy = () => {
   const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(selectionData.value.translation) : selectionData.value.translation;
   navigator.clipboard.writeText(plainText)
   pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
-    message: 'Translation copied to clipboard',
+    message: t('mobile_selection_copied_message') || 'Translation copied to clipboard',
     type: 'success'
   })
 }
 
 const toggleHistory = () => {
   pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
-    message: 'History feature coming soon to mobile',
+    message: t('mobile_selection_history_unavailable') || 'History feature coming soon to mobile',
     type: 'info'
   })
 }

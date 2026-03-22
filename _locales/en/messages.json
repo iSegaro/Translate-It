@@ -413,6 +413,120 @@
   "translate_on_text_selection_description": {
     "message": "Allow triggering translation automatically or via an icon after selecting text on the page."
   },
+  "mobile_dashboard_page_label": {
+    "message": "Page"
+  },
+  "mobile_dashboard_select_label": {
+    "message": "Select"
+  },
+  "mobile_dashboard_input_label": {
+    "message": "Input"
+  },
+  "mobile_dashboard_settings_label": {
+    "message": "Settings"
+  },
+  "mobile_dashboard_revert_label": {
+    "message": "Revert"
+  },
+  "mobile_selection_auto_label": {
+    "message": "Auto"
+  },
+  "mobile_selection_translating_label": {
+    "message": "Translating..."
+  },
+  "mobile_selection_translation_title": {
+    "message": "Translation"
+  },
+  "mobile_selection_source_text_title": {
+    "message": "Source Text"
+  },
+  "mobile_selection_speak_tooltip": {
+    "message": "Speak"
+  },
+  "mobile_selection_copy_tooltip": {
+    "message": "Copy"
+  },
+  "mobile_selection_history_tooltip": {
+    "message": "History"
+  },
+  "mobile_selection_copied_message": {
+    "message": "Translation copied to clipboard"
+  },
+  "mobile_selection_history_unavailable": {
+    "message": "History feature coming soon to mobile"
+  },
+  "mobile_page_dashboard_btn": {
+    "message": "Dashboard"
+  },
+  "mobile_page_error_encountered": {
+    "message": "Error Encountered"
+  },
+  "mobile_page_translation_progress": {
+    "message": "Translation Progress"
+  },
+  "mobile_page_failed_status": {
+    "message": "Failed"
+  },
+  "mobile_page_unknown_error": {
+    "message": "Unknown translation error"
+  },
+  "mobile_page_translating_status": {
+    "message": "Translating Page..."
+  },
+  "mobile_page_auto_translating_status": {
+    "message": "Auto-Translating"
+  },
+  "mobile_page_translated_status": {
+    "message": "Page Translated"
+  },
+  "mobile_page_translation_failed": {
+    "message": "Translation Failed"
+  },
+  "mobile_page_ready_status": {
+    "message": "Ready to Translate"
+  },
+  "mobile_page_retry_btn": {
+    "message": "Retry Translation"
+  },
+  "mobile_page_stop_btn": {
+    "message": "Stop Translation"
+  },
+  "mobile_page_stop_auto_btn": {
+    "message": "Stop Auto-Translation"
+  },
+  "mobile_page_restore_btn": {
+    "message": "Restore Original Page"
+  },
+  "mobile_page_start_btn": {
+    "message": "Start Translation"
+  },
+  "mobile_input_header_title": {
+    "message": "Manual Input"
+  },
+  "mobile_input_source_text_label": {
+    "message": "Source Text"
+  },
+  "mobile_input_placeholder": {
+    "message": "Type here..."
+  },
+  "mobile_input_clear_btn": {
+    "message": "Clear"
+  },
+  "mobile_input_to_label": {
+    "message": "To:"
+  },
+  "mobile_input_translate_btn": {
+    "message": "Translate"
+  },
+  "mobile_input_no_result_error": {
+    "message": "No translation found. Please try again."
+  },
+  "mobile_input_default_error": {
+    "message": "Translation failed."
+  },
+  "mobile_input_copied_message": {
+    "message": "Copied"
+  },
   "options_textField_mode_copy": {
     "message": "Copy to Clipboard"
   },
