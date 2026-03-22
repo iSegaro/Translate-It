@@ -18,12 +18,12 @@
       <!-- Drag Handle Header -->
       <div 
         class="sheet-header" 
-        style="width: 100% !important; height: 24px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
+        style="width: 100% !important; height: 16px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
       >
-        <div style="width: 36px !important; height: 4px !important; background: #e0e0e0 !important; border-radius: 2px !important;"></div>
+        <div style="width: 32px !important; height: 4px !important; background: #e0e0e0 !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
       </div>
 
       <!-- Main Content Container -->
@@ -33,7 +33,7 @@
           flex: '1 !important', 
           overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
           background: 'white !important', 
-          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '20px !important' 
+          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important' 
         }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
@@ -110,8 +110,9 @@ const sheetStyle = computed(() => {
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
       ? '90vh' 
-      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '18vh' : '40vh'),
-    maxHeight: '90vh'
+      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '22vh' : '40vh'),
+    maxHeight: '90vh',
+    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease'
   }
 })
 

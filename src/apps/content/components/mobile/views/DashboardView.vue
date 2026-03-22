@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard-view" style="width: 100% !important; margin: 0 !important; padding: 0 !important; background: transparent !important; display: block !important; overflow: hidden !important;">
-    <div class="dashboard-scroll-container" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; overflow-x: auto !important; overflow-y: hidden !important; width: 100% !important; padding: 15px 10px !important; gap: 8px !important; box-sizing: border-box !important; -webkit-overflow-scrolling: touch !important;">
+    <div class="dashboard-scroll-container" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; overflow-x: auto !important; overflow-y: hidden !important; width: 100% !important; padding: 10px 10px !important; gap: 8px !important; box-sizing: border-box !important; -webkit-overflow-scrolling: touch !important;">
       
       <!-- Translate Page Button -->
       <button class="action-btn" @click="translatePage" :style="btnStyle">
