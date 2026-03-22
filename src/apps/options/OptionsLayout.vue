@@ -75,11 +75,8 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   height: calc(100vh - 40px);
   height: calc(100svh - 40px); 
   
-  margin-bottom: 40px;
+  margin: 20px auto;
   overflow: hidden;
-  
-  /* Fix for Waydroid/Android Nav Bar overlap in all layouts */
-  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
 }
 
 /* RTL layout adjustments */
@@ -100,7 +97,6 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 .tab-content-container {
   flex: 1;
   padding: $spacing-xl;
-  padding-bottom: calc($spacing-xl + env(safe-area-inset-bottom, 0px)); /* Added safety padding for desktop layout in emulators */
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;

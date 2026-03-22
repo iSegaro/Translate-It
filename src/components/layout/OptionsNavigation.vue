@@ -115,7 +115,7 @@ const saveAllSettings = async () => {
 .vertical-tabs {
   flex: 0 0 200px;
   border-right: $border-width $border-style var(--color-border);
-  padding: $spacing-md 0;
+  padding: $spacing-md 0 0 0;
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface);
@@ -123,10 +123,13 @@ const saveAllSettings = async () => {
   box-sizing: border-box;
   max-width: 200px;
   width: 200px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   
   // Custom scrollbar
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
   }
   
   &::-webkit-scrollbar-track {
@@ -135,7 +138,7 @@ const saveAllSettings = async () => {
   
   &::-webkit-scrollbar-thumb {
     background-color: var(--color-border);
-    border-radius: 3px;
+    border-radius: 2px;
     
     &:hover {
       background-color: var(--color-text-secondary);
@@ -195,12 +198,16 @@ const saveAllSettings = async () => {
 
 .tabs-action-area {
   margin-top: auto;
-  padding: $spacing-md;
+  position: sticky;
+  bottom: 0;
+  background-color: var(--color-surface);
+  padding: $spacing-md $spacing-md calc($spacing-md + 45px) $spacing-md;
   border-top: $border-width $border-style var(--color-border);
   display: flex;
   flex-direction: column;
   gap: $spacing-base;
   align-items: center;
+  z-index: 5;
 }
 
 .save-button {
@@ -317,27 +324,27 @@ const saveAllSettings = async () => {
     
     .tabs-action-area {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 60px; /* Explicit height */
+      bottom: 20px; /* Elevated from 0 to clear most nav bars */
+      left: 10px;
+      right: 10px;
+      height: 60px; 
       background: var(--color-surface);
-      border-top: $border-width $border-style var(--color-border);
-      border-left: none;
-      padding: 0 $spacing-md; /* Reduce padding for smaller height */
+      border: $border-width $border-style var(--color-border); /* Full border since it's floating now */
+      border-radius: $border-radius-lg; /* Rounded corners for modern look */
+      padding: 0 $spacing-md; 
       z-index: 100;
       flex-direction: row;
-      align-items: center; /* Center vertically */
+      align-items: center; 
       justify-content: space-between;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
       margin: 0;
-      width: 100%;
+      width: calc(100% - 20px);
       box-sizing: border-box;
 
       .save-button {
         width: auto;
         padding: $spacing-xs $spacing-lg;
-        margin-bottom: 0; /* Override any margin */
+        margin-bottom: 0; 
       }
 
       #status {

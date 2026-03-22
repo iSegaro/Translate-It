@@ -39,8 +39,8 @@ body.options-context {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  padding: 0 0 env(safe-area-inset-bottom, 0px) 0 !important; /* Safety padding for Android Nav Bar */
-  margin: 0; /* Ensure no default margin */
+  padding: 0 !important;
+  margin: 0; 
 }
 
 body.sidepanel-context #app {
