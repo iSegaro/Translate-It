@@ -218,6 +218,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.translationMessageId = `page-translate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     this.sessionContext = Symbol('translation-session');
 
+    // Reset scheduler for a fresh session
+    this.scheduler.reset();
+
     try {
       await this._loadSettings(options);
 
@@ -346,7 +349,7 @@ export class PageTranslationManager extends ResourceTracker {
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
       this.isTranslating = false;
-      this.isTranslated = true; // Keep true as existing translations remain
+      this.isTranslated = this.scheduler.translatedCount > 0;
       
       // Stop the scheduler from processing more batches
       this.scheduler.setTranslationState(false);
@@ -354,7 +357,7 @@ export class PageTranslationManager extends ResourceTracker {
       const resultData = {
         url: this.currentUrl, 
         translatedCount: this.scheduler.translatedCount,
-        isTranslated: true, 
+        isTranslated: this.isTranslated, 
         isAutoTranslating: false
       };
       

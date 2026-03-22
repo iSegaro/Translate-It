@@ -108,15 +108,15 @@ const menuItems = computed(() => {
 
   const pageData = mobileStore.pageTranslationData;
   const isDone = pageData.totalCount > 0 && pageData.translatedCount >= pageData.totalCount;
-  const isTranslating = pageData.status === 'translating' && !isDone;
+  const isCurrentlyTranslating = pageData.isTranslating && !isDone;
 
-  if (isTranslating) {
+  if (isCurrentlyTranslating) {
     const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
     items.push({
       id: 'page_translating',
-      label: `${t('translating_label') || 'Translating'} (${percent}%)`,
-      icon: IconTranslatePage,
-      disabled: true
+      label: `${t('translating_label') || 'Translating'} (${percent}%) - ${t('stop_auto_translating_label') || 'Stop'}`,
+      icon: IconClear,
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
   } else if (pageData.isAutoTranslating) {
     // If auto-translating, primary action is to STOP it

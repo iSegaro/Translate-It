@@ -620,7 +620,8 @@ onMounted(async () => {
     mobileStore.setPageTranslation({ 
       isTranslating: false,
       isAutoTranslating: false,
-      isTranslated: true
+      isTranslated: detail.translatedCount > 0,
+      status: 'completed'
     });
   });
 
