@@ -107,11 +107,25 @@ export function detectDirectionFromContent(text = '') {
  */
 function isLayoutContainer(el) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  
+  // NEVER flip direction for the root structural elements as it often causes horizontal scroll/overflow
+  if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN' || el.tagName === 'ARTICLE' || el.tagName === 'SECTION') {
+    return true;
+  }
+  
   if (LAYOUT_TAGS.has(el.tagName)) return true;
 
   const style = window.getComputedStyle(el);
   const isLayoutDisplay = style.display === 'flex' || style.display === 'grid';
+  
+  // If it's a layout engine (flex/grid) with multiple children, don't flip it
   if (isLayoutDisplay && el.children.length > 1) return true;
+
+  // If it has explicit width or height, it might be a rigid layout part
+  if (el.style.width || el.style.height || style.width.includes('px') || style.maxWidth !== 'none') {
+    // Only allow if it's a very small text-centric tag
+    if (!BLOCK_TAGS.has(el.tagName)) return true;
+  }
 
   const hasBlockChildren = Array.from(el.children).some(child => {
     const childStyle = window.getComputedStyle(child);

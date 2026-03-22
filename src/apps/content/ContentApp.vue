@@ -83,21 +83,10 @@
       class="mobile-fab notranslate"
       translate="no"
       :style="{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        width: '44px',
-        height: '44px',
-        background: 'transparent',
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.15)',
-        zIndex: '2147483647',
-        pointerEvents: 'auto',
-        cursor: 'pointer',
-        transition: 'opacity 0.5s ease, transform 0.2s ease',
+        position: 'fixed !important',
+        bottom: '24px !important',
+        right: '24px !important',
+        left: 'auto !important',
         opacity: isFabIdle ? '0.35' : '1',
         transform: 'scale(1)'
       }"
@@ -821,13 +810,11 @@ onUnmounted(async () => {
 /* Since this is in a Shadow DOM, these styles are completely isolated. */
 .content-app-container {
   position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  inset: 0 !important;
   z-index: 2147483647 !important;
   pointer-events: none !important;
   display: block !important;
+  overflow: hidden !important;
 }
 
 /* Individual components inside will override this (e.g., toaster, toolbars) */
@@ -877,7 +864,7 @@ onUnmounted(async () => {
   z-index: 2147483647;
   pointer-events: auto !important;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.5s ease;
 }
 
 .mobile-fab:active {

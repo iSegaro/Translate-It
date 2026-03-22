@@ -26,6 +26,7 @@ export class PageTranslationBridge extends ResourceTracker {
     
     // Explicitly set from settings (defaulted to true if undefined)
     this.showOriginalOnHover = settings.showOriginalOnHover ?? true;
+    const isTargetRTL = isRTL(settings.targetLanguage);
 
     // Reset lookup for a new session
     pageTranslationLookup.clear();
@@ -63,7 +64,6 @@ export class PageTranslationBridge extends ResourceTracker {
       if (translated && translated !== trimmedText) {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
         // This provides immediate string-level direction correction even before CSS is applied.
-        const isTargetRTL = isRTL(settings.targetLanguage);
         const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         
         return leadingWhitespace + mark + translated + trailingWhitespace;
@@ -103,7 +103,7 @@ export class PageTranslationBridge extends ResourceTracker {
 
             if (processedNode.nodeType === Node.TEXT_NODE) {
               try {
-                if (hasMark) {
+                if (hasMark && isTargetRTL) {
                   // Apply directional logic (Unicode marks + container alignment)
                   applyNodeDirection(processedNode, settings.targetLanguage);
                   

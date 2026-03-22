@@ -194,13 +194,16 @@ async function createMountPoint() {
       :host {
         all: initial;
         display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
         pointer-events: none;
         z-index: 2147483647;
+        overflow: hidden !important;
       }
 
       #${UI_HOST_IDS.APP_CONTAINER} {
