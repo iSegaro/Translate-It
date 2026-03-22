@@ -159,6 +159,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     border: none !important;
     max-width: none !important;
     min-width: 0 !important;
+    overflow: auto !important; /* Fix for dropdown position */
   }
 
   .options-main {

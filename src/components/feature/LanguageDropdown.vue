@@ -53,6 +53,8 @@ const handleChange = (event) => {
   background-color: var(--color-background);
   color: var(--color-text);
   cursor: pointer;
+  appearance: auto !important; /* Force native appearance on mobile for better positioning */
+  -webkit-appearance: auto !important;
   
   &:focus {
     outline: none;
