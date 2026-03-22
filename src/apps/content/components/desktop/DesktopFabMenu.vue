@@ -7,12 +7,28 @@
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
+    <!-- Revert Action (Small Badge Button) -->
+    <Transition name="fade-scale">
+      <div 
+        v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
+        class="fab-revert-badge"
+        @click.stop="handleRevert"
+        title="Revert Translations"
+        style="position: absolute !important; bottom: 55px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease !important; pointer-events: auto !important;"
+        @mouseenter="isRevertHovered = true"
+        @mouseleave="isRevertHovered = false"
+        :style="{ transform: isRevertHovered ? 'scale(1.15)' : 'scale(1)' }"
+      >
+        <img :src="IconRevert" alt="Revert" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
+      </div>
+    </Transition>
+
     <!-- Menu -->
     <Transition name="fab-menu">
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        style="position: absolute !important; bottom: 0px !important; right: 45px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; padding: 8px 0 !important; min-width: 200px !important; width: max-content !important; border: 1px solid #ddd !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        style="position: absolute !important; bottom: 0px !important; right: 80px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; padding: 8px 0 !important; min-width: 200px !important; width: max-content !important; border: 1px solid #ddd !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
       >
         <div 
           v-for="item in menuItems" 
@@ -52,16 +68,20 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { useMobileStore } from '@/store/modules/mobile.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
+import IconRevert from '@/icons/ui/revert.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
+const mobileStore = useMobileStore();
 
 const isMenuOpen = ref(false);
 const isFaded = ref(false);
 const isHovered = ref(false);
+const isRevertHovered = ref(false);
 const fabContainerRef = ref(null);
 
 const menuItems = ref([
@@ -92,10 +112,9 @@ const isDragging = ref(false);
 let startY = 0;
 
 const containerStyle = computed(() => {
-  // Determine Opacity logic
   let opacityValue = 1;
   if (isFaded.value && !isHovered.value && !isMenuOpen.value) {
-    opacityValue = 0.2; // 80% transparent when idle after 2s
+    opacityValue = 0.2; 
   }
 
   const baseStyle = {
@@ -122,6 +141,19 @@ const handleMenuItemClick = async (item) => {
   isMenuOpen.value = false;
   if (typeof item.action === 'function') {
     await item.action();
+  }
+};
+
+const handleRevert = async () => {
+  logger.info('Triggering Revert from Desktop FAB badge');
+  try {
+    // Set to false immediately for better UX
+    mobileStore.setHasElementTranslations(false);
+    
+    // Send revert message
+    await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
+  } catch (err) {
+    logger.error('Failed to revert translations from FAB:', err);
   }
 };
 
@@ -220,4 +252,28 @@ onUnmounted(() => {
 }
 
 .fab-menu-item:hover { background-color: #f5f5f5 !important; }
+
+/* Transitions */
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.fade-scale-enter-from,
+.fade-scale-leave-to {
+  opacity: 0 !important;
+  transform: scale(0.5) translateY(10px) !important;
+}
+
+.fab-menu-enter-active,
+.fab-menu-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: bottom right;
+}
+
+.fab-menu-enter-from,
+.fab-menu-leave-to {
+  opacity: 0;
+  transform: scale(0.8) translateY(10px);
+}
 </style>

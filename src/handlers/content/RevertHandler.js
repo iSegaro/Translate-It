@@ -143,11 +143,9 @@ export class RevertHandler extends ResourceTracker {
       if (selectElementReverted) {
         logger.debug('Reverted Select Element translation via global state');
         
-        // Update mobile store if on mobile
-        if (deviceDetector.isMobile()) {
-          const mobileStore = useMobileStore();
-          mobileStore.setHasElementTranslations(false);
-        }
+        // Update store to reset Revert badge
+        const mobileStore = useMobileStore();
+        mobileStore.setHasElementTranslations(false);
         
         return 1;
       }

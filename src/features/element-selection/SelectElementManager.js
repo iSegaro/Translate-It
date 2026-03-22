@@ -626,11 +626,9 @@ class SelectElementManager extends ResourceTracker {
       if (result.success) {
         this.logger.info('Translation completed successfully');
 
-        // Update mobile store to show Revert button if on mobile
-        if (deviceDetector.isMobile()) {
-          const mobileStore = useMobileStore();
-          mobileStore.setHasElementTranslations(true);
-        }
+        // Update store to show Revert button
+        const mobileStore = useMobileStore();
+        mobileStore.setHasElementTranslations(true);
 
         // Hide translation overlay
         pageEventBus.emit('hide-translation', { element: targetElement });
@@ -719,11 +717,9 @@ class SelectElementManager extends ResourceTracker {
     // Revert via domtranslator adapter (returns count of reverted translations)
     const revertedCount = await this.domTranslatorAdapter.revertTranslation();
 
-    // Reset mobile store status if on mobile
-    if (deviceDetector.isMobile()) {
-      const mobileStore = useMobileStore();
-      mobileStore.setHasElementTranslations(false);
-    }
+    // Reset store status
+    const mobileStore = useMobileStore();
+    mobileStore.setHasElementTranslations(false);
 
     this.logger.info('Translation revert completed', { revertedCount });
 
