@@ -12,8 +12,15 @@
       class="sidebar-content"
     >
       <div class="sidebar-header">
-        <h1>{{ t('name') }}</h1>
-        <span>{{ manifestVersion }}</span>
+        <a
+          href="https://github.com/iSegaro/Translate-It"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="header-logo-link"
+        >
+          <h1>{{ t('name') }}</h1>
+          <span>{{ manifestVersion }}</span>
+        </a>
         <p>{{ t('description') }}</p>
       </div>
       <div class="sidebar-section theme-controls">
@@ -212,6 +219,14 @@ onMounted(async () => {
   text-align: center;
   margin-bottom: var(--spacing-sm);
 
+  .header-logo-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    cursor: default;
+    pointer-events: none; /* Disabled by default on desktop */
+  }
+
   h1 {
     font-size: var(--font-size-xxl);
     font-weight: var(--font-weight-medium);
@@ -348,12 +363,36 @@ onMounted(async () => {
   .sidebar-header {
     margin-bottom: 0;
     text-align: left;
-    flex: 0 1 auto; /* Don't force to fill, but allow shrinking if needed */
-    p, span { display: none; }
+    flex: 0 1 auto;
+    display: flex; /* Align H1 and Span in a row */
+    align-items: baseline;
+    gap: 8px;
+
+    .header-logo-link {
+      pointer-events: auto; /* Enable link only in header mode */
+      cursor: pointer;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      transition: transform var(--transition-base);
+
+      &:hover {
+        transform: scale(1.02);
+        h1 { color: var(--color-primary); }
+      }
+    }
+
+    p { display: none; } /* Still hide description */
+    span { 
+      display: inline-block; /* Show version now */
+      font-size: var(--font-size-xs);
+      opacity: 0.7;
+    }
+
     h1 { 
       font-size: var(--font-size-xl); 
       margin: 0;
-      white-space: nowrap; /* Keep title on one line */
+      white-space: nowrap;
     }
   }
 
