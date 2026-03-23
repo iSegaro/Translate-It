@@ -21,7 +21,9 @@
       </div>
       <div class="sidebar-section localization-controls">
         <h2>{{ t('localization_section_title') }}</h2>
-        <ul :class="['language-list', { 'rtl': selectedLanguage === 'fa' }]">
+        
+        <!-- Desktop Language List -->
+        <ul :class="['language-list', 'desktop-only', { 'rtl': selectedLanguage === 'fa' }]">
           <li
             v-for="lang in interfaceLanguages"
             :key="lang.code"
@@ -37,6 +39,27 @@
             <span>{{ lang.name }}</span>
           </li>
         </ul>
+
+        <!-- Mobile Language Dropdown -->
+        <select
+          v-model="selectedLanguage"
+          class="language-select mobile-only"
+        >
+          <option
+            v-if="!interfaceLanguages || interfaceLanguages.length === 0"
+            disabled
+            value=""
+          >
+            ...
+          </option>
+          <option
+            v-for="lang in interfaceLanguages"
+            :key="lang.code"
+            :value="lang.code"
+          >
+            {{ lang.name }}
+          </option>
+        </select>
       </div>
       <div class="sidebar-footer">
         <a
@@ -261,8 +284,49 @@ onMounted(async () => {
   }
 }
 
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none;
+}
+
+/* Custom dropdown style */
+.language-select {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-base);
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+  }
+}
+
 /* Tablet responsive */
 @media (max-width: #{$breakpoint-lg}) {
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+    width: auto;
+    min-width: 140px;
+  }
+
   .options-sidebar {
     flex: none;
     width: 100%;
@@ -351,16 +415,6 @@ onMounted(async () => {
       font-size: var(--font-size-base);
     }
   }
-}
-
-.language-select {
-  width: 100%;
-  padding: var(--spacing-sm);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
 }
 
 .localization-controls {
