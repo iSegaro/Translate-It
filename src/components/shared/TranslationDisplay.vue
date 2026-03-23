@@ -508,10 +508,8 @@ onMounted(() => {
 
 /* Mode-specific containers */
 .ti-translation-display.popup-mode {
-  margin: 8px 12px;
   height: 100%;
-  max-width: calc(100vw - 24px);
-  width: 100%;
+  width: auto; /* Allow parent margins to work correctly */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -664,7 +662,7 @@ onMounted(() => {
   height: 100%;
   flex: 1;
   font-size: 13px;
-  padding: 40px 8px 8px 8px;
+  padding: 40px 12px 12px 12px;
 }
 
 .ti-popup-mode .ti-translation-content.has-error {

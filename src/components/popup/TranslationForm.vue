@@ -354,7 +354,7 @@ defineExpose({
 /* Responsive Adjustments using Media Queries */
 @media (max-width: 480px) {
   .translation-form :deep(.textarea-container) {
-    margin: 12px 16px;
+    margin: 8px 8px;
     border-radius: 8px;
   }
 
@@ -364,7 +364,7 @@ defineExpose({
   }
 
   .translation-form :deep(.translation-display.popup-mode) {
-    margin: 0 16px 16px 16px;
+    margin: 0 8px 8px 8px;
   }
 
   .translation-form :deep(.result-content) {
