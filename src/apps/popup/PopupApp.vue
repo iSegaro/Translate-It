@@ -373,25 +373,37 @@ const retryLoading = () => {
 }
 
 .language-controls {
-  display: flex;
-  flex-wrap: wrap; /* Fluid wrapping based on content width */
+  display: grid;
+  grid-template-columns: max-content 1fr; /* Allow button to take natural width */
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  padding: 4px 12px;
   gap: 12px;
   background: var(--language-controls-bg-color);
   min-height: 48px;
   box-sizing: border-box;
   width: 100%;
   overflow: hidden;
+}
 
-  /* Responsive stacking for very narrow containers */
-  @media (max-width: 350px) {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 12px;
-    gap: 12px;
+.language-controls > :first-child {
+  min-width: 110px;
+}
+
+.language-controls > :last-child {
+  min-width: 0;
+  width: 100%;
+}
+
+/* On very narrow screens, switch to two rows */
+@media (max-width: 340px) {
+  .language-controls {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  .language-controls > :first-child {
+    max-width: none;
+    width: 100%;
   }
 }
 </style>

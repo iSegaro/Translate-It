@@ -133,10 +133,6 @@ const handleSelectElement = async () => {
   logger.debug('Select Element button clicked!')
   
   try {
-    // Resolve provider based on hierarchy:
-    // 1. If Sync is ON, use UI's active provider
-    // 2. If Sync is OFF, use setting from MODE_PROVIDERS (if not null)
-    // 3. Fallback to UI's active provider (legacy behavior)
     let effectiveProvider;
     if (translationStore.ephemeralSync.element && translationStore.selectedProvider) {
       effectiveProvider = translationStore.selectedProvider;
@@ -146,39 +142,25 @@ const handleSelectElement = async () => {
       effectiveProvider = settingProvider || props.provider;
     }
 
-    logger.debug('[PopupHeader] Select element button clicked', { 
-      provider: effectiveProvider,
-      isSynced: translationStore.ephemeralSync.element 
-    })
-    
     const success = await toggleSelectElement({ 
       targetLanguage: props.targetLanguage,
       provider: effectiveProvider
     })
     if (success) {
-      logger.debug('[PopupHeader] Select element mode toggled successfully')
       window.close()
-    } else {
-      logger.debug('[PopupHeader] Select element toggle failed, keeping popup open')
     }
   } catch (error) {
-    logger.error('Select element toggle failed:', error)
     await handleError(error, 'PopupHeader-selectElement')
   }
 }
 
 const handleClearStorage = () => {
-  logger.debug('🧹 Clear Storage button clicked!')
   const event = new CustomEvent('clear-storage')
   document.dispatchEvent(event)
 }
 
 const handleRevert = async () => {
-  logger.debug('Revert button clicked!')
   try {
-    logger.debug('[PopupHeader] Executing revert action')
-
-    // Use sendMessage (goes through background script) for proper error handling
     const response = await sendMessage({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
       context: MessageContexts.POPUP,
@@ -186,79 +168,35 @@ const handleRevert = async () => {
       timestamp: Date.now()
     })
 
-    if (response?.success) {
-      logger.debug(`[PopupHeader] Revert successful: ${response.revertedCount || 0} translations reverted`)
-    } else if (response?.isRestrictedPage) {
-      // Tab is restricted - log as debug and exit gracefully
-      logger.debug('Revert action blocked (restricted page):', {
-        message: response.message,
-        tabUrl: response.tabUrl
-      });
-      return;
-    } else {
+    if (!response?.success && !response?.isRestrictedPage) {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      await handleError(new Error(`Revert failed: ${errorMsg}`), {
-        context: 'popup-header-revert-failed',
-        isSilent: true // Silent error handling for restricted pages
-      })
+      await handleError(new Error(`Revert failed: ${errorMsg}`), { context: 'popup-header-revert-failed', isSilent: true })
     }
-
   } catch (error) {
-    // Check if this is a restricted page error with response data
-    if (error.isRestrictedPage) {
-      logger.debug('Revert action blocked (restricted page):', {
-        message: error.message,
-        tabUrl: error.tabUrl
-      });
-      return; // Exit gracefully without showing error to user
-    }
-
-    // Handle all errors silently - ErrorHandler will automatically handle tab restriction errors silently
-    await handleError(error, {
-      context: 'PopupHeader-revert',
-      isSilent: true // Silent error handling for restricted pages
-    })
+    await handleError(error, { context: 'PopupHeader-revert', isSilent: true })
   }
 }
 
 const handleOpenSettings = async () => {
-  logger.debug('⚙️ Settings button clicked!')
   try {
     await browser.runtime.openOptionsPage()
-    logger.debug('Options page opened successfully')
     window.close()
   } catch (error) {
-    logger.error('Failed to open settings:', error)
     await handleError(error, 'PopupHeader-openSettings')
   }
 }
 
 const handleExcludeToggle = async () => {
-  logger.debug('🚫 Exclude Toggle button clicked! Current state:', isExtensionEnabled.value)
   try {
-    const [activeTab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-    
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (activeTab) {
-      // isExtensionEnabled = true یعنی exclude = false
-      // isExtensionEnabled = false یعنی exclude = true
       const exclude = !isExtensionEnabled.value
-      logger.debug('🚫 Setting page exclusion to:', exclude, 'for URL:', activeTab.url)
-      
       await sendMessage({
         action: MessageActions.Set_Exclude_Current_Page,
-        data: {
-          exclude: exclude,
-          url: activeTab.url,
-        },
+        data: { exclude: exclude, url: activeTab.url },
       })
-      
-      logger.debug('Page exclusion updated successfully')
     }
   } catch (error) {
-    logger.error('Failed to toggle exclusion:', error)
     await handleError(error, 'PopupHeader-excludeToggle')
   }
 }
@@ -266,22 +204,14 @@ const handleExcludeToggle = async () => {
 // Initialize exclude status
 onMounted(async () => {
   try {
-    const [activeTab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-    
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (activeTab) {
       const response = await sendMessage({
         action: MessageActions.IS_Current_Page_Excluded,
         data: { url: activeTab.url },
       })
-      // اگر صفحه excluded باشد، افزونه غیرفعال است
-      // اگر صفحه excluded نباشد، افزونه فعال است
       isExtensionEnabled.value = !(response?.excluded || false)
     }
-    
-    // Add native event listener for sidepanel button (Firefox compatibility)
     if (sidePanelButton.value && sidePanelButton.value.$el) {
       tracker.addEventListener(sidePanelButton.value.$el, 'click', handleOpenSidePanelNative, true)
     }
@@ -291,159 +221,112 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Cleanup event listener
   if (sidePanelButton.value && sidePanelButton.value.$el) {
     sidePanelButton.value.$el.removeEventListener('click', handleOpenSidePanelNative, true)
   }
 })
 
-// Native event handler for cross-browser compatibility
 const handleOpenSidePanelNative = async (event) => {
   event.preventDefault()
   event.stopPropagation()
-  
-  logger.debug('[PopupHeader] Opening sidepanel')
-  
   try {
     if (browser.sidebarAction) {
-      // Firefox: toggle behavior
       browser.sidebarAction.toggle()
-  logger.debug('[PopupHeader] Firefox sidebar toggled')
     } else if (browser.sidePanel) {
-      // Chrome: simple open behavior
       const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
-      
       if (activeTab?.id) {
         await browser.sidePanel.open({ tabId: activeTab.id })
       } else {
         await browser.sidePanel.open({})
       }
-  logger.debug('[PopupHeader] Chrome sidePanel opened')
     }
-    
     window.close()
   } catch (error) {
-  logger.error('[PopupHeader] Sidepanel failed:', error)
     await handleError(error, 'PopupHeader-sidePanel')
   }
 }
-
-
 </script>
 
 <style scoped>
 .header-toolbar {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 8px;
-  background-color: var(--header-bg-color);
-  border-bottom: 1px solid var(--header-border-color);
-  flex-direction: row;
-}
-
-.toolbar-right-group {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.toolbar-left-group {
-  display: flex;
-  gap: 4px;
-}
-
-/* Left group (Translate link) should stay on the left side */
-.toolbar-left-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  order: 1;
-}
-
-/* Right group (icon buttons + switch) should stay on the right side */
-.toolbar-right-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  order: 2;
-  /* Render items from right to left so rightmost is side-panel, then select, ..., and checkbox becomes leftmost */
-  flex-direction: row-reverse;
-}
-
-
-/* New Fluid Toolbar Styles (Universal) */
-.header-toolbar {
-  display: flex;
-  flex-wrap: wrap; /* Auto-wrap if space is tight */
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  gap: 12px;
+  padding: 8px clamp(8px, 3vw, 16px);
   background-color: var(--header-bg-color);
   border-bottom: 1px solid var(--header-border-color);
   width: 100%;
   box-sizing: border-box;
-}
-
-.toolbar-left-group {
-  display: flex;
-  align-items: center;
+  min-height: clamp(50px, 10vh, 64px);
   gap: 8px;
-  flex: 1 0 auto; /* Allow growth to fill space */
-  justify-content: flex-start;
-  min-width: fit-content;
 }
 
+.toolbar-left-group, 
 .toolbar-right-group {
   display: flex;
   align-items: center;
-  /* Larger, touch-friendly gap that scales with screen size */
-  gap: clamp(8px, 3vw, 20px); 
-  flex: 1 1 auto; 
-  justify-content: flex-end; /* Align to the end but with larger gaps */
-  flex-wrap: wrap;
+  flex: 1;
+  gap: clamp(8px, 4vw, 24px);
 }
 
-/* Base button styles that scale between compact and touch-friendly */
+.toolbar-left-group {
+  justify-content: flex-start;
+  flex: 0 1 auto;
+}
+
+.toolbar-right-group {
+  justify-content: space-around; /* Spread icons across the available width */
+  flex: 1 1 auto;
+}
+
 .ti-toolbar-button {
-  width: clamp(36px, 9vw, 48px);
-  height: clamp(36px, 9vw, 48px);
+  width: clamp(38px, 9vw, 52px);
+  height: clamp(38px, 9vw, 52px);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px; /* Slightly more rounded */
-  transition: all 0.2s ease;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   background-color: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .ti-toolbar-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
+  transform: scale(1.05);
 }
 
 .ti-toolbar-icon {
-  width: clamp(20px, 5vw, 26px);
-  height: clamp(20px, 5vw, 26px);
+  width: clamp(22px, 6vw, 30px);
+  height: clamp(22px, 6vw, 30px);
+  filter: var(--icon-filter);
+  opacity: var(--icon-opacity);
 }
 
-/* Link styling that looks good in both 1-row and 2-row layouts */
 .header-toolbar :deep(.toolbar-link) {
-  font-size: clamp(13px, 4vw, 15px);
+  font-size: clamp(14px, 4.5vw, 16px);
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
   white-space: nowrap;
   background-color: var(--toolbar-link-hover-bg-color);
-  opacity: 0.9;
+  color: var(--toolbar-link-color);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .switch {
-  width: clamp(40px, 10vw, 50px);
-  height: clamp(22px, 5vw, 26px);
   position: relative;
   display: inline-block;
+  width: clamp(44px, 12vw, 56px);
+  height: clamp(24px, 6vw, 30px);
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .switch input {
@@ -457,20 +340,21 @@ const handleOpenSidePanelNative = async (event) => {
   cursor: pointer;
   inset: 0;
   background-color: #ccc;
-  transition: 0.2s;
-  border-radius: 20px;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 30px;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: clamp(16px, 4vw, 20px);
-  width: clamp(16px, 4vw, 20px);
-  left: 2px;
-  bottom: 2px;
+  height: clamp(18px, 5vw, 24px);
+  width: clamp(18px, 5vw, 24px);
+  left: 3px;
+  bottom: 3px;
   background-color: white;
-  transition: 0.2s;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 input:checked + .slider {
@@ -478,19 +362,19 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-  /* Dynamic translation based on switch width */
-  transform: translateX(calc(clamp(40px, 10vw, 50px) - clamp(16px, 4vw, 20px) - 4px));
+  transform: translateX(calc(clamp(44px, 12vw, 56px) - clamp(18px, 5vw, 24px) - 6px));
 }
 
-/* Clean up old media queries */
-@media (max-width: 350px) {
+@media (max-width: 380px) {
   .header-toolbar {
+    flex-wrap: wrap;
     justify-content: center;
-    padding: 10px 6px;
+    gap: 12px;
   }
-  .toolbar-right-group {
+  .toolbar-left-group, .toolbar-right-group {
     justify-content: center;
     width: 100%;
+    flex: 1 0 100%;
   }
 }
 </style>

@@ -966,8 +966,7 @@ onUnmounted(() => {
 
 /* Context-specific adjustments for popup vs sidepanel */
 .popup-wrapper .ti-split-translate-button-container {
-  width: 100px;
-  min-width: 100px;
+  min-width: 110px;
   flex: none;
 }
 
