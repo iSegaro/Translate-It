@@ -372,80 +372,77 @@ const handleOpenSidePanelNative = async (event) => {
 }
 
 
-/* Responsive adjustments using Media Queries */
-@media (max-width: 480px) {
-  .header-toolbar {
-    padding: 4px 4px 4px 8px;
-    flex-wrap: nowrap;
-    gap: 8px;
-    min-height: 38px;
-  }
-
-  .toolbar-right-group {
-    gap: 4px;
-    flex-grow: 1;
-    justify-content: flex-start;
-  }
-
-  .toolbar-left-group {
-    flex-grow: 1;
-  }
-
-  .ti-toolbar-button {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .ti-toolbar-icon {
-    width: 20px;
-    height: 20px;
-  }
-
-  .switch {
-    width: 44px;
-    height: 24px;
-  }
-
-  .slider:before {
-    height: 20px;
-    width: 20px;
-  }
-
-  input:checked + .slider:before {
-    transform: translateX(20px);
-  }
+/* New Fluid Toolbar Styles (Universal) */
+.header-toolbar {
+  display: flex;
+  flex-wrap: wrap; /* Auto-wrap if space is tight */
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 12px;
+  background-color: var(--header-bg-color);
+  border-bottom: 1px solid var(--header-border-color);
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Icon styles are now handled by popup.scss global styles */
+.toolbar-left-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 0 auto; /* Allow growth to fill space */
+  justify-content: flex-start;
+  min-width: fit-content;
+}
 
-.toolbar-link {
-  display: inline-flex;
+.toolbar-right-group {
+  display: flex;
+  align-items: center;
+  /* Larger, touch-friendly gap that scales with screen size */
+  gap: clamp(8px, 3vw, 20px); 
+  flex: 1 1 auto; 
+  justify-content: flex-end; /* Align to the end but with larger gaps */
+  flex-wrap: wrap;
+}
+
+/* Base button styles that scale between compact and touch-friendly */
+.ti-toolbar-button {
+  width: clamp(36px, 9vw, 48px);
+  height: clamp(36px, 9vw, 48px);
+  display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--toolbar-link-color);
-  text-decoration: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  border-radius: 10px; /* Slightly more rounded */
+  transition: all 0.2s ease;
+  flex-shrink: 0;
   background-color: transparent;
 }
 
-.toolbar-link:hover {
-  opacity: var(--icon-hover-opacity);
+.ti-toolbar-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
-/* Toggle Switch Styles */
+.ti-toolbar-icon {
+  width: clamp(20px, 5vw, 26px);
+  height: clamp(20px, 5vw, 26px);
+}
+
+/* Link styling that looks good in both 1-row and 2-row layouts */
+.header-toolbar :deep(.toolbar-link) {
+  font-size: clamp(13px, 4vw, 15px);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  background-color: var(--toolbar-link-hover-bg-color);
+  opacity: 0.9;
+}
+
 .switch {
+  width: clamp(40px, 10vw, 50px);
+  height: clamp(22px, 5vw, 26px);
   position: relative;
   display: inline-block;
-  width: 40px;
-  height: 20px;
   vertical-align: middle;
 }
 
@@ -458,10 +455,7 @@ const handleOpenSidePanelNative = async (event) => {
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: #ccc;
   transition: 0.2s;
   border-radius: 20px;
@@ -470,8 +464,8 @@ const handleOpenSidePanelNative = async (event) => {
 .slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
+  height: clamp(16px, 4vw, 20px);
+  width: clamp(16px, 4vw, 20px);
   left: 2px;
   bottom: 2px;
   background-color: white;
@@ -483,11 +477,20 @@ input:checked + .slider {
   background-color: #4caf50;
 }
 
-input:focus + .slider {
-  box-shadow: 0 0 1px #4caf50;
+input:checked + .slider:before {
+  /* Dynamic translation based on switch width */
+  transform: translateX(calc(clamp(40px, 10vw, 50px) - clamp(16px, 4vw, 20px) - 4px));
 }
 
-input:checked + .slider:before {
-  transform: translateX(20px);
+/* Clean up old media queries */
+@media (max-width: 350px) {
+  .header-toolbar {
+    justify-content: center;
+    padding: 10px 6px;
+  }
+  .toolbar-right-group {
+    justify-content: center;
+    width: 100%;
+  }
 }
 </style>

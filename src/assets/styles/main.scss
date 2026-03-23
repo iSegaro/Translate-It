@@ -24,16 +24,18 @@
 
 // Context-specific styles - these should be overridden by specific entry points
 
-/* Popup context (400px width) - only applied in popup.js */
+/* Popup context - Fully fluid for all devices */
 body.popup-context {
-  min-width: 400px !important;
   width: 100% !important;
-  max-height: 600px !important;
+  height: 100% !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow-x: hidden !important;
   display: flex !important;
-  justify-content: center !important;
-  align-items: flex-start !important;
-  background-color: transparent !important; /* Allow wrapper background to show if needed */
+  flex-direction: column !important;
+  background-color: var(--bg-color) !important;
 }
 
 /* Options context - only applied in options.js */

@@ -306,42 +306,20 @@ const retryLoading = () => {
   color: var(--text-color);
   overflow-x: hidden;
 }
-
-/* Content container: Limits width on large screens and stays centered */
+/* Content container: Fully Fluid for all devices */
 .popup-content-container, .popup-container {
-  width: 94%;
-  max-width: 480px; /* Optimized for mobile/tablet */
-  height: auto;
-  max-height: 96vh;
-  max-height: 96dvh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg-color);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: none;
   position: relative;
   box-sizing: border-box;
-  margin: 12px auto; /* Perfect horizontal centering with top/bottom distance */
-  border-radius: 12px; /* Rounded corners for card look */
-  overflow: hidden; /* Ensure content follows border radius */
-  
-  /* Desktop Popup Specific (Extension Mode) */
-  @media (min-width: 481px) {
-    max-width: 400px; /* Standard extension width */
-    height: auto;
-    max-height: 600px;
-    min-height: 350px;
-    border-radius: 6px;
-    margin: 10px auto; 
-  }
-
-  /* On very small desktop popups, we don't want the shadow or fixed height */
-  @media (max-width: 500px) and (max-height: 650px) {
-    max-height: 600px;
-    height: auto;
-    min-height: 350px;
-    box-shadow: none;
-    margin: 0;
-  }
+  margin: 0;
+  border-radius: 0;
+  overflow: hidden;
 }
 
 /* Header section remains visible during scroll */
@@ -395,24 +373,19 @@ const retryLoading = () => {
 }
 
 .language-controls {
-  display: grid;
-  grid-template-columns: 100px minmax(0, 1fr); /* Strictly constrain the second column */
+  display: flex;
+  flex-wrap: wrap; /* Fluid wrapping based on content width */
   align-items: center;
-  padding: 2px 8px;
-  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 12px;
   background: var(--language-controls-bg-color);
-  min-height: 32px;
+  min-height: 48px;
   box-sizing: border-box;
   width: 100%;
-  overflow: hidden; /* Prevent any child from leaking out */
+  overflow: hidden;
 
-  @media (max-width: 480px) {
-    padding: 4px 8px;
-    grid-template-columns: 140px minmax(0, 1fr);
-    min-height: 36px;
-  }
-
-  /* Responsive stacking for narrow containers */
+  /* Responsive stacking for very narrow containers */
   @media (max-width: 350px) {
     display: flex;
     flex-direction: column;
