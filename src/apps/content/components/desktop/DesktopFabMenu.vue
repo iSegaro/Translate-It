@@ -96,6 +96,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -108,6 +109,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
 const mobileStore = useMobileStore();
 const { t } = useUnifiedI18n();
+const tracker = useResourceTracker('desktop-fab-menu');
 
 const isMenuOpen = ref(false);
 const isFaded = ref(false);
@@ -116,21 +118,22 @@ const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
 const isFullscreen = ref(false);
 const fabContainerRef = ref(null);
-let hoverTimer = null;
+let hoverTimerId = null;
 
 const handleMouseEnter = () => {
-  if (hoverTimer) {
-    clearTimeout(hoverTimer);
-    hoverTimer = null;
+  if (hoverTimerId) {
+    // Clear tracked timeout using the native ID returned by trackTimeout
+    clearTimeout(hoverTimerId);
+    hoverTimerId = null;
   }
   isHovered.value = true;
 };
 
 const handleMouseLeave = () => {
-  // 1 second delay before closing
-  hoverTimer = setTimeout(() => {
+  // Use resource tracker to manage the timer
+  hoverTimerId = tracker.trackTimeout(() => {
     isHovered.value = false;
-    hoverTimer = null;
+    hoverTimerId = null;
   }, 750);
 };
 
@@ -165,7 +168,6 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
   } else if (pageData.isAutoTranslating) {
-    // If auto-translating, primary action is to STOP it
     items.push({
       id: 'stop_auto',
       label: t('desktop_fab_stop_auto_translating_label'),
@@ -174,7 +176,6 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
   } else if (pageData.isTranslated || isDone) {
-    // If translated but NOT auto-translating, show Restore
     items.push({
       id: 'restore_page',
       label: t('desktop_fab_restore_original_label'),
@@ -183,7 +184,6 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
   } else {
-    // Default state: Translate Page
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
@@ -237,7 +237,6 @@ const handleMenuItemClick = async (item) => {
 
 const handleOpenSettings = async () => {
   try {
-    // Content scripts usually can't open options directly, so we use our messaging system
     await sendMessage({ action: MessageActions.OPEN_OPTIONS_PAGE });
     isMenuOpen.value = false;
   } catch (err) {
@@ -263,6 +262,8 @@ const startDrag = (e) => {
   }
   isDragging.value = false;
   startY = e.clientY - verticalPos.value;
+  
+  // Track temporary drag listeners
   window.addEventListener('mousemove', onDrag);
   window.addEventListener('mouseup', stopDrag);
 };
@@ -298,20 +299,21 @@ const updateFullscreenState = () => {
     document.msFullscreenElement
   );
   if (isFullscreen.value) {
-    isMenuOpen.value = false; // Close menu if it was open
+    isMenuOpen.value = false;
   }
 };
 
 onMounted(() => {
-  setTimeout(() => {
+  // Track long-lived elements
+  tracker.trackTimeout(() => {
     isFaded.value = true;
   }, 2000);
 
-  // Fullscreen listeners
-  document.addEventListener('fullscreenchange', updateFullscreenState);
-  document.addEventListener('webkitfullscreenchange', updateFullscreenState);
-  document.addEventListener('mozfullscreenchange', updateFullscreenState);
-  document.addEventListener('MSFullscreenChange', updateFullscreenState);
+  // Use tracker for fullscreen events
+  tracker.addEventListener(document, 'fullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'webkitfullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'mozfullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'MSFullscreenChange', updateFullscreenState);
 
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
@@ -321,21 +323,12 @@ onMounted(() => {
     }
   };
 
-  window.addEventListener('click', handleClickOutside);
-  onUnmounted(() => {
-    window.removeEventListener('click', handleClickOutside);
-    document.removeEventListener('fullscreenchange', updateFullscreenState);
-    document.removeEventListener('webkitfullscreenchange', updateFullscreenState);
-    document.removeEventListener('mozfullscreenchange', updateFullscreenState);
-    document.removeEventListener('MSFullscreenChange', updateFullscreenState);
-  });
+  // Use tracker for click outside
+  tracker.addEventListener(window, 'click', handleClickOutside);
 });
 
-onUnmounted(() => {
-  window.removeEventListener('mousemove', onDrag);
-  window.removeEventListener('mouseup', stopDrag);
-  if (hoverTimer) clearTimeout(hoverTimer);
-});
+// onUnmounted is now handled automatically by useResourceTracker!
+// No need to manually remove listeners or clear timeouts tracked via 'tracker'.
 </script>
 
 <style scoped>
