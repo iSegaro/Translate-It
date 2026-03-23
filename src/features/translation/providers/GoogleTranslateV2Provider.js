@@ -144,7 +144,28 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
         // Combine segments back
         const translatedText = data[0].map(segment => segment[0] || "").join('');
-        const translatedSegments = translatedText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+        
+        // Robust splitting logic
+        let translatedSegments = [];
+        const primaryDelimiter = TRANSLATION_CONSTANTS.TEXT_DELIMITER;
+        
+        if (chunkTexts.length === 1) {
+          translatedSegments = [translatedText];
+        } else {
+          // Try primary delimiter first
+          translatedSegments = translatedText.split(primaryDelimiter);
+          
+          // If mismatch, try alternative delimiters from constants
+          if (translatedSegments.length !== chunkTexts.length) {
+            for (const altDelimiter of TRANSLATION_CONSTANTS.ALTERNATIVE_DELIMITERS) {
+              const altSplit = translatedText.split(altDelimiter);
+              if (altSplit.length === chunkTexts.length) {
+                translatedSegments = altSplit;
+                break;
+              }
+            }
+          }
+        }
 
         let candidateText = "";
         if (shouldIncludeDictionary && data[1]) {
@@ -159,9 +180,21 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           return { translatedSegments, candidateText: candidateText.trim() };
         }
 
-        // Mismatch handling
-        logger.debug('[GoogleV2] Segment count mismatch, returning joined text');
-        return { translatedSegments: [translatedText], candidateText: candidateText.trim() };
+        // Mismatch handling - if still mismatch, try to pad or truncate to match chunkTexts length
+        logger.debug('[GoogleV2] Segment count mismatch after robust split', {
+          expected: chunkTexts.length,
+          received: translatedSegments.length
+        });
+        
+        if (translatedSegments.length > chunkTexts.length) {
+          translatedSegments = translatedSegments.slice(0, chunkTexts.length);
+        } else {
+          while (translatedSegments.length < chunkTexts.length) {
+            translatedSegments.push(""); // Pad with empty strings
+          }
+        }
+        
+        return { translatedSegments, candidateText: candidateText.trim() };
       },
       context: 'googlev2-translate-chunk',
       abortController

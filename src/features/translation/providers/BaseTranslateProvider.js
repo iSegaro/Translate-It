@@ -94,12 +94,24 @@ export class BaseTranslateProvider extends BaseProvider {
 
     // 4. Reconstruct output
     if (isJson && Array.isArray(translatedSegments)) {
+      // If mismatch, try to fix by padding or truncating to match original length
+      let finalSegments = translatedSegments;
       if (translatedSegments.length !== parsedJson.length) {
-        return translatedSegments.join('\n');
+        logger.debug(`[${this.providerName}] JSON segment mismatch: expected ${parsedJson.length}, got ${translatedSegments.length}`);
+        if (translatedSegments.length > parsedJson.length) {
+          finalSegments = translatedSegments.slice(0, parsedJson.length);
+        } else {
+          // Pad with original text if translation failed for some segments
+          finalSegments = [
+            ...translatedSegments,
+            ...parsedJson.slice(translatedSegments.length).map(item => item.text || '')
+          ];
+        }
       }
+
       const translatedJson = parsedJson.map((item, index) => ({
         ...item,
-        text: translatedSegments[index] || "",
+        text: finalSegments[index] || "",
       }));
       return JSON.stringify(translatedJson, null, 2);
     }
