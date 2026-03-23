@@ -87,20 +87,32 @@
       <div 
         v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive" 
         class="mobile-fab notranslate"
+        :class="{ 'is-idle': isFabIdle }"
         translate="no"
         :style="{
           position: 'fixed !important',
-          bottom: '24px !important',
-          right: '24px !important',
-          left: 'auto !important',
-          opacity: isFabIdle ? '0.35' : '1',
-          transform: 'scale(1)'
+          bottom: '120px !important',
+          right: isFabIdle ? '0px !important' : '12px !important',
+          width: '50px !important',
+          height: '50px !important',
+          display: 'flex !important',
+          opacity: isFabIdle ? '0.4' : '1',
+          transform: isFabIdle ? 'translateX(40%)' : 'translateX(0)'
         }"
         @click="onMobileFabClick"
         @touchstart="startFabIdleTimer"
         :title="t('mobile_fab_alt') || 'Translate'"
       >
-        <img src="@/icons/extension/extension_icon_64.svg" :alt="t('mobile_fab_alt') || 'Translate'" style="width: 70%; height: 70%; object-fit: contain;" />
+        <img 
+          src="@/icons/extension/extension_icon_64.svg" 
+          :alt="t('mobile_fab_alt') || 'Translate'" 
+          :style="{
+            width: '26px !important',
+            height: '26px !important',
+            objectFit: 'contain',
+            transform: isFabIdle ? 'translateX(-8px)' : 'none'
+          }"
+        />
       </div>
 
       <!-- Mobile-specific Exit Select Mode button -->
@@ -859,31 +871,28 @@ onUnmounted(async () => {
 }
 
 .mobile-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 56px;
-  height: 56px;
-  background: #339af0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4);
-  z-index: 2147483647;
+  background: #339af0 !important;
+  border-radius: 50% !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4) !important;
+  z-index: 2147483647 !important;
   pointer-events: auto !important;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.5s ease;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              opacity 0.4s ease,
+              right 0.4s ease !important;
+  will-change: transform, opacity, right;
 }
 
 .mobile-fab:active {
-  transform: scale(0.85);
+  transform: scale(0.9) !important;
+  opacity: 1 !important;
 }
 
 .mobile-fab img {
-  width: 28px;
-  height: 28px;
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(1) !important;
+  transition: transform 0.3s ease !important;
 }
 
 @keyframes slide-up {
