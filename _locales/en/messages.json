@@ -525,7 +525,7 @@
     "message": "History"
   },
   "desktop_fab_tooltip": {
-    "message": "Quick Actions"
+    "message": "Translate It"
   },
   "desktop_fab_alt": {
     "message": "Translate Actions"
@@ -540,7 +540,7 @@
     "message": "Always Mobile"
   },
   "mobile_ui_mode_mobile_desc": {
-    "message": "(Bottom Sheet - optimized for touch))"
+    "message": "(Bottom Sheet - optimized for touch)"
   },
   "mobile_ui_mode_desktop": {
     "message": "Always Desktop"

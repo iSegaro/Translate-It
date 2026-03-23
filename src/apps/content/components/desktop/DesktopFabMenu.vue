@@ -58,7 +58,7 @@
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
       @mousedown="startDrag"
       @click.stop="toggleMenu"
-      :title="t('desktop_fab_tooltip') || 'Quick Actions'"
+      :title="t('desktop_fab_tooltip') || 'Translate It'"
       :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
     >
       <img 
