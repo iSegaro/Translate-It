@@ -92,12 +92,13 @@
         :style="{
           position: 'fixed !important',
           bottom: '120px !important',
-          right: '-25px !important',
+          left: '100% !important',
+          marginLeft: '-25px !important',
           width: '50px !important',
           height: '50px !important',
           display: 'flex !important',
           opacity: isFabIdle ? '0.2' : '1',
-          transform: 'none',
+          transform: 'none !important',
           transition: 'opacity 0.8s ease'
         }"
         @click="onMobileFabClick"
@@ -111,7 +112,9 @@
             width: '26px !important',
             height: '26px !important',
             objectFit: 'contain',
-            marginRight: '15px',
+            marginLeft: '0 !important',
+            marginRight: 'auto !important',
+            paddingLeft: '6px !important',
             transition: 'none'
           }"
         />
@@ -871,25 +874,22 @@ onUnmounted(async () => {
   background: #339af0 !important;
   border-radius: 50% !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important; /* Help position icon in the visible part */
   box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4) !important;
   z-index: 2147483647 !important;
   pointer-events: auto !important;
   cursor: pointer;
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
-              opacity 0.4s ease,
-              right 0.4s ease !important;
-  will-change: transform, opacity, right;
+  transition: opacity 0.8s ease !important;
+  will-change: opacity;
 }
 
 .mobile-fab:active {
-  transform: scale(0.9) !important;
   opacity: 1 !important;
 }
 
 .mobile-fab img {
   filter: brightness(0) invert(1) !important;
-  transition: transform 0.3s ease !important;
+  transition: none !important;
 }
 
 @keyframes slide-up {
