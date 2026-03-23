@@ -118,9 +118,10 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
@@ -170,6 +171,7 @@ let selectElementNotificationManager = null;
 
 // Mobile Store
 const mobileStore = useMobileStore();
+const settingsStore = useSettingsStore();
 const { getErrorForDisplay } = useErrorHandler();
 
 // Debounce cancel requests to prevent event loops
@@ -242,16 +244,23 @@ const updateToastRTL = async () => {
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
-const isExtensionEnabled = ref(true);
-const showDesktopFab = ref(false);
+const isExtensionEnabled = ref(settingsStore.settings?.EXTENSION_ENABLED !== false);
+const showDesktopFab = ref(settingsStore.settings?.SHOW_DESKTOP_FAB || false);
+
+// Watch for store changes to ensure real-time updates without refresh
+watch(() => settingsStore.settings, (newSettings) => {
+  if (newSettings) {
+    isExtensionEnabled.value = newSettings.EXTENSION_ENABLED !== false;
+    showDesktopFab.value = newSettings.SHOW_DESKTOP_FAB || false;
+    logger.debug('[ContentApp] Settings updated reactively:', { 
+      enabled: isExtensionEnabled.value, 
+      fab: showDesktopFab.value 
+    });
+  }
+}, { deep: true });
+
 const activeIcons = ref([]); // Stores { id, position, visible, targetElement, attachmentMode } for each icon
 const iconRefs = ref(new Map()); // Stores Vue component references
-
-// Fetch settings
-const fetchSettings = async () => {
-  isExtensionEnabled.value = await getExtensionEnabledAsync();
-  showDesktopFab.value = await getShowDesktopFabAsync();
-};
 
 // Icon reference management
 const setIconRef = (iconId, el) => {
@@ -341,7 +350,10 @@ const startFabIdleTimer = () => {
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
-  await fetchSettings();
+  // Ensure settings are loaded
+  if (!settingsStore.isInitialized) {
+    await settingsStore.loadSettings();
+  }
   
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
@@ -401,16 +413,6 @@ onMounted(async () => {
           logger.info('[Toast] Language changed in storage:', newLocale);
           // Update RTL immediately
           updateToastRTL();
-        }
-
-        if (changes.EXTENSION_ENABLED !== undefined) {
-          isExtensionEnabled.value = changes.EXTENSION_ENABLED.newValue !== false;
-          logger.info('[ContentApp] Extension enabled setting changed:', isExtensionEnabled.value);
-        }
-        
-        if (changes.SHOW_DESKTOP_FAB !== undefined) {
-          showDesktopFab.value = changes.SHOW_DESKTOP_FAB.newValue || false;
-          logger.info('[Desktop FAB] Setting changed in storage:', showDesktopFab.value);
         }
       }
     };

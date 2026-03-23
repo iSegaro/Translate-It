@@ -159,6 +159,10 @@ export const useSettingsStore = defineStore('settings', () => {
         logger.debug('Settings merged from storage');
 
         isInitialized.value = true;
+        
+        // Setup listener for future changes
+        await setupStorageListener();
+        
         return current;
       } catch (error) {
         logger.error('Failed to load settings:', error);
@@ -390,22 +394,14 @@ export const useSettingsStore = defineStore('settings', () => {
   let storageListener = null
 
   // Handle storage changes from other parts of extension
-  const handleStorageChange = (changes, areaName) => {
-    if (areaName === 'local') {
-      for (const key in changes) {
-        if (Object.prototype.hasOwnProperty.call(changes, key)) {
-          const newValue = changes[key].newValue
-          // Update the reactive settings ref
-          if (settings.value[key] !== newValue) {
-            const oldValue = settings.value[key]
-            settings.value[key] = newValue
+  const handleStorageChange = ({ key, newValue, oldValue }) => {
+    // Update the reactive settings ref
+    if (settings.value[key] !== newValue) {
+      settings.value[key] = newValue
 
-            // Special handling for DEBUG_MODE - sync with logging system
-            if (key === 'DEBUG_MODE' && oldValue !== newValue) {
-              handleDebugModeChange(Boolean(newValue))
-            }
-          }
-        }
+      // Special handling for DEBUG_MODE - sync with logging system
+      if (key === 'DEBUG_MODE' && oldValue !== newValue) {
+        handleDebugModeChange(Boolean(newValue))
       }
     }
   }
