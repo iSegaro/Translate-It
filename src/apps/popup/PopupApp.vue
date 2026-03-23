@@ -382,7 +382,7 @@ const retryLoading = () => {
   min-height: 48px;
   box-sizing: border-box;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .language-controls > :first-child {

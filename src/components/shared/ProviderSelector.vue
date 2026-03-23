@@ -4,6 +4,7 @@
     v-if="mode === 'split'"
     ref="selectorRef"
     class="ti-split-translate-button-container"
+    :class="{ 'ti-dropdown-open': isDropdownOpen }"
     v-bind="$attrs"
   >
     <div class="ti-split-translate-button">
@@ -569,6 +570,10 @@ onUnmounted(() => {
   position: relative;
   flex-shrink: 0;
   z-index: 100;
+
+  &.ti-dropdown-open {
+    z-index: 10001;
+  }
 }
 
 .ti-split-translate-button {
