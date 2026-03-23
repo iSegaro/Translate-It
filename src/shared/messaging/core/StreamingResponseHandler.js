@@ -236,7 +236,12 @@ export class StreamingResponseHandler {
   _handleError(handler, error) {
     const { messageId } = handler;
 
-    logger.error(`Streaming response error for ${messageId}:`, error);
+    // Use info level for expected cancellations to reduce log verbosity
+    if (error.message === 'Handler cancelled' || error.type === 'HANDLER_CANCELLED' || error.type === 'USER_CANCELLED') {
+      logger.info(`Streaming response cancelled for ${messageId}`);
+    } else {
+      logger.error(`Streaming response error for ${messageId}:`, error);
+    }
 
     handler.isCompleted = true;
 

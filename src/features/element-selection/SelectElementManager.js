@@ -619,7 +619,16 @@ class SelectElementManager extends ResourceTracker {
         // Don't show error notification or perform cleanup - already done in deactivate()
       }
     } catch (error) {
-      this.logger.error('Error during translation:', error);
+      const errorType = matchErrorToType(error);
+      const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 
+                             error.message === 'Handler cancelled' || 
+                             error.type === 'HANDLER_CANCELLED';
+
+      if (isCancellation) {
+        this.logger.debug('Translation cancelled by user, performing cleanup');
+      } else {
+        this.logger.error('Error during translation:', error);
+      }
 
       // Ensure Revert button is shown if any partial translation happened
       if (this.domTranslatorAdapter && this.domTranslatorAdapter.hasTranslation()) {
@@ -633,11 +642,8 @@ class SelectElementManager extends ResourceTracker {
       if (isContextError) {
         this.logger.debug('Translation failed: extension context invalidated');
         ExtensionContextManager.handleContextError(error, 'element-translation');
-      } else {
-        const errorType = matchErrorToType(error);
-        if (errorType === ErrorTypes.USER_CANCELLED) {
-          this.logger.debug('Translation cancelled by user:', error);
-        } else if (!error.alreadyHandled) {
+      } else if (!isCancellation) {
+        if (!error.alreadyHandled) {
           // If not already handled by ErrorHandler in Adapter, we could handle it here, 
           // but Adapter already handles most cases with showToast: true
         }

@@ -16,6 +16,7 @@ export const SILENT_ERRORS = new Set([
   ErrorTypes.TAB_LOCAL_FILE,
   ErrorTypes.TAB_NOT_ACCESSIBLE,
   ErrorTypes.NODE_ALREADY_TRANSLATED,
+  ErrorTypes.USER_CANCELLED,
 ]);
 
 /**
@@ -46,6 +47,7 @@ export const SUPPRESS_CONSOLE_ERRORS = new Set([
   ErrorTypes.TAB_AVAILABILITY,
   ErrorTypes.IMPORT_PASSWORD_INCORRECT,
   ErrorTypes.IMPORT_PASSWORD_REQUIRED,
+  ErrorTypes.USER_CANCELLED,
 ]);
 
 /**

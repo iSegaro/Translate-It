@@ -67,7 +67,13 @@ export class ContentScriptIntegration {
         }
       },
       onError: (error) => {
-        logger.error(`Translation error for ${messageId}:`, error);
+        // Use info level for expected cancellations
+        if (error.message === 'Handler cancelled' || error.type === 'HANDLER_CANCELLED' || error.type === 'USER_CANCELLED') {
+          logger.info(`Translation cancelled for ${messageId}`);
+        } else {
+          logger.error(`Translation error for ${messageId}:`, error);
+        }
+        
         if (callbacks.onError) {
           callbacks.onError(error);
         }
