@@ -2,41 +2,6 @@
   <section class="options-tab-content">
     <h2>{{ t('appearance_section_title') || 'Appearance' }}</h2>
     
-    <!-- Interface Settings -->
-    <div class="setting-group interface-settings">
-      <h3>{{ t('interface_settings_title') || 'Interface Settings' }}</h3>
-      <p class="setting-description">
-        {{ t('interface_settings_description') || 'Customize how the translation interface appears on different devices' }}
-      </p>
-      
-      <div class="setting-row mobile-ui-mode-row">
-        <label class="setting-label">{{ t('mobile_ui_mode_label') || 'Mobile UI Mode' }}:</label>
-        <div class="radio-group">
-          <BaseRadio
-            v-model="mobileUiMode"
-            :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
-            name="mobileUiMode"
-            :label="t('mobile_ui_mode_auto') || 'Auto'"
-          />
-          <BaseRadio
-            v-model="mobileUiMode"
-            :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
-            name="mobileUiMode"
-            :label="t('mobile_ui_mode_mobile') || 'Always Mobile'"
-          />
-          <BaseRadio
-            v-model="mobileUiMode"
-            :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
-            name="mobileUiMode"
-            :label="t('mobile_ui_mode_desktop') || 'Always Desktop'"
-          />
-        </div>
-      </div>
-      <p class="setting-hint">
-        {{ t('mobile_ui_mode_description') || 'Choose how the translation interface should appear on mobile and touch devices.' }}
-      </p>
-    </div>
-
     <!-- Font Settings -->
     <div class="setting-group font-settings">
       <h3>{{ t('font_settings_title') || 'Font Settings' }}</h3>
@@ -67,9 +32,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import FontSelector from '@/components/feature/FontSelector.vue'
-import BaseRadio from '@/components/base/BaseRadio.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -82,15 +45,6 @@ const settingsStore = useSettingsStore()
 // Refs
 const fontSelectorRef = ref(null)
 const validationError = ref('')
-
-// Mobile UI Mode settings
-const mobileUiMode = computed({
-  get: () => settingsStore.settings?.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
-  set: (value) => {
-    logger.debug('📝 Mobile UI Mode changed:', value)
-    settingsStore.updateSettingLocally('MOBILE_UI_MODE', value)
-  }
-})
 
 // Font settings refs synchronized with store (like other tabs)
 const fontFamily = ref(settingsStore.settings?.TRANSLATION_FONT_FAMILY || 'auto')
@@ -149,7 +103,7 @@ const validateFonts = () => {
   }
 }
 
-.font-settings, .interface-settings {
+.font-settings {
   background-color: var(--color-surface);
   border: $border-width $border-style var(--color-border);
   border-radius: $border-radius-base;
@@ -175,23 +129,11 @@ const validateFonts = () => {
     color: var(--color-text);
     min-width: 150px;
   }
-
-  .radio-group {
-    display: flex;
-    gap: $spacing-lg;
-    flex-wrap: wrap;
-  }
-}
-
-.setting-hint {
-  font-size: 0.9em;
-  color: var(--color-text-secondary);
-  margin: $spacing-sm 0 0 0;
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .font-settings, .interface-settings {
+  .font-settings {
     padding: $spacing-sm;
   }
 
@@ -199,10 +141,6 @@ const validateFonts = () => {
     flex-direction: column;
     align-items: flex-start;
     gap: $spacing-sm;
-
-    .radio-group {
-      gap: $spacing-sm;
-    }
   }
 }
 </style>

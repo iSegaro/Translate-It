@@ -230,6 +230,9 @@
   "activation_group_general_title": {
     "message": "全般スイッチ"
   },
+  "activation_group_fab_title": {
+    "message": "クイックアクションボタン (FAB)"
+  },
   "activation_group_text_fields_title": {
     "message": "テキストフィールド翻訳"
   },
@@ -530,20 +533,23 @@
   "desktop_fab_alt": {
     "message": "翻訳操作"
   },
-  "mobile_ui_mode_label": {
-    "message": "UIモード"
-  },
-  "mobile_ui_mode_description": {
-    "message": "モバイルおよびタッチデバイスでの翻訳インターフェースの表示方法を選択します。"
-  },
   "mobile_ui_mode_auto": {
-    "message": "自動（画面サイズに基づく）"
+    "message": "自動"
+  },
+  "mobile_ui_mode_auto_desc": {
+    "message": "（画面サイズに基づく）"
   },
   "mobile_ui_mode_mobile": {
-    "message": "常にモバイル（ボトムシート）"
+    "message": "常にモバイル"
+  },
+  "mobile_ui_mode_mobile_desc": {
+    "message": "（ボトムシート - タッチ操作に最適化）"
   },
   "mobile_ui_mode_desktop": {
-    "message": "常にデスクトップ（フローティングウィンドウ）"
+    "message": "常にデスクトップ"
+  },
+  "mobile_ui_mode_desktop_desc": {
+    "message": "（フローティングウィンドウ - デスクトップ用）"
   },
   "mobile_input_header_title": {
     "message": "手動入力"
@@ -1399,12 +1405,6 @@
   },
   "appearance_section_title": {
     "message": "外観"
-  },
-  "interface_settings_title": {
-    "message": "インターフェース設定"
-  },
-  "interface_settings_description": {
-    "message": "異なるデバイスでの翻訳インターフェースの表示方法をカスタマイズします"
   },
   "font_settings_title": {
     "message": "フォント設定"

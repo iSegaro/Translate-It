@@ -228,7 +228,10 @@
     "message": "دوباره"
   },
   "activation_group_general_title": {
-    "message": "سوییچ کلی"
+    "message": "کلید اصلی"
+  },
+  "activation_group_fab_title": {
+    "message": "دکمه عملیات سریع (FAB)"
   },
   "activation_group_text_fields_title": {
     "message": "ترجمه فیلدهای متنی"
@@ -530,20 +533,23 @@
   "desktop_fab_alt": {
     "message": "عملیات ترجمه"
   },
-  "mobile_ui_mode_label": {
-    "message": "حالت رابط کاربری"
-  },
-  "mobile_ui_mode_description": {
-    "message": "انتخاب کنید که رابط کاربری ترجمه در دستگاه‌های موبایل و لمسی چگونه نمایش داده شود."
-  },
   "mobile_ui_mode_auto": {
-    "message": "خودکار (بر اساس سایز صفحه)"
+    "message": "خودکار"
+  },
+  "mobile_ui_mode_auto_desc": {
+    "message": "(بر اساس سایز صفحه)"
   },
   "mobile_ui_mode_mobile": {
-    "message": "همیشه موبایل (منوی پایین صفحه)"
+    "message": "همیشه موبایل"
+  },
+  "mobile_ui_mode_mobile_desc": {
+    "message": "(منوی پایین صفحه - بهینه شده برای لمس)"
   },
   "mobile_ui_mode_desktop": {
-    "message": "همیشه دسکتاپ (پنجره شناور)"
+    "message": "همیشه دسکتاپ"
+  },
+  "mobile_ui_mode_desktop_desc": {
+    "message": "(پنجره شناور - برای دسکتاپ)"
   },
   "mobile_input_header_title": {
     "message": "ورودی دستی"
@@ -1399,12 +1405,6 @@
   },
   "appearance_section_title": {
     "message": "ظاهر"
-  },
-  "interface_settings_title": {
-    "message": "تنظیمات رابط کاربری"
-  },
-  "interface_settings_description": {
-    "message": "سفارشی‌سازی نحوه نمایش رابط کاربری ترجمه در دستگاه‌های مختلف"
   },
   "font_settings_title": {
     "message": "تنظیمات فونت"

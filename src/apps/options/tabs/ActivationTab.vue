@@ -14,16 +14,60 @@
     </div>
 
     <!-- Desktop FAB Menu -->
-    <div class="setting-group">
-      <BaseCheckbox
-        v-model="showDesktopFab"
-        :disabled="!extensionEnabled"
-        :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
-      />
-      <span class="setting-description" style="margin-left: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;">
-        {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
-      </span>
-    </div>
+    <BaseFieldset :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'">
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="showDesktopFab"
+          :disabled="!extensionEnabled"
+          :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
+        />
+        <span class="setting-description" style="margin-left: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;">
+          {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
+        </span>
+
+        <!-- Mobile UI Mode Settings nested under FAB -->
+        <div 
+          v-if="showDesktopFab"
+          class="sub-options-group fab-sub-options"
+        >
+          <div class="radio-group ui-mode-radio-group">
+            <BaseRadio
+              v-model="mobileUiMode"
+              :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
+              name="mobileUiMode"
+              :disabled="!extensionEnabled"
+            >
+              <div class="radio-label-content">
+                <span class="label-title">{{ t('mobile_ui_mode_auto') }}</span>
+                <span class="label-description">{{ t('mobile_ui_mode_auto_desc') }}</span>
+              </div>
+            </BaseRadio>
+            <BaseRadio
+              v-model="mobileUiMode"
+              :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
+              name="mobileUiMode"
+              :disabled="!extensionEnabled"
+            >
+              <div class="radio-label-content">
+                <span class="label-title">{{ t('mobile_ui_mode_mobile') }}</span>
+                <span class="label-description">{{ t('mobile_ui_mode_mobile_desc') }}</span>
+              </div>
+            </BaseRadio>
+            <BaseRadio
+              v-model="mobileUiMode"
+              :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
+              name="mobileUiMode"
+              :disabled="!extensionEnabled"
+            >
+              <div class="radio-label-content">
+                <span class="label-title">{{ t('mobile_ui_mode_desktop') }}</span>
+                <span class="label-description">{{ t('mobile_ui_mode_desktop_desc') }}</span>
+              </div>
+            </BaseRadio>
+          </div>
+        </div>
+      </div>
+    </BaseFieldset>
 
     <!-- Text Field Translation -->
     <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
@@ -346,6 +390,15 @@ const showDesktopFab = computed({
   }
 })
 
+// Mobile UI Mode settings
+const mobileUiMode = computed({
+  get: () => settingsStore.settings?.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
+  set: (value) => {
+    logger.debug('📝 Mobile UI Mode changed:', value)
+    settingsStore.updateSettingLocally('MOBILE_UI_MODE', value)
+  }
+})
+
 // Text field settings
 const translateOnTextFields = computed({
   get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_FIELDS || false,
@@ -487,6 +540,12 @@ const dictionaryProvider = computed({
   align-items: center;
   gap: $spacing-md;
   width: 100%;
+
+  .setting-label {
+    font-weight: 600;
+    color: var(--color-text);
+    min-width: 150px;
+  }
 }
 
 .setting-row-with-provider {
@@ -557,6 +616,30 @@ const dictionaryProvider = computed({
     align-items: center;
     gap: $spacing-xl;
     margin-bottom: $spacing-base;
+
+    &.ui-mode-radio-group {
+      align-items: flex-start;
+      gap: $spacing-lg;
+
+      .radio-label-content {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+
+        .label-title {
+          font-weight: 500;
+          color: var(--color-text);
+          display: block;
+        }
+
+        .label-description {
+          font-size: 0.85em;
+          color: var(--color-text-secondary);
+          display: block;
+          margin-top: 2px;
+        }
+      }
+    }
   }
   
   .sub-setting-group {
