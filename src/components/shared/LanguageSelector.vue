@@ -390,6 +390,40 @@ onUnmounted(() => {
   opacity: var(--icon-hover-opacity);
 }
 
+/* Responsive adjustments using Media Queries */
+@media (max-width: 480px) {
+  .ti-language-controls {
+    margin: 0;
+    padding: 0;
+    height: auto;
+    flex-direction: row !important;
+    width: 100%;
+  }
+
+  .ti-language-select {
+    height: 44px !important;
+    font-size: 16px !important;
+    max-width: none !important;
+    flex: 1;
+  }
+
+  .ti-swap-button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .ti-swap-button img {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+
+@media (min-width: 481px) {
+  .ti-language-select {
+    font-size: 15px;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 320px) {
   .ti-language-controls {
@@ -414,30 +448,37 @@ onUnmounted(() => {
 
 /* Context-specific adjustments for popup vs sidepanel */
 .popup-wrapper .ti-language-controls {
+  display: flex;
   align-items: center;
-  height: 32px;
+  height: 28px;
   justify-content: flex-end;
   padding: 0;
   margin: 0;
+  gap: 6px;
+  box-sizing: border-box;
 }
 
 .popup-wrapper .ti-language-select {
-  padding: 6px 30px 6px 10px;
-  font-size: 14px;
-  min-width: 70px;
-  max-width: 100px;
-  height: 32px;
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  vertical-align: middle;
+  padding: 0 22px 0 6px; /* Optimized padding for desktop */
+  font-size: 13px; /* Slightly smaller for better fit */
+  flex: 1; 
+  min-width: 0;
+  max-width: 110px; /* Constrain each select to half of the remaining space approximately */
+  height: 28px;
+  line-height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  appearance: none;
+  box-sizing: border-box;
 }
 
 .popup-wrapper .ti-swap-button {
-  width: 32px;
-  height: 32px;
-  padding: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  flex: 0 0 24px; /* Constant size swap button */
 }
 
 .popup-wrapper .ti-swap-button img {

@@ -336,7 +336,7 @@ const handleOpenSidePanelNative = async (event) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 4px 12px;
   background-color: var(--header-bg-color);
   border-bottom: 1px solid var(--header-border-color);
   flex-direction: row;
@@ -371,6 +371,53 @@ const handleOpenSidePanelNative = async (event) => {
   flex-direction: row-reverse;
 }
 
+
+/* Responsive adjustments using Media Queries */
+@media (max-width: 480px) {
+  .header-toolbar {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-height: 56px;
+  }
+
+  .toolbar-right-group {
+    gap: 8px;
+    flex-grow: 1;
+    justify-content: flex-end;
+  }
+
+  .toolbar-left-group {
+    flex-grow: 1;
+  }
+
+  .ti-toolbar-button {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ti-toolbar-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .switch {
+    width: 44px;
+    height: 24px;
+  }
+
+  .slider:before {
+    height: 20px;
+    width: 20px;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(20px);
+  }
+}
 
 /* Icon styles are now handled by popup.scss global styles */
 

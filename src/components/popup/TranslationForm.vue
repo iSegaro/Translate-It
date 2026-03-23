@@ -332,7 +332,7 @@ defineExpose({
 .translation-form :deep(.translation-textarea) {
   min-height: 50px;
   max-height: 120px;
-  font-size: 13px;
+  font-size: 14px;
   padding: 42px 8px 8px 8px;
 }
 
@@ -347,8 +347,40 @@ defineExpose({
   flex: 1;
   min-height: 0;
   max-height: none;
-  font-size: 13px;
+  font-size: 14px;
   height: 100%;
+}
+
+/* Responsive Adjustments using Media Queries */
+@media (max-width: 480px) {
+  .translation-form :deep(.textarea-container) {
+    margin: 12px 16px;
+    border-radius: 8px;
+  }
+
+  .translation-form :deep(.translation-textarea) {
+    font-size: 16px;
+    max-height: 200px;
+  }
+
+  .translation-form :deep(.translation-display.popup-mode) {
+    margin: 0 16px 16px 16px;
+  }
+
+  .translation-form :deep(.result-content) {
+    font-size: 16px;
+    padding: 12px;
+  }
+}
+
+@media (min-width: 481px) {
+  .translation-form :deep(.translation-textarea) {
+    font-size: 15px;
+  }
+  
+  .translation-form :deep(.result-content) {
+    font-size: 15px;
+  }
 }
 
 .result {

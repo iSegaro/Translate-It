@@ -1,79 +1,79 @@
 <template>
   <div class="popup-wrapper">
     <!-- Initial Loading State -->
-    <div
-      v-if="isLoading"
-      class="popup-container"
-    >
-      <div class="loading-container">
-        <LoadingSpinner size="sm" />
-        <span class="loading-text">{{ loadingText }}</span>
+    <template v-if="isLoading">
+      <div class="popup-container">
+        <div class="loading-container">
+          <LoadingSpinner size="sm" />
+          <span class="loading-text">{{ loadingText }}</span>
+        </div>
       </div>
-    </div>
+    </template>
     
     <!-- Error State Display -->
-    <div
-      v-else-if="hasError"
-      class="popup-container"
-    >
-      <div class="error-container">
-        <div class="error-icon">
-          ⚠️
+    <template v-else-if="hasError">
+      <div class="popup-container">
+        <div class="error-container">
+          <div class="error-icon">
+            ⚠️
+          </div>
+          <h2>{{ t('popup_load_error_title') || 'Failed to Load Popup' }}</h2>
+          <p class="error-message">
+            {{ displayErrorMessage }}
+          </p>
+          <button
+            class="retry-button"
+            @click="retryLoading"
+          >
+            {{ t('retry_button') || 'Retry' }}
+          </button>
         </div>
-        <h2>{{ t('popup_load_error_title') || 'Failed to Load Popup' }}</h2>
-        <p class="error-message">
-          {{ displayErrorMessage }}
-        </p>
-        <button
-          class="retry-button"
-          @click="retryLoading"
-        >
-          {{ t('retry_button') || 'Retry' }}
-        </button>
       </div>
-    </div>
+    </template>
     
     <!-- Main Popup Content -->
     <template v-else>
-      <!-- Sticky Header: Contains Toolbar and Language/Provider Selectors -->
-      <div class="sticky-header">
-        <PopupHeader 
-          :target-language="targetLanguage" 
-          :provider="currentProvider"
-        />
-        <div class="language-controls">
-          <!-- Provider Selector: Manages temporary session-based provider overrides -->
-          <ProviderSelector
-            v-model="currentProvider"
-            mode="split"
-            :is-global="false"
-            :show-sync="true"
-            :disabled="!canTranslateFromForm"
-            @translate="handleTranslate"
+      <div class="popup-content-container">
+        <!-- Sticky Header: Contains Toolbar and Language/Provider Selectors -->
+        <div class="sticky-header">
+          <PopupHeader 
+            :target-language="targetLanguage" 
+            :provider="currentProvider"
           />
+          <div class="language-controls">
+            <!-- Provider Selector: Manages temporary session-based provider overrides -->
+            <ProviderSelector
+              v-model="currentProvider"
+              mode="split"
+              :is-global="false"
+              :show-sync="true"
+              :disabled="!canTranslateFromForm"
+              @translate="handleTranslate"
+            />
 
-          <!-- Language Selector: Handles source and target language selection -->
-          <LanguageSelector
-            v-model:source-language="sourceLanguage"
-            v-model:target-language="targetLanguage"
-            :source-title="t('popup_source_language_title') || 'زبان مبدا'"
-            :target-title="t('popup_target_language_title') || 'زبان مقصد'"
-            :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
-            :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
-            :auto-detect-label="'Auto-Detect'"
+            <!-- Language Selector: Handles source and target language selection -->
+            <LanguageSelector
+              v-model:source-language="sourceLanguage"
+              v-model:target-language="targetLanguage"
+              :source-title="t('popup_source_language_title') || 'زبان مبدا'"
+              :target-title="t('popup_target_language_title') || 'زبان مقصد'"
+              :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
+              :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
+              :auto-detect-label="'Auto-Detect'"
+            />
+          </div>
+        </div>
+        
+        <!-- Scrollable Translation Area: Contains the main translation form -->
+        <div class="translation-container">
+          <TranslationForm
+            ref="translationFormRef"
+            :source-language="sourceLanguage"
+            :target-language="targetLanguage"
+            :provider="currentProvider"
+            @can-translate-change="canTranslateFromForm = $event" 
           />
         </div>
-      </div>
-      
-      <!-- Scrollable Translation Area: Contains the main translation form -->
-      <div class="translation-container">
-        <TranslationForm
-          ref="translationFormRef"
-          :source-language="sourceLanguage"
-          :target-language="targetLanguage"
-          :provider="currentProvider"
-          @can-translate-change="canTranslateFromForm = $event" 
-        />
       </div>
     </template>
   </div>
@@ -288,30 +288,55 @@ const retryLoading = () => {
 }
 </script>
 
-<style scoped>
-/* Main popup wrapper using Flexbox for adaptive sizing */
+<style scoped lang="scss">
+@use "@/assets/styles/base/variables" as *;
+
+/* Main popup wrapper: Handles centering on large screens */
 .popup-wrapper {
   width: 100%;
-  height: 100vh;
-  max-height: 600px;
-  min-height: 350px;
+  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-radius: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
-  font-size: 15px;
   color: var(--text-color);
+  overflow-x: hidden;
 }
 
-.popup-container {
+/* Content container: Limits width on large screens and stays centered */
+.popup-content-container, .popup-container {
   width: 100%;
-  height: auto;
+  max-width: 480px; /* Optimized for mobile/tablet */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  background: var(--bg-color);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  position: relative;
+  box-sizing: border-box;
+  
+  /* Desktop Popup Specific (Extension Mode) */
+  @media (min-width: 481px) {
+    max-width: 400px; /* Standard extension width */
+    height: auto;
+    max-height: 600px;
+    min-height: 350px;
+    border-radius: 6px;
+    margin: 10px 0; /* Centering vertically on large screens if needed */
+  }
+
+  /* On very small desktop popups, we don't want the shadow or fixed height */
+  @media (max-width: 500px) and (max-height: 650px) {
+    max-height: 600px;
+    height: auto;
+    min-height: 350px;
+    box-shadow: none;
+    margin: 0;
+  }
 }
 
 /* Header section remains visible during scroll */
@@ -324,10 +349,11 @@ const retryLoading = () => {
   border-bottom: 1px solid var(--header-border-color);
 }
 
-/* Main form area that can scroll if content exceeds max-height */
+/* Main form area that can scroll if content exceeds viewport */
 .translation-container {
   flex: 1;
-  overflow: visible !important;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -338,7 +364,7 @@ const retryLoading = () => {
   justify-content: center;
   padding: 2rem;
   gap: 1rem;
-  min-height: 200px;
+  flex: 1;
 }
 
 .loading-text {
@@ -364,23 +390,29 @@ const retryLoading = () => {
 }
 
 .language-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr); /* Strictly constrain the second column */
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: 4px 12px;
+  gap: 12px;
   background: var(--language-controls-bg-color);
-  min-height: 40px;
-}
-</style>
+  min-height: 38px;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden; /* Prevent any child from leaking out */
 
-<style scoped lang="scss">
-@use '@/assets/styles/base/variables' as *;
+  @media (max-width: 480px) {
+    padding: 8px 12px;
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
 
-/* Legacy support for extension popup width/height from variables */
-.extension-popup {
-  width: $popup-width;
-  max-height: $popup-max-height;
-  overflow-y: auto;
+  /* Responsive stacking for narrow containers */
+  @media (max-width: 350px) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 12px;
+  }
 }
 </style>

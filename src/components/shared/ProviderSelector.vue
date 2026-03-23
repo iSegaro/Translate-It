@@ -917,24 +917,79 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* Responsive adjustments using Media Queries */
+@media (max-width: 480px) {
+  .ti-split-translate-button {
+    height: 44px !important;
+    min-width: 140px !important;
+  }
+
+  .ti-translate-main-area span {
+    font-size: 16px !important;
+  }
+
+  .ti-api-provider-icon {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .ti-provider-dropdown-area {
+    width: 40px !important;
+  }
+
+  .ti-dropdown-item {
+    padding: 12px 16px !important;
+  }
+
+  .ti-dropdown-item span {
+    font-size: 16px !important;
+  }
+
+  .ti-dropdown-item img {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .ti-sync-info span {
+    font-size: 14px !important;
+  }
+
+  .ti-sync-icon {
+    font-size: 16px !important;
+  }
+
+  .ti-sync-provider-icon {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
 /* Context-specific adjustments for popup vs sidepanel */
-.popup-wrapper .ti-split-translate-button {
-  height: 32px;
+.popup-wrapper .ti-split-translate-button-container {
+  width: 100px;
   min-width: 100px;
+  flex: none;
+}
+
+.popup-wrapper .ti-split-translate-button {
+  height: 28px;
+  width: 100%;
   align-self: center;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .popup-wrapper .ti-translate-main-area {
-  padding: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  padding-left: 5px;
+  padding: 0 4px;
+  overflow: hidden;
 }
 
 .popup-wrapper .ti-translate-main-area span {
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Truncate text if too long */
 }
 
 .popup-wrapper .ti-api-provider-icon {
