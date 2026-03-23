@@ -342,13 +342,19 @@ onMounted(async () => {
     align-items: center;
     width: 100%;
     gap: var(--spacing-lg);
+    justify-content: space-between; /* Spread items across the header */
   }
 
   .sidebar-header {
     margin-bottom: 0;
     text-align: left;
+    flex: 0 1 auto; /* Don't force to fill, but allow shrinking if needed */
     p, span { display: none; }
-    h1 { font-size: var(--font-size-xl); margin: 0; }
+    h1 { 
+      font-size: var(--font-size-xl); 
+      margin: 0;
+      white-space: nowrap; /* Keep title on one line */
+    }
   }
 
   .sidebar-section {
@@ -358,6 +364,7 @@ onMounted(async () => {
     border: none !important;
     background: transparent !important;
     h2 { display: none; }
+    flex: 0 0 auto; /* Keep controls at their natural size */
     
     /* Limit list height even more in horizontal header mode */
     .language-list {
