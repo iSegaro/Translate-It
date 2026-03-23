@@ -14,12 +14,12 @@
         class="fab-revert-badge"
         @click.stop="handleRevert"
         title="Revert Element Translations"
-        style="position: absolute !important; bottom: 55px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease !important; pointer-events: auto !important;"
+        style="position: absolute !important; bottom: 44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
-        :style="{ transform: isRevertHovered ? 'scale(1.15)' : 'scale(1)' }"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconRevert" alt="Revert" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconRevert" alt="Revert" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
       </div>
     </Transition>
 
@@ -66,7 +66,24 @@
         :alt="t('desktop_fab_alt') || 'Translate Actions'" 
         style="width: 30px !important; height: 30px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
       />
-    </div>  </div>
+    </div>
+
+    <!-- Settings Button (below main button when open) -->
+    <Transition name="fade-scale">
+      <div 
+        v-if="isMenuOpen" 
+        class="fab-settings-badge"
+        @click.stop="handleOpenSettings"
+        title="Open Settings"
+        style="position: absolute !important; bottom: -44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #4b5563 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
+        @mouseenter="isSettingsHovered = true"
+        @mouseleave="isSettingsHovered = false"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.1)' : 'scale(1)') }"
+      >
+        <img :src="IconSettings" alt="Settings" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script setup>
@@ -84,6 +101,7 @@ import IconTranslatePage from '@/icons/ui/whole-page.png';
 import IconRevert from '@/icons/ui/revert.png';
 import IconRestore from '@/icons/ui/restore.svg';
 import IconClear from '@/icons/ui/clear.png';
+import IconSettings from '@/icons/ui/settings.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
@@ -94,6 +112,7 @@ const isMenuOpen = ref(false);
 const isFaded = ref(false);
 const isHovered = ref(false);
 const isRevertHovered = ref(false);
+const isSettingsHovered = ref(false);
 const fabContainerRef = ref(null);
 
 const menuItems = computed(() => {
@@ -194,6 +213,16 @@ const handleMenuItemClick = async (item) => {
   }
   if (typeof item.action === 'function') {
     await item.action();
+  }
+};
+
+const handleOpenSettings = async () => {
+  try {
+    // Content scripts usually can't open options directly, so we use our messaging system
+    await sendMessage({ action: MessageActions.OPEN_OPTIONS_PAGE });
+    isMenuOpen.value = false;
+  } catch (err) {
+    logger.error('Failed to open settings from FAB:', err);
   }
 };
 
