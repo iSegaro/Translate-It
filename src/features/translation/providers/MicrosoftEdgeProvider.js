@@ -4,6 +4,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { 
+  getMicrosoftEdgeAuthUrlAsync,
+  getMicrosoftEdgeTranslateUrlAsync
+} from "@/shared/config/config.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MicrosoftEdge');
@@ -12,8 +16,6 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   static type = "translate";
   static displayName = "Microsoft Edge";
   static reliableJsonMode = true;
-  static authUrl = "https://edge.microsoft.com/translate/auth";
-  static translateUrl = "https://api-edge.cognitive.microsofttranslator.com/translate";
   
   static accessToken = null;
   static tokenExpiry = 0;
@@ -38,8 +40,10 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
     logger.debug('[Edge] Fetching new auth token...');
     
+    const authUrl = await getMicrosoftEdgeAuthUrlAsync();
+
     return this._executeRequest({
-      url: MicrosoftEdgeProvider.authUrl,
+      url: authUrl,
       fetchOptions: {
         method: 'GET',
         mode: 'cors',
@@ -92,7 +96,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
-    const url = new URL(MicrosoftEdgeProvider.translateUrl);
+    const translateUrl = await getMicrosoftEdgeTranslateUrlAsync();
+    const url = new URL(translateUrl);
     url.searchParams.set("api-version", "3.0");
     if (sl) url.searchParams.set("from", sl);
     url.searchParams.set("to", tl);
