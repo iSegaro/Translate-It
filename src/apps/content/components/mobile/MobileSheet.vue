@@ -1,6 +1,6 @@
 <template>
   <div 
-    v-if="isOpen"
+    v-if="isOpen && !isFullscreen"
     class="mobile-sheet-overlay notranslate"
     translate="no"
     style="position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
@@ -63,7 +63,7 @@ import InputView from './views/InputView.vue'
 import PageTranslationView from './views/PageTranslationView.vue'
 
 const mobileStore = useMobileStore()
-const { isOpen, activeView, sheetState } = storeToRefs(mobileStore)
+const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
 
 // Watch for isOpen changes to sync state with WindowsManager
 watch(isOpen, (newVal) => {
@@ -105,7 +105,6 @@ const sheetStyle = computed(() => {
     zIndex: '2147483647',
     display: 'flex',
     flexDirection: 'column',
-    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
     boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 

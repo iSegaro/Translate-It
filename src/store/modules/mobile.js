@@ -8,6 +8,7 @@ export const useMobileStore = defineStore('mobile', () => {
   const activeView = ref(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
   const sheetState = ref(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
   const isKeyboardVisible = ref(false)
+  const isFullscreen = ref(false)
   
   // Selection Specific State
   const selectionData = ref({
@@ -109,12 +110,17 @@ export const useMobileStore = defineStore('mobile', () => {
     hasElementTranslations.value = value
   }
 
+  const setFullscreen = (value) => {
+    isFullscreen.value = value
+  }
+
   return {
     // State
     isOpen,
     activeView,
     sheetState,
     isKeyboardVisible,
+    isFullscreen,
     selectionData,
     pageTranslationData,
     hasElementTranslations,
@@ -135,6 +141,7 @@ export const useMobileStore = defineStore('mobile', () => {
     resetSelectionData,
     setPageTranslation,
     resetPageTranslation,
-    setHasElementTranslations
+    setHasElementTranslations,
+    setFullscreen
   }
 })

@@ -85,7 +85,7 @@
 
       <!-- Mobile Floating Action Button (FAB) -->
       <div 
-        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive" 
+        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen" 
         class="mobile-fab notranslate"
         :class="{ 'is-idle': isFabIdle }"
         translate="no"
@@ -265,6 +265,7 @@ const updateToastRTL = async () => {
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
+const isFullscreen = computed(() => mobileStore.isFullscreen); 
 const isExtensionEnabled = computed(() => settingsStore.settings?.EXTENSION_ENABLED !== false);
 const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB || false);
 
@@ -364,6 +365,16 @@ const setupOutsideClickHandler = () => {
 const isFabIdle = ref(true);
 let fabIdleTimer = null;
 
+const updateFullscreenState = () => {
+  const isNowFullscreen = !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+  mobileStore.setFullscreen(isNowFullscreen);
+};
+
 const startFabIdleTimer = () => {
   if (fabIdleTimer) clearTimeout(fabIdleTimer);
   isFabIdle.value = false;
@@ -420,6 +431,15 @@ onMounted(async () => {
   // CRITICAL: Initialize RTL for toasts
   // 1. Initialize on mount
   await updateToastRTL();
+
+  // Fullscreen listeners via tracker
+  tracker.addEventListener(document, 'fullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'webkitfullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'mozfullscreenchange', updateFullscreenState);
+  tracker.addEventListener(document, 'MSFullscreenChange', updateFullscreenState);
+  
+  // Initial check
+  updateFullscreenState();
 
   const toastMap = {
     error: toast.error,

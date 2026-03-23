@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -116,13 +116,12 @@ const isFaded = ref(false);
 const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
-const isFullscreen = ref(false);
+const isFullscreen = computed(() => mobileStore.isFullscreen);
 const fabContainerRef = ref(null);
 let hoverTimerId = null;
 
 const handleMouseEnter = () => {
   if (hoverTimerId) {
-    // Clear tracked timeout using the native ID returned by trackTimeout
     clearTimeout(hoverTimerId);
     hoverTimerId = null;
   }
@@ -130,11 +129,10 @@ const handleMouseEnter = () => {
 };
 
 const handleMouseLeave = () => {
-  // Use resource tracker to manage the timer
   hoverTimerId = tracker.trackTimeout(() => {
     isHovered.value = false;
     hoverTimerId = null;
-  }, 750);
+  }, 1000);
 };
 
 const menuItems = computed(() => {
@@ -184,6 +182,7 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
   } else {
+    // Default state: Translate Page
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
@@ -262,8 +261,6 @@ const startDrag = (e) => {
   }
   isDragging.value = false;
   startY = e.clientY - verticalPos.value;
-  
-  // Track temporary drag listeners
   window.addEventListener('mousemove', onDrag);
   window.addEventListener('mouseup', stopDrag);
 };
@@ -291,29 +288,10 @@ const stopDrag = () => {
   setTimeout(() => { isDragging.value = false; }, 100);
 };
 
-const updateFullscreenState = () => {
-  isFullscreen.value = !!(
-    document.fullscreenElement ||
-    document.webkitFullscreenElement ||
-    document.mozFullScreenElement ||
-    document.msFullscreenElement
-  );
-  if (isFullscreen.value) {
-    isMenuOpen.value = false;
-  }
-};
-
 onMounted(() => {
-  // Track long-lived elements
   tracker.trackTimeout(() => {
     isFaded.value = true;
   }, 2000);
-
-  // Use tracker for fullscreen events
-  tracker.addEventListener(document, 'fullscreenchange', updateFullscreenState);
-  tracker.addEventListener(document, 'webkitfullscreenchange', updateFullscreenState);
-  tracker.addEventListener(document, 'mozfullscreenchange', updateFullscreenState);
-  tracker.addEventListener(document, 'MSFullscreenChange', updateFullscreenState);
 
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
@@ -323,12 +301,10 @@ onMounted(() => {
     }
   };
 
-  // Use tracker for click outside
   tracker.addEventListener(window, 'click', handleClickOutside);
 });
 
-// onUnmounted is now handled automatically by useResourceTracker!
-// No need to manually remove listeners or clear timeouts tracked via 'tracker'.
+// onBeforeUnmount is handled by tracker
 </script>
 
 <style scoped>
