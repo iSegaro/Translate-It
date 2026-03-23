@@ -115,12 +115,21 @@ export function usePositioning(initialPosition, options = {}) {
     zIndex: 2147483647
   }));
 
+  // Helper to get coordinates from mouse or touch event
+  const getCoordinates = (event) => {
+    if (event.touches && event.touches.length > 0) {
+      return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }
+    return { x: event.clientX, y: event.clientY };
+  };
+
   // Drag handling functions
   const onDrag = (event) => {
     if (!isDragging.value) return;
     
-    const newX = event.clientX - dragStartOffset.value.x;
-    const newY = event.clientY - dragStartOffset.value.y;
+    const coords = getCoordinates(event);
+    const newX = coords.x - dragStartOffset.value.x;
+    const newY = coords.y - dragStartOffset.value.y;
     
     currentPosition.value = clampToViewport({ x: newX, y: newY });
   };
@@ -129,6 +138,8 @@ export function usePositioning(initialPosition, options = {}) {
     isDragging.value = false;
     document.removeEventListener('mousemove', onDrag);
     document.removeEventListener('mouseup', stopDrag);
+    document.removeEventListener('touchmove', onDrag);
+    document.removeEventListener('touchend', stopDrag);
     
     // Restore text selection
     document.body.style.userSelect = '';
@@ -136,11 +147,14 @@ export function usePositioning(initialPosition, options = {}) {
 
   const startDrag = (event) => {
     isDragging.value = true;
-    dragStartOffset.value.x = event.clientX - currentPosition.value.x;
-    dragStartOffset.value.y = event.clientY - currentPosition.value.y;
+    const coords = getCoordinates(event);
+    dragStartOffset.value.x = coords.x - currentPosition.value.x;
+    dragStartOffset.value.y = coords.y - currentPosition.value.y;
     
     document.addEventListener('mousemove', onDrag);
     document.addEventListener('mouseup', stopDrag);
+    document.addEventListener('touchmove', onDrag, { passive: false });
+    document.addEventListener('touchend', stopDrag);
     
     // Prevent text selection during drag
     document.body.style.userSelect = 'none';

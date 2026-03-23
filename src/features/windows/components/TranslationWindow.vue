@@ -41,6 +41,7 @@
     <div
       class="ti-window-header"
       @mousedown="handleStartDrag"
+      @touchstart="handleStartDrag"
     >
       <div class="ti-header-actions">
         <!-- ProviderSelector moved to window root for better dropdown positioning -->
@@ -173,6 +174,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
+import { WindowsConfig } from '@/features/windows/managers/core/WindowsConfig.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
@@ -316,16 +318,16 @@ const {
   updatePosition,
   cleanup: cleanupPositioning
 } = usePositioning(props.position, {
-  defaultWidth: currentWidth.value || 240, // fallback for normal windows
-  defaultHeight: currentHeight.value || 180, // fallback for normal windows
+  defaultWidth: currentWidth.value || WindowsConfig.POSITIONING.POPUP_WIDTH,
+  defaultHeight: currentHeight.value || WindowsConfig.POSITIONING.POPUP_HEIGHT,
   enableDragging: true
 });
 
 // Watch for prop changes and recalculate position with correct dimensions
 watch(() => props.position, (newPos) => {
   updatePosition(newPos, {
-    width: currentWidth.value || 240,
-    height: currentHeight.value || 180
+    width: currentWidth.value || WindowsConfig.POSITIONING.POPUP_WIDTH,
+    height: currentHeight.value || WindowsConfig.POSITIONING.POPUP_HEIGHT
   });
 });
 
@@ -474,7 +476,7 @@ const handleStartDrag = (event) => {
   // Use composable's drag handler
   startDrag(event);
   
-  // Add our custom cleanup to mouseup
+  // Add our custom cleanup to mouseup/touchend
   const customStopDrag = () => {
     logger.debug('[TranslationWindow] Setting drag flag to FALSE');
     window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
@@ -485,6 +487,7 @@ const handleStartDrag = (event) => {
   };
   
   tracker.addEventListener(document, 'mouseup', customStopDrag, { once: true });
+  tracker.addEventListener(document, 'touchend', customStopDrag, { once: true });
 };
 
 </script>

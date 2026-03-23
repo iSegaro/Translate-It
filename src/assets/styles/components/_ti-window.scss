@@ -51,6 +51,8 @@
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: plaintext !important;
+  max-width: 95vw; // Prevent overflow on small screens
+  box-sizing: border-box;
 
   // CRITICAL: Ensure proper positioning and z-index override external styles
   position: fixed !important;

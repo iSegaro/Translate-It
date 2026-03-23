@@ -291,9 +291,13 @@ export class PositionCalculator {
       return position;
     }
 
+    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN || 8;
+    const popupWidth = Math.min(WindowsConfig.POSITIONING.POPUP_WIDTH, viewport.width - (margin * 2));
+    const popupHeight = WindowsConfig.POSITIONING.POPUP_HEIGHT;
+
     return {
-      x: Math.max(0, Math.min(position.x, viewport.width - WindowsConfig.POSITIONING.POPUP_WIDTH)),
-      y: Math.max(0, Math.min(position.y, viewport.height - WindowsConfig.POSITIONING.POPUP_HEIGHT))
+      x: Math.max(margin, Math.min(position.x, viewport.width - popupWidth - margin)),
+      y: Math.max(margin, Math.min(position.y, viewport.height - popupHeight - margin))
     };
   }
 }
