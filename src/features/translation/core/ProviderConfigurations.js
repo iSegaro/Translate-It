@@ -536,7 +536,7 @@ export const PROVIDER_CONFIGURATIONS = {
       delayBetweenRequests: 0,
       initialDelay: 0,
       subsequentDelay: 200,
-      burstLimit: 5,
+      burstLimit: 10, // Increased burst limit
       burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
@@ -548,7 +548,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit',
       characterLimit: 5000,
-      maxChunksPerBatch: 20, // Edge API supports larger batches
+      maxChunksPerBatch: 100, // Increased from 20 to 100 - Edge API supports large batches
       delimiter: null // Uses JSON array
     },
     streaming: {
