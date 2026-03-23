@@ -254,12 +254,13 @@ class SelectElementManager extends ResourceTracker {
       fromBackground = false,
       fromNotification = false,
       fromCancel = false,
-      preserveTranslations = false,
+      preserveTranslations = true, // Default to true: don't revert on deactivation
       silent = false,
     } = options;
 
-    // When cancelling, preserve translations so user can revert them later with ESC
-    const shouldPreserve = preserveTranslations || fromCancel;
+    // When deactivating, we almost always want to preserve what's already been translated
+    // unless explicitly told otherwise (e.g. for emergency cleanup)
+    const shouldPreserve = preserveTranslations;
 
     this.logger.debug('Deactivating SelectElementManager', {
       fromBackground,
@@ -275,10 +276,9 @@ class SelectElementManager extends ResourceTracker {
       // Set active state immediately
       this.isActive = false;
 
-      // Cancel any ongoing translations (but don't revert them)
-      if (!preserveTranslations) {
-        this.domTranslatorAdapter.cancelTranslation({ silent });
-      }
+      // ALWAYS cancel any ongoing translations to stop background processes
+      // The silent option prevents unwanted toast notifications if needed
+      this.domTranslatorAdapter.cancelTranslation({ silent });
 
       // Remove event listeners
       this.removeEventListeners();
@@ -313,40 +313,11 @@ class SelectElementManager extends ResourceTracker {
   }
 
   /**
-   * Force deactivation (emergency cleanup)
+   * Force deactivation (emergency cleanup with revert)
    */
   async forceDeactivate() {
     this.logger.debug('Force deactivating SelectElementManager');
-
-    // Set active state immediately
-    this.isActive = false;
-    this.isProcessingClick = false;
-
-    try {
-      // Cancel translation immediately
-      this.domTranslatorAdapter.cancelTranslation();
-
-      // Remove event listeners
-      this.removeEventListeners();
-
-      // Deactivate element selector
-      this.elementSelector.deactivate();
-
-      // Revert translation
-      await this.domTranslatorAdapter.revertTranslation();
-
-      // Dismiss notification
-      if (window === window.top) {
-        this.dismissNotification();
-      }
-
-      this.logger.info('SelectElementManager force deactivated successfully');
-    } catch (error) {
-      this.logger.error('Error during force deactivation:', error);
-      // Ensure state is reset even if cleanup fails
-      this.isActive = false;
-      this.isProcessingClick = false;
-    }
+    return this.deactivate({ preserveTranslations: false, silent: true });
   }
 
   /**

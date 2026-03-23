@@ -474,7 +474,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }).catch(() => {});
     }
 
-    if (this.hasTranslation()) await this.revertTranslation();
+    // IMPORTANT: Do NOT revert translations in cleanup. 
+    // This is called when switching tabs or deactivating the manager, 
+    // and we want to keep already translated parts visible.
+    // Revert is only called explicitly by the user via Revert button or ESC.
+
     super.cleanup();
   }
 }
