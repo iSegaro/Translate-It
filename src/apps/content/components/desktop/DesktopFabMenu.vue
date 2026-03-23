@@ -4,8 +4,8 @@
     translate="no"
     ref="fabContainerRef"
     :style="containerStyle"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
   >
     <!-- Revert Action (Small Badge Button) -->
     <Transition name="fade-scale">
@@ -14,10 +14,10 @@
         class="fab-revert-badge"
         @click.stop="handleRevert"
         :title="t('desktop_fab_revert_tooltip')"
-        style="position: absolute !important; bottom: 40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
+        style="position: absolute !important; bottom: 42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(250, 82, 82, 0.3) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important;"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.1)' : 'scale(1)') }"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.15)' : 'scale(1)') }"
       >
         <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
       </div>
@@ -28,7 +28,7 @@
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        style="position: absolute !important; bottom: 0px !important; right: 80px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important; padding: 6px 0 !important; min-width: 220px !important; width: max-content !important; border: 1px solid rgba(0, 0, 0, 0.08) !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        style="position: absolute !important; bottom: 0px !important; right: 85px !important; background-color: #ffffff !important; border-radius: 14px !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important; padding: 8px 0 !important; min-width: 230px !important; width: max-content !important; border: 1px solid rgba(0, 0, 0, 0.06) !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
       >
         <div 
           v-for="item in menuItems" 
@@ -36,7 +36,7 @@
           class="fab-menu-item"
           :class="{ 'is-disabled': item.disabled }"
           @click.stop="item.disabled ? null : handleMenuItemClick(item)"
-          style="display: flex !important; align-items: center !important; padding: 10px 16px !important; cursor: pointer !important; color: #374151 !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s ease !important;"
+          style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; color: #374151 !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
           :style="item.disabled ? 'opacity: 0.5 !important; cursor: default !important; pointer-events: none !important;' : ''"
         >
           <div style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; margin-right: 12px !important; flex-shrink: 0 !important;">
@@ -59,12 +59,12 @@
       @mousedown="startDrag"
       @click.stop="toggleMenu"
       :title="t('desktop_fab_tooltip')"
-      :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
+      :style="{ transform: isHovered || isMenuOpen ? 'translateX(-18px)' : 'translateX(0)' }"
     >
       <img 
         src="@/icons/extension/extension_icon_64.svg" 
         :alt="t('desktop_fab_alt')" 
-        style="width: 30px !important; height: 30px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
+        style="width: 32px !important; height: 32px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
       />
     </div>
 
@@ -75,10 +75,10 @@
         class="fab-settings-badge"
         @click.stop="handleOpenSettings"
         :title="t('desktop_fab_settings_tooltip')"
-        style="position: absolute !important; bottom: -40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important; border: 1px solid rgba(0,0,0,0.05) !important;"
+        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important; border: 1px solid rgba(0,0,0,0.05) !important;"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.1)' : 'scale(1)') }"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }"
       >
         <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 16px !important; height: 16px !important; filter: opacity(0.7) !important;" />
       </div>
@@ -114,6 +114,23 @@ const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
 const fabContainerRef = ref(null);
+let hoverTimer = null;
+
+const handleMouseEnter = () => {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  isHovered.value = true;
+};
+
+const handleMouseLeave = () => {
+  // 1 second delay before closing
+  hoverTimer = setTimeout(() => {
+    isHovered.value = false;
+    hoverTimer = null;
+  }, 750);
+};
 
 const menuItems = computed(() => {
   const items = [
@@ -191,7 +208,7 @@ const containerStyle = computed(() => {
     position: 'fixed !important',
     right: '-25px !important',
     zIndex: 2147483647,
-    transition: 'opacity 0.8s ease, transform 0.3s ease !important',
+    transition: 'opacity 0.8s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important',
     opacity: `${opacityValue} !important`,
     left: 'auto !important'
   };
@@ -293,6 +310,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mousemove', onDrag);
   window.removeEventListener('mouseup', stopDrag);
+  if (hoverTimer) clearTimeout(hoverTimer);
 });
 </script>
 
@@ -305,18 +323,23 @@ onUnmounted(() => {
 }
 
 .desktop-fab-button {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background-color: #4A90E2;
-  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.2);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   pointer-events: auto;
   user-select: none;
-  transition: transform 0.3s ease, background-color 0.2s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease;
+}
+
+.desktop-fab-button:hover {
+  background-color: #5097E8;
+  box-shadow: -6px 0 25px rgba(0, 0, 0, 0.25);
 }
 
 .desktop-fab-button.is-open {
@@ -329,26 +352,33 @@ onUnmounted(() => {
 }
 
 /* Transitions */
-.fade-scale-enter-active,
+.fade-scale-enter-active {
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
 .fade-scale-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 1, 1) !important;
 }
 
 .fade-scale-enter-from,
 .fade-scale-leave-to {
   opacity: 0 !important;
-  transform: scale(0.5) translateY(10px) !important;
+  transform: scale(0.6) translateY(15px) !important;
 }
 
-.fab-menu-enter-active,
+.fab-menu-enter-active {
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom right;
+}
+
 .fab-menu-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 1, 1);
   transform-origin: bottom right;
 }
 
 .fab-menu-enter-from,
 .fab-menu-leave-to {
   opacity: 0;
-  transform: scale(0.8) translateY(10px);
+  transform: scale(0.85) translateX(20px);
 }
 </style>
