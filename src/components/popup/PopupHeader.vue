@@ -260,24 +260,23 @@ const handleOpenSidePanelNative = async (event) => {
   box-sizing: border-box;
   min-height: clamp(50px, 10vh, 64px);
   gap: 8px;
-}
-
-.toolbar-left-group, 
-.toolbar-right-group {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  gap: clamp(8px, 4vw, 24px);
+  direction: ltr !important; /* Force 'Translate Page' to the LEFT */
 }
 
 .toolbar-left-group {
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
-  flex: 0 1 auto;
+  flex: 0 0 auto; /* Pinned to the left side */
 }
 
 .toolbar-right-group {
-  justify-content: space-around; /* Spread icons across the available width */
-  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto; /* Take all remaining space */
+  gap: clamp(8px, 4vw, 24px);
+  flex-direction: row-reverse; /* Order icons from right to left */
+  justify-content: space-around; /* Spread icons across available width */
 }
 
 .ti-toolbar-button {
