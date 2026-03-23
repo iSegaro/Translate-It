@@ -59,7 +59,11 @@
       :title="t('desktop_fab_tooltip') || 'Quick Actions'"
       :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
     >
-      <img src="@/icons/extension/extension_icon_64.svg" :alt="t('desktop_fab_alt') || 'Translate Actions'" class="fab-icon" />
+      <img 
+        src="@/icons/extension/extension_icon_64.svg" 
+        :alt="t('desktop_fab_alt') || 'Translate Actions'" 
+        style="width: 30px !important; height: 30px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
+      />
     </div>  </div>
 </template>
 
@@ -278,13 +282,6 @@ onUnmounted(() => {
 
 .desktop-fab-button.is-open {
   background-color: #357ABD;
-}
-
-.fab-icon { 
-  width: 28px; 
-  height: 28px; 
-  pointer-events: none;
-  margin-right: 15px; 
 }
 
 .fab-menu-item:hover { background-color: #f5f5f5 !important; }
