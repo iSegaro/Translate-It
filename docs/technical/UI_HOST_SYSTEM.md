@@ -16,6 +16,7 @@ The UI Host system is a centralized Vue.js application that manages all in-page 
 
 - **Shadow DOM Isolation**: All UI elements are rendered within a Shadow DOM to prevent CSS conflicts
 - **Event-Based Communication**: Uses a custom event bus for seamless communication between vanilla JS and Vue
+- **Desktop FAB Integration**: Provides a persistent, draggable menu for quick access to extension features
 - **Centralized Management**: All in-page UI (notifications, toolbars, icons) is managed by a single Vue app
 - **Performance Optimized**: Minimizes DOM manipulation and leverages Vue's reactivity system
 
@@ -91,6 +92,12 @@ Renders the toolbar/overlay when Select Element mode is active. Controlled by th
 ### TextFieldIcon.vue  
 Renders translation icons on text fields. Managed through the `activeIcons` reactive array with absolute positioning.
 
+### DesktopFabMenu.vue
+A persistent, vertically draggable floating action button that provides quick access to "Select Element" and "Page Translation" features. It features smart-fading and dynamic menu items based on page state. See [Desktop FAB System](DESKTOP_FAB_SYSTEM.md) for full details.
+
+### MobileSheet.vue
+The central UI container for mobile browsers. It provides a touch-friendly "Bottom Sheet" experience with gesture support and dynamic view switching. See [Mobile Support System](MOBILE_SUPPORT.md) for full details.
+
 ## Benefits
 
 1. **Isolation**: Complete CSS/JS isolation prevents conflicts with webpage styles
@@ -105,6 +112,8 @@ Renders translation icons on text fields. Managed through the `activeIcons` reac
 
 The system integrates with:
 - `SelectElementManager.js` - For select mode toolbar
+- `Desktop FAB System` - For the persistent floating action menu
+- `Mobile Support System` - For the touch-friendly mobile interface
 - `smartTranslationIntegration.js` - For translation status notifications
 - `RevertHandler.js` - For revert operation notifications
 - `ErrorHandler.js` - For error notifications

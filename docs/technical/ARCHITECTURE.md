@@ -4,7 +4,7 @@
 
 **Modern Vue.js browser extension** for AI-powered translation supporting **Chrome and Firefox** with **Manifest V3**. Built with comprehensive modular architecture, advanced state management, and robust error handling.
 
-## Current Status ✅
+## Current Status
 
 **Latest Optimizations:**
 - **Advanced Code Splitting** - Sophisticated bundle splitting with lazy loading for features, languages, and utilities
@@ -36,7 +36,7 @@
 
 ---
 
-## 📚 Documentation Index
+## Documentation Index
 
 ### Core Documentation
 - **[Architecture](ARCHITECTURE.md)** - This file - Complete system overview and integration guide
@@ -63,6 +63,7 @@
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
 - **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
 - **[Mobile Support System](MOBILE_SUPPORT.md)** - Centralized Bottom Sheet architecture for mobile browsers with gesture support
+- **[Desktop FAB System](DESKTOP_FAB_SYSTEM.md)** - Floating action menu for quick access to translation features on desktop
 
 ### Media Assets
 - **[Video Tutorials](../guides/Introduce.mp4)** - Introduction and feature overview
@@ -82,7 +83,7 @@
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -123,11 +124,11 @@
 
 ---
 
-## 📁 Optimized Project Structure
+## Optimized Project Structure
 
 ```
 src/
-├── 🎯 apps/                     # Vue Applications (Entry Points)
+├── apps/                     # Vue Applications (Entry Points)
 │   ├── popup/                  # PopupApp.vue + components
 │   │   ├── PopupApp.vue            # Main popup application
 │   │   └── components/             # Popup-specific components
@@ -377,7 +378,7 @@ src/
 
 ---
 
-## 🚀 Content Script Architecture (Smart Loading)
+## Content Script Architecture (Smart Loading)
 
 ### Ultra-Optimized Loading System
 The content script implements an intelligent, interaction-based loading system that dramatically reduces memory usage and improves page load performance.
@@ -416,7 +417,7 @@ Feature Categories:
 
 ---
 
-## ⚡ Performance Optimizations
+## Performance Optimizations
 
 ### Achieved Optimizations
 The project has undergone significant performance improvements through advanced optimization techniques:
@@ -454,7 +455,7 @@ The project has undergone significant performance improvements through advanced 
 
 ---
 
-## 🎯 Shared Systems Architecture
+## Shared Systems Architecture
 
 ### Toast Integration System (2025)
 Comprehensive toast notification system providing **event-driven, actionable notifications** with Vue Sonner integration. See **[Toast Integration System Documentation](TOAST_INTEGRATION_SYSTEM.md)** for complete details.
@@ -670,7 +671,7 @@ const handleStreamingTranslation = async (message) => {
 
 ---
 
-## 🚀 Unified Translation Service (2025)
+## Unified Translation Service (2025)
 
 ### Overview
 The **Unified Translation Service** is the central coordination system for all translation operations in the extension. It provides **centralized coordination**, **duplicate prevention**, and **intelligent result routing** while maintaining **comprehensive lifecycle management** for all translation requests.
@@ -796,7 +797,7 @@ export default async function handleTranslationResult(message, sender) {
 
 ---
 
-## 🎯 Background Service
+## Background Service
 
 ### Service Worker Architecture
 Modern Manifest V3 service worker with dynamic feature loading:
@@ -868,7 +869,7 @@ export class FeatureLoader {
 
 ---
 
-## 🏭 Provider System
+## Provider System
 
 ### Factory Pattern
 ```javascript
@@ -902,7 +903,7 @@ const result = await engine.translate({
 
 ---
 
-## 🗂️ Vue.js State Management
+## Vue.js State Management
 
 ### Pinia Store Architecture
 The extension uses Pinia for reactive state management across all Vue applications:
@@ -973,7 +974,7 @@ Vue Component → Pinia Store → Storage Manager → browser.storage
 
 ---
 
-## 🔗 Cross-System Integration Guide
+## Cross-System Integration Guide
 
 ### Vue Component Integration Pattern
 The extension follows a consistent pattern for integrating Vue components with backend systems:
@@ -1149,7 +1150,7 @@ const windowsManager = new WindowsManager()
 await windowsManager.show(selectedText, position)
 ```
 
-## 🛠️ Vue.js Development Patterns
+## Vue.js Development Patterns
 
 ### Composable Design Pattern
 All business logic is extracted into composables for reusability:
@@ -1253,7 +1254,7 @@ export const useTranslationStore = defineStore('translation', {
 
 ---
 
-## 📋 Essential Files
+## Essential Files
 
 ### Vue Application Entry Points
 - `src/views/popup/PopupApp.vue` - Main popup application
@@ -1318,7 +1319,7 @@ export const useTranslationStore = defineStore('translation', {
 
 ---
 
-## 🎯 Smart Handler Registration System
+## Smart Handler Registration System
 
 ### Overview
 Dynamic feature lifecycle management system that only registers handlers when needed based on settings and URL exclusions. Provides real-time activation/deactivation without page refresh.
@@ -1347,7 +1348,7 @@ See **[Smart Handler Registration System Documentation](SMART_HANDLER_REGISTRATI
 
 ---
 
-## 🖼️ Windows Manager System
+## Windows Manager System
 
 ### Overview
 The Windows Manager has been refactored into a **decoupled, event-driven architecture**. The legacy approach of direct DOM manipulation has been completely removed. The system is now split into a pure business logic layer and a reactive UI layer, communicating via an event bus. This provides better performance, maintainability, and a clean separation of concerns.
@@ -1390,7 +1391,7 @@ TranslationWindow.vue handles all UI and interactions
 
 ---
 
-## 🖥️ UI Host System
+## UI Host System
 
 ### Overview
 The UI Host System is a critical architectural component that acts as a **centralized Vue application (`ContentApp.vue`)** for managing all in-page UI elements. It operates entirely within a **Shadow DOM**, ensuring complete CSS and JavaScript isolation from the host webpage.
@@ -1409,7 +1410,7 @@ See [UI Host System Documentation](docs/UI_HOST_SYSTEM.md) for complete details.
 
 ---
 
-## 📝 Text Actions System
+## Text Actions System
 
 ### Overview
 The Text Actions System provides a unified interface for copy, paste, and TTS operations throughout the extension. See [Text Actions Documentation](TEXT_ACTIONS_SYSTEM.md) for complete details.
@@ -1438,7 +1439,7 @@ src/composables/actions/
 
 ---
 
-## 🔊 TTS (Text-to-Speech) System
+## TTS (Text-to-Speech) System
 
 ### Overview
 A **fully unified, stateful TTS system** with complete Play/Pause/Resume/Stop controls and exclusive playback across all extension contexts. The system has been **completely unified (2025)** around a single composable that eliminates all duplicate implementations. See [TTS System Documentation](TTS_SYSTEM.md) for complete details.
@@ -1477,15 +1478,43 @@ Cross-Browser Audio Playback (Chrome: Offscreen, Firefox: Direct)
 - **Cross-Browser Compatibility**: Seamless Chrome (Offscreen) and Firefox (Direct) support
 
 **Benefits of Complete Unification (2025):**
-- **🎯 Single Composable**: Zero duplicate implementations across codebase
-- **🚀 Performance**: 600+ lines of redundant code eliminated
-- **🌍 Language Support**: All languages work through intelligent fallback mapping
-- **🔧 Maintainability**: Single system to debug and enhance
-- **📱 Consistency**: Identical TTS experience across all extension contexts
+- **Single Composable**: Zero duplicate implementations across codebase
+- **Performance**: 600+ lines of redundant code eliminated
+- **Language Support**: All languages work through intelligent fallback mapping
+- **Maintainability**: Single system to debug and enhance
+- **Consistency**: Identical TTS experience across all extension contexts
 
 ---
 
-## 🖼️ IFrame Support System
+## Mobile Support System
+
+### Overview
+The **Mobile Support** system provides a native-like, touch-friendly translation experience for mobile browsers. It replaces desktop-centric UI with a centralized **In-Page Bottom Sheet** architecture, optimized for thumb interaction and small screens.
+
+**Key Features:**
+- **Bottom Sheet UI**: A draggable, multi-state (Peek/Full) container for all mobile interactions.
+- **Gesture Engine**: High-performance touch gestures for swiping, expanding, and dismissing the UI.
+- **Device Detection**: Intelligent environment identification to switch between Desktop and Mobile UI.
+- **Visual Viewport Awareness**: Automatically adjusts layout when the virtual keyboard is active.
+- **Unified Hub**: Consolidates dashboard, selection results, and page translation progress into a single view.
+
+---
+
+## Desktop FAB System
+
+### Overview
+The **Desktop FAB (Floating Action Button)** provides a persistent, draggable entry point for core extension features on desktop browsers. It minimizes UI friction by offering quick access to "Select Element" and "Page Translation" without requiring the user to interact with the extension popup.
+
+**Key Features:**
+- **Dynamic Context Menu**: Adapts its options based on page translation status (Progress, Restore, Stop).
+- **Vertical Draggability**: Users can reposition the FAB to avoid site-specific layout conflicts.
+- **Smart Fading**: Reduces visual noise by fading to low opacity when not in use.
+- **Shadow DOM Isolation**: Rendered within the UI Host to ensure style consistency across all websites.
+- **Resource Management**: Uses `ResourceTracker` for safe cleanup of drag listeners and timers.
+
+---
+
+## IFrame Support System
 
 ### Overview
 Streamlined iframe support system that provides essential iframe functionality while maintaining compatibility with existing Vue.js, ResourceTracker, Error Management, and Smart Messaging systems. The system has been simplified to include only actively used components. See [IFrame Support Documentation](../features/iframe-support/README.md) for complete details.

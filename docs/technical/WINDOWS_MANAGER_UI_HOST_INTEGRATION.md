@@ -69,6 +69,8 @@ This document describes the successful migration of the WindowsManager system to
 ### 2. Vue UI Host Components
 - **TranslationWindow.vue** - Handles window rendering and management
 - **TranslationIcon.vue** - Handles icon rendering and interactions
+- **DesktopFabMenu.vue** - Persistent floating menu for global actions (See [Desktop FAB System](DESKTOP_FAB_SYSTEM.md))
+- **MobileSheet.vue** - Centralized bottom sheet for mobile browsers (See [Mobile Support System](MOBILE_SUPPORT.md))
 - **ContentApp.vue** - Root component that manages all UI elements
 
 ### 3. Event Bus System
