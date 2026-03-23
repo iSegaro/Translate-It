@@ -75,12 +75,12 @@
         class="fab-settings-badge"
         @click.stop="handleOpenSettings"
         :title="t('desktop_fab_settings_tooltip')"
-        style="position: absolute !important; bottom: -40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #4b5563 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
+        style="position: absolute !important; bottom: -40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important; border: 1px solid rgba(0,0,0,0.05) !important;"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
         :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 16px !important; height: 16px !important; filter: opacity(0.7) !important;" />
       </div>
     </Transition>
   </div>
