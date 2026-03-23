@@ -1,5 +1,5 @@
 // src/composables/core/useResourceTracker.js
-import { onUnmounted, getCurrentInstance } from 'vue'
+import { onBeforeUnmount, getCurrentInstance } from 'vue'
 import ResourceTracker from '../../core/memory/ResourceTracker.js'
 import { getScopedLogger } from '../../shared/logging/logger.js'
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js'
@@ -20,7 +20,7 @@ const shouldEnableLogging = () => {
 
 /**
  * Vue Composable for automatic resource management
- * Automatically cleans up resources when Vue component is unmounted
+ * Automatically cleans up resources when Vue component is about to be unmounted
  *
  * @param {string} groupId - Group identifier for batch cleanup
  * @returns {ResourceTracker} Resource tracker instance
@@ -29,15 +29,15 @@ export function useResourceTracker(groupId) {
   const tracker = new ResourceTracker(groupId)
   const logger = getScopedLogger(LOG_COMPONENTS.MEMORY, `useResourceTracker:${groupId}`)
 
-  // Only register onUnmounted if we're inside a component context
+  // Only register onBeforeUnmount if we're inside a component context
   const instance = getCurrentInstance()
   if (instance) {
-    onUnmounted(() => {
+    onBeforeUnmount(() => {
       tracker.cleanup()
       
       // Only log in development or when explicitly enabled
       if (shouldEnableLogging()) {
-        logger.debug('Resources cleaned up automatically')
+        logger.debug('Resources cleaned up automatically (onBeforeUnmount)')
       }
     })
   } else {
