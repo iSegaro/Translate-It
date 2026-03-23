@@ -1,14 +1,16 @@
 <template>
   <!-- Direct DOM Manipulation - no template needed -->
-  <div style="display: none;" />
+  <div v-show="!isFullscreen" style="display: none;" />
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { useMobileStore } from '@/store/modules/mobile.js';
 
 // State management for translated elements using direct DOM manipulation
 const translatedElementsMap = new Map(); // element -> {originalText, translationId}
@@ -18,13 +20,16 @@ let translationIdCounter = 0;
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('translation-overlay')
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'TranslationOverlay')
+const mobileStore = useMobileStore();
+
+const isFullscreen = computed(() => mobileStore.isFullscreen);
 
 // Generate unique IDs for translations
 const generateUniqueTranslationId = () => {
   return `translate-${Date.now()}-${++translationIdCounter}`;
 };
 
-// Apply translations directly to DOM elements (like OLD system)
+// Apply translations directly to DOM elements
 const applyTranslationsToNodes = (element, translationsMap) => {
   const originalText = element.textContent?.trim() || '';
   const translationId = generateUniqueTranslationId();
@@ -68,7 +73,6 @@ const applyTranslationsToNodes = (element, translationsMap) => {
   };
   
   traverse(element);
-  
   logger.debug('Applied translation directly to DOM element:', element.tagName, 'with', translationsMap.size, 'translations');
 };
 
@@ -105,25 +109,22 @@ const clearAllTranslations = () => {
   logger.debug('All translations cleared');
 };
 
-// Listen for translation events using direct DOM manipulation
-pageEventBus.on('show-translation', (detail) => {
+// Listen for translation events using tracker
+tracker.addEventListener(pageEventBus, 'show-translation', (detail) => {
   logger.debug('Received show-translation event for', detail.element.tagName, 'with', detail.translations?.size || 0, 'translations');
   const { element, translations } = detail;
-  
-  // Apply translations directly to the DOM element
   applyTranslationsToNodes(element, translations);
 });
 
-pageEventBus.on('hide-translation', (detail) => {
+tracker.addEventListener(pageEventBus, 'hide-translation', (detail) => {
   if (detail.element) {
     revertTranslations(detail.element);
   } else {
-    // Revert all translations
     clearAllTranslations();
   }
 });
 
-pageEventBus.on('clear-all-translations', () => {
+tracker.addEventListener(pageEventBus, 'clear-all-translations', () => {
   clearAllTranslations();
 });
 
@@ -134,11 +135,9 @@ const handleNavigationChange = () => {
   const newUrl = window.location.href;
   if (newUrl !== currentUrl) {
     logger.debug('Navigation detected, cleaning up translations');
-    // Clear all translations when navigation occurs
     clearAllTranslations();
     currentUrl = newUrl;
     
-    // Emit event to notify other components
     pageEventBus.emit('navigation-detected', { 
       oldUrl: currentUrl, 
       newUrl: newUrl 
@@ -146,25 +145,31 @@ const handleNavigationChange = () => {
   }
 };
 
-// Listen for navigation events (works for both traditional and SPA navigation) with automatic cleanup
+// Listen for navigation events with automatic cleanup
 tracker.addEventListener(window, 'popstate', handleNavigationChange);
 tracker.addEventListener(window, 'pushstate', handleNavigationChange);
 
-// For SPAs that use history.pushState/replaceState, we need to override them
+// For SPAs that use history.pushState/replaceState
 const originalPushState = history.pushState;
 const originalReplaceState = history.replaceState;
 
+// Use tracker.trackResource to store the restore function for pushState
+tracker.trackResource('history-hook-cleanup', () => {
+  history.pushState = originalPushState;
+  history.replaceState = originalReplaceState;
+});
+
 history.pushState = function(...args) {
   originalPushState.apply(this, args);
-  setTimeout(handleNavigationChange, 0);
+  tracker.trackTimeout(handleNavigationChange, 0);
 };
 
 history.replaceState = function(...args) {
   originalReplaceState.apply(this, args);
-  setTimeout(handleNavigationChange, 0);
+  tracker.trackTimeout(handleNavigationChange, 0);
 };
 </script>
 
 <style scoped>
-/* No styles needed for direct DOM manipulation */
+/* No styles needed */
 </style>
