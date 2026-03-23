@@ -78,9 +78,6 @@ export class LingvaProvider extends BaseTranslateProvider {
     }
 
     // Standard splitting logic
-    const translatedParts = result.split(LingvaProvider.TEXT_DELIMITER.trim());
-    return chunkTexts.map((original, i) => {
-      return translatedParts[i]?.trim() || original;
-    });
+    return await this._robustSplit(result, chunkTexts);
   }
 }

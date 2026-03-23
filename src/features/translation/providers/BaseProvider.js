@@ -361,24 +361,50 @@ export class BaseProvider {
         throw err;
       }
 
-      // Enhanced content type handling with support for async extractResponse
+      // Enhanced content type handling
       const contentType = response.headers.get('content-type');
 
-      // Check if extractResponse is async (new pattern for providers that need to inspect raw response)
-      if (extractResponse.constructor.name === 'AsyncFunction' || extractResponse.length > 2) {
-        // Async extractResponse - pass the full response object for detailed inspection
-        logger.debug(`[${this.providerName}] Using async extractResponse for ${contentType || 'unknown content type'}`);
-        const result = await extractResponse(response);
-        logger.debug(`[${this.providerName}] Async extractResponse result:`, result);
-        return result;
+      // Check if extractResponse is async OR expects the raw response object (length > 2)
+      // For these cases, we MUST NOT consume the body beforehand (e.g., via response.json())
+      // because the handler might want to call response.text() or handle streaming itself.
+      const isAsyncHandler = extractResponse.constructor.name === 'AsyncFunction';
+      const wantsRawResponse = extractResponse.length > 2;
+
+      if (isAsyncHandler || wantsRawResponse) {
+        logger.debug(`[${this.providerName}] Passing raw response to ${isAsyncHandler ? 'async ' : ''}extractResponse`);
+        // We still try to provide parsed data as the 3rd argument if it happens to be JSON
+        // but we don't consume the body of the 'response' object we pass as the 1st argument.
+        // Actually, consuming it once consumes it for all. So we just pass the response.
+        return await extractResponse(response, response.status, response);
       }
 
-      // Traditional JSON response handling
-      if (!contentType || !contentType.includes('application/json')) {
-        // If we got HTML or other content, log the response for debugging
-        const responseText = await response.text();
-        logger.error(`[${this.providerName}] Expected JSON but received ${contentType || 'unknown content type'}. Response:`, responseText.substring(0, 500));
+      // Traditional synchronous handling (1-2 args)
+      const isJson = contentType && contentType.includes('application/json');
+      if (isJson) {
+        try {
+          const data = await response.json();
+          logger.debug('_executeApiCall raw response data:', data);
+          const result = await extractResponse(data, response.status);
+          
+          if (result === undefined) {
+            logger.error(`[${this.providerName}] _executeApiCall result is undefined. Raw data:`, data);
+            const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+            err.type = ErrorTypes.API_RESPONSE_INVALID;
+            err.statusCode = response.status;
+            err.context = context;
+            throw err;
+          }
+          return result;
+        } catch (jsonErr) {
+          if (jsonErr.type === ErrorTypes.API_RESPONSE_INVALID) throw jsonErr;
+          logger.debug(`[${this.providerName}] Failed to parse JSON even though content-type was JSON`, jsonErr);
+        }
+      }
 
+      // Fallback for non-JSON or failed JSON parsing
+      const responseText = await response.text();
+      if (!isJson) {
+        logger.error(`[${this.providerName}] Expected JSON but received ${contentType || 'unknown content type'}. Response:`, responseText.substring(0, 500));
         const err = new Error('API returned non-JSON response. This may indicate a proxy configuration error.');
         err.type = ErrorTypes.API_RESPONSE_INVALID;
         err.statusCode = response.status;
@@ -386,21 +412,9 @@ export class BaseProvider {
         throw err;
       }
 
-      const data = await response.json();
-      logger.debug('_executeApiCall raw response data:', data);
-
-      const result = extractResponse(data, response.status);
-      if (result === undefined) {
-        logger.error(`[${this.providerName}] _executeApiCall result is undefined. Raw data:`, data);
-        const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
-        err.type = ErrorTypes.API_RESPONSE_INVALID;
-        err.statusCode = response.status;
-        err.context = context;
-        throw err;
-      }
-
-      logger.init(`_executeApiCall success for context: ${context}`);
-      return result;
+      // If it was supposed to be JSON but parsing failed, we already logged it.
+      // Final attempt to call extractResponse with the text (though it likely expects an object)
+      return await extractResponse(responseText, response.status);
     } catch (err) {
       if (err.name === 'AbortError') {
         const abortErr = new Error('Translation cancelled by user');

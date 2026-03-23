@@ -4,6 +4,11 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import {
+  getEnableDictionaryAsync,
+  getYandexTranslateUrlAsync,
+  getYandexDetectUrlAsync
+} from "@/shared/config/config.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
@@ -83,7 +88,8 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     formData.append('lang', lang);
     chunkTexts.forEach(text => formData.append('text', text || ''));
 
-    const url = new URL(YandexTranslateProvider.mainUrl);
+    const apiUrl = await getYandexTranslateUrlAsync();
+    const url = new URL(apiUrl);
     url.searchParams.set("id", `${uuid}-0-0`);
     url.searchParams.set("srv", "android");
 

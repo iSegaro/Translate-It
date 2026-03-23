@@ -4,7 +4,9 @@ import {
   getDeeplApiKeysAsync,
   getDeeplApiTierAsync,
   getDeeplFormalityAsync,
-  getDeeplBetaLanguagesEnabledAsync
+  getDeeplBetaLanguagesEnabledAsync,
+  getDeeplFreeApiUrlAsync,
+  getDeeplProApiUrlAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -57,8 +59,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
       // Get API endpoint based on tier
       const apiUrl = apiTier === 'pro'
-        ? 'https://api.deepl.com/v2/translate'
-        : 'https://api-free.deepl.com/v2/translate';
+        ? await getDeeplProApiUrlAsync()
+        : await getDeeplFreeApiUrlAsync();
 
       // Configuration loaded successfully
       logger.info(`[DeepL] Using tier: ${apiTier}`);

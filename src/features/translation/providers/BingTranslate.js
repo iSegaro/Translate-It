@@ -211,51 +211,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
-          let translatedSegments = targetText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER).map(t => t.trim());
-          
-          // Validate segment count match
-          if (translatedSegments.length !== chunkTexts.length) {
-            logger.debug("[Bing] Translated segment count mismatch after splitting.", { 
-              expected: chunkTexts.length, 
-              got: translatedSegments.length 
-            });
-            
-            // Try alternative splitting strategies
-            if (translatedSegments.length === 1 && chunkTexts.length > 1) {
-              // If we got one big translation but expected multiple, try enhanced mapping
-              const text = translatedSegments[0];
-
-              // Use enhanced mapping similar to GoogleTranslate
-              const mappedSegments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-                text,
-                chunkTexts,
-                TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-                'BingTranslate'
-              );
-
-              if (mappedSegments.length === chunkTexts.length) {
-                translatedSegments = mappedSegments;
-                logger.info("[Bing] Successfully mapped translation to original segments");
-              } else {
-                // Use the utility's fallback method
-                translatedSegments = TranslationSegmentMapper.createAlternativeFallback(
-                  text,
-                  chunkTexts,
-                  'BingTranslate'
-                );
-              }
-            } else if (translatedSegments.length > chunkTexts.length) {
-              // If we got too many segments, take only what we need
-              translatedSegments = translatedSegments.slice(0, chunkTexts.length);
-            } else {
-              // If we got fewer segments than expected, pad with empty strings
-              while (translatedSegments.length < chunkTexts.length) {
-                translatedSegments.push("");
-              }
-            }
-          }
-          
-          return translatedSegments;
+          return await this._robustSplit(targetText, chunkTexts);
         },
         context,
         abortController,

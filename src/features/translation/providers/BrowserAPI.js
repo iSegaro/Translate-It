@@ -352,8 +352,9 @@ export class browserTranslateProvider extends BaseTranslateProvider {
         return JSON.stringify(translatedJson, null, 2);
       } else {
         if (textsToTranslate.length > 1) {
-          // Handle delimiter-separated text
-          const parts = translatedResults[0].split(TEXT_DELIMITER);
+          // Handle delimiter-separated text using the standard robust split
+          const parts = await this._robustSplit(translatedResults[0], textsToTranslate);
+          
           if (parts.length === textsToTranslate.length) {
             return parts.join("");
           }

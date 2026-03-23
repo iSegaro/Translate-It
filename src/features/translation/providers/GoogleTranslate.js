@@ -92,35 +92,11 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       },
       extractResponse: (data) => {
         if (!data?.[0]?.[0]?.[0]) {
-          return { translatedSegments: chunkTexts.map(() => ''), candidateText: '' };
+          return { translatedText: "", candidateText: "" };
         }
 
         const translatedText = data[0].map(segment => segment[0]).join('');
-        const translatedSegments = translatedText.split(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
-
-        if (translatedSegments.length !== chunkTexts.length) {
-          logger.debug("[Google] Translated segment count mismatch after splitting.", {
-            expected: chunkTexts.length,
-            got: translatedSegments.length
-          });
-
-          // Enhanced fallback: try to map back to original segments
-          const fallbackSegments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-            translatedText,
-            chunkTexts,
-            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-            'GoogleTranslate'
-          );
-
-          if (fallbackSegments.length === chunkTexts.length) {
-            logger.info("[Google] Successfully mapped translation to original segments using fallback logic");
-            return { translatedSegments: fallbackSegments, candidateText: '' };
-          } else {
-            logger.debug("[Google] Fallback mapping also failed, using single segment");
-            return { translatedSegments: [translatedText], candidateText: '' };
-          }
-        }
-
+        
         let candidateText = "";
         if (shouldIncludeDictionary && data[1]) {
           candidateText = data[1].map((dict) => {
@@ -131,7 +107,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
         }
 
         return {
-          translatedSegments,
+          translatedText,
           candidateText: candidateText.trim(),
         };
       },
@@ -139,13 +115,16 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       abortController,
     });
 
+    // Use robust split logic from base class OUTSIDE extractResponse
+    const translatedSegments = await this._robustSplit(result?.translatedText || "", chunkTexts);
+
     // Handle dictionary formatting for single segment
     if (chunkTexts.length === 1 && result?.candidateText) {
       const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
-      return [`${result.translatedSegments[0]}\n\n${formattedDictionary}`];
+      return [`${translatedSegments[0]}\n\n${formattedDictionary}`];
     }
 
-    const finalResult = result?.translatedSegments || chunkTexts;
+    const finalResult = translatedSegments || chunkTexts;
 
     // Add completion log for successful translation
     if (finalResult.length > 0) {

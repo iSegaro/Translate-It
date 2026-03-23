@@ -98,6 +98,11 @@ export const CONFIG = {
     { value: "custom", name: "Custom Model", custom: true, thinking: { supported: true, controllable: true, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single",
+  GOOGLE_TRANSLATE_V2_URL: "https://translate.google.com/translate_a/single",
+  DEEPL_FREE_API_URL: "https://api-free.deepl.com/v2/translate",
+  DEEPL_PRO_API_URL: "https://api.deepl.com/v2/translate",
+  YANDEX_TRANSLATE_URL: "https://translate.yandex.net/api/v1/tr.json/translate",
+  YANDEX_DETECT_URL: "https://translate.yandex.net/api/v1/tr.json/detect",
   LINGVA_API_URL: "https://lingva.ml",
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.5-flash",
@@ -558,6 +563,28 @@ export const getGeminiApiUrlAsync = async () => {
 // Google Translate Specific
 export const getGoogleTranslateUrlAsync = async () => {
   return getSettingValueAsync("GOOGLE_TRANSLATE_URL", CONFIG.GOOGLE_TRANSLATE_URL);
+};
+
+export const getGoogleTranslateV2UrlAsync = async () => {
+  return getSettingValueAsync("GOOGLE_TRANSLATE_V2_URL", CONFIG.GOOGLE_TRANSLATE_V2_URL);
+};
+
+// DeepL API Specific
+export const getDeeplFreeApiUrlAsync = async () => {
+  return getSettingValueAsync("DEEPL_FREE_API_URL", CONFIG.DEEPL_FREE_API_URL);
+};
+
+export const getDeeplProApiUrlAsync = async () => {
+  return getSettingValueAsync("DEEPL_PRO_API_URL", CONFIG.DEEPL_PRO_API_URL);
+};
+
+// Yandex Translate Specific
+export const getYandexTranslateUrlAsync = async () => {
+  return getSettingValueAsync("YANDEX_TRANSLATE_URL", CONFIG.YANDEX_TRANSLATE_URL);
+};
+
+export const getYandexDetectUrlAsync = async () => {
+  return getSettingValueAsync("YANDEX_DETECT_URL", CONFIG.YANDEX_DETECT_URL);
 };
 
 // Lingva Translate Specific

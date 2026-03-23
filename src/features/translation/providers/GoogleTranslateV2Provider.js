@@ -7,7 +7,8 @@ import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js"
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import {
   getEnableDictionaryAsync,
-  TranslationMode
+  TranslationMode,
+  getGoogleTranslateV2UrlAsync
 } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslateV2');
@@ -94,7 +95,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
                                     chunkTexts.length === 1 && 
                                     !isExcludedMode;
 
-    const url = new URL("https://translate.google.com/translate_a/single");
+    const apiUrl = await getGoogleTranslateV2UrlAsync();
+    const url = new URL(apiUrl);
     const params = {
       client: 't',
       sl: sl,
@@ -121,7 +123,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const body = new URLSearchParams();
     body.append("q", combinedText);
 
-    const result = await this._executeApiCall({
+    const responseObj = await this._executeApiCall({
       url: url.toString(),
       fetchOptions: {
         method: "POST",
@@ -131,7 +133,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           "Sec-Fetch-Dest": "empty",
           "Sec-Fetch-Mode": "cors",
           "Sec-Fetch-Site": "same-origin",
-          "Referer": "https://translate.google.com/",
+          "Referer": new URL(apiUrl).origin + "/",
           "Priority": "u=1, i"
         },
         body: body.toString()
@@ -139,34 +141,12 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       extractResponse: (data) => {
         if (!data || !data[0]) {
           logger.warn('[GoogleV2] Empty or invalid response data');
-          return { translatedSegments: chunkTexts.map(() => ""), candidateText: "" };
+          return { translatedText: "", candidateText: "" };
         }
 
         // Combine segments back
         const translatedText = data[0].map(segment => segment[0] || "").join('');
         
-        // Robust splitting logic
-        let translatedSegments = [];
-        const primaryDelimiter = TRANSLATION_CONSTANTS.TEXT_DELIMITER;
-        
-        if (chunkTexts.length === 1) {
-          translatedSegments = [translatedText];
-        } else {
-          // Try primary delimiter first
-          translatedSegments = translatedText.split(primaryDelimiter);
-          
-          // If mismatch, try alternative delimiters from constants
-          if (translatedSegments.length !== chunkTexts.length) {
-            for (const altDelimiter of TRANSLATION_CONSTANTS.ALTERNATIVE_DELIMITERS) {
-              const altSplit = translatedText.split(altDelimiter);
-              if (altSplit.length === chunkTexts.length) {
-                translatedSegments = altSplit;
-                break;
-              }
-            }
-          }
-        }
-
         let candidateText = "";
         if (shouldIncludeDictionary && data[1]) {
           candidateText = data[1].map((dict) => {
@@ -176,37 +156,22 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           }).join("");
         }
 
-        if (translatedSegments.length === chunkTexts.length) {
-          return { translatedSegments, candidateText: candidateText.trim() };
-        }
-
-        // Mismatch handling - if still mismatch, try to pad or truncate to match chunkTexts length
-        logger.debug('[GoogleV2] Segment count mismatch after robust split', {
-          expected: chunkTexts.length,
-          received: translatedSegments.length
-        });
-        
-        if (translatedSegments.length > chunkTexts.length) {
-          translatedSegments = translatedSegments.slice(0, chunkTexts.length);
-        } else {
-          while (translatedSegments.length < chunkTexts.length) {
-            translatedSegments.push(""); // Pad with empty strings
-          }
-        }
-        
-        return { translatedSegments, candidateText: candidateText.trim() };
+        return { translatedText, candidateText: candidateText.trim() };
       },
       context: 'googlev2-translate-chunk',
       abortController
     });
 
+    // Use robust split logic from base class OUTSIDE extractResponse
+    const translatedSegments = await this._robustSplit(responseObj.translatedText, chunkTexts);
+
     // Handle dictionary formatting for single segment
-    if (chunkTexts.length === 1 && result?.candidateText) {
-      const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
-      return [`${result.translatedSegments[0]}\n\n${formattedDictionary}`];
+    if (chunkTexts.length === 1 && responseObj?.candidateText) {
+      const formattedDictionary = this._formatDictionaryAsMarkdown(responseObj.candidateText);
+      return [`${translatedSegments[0]}\n\n${formattedDictionary}`];
     }
 
-    return result?.translatedSegments || chunkTexts;
+    return translatedSegments || chunkTexts;
   }
 
   _formatDictionaryAsMarkdown(candidateText) {

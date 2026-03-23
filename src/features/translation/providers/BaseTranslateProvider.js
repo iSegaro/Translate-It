@@ -120,6 +120,45 @@ export class BaseTranslateProvider extends BaseProvider {
   }
 
   /**
+   * Robustly splits translated text into segments by using TranslationSegmentMapper.
+   * Ensures the returned array matches the expected count by padding or truncating.
+   * @param {string} translatedText - The full translated text string
+   * @param {string[]} originalSegments - Original segments for pattern reference
+   * @returns {string[]} - Array of translated segments matching original count
+   */
+  async _robustSplit(translatedText, originalSegments) {
+    const expectedCount = originalSegments.length;
+    if (expectedCount <= 1) return [translatedText];
+    
+    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
+    const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
+    
+    // Use the advanced mapper to recover segments
+    let segments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+      translatedText,
+      originalSegments,
+      TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+      this.providerName
+    );
+    
+    // Final validation and normalization to ensure exactly expectedCount segments
+    if (segments.length !== expectedCount) {
+      logger.debug(`[${this.providerName}] Segment count mismatch after advanced mapping: expected ${expectedCount}, got ${segments.length}`);
+      
+      if (segments.length > expectedCount) {
+        segments = segments.slice(0, expectedCount);
+      } else {
+        // Pad with empty strings if we still have a mismatch
+        while (segments.length < expectedCount) {
+          segments.push("");
+        }
+      }
+    }
+    
+    return segments.map(s => s ? s.trim() : "");
+  }
+
+  /**
    * Enhanced batch translation with streaming support
    * @param {string[]} texts - Array of texts to translate
    * @param {string} sourceLang - Source language
