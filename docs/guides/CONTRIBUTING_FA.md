@@ -88,6 +88,8 @@ pnpm run validate
 
 برای درک عمیق‌تر از معماری و طراحی سیستم، لطفاً به موارد زیر مراجعه کنید:
 - [Architecture Overview](../technical/ARCHITECTURE.md)
+- [Desktop FAB System](../technical/DESKTOP_FAB_SYSTEM.md)
+- [Mobile Support Architecture](../technical/MOBILE_SUPPORT.md)
 - [Translation Provider Logic](../technical/TRANSLATION_PROVIDER_LOGIC.md)
 - [Messaging System](../technical/MessagingSystem.md)
 - [و موارد بیشتر در پوشه فنی...](../technical/)

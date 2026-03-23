@@ -45,6 +45,16 @@ If you prefer to install the extension manually or use a specific version, follo
 
 ---
 
+### Mobile Browsers (Kiwi, Lemur, Firefox Android)
+
+1. **Kiwi / Lemur:**
+   - Follow the **Chromium-based** manual installation steps above. 
+   - Note: In mobile, you need to enable "Developer mode" in the browser's menu first.
+2. **Firefox Android:**
+   - Use the **Firefox Official Store** link. Please note that Firefox Android only supports extensions from verified collections or official stores.
+
+---
+
 ## 🔑 Initial Setup
 
 After installation:

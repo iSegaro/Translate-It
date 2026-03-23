@@ -150,6 +150,8 @@ After running, the `dist/Publish` directory will contain:
 
 For a deeper dive into the architecture and system design, please refer to:
 - [Architecture Overview](../technical/ARCHITECTURE.md)
+- [Desktop FAB System](../technical/DESKTOP_FAB_SYSTEM.md)
+- [Mobile Support Architecture](../technical/MOBILE_SUPPORT.md)
 - [Translation Provider Logic](../technical/TRANSLATION_PROVIDER_LOGIC.md)
 - [Messaging System](../technical/MessagingSystem.md)
 - [And more in the docs folder...](../technical/)
