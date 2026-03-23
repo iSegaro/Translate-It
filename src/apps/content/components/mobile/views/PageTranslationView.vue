@@ -121,6 +121,7 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
 // Import icons for dynamic usage
 import wholePageIcon from '@/icons/ui/whole-page.png';
@@ -131,6 +132,7 @@ import restoreIcon from '@/icons/ui/restore.svg';
 const mobileStore = useMobileStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useI18n()
+const tracker = useResourceTracker('mobile-page-translation')
 
 const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'completed') return 100;
@@ -218,8 +220,8 @@ const closeView = () => {
 const startTranslation = () => {
   mobileStore.closeSheet()
   
-  // Defer heavy logic
-  setTimeout(() => {
+  // Use tracker to safely manage the deferred event
+  tracker.trackTimeout(() => {
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
   }, 0)
 }

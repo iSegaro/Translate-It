@@ -52,6 +52,7 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
@@ -63,6 +64,7 @@ const mobileStore = useMobileStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
 const { t } = useI18n()
 const pageEventBus = window.pageEventBus
+const tracker = useResourceTracker('mobile-dashboard')
 
 // NEW: Minimal Button Style (No card background/border)
 const btnStyle = {
@@ -118,7 +120,11 @@ const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
   mobileStore.closeSheet()
-  setTimeout(() => { pageEventBus.emit(MessageActions.PAGE_TRANSLATE) }, 0)
+  
+  // Use tracker to safely manage the deferred event
+  tracker.trackTimeout(() => { 
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE) 
+  }, 0)
 }
 
 const activateSelectElement = () => {
