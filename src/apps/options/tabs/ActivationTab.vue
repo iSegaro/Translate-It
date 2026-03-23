@@ -25,6 +25,39 @@
       </span>
     </div>
 
+    <!-- Mobile UI Mode -->
+    <div class="setting-group mobile-ui-mode-group">
+      <div class="setting-row">
+        <label style="font-weight: 600; color: var(--text-color, #333); margin-right: 12px; min-width: 150px;">{{ t('mobile_ui_mode_label') || 'Mobile UI Mode' }}:</label>
+        <div class="radio-group" style="display: flex; gap: 15px; flex-wrap: wrap;">
+          <BaseRadio
+            v-model="mobileUiMode"
+            value="auto"
+            name="mobileUiMode"
+            :disabled="!extensionEnabled"
+            :label="t('mobile_ui_mode_auto') || 'Auto'"
+          />
+          <BaseRadio
+            v-model="mobileUiMode"
+            value="mobile"
+            name="mobileUiMode"
+            :disabled="!extensionEnabled"
+            :label="t('mobile_ui_mode_mobile') || 'Always Mobile'"
+          />
+          <BaseRadio
+            v-model="mobileUiMode"
+            value="desktop"
+            name="mobileUiMode"
+            :disabled="!extensionEnabled"
+            :label="t('mobile_ui_mode_desktop') || 'Always Desktop'"
+          />
+        </div>
+      </div>
+      <span class="setting-description" style="margin-left: 0; display: block; margin-top: 8px; color: var(--text-color-secondary, #666); font-size: 0.9em;">
+        {{ t('mobile_ui_mode_description') || 'Choose how the translation interface should appear on mobile and touch devices.' }}
+      </span>
+    </div>
+
     <!-- Text Field Translation -->
     <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
@@ -343,6 +376,15 @@ const showDesktopFab = computed({
   set: (value) => {
     logger.debug('📝 Show Desktop FAB changed:', value)
     settingsStore.updateSettingLocally('SHOW_DESKTOP_FAB', value)
+  }
+})
+
+// Mobile UI Mode settings
+const mobileUiMode = computed({
+  get: () => settingsStore.settings?.MOBILE_UI_MODE || 'auto',
+  set: (value) => {
+    logger.debug('📝 Mobile UI Mode changed:', value)
+    settingsStore.updateSettingLocally('MOBILE_UI_MODE', value)
   }
 })
 

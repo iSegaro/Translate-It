@@ -533,6 +533,21 @@
   "desktop_fab_alt": {
     "message": "翻訳操作"
   },
+  "mobile_ui_mode_label": {
+    "message": "モバイルUIモード"
+  },
+  "mobile_ui_mode_description": {
+    "message": "モバイルおよびタッチデバイスでの翻訳インターフェースの表示方法を選択します。"
+  },
+  "mobile_ui_mode_auto": {
+    "message": "自動（画面サイズに基づく）"
+  },
+  "mobile_ui_mode_mobile": {
+    "message": "常にモバイル（ボトムシート）"
+  },
+  "mobile_ui_mode_desktop": {
+    "message": "常にデスクトップ（フローティングウィンドウ）"
+  },
   "mobile_input_header_title": {
     "message": "手動入力"
   },

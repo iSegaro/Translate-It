@@ -12,7 +12,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
-import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import settingsManager from '@/shared/managers/SettingsManager.js';
 import { state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
@@ -237,6 +237,16 @@ export class WindowsManager extends ResourceTracker {
    * @param {string} selectedText - Selected text to translate
    * @param {Object} position - Position to show window/icon
    */
+  /**
+   * Determine if we should use Mobile UI based on device detection and user preference
+   */
+  shouldUseMobileUI() {
+    const mode = settingsManager.get('MOBILE_UI_MODE', 'auto');
+    if (mode === 'mobile') return true;
+    if (mode === 'desktop') return false;
+    return deviceDetector.shouldEnableMobileUI();
+  }
+
   async show(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, aborting show()');
@@ -261,7 +271,7 @@ export class WindowsManager extends ResourceTracker {
     // Mobile specific: Do NOT show bottom sheet automatically on selection
     // to preserve native browser selection menu.
     // Instead, we just store the selected text in state and wait for manual trigger
-    if (deviceDetector.shouldEnableMobileUI()) {
+    if (this.shouldUseMobileUI()) {
       this.logger.info('Mobile environment detected, skipping automatic mobile sheet to preserve native menu');
       this.state.setOriginalText(selectedText);
       
@@ -1002,7 +1012,7 @@ export class WindowsManager extends ResourceTracker {
 
     // In mobile, if we have stored original text but no visible UI elements, 
     // we still need to dismiss/reset state when clicking outside
-    const hasStoredMobileText = deviceDetector.shouldEnableMobileUI() && this.state.originalText;
+    const hasStoredMobileText = this.shouldUseMobileUI() && this.state.originalText;
 
     if (this.state.hasActiveElements || hasStoredMobileText) {
       await this.dismiss(true);
@@ -1527,8 +1537,8 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
     }
 
-    // Mobile sheet dismissal
-    if (deviceDetector.shouldEnableMobileUI()) {
+    // Close mobile sheet if open
+    if (this.shouldUseMobileUI()) {
       WindowsManagerEvents.showMobileSheet({ isOpen: false });
     }
 

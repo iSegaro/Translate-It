@@ -530,6 +530,21 @@
   "desktop_fab_alt": {
     "message": "Translate Actions"
   },
+  "mobile_ui_mode_label": {
+    "message": "Mobile UI Mode"
+  },
+  "mobile_ui_mode_description": {
+    "message": "Choose how the translation interface should appear on mobile and touch devices."
+  },
+  "mobile_ui_mode_auto": {
+    "message": "Auto (Based on screen size)"
+  },
+  "mobile_ui_mode_mobile": {
+    "message": "Always Mobile (Bottom Sheet)"
+  },
+  "mobile_ui_mode_desktop": {
+    "message": "Always Desktop (Floating Window)"
+  },
   "mobile_input_header_title": {
     "message": "Manual Input"
   },

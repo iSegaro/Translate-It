@@ -78,6 +78,7 @@ class SettingsManager {
       ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false,
+      MOBILE_UI_MODE: 'auto',
       // Whole Page Translation Defaults
       WHOLE_PAGE_TRANSLATION_ENABLED: true,
       WHOLE_PAGE_LAZY_LOADING: true,

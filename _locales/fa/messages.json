@@ -533,6 +533,21 @@
   "desktop_fab_alt": {
     "message": "عملیات ترجمه"
   },
+  "mobile_ui_mode_label": {
+    "message": "حالت رابط کاربری موبایل"
+  },
+  "mobile_ui_mode_description": {
+    "message": "انتخاب کنید که رابط کاربری ترجمه در دستگاه‌های موبایل و لمسی چگونه نمایش داده شود."
+  },
+  "mobile_ui_mode_auto": {
+    "message": "خودکار (بر اساس سایز صفحه)"
+  },
+  "mobile_ui_mode_mobile": {
+    "message": "همیشه موبایل (منوی پایین صفحه)"
+  },
+  "mobile_ui_mode_desktop": {
+    "message": "همیشه دسکتاپ (پنجره شناور)"
+  },
   "mobile_input_header_title": {
     "message": "ورودی دستی"
   },

@@ -176,6 +176,7 @@ export const CONFIG = {
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
+  MOBILE_UI_MODE: "auto", // حالت رابط کاربری موبایل: auto, mobile, desktop
 
   // --- Whole Page Translation Settings (NEW) ---
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -589,6 +590,10 @@ export const getTargetLanguageAsync = async () => {
 
 export const getEnableDictionaryAsync = async () => {
   return getSettingValueAsync("ENABLE_DICTIONARY", CONFIG.ENABLE_DICTIONARY);
+};
+
+export const getMobileUiModeAsync = async () => {
+  return getSettingValueAsync("MOBILE_UI_MODE", CONFIG.MOBILE_UI_MODE);
 };
 
 export const getPromptAsync = async () => {

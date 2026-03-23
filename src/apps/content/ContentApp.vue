@@ -76,16 +76,16 @@
       <ElementHighlightOverlay />
 
       <!-- Mobile Bottom Sheet -->
-      <MobileSheet />
+      <MobileSheet v-if="isMobileUI" />
 
       <!-- Desktop FAB Menu -->
       <DesktopFabMenu 
-        v-if="!deviceDetector.isMobile() && showDesktopFab" 
+        v-if="!isMobileUI && showDesktopFab" 
       />
 
       <!-- Mobile Floating Action Button (FAB) -->
       <div 
-        v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
+        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive" 
         class="mobile-fab notranslate"
         translate="no"
         :style="{
@@ -105,7 +105,7 @@
 
       <!-- Mobile-specific Exit Select Mode button -->
       <div
-        v-if="isSelectModeActive && deviceDetector.isMobile()"
+        v-if="isSelectModeActive && isMobileUI"
         class="mobile-exit-selection notranslate"
         translate="no"
         @click="onCancelClick"
@@ -250,6 +250,14 @@ const updateToastRTL = async () => {
 const isSelectModeActive = ref(false);
 const isExtensionEnabled = computed(() => settingsStore.settings?.EXTENSION_ENABLED !== false);
 const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB || false);
+
+// Determine if we should use Mobile UI based on device and user preference
+const isMobileUI = computed(() => {
+  const mode = settingsStore.settings?.MOBILE_UI_MODE || 'auto';
+  if (mode === 'mobile') return true;
+  if (mode === 'desktop') return false;
+  return deviceDetector.shouldEnableMobileUI();
+});
 
 // Only watch for localization changes to update RTL (Performance Optimized)
 watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, (newLocale) => {
