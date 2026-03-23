@@ -531,7 +531,7 @@
     "message": "Translate Actions"
   },
   "mobile_ui_mode_label": {
-    "message": "Mobile UI Mode"
+    "message": "UI Mode"
   },
   "mobile_ui_mode_description": {
     "message": "Choose how the translation interface should appear on mobile and touch devices."
@@ -1411,6 +1411,12 @@
   },
   "appearance_section_title": {
     "message": "Appearance"
+  },
+  "interface_settings_title": {
+    "message": "Interface Settings"
+  },
+  "interface_settings_description": {
+    "message": "Customize how the translation interface appears on different devices"
   },
   "font_settings_title": {
     "message": "Font Settings"

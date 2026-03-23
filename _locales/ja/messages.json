@@ -534,7 +534,7 @@
     "message": "翻訳操作"
   },
   "mobile_ui_mode_label": {
-    "message": "モバイルUIモード"
+    "message": "UIモード"
   },
   "mobile_ui_mode_description": {
     "message": "モバイルおよびタッチデバイスでの翻訳インターフェースの表示方法を選択します。"
@@ -1402,6 +1402,12 @@
   },
   "appearance_section_title": {
     "message": "外観"
+  },
+  "interface_settings_title": {
+    "message": "インターフェース設定"
+  },
+  "interface_settings_description": {
+    "message": "異なるデバイスでの翻訳インターフェースの表示方法をカスタマイズします"
   },
   "font_settings_title": {
     "message": "フォント設定"

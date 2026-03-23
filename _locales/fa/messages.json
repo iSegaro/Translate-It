@@ -534,7 +534,7 @@
     "message": "عملیات ترجمه"
   },
   "mobile_ui_mode_label": {
-    "message": "حالت رابط کاربری موبایل"
+    "message": "حالت رابط کاربری"
   },
   "mobile_ui_mode_description": {
     "message": "انتخاب کنید که رابط کاربری ترجمه در دستگاه‌های موبایل و لمسی چگونه نمایش داده شود."
@@ -1402,6 +1402,12 @@
   },
   "appearance_section_title": {
     "message": "ظاهر"
+  },
+  "interface_settings_title": {
+    "message": "تنظیمات رابط کاربری"
+  },
+  "interface_settings_description": {
+    "message": "سفارشی‌سازی نحوه نمایش رابط کاربری ترجمه در دستگاه‌های مختلف"
   },
   "font_settings_title": {
     "message": "تنظیمات فونت"
