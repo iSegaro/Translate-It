@@ -122,7 +122,7 @@ let hoverTimerId = null;
 
 const handleMouseEnter = () => {
   if (hoverTimerId) {
-    clearTimeout(hoverTimerId);
+    tracker.clearTimer(hoverTimerId);
     hoverTimerId = null;
   }
   isHovered.value = true;
@@ -261,8 +261,10 @@ const startDrag = (e) => {
   }
   isDragging.value = false;
   startY = e.clientY - verticalPos.value;
-  window.addEventListener('mousemove', onDrag);
-  window.addEventListener('mouseup', stopDrag);
+  
+  // Track temporary drag listeners through resource tracker
+  tracker.addEventListener(window, 'mousemove', onDrag);
+  tracker.addEventListener(window, 'mouseup', stopDrag);
 };
 
 const onDrag = (e) => {
@@ -283,8 +285,10 @@ const onDrag = (e) => {
 };
 
 const stopDrag = () => {
-  window.removeEventListener('mousemove', onDrag);
-  window.removeEventListener('mouseup', stopDrag);
+  // Use tracker to remove the specific listeners added during startDrag
+  tracker.removeEventListener(window, 'mousemove', onDrag);
+  tracker.removeEventListener(window, 'mouseup', stopDrag);
+  
   setTimeout(() => { isDragging.value = false; }, 100);
 };
 

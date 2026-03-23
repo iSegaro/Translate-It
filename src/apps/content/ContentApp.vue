@@ -197,7 +197,7 @@ const { getErrorForDisplay } = useErrorHandler();
 
 // Debounce cancel requests to prevent event loops
 let isCancelInProgress = false;
-let cancelTimeout = null;
+let cancelTimeoutId = null;
 
 const onCancelClick = () => {
   logger.info('Cancel Select Element mode requested');
@@ -220,11 +220,14 @@ const onCancelClick = () => {
     logger.warn('Error emitting cancel-select-element-mode event:', error);
   }
 
-  // Reset flag after a delay to prevent event loops
-  if (cancelTimeout) clearTimeout(cancelTimeout);
-  cancelTimeout = setTimeout(() => {
+  // Reset flag after a delay to prevent event loops using tracker
+  if (cancelTimeoutId) {
+    tracker.clearTimer(cancelTimeoutId);
+  }
+  
+  cancelTimeoutId = tracker.trackTimeout(() => {
     isCancelInProgress = false;
-    cancelTimeout = null;
+    cancelTimeoutId = null;
     logger.debug('Cancel request flag reset');
   }, 1000); // 1 second debounce
 };
@@ -363,7 +366,7 @@ const setupOutsideClickHandler = () => {
 
 // Mobile FAB behavior state
 const isFabIdle = ref(true);
-let fabIdleTimer = null;
+let fabIdleTimerId = null;
 
 const updateFullscreenState = () => {
   const isNowFullscreen = !!(
@@ -376,10 +379,13 @@ const updateFullscreenState = () => {
 };
 
 const startFabIdleTimer = () => {
-  if (fabIdleTimer) clearTimeout(fabIdleTimer);
+  if (fabIdleTimerId) {
+    tracker.clearTimer(fabIdleTimerId);
+  }
   isFabIdle.value = false;
-  fabIdleTimer = setTimeout(() => {
+  fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
+    fabIdleTimerId = null;
   }, 1500); // 1.5 seconds of inactivity to become semi-transparent
 };
 
@@ -808,22 +814,6 @@ onMounted(async () => {
 onUnmounted(async () => {
   logger.info('ContentApp component is being unmounted.');
 
-  if (deviceDetector.isMobile()) {
-    if (fabIdleTimer) clearTimeout(fabIdleTimer);
-  }
-
-  // Clean up settings listener
-  if (tracker._toastSettingsCleanup) {
-    tracker._toastSettingsCleanup();
-    delete tracker._toastSettingsCleanup;
-  }
-
-  // Clear cancel timeout if exists
-  if (cancelTimeout) {
-    clearTimeout(cancelTimeout);
-    cancelTimeout = null;
-  }
-
   // Shutdown toast integration if it was initialized
   try {
     if (toastIntegration) {
@@ -844,11 +834,6 @@ onUnmounted(async () => {
   } catch (error) {
     logger.warn('Error cleaning up SelectElementNotificationManager:', error);
   }
-  
-    
-  
-  // Event listeners cleanup is now handled automatically by useResourceTracker
-  // No manual cleanup needed!
 });
 </script>
 
