@@ -584,6 +584,11 @@ class SelectElementManager extends ResourceTracker {
     } catch (error) {
       this.logger.error('Error handling element click:', error);
     } finally {
+      // Check if any translations were stored (even partial ones) to show Revert button
+      if (this.domTranslatorAdapter && this.domTranslatorAdapter.hasTranslation()) {
+        const mobileStore = useMobileStore();
+        mobileStore.setHasElementTranslations(true);
+      }
       this.isProcessingClick = false;
     }
   }
@@ -612,6 +617,9 @@ class SelectElementManager extends ResourceTracker {
         ...options,
         onProgress: async (status) => {
           this.logger.debug('Translation progress:', status);
+          // Show Revert button as soon as we start, as state is already stored
+          const mobileStore = useMobileStore();
+          mobileStore.setHasElementTranslations(true);
         },
         onComplete: async (status) => {
           this.logger.debug('Translation completed:', status);
@@ -626,7 +634,7 @@ class SelectElementManager extends ResourceTracker {
       if (result.success) {
         this.logger.info('Translation completed successfully');
 
-        // Update store to show Revert button
+        // Update store to show Revert button (redundant but safe)
         const mobileStore = useMobileStore();
         mobileStore.setHasElementTranslations(true);
 
@@ -641,6 +649,12 @@ class SelectElementManager extends ResourceTracker {
       }
     } catch (error) {
       this.logger.error('Error during translation:', error);
+
+      // Ensure Revert button is shown if any partial translation happened
+      if (this.domTranslatorAdapter && this.domTranslatorAdapter.hasTranslation()) {
+        const mobileStore = useMobileStore();
+        mobileStore.setHasElementTranslations(true);
+      }
 
       // Check for context errors
       const isContextError = ExtensionContextManager.isContextError(error);
