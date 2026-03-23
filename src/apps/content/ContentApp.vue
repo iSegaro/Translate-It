@@ -244,27 +244,16 @@ const updateToastRTL = async () => {
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
-const isExtensionEnabled = ref(settingsStore.settings?.EXTENSION_ENABLED !== false);
-const showDesktopFab = ref(settingsStore.settings?.SHOW_DESKTOP_FAB || false);
+const isExtensionEnabled = computed(() => settingsStore.settings?.EXTENSION_ENABLED !== false);
+const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB || false);
 
-// Watch for store changes to ensure real-time updates without refresh
-watch(() => settingsStore.settings, (newSettings, oldSettings) => {
-  if (newSettings) {
-    isExtensionEnabled.value = newSettings.EXTENSION_ENABLED !== false;
-    showDesktopFab.value = newSettings.SHOW_DESKTOP_FAB || false;
-    
-    // Update RTL if locale changed
-    if (newSettings.APPLICATION_LOCALIZE !== oldSettings?.APPLICATION_LOCALIZE) {
-      logger.info('[ContentApp] Language changed reactively:', newSettings.APPLICATION_LOCALIZE);
-      updateToastRTL();
-    }
-
-    logger.debug('[ContentApp] Settings updated reactively:', { 
-      enabled: isExtensionEnabled.value, 
-      fab: showDesktopFab.value 
-    });
+// Only watch for localization changes to update RTL (Performance Optimized)
+watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, (newLocale) => {
+  if (newLocale) {
+    logger.info('[ContentApp] Language changed reactively:', newLocale);
+    updateToastRTL();
   }
-}, { deep: true });
+});
 
 const activeIcons = ref([]); // Stores { id, position, visible, targetElement, attachmentMode } for each icon
 const iconRefs = ref(new Map()); // Stores Vue component references
