@@ -25,93 +25,95 @@
         }
       }"
     />
-    <TextFieldIcon
-      v-for="icon in activeIcons"
-      :id="icon.id"
-      :key="icon.id"
-      :ref="el => setIconRef(icon.id, el)"
-      :position="icon.position"
-      :visible="icon.visible !== false"
-      :target-element="icon.targetElement"
-      :attachment-mode="icon.attachmentMode || 'smart'"
-      :positioning-mode="icon.positioningMode || 'absolute'"
-      @click="onIconClick"
-      @position-updated="onIconPositionUpdated"
-    />
-    
-    <!-- WindowsManager Translation Windows -->
-    <TranslationWindow
-      v-for="window in translationWindows"
-      :id="window.id"
-      :key="window.id"
-      :position="window.position"
-      :selected-text="window.selectedText"
-      :initial-translated-text="window.translatedText"
-      :theme="window.theme"
-      :is-loading="window.isLoading"
-      :is-error="window.isError"
-      :error-type="window.errorType"
-      :can-retry="window.canRetry"
-      :needs-settings="window.needsSettings"
-      :initial-size="window.initialSize"
-      :target-language="window.targetLanguage || 'auto'"
-      :provider="window.provider"
-      @close="onTranslationWindowClose"
-      @speak="onTranslationWindowSpeak"
-    />
-    
-    <!-- WindowsManager Translation Icons -->
-    <TranslationIcon
-      v-for="icon in translationIcons"
-      :id="icon.id"
-      :key="icon.id"
-      :position="icon.position"
-      :text="icon.text"
-      @click="onTranslationIconClick"
-      @close="onTranslationIconClose"
-    />
-    
-    <!-- Select Element Overlays -->
-    <ElementHighlightOverlay />
+    <template v-if="isExtensionEnabled">
+      <TextFieldIcon
+        v-for="icon in activeIcons"
+        :id="icon.id"
+        :key="icon.id"
+        :ref="el => setIconRef(icon.id, el)"
+        :position="icon.position"
+        :visible="icon.visible !== false"
+        :target-element="icon.targetElement"
+        :attachment-mode="icon.attachmentMode || 'smart'"
+        :positioning-mode="icon.positioningMode || 'absolute'"
+        @click="onIconClick"
+        @position-updated="onIconPositionUpdated"
+      />
 
-    <!-- Mobile Bottom Sheet -->
-    <MobileSheet />
+      <!-- WindowsManager Translation Windows -->
+      <TranslationWindow
+        v-for="window in translationWindows"
+        :id="window.id"
+        :key="window.id"
+        :position="window.position"
+        :selected-text="window.selectedText"
+        :initial-translated-text="window.translatedText"
+        :theme="window.theme"
+        :is-loading="window.isLoading"
+        :is-error="window.isError"
+        :error-type="window.errorType"
+        :can-retry="window.canRetry"
+        :needs-settings="window.needsSettings"
+        :initial-size="window.initialSize"
+        :target-language="window.targetLanguage || 'auto'"
+        :provider="window.provider"
+        @close="onTranslationWindowClose"
+        @speak="onTranslationWindowSpeak"
+      />
 
-    <!-- Desktop FAB Menu -->
-    <DesktopFabMenu 
-      v-if="!deviceDetector.isMobile() && showDesktopFab" 
-    />
+      <!-- WindowsManager Translation Icons -->
+      <TranslationIcon
+        v-for="icon in translationIcons"
+        :id="icon.id"
+        :key="icon.id"
+        :position="icon.position"
+        :text="icon.text"
+        @click="onTranslationIconClick"
+        @close="onTranslationIconClose"
+      />
 
-    <!-- Mobile Floating Action Button (FAB) -->
-    <div 
-      v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
-      class="mobile-fab notranslate"
-      translate="no"
-      :style="{
-        position: 'fixed !important',
-        bottom: '24px !important',
-        right: '24px !important',
-        left: 'auto !important',
-        opacity: isFabIdle ? '0.35' : '1',
-        transform: 'scale(1)'
-      }"
-      @click="onMobileFabClick"
-      @touchstart="startFabIdleTimer"
-      :title="t('mobile_fab_alt') || 'Translate'"
-    >
-      <img src="@/icons/extension/extension_icon_64.svg" :alt="t('mobile_fab_alt') || 'Translate'" style="width: 70%; height: 70%; object-fit: contain;" />
-    </div>
+      <!-- Select Element Overlays -->
+      <ElementHighlightOverlay />
 
-    <!-- Mobile-specific Exit Select Mode button -->
-    <div 
-      v-if="isSelectModeActive && deviceDetector.isMobile()" 
-      class="mobile-exit-selection notranslate"
-      translate="no"
-      @click="onCancelClick"
-    >
-      <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Exit'" />
-      <span>{{ t('mobile_exit_select_mode') || 'Exit Select Mode' }}</span>
-    </div>
+      <!-- Mobile Bottom Sheet -->
+      <MobileSheet />
+
+      <!-- Desktop FAB Menu -->
+      <DesktopFabMenu 
+        v-if="!deviceDetector.isMobile() && showDesktopFab" 
+      />
+
+      <!-- Mobile Floating Action Button (FAB) -->
+      <div 
+        v-if="deviceDetector.isMobile() && !mobileStore.isOpen && !isSelectModeActive" 
+        class="mobile-fab notranslate"
+        translate="no"
+        :style="{
+          position: 'fixed !important',
+          bottom: '24px !important',
+          right: '24px !important',
+          left: 'auto !important',
+          opacity: isFabIdle ? '0.35' : '1',
+          transform: 'scale(1)'
+        }"
+        @click="onMobileFabClick"
+        @touchstart="startFabIdleTimer"
+        :title="t('mobile_fab_alt') || 'Translate'"
+      >
+        <img src="@/icons/extension/extension_icon_64.svg" :alt="t('mobile_fab_alt') || 'Translate'" style="width: 70%; height: 70%; object-fit: contain;" />
+      </div>
+
+      <!-- Mobile-specific Exit Select Mode button -->
+      <div
+        v-if="isSelectModeActive && deviceDetector.isMobile()"
+        class="mobile-exit-selection notranslate"
+        translate="no"
+        @click="onCancelClick"
+      >
+        <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Exit'" />
+        <span>{{ t('mobile_exit_select_mode') || 'Exit Select Mode' }}</span>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -137,7 +139,7 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
-import { CONFIG, getShowDesktopFabAsync } from '@/shared/config/config.js';
+import { CONFIG, getShowDesktopFabAsync, getExtensionEnabledAsync } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import browser from 'webextension-polyfill';
@@ -240,12 +242,14 @@ const updateToastRTL = async () => {
 
 // Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
+const isExtensionEnabled = ref(true);
 const showDesktopFab = ref(false);
 const activeIcons = ref([]); // Stores { id, position, visible, targetElement, attachmentMode } for each icon
 const iconRefs = ref(new Map()); // Stores Vue component references
 
-// Fetch desktop FAB setting
-const fetchDesktopFabSetting = async () => {
+// Fetch settings
+const fetchSettings = async () => {
+  isExtensionEnabled.value = await getExtensionEnabledAsync();
   showDesktopFab.value = await getShowDesktopFabAsync();
 };
 
@@ -337,7 +341,7 @@ const startFabIdleTimer = () => {
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
-  await fetchDesktopFabSetting();
+  await fetchSettings();
   
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
@@ -397,6 +401,11 @@ onMounted(async () => {
           logger.info('[Toast] Language changed in storage:', newLocale);
           // Update RTL immediately
           updateToastRTL();
+        }
+
+        if (changes.EXTENSION_ENABLED !== undefined) {
+          isExtensionEnabled.value = changes.EXTENSION_ENABLED.newValue !== false;
+          logger.info('[ContentApp] Extension enabled setting changed:', isExtensionEnabled.value);
         }
         
         if (changes.SHOW_DESKTOP_FAB !== undefined) {
