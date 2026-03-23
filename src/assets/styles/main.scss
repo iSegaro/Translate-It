@@ -26,9 +26,14 @@
 
 /* Popup context (400px width) - only applied in popup.js */
 body.popup-context {
-  width: 400px !important;
+  min-width: 400px !important;
+  width: 100% !important;
   max-height: 600px !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  background-color: transparent !important; /* Allow wrapper background to show if needed */
 }
 
 /* Options context - only applied in options.js */

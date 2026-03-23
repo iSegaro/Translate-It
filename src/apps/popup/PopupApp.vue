@@ -294,13 +294,14 @@ const retryLoading = () => {
 /* Main popup wrapper: Handles centering on large screens */
 .popup-wrapper {
   width: 100%;
+  width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-color);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: center; /* Center horizontally */
+  justify-content: flex-start; /* Keep it at the top vertically */
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
   color: var(--text-color);
   overflow-x: hidden;
@@ -308,16 +309,20 @@ const retryLoading = () => {
 
 /* Content container: Limits width on large screens and stays centered */
 .popup-content-container, .popup-container {
-  width: 100%;
+  width: 94%;
   max-width: 480px; /* Optimized for mobile/tablet */
-  height: 100vh;
-  height: 100dvh;
+  height: auto;
+  max-height: 96vh;
+  max-height: 96dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg-color);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   position: relative;
   box-sizing: border-box;
+  margin: 12px auto; /* Perfect horizontal centering with top/bottom distance */
+  border-radius: 12px; /* Rounded corners for card look */
+  overflow: hidden; /* Ensure content follows border radius */
   
   /* Desktop Popup Specific (Extension Mode) */
   @media (min-width: 481px) {
@@ -326,7 +331,7 @@ const retryLoading = () => {
     max-height: 600px;
     min-height: 350px;
     border-radius: 6px;
-    margin: 10px 0; /* Centering vertically on large screens if needed */
+    margin: 10px auto; 
   }
 
   /* On very small desktop popups, we don't want the shadow or fixed height */
