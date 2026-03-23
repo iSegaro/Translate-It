@@ -28,7 +28,7 @@
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        style="position: absolute !important; bottom: 0px !important; right: 80px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; padding: 8px 0 !important; min-width: 200px !important; width: max-content !important; border: 1px solid #ddd !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        style="position: absolute !important; bottom: 0px !important; right: 80px !important; background-color: #ffffff !important; border-radius: 12px !important; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important; padding: 6px 0 !important; min-width: 220px !important; width: max-content !important; border: 1px solid rgba(0, 0, 0, 0.08) !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
       >
         <div 
           v-for="item in menuItems" 
@@ -36,16 +36,18 @@
           class="fab-menu-item"
           :class="{ 'is-disabled': item.disabled }"
           @click.stop="item.disabled ? null : handleMenuItemClick(item)"
-          style="display: flex !important; align-items: center !important; padding: 12px 16px !important; cursor: pointer !important; color: #333 !important; width: 100% !important; box-sizing: border-box !important; transition: background 0.2s !important;"
-          :style="item.disabled ? 'opacity: 0.6 !important; cursor: default !important; pointer-events: none !important;' : ''"
+          style="display: flex !important; align-items: center !important; padding: 10px 16px !important; cursor: pointer !important; color: #374151 !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s ease !important;"
+          :style="item.disabled ? 'opacity: 0.5 !important; cursor: default !important; pointer-events: none !important;' : ''"
         >
-          <img 
-            v-if="item.icon" 
-            :src="item.icon" 
-            :alt="item.label" 
-            style="width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; max-width: 20px !important; max-height: 20px !important; margin-right: 12px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; margin: 0 !important;"
-          />
-          <span style="font-size: 14px !important; font-weight: 600 !important; white-space: nowrap !important; font-family: sans-serif !important; line-height: 1.2 !important;">{{ item.label }}</span>
+          <div style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; margin-right: 12px !important; flex-shrink: 0 !important;">
+            <img 
+              v-if="item.icon" 
+              :src="item.icon" 
+              :alt="item.label" 
+              style="width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important;"
+            />
+          </div>
+          <span style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
         </div>
       </div>
     </Transition>
@@ -99,6 +101,7 @@ const menuItems = computed(() => {
       id: 'select_element',
       label: t('select_element_label') || 'Select Element',
       icon: IconSelectElement,
+      closeMenu: true,
       action: async () => {
         try {
           await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
@@ -119,6 +122,7 @@ const menuItems = computed(() => {
       id: 'page_translating',
       label: `${t('translating_label') || 'Translating'} (${percent}%) - ${t('stop_auto_translating_label') || 'Stop'}`,
       icon: IconClear,
+      closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
   } else if (pageData.isAutoTranslating) {
@@ -127,6 +131,7 @@ const menuItems = computed(() => {
       id: 'stop_auto',
       label: t('stop_auto_translating_label') || 'Stop Auto Translating',
       icon: IconClear,
+      closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
   } else if (pageData.isTranslated || isDone) {
@@ -135,6 +140,7 @@ const menuItems = computed(() => {
       id: 'restore_page',
       label: t('restore_original_label') || 'Restore Original',
       icon: IconRestore,
+      closeMenu: true,
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
   } else {
@@ -143,6 +149,7 @@ const menuItems = computed(() => {
       id: 'translate_page',
       label: t('translate_page_label') || 'Translate Page',
       icon: IconTranslatePage,
+      closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
     });
   }
@@ -181,7 +188,9 @@ const toggleMenu = () => {
 };
 
 const handleMenuItemClick = async (item) => {
-  isMenuOpen.value = false;
+  if (item.closeMenu) {
+    isMenuOpen.value = false;
+  }
   if (typeof item.action === 'function') {
     await item.action();
   }
@@ -284,7 +293,10 @@ onUnmounted(() => {
   background-color: #357ABD;
 }
 
-.fab-menu-item:hover { background-color: #f5f5f5 !important; }
+.fab-menu-item:hover { 
+  background-color: #f9fafb !important; 
+  color: #111827 !important;
+}
 
 /* Transitions */
 .fade-scale-enter-active,
