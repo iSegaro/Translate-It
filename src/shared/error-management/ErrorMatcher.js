@@ -192,55 +192,36 @@ export function matchErrorToType(rawOrError = "") {
 
   // اولویت ۲: تشخیص دقیق خطا بر اساس کد وضعیت HTTP
   if (rawOrError && typeof rawOrError === "object" && rawOrError.statusCode) {
-    const code = rawOrError.statusCode;
-    if (typeof code === "number" && code >= 400 && code < 600) {
-      // For ambiguous status codes (400, 422), check message first
-      if ((code === 400 || code === 422) && rawOrError.message) {
-        const errorMsg = String(rawOrError.message).toLowerCase();
-
-        if (errorMsg.includes("api key") ||
-            errorMsg.includes("auth") ||
-            errorMsg.includes("authentication") ||
-            errorMsg.includes("unauthorized") ||
-            errorMsg.includes("credentials") ||
-            errorMsg.includes("key not") ||
-            errorMsg.includes("invalid key")) {
-          return ErrorTypes.API_KEY_INVALID;
-        }
-
-        if (errorMsg.includes("text is empty") || errorMsg.includes("empty text")) {
-          return ErrorTypes.TEXT_EMPTY;
-        }
-
-        if (errorMsg.includes("text is too long") ||
-            errorMsg.includes("too long") ||
-            errorMsg.includes("exceeds limit") ||
-            errorMsg.includes("maximum length")) {
-          return ErrorTypes.TEXT_TOO_LONG;
-        }
+    const code = Number(rawOrError.statusCode);
+    if (!isNaN(code) && code >= 400) {
+      // 1. Granular overrides for 400/422/404 based on message/context
+      const errorMsg = String(rawOrError.message || "").toLowerCase();
+      
+      if (code === 400 || code === 422) {
+        if (errorMsg.includes("api key") || errorMsg.includes("auth") || errorMsg.includes("invalid key")) return ErrorTypes.API_KEY_INVALID;
+        if (errorMsg.includes("text is empty") || errorMsg.includes("empty text")) return ErrorTypes.TEXT_EMPTY;
+        if (errorMsg.includes("too long") || errorMsg.includes("limit") || errorMsg.includes("maximum length")) return ErrorTypes.TEXT_TOO_LONG;
       }
 
-      switch (code) {
-        case 401: return ErrorTypes.API_KEY_INVALID;
-        case 402: return ErrorTypes.INSUFFICIENT_BALANCE;
-        case 403: return ErrorTypes.FORBIDDEN_ERROR;
-        case 404: {
-          const providerType = rawOrError.providerType;
-          const msgLower = (rawOrError.message || "").toLowerCase();
-          if (providerType === ProviderTypes.AI || msgLower.includes('model')) return ErrorTypes.MODEL_MISSING;
-          if (msgLower.includes('chrome') || msgLower.includes('translator')) return ErrorTypes.BROWSER_API_UNAVAILABLE;
-          return ErrorTypes.API_URL_MISSING;
-        }
-        case 400:
-        case 422: return ErrorTypes.INVALID_REQUEST;
-        case 429: return ErrorTypes.RATE_LIMIT_REACHED;
-        case 456: return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
-        case 500:
-        case 502:
-        case 503:
-        case 524: return ErrorTypes.SERVER_ERROR;
-        default: return ErrorTypes.HTTP_ERROR;
+      if (code === 404) {
+        const providerType = rawOrError.providerType;
+        if (providerType === ProviderTypes.AI || errorMsg.includes('model')) return ErrorTypes.MODEL_MISSING;
+        if (errorMsg.includes('chrome') || errorMsg.includes('translator')) return ErrorTypes.BROWSER_API_UNAVAILABLE;
+        return ErrorTypes.API_URL_MISSING;
       }
+
+      // 2. Map other standard status codes
+      if (code === 401) return ErrorTypes.API_KEY_INVALID;
+      if (code === 402) return ErrorTypes.INSUFFICIENT_BALANCE;
+      if (code === 403) return ErrorTypes.FORBIDDEN_ERROR;
+      if (code === 429) return ErrorTypes.RATE_LIMIT_REACHED;
+      if (code === 456) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
+      
+      // 3. Catch ALL server-side errors (500-599)
+      if (code >= 500 && code <= 599) return ErrorTypes.SERVER_ERROR;
+
+      // 4. Default for other 4xx errors
+      return ErrorTypes.HTTP_ERROR;
     }
   }
 
@@ -308,7 +289,7 @@ export function matchErrorToType(rawOrError = "") {
   }
   if (msg.includes("http 429") || msg.includes("429 error") || msg.includes("status 429") || msg.includes("rate limit") || msg.includes("too many requests")) return ErrorTypes.RATE_LIMIT_REACHED;
   if (msg.includes("http 456") || msg.includes("456 error") || (msg.includes("deepl") && (msg.includes("quota exceeded") || msg.includes("character limit")))) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
-  if (msg.includes("http 500") || msg.includes("500 error") || msg.includes("internal server error") || msg.includes("http 502") || msg.includes("503 error") || msg.includes("service unavailable")) return ErrorTypes.SERVER_ERROR;
+  if (msg.includes("500") || msg.includes("502") || msg.includes("503") || msg.includes("504") || msg.includes("internal server error") || msg.includes("service unavailable") || msg.includes("gateway timeout")) return ErrorTypes.SERVER_ERROR;
 
   if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg.includes("api_url_missing")) return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
