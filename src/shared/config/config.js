@@ -173,6 +173,7 @@ export const CONFIG = {
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
   SHOW_DESKTOP_FAB: false, // نمایش دکمه دسترسی سریع در دسکتاپ
+  DESKTOP_FAB_VERTICAL_POS: -1, // موقعیت عمودی دکمه دسترسی سریع (-1 یعنی پیش‌فرض)
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
@@ -767,6 +768,13 @@ export const getShowDesktopFabAsync = async () => {
   return getSettingValueAsync(
     "SHOW_DESKTOP_FAB",
     CONFIG.SHOW_DESKTOP_FAB
+  );
+};
+
+export const getDesktopFabVerticalPosAsync = async () => {
+  return getSettingValueAsync(
+    "DESKTOP_FAB_VERTICAL_POS",
+    CONFIG.DESKTOP_FAB_VERTICAL_POS
   );
 };
 

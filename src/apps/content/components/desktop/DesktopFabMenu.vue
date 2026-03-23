@@ -97,6 +97,8 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { getDesktopFabVerticalPosAsync } from '@/shared/config/config.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -289,10 +291,30 @@ const stopDrag = () => {
   tracker.removeEventListener(window, 'mousemove', onDrag);
   tracker.removeEventListener(window, 'mouseup', stopDrag);
   
-  setTimeout(() => { isDragging.value = false; }, 100);
+  setTimeout(async () => { 
+    isDragging.value = false; 
+    // Save position after drag ends
+    if (verticalPos.value !== -1) {
+      try {
+        await storageManager.set({ DESKTOP_FAB_VERTICAL_POS: verticalPos.value });
+      } catch (err) {
+        logger.info('Failed to save FAB position:', err);
+      }
+    }
+  }, 100);
 };
 
-onMounted(() => {
+onMounted(async () => {
+  // Load saved position
+  try {
+    const savedPos = await getDesktopFabVerticalPosAsync();
+    if (savedPos !== -1) {
+      verticalPos.value = savedPos;
+    }
+  } catch (err) {
+    logger.info('Failed to load FAB position:', err);
+  }
+
   tracker.trackTimeout(() => {
     isFaded.value = true;
   }, 2000);
