@@ -530,6 +530,24 @@
   "desktop_fab_alt": {
     "message": "Translate Actions"
   },
+  "desktop_fab_revert_tooltip": {
+    "message": "Revert Element Translations"
+  },
+  "desktop_fab_settings_tooltip": {
+    "message": "Open Settings"
+  },
+  "desktop_fab_select_element_label": {
+    "message": "Select Element"
+  },
+  "desktop_fab_stop_auto_translating_label": {
+    "message": "Stop Auto Translating"
+  },
+  "desktop_fab_restore_original_label": {
+    "message": "Restore Original"
+  },
+  "desktop_fab_translate_page_label": {
+    "message": "Translate Page"
+  },
   "mobile_ui_mode_auto": {
     "message": "Auto"
   },

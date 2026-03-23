@@ -533,6 +533,24 @@
   "desktop_fab_alt": {
     "message": "翻訳操作"
   },
+  "desktop_fab_revert_tooltip": {
+    "message": "要素の翻訳を元に戻す"
+  },
+  "desktop_fab_settings_tooltip": {
+    "message": "設定を開く"
+  },
+  "desktop_fab_select_element_label": {
+    "message": "要素を選択"
+  },
+  "desktop_fab_stop_auto_translating_label": {
+    "message": "自動翻訳を停止"
+  },
+  "desktop_fab_restore_original_label": {
+    "message": "原文に戻す"
+  },
+  "desktop_fab_translate_page_label": {
+    "message": "ページを翻訳"
+  },
   "mobile_ui_mode_auto": {
     "message": "自動"
   },

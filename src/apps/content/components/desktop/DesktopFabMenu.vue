@@ -13,13 +13,13 @@
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
         @click.stop="handleRevert"
-        title="Revert Element Translations"
+        :title="t('desktop_fab_revert_tooltip')"
         style="position: absolute !important; bottom: 44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
         :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconRevert" alt="Revert" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
       </div>
     </Transition>
 
@@ -58,12 +58,12 @@
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
       @mousedown="startDrag"
       @click.stop="toggleMenu"
-      :title="t('desktop_fab_tooltip') || 'Translate It'"
+      :title="t('desktop_fab_tooltip')"
       :style="{ transform: isHovered || isMenuOpen ? 'translateX(-15px)' : 'translateX(0)' }"
     >
       <img 
         src="@/icons/extension/extension_icon_64.svg" 
-        :alt="t('desktop_fab_alt') || 'Translate Actions'" 
+        :alt="t('desktop_fab_alt')" 
         style="width: 30px !important; height: 30px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
       />
     </div>
@@ -74,13 +74,13 @@
         v-if="isMenuOpen" 
         class="fab-settings-badge"
         @click.stop="handleOpenSettings"
-        title="Open Settings"
+        :title="t('desktop_fab_settings_tooltip')"
         style="position: absolute !important; bottom: -44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #4b5563 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
         :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconSettings" alt="Settings" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
       </div>
     </Transition>
   </div>
@@ -88,7 +88,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -106,7 +106,7 @@ import IconSettings from '@/icons/ui/settings.png';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const pageEventBus = window.pageEventBus;
 const mobileStore = useMobileStore();
-const { t } = useI18n();
+const { t } = useUnifiedI18n();
 
 const isMenuOpen = ref(false);
 const isFaded = ref(false);
@@ -119,7 +119,7 @@ const menuItems = computed(() => {
   const items = [
     {
       id: 'select_element',
-      label: t('select_element_label') || 'Select Element',
+      label: t('desktop_fab_select_element_label'),
       icon: IconSelectElement,
       closeMenu: true,
       action: async () => {
@@ -140,7 +140,7 @@ const menuItems = computed(() => {
     const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
     items.push({
       id: 'page_translating',
-      label: `${percent}% - ${t('stop_auto_translating_label') || 'Stop'}`,
+      label: `${percent}% - ${t('desktop_fab_stop_auto_translating_label')}`,
       icon: IconClear,
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
@@ -149,7 +149,7 @@ const menuItems = computed(() => {
     // If auto-translating, primary action is to STOP it
     items.push({
       id: 'stop_auto',
-      label: t('stop_auto_translating_label') || 'Stop Auto Translating',
+      label: t('desktop_fab_stop_auto_translating_label'),
       icon: IconClear,
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
@@ -158,7 +158,7 @@ const menuItems = computed(() => {
     // If translated but NOT auto-translating, show Restore
     items.push({
       id: 'restore_page',
-      label: t('restore_original_label') || 'Restore Original',
+      label: t('desktop_fab_restore_original_label'),
       icon: IconRestore,
       closeMenu: true,
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
@@ -167,7 +167,7 @@ const menuItems = computed(() => {
     // Default state: Translate Page
     items.push({
       id: 'translate_page',
-      label: t('translate_page_label') || 'Translate Page',
+      label: t('desktop_fab_translate_page_label'),
       icon: IconTranslatePage,
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)

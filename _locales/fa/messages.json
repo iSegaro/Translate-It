@@ -533,6 +533,24 @@
   "desktop_fab_alt": {
     "message": "عملیات ترجمه"
   },
+  "desktop_fab_revert_tooltip": {
+    "message": "بازگرداندن ترجمه‌های المان"
+  },
+  "desktop_fab_settings_tooltip": {
+    "message": "باز کردن تنظیمات"
+  },
+  "desktop_fab_select_element_label": {
+    "message": "انتخاب المان"
+  },
+  "desktop_fab_stop_auto_translating_label": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "desktop_fab_restore_original_label": {
+    "message": "مشاهده متن اصلی"
+  },
+  "desktop_fab_translate_page_label": {
+    "message": "ترجمه صفحه"
+  },
   "mobile_ui_mode_auto": {
     "message": "خودکار"
   },
