@@ -125,6 +125,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
@@ -148,6 +149,9 @@ import browser from 'webextension-polyfill';
 const pageEventBus = window.pageEventBus;
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
+
+// Localization helper for template (Standard project approach)
+const { t } = useUnifiedI18n();
 
 // Use WindowsManager composable
 const {
