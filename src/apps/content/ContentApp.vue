@@ -589,9 +589,14 @@ onMounted(async () => {
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
+    const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
+    const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
+    const isDone = totalCount > 0 && translatedCount >= totalCount;
+
     mobileStore.setPageTranslation({
-      translatedCount: detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount,
-      totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount
+      translatedCount,
+      totalCount,
+      status: isDone ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING
     });
   });
 

@@ -77,6 +77,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -113,10 +114,10 @@ const menuItems = computed(() => {
   ];
 
   const pageData = mobileStore.pageTranslationData;
+  const isCurrentlyBusy = pageData.status === TRANSLATION_STATUS.TRANSLATING;
   const isDone = pageData.totalCount > 0 && pageData.translatedCount >= pageData.totalCount;
-  const isCurrentlyTranslating = pageData.isTranslating && !isDone;
 
-  if (isCurrentlyTranslating) {
+  if (isCurrentlyBusy) {
     const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
     items.push({
       id: 'page_translating',
