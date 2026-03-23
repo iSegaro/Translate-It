@@ -1,5 +1,6 @@
 <template>
   <div
+    v-show="!isFullscreen"
     class="desktop-fab-container notranslate"
     translate="no"
     ref="fabContainerRef"
@@ -113,6 +114,7 @@ const isFaded = ref(false);
 const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
+const isFullscreen = ref(false);
 const fabContainerRef = ref(null);
 let hoverTimer = null;
 
@@ -288,10 +290,28 @@ const stopDrag = () => {
   setTimeout(() => { isDragging.value = false; }, 100);
 };
 
+const updateFullscreenState = () => {
+  isFullscreen.value = !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+  if (isFullscreen.value) {
+    isMenuOpen.value = false; // Close menu if it was open
+  }
+};
+
 onMounted(() => {
   setTimeout(() => {
     isFaded.value = true;
   }, 2000);
+
+  // Fullscreen listeners
+  document.addEventListener('fullscreenchange', updateFullscreenState);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+  document.addEventListener('mozfullscreenchange', updateFullscreenState);
+  document.addEventListener('MSFullscreenChange', updateFullscreenState);
 
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
@@ -304,6 +324,10 @@ onMounted(() => {
   window.addEventListener('click', handleClickOutside);
   onUnmounted(() => {
     window.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('fullscreenchange', updateFullscreenState);
+    document.removeEventListener('webkitfullscreenchange', updateFullscreenState);
+    document.removeEventListener('mozfullscreenchange', updateFullscreenState);
+    document.removeEventListener('MSFullscreenChange', updateFullscreenState);
   });
 });
 
