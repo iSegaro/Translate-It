@@ -14,12 +14,12 @@
         class="fab-revert-badge"
         @click.stop="handleRevert"
         :title="t('desktop_fab_revert_tooltip')"
-        style="position: absolute !important; bottom: 44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
+        style="position: absolute !important; bottom: 40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
         :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
       </div>
     </Transition>
 
@@ -75,12 +75,12 @@
         class="fab-settings-badge"
         @click.stop="handleOpenSettings"
         :title="t('desktop_fab_settings_tooltip')"
-        style="position: absolute !important; bottom: -44px !important; right: 15px !important; width: 36px !important; height: 36px !important; border-radius: 50% !important; background-color: #4b5563 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
+        style="position: absolute !important; bottom: -40px !important; right: 15px !important; width: 30px !important; height: 30px !important; border-radius: 50% !important; background-color: #4b5563 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important; transition: transform 0.2s ease, opacity 0.2s ease !important; pointer-events: auto !important;"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
         :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-15px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.1)' : 'scale(1)') }"
       >
-        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 20px !important; height: 20px !important; filter: brightness(0) invert(1) !important;" />
+        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
       </div>
     </Transition>
   </div>
