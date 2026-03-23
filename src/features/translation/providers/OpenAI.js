@@ -95,42 +95,7 @@ export class OpenAIProvider extends BaseAIProvider {
       await this._updateSessionHistory(sessionId, userText, result);
     }
 
-    // CRITICAL FIX: Handle single segment JSON arrays properly
-    // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content
-    let processedResult = result;
-
-    if (result && typeof result === 'string') {
-      let jsonString = null;
-
-      // First try to find JSON array in markdown code blocks
-      const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-      if (markdownMatch) {
-        jsonString = markdownMatch[1].trim();
-      } else {
-        // Try to find direct JSON array (without markdown)
-        const directMatch = result.match(/^\s*\[([\s\S]*)\]\s*$/);
-        if (directMatch) {
-          // Reconstruct the JSON string for parsing
-          jsonString = `[${directMatch[1]}]`;
-        }
-      }
-
-      if (jsonString) {
-        try {
-          const parsed = JSON.parse(jsonString);
-
-          if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
-            logger.debug(`[OpenAI] Single segment JSON array detected, extracting text properly`);
-            processedResult = parsed[0];
-          }
-        } catch (error) {
-          logger.debug(`[OpenAI] Failed to parse JSON array, using original result:`, error.message);
-        }
-      }
-    }
-
-    logger.info(`[OpenAI] Translation completed successfully`);
-    return processedResult;
+    return this._cleanAIResponse(result);
   }
 
   /**
@@ -168,23 +133,13 @@ export class OpenAIProvider extends BaseAIProvider {
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    logger.debug('translateImage built prompt:', prompt);
-
     // Prepare message with image
     const messages = [
       {
         role: "user",
         content: [
-          {
-            type: "text",
-            text: prompt
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: imageData
-            }
-          }
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageData } }
         ]
       }
     ];
@@ -203,32 +158,22 @@ export class OpenAIProvider extends BaseAIProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    logger.debug('about to call _executeApiCall for image translation');
 
     try {
-      const result = await this._executeApiCall({
+      const result = await this._executeRequest({
         url: apiUrl,
         fetchOptions,
         extractResponse: (data) => data?.choices?.[0]?.message?.content,
         context: context,
+        updateApiKey: (newKey, options) => {
+          options.headers.Authorization = `Bearer ${newKey}`;
+        }
       });
 
       logger.info(`[OpenAI] Image translation completed successfully`);
       return result;
     } catch (error) {
-      // Check if this is a user cancellation (should be handled silently)
-      const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
-        // Log user cancellation at debug level only
-        logger.debug(`[OpenAI] Image translation cancelled by user`);
-        throw error; // Re-throw without ErrorHandler processing
-      }
-
-      logger.error('image translation failed with error:', error);
-      // Let ErrorHandler automatically detect and handle all error types
-      await ErrorHandler.getInstance().handle(error, {
-        context: 'openai-image-translation'
-      });
+      // Errors are already handled and logged by _executeRequest
       throw error;
     }
   }

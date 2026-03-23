@@ -191,50 +191,15 @@ export class GeminiProvider extends BaseAIProvider {
         await this._updateSessionHistory(sessionId, userText, result);
       }
 
-      // CRITICAL FIX: Handle single segment JSON arrays properly
-      // When we receive ```json\n["translated text"]\n``` or ["translated text"] for single segments, extract the text content
-      let processedResult = result;
-
-      if (result && typeof result === 'string') {
-        let jsonString = null;
-
-        // First try to find JSON array in markdown code blocks
-        const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-        if (markdownMatch) {
-          jsonString = markdownMatch[1].trim();
-        } else {
-          // Try to find direct JSON array (without markdown)
-          const directMatch = result.match(/^\s*\[([\s\S]*)\]\s*$/);
-          if (directMatch) {
-            // Reconstruct the JSON string for parsing
-            jsonString = `[${directMatch[1]}]`;
-          }
-        }
-
-        if (jsonString) {
-          try {
-            const parsed = JSON.parse(jsonString);
-
-            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
-              logger.debug(`[Gemini] Single segment JSON array detected, extracting text properly`);
-              processedResult = parsed[0];
-            }
-          } catch (error) {
-            logger.debug(`[Gemini] Failed to parse JSON array, using original result:`, error.message);
-          }
-        }
-      }
-
       // API call completed successfully
       logger.info(`[Gemini] Translation completed successfully`);
-      return processedResult;
+      return this._cleanAIResponse(result);
     } catch (error) {
       // Check if this is a user cancellation (should be handled silently)
-      const errorType = matchErrorToType(error);
+      const errorType = error.type || matchErrorToType(error);
       if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
-        // Log user cancellation at debug level only
         logger.debug(`[Gemini] Translation cancelled by user`);
-        throw error; // Re-throw without ErrorHandler processing
+        throw error;
       }
 
       // If thinking-related error occurs, retry without thinking config
@@ -245,7 +210,7 @@ export class GeminiProvider extends BaseAIProvider {
       ) {
         logger.debug('[Gemini] Thinking parameter not supported, retrying without thinking config...');
 
-        // Remove thinking config and retry
+        // Remove thinking config and retry using unified handler
         delete requestBody.generationConfig;
         const fallbackFetchOptions = {
           method: "POST",
@@ -254,44 +219,24 @@ export class GeminiProvider extends BaseAIProvider {
         };
 
         try {
-          const fallbackResult = await this._executeApiCall({
+          return await this._executeRequest({
             url,
             fetchOptions: fallbackFetchOptions,
             extractResponse: (data) =>
               data?.candidates?.[0]?.content?.parts?.[0]?.text,
             context: `${context}-fallback`,
+            abortController,
+            updateApiKey: (newKey, options) => {
+              const urlObj = new URL(url);
+              urlObj.searchParams.set('key', newKey);
+              options.url = urlObj.toString();
+            }
           });
-
-          // Fallback without thinking config successful
-          return fallbackResult;
         } catch (fallbackError) {
-          // Check if fallback was also cancelled by user
-          const fallbackErrorType = matchErrorToType(fallbackError);
-          if (fallbackErrorType === ErrorTypes.USER_CANCELLED || fallbackErrorType === ErrorTypes.TRANSLATION_CANCELLED) {
-            logger.debug(`[Gemini] Translation fallback cancelled by user`);
-            throw fallbackError;
-          }
-
-          // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
-          await ErrorHandler.getInstance().handle(fallbackError, {
-            context: 'gemini-translation-fallback'
-          });
-
-          // Re-throw fallback error with enhanced context
-          fallbackError.context = `${this.providerName.toLowerCase()}-translation-fallback`;
-          fallbackError.provider = this.providerName;
           throw fallbackError;
         }
       }
 
-      // Let ErrorHandler automatically detect and handle all error types including quota/rate limits
-      await ErrorHandler.getInstance().handle(error, {
-        context: 'gemini-translation'
-      });
-      
-      logger.error('[Gemini] Translation failed with error:', error);
-      error.context = `${this.providerName.toLowerCase()}-translation`;
-      error.provider = this.providerName;
       throw error;
     }
   }
@@ -309,16 +254,12 @@ export class GeminiProvider extends BaseAIProvider {
 
     const { apiKey, geminiModel, geminiApiUrl, isCustomModel } = await this._getConfig();
 
-    // Build API URL with enhanced custom model and URL support
+    // Build API URL
     let apiUrl;
     if (isCustomModel) {
-      // For custom models, use custom API URL if provided, otherwise fallback to default Gemini endpoint
       apiUrl = geminiApiUrl || CONFIG.GEMINI_API_URL;
     } else {
-      // For predefined models, use model-specific URL from config
-      const modelConfig = CONFIG.GEMINI_MODELS?.find(
-        (m) => m.value === geminiModel
-      );
+      const modelConfig = CONFIG.GEMINI_MODELS?.find(m => m.value === geminiModel);
       apiUrl = modelConfig?.url || CONFIG.GEMINI_API_URL;
     }
 
@@ -329,43 +270,30 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    // translateImage called
     logger.info(`[Gemini] Starting image translation`);
 
-    // Build prompt for screen capture translation
+    // Build prompt
     const basePrompt = await getPromptBASEScreenCaptureAsync();
     const prompt = basePrompt
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    // Prompt built for image translation
-
     // Extract image format and data
     const imageMatch = imageData.match(/^data:image\/([^;]+);base64,(.+)/);
     if (!imageMatch) {
-      throw this._createError(
-        "IMAGE_PROCESSING_FAILED",
-        "Invalid image data format"
-      );
+      throw this._createError("IMAGE_PROCESSING_FAILED", "Invalid image data format");
     }
 
     const [, imageFormat, base64Data] = imageMatch;
 
-    // Prepare request body with image
+    // Prepare request body
     const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: `image/${imageFormat}`,
-                data: base64Data
-              }
-            }
-          ]
-        }
-      ]
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: `image/${imageFormat}`, data: base64Data } }
+        ]
+      }]
     };
 
     const url = `${apiUrl}?key=${apiKey}`;
@@ -376,35 +304,24 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    // About to call API for image translation
 
     try {
-      const result = await this._executeApiCall({
+      const result = await this._executeRequest({
         url,
         fetchOptions,
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: context,
-        // abortController: abortController
+        updateApiKey: (newKey, options) => {
+          const urlObj = new URL(url);
+          urlObj.searchParams.set('key', newKey);
+          options.url = urlObj.toString();
+        }
       });
 
-      // Image translation completed successfully
       logger.info(`[Gemini] Image translation completed successfully`);
       return result;
     } catch (error) {
-      // Check if this is a user cancellation (should be handled silently)
-      const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
-        // Log user cancellation at debug level only
-        logger.debug(`[Gemini] Image translation cancelled by user`);
-        throw error; // Re-throw without ErrorHandler processing
-      }
-
-      logger.error('image translation failed with error:', error);
-      // Let ErrorHandler automatically detect and handle all error types
-      await ErrorHandler.getInstance().handle(error, {
-        context: 'gemini-image-translation'
-      });
       throw error;
     }
   }

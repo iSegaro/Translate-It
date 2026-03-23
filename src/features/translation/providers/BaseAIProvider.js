@@ -705,7 +705,7 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
-   * Update session history with results
+   * Helper to update session history with results
    */
   async _updateSessionHistory(sessionId, userContent, assistantContent) {
     if (!sessionId) return;
@@ -719,6 +719,46 @@ export class BaseAIProvider extends BaseProvider {
     } catch (e) {
       logger.warn('Failed to update session history:', e);
     }
+  }
+
+  /**
+   * Centralized helper to clean AI responses from common artifacts
+   * Handles markdown JSON blocks and accidental single-segment arrays
+   * @param {string} result - Raw text from AI
+   * @returns {string} Cleaned text
+   * @protected
+   */
+  _cleanAIResponse(result) {
+    if (!result || typeof result !== 'string') return result;
+
+    let processedResult = result;
+    let jsonString = null;
+
+    // 1. Try to find JSON array in markdown code blocks
+    const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+    if (markdownMatch) {
+      jsonString = markdownMatch[1].trim();
+    } else {
+      // 2. Try to find direct JSON array (without markdown)
+      const directMatch = result.match(/^\s*\[([\s\S]*)\]\s*$/);
+      if (directMatch) {
+        jsonString = `[${directMatch[1]}]`;
+      }
+    }
+
+    if (jsonString) {
+      try {
+        const parsed = JSON.parse(jsonString);
+        if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
+          logger.debug(`[${this.providerName}] Single segment JSON array detected and extracted`);
+          processedResult = parsed[0];
+        }
+      } catch {
+        // Not a valid JSON or not a single-segment array, keep original result
+      }
+    }
+
+    return processedResult;
   }
 
   /**
