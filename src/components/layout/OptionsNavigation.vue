@@ -261,6 +261,7 @@ const saveAllSettings = async () => {
     padding: $spacing-xs 0;
     width: 100%;
     max-width: none;
+    height: auto; /* Reset desktop height */
     position: sticky;
     top: 0;
     z-index: 10;
@@ -305,6 +306,7 @@ const saveAllSettings = async () => {
     padding: 0;
     width: 100%;
     max-width: none;
+    height: auto; /* Reset desktop height */
     position: sticky;
     top: 0;
     z-index: 10;
