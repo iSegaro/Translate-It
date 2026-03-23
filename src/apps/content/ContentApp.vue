@@ -248,10 +248,17 @@ const isExtensionEnabled = ref(settingsStore.settings?.EXTENSION_ENABLED !== fal
 const showDesktopFab = ref(settingsStore.settings?.SHOW_DESKTOP_FAB || false);
 
 // Watch for store changes to ensure real-time updates without refresh
-watch(() => settingsStore.settings, (newSettings) => {
+watch(() => settingsStore.settings, (newSettings, oldSettings) => {
   if (newSettings) {
     isExtensionEnabled.value = newSettings.EXTENSION_ENABLED !== false;
     showDesktopFab.value = newSettings.SHOW_DESKTOP_FAB || false;
+    
+    // Update RTL if locale changed
+    if (newSettings.APPLICATION_LOCALIZE !== oldSettings?.APPLICATION_LOCALIZE) {
+      logger.info('[ContentApp] Language changed reactively:', newSettings.APPLICATION_LOCALIZE);
+      updateToastRTL();
+    }
+
     logger.debug('[ContentApp] Settings updated reactively:', { 
       enabled: isExtensionEnabled.value, 
       fab: showDesktopFab.value 
@@ -397,33 +404,9 @@ onMounted(async () => {
     logger.warn('Failed to initialize SelectElementNotificationManager:', error);
   }
 
-  // CRITICAL: Initialize RTL for toasts + listen for storage changes
-  // Using storage.onChanged instead of runtime.onMessage because it fires AFTER storage is updated
-  // This ensures we get the fresh value, not the old one
-
+  // CRITICAL: Initialize RTL for toasts
   // 1. Initialize on mount
   await updateToastRTL();
-
-  // 2. Listen for storage changes directly (fires AFTER storage is updated)
-  if (browser.storage?.onChanged) {
-    const storageListener = (changes, areaName) => {
-      if (areaName === 'local') {
-        if (changes.APPLICATION_LOCALIZE) {
-          const newLocale = changes.APPLICATION_LOCALIZE.newValue;
-          logger.info('[Toast] Language changed in storage:', newLocale);
-          // Update RTL immediately
-          updateToastRTL();
-        }
-      }
-    };
-
-    browser.storage.onChanged.addListener(storageListener);
-
-    // Cleanup on unmount
-    tracker._toastSettingsCleanup = () => {
-      browser.storage.onChanged.removeListener(storageListener);
-    };
-  }
 
   const toastMap = {
     error: toast.error,

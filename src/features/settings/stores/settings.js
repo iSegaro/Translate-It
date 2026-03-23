@@ -449,8 +449,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Initialize settings on store creation and setup listener
   loadSettings().then(async () => {
-    setupStorageListener()
-
     // Initialize DebugModeBridge after settings are loaded
     try {
       const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js')
