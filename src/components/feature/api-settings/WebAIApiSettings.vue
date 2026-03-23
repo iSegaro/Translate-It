@@ -7,7 +7,7 @@
       </span>
       <a
         class="api-link"
-        href="https://github.com/Amm1rr/WebAI-to-API"
+        :href="REPO_URLS.WEBAI_API"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -38,6 +38,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
+import { REPO_URLS } from '@/shared/config/constants.js'
 
 const { t } = useI18n()
 

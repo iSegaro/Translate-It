@@ -13,7 +13,7 @@
     >
       <div class="sidebar-header">
         <a
-          href="https://github.com/iSegaro/Translate-It"
+          :href="REPO_URLS.GITHUB_MAIN"
           target="_blank"
           rel="noopener noreferrer"
           class="header-logo-link"
@@ -70,7 +70,7 @@
       </div>
       <div class="sidebar-footer">
         <a
-          href="https://github.com/iSegaro/Translate-It"
+          :href="REPO_URLS.GITHUB_MAIN"
           target="_blank"
           rel="noopener noreferrer"
           :title="t('github_link_title') || 'GitHub'"
@@ -113,6 +113,7 @@ import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getLocaleInfo } from '@/shared/config/LocaleManifest.js'
+import { REPO_URLS } from '@/shared/config/constants.js'
 import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')

@@ -227,3 +227,9 @@ export const TRANSLATION_STATUS = {
   COMPLETED: 'completed',
   ERROR: 'error'
 };
+
+// ===== GLOBAL REPOSITORY URLS =====
+export const REPO_URLS = {
+  GITHUB_MAIN: 'https://github.com/iSegaro/Translate-It',
+  WEBAI_API: 'https://github.com/Amm1rr/WebAI-to-API'
+};
