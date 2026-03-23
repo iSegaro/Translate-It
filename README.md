@@ -36,6 +36,8 @@
 ## Key Features
 
 - **Text Selection:** Instant translation box or icon appears right where you select text.
+- **Mobile Support:** A native-like, thumb-friendly **In-Page Bottom Sheet** optimized for mobile browsers (Firefox Android, Kiwi, Lemur) and touchscreen devices with smooth touch gestures and multi-view support.
+- **Desktop FAB Menu:** A persistent, draggable floating action button on desktop for quick access to core features like "Select Element" and "Page Translation" without opening the popup.
 - **Select Element:** Click any part of the page (e.g., paragraph, button) to translate it entirely.
 - **Whole Page Translation:** Automatically translate all text content on the current page with smart lazy-loading to optimize performance and API costs.
 - **In-Field Translation:** Press `Ctrl + /` to instantly translate content inside text fields before sending.
