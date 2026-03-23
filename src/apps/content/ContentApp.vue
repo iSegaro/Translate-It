@@ -92,12 +92,13 @@
         :style="{
           position: 'fixed !important',
           bottom: '120px !important',
-          right: isFabIdle ? '0px !important' : '12px !important',
+          right: '-25px !important',
           width: '50px !important',
           height: '50px !important',
           display: 'flex !important',
-          opacity: isFabIdle ? '0.4' : '1',
-          transform: isFabIdle ? 'translateX(40%)' : 'translateX(0)'
+          opacity: isFabIdle ? '0.2' : '1',
+          transform: 'none',
+          transition: 'opacity 0.8s ease'
         }"
         @click="onMobileFabClick"
         @touchstart="startFabIdleTimer"
@@ -110,7 +111,8 @@
             width: '26px !important',
             height: '26px !important',
             objectFit: 'contain',
-            transform: isFabIdle ? 'translateX(-8px)' : 'none'
+            marginRight: '15px',
+            transition: 'none'
           }"
         />
       </div>
@@ -356,7 +358,7 @@ const setupOutsideClickHandler = () => {
 };
 
 // Mobile FAB behavior state
-const isFabIdle = ref(false);
+const isFabIdle = ref(true);
 let fabIdleTimer = null;
 
 const startFabIdleTimer = () => {
@@ -364,7 +366,7 @@ const startFabIdleTimer = () => {
   isFabIdle.value = false;
   fabIdleTimer = setTimeout(() => {
     isFabIdle.value = true;
-  }, 3000); // 3 seconds of inactivity to become semi-transparent
+  }, 1500); // 1.5 seconds of inactivity to become semi-transparent
 };
 
 logger.debug('ContentApp script setup executed.');
@@ -386,11 +388,6 @@ onMounted(async () => {
     touchPoints: navigator.maxTouchPoints,
     userAgent: navigator.userAgent
   });
-
-  // Mobile idle timer handling
-  if (deviceDetector.isMobile()) {
-    startFabIdleTimer();
-  }
 
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();
