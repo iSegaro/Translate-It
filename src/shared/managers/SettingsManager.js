@@ -10,6 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { ref, computed, watchEffect } from 'vue'
 
 // Lazy logger initialization to avoid TDZ issues
@@ -78,7 +79,7 @@ class SettingsManager {
       ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false,
-      MOBILE_UI_MODE: 'auto',
+      MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       // Whole Page Translation Defaults
       WHOLE_PAGE_TRANSLATION_ENABLED: true,
       WHOLE_PAGE_LAZY_LOADING: true,

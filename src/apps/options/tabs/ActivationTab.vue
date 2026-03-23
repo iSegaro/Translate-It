@@ -32,21 +32,21 @@
         <div class="radio-group" style="display: flex; gap: 15px; flex-wrap: wrap;">
           <BaseRadio
             v-model="mobileUiMode"
-            value="auto"
+            :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
             name="mobileUiMode"
             :disabled="!extensionEnabled"
             :label="t('mobile_ui_mode_auto') || 'Auto'"
           />
           <BaseRadio
             v-model="mobileUiMode"
-            value="mobile"
+            :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
             name="mobileUiMode"
             :disabled="!extensionEnabled"
             :label="t('mobile_ui_mode_mobile') || 'Always Mobile'"
           />
           <BaseRadio
             v-model="mobileUiMode"
-            value="desktop"
+            :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
             name="mobileUiMode"
             :disabled="!extensionEnabled"
             :label="t('mobile_ui_mode_desktop') || 'Always Desktop'"
@@ -381,7 +381,7 @@ const showDesktopFab = computed({
 
 // Mobile UI Mode settings
 const mobileUiMode = computed({
-  get: () => settingsStore.settings?.MOBILE_UI_MODE || 'auto',
+  get: () => settingsStore.settings?.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
   set: (value) => {
     logger.debug('📝 Mobile UI Mode changed:', value)
     settingsStore.updateSettingLocally('MOBILE_UI_MODE', value)
@@ -476,6 +476,7 @@ const wholePageShowOriginal = computed({
 })
 
 import { TranslationMode } from '@/shared/config/config.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // --- Mode Specific Providers ---
 

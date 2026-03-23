@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode } from '@/shared/config/config.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
@@ -70,7 +71,7 @@ function getDefaultSettings() {
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
     ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
-    MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || 'auto',
+    MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
     // Proxy Settings

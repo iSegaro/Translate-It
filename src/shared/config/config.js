@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
-import { TRANSLATION_HTML } from './constants.js';
+import { TRANSLATION_HTML, MOBILE_CONSTANTS } from './constants.js';
 
 // NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
 // Using literal 'Core' keeps semantics intact.
@@ -176,7 +176,7 @@ export const CONFIG = {
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
-  MOBILE_UI_MODE: "auto", // حالت رابط کاربری موبایل: auto, mobile, desktop
+  MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
 
   // --- Whole Page Translation Settings (NEW) ---
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه

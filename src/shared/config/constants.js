@@ -212,6 +212,11 @@ export const MOBILE_CONSTANTS = {
     PEEK: 'peek',
     FULL: 'full',
     CLOSED: 'closed'
+  },
+  UI_MODE: {
+    AUTO: 'auto',
+    MOBILE: 'mobile',
+    DESKTOP: 'desktop'
   }
 };
 

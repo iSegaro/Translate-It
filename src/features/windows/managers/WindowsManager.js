@@ -241,9 +241,9 @@ export class WindowsManager extends ResourceTracker {
    * Determine if we should use Mobile UI based on device detection and user preference
    */
   shouldUseMobileUI() {
-    const mode = settingsManager.get('MOBILE_UI_MODE', 'auto');
-    if (mode === 'mobile') return true;
-    if (mode === 'desktop') return false;
+    const mode = settingsManager.get('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AUTO);
+    if (mode === MOBILE_CONSTANTS.UI_MODE.MOBILE) return true;
+    if (mode === MOBILE_CONSTANTS.UI_MODE.DESKTOP) return false;
     return deviceDetector.shouldEnableMobileUI();
   }
 
