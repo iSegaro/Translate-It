@@ -326,7 +326,7 @@ defineExpose({
   border-radius: 4px;
   background-color: var(--color-textarea-background);
   padding: 5px;
-  margin: 6px 12px;
+  margin: 4px 8px;
 }
 
 .translation-form :deep(.translation-textarea) {
@@ -337,7 +337,7 @@ defineExpose({
 }
 
 .translation-form :deep(.translation-display.popup-mode) {
-  margin: 6px 12px;
+  margin: 4px 8px;
   flex: 1;
   display: flex;
   flex-direction: column;

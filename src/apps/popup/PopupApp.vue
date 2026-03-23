@@ -393,17 +393,18 @@ const retryLoading = () => {
   display: grid;
   grid-template-columns: 100px minmax(0, 1fr); /* Strictly constrain the second column */
   align-items: center;
-  padding: 4px 12px;
-  gap: 12px;
+  padding: 2px 8px;
+  gap: 8px;
   background: var(--language-controls-bg-color);
-  min-height: 38px;
+  min-height: 32px;
   box-sizing: border-box;
   width: 100%;
   overflow: hidden; /* Prevent any child from leaking out */
 
   @media (max-width: 480px) {
-    padding: 8px 12px;
+    padding: 4px 8px;
     grid-template-columns: 140px minmax(0, 1fr);
+    min-height: 36px;
   }
 
   /* Responsive stacking for narrow containers */

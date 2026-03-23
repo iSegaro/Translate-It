@@ -336,7 +336,7 @@ const handleOpenSidePanelNative = async (event) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 12px;
+  padding: 2px 8px;
   background-color: var(--header-bg-color);
   border-bottom: 1px solid var(--header-border-color);
   flex-direction: row;
@@ -344,20 +344,20 @@ const handleOpenSidePanelNative = async (event) => {
 
 .toolbar-right-group {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
 .toolbar-left-group {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 /* Left group (Translate link) should stay on the left side */
 .toolbar-left-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   order: 1;
 }
 
@@ -365,7 +365,7 @@ const handleOpenSidePanelNative = async (event) => {
 .toolbar-right-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   order: 2;
   /* Render items from right to left so rightmost is side-panel, then select, ..., and checkbox becomes leftmost */
   flex-direction: row-reverse;
@@ -375,16 +375,16 @@ const handleOpenSidePanelNative = async (event) => {
 /* Responsive adjustments using Media Queries */
 @media (max-width: 480px) {
   .header-toolbar {
-    padding: 12px 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-    min-height: 56px;
+    padding: 4px 4px 4px 8px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-height: 38px;
   }
 
   .toolbar-right-group {
-    gap: 8px;
+    gap: 4px;
     flex-grow: 1;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .toolbar-left-group {
@@ -392,16 +392,16 @@ const handleOpenSidePanelNative = async (event) => {
   }
 
   .ti-toolbar-button {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .ti-toolbar-icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
 
   .switch {
@@ -446,7 +446,6 @@ const handleOpenSidePanelNative = async (event) => {
   display: inline-block;
   width: 40px;
   height: 20px;
-  margin-left: 8px;
   vertical-align: middle;
 }
 
