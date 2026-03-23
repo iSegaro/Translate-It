@@ -121,7 +121,7 @@ const menuItems = computed(() => {
     const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
     items.push({
       id: 'page_translating',
-      label: `${t('translating_label') || 'Translating'} (${percent}%) - ${t('stop_auto_translating_label') || 'Stop'}`,
+      label: `${percent}% - ${t('stop_auto_translating_label') || 'Stop'}`,
       icon: IconClear,
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)

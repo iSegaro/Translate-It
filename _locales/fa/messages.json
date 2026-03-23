@@ -380,9 +380,6 @@
   "stop_auto_translating_label": {
     "message": "توقف ترجمه خودکار"
   },
-  "translating_label": {
-    "message": "در حال ترجمه"
-  },
   "select_element_label": {
     "message": "انتخاب المان"
   },

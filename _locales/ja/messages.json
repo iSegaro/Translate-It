@@ -380,9 +380,6 @@
   "stop_auto_translating_label": {
     "message": "自動翻訳を停止"
   },
-  "translating_label": {
-    "message": "翻訳中"
-  },
   "select_element_label": {
     "message": "要素を選択"
   },

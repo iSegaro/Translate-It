@@ -380,9 +380,6 @@
   "stop_auto_translating_label": {
     "message": "Stop Auto Translating"
   },
-  "translating_label": {
-    "message": "Translating"
-  },
   "select_element_label": {
     "message": "Select Element"
   },
