@@ -3,32 +3,52 @@
     
     <!-- Header -->
     <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-      <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0;">
-        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 18px; height: 18px; transform: rotate(90deg); opacity: 0.6;" />
-        <span style="font-weight: bold; font-size: 16px; color: #333;" class="header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+      <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0; height: 44px; min-width: 44px; -webkit-tap-highlight-color: transparent;">
+        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 20px; height: 20px; transform: rotate(90deg); opacity: 0.6;" />
+        <span style="font-weight: bold; font-size: 17px; color: #333;" class="header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
 
     <!-- Input Card -->
     <div class="input-card" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
-      <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
+        
+        <div style="display: flex; gap: 8px;">
+           <button 
+            class="input-action-btn paste-btn" 
+            @click="handlePaste" 
+            style="background: #e7f5ff; border: 1px solid #d0ebff; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #1c7ed6; cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: 600;"
+          >
+            <img src="@/icons/ui/paste.png" style="width: 14px; height: 14px; filter: brightness(0.8);" />
+            {{ t('action_paste_from_clipboard') || 'Paste' }}
+          </button>
+          
+          <button 
+            v-if="inputText"
+            class="input-action-btn clear-btn" 
+            @click="inputText = ''" 
+            style="background: #fff5f5; border: 1px solid #ffe3e3; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #fa5252; cursor: pointer; font-weight: 600;"
+          >
+            {{ t('mobile_input_clear_btn') || 'Clear' }}
+          </button>
+        </div>
+      </div>
+      
       <textarea
         v-model="inputText"
         :placeholder="t('mobile_input_placeholder') || 'Type here...'"
         :dir="inputDir"
-        style="width: 100%; min-height: 80px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 0; text-align: start;"
+        style="width: 100%; min-height: 100px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 4px 0; text-align: start; line-height: 1.5;"
         @focus="onFocus"
       ></textarea>
-      <div v-if="inputText" style="display: flex; justify-content: flex-end;">
-        <button class="clear-btn" @click="inputText = ''" style="background: #eee; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #666; cursor: pointer;">{{ t('mobile_input_clear_btn') || 'Clear' }}</button>
-      </div>
     </div>
 
     <!-- Controls -->
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 14px; color: #868e96;">{{ t('mobile_input_to_label') || 'To:' }}</span>
-        <select v-model="targetLang" style="padding: 5px 10px; border-radius: 8px; border: 1px solid #ced4da; background: white; font-size: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+      <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+        <span style="font-size: 14px; color: #868e96; white-space: nowrap;">{{ t('mobile_input_to_label') || 'To:' }}</span>
+        <select v-model="targetLang" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid #ced4da; background: white; font-size: 14px; color: #495057;">
           <option value="en">English</option>
           <option value="fa">Persian</option>
           <option value="de">German</option>
@@ -40,9 +60,12 @@
       <button 
         @click="handleTranslate"
         :disabled="!inputText || isLoading"
-        style="background: #339af0; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: (isLoading || !inputText) ? 0.6 : 1;"
+        class="translate-main-btn"
+        style="background: #339af0; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; min-width: 110px; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);"
+        :style="{ opacity: (isLoading || !inputText) ? 0.6 : 1 }"
       >
-        {{ isLoading ? '...' : (t('mobile_input_translate_btn') || 'Translate') }}
+        <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
+        {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
       </button>
     </div>
 
@@ -99,6 +122,25 @@ const goBack = () => {
 
 const onFocus = () => {
   mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+}
+
+const handlePaste = async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      inputText.value = text;
+      pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
+        message: t('mobile_input_pasted_message') || 'Pasted from clipboard', 
+        type: 'success' 
+      });
+    }
+  } catch (error) {
+    console.error('[InputView] Paste failed:', error);
+    pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
+      message: 'Paste failed. Please allow clipboard access.', 
+      type: 'error' 
+    });
+  }
 }
 
 const handleTranslate = async () => {
@@ -184,8 +226,21 @@ const onHistory = () => {
   .header-title { color: #adb5bd !important; }
   .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
   .input-card textarea { color: #dee2e6 !important; }
-  .clear-btn { background: #3d3d3d !important; color: #adb5bd !important; }
+  
+  .paste-btn { 
+    background: rgba(28, 126, 214, 0.1) !important; 
+    border-color: rgba(28, 126, 214, 0.3) !important; 
+    color: #74c0fc !important; 
+  }
+  .paste-btn img { filter: invert(0.8) sepia(1) saturate(5) hue-rotate(180deg); }
+  
+  .clear-btn { 
+    background: rgba(250, 82, 82, 0.1) !important; 
+    border-color: rgba(250, 82, 82, 0.3) !important; 
+    color: #ff8787 !important; 
+  }
   
   select { background-color: #2d2d2d !important; color: #dee2e6 !important; border-color: #444 !important; }
+  .translate-main-btn { background: #1971c2 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; }
 }
 </style>

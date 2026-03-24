@@ -2,21 +2,21 @@
   <div class="selection-view" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 12px;">
     
     <!-- Header -->
-    <div class="selection-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f1f3f5;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <button class="back-btn" @click="goBack" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-          <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 18px !important; height: 18px !important; transform: rotate(90deg); opacity: 0.6;" />
+    <div class="selection-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f1f3f5; min-height: 48px;">
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <button class="back-btn" @click="goBack" style="background: none; border: none; width: 44px; height: 44px; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent;">
+          <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 20px !important; height: 20px !important; transform: rotate(90deg); opacity: 0.6;" />
         </button>
-        <div class="lang-pair" style="display: flex; align-items: center; gap: 6px; background: #f1f3f5; padding: 4px 12px; border-radius: 20px;">
+        <div class="lang-pair" style="display: flex; align-items: center; gap: 8px; background: #f1f3f5; padding: 6px 14px; border-radius: 20px;">
           <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #495057;">{{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}</span>
           <img src="@/icons/ui/swap.png" class="swap-icon" :alt="t('mobile_swap_languages_alt') || 'to'" style="width: 12px !important; height: 12px !important; opacity: 0.5;" />
           <span class="lang" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #339af0;">{{ selectionData.targetLang }}</span>
         </div>
       </div>
       
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <button class="close-btn" @click="closeView" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" style="width: 20px !important; height: 20px !important; opacity: 0.4;" />
+      <div style="display: flex; align-items: center;">
+        <button class="close-btn" @click="closeView" style="background: none; border: none; width: 44px; height: 44px; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent;">
+          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" style="width: 22px !important; height: 22px !important; opacity: 0.4;" />
         </button>
       </div>
     </div>
@@ -34,7 +34,7 @@
       <div v-else class="translation-result" style="display: flex; flex-direction: column; gap: 12px;">
         
         <!-- Result Card using Shared Component -->
-        <div @click="expandSheet" style="cursor: pointer;">
+        <div @click="expandSheet" style="cursor: pointer; width: 100%;">
           <TranslationDisplay
             mode="mobile"
             :content="selectionData.translation"

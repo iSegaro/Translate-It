@@ -12,6 +12,7 @@
         'popup-mode': mode === 'popup',
         'sidepanel-mode': mode === 'sidepanel',
         'selection-mode': mode === 'selection',
+        'mobile-mode': mode === 'mobile',
       },
       containerClass,
     ]"
@@ -124,16 +125,36 @@
       <div 
         v-if="mode === 'mobile' && hasContent"
         class="ti-mobile-actions"
+        style="display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid rgba(51, 154, 240, 0.15) !important; box-sizing: border-box !important; justify-content: space-between !important;"
         @click.stop
       >
-        <button class="mobile-action-btn" @click="handleMobileSpeak" :title="ttsTitle">
-          <img src="@/icons/ui/speaker.png" :alt="ttsAlt" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        <button 
+          class="mobile-action-btn primary-action" 
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
+          @click="handleMobileSpeak" 
+          :title="ttsTitle"
+        >
+          <img src="@/icons/ui/speaker.png" :alt="ttsAlt" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
+          <span>{{ t('mobile_selection_speak_tooltip') || 'Speak' }}</span>
         </button>
-        <button class="mobile-action-btn" @click="handleMobileCopy" :title="copyTitle">
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        
+        <button 
+          class="mobile-action-btn secondary-action" 
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
+          @click="handleMobileCopy" 
+          :title="copyTitle"
+        >
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
+          <span>{{ t('mobile_selection_copy_tooltip') || 'Copy' }}</span>
         </button>
-        <button class="mobile-action-btn" @click="handleMobileHistory" :title="t('mobile_selection_history_tooltip') || 'History'">
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        
+        <button 
+          class="mobile-action-btn icon-only-action" 
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important;"
+          @click="handleMobileHistory" 
+          :title="t('mobile_selection_history_tooltip') || 'History'"
+        >
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
         </button>
       </div>
     </template>
@@ -974,12 +995,15 @@ onMounted(() => {
   background: #e7f5ff;
   border: 1px solid #d0ebff;
   border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  padding: 15px;
-  gap: 12px; /* Increased gap */
-  min-height: auto;
-  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 15px !important;
+  gap: 12px !important;
+  min-height: auto !important;
+  box-sizing: border-box !important;
+  width: 100% !important; /* Force full width */
+  max-width: 100% !important;
+  align-self: stretch !important;
 }
 
 .ti-translation-display.mobile-mode.has-error {
@@ -993,7 +1017,8 @@ onMounted(() => {
   color: #1c7ed6;
   line-height: 1.5;
   min-height: auto;
-  max-height: 200px; /* Limit height in mobile to avoid huge sheets */
+  max-height: 250px;
+  width: 100% !important;
 }
 
 .ti-translation-display.mobile-mode.has-error .ti-translation-content {
@@ -1001,59 +1026,84 @@ onMounted(() => {
 }
 
 .ti-mobile-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(51, 154, 240, 0.15);
-  justify-content: flex-start;
-  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: stretch !important; /* Stretch buttons to same height */
+  gap: 10px !important;
+  margin-top: 15px !important;
+  padding-top: 15px !important;
+  border-top: 1px solid rgba(51, 154, 240, 0.15) !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .mobile-action-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid #d0ebff;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 0;
-  flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  height: 46px !important;
+  border-radius: 12px !important;
+  border: 1px solid #d0ebff !important;
+  background: white !important;
+  display: flex !important;
+  flex: 1 1 0% !important; /* Force equal width distribution */
+  min-width: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  padding: 0 4px !important;
+  gap: 6px !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
+  color: #1c7ed6 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  -webkit-tap-highlight-color: transparent !important;
+  text-align: center !important;
+}
+
+.mobile-action-btn.icon-only-action {
+  /* Same flex as others to maintain balance */
 }
 
 .mobile-action-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.95);
   background: #f1f3f5;
+  box-shadow: none;
 }
 
 .mobile-action-btn img {
-  width: 18px !important;
-  height: 18px !important;
-  max-width: 18px !important;
-  max-height: 18px !important;
-  min-width: 18px !important;
-  min-height: 18px !important;
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
   object-fit: contain !important;
   display: block !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
+.mobile-action-btn.primary-action {
+  background: #339af0;
+  color: white;
+  border-color: #228be6;
+}
+
+.mobile-action-btn.primary-action img {
+  filter: brightness(0) invert(1);
+}
+
 /* Mobile Dark Mode */
 @media (prefers-color-scheme: dark) {
   .ti-translation-display.mobile-mode:not(.has-error) { 
-    background: rgba(28, 126, 214, 0.15) !important; 
-    border-color: rgba(28, 126, 214, 0.3) !important; 
+    background: rgba(28, 126, 214, 0.1) !important; 
+    border-color: rgba(28, 126, 214, 0.25) !important; 
   }
   
   .ti-translation-display.mobile-mode.has-error {
-    background: rgba(250, 82, 82, 0.15) !important;
-    border-color: rgba(250, 82, 82, 0.3) !important;
+    background: rgba(250, 82, 82, 0.12) !important;
+    border-color: rgba(250, 82, 82, 0.25) !important;
   }
 
   .ti-translation-display.mobile-mode .ti-translation-content:not(.has-error) { 
@@ -1066,10 +1116,18 @@ onMounted(() => {
   
   .mobile-action-btn { 
     background: #2d2d2d !important; 
-    border-color: #444 !important; 
+    border-color: #444 !important;
+    color: #74c0fc !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  .mobile-action-btn.primary-action {
+    background: #1971c2 !important;
+    color: white !important;
+    border-color: #1864ab !important;
   }
   
-  .mobile-action-btn img { 
+  .mobile-action-btn:not(.primary-action) img { 
     filter: invert(0.8); 
   }
   
