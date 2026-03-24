@@ -23,6 +23,7 @@ export const TranslationMode = {
   Dictionary_Translation: MessageContexts.DICTIONARY,
   Popup_Translate: MessageContexts.POPUP,
   Sidepanel_Translate: MessageContexts.SIDEPANEL,
+  Mobile_Translate: MessageContexts.MOBILE_TRANSLATE,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
   

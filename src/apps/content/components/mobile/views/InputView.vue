@@ -133,9 +133,10 @@ import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
@@ -145,7 +146,7 @@ import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
-const { sendMessage, createMessage } = useMessaging('mobile-input')
+const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
 const { getErrorForDisplay } = useErrorHandler()
 
 // Initialize with store text if available (from SelectionView)
@@ -202,7 +203,8 @@ const handleTranslate = async () => {
       text: inputText.value,
       sourceLanguage: sourceLang.value,
       targetLanguage: targetLang.value,
-      api: currentProvider.value
+      provider: currentProvider.value,
+      mode: TranslationMode.Mobile_Translate
     };
 
     const message = createMessage(MessageActions.TRANSLATE, payload);

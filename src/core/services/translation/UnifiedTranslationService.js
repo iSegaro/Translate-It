@@ -59,7 +59,8 @@ export class UnifiedTranslationService {
       MessageContexts.SIDEPANEL,
       MessageContexts.SELECT_ELEMENT,
       MessageContexts.PAGE_TRANSLATION_BATCH,
-      MessageContexts.CONTENT
+      MessageContexts.CONTENT,
+      MessageContexts.MOBILE_TRANSLATE
     ];
     if (uiContexts.includes(context) && data.provider) {
       return data.provider;
@@ -411,6 +412,7 @@ class TranslationModeCoordinator {
       TranslationMode.Dictionary_Translation,
       TranslationMode.Popup_Translate,
       TranslationMode.Sidepanel_Translate,
+      TranslationMode.Mobile_Translate,
     ]);
     
     const lowPriorityModes = new Set([
