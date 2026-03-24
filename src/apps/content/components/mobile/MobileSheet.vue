@@ -54,6 +54,7 @@ import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useMobileGestures } from '@/composables/ui/useMobileGestures.js'
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
@@ -66,11 +67,17 @@ import HistoryView from './views/HistoryView.vue'
 
 const mobileStore = useMobileStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
+const tts = useTTSSmart()
 
-// Watch for isOpen changes to sync state with WindowsManager
+// Watch for isOpen changes to sync state with WindowsManager and stop audio
 watch(isOpen, (newVal) => {
   if (!newVal) {
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id: 'mobile-sheet' });
+    
+    // Auto-stop any TTS playback when the mobile sheet is closed
+    if (tts && typeof tts.stopAll === 'function') {
+      tts.stopAll();
+    }
   }
 });
 
