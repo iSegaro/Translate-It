@@ -1,33 +1,31 @@
 <template>
-  <!-- Visual Viewport Resize Mask: Clips the FAB to the visible area and provides a relative coordinate system -->
-  <div class="mobile-fab-viewport-mask notranslate" :style="maskStyle" translate="no">
-    <div 
-      class="mobile-fab"
-      :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
-      :style="fabStyle"
-      @click="onMobileFabClick"
-      @mousedown="onFabDragStart"
-      @touchstart="onFabDragStart"
-      @touchmove="onFabDragMove"
-      @touchend="onFabDragEnd"
-      @mouseenter="onMouseEnter"
-      @mouseleave="onMouseLeave"
-      :title="t('mobile_fab_alt') || 'Translate'"
-    >
-      <img 
-        src="@/icons/extension/extension_icon_64.svg" 
-        :alt="t('mobile_fab_alt') || 'Translate'" 
-        :style="{
-          width: '26px !important',
-          height: '26px !important',
-          objectFit: 'contain',
-          marginLeft: '0 !important',
-          marginRight: 'auto !important',
-          paddingLeft: '6px !important',
-          transition: 'none'
-        }"
-      />
-    </div>
+  <div 
+    class="mobile-fab notranslate"
+    :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
+    translate="no"
+    :style="fabStyle"
+    @click="onMobileFabClick"
+    @mousedown="onFabDragStart"
+    @touchstart="onFabDragStart"
+    @touchmove="onFabDragMove"
+    @touchend="onFabDragEnd"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
+    :title="t('mobile_fab_alt') || 'Translate'"
+  >
+    <img 
+      src="@/icons/extension/extension_icon_64.svg" 
+      :alt="t('mobile_fab_alt') || 'Translate'" 
+      :style="{
+        width: '26px !important',
+        height: '26px !important',
+        objectFit: 'contain',
+        marginLeft: '0 !important',
+        marginRight: 'auto !important',
+        paddingLeft: '6px !important',
+        transition: 'none'
+      }"
+    />
   </div>
 </template>
 
@@ -54,48 +52,34 @@ const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
 const tracker = useResourceTracker('mobile-fab');
 
-// Viewport State for Resize Masking
-const viewport = ref({
-  width: typeof window !== 'undefined' ? window.innerWidth : 0,
-  height: typeof window !== 'undefined' ? window.innerHeight : 0,
-  offsetLeft: 0,
-  offsetTop: 0
-});
-
-// FAB State
+// State
 const fabPosition = ref({ x: null, y: 120 });
 const isFabDragging = ref(false);
 const isFabIdle = ref(false);
 const isHovering = ref(false);
+const isViewportUnstable = ref(false);
 let dragStartY = 0;
 let initialFabY = 0;
 let fabIdleTimerId = null;
 let animationFrameId = null;
 
 let keyboardDebounceTimer = null;
+let instabilityTimer = null;
 
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
   
+  // 1. Instability Tracking (Hide during scroll/resize)
+  isViewportUnstable.value = true;
+  if (instabilityTimer) clearTimeout(instabilityTimer);
+  instabilityTimer = tracker.trackTimeout(() => {
+    isViewportUnstable.value = false;
+    instabilityTimer = null;
+  }, 300);
+
+  // 2. Keyboard Detection
   if (window.visualViewport) {
     const vv = window.visualViewport;
-    
-    // Optimization: Only update if change is significant (> 0.5px) to reduce jitter
-    const hasChanged = 
-      Math.abs(viewport.value.width - vv.width) > 0.5 || 
-      Math.abs(viewport.value.height - vv.height) > 0.5 ||
-      Math.abs(viewport.value.offsetTop - vv.offsetTop) > 0.5;
-
-    if (hasChanged) {
-      viewport.value = {
-        width: vv.width,
-        height: vv.height,
-        offsetLeft: vv.offsetLeft,
-        offsetTop: vv.offsetTop
-      };
-    }
-
-    // Smart Keyboard Detection with Debounce
     if (keyboardDebounceTimer) clearTimeout(keyboardDebounceTimer);
     
     keyboardDebounceTimer = tracker.trackTimeout(() => {
@@ -108,13 +92,6 @@ const updateViewport = () => {
       }
       keyboardDebounceTimer = null;
     }, 150);
-  } else {
-    viewport.value = {
-      width: window.innerWidth,
-      height: window.innerHeight,
-      offsetLeft: 0,
-      offsetTop: 0
-    };
   }
 };
 
@@ -178,8 +155,8 @@ const onFabDragMove = (e) => {
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
     
-    const currentViewHeight = viewport.value.height || window.innerHeight;
-    newY = Math.max(50, Math.min(currentViewHeight - 50, newY));
+    // Clamp to layout viewport
+    newY = Math.max(50, Math.min(window.innerHeight - 50, newY));
     
     fabPosition.value = { ...fabPosition.value, y: newY };
     animationFrameId = null;
@@ -232,40 +209,31 @@ const onMobileFabClick = () => {
   }
 };
 
-// Mask Style: Optimized with faster smoothing and rounded values
-const maskStyle = computed(() => {
-  const { width, height, offsetLeft, offsetTop } = viewport.value;
-  
-  // Rounding prevents sub-pixel rendering jitters
-  const rWidth = Math.round(width);
-  const rHeight = Math.round(height);
-  const rLeft = Math.round(offsetLeft);
-  const rTop = Math.round(offsetTop);
-
-  return {
-    position: 'fixed !important',
-    left: `${rLeft}px !important`,
-    top: `${rTop}px !important`,
-    width: `${rWidth}px !important`,
-    height: `${rHeight}px !important`,
-    pointerEvents: 'none !important',
-    zIndex: '2147483647 !important',
-    overflow: 'hidden !important',
-    display: 'block !important',
-    // Snappier Transition: Reduced to 0.1s with ease-out for faster response
-    transition: isFabDragging.value ? 'none' : 'all 0.1s ease-out',
-    willChange: 'top, left, width, height'
-  };
-});
-
-// FAB Style: Coordinated with the faster mask transition
 const fabStyle = computed(() => {
   const isRTL = props.isRtl;
   const y = fabPosition.value.y || 120;
-  const currentOpacity = (isFabIdle.value && !isFabDragging.value && !isHovering.value) ? '0.2' : '1';
+  
+  // Visibility Logic: 
+  // 1. If dragging or hovering: Full visibility
+  // 2. If scrolling/unstable: Completely hidden (0)
+  // 3. If idle: Faint (0.2)
+  // 4. Default: Active (1)
+  let currentOpacity = '1';
+  let pointerEvents = 'auto';
+
+  if (isFabDragging.value || isHovering.value) {
+    currentOpacity = '1';
+    pointerEvents = 'auto';
+  } else if (isViewportUnstable.value) {
+    currentOpacity = '0';
+    pointerEvents = 'none';
+  } else if (isFabIdle.value) {
+    currentOpacity = '0.2';
+    pointerEvents = 'auto';
+  }
   
   return {
-    position: 'absolute !important', 
+    position: 'fixed !important',
     bottom: `${y}px !important`,
     left: isRTL ? '0 !important' : '100% !important',
     marginLeft: '-25px !important',
@@ -273,21 +241,21 @@ const fabStyle = computed(() => {
     height: '50px !important',
     display: 'flex !important',
     zIndex: '2147483647 !important',
-    pointerEvents: 'auto !important',
+    pointerEvents: `${pointerEvents} !important`,
     '--fab-opacity-val': currentOpacity,
     opacity: 'var(--fab-opacity-val) !important',
-    // Coordinated timing: 0.1s to match mask
-    transition: isFabDragging.value ? 'none' : 'opacity 0.3s ease, bottom 0.1s ease-out'
+    transition: isFabDragging.value ? 'none' : 'opacity 0.25s ease, bottom 0.1s ease-out'
   };
 });
 
 onMounted(async () => {
-  // Initialize Viewport Monitoring via tracker
-  if (typeof window !== 'undefined' && window.visualViewport) {
-    tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
-    tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
-  } else {
+  if (typeof window !== 'undefined') {
+    if (window.visualViewport) {
+      tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
+      tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
+    }
     tracker.addEventListener(window, 'resize', updateViewport);
+    tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
   }
   
   updateViewport();
@@ -304,21 +272,15 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Safety: Dynamic drag listeners are manually removed, tracker handles everything else
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
-  
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
   if (keyboardDebounceTimer) clearTimeout(keyboardDebounceTimer);
+  if (instabilityTimer) clearTimeout(instabilityTimer);
 });
 </script>
 
 <style scoped>
-.mobile-fab-viewport-mask {
-  /* Critical for resize masking - isolates children from layout viewport jumps */
-  contain: strict !important;
-}
-
 .mobile-fab {
   background: #339af0 !important;
   border-radius: 50% !important;
