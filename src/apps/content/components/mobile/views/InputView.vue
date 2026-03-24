@@ -45,9 +45,9 @@
     </div>
 
     <!-- Controls -->
-    <div class="input-controls">
+    <div class="input-controls" style="display: flex; flex-direction: column; gap: 12px;">
       <!-- Languages -->
-      <div class="language-controls-card">
+      <div class="language-controls-card" style="border: 1px solid #ced4da; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-top: 5px;">
         <LanguageSelector
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
@@ -60,8 +60,8 @@
       </div>
       
       <!-- Provider and Translate -->
-      <div class="actions-row">
-        <div class="provider-wrapper">
+      <div class="actions-row" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+        <div class="provider-wrapper" style="flex: 1; max-width: 48%;">
           <ProviderSelector
             v-model="currentProvider"
             mode="button"
@@ -74,8 +74,24 @@
           @click="handleTranslate"
           :disabled="!inputText || isLoading"
           class="translate-main-btn"
+          :style="{
+            backgroundColor: (!inputText || isLoading) ? '#ced4da' : '#1a73e8',
+            color: 'white',
+            border: 'none',
+            padding: '0 20px',
+            borderRadius: '12px',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            height: '46px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: (!inputText || isLoading) ? 'not-allowed' : 'pointer',
+            boxShadow: (!inputText || isLoading) ? 'none' : '0 4px 10px rgba(26, 115, 232, 0.25)',
+            flex: '1.2'
+          }"
         >
-          <span v-if="isLoading" class="mini-spinner"></span>
+          <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
           {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
         </button>
       </div>
@@ -235,32 +251,8 @@ const onHistory = () => {
 </script>
 
 <style scoped>
-.input-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.language-controls-card {
-  border: 1px solid #ced4da;
-  border-radius: 12px;
-  background: white;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-  margin-top: 5px;
-}
-
-.actions-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.provider-wrapper {
-  flex: 1;
-  max-width: 48%;
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 :deep(.ti-provider-button) {
   width: 100% !important;
@@ -270,75 +262,31 @@ const onHistory = () => {
   justify-content: space-between !important;
   font-size: 13px !important;
   background: white !important;
-}
-
-.translate-main-btn {
-  flex: 1.2;
-  background: #339af0;
-  color: white;
-  border: none;
-  padding: 0 20px;
-  border-radius: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 15px;
-  height: 46px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);
-}
-
-.translate-main-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.mini-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  border: 1px solid #ced4da !important;
 }
 
 @media (prefers-color-scheme: dark) {
   .header-title { color: #adb5bd !important; }
   .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
   .input-card textarea { color: #dee2e6 !important; }
-  
   .language-controls-card { background: #2d2d2d !important; border-color: #444 !important; }
-  :deep(.ti-language-select) { color: #dee2e6 !important; }
-  :deep(.ti-swap-button) { background: #3d3d3d !important; }
-  :deep(.ti-swap-button img) { filter: invert(0.8); }
   :deep(.ti-provider-button) { background: #2d2d2d !important; border-color: #444 !important; color: #dee2e6 !important; }
-  :deep(.ti-provider-button .dropdown-arrow) { filter: invert(0.8); }
   
-  .paste-btn { 
-    background: rgba(28, 126, 214, 0.1) !important; 
-    border-color: rgba(28, 126, 214, 0.3) !important; 
-    color: #74c0fc !important; 
+  .paste-btn { background: rgba(28, 126, 214, 0.1) !important; border-color: rgba(28, 126, 214, 0.3) !important; color: #74c0fc !important; }
+  .clear-btn { background: rgba(250, 82, 82, 0.1) !important; border-color: rgba(250, 82, 82, 0.3) !important; color: #ff8787 !important; }
+}
+</style>
+
+<style>
+/* Global overrides for tactile feedback */
+.input-view .translate-main-btn:active:not(:disabled) {
+  transform: scale(0.96) !important;
+  filter: brightness(0.9) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .input-view .translate-main-btn:not(:disabled) {
+    background-color: #1971c2 !important;
   }
-  .paste-btn img { filter: invert(0.8) sepia(1) saturate(5) hue-rotate(180deg); }
-  
-  .clear-btn { 
-    background: rgba(250, 82, 82, 0.1) !important; 
-    border-color: rgba(250, 82, 82, 0.3) !important; 
-    color: #ff8787 !important; 
-  }
-  
-  .translate-main-btn { background: #1971c2 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; }
 }
 </style>
