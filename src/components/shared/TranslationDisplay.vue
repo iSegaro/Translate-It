@@ -135,19 +135,25 @@
           @click="handleMobileSpeak" 
           :title="ttsStatus === 'playing' ? (t('mobile_selection_stop_tooltip') || 'Stop') : ttsTitle"
         >
-          <img 
-            v-if="ttsStatus === 'playing'" 
-            src="@/icons/ui/close.png" 
-            alt="Stop" 
-            style="width: 18px !important; height: 18px !important; object-fit: contain !important; filter: brightness(0) invert(1);" 
-          />
+          <svg
+            v-if="ttsStatus === 'playing'"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="currentColor"
+            style="flex-shrink: 0 !important; display: block !important;"
+          >
+            <rect x="6" y="6" width="12" height="12" rx="1.5" />
+          </svg>
           <img 
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
-            style="width: 22px !important; height: 22px !important; object-fit: contain !important;" 
+            style="width: 16px !important; height: 16px !important; object-fit: contain !important;" 
           />
-          <span>{{ ttsStatus === 'playing' ? (t('mobile_selection_stop_label') || 'Stop') : (t('mobile_selection_speak_tooltip') || 'Speak') }}</span>
+          <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
+            {{ ttsStatus === 'playing' ? (t('mobile_selection_stop_label') || 'Stop') : (t('mobile_selection_speak_tooltip') || 'Speak') }}
+          </span>
         </button>
         
         <button 
@@ -156,8 +162,10 @@
           @click="handleMobileCopy" 
           :title="copyTitle"
         >
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
-          <span>{{ t('mobile_selection_copy_tooltip') || 'Copy' }}</span>
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
+          <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
+            {{ t('mobile_selection_copy_tooltip') || 'Copy' }}
+          </span>
         </button>
         
         <button 
@@ -166,7 +174,7 @@
           @click="handleMobileHistory" 
           :title="t('mobile_selection_history_tooltip') || 'History'"
         >
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
         </button>
       </div>
     </template>
@@ -953,6 +961,21 @@ onMounted(() => {
   padding: 2px;
 }
 
+/* Loading overlay */
+.ti-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-result-color-rgb, 255, 255, 255), 0.8);
+  border-radius: 4px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Animations */
 @keyframes pulse {
   0%,
@@ -1051,12 +1074,28 @@ onMounted(() => {
   font-size: 13px !important;
   -webkit-tap-highlight-color: rgba(0,0,0,0.1) !important;
   text-align: center !important;
+  line-height: 1 !important; /* Ensure vertical centering for text */
 }
 
 .mobile-action-btn:active {
   transform: scale(0.95);
   background: #f1f3f5 !important;
   box-shadow: none;
+}
+
+/* Ensure icons in mobile buttons have proper sizing and alignment */
+.mobile-action-btn img,
+.mobile-action-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  flex-shrink: 0 !important;
+  object-fit: contain !important;
+}
+
+.mobile-action-btn img {
+  display: block !important;
 }
 
 .mobile-action-btn.primary-action {
