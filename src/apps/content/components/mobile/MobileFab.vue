@@ -1,31 +1,33 @@
 <template>
-  <div 
-    class="mobile-fab notranslate"
-    :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
-    translate="no"
-    :style="fabStyle"
-    @click="onMobileFabClick"
-    @mousedown="onFabDragStart"
-    @touchstart="onFabDragStart"
-    @touchmove="onFabDragMove"
-    @touchend="onFabDragEnd"
-    @mouseenter="onMouseEnter"
-    @mouseleave="onMouseLeave"
-    :title="t('mobile_fab_alt') || 'Translate'"
-  >
-    <img 
-      src="@/icons/extension/extension_icon_64.svg" 
-      :alt="t('mobile_fab_alt') || 'Translate'" 
-      :style="{
-        width: '26px !important',
-        height: '26px !important',
-        objectFit: 'contain',
-        marginLeft: '0 !important',
-        marginRight: 'auto !important',
-        paddingLeft: '6px !important',
-        transition: 'none'
-      }"
-    />
+  <!-- Visual Viewport Resize Mask: Clips the FAB to the visible area and provides a relative coordinate system -->
+  <div class="mobile-fab-viewport-mask notranslate" :style="maskStyle" translate="no">
+    <div 
+      class="mobile-fab"
+      :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
+      :style="fabStyle"
+      @click="onMobileFabClick"
+      @mousedown="onFabDragStart"
+      @touchstart="onFabDragStart"
+      @touchmove="onFabDragMove"
+      @touchend="onFabDragEnd"
+      @mouseenter="onMouseEnter"
+      @mouseleave="onMouseLeave"
+      :title="t('mobile_fab_alt') || 'Translate'"
+    >
+      <img 
+        src="@/icons/extension/extension_icon_64.svg" 
+        :alt="t('mobile_fab_alt') || 'Translate'" 
+        :style="{
+          width: '26px !important',
+          height: '26px !important',
+          objectFit: 'contain',
+          marginLeft: '0 !important',
+          marginRight: 'auto !important',
+          paddingLeft: '6px !important',
+          transition: 'none'
+        }"
+      />
+    </div>
   </div>
 </template>
 
@@ -52,7 +54,15 @@ const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
 const tracker = useResourceTracker('mobile-fab');
 
-// State
+// Viewport State for Resize Masking
+const viewport = ref({
+  width: typeof window !== 'undefined' ? window.innerWidth : 0,
+  height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  offsetLeft: 0,
+  offsetTop: 0
+});
+
+// FAB State
 const fabPosition = ref({ x: null, y: 120 });
 const isFabDragging = ref(false);
 const isFabIdle = ref(false);
@@ -62,12 +72,39 @@ let initialFabY = 0;
 let fabIdleTimerId = null;
 let animationFrameId = null;
 
+const updateViewport = () => {
+  if (typeof window === 'undefined') return;
+  
+  if (window.visualViewport) {
+    viewport.value = {
+      width: window.visualViewport.width,
+      height: window.visualViewport.height,
+      offsetLeft: window.visualViewport.offsetLeft,
+      offsetTop: window.visualViewport.offsetTop
+    };
+
+    // Smart Keyboard Detection: If visual viewport is significantly smaller than layout viewport
+    const threshold = 160; // Common keyboard height minimum
+    const keyboardVisible = (window.innerHeight - window.visualViewport.height) > threshold;
+    if (mobileStore.isKeyboardVisible !== keyboardVisible) {
+      mobileStore.setKeyboardVisibility(keyboardVisible);
+      logger.debug(`Keyboard visibility changed: ${keyboardVisible}`);
+    }
+  } else {
+    viewport.value = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      offsetLeft: 0,
+      offsetTop: 0
+    };
+  }
+};
+
 const startFabIdleTimer = () => {
   if (isHovering.value || isFabDragging.value) return;
   if (fabIdleTimerId) clearTimeout(fabIdleTimerId);
   
   isFabIdle.value = false;
-  // Timers are best handled by tracker as they are long-lived/system resources
   fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
     fabIdleTimerId = null;
@@ -98,8 +135,6 @@ const onFabDragStart = (e) => {
   initialFabY = fabPosition.value.y || 120;
   
   if (isMouseEvent) {
-    // For highly dynamic/frequent events like Drag, manual management 
-    // is more efficient to avoid bloating the tracker's internal list.
     window.addEventListener('mousemove', onFabDragMove);
     window.addEventListener('mouseup', onFabDragEnd);
   }
@@ -121,11 +156,14 @@ const onFabDragMove = (e) => {
   if (e.cancelable) e.preventDefault();
   if (animationFrameId) return;
 
-  // Animation frames are system resources, tracker is good for them
   animationFrameId = requestAnimationFrame(() => {
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
-    newY = Math.max(50, Math.min(window.innerHeight - 50, newY));
+    
+    // Clamp to visible viewport height instead of layout innerHeight
+    const currentViewHeight = viewport.value.height || window.innerHeight;
+    newY = Math.max(50, Math.min(currentViewHeight - 50, newY));
+    
     fabPosition.value = { ...fabPosition.value, y: newY };
     animationFrameId = null;
   });
@@ -177,13 +215,31 @@ const onMobileFabClick = () => {
   }
 };
 
+// Mask Style: Sized exactly to the visible viewport
+const maskStyle = computed(() => {
+  const { width, height, offsetLeft, offsetTop } = viewport.value;
+  
+  return {
+    position: 'fixed !important',
+    left: `${offsetLeft}px !important`,
+    top: `${offsetTop}px !important`,
+    width: `${width}px !important`,
+    height: `${height}px !important`,
+    pointerEvents: 'none !important',
+    zIndex: '2147483647 !important',
+    overflow: 'hidden !important',
+    display: 'block !important'
+  };
+});
+
+// FAB Style: Positioned relatively within the visual viewport mask
 const fabStyle = computed(() => {
   const isRTL = props.isRtl;
   const y = fabPosition.value.y || 120;
   const currentOpacity = (isFabIdle.value && !isFabDragging.value && !isHovering.value) ? '0.2' : '1';
   
   return {
-    position: 'fixed !important',
+    position: 'absolute !important', // Absolute relative to the viewport mask
     bottom: `${y}px !important`,
     left: isRTL ? '0 !important' : '100% !important',
     marginLeft: '-25px !important',
@@ -199,6 +255,17 @@ const fabStyle = computed(() => {
 });
 
 onMounted(async () => {
+  // Initialize Viewport Monitoring
+  if (typeof window !== 'undefined' && window.visualViewport) {
+    tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
+    tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
+    updateViewport();
+  } else {
+    // Fallback for older browsers
+    window.addEventListener('resize', updateViewport);
+    updateViewport();
+  }
+
   try {
     const savedPosition = await getMobileFabPositionAsync();
     if (savedPosition && savedPosition.y !== null) {
@@ -211,16 +278,19 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Triple-Safety: Manual cleanup as a fallback/defense-in-depth
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
-  
-  // Tracker will automatically handle everything else!
+  window.removeEventListener('resize', updateViewport);
 });
 </script>
 
 <style scoped>
+.mobile-fab-viewport-mask {
+  /* Critical for resize masking - isolates children from layout viewport jumps */
+  contain: strict !important;
+}
+
 .mobile-fab {
   background: #339af0 !important;
   border-radius: 50% !important;
@@ -230,7 +300,7 @@ onUnmounted(() => {
   z-index: 2147483647 !important;
   pointer-events: auto !important;
   cursor: pointer;
-  will-change: opacity;
+  will-change: opacity, bottom;
 }
 
 .mobile-fab:hover,
