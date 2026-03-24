@@ -3,6 +3,7 @@
  * Common language detection and text direction functions used across multiple features
  */
 
+import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
