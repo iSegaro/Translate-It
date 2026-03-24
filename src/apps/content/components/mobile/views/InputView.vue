@@ -45,12 +45,13 @@
     </div>
 
     <!-- Controls -->
-    <div style="display: flex; flex-direction: column; gap: 15px;">
+    <div class="input-controls">
       <!-- Languages -->
-      <div class="language-controls-wrapper" style="border: 1px solid #ced4da; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+      <div class="language-controls-card">
         <LanguageSelector
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
+          compact
           :source-title="t('popup_source_language_title') || 'Source'"
           :target-title="t('popup_target_language_title') || 'Target'"
           :swap-title="t('popup_swap_languages_title') || 'Swap'"
@@ -59,14 +60,13 @@
       </div>
       
       <!-- Provider and Translate -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-        <div style="flex: 1; max-width: 50%;">
+      <div class="actions-row">
+        <div class="provider-wrapper">
           <ProviderSelector
             v-model="currentProvider"
             mode="button"
             :is-global="false"
             :show-sync="false"
-            style="width: 100%; border-radius: 12px;"
           />
         </div>
         
@@ -74,10 +74,8 @@
           @click="handleTranslate"
           :disabled="!inputText || isLoading"
           class="translate-main-btn"
-          style="background: #339af0; color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: 1; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);"
-          :style="{ opacity: (isLoading || !inputText) ? 0.6 : 1 }"
         >
-          <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
+          <span v-if="isLoading" class="mini-spinner"></span>
           {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
         </button>
       </div>
@@ -236,7 +234,81 @@ const onHistory = () => {
 }
 </script>
 
-<style>
+<style scoped>
+.input-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.language-controls-card {
+  border: 1px solid #ced4da;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  margin-top: 5px;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-wrapper {
+  flex: 1;
+  max-width: 48%;
+}
+
+:deep(.ti-provider-button) {
+  width: 100% !important;
+  border-radius: 12px !important;
+  height: 46px !important;
+  padding: 0 12px !important;
+  justify-content: space-between !important;
+  font-size: 13px !important;
+  background: white !important;
+}
+
+.translate-main-btn {
+  flex: 1.2;
+  background: #339af0;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 15px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);
+}
+
+.translate-main-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mini-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -246,6 +318,13 @@ const onHistory = () => {
   .header-title { color: #adb5bd !important; }
   .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
   .input-card textarea { color: #dee2e6 !important; }
+  
+  .language-controls-card { background: #2d2d2d !important; border-color: #444 !important; }
+  :deep(.ti-language-select) { color: #dee2e6 !important; }
+  :deep(.ti-swap-button) { background: #3d3d3d !important; }
+  :deep(.ti-swap-button img) { filter: invert(0.8); }
+  :deep(.ti-provider-button) { background: #2d2d2d !important; border-color: #444 !important; color: #dee2e6 !important; }
+  :deep(.ti-provider-button .dropdown-arrow) { filter: invert(0.8); }
   
   .paste-btn { 
     background: rgba(28, 126, 214, 0.1) !important; 
@@ -260,7 +339,6 @@ const onHistory = () => {
     color: #ff8787 !important; 
   }
   
-  select { background-color: #2d2d2d !important; color: #dee2e6 !important; border-color: #444 !important; }
   .translate-main-btn { background: #1971c2 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; }
 }
 </style>

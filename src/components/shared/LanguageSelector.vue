@@ -25,11 +25,13 @@
       type="button"
       class="ti-swap-button"
       :title="swapTitle"
+      :style="compact ? 'width: 32px !important; height: 32px !important; min-width: 32px !important;' : ''"
       @click="handleSwapLanguages"
     >
       <img
         :src="swapIcon"
         :alt="swapAlt"
+        :style="compact ? 'width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important;' : ''"
       >
     </button>
 
@@ -80,6 +82,10 @@ const props = defineProps({
     default: 'en'
   },
   disabled: {
+    type: Boolean,
+    default: false
+  },
+  compact: {
     type: Boolean,
     default: false
   },
@@ -408,13 +414,49 @@ onUnmounted(() => {
   }
 
   .ti-swap-button {
-    width: 44px !important;
-    height: 44px !important;
+    width: 44px;
+    height: 44px;
   }
 
   .ti-swap-button img {
-    width: 24px !important;
-    height: 24px !important;
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Specific overrides for InputView within mobile breakpoint */
+  .input-view .ti-language-controls {
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    height: auto !important;
+    background: transparent !important;
+    width: 100% !important;
+  }
+
+  .input-view .ti-language-select {
+    height: 40px !important;
+    font-size: 15px !important;
+    flex: 1 !important;
+    background-color: transparent !important;
+    border: none !important;
+  }
+
+  .input-view .ti-swap-button {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    background: #f1f3f5 !important;
+    border-radius: 50% !important;
+    margin: 0 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .input-view .ti-swap-button img {
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
   }
 }
 
@@ -545,5 +587,54 @@ onUnmounted(() => {
   height: 32px;
   margin: 1px 0;
   align-self: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .input-view .ti-swap-button {
+    background: #3d3d3d !important;
+  }
+  .input-view .ti-swap-button img {
+    filter: invert(0.8) !important;
+  }
+}
+</style>
+
+<!-- Global style block for contextual overrides -->
+<style>
+/* Use attribute selectors to match the specific Vue-scoped elements */
+.input-view button.ti-swap-button[data-v-84e8a8ef] {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  background-color: #f1f3f5 !important;
+  border-radius: 50% !important;
+  margin: 0 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 1px solid #e9ecef !important;
+}
+
+.input-view button.ti-swap-button[data-v-84e8a8ef] img {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  display: block !important;
+}
+
+@media (max-width: 480px) {
+  .input-view button.ti-swap-button[data-v-84e8a8ef] {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .input-view button.ti-swap-button[data-v-84e8a8ef] img {
+    width: 16px !important;
+    height: 16px !important;
+  }
 }
 </style>
