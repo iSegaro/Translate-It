@@ -127,13 +127,15 @@ const labelStyle = {
 
 const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  mobileStore.closeSheet()
   
-  // Use tracker to safely manage the deferred event
-  tracker.trackTimeout(() => { 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE) 
-  }, 0)
+  // Set view first so store is ready for progress updates
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
+  
+  // Emit translation event BEFORE closing the sheet to ensure it fires
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+  
+  // Close the sheet to let user see the page
+  mobileStore.closeSheet()
 }
 
 const activateSelectElement = () => {

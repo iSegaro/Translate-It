@@ -218,12 +218,11 @@ const closeView = () => {
 }
 
 const startTranslation = () => {
-  mobileStore.closeSheet()
+  // Emit translation event BEFORE closing the sheet to ensure it fires
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
   
-  // Use tracker to safely manage the deferred event
-  tracker.trackTimeout(() => {
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
-  }, 0)
+  // Close the sheet to let user see the page being translated
+  mobileStore.closeSheet()
 }
 
 const stopAutoTranslation = () => {
