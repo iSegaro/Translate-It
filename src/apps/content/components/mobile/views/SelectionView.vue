@@ -113,15 +113,14 @@ const expandSheet = () => {
 
 const handleSourceTextClick = () => {
   if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) {
-    mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
+    mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT)
   } else {
     expandSheet()
   }
 }
 
 const goBack = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const closeView = () => {
@@ -145,8 +144,7 @@ const onTextCopied = () => {
 }
 
 const onHistory = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY)
 }
 </script>
 

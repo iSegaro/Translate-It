@@ -102,8 +102,23 @@ watch(sheetState, (newVal) => {
   }
 }, { immediate: true });
 
+// Standard height mapping for different views when in PEEK mode
+const PEEK_HEIGHTS = {
+  [MOBILE_CONSTANTS.VIEWS.DASHBOARD]: '22vh',
+  [MOBILE_CONSTANTS.VIEWS.SELECTION]: '40vh',
+  [MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION]: '40vh',
+  [MOBILE_CONSTANTS.VIEWS.INPUT]: '40vh', // Initial peek before interaction
+  [MOBILE_CONSTANTS.VIEWS.HISTORY]: '60vh'
+}
+
 const sheetStyle = computed(() => {
   const y = isDragging.value ? sheetTranslation.value : 0;
+  
+  // Use FULL height (90vh) or the specific PEEK height for the current view
+  const targetHeight = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
+    ? '90vh' 
+    : (PEEK_HEIGHTS[activeView.value] || '40vh');
+
   return {
     transform: `translateY(${y}px)`,
     position: 'fixed',
@@ -116,13 +131,9 @@ const sheetStyle = computed(() => {
     flexDirection: 'column',
     boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
-    height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
-      ? '90vh' 
-      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD 
-          ? '22vh' 
-          : (activeView.value === MOBILE_CONSTANTS.VIEWS.HISTORY ? '60vh' : '40vh')),
+    height: targetHeight,
     maxHeight: '90vh',
-    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease'
+    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease-in-out'
   }
 })
 

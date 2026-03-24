@@ -210,7 +210,7 @@ const primaryAction = computed(() => {
 })
 
 const goToDashboard = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const closeView = () => {

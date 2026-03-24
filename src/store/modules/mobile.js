@@ -40,15 +40,44 @@ export const useMobileStore = defineStore('mobile', () => {
   const currentSheetState = computed(() => sheetState.value)
   
   // Actions
-  const openSheet = (view = MOBILE_CONSTANTS.VIEWS.DASHBOARD, state = MOBILE_CONSTANTS.SHEET_STATE.PEEK) => {
-    activeView.value = view
-    sheetState.value = state
-    isOpen.value = true
+  const navigate = (view, state = null) => {
+    // 1. Force keyboard to hide before any transition to prevent layout overlap
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    // 2. Set the active view
+    activeView.value = view;
+
+    // 3. Determine the smart sheet state if not explicitly provided
+    if (state) {
+      sheetState.value = state;
+    } else {
+      // Default logic: Fullscreen for complex interaction views, Peek for others
+      const fullViews = [
+        MOBILE_CONSTANTS.VIEWS.INPUT, 
+        MOBILE_CONSTANTS.VIEWS.HISTORY,
+        MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION
+      ];
+      
+      sheetState.value = fullViews.includes(view)
+        ? MOBILE_CONSTANTS.SHEET_STATE.FULL
+        : MOBILE_CONSTANTS.SHEET_STATE.PEEK;
+    }
+  }
+
+  const openSheet = (view = MOBILE_CONSTANTS.VIEWS.DASHBOARD, state = null) => {
+    navigate(view, state);
+    isOpen.value = true;
   }
 
   const closeSheet = () => {
-    isOpen.value = false
-    sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED
+    // Also blur on close to be safe
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    isOpen.value = false;
+    sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED;
   }
 
   const toggleSheet = () => {
@@ -131,6 +160,7 @@ export const useMobileStore = defineStore('mobile', () => {
     currentSheetState,
     
     // Actions
+    navigate,
     openSheet,
     closeSheet,
     toggleSheet,

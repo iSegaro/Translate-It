@@ -128,8 +128,8 @@ const labelStyle = {
 const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   
-  // Set view first so store is ready for progress updates
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
+  // Navigate with implicit state (PAGE_TRANSLATION uses FULL state by default in navigate logic)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
   
   // Emit translation event BEFORE closing the sheet to ensure it fires
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
@@ -145,13 +145,11 @@ const activateSelectElement = () => {
 
 const goToInputView = () => {
   mobileStore.resetSelectionData()
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT)
 }
 
 const goToHistoryView = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY)
 }
 
 const openSettings = () => {

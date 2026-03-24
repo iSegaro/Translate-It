@@ -167,13 +167,13 @@ const onMobileFabClick = () => {
 
   if (selectedText) {
     mobileStore.updateSelectionData({ text: selectedText, isLoading: true, translation: '' });
-    mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
+    mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION);
     if (window.windowsManagerInstance) {
       window.windowsManagerInstance._showMobileSheet(selectedText);
     }
   } else {
     let viewToOpen = mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD;
-    mobileStore.openSheet(viewToOpen, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
+    mobileStore.openSheet(viewToOpen);
   }
 };
 

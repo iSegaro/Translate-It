@@ -172,8 +172,7 @@ const inputDir = computed(() => {
 })
 
 const goBack = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const onFocus = () => {

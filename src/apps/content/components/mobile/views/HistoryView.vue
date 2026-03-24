@@ -105,7 +105,7 @@ const getLangName = (code) => {
 }
 
 const goBack = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
 const removeItem = async (index) => {
@@ -124,8 +124,7 @@ const selectItem = (item) => {
     sourceLang: item.sourceLanguage,
     targetLang: item.targetLanguage
   })
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT)
 }
 </script>
 
