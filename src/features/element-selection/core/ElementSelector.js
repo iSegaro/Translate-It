@@ -139,7 +139,9 @@ export class ElementSelector extends ResourceTracker {
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
-    if (!this.isActive) return;
+    if (!this.isActive) {
+      return;
+    }
 
     // Guard against invalid elements
     if (!element || typeof element.hasAttribute !== 'function') {

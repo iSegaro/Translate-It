@@ -185,7 +185,13 @@ class SelectElementManager extends ResourceTracker {
       // Reset state
       this.isActive = true;
       this.isProcessingClick = false;
+      this.hasInitialMovementOccurred = false; // Require movement before first highlight
       this.currentOptions = activationOptions; // Store current options (includes targetLanguage)
+
+      // Ensure highlight is cleared from any previous state
+      if (this.elementSelector) {
+        this.elementSelector.clearHighlight();
+      }
 
       // Setup event listeners
       this.setupEventListeners();
@@ -234,6 +240,9 @@ class SelectElementManager extends ResourceTracker {
       // Notify background script
       await this.notifyBackgroundActivation();
 
+      // Final reset of activation time after everything is initialized
+      this.activationTime = Date.now();
+
       // Notify UI (ContentApp.vue) to show mobile exit button
       pageEventBus.emit('select-mode-activated');
 
@@ -281,6 +290,7 @@ class SelectElementManager extends ResourceTracker {
     try {
       // Set active state immediately
       this.isActive = false;
+      this.activationTime = 0; // Reset activation time
 
       // ALWAYS cancel any ongoing translations to stop background processes
       // The silent option prevents unwanted toast notifications if needed
@@ -419,10 +429,18 @@ class SelectElementManager extends ResourceTracker {
   }
 
   /**
+   * Helper to prevent events firing too early after activation
+   */
+  isCooldownActive() {
+    return Date.now() - (this.activationTime || 0) < 500;
+  }
+
+
+  /**
    * Handle mouse over event
    */
   handleMouseOver(event) {
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive || this.isProcessingClick || this.isCooldownActive() || !this.hasInitialMovementOccurred) return;
 
     // Skip our own elements
     if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
@@ -436,15 +454,20 @@ class SelectElementManager extends ResourceTracker {
    * Handle touch start event - initialize scanning
    */
   handleTouchStart(event) {
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
     
     // Check if it's our own UI
     if (this.elementSelector && this.elementSelector.isOurElement(event.touches[0].target)) {
       return;
     }
 
+    // A fresh touch on the page should count as "intentional action"
+    if (!this.hasInitialMovementOccurred) {
+      this.hasInitialMovementOccurred = true;
+      this.logger.debug('Fresh touch detected, enabling Select Element scanner');
+    }
+
     // Prevent site scrolling ONLY during the selection scan
-    // This allows the user to 'feel' the elements without the page moving
     event.preventDefault();
 
     const target = event.touches[0].target;
@@ -455,7 +478,13 @@ class SelectElementManager extends ResourceTracker {
    * Handle touch move - the core of "Scanner Mode"
    */
   handleTouchMove(event) {
-    if (!this.isActive || this.isProcessingClick) return;
+    if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
+
+    // First real movement after activation: enable highlights
+    if (!this.hasInitialMovementOccurred) {
+      this.hasInitialMovementOccurred = true;
+      this.logger.debug('Initial movement detected, enabling Select Element scanner');
+    }
 
     // Prevent scrolling while scanning
     event.preventDefault();
@@ -509,7 +538,7 @@ class SelectElementManager extends ResourceTracker {
    * Universal interaction handler - blocks all site interactions while mode is active
    */
   handleInteraction(event) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isCooldownActive()) return;
 
     // Use composedPath for more reliable detection, especially with Shadow DOM
     const path = event.composedPath ? event.composedPath() : [event.target];
