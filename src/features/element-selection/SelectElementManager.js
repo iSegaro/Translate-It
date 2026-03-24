@@ -444,9 +444,15 @@ class SelectElementManager extends ResourceTracker {
     if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
 
     // On desktop, the first mouseover after activation counts as intentional movement
-    if (!this.hasInitialMovementOccurred) {
+    if (!this.hasInitialMovementOccurred && !deviceDetector.isMobile()) {
       this.hasInitialMovementOccurred = true;
       this.logger.debug('Initial mouse movement detected, enabling Select Element highlighter');
+    }
+
+    // On mobile, if movement hasn't occurred, DO NOT allow mouseover to highlight
+    // This blocks simulated mouseover events from touch starts
+    if (!this.hasInitialMovementOccurred && deviceDetector.isMobile()) {
+      return;
     }
 
     // Skip our own elements
@@ -468,17 +474,12 @@ class SelectElementManager extends ResourceTracker {
       return;
     }
 
-    // A fresh touch on the page should count as "intentional action"
-    if (!this.hasInitialMovementOccurred) {
-      this.hasInitialMovementOccurred = true;
-      this.logger.debug('Fresh touch detected, enabling Select Element scanner');
-    }
+    // On mobile touchstart, we DO NOT highlight anything yet.
+    // We wait for the first touchmove to confirm the user is intentionally scanning.
+    // This is the definitive fix for initial ghost highlights on mobile.
 
     // Prevent site scrolling ONLY during the selection scan
     event.preventDefault();
-
-    const target = event.touches[0].target;
-    this.elementSelector.handleMouseOver(target);
   }
 
   /**
