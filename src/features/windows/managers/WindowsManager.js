@@ -1553,16 +1553,6 @@ export class WindowsManager extends ResourceTracker {
       }
     }
 
-    // Stop any ongoing TTS when dismissing
-    try {
-      if (this.tts) {
-        await this.tts.stopAll();
-        this.logger.info('TTS stopped during dismiss');
-      }
-    } catch (error) {
-      this.logger.warn('Failed to stop TTS during dismiss:', error);
-    }
-
     // Reset flags
     this._resetState();
     this.state.setProcessing(false); // Ensure processing is reset on dismiss
