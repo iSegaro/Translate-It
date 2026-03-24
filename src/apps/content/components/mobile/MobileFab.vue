@@ -52,7 +52,7 @@ const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
 const tracker = useResourceTracker('mobile-fab');
 
-// Mobile FAB Position and Drag Logic
+// State
 const fabPosition = ref({ x: null, y: 120 });
 const isFabDragging = ref(false);
 const isFabIdle = ref(false);
@@ -63,14 +63,11 @@ let fabIdleTimerId = null;
 let animationFrameId = null;
 
 const startFabIdleTimer = () => {
-  // If we're hovering or dragging, don't start the idle timer
   if (isHovering.value || isFabDragging.value) return;
-
-  if (fabIdleTimerId) {
-    clearTimeout(fabIdleTimerId);
-  }
-  isFabIdle.value = false;
+  if (fabIdleTimerId) clearTimeout(fabIdleTimerId);
   
+  isFabIdle.value = false;
+  // Timers are best handled by tracker as they are long-lived/system resources
   fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
     fabIdleTimerId = null;
@@ -80,7 +77,6 @@ const startFabIdleTimer = () => {
 const onMouseEnter = () => {
   isHovering.value = true;
   isFabIdle.value = false;
-  // Stop any pending idle timer because user is active on the element
   if (fabIdleTimerId) {
     clearTimeout(fabIdleTimerId);
     fabIdleTimerId = null;
@@ -89,10 +85,7 @@ const onMouseEnter = () => {
 
 const onMouseLeave = () => {
   isHovering.value = false;
-  // Only start idle timer if we're not dragging
-  if (!isFabDragging.value) {
-    startFabIdleTimer();
-  }
+  if (!isFabDragging.value) startFabIdleTimer();
 };
 
 const onFabDragStart = (e) => {
@@ -105,11 +98,12 @@ const onFabDragStart = (e) => {
   initialFabY = fabPosition.value.y || 120;
   
   if (isMouseEvent) {
+    // For highly dynamic/frequent events like Drag, manual management 
+    // is more efficient to avoid bloating the tracker's internal list.
     window.addEventListener('mousemove', onFabDragMove);
     window.addEventListener('mouseup', onFabDragEnd);
   }
   
-  // While dragging, it should never be idle
   isFabIdle.value = false;
   if (fabIdleTimerId) {
     clearTimeout(fabIdleTimerId);
@@ -127,6 +121,7 @@ const onFabDragMove = (e) => {
   if (e.cancelable) e.preventDefault();
   if (animationFrameId) return;
 
+  // Animation frames are system resources, tracker is good for them
   animationFrameId = requestAnimationFrame(() => {
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
@@ -159,7 +154,6 @@ const onFabDragEnd = async (e) => {
     logger.error('Failed to save mobile FAB position:', err);
   }
   
-  // After dragging ends, start the idle timer
   startFabIdleTimer();
 };
 
@@ -186,8 +180,6 @@ const onMobileFabClick = () => {
 const fabStyle = computed(() => {
   const isRTL = props.isRtl;
   const y = fabPosition.value.y || 120;
-  
-  // Calculate opacity in JS for maximum reliability
   const currentOpacity = (isFabIdle.value && !isFabDragging.value && !isHovering.value) ? '0.2' : '1';
   
   return {
@@ -219,11 +211,12 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-  }
+  // Triple-Safety: Manual cleanup as a fallback/defense-in-depth
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
+  
+  // Tracker will automatically handle everything else!
 });
 </script>
 
@@ -240,7 +233,6 @@ onUnmounted(() => {
   will-change: opacity;
 }
 
-/* Hover/Active effects */
 .mobile-fab:hover,
 .mobile-fab:active {
   --fab-opacity-val: 1 !important;
