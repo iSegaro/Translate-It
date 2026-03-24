@@ -186,8 +186,10 @@ class SelectElementManager extends ResourceTracker {
       // Reset state
       this.isActive = true;
       this.isProcessingClick = false;
-      this.hasInitialMovementOccurred = false; // Require movement before first highlight
-      this.currentOptions = activationOptions; // Store current options (includes targetLanguage)
+      this.hasInitialMovementOccurred = false; 
+      this.lastMouseX = undefined; // Reset coordinates
+      this.lastMouseY = undefined;
+      this.currentOptions = activationOptions; 
 
       // Ensure highlight is cleared from any previous state
       if (this.elementSelector) {
@@ -443,15 +445,25 @@ class SelectElementManager extends ResourceTracker {
   handleMouseOver(event) {
     if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
 
-    // On desktop, the first mouseover after activation counts as intentional movement
-    if (!this.hasInitialMovementOccurred && !deviceDetector.isMobile()) {
-      this.hasInitialMovementOccurred = true;
-      this.logger.debug('Initial mouse movement detected, enabling Select Element highlighter');
+    const currentX = event.clientX;
+    const currentY = event.clientY;
+
+    // Smart Movement Detection:
+    // If coordinates have changed since the last event, it's an intentional movement 
+    // (either hardware mouse moving or a touch-drag starting).
+    if (this.lastMouseX !== undefined && (this.lastMouseX !== currentX || this.lastMouseY !== currentY)) {
+      if (!this.hasInitialMovementOccurred) {
+        this.hasInitialMovementOccurred = true;
+        this.logger.debug('Intentional movement detected via coordinates, enabling highlighter');
+      }
     }
 
-    // On mobile, if movement hasn't occurred, DO NOT allow mouseover to highlight
-    // This blocks simulated mouseover events from touch starts
-    if (!this.hasInitialMovementOccurred && deviceDetector.isMobile()) {
+    // Update last known coordinates
+    this.lastMouseX = currentX;
+    this.lastMouseY = currentY;
+
+    // Block highlighting until we are sure the user is intentionally moving/scanning
+    if (!this.hasInitialMovementOccurred) {
       return;
     }
 
