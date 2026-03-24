@@ -80,7 +80,7 @@
           class="translate-main-btn"
           :style="{
             backgroundColor: (isLoading || !inputText) ? '#1a73e8' : '#1a73e8',
-            opacity: (isLoading || !inputText) ? '0.7' : '1',
+            opacity: (isLoading || !inputText) ? '0.6' : '1',
             color: 'white',
             border: 'none',
             padding: '0 20px',
@@ -92,12 +92,12 @@
             alignItems: 'center',
             justifyContent: 'center',
             cursor: (isLoading || !inputText) ? 'not-allowed' : 'pointer',
-            boxShadow: '0 4px 10px rgba(26, 115, 232, 0.25)',
-            flex: '1.2'
+            boxShadow: (isLoading || !inputText) ? 'none' : '0 4px 10px rgba(26, 115, 232, 0.25)',
+            flex: '1.2',
+            transition: 'all 0.2s ease'
           }"
         >
-          <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
-          {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
+          {{ t('mobile_input_translate_btn') || 'Translate' }}
         </button>
       </div>
     </div>
