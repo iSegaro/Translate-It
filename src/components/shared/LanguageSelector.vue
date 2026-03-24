@@ -2,6 +2,7 @@
   <div
     ref="languageControlsRef"
     :class="['ti-language-controls', { 'ti-language-controls--vertical': isVerticalLayout && isSidepanelContext }]"
+    :style="compact ? 'display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin: 0 !important; padding: 4px 8px !important; background: transparent !important;' : ''"
   >
     <!-- Target Language Dropdown -->
     <select
@@ -9,6 +10,7 @@
       class="ti-language-select"
       :title="targetTitle"
       :disabled="disabled"
+      :style="compact ? 'flex: 0 1 120px !important; max-width: 130px !important; text-align: center !important; border: none !important; background-color: transparent !important; height: 44px !important; font-size: 15px !important; appearance: none !important; -webkit-appearance: none !important; padding: 0 10px !important;' : ''"
       @click="handleDropdownClick"
     >
       <option
@@ -25,7 +27,7 @@
       type="button"
       class="ti-swap-button"
       :title="swapTitle"
-      :style="compact ? 'width: 32px !important; height: 32px !important; min-width: 32px !important;' : ''"
+      :style="compact ? 'width: 32px !important; height: 32px !important; min-width: 32px !important; margin: 0 10px !important;' : ''"
       @click="handleSwapLanguages"
     >
       <img
@@ -41,6 +43,7 @@
       class="ti-language-select"
       :title="sourceTitle"
       :disabled="disabled"
+      :style="compact ? 'flex: 0 1 120px !important; max-width: 130px !important; text-align: center !important; border: none !important; background-color: transparent !important; height: 44px !important; font-size: 15px !important; appearance: none !important; -webkit-appearance: none !important; padding: 0 10px !important;' : ''"
       @click="handleDropdownClick"
     >
       <option value="auto">
@@ -430,14 +433,22 @@ onUnmounted(() => {
     height: auto !important;
     background: transparent !important;
     width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
   }
 
   .input-view .ti-language-select {
     height: 40px !important;
     font-size: 15px !important;
-    flex: 1 !important;
+    flex: 0 1 120px !important; /* Constrain width to allow centering */
     background-color: transparent !important;
     border: none !important;
+    text-align: center !important;
+    padding-right: 20px !important;
+    padding-left: 10px !important;
+    background-position: right 2px center !important;
+    max-width: 130px !important;
   }
 
   .input-view .ti-swap-button {
