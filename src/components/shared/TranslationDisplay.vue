@@ -30,9 +30,9 @@
 
     <!-- Main Content State -->
     <template v-else>
-      <!-- Enhanced Actions Toolbar -->
+      <!-- Enhanced Actions Toolbar (Desktop/Standard) -->
       <ActionToolbar
-        v-show="showToolbar && hasContent"
+        v-show="showToolbar && hasContent && mode !== 'mobile'"
         :text="content"
         :language="targetLanguage"
         :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
@@ -119,6 +119,23 @@
           v-html="sanitizedContent"
         />
       </div>
+
+      <!-- Mobile Actions Row -->
+      <div 
+        v-if="mode === 'mobile' && hasContent"
+        class="ti-mobile-actions"
+        @click.stop
+      >
+        <button class="mobile-action-btn" @click="handleMobileSpeak" :title="ttsTitle">
+          <img src="@/icons/ui/speaker.png" :alt="ttsAlt" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        </button>
+        <button class="mobile-action-btn" @click="handleMobileCopy" :title="copyTitle">
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        </button>
+        <button class="mobile-action-btn" @click="handleMobileHistory" :title="t('mobile_selection_history_tooltip') || 'History'">
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 18px !important; height: 18px !important; max-width: 18px !important; max-height: 18px !important; object-fit: contain !important; display: block !important;" />
+        </button>
+      </div>
     </template>
   </div>
 </template>
@@ -186,9 +203,9 @@ const props = defineProps({
   // Display options
   mode: {
     type: String,
-    default: "standard", // standard, compact, popup, sidepanel, selection
+    default: "standard", // standard, compact, popup, sidepanel, selection, mobile
     validator: (value) =>
-      ["standard", "compact", "popup", "sidepanel", "selection"].includes(
+      ["standard", "compact", "popup", "sidepanel", "selection", "mobile"].includes(
         value,
       ),
   },
@@ -275,6 +292,7 @@ const emit = defineEmits([
   "action-failed",
   "retry-requested",
   "settings-requested",
+  "history-requested",
 ]);
 
 // Refs
@@ -446,6 +464,32 @@ const handleTTSSpeaking = (data) => {
 
 const handleActionFailed = (error) => {
   emit("action-failed", error);
+};
+
+// Mobile Action Handlers
+const handleMobileSpeak = () => {
+  emit('tts-started', {
+    text: props.content,
+    language: props.targetLanguage
+  });
+  emit('tts-speaking', {
+    text: props.content,
+    language: props.targetLanguage
+  });
+};
+
+const handleMobileCopy = async () => {
+  const textToCopy = SimpleMarkdown.strip ? SimpleMarkdown.strip(props.content) : props.content;
+  try {
+    await navigator.clipboard.writeText(textToCopy);
+    emit('text-copied', textToCopy);
+  } catch (error) {
+    emit('action-failed', error);
+  }
+};
+
+const handleMobileHistory = () => {
+  emit('history-requested');
 };
 
 // Error action handlers
@@ -923,5 +967,114 @@ onMounted(() => {
 .ti-translation-content[dir="rtl"] :deep(ol > li)::before,
 .ti-translation-content.rtl-content :deep(ol > li)::before {
   text-align: right !important;
+}
+
+/* --- Mobile Mode Styles --- */
+.ti-translation-display.mobile-mode {
+  background: #e7f5ff;
+  border: 1px solid #d0ebff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  gap: 12px; /* Increased gap */
+  min-height: auto;
+  box-sizing: border-box;
+}
+
+.ti-translation-display.mobile-mode.has-error {
+  background: #fff5f5 !important;
+  border-color: #ffe3e3 !important;
+}
+
+.ti-translation-display.mobile-mode .ti-translation-content {
+  padding: 0;
+  font-size: 16px;
+  color: #1c7ed6;
+  line-height: 1.5;
+  min-height: auto;
+  max-height: 200px; /* Limit height in mobile to avoid huge sheets */
+}
+
+.ti-translation-display.mobile-mode.has-error .ti-translation-content {
+  color: #fa5252;
+}
+
+.ti-mobile-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(51, 154, 240, 0.15);
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.mobile-action-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #d0ebff;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.mobile-action-btn:active {
+  transform: scale(0.92);
+  background: #f1f3f5;
+}
+
+.mobile-action-btn img {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Mobile Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .ti-translation-display.mobile-mode:not(.has-error) { 
+    background: rgba(28, 126, 214, 0.15) !important; 
+    border-color: rgba(28, 126, 214, 0.3) !important; 
+  }
+  
+  .ti-translation-display.mobile-mode.has-error {
+    background: rgba(250, 82, 82, 0.15) !important;
+    border-color: rgba(250, 82, 82, 0.3) !important;
+  }
+
+  .ti-translation-display.mobile-mode .ti-translation-content:not(.has-error) { 
+    color: #74c0fc !important; 
+  }
+  
+  .ti-translation-display.mobile-mode.has-error .ti-translation-content { 
+    color: #ff8787 !important; 
+  }
+  
+  .mobile-action-btn { 
+    background: #2d2d2d !important; 
+    border-color: #444 !important; 
+  }
+  
+  .mobile-action-btn img { 
+    filter: invert(0.8); 
+  }
+  
+  .ti-mobile-actions {
+    border-top-color: rgba(255, 255, 255, 0.1) !important;
+  }
 }
 </style>
