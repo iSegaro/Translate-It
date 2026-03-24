@@ -46,25 +46,20 @@
       </button>
     </div>
 
-    <!-- Result Card -->
-    <div v-if="resultText" class="result-card" :class="{ 'is-error': isError }" style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease;">
-      <!-- Rendered Markdown Content -->
-      <div 
-        class="result-content markdown-body" 
-        :dir="detectedDir"
-        style="font-size: 16px; color: #1c7ed6; line-height: 1.5; margin-bottom: 12px; text-align: start;"
-        :style="{ color: isError ? '#fa5252' : '#1c7ed6' }"
-        v-html="sanitizedResult"
-      ></div>
-      
-      <div v-if="!isError" style="display: flex; gap: 10px;">
-        <button class="action-btn" @click="copyResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" :title="t('mobile_selection_copy_tooltip') || 'Copy'">
-          <img src="@/icons/ui/copy.png" :alt="t('mobile_copy_button_alt') || 'Copy'" style="width: 16px; height: 16px;" />
-        </button>
-        <button class="action-btn" @click="speakResult" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0ebff; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" :title="t('mobile_selection_speak_tooltip') || 'Speak'">
-          <img src="@/icons/ui/speaker.png" :alt="t('mobile_speak_button_alt') || 'Speak'" style="width: 16px; height: 16px;" />
-        </button>
-      </div>
+    <!-- Result Card using Shared Component -->
+    <div v-if="resultText || isLoading || isError" style="animation: slideIn 0.3s ease;">
+      <TranslationDisplay
+        mode="mobile"
+        :content="resultText"
+        :target-language="targetLang"
+        :is-loading="isLoading"
+        :error="isError ? resultText : ''"
+        :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
+        :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+        @text-copied="onTextCopied"
+        @tts-started="onSpeak"
+        @history-requested="onHistory"
+      />
     </div>
   </div>
 </template>
@@ -76,12 +71,10 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import DOMPurify from "dompurify";
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
 const { t } = useI18n()
@@ -99,24 +92,6 @@ const inputDir = computed(() => {
   return shouldApplyRtl(inputText.value) ? 'rtl' : 'ltr'
 })
 
-const detectedDir = computed(() => {
-  if (!resultText.value) return 'ltr'
-  const direction = getTextDirection(targetLang.value, resultText.value)
-  return direction === 'rtl' || shouldApplyRtl(resultText.value) ? 'rtl' : 'ltr'
-})
-
-const sanitizedResult = computed(() => {
-  if (!resultText.value) return ''
-  try {
-    const markdownElement = SimpleMarkdown.render(resultText.value)
-    const htmlContent = markdownElement ? markdownElement.innerHTML : resultText.value.replace(/\n/g, '<br>')
-    return DOMPurify.sanitize(htmlContent)
-  } catch (error) {
-    console.error('[InputView] Markdown error:', error)
-    return DOMPurify.sanitize(resultText.value.replace(/\n/g, '<br>'))
-  }
-})
-
 const goBack = () => {
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
   mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
@@ -130,7 +105,7 @@ const handleTranslate = async () => {
   if (!inputText.value || isLoading.value) return
   
   isLoading.value = true
-  resultText.value = '' // Clear previous result immediately
+  resultText.value = '' 
   isError.value = false
   
   try {
@@ -173,19 +148,28 @@ const handleTranslate = async () => {
   }
 }
 
-const copyResult = () => {
-  const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(resultText.value) : resultText.value;
-  navigator.clipboard.writeText(plainText)
+const onTextCopied = () => {
   pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
     message: t('mobile_input_copied_message') || 'Copied', 
     type: 'success' 
   })
 }
 
-const speakResult = () => {
+const onSpeak = (data) => {
+  // Use data from event or fallback to local state
+  const text = data?.text || resultText.value;
+  const lang = data?.language || targetLang.value;
+  
   pageEventBus.emit(MessageActions.GOOGLE_TTS_SPEAK, {
-    text: resultText.value,
-    lang: targetLang.value
+    text: text,
+    lang: lang
+  })
+}
+
+const onHistory = () => {
+  pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
+    message: t('mobile_selection_history_unavailable') || 'History feature coming soon to mobile',
+    type: 'info'
   })
 }
 </script>
@@ -196,16 +180,6 @@ const speakResult = () => {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.result-card.is-error {
-  background: #fff5f5 !important;
-  border-color: #ffe3e3 !important;
-}
-
-.result-content.markdown-body { word-wrap: break-word; }
-.result-content.markdown-body p { margin-bottom: 8px; }
-.result-content.markdown-body strong { font-weight: bold; }
-.result-content.markdown-body ul, .result-content.markdown-body ol { padding-inline-start: 20px; margin-bottom: 8px; }
-
 @media (prefers-color-scheme: dark) {
   .header-title { color: #adb5bd !important; }
   .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
@@ -213,23 +187,5 @@ const speakResult = () => {
   .clear-btn { background: #3d3d3d !important; color: #adb5bd !important; }
   
   select { background-color: #2d2d2d !important; color: #dee2e6 !important; border-color: #444 !important; }
-  
-  .result-card:not(.is-error) { 
-    background: rgba(28, 126, 214, 0.15) !important; 
-    border-color: rgba(28, 126, 214, 0.3) !important; 
-  }
-  
-  .result-card.is-error {
-    background: rgba(250, 82, 82, 0.15) !important;
-    border-color: rgba(250, 82, 82, 0.3) !important;
-  }
-
-  .result-content:not(.is-error) { color: #74c0fc !important; }
-  .result-content.is-error { color: #ff8787 !important; }
-  
-  .result-content.markdown-body code { background: rgba(255,255,255,0.1); }
-  
-  .action-btn { background: #2d2d2d !important; border-color: #444 !important; }
-  .action-btn img { filter: invert(0.8); }
 }
 </style>
