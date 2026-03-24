@@ -45,7 +45,7 @@
     </div>
 
     <!-- Controls -->
-    <div class="input-controls" style="display: flex; flex-direction: column; gap: 12px;">
+    <div class="input-controls" style="display: flex; flex-direction: column; gap: 12px; position: relative;">
       <!-- Languages -->
       <div class="language-controls-card" style="border: 1px solid #ced4da; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-top: 5px;">
         <LanguageSelector
@@ -61,13 +61,19 @@
       
       <!-- Provider and Translate -->
       <div class="actions-row" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-        <div class="provider-wrapper" style="flex: 1; max-width: 48%;">
+        <div class="provider-wrapper" style="flex: 1; max-width: 48%; position: relative;">
+          <!-- Using compact mode which renders a native <select> for best mobile UX -->
           <ProviderSelector
             v-model="currentProvider"
-            mode="button"
+            mode="compact"
             :is-global="false"
             :show-sync="false"
+            class="mobile-native-provider"
           />
+          <!-- Decorative arrow for the select -->
+          <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.5; display: flex; align-items: center;">
+            <img src="@/icons/ui/dropdown-arrow.svg" style="width: 10px; height: 10px;" />
+          </div>
         </div>
         
         <button 
@@ -254,15 +260,20 @@ const onHistory = () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-:deep(.ti-provider-button) {
+/* Force styles for the native select used in compact mode */
+:deep(.ti-provider-select) {
   width: 100% !important;
-  border-radius: 12px !important;
   height: 46px !important;
-  padding: 0 12px !important;
-  justify-content: space-between !important;
-  font-size: 13px !important;
-  background: white !important;
+  border-radius: 12px !important;
   border: 1px solid #ced4da !important;
+  background-color: white !important;
+  padding: 0 30px 0 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #495057 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  outline: none !important;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -270,7 +281,12 @@ const onHistory = () => {
   .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
   .input-card textarea { color: #dee2e6 !important; }
   .language-controls-card { background: #2d2d2d !important; border-color: #444 !important; }
-  :deep(.ti-provider-button) { background: #2d2d2d !important; border-color: #444 !important; color: #dee2e6 !important; }
+  
+  :deep(.ti-provider-select) {
+    background-color: #2d2d2d !important;
+    border-color: #444 !important;
+    color: #dee2e6 !important;
+  }
   
   .paste-btn { background: rgba(28, 126, 214, 0.1) !important; border-color: rgba(28, 126, 214, 0.3) !important; color: #74c0fc !important; }
   .clear-btn { background: rgba(250, 82, 82, 0.1) !important; border-color: rgba(250, 82, 82, 0.3) !important; color: #ff8787 !important; }
@@ -278,7 +294,7 @@ const onHistory = () => {
 </style>
 
 <style>
-/* Global overrides for tactile feedback */
+/* Global active feedback for Translate button */
 .input-view .translate-main-btn:active:not(:disabled) {
   transform: scale(0.96) !important;
   filter: brightness(0.9) !important;
@@ -286,7 +302,8 @@ const onHistory = () => {
 
 @media (prefers-color-scheme: dark) {
   .input-view .translate-main-btn:not(:disabled) {
-    background-color: #1971c2 !important;
+    background-color: #8ab4f8 !important;
+    color: #202124 !important;
   }
 }
 </style>
