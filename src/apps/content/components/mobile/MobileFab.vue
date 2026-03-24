@@ -78,19 +78,29 @@ const updateViewport = () => {
   if (typeof window === 'undefined') return;
   
   if (window.visualViewport) {
-    viewport.value = {
-      width: window.visualViewport.width,
-      height: window.visualViewport.height,
-      offsetLeft: window.visualViewport.offsetLeft,
-      offsetTop: window.visualViewport.offsetTop
-    };
+    const vv = window.visualViewport;
+    
+    // Optimization: Only update if change is significant (> 0.5px) to reduce jitter
+    const hasChanged = 
+      Math.abs(viewport.value.width - vv.width) > 0.5 || 
+      Math.abs(viewport.value.height - vv.height) > 0.5 ||
+      Math.abs(viewport.value.offsetTop - vv.offsetTop) > 0.5;
 
-    // Smart Keyboard Detection with Debounce (Tracked for auto-cleanup)
+    if (hasChanged) {
+      viewport.value = {
+        width: vv.width,
+        height: vv.height,
+        offsetLeft: vv.offsetLeft,
+        offsetTop: vv.offsetTop
+      };
+    }
+
+    // Smart Keyboard Detection with Debounce
     if (keyboardDebounceTimer) clearTimeout(keyboardDebounceTimer);
     
     keyboardDebounceTimer = tracker.trackTimeout(() => {
       const threshold = 160; 
-      const keyboardVisible = (window.innerHeight - window.visualViewport.height) > threshold;
+      const keyboardVisible = (window.innerHeight - vv.height) > threshold;
       
       if (mobileStore.isKeyboardVisible !== keyboardVisible) {
         mobileStore.setKeyboardVisibility(keyboardVisible);
@@ -143,7 +153,6 @@ const onFabDragStart = (e) => {
   initialFabY = fabPosition.value.y || 120;
   
   if (isMouseEvent) {
-    // Dynamic listeners are also registered via tracker for safety
     window.addEventListener('mousemove', onFabDragMove);
     window.addEventListener('mouseup', onFabDragEnd);
   }
@@ -165,7 +174,6 @@ const onFabDragMove = (e) => {
   if (e.cancelable) e.preventDefault();
   if (animationFrameId) return;
 
-  // Use tracker to manage animation frames
   animationFrameId = requestAnimationFrame(() => {
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
@@ -224,24 +232,33 @@ const onMobileFabClick = () => {
   }
 };
 
-// Mask Style: Sized exactly to the visible viewport
+// Mask Style: Optimized with faster smoothing and rounded values
 const maskStyle = computed(() => {
   const { width, height, offsetLeft, offsetTop } = viewport.value;
   
+  // Rounding prevents sub-pixel rendering jitters
+  const rWidth = Math.round(width);
+  const rHeight = Math.round(height);
+  const rLeft = Math.round(offsetLeft);
+  const rTop = Math.round(offsetTop);
+
   return {
     position: 'fixed !important',
-    left: `${offsetLeft}px !important`,
-    top: `${offsetTop}px !important`,
-    width: `${width}px !important`,
-    height: `${height}px !important`,
+    left: `${rLeft}px !important`,
+    top: `${rTop}px !important`,
+    width: `${rWidth}px !important`,
+    height: `${rHeight}px !important`,
     pointerEvents: 'none !important',
     zIndex: '2147483647 !important',
     overflow: 'hidden !important',
-    display: 'block !important'
+    display: 'block !important',
+    // Snappier Transition: Reduced to 0.1s with ease-out for faster response
+    transition: isFabDragging.value ? 'none' : 'all 0.1s ease-out',
+    willChange: 'top, left, width, height'
   };
 });
 
-// FAB Style: Positioned relatively within the visual viewport mask
+// FAB Style: Coordinated with the faster mask transition
 const fabStyle = computed(() => {
   const isRTL = props.isRtl;
   const y = fabPosition.value.y || 120;
@@ -259,7 +276,8 @@ const fabStyle = computed(() => {
     pointerEvents: 'auto !important',
     '--fab-opacity-val': currentOpacity,
     opacity: 'var(--fab-opacity-val) !important',
-    transition: isFabDragging.value ? 'none' : 'opacity 0.3s ease, bottom 0.3s ease'
+    // Coordinated timing: 0.1s to match mask
+    transition: isFabDragging.value ? 'none' : 'opacity 0.3s ease, bottom 0.1s ease-out'
   };
 });
 
