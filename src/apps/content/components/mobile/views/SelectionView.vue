@@ -40,11 +40,13 @@
             :content="selectionData.translation"
             :target-language="selectionData.targetLang"
             :is-loading="selectionData.isLoading"
+            :tts-status="tts.ttsState.value"
             :error="selectionData.error"
             :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
             :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
             @text-copied="onTextCopied"
             @tts-started="onSpeak"
+            @tts-stopped="tts.stop()"
             @history-requested="onHistory"
             @content-click="expandSheet"
           />

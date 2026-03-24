@@ -133,10 +133,21 @@
           class="mobile-action-btn primary-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
           @click="handleMobileSpeak" 
-          :title="ttsTitle"
+          :title="ttsStatus === 'playing' ? (t('mobile_selection_stop_tooltip') || 'Stop') : ttsTitle"
         >
-          <img src="@/icons/ui/speaker.png" :alt="ttsAlt" style="width: 22px !important; height: 22px !important; object-fit: contain !important;" />
-          <span>{{ t('mobile_selection_speak_tooltip') || 'Speak' }}</span>
+          <img 
+            v-if="ttsStatus === 'playing'" 
+            src="@/icons/ui/close.png" 
+            alt="Stop" 
+            style="width: 18px !important; height: 18px !important; object-fit: contain !important; filter: brightness(0) invert(1);" 
+          />
+          <img 
+            v-else
+            src="@/icons/ui/speaker.png" 
+            :alt="ttsAlt" 
+            style="width: 22px !important; height: 22px !important; object-fit: contain !important;" 
+          />
+          <span>{{ ttsStatus === 'playing' ? (t('mobile_selection_stop_label') || 'Stop') : (t('mobile_selection_speak_tooltip') || 'Speak') }}</span>
         </button>
         
         <button 
@@ -291,6 +302,11 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: "fa",
+  },
+  // TTS Status for mobile toggle
+  ttsStatus: {
+    type: String,
+    default: "idle", // idle, loading, playing, paused, error
   },
 
   // Enhanced popup-specific props
@@ -494,10 +510,14 @@ const handleActionFailed = (error) => {
 
 // Mobile Action Handlers
 const handleMobileSpeak = () => {
-  emit('tts-started', {
-    text: props.content,
-    language: props.targetLanguage
-  });
+  if (props.ttsStatus === 'playing') {
+    emit('tts-stopped');
+  } else {
+    emit('tts-started', {
+      text: props.content,
+      language: props.targetLanguage
+    });
+  }
 };
 
 const handleMobileCopy = async () => {

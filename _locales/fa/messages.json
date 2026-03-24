@@ -455,8 +455,14 @@
   "mobile_selection_history_tooltip": {
     "message": "تاریخچه"
   },
+  "mobile_selection_stop_label": {
+    "message": "توقف"
+  },
+  "mobile_selection_stop_tooltip": {
+    "message": "توقف پخش"
+  },
   "mobile_selection_copied_message": {
-    "message": "ترجمه در کلیپ‌بورد کپی شد"
+    "message": "ترجمه در حافظه کپی شد"
   },
   "mobile_selection_history_unavailable": {
     "message": "ویژگی تاریخچه به زودی به موبایل اضافه می‌شود"

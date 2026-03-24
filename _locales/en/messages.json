@@ -452,6 +452,12 @@
   "mobile_selection_history_tooltip": {
     "message": "History"
   },
+  "mobile_selection_stop_label": {
+    "message": "Stop"
+  },
+  "mobile_selection_stop_tooltip": {
+    "message": "Stop"
+  },
   "mobile_selection_copied_message": {
     "message": "Translation copied to clipboard"
   },

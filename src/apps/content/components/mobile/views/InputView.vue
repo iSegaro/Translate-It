@@ -107,11 +107,13 @@
           :content="resultText"
           :target-language="targetLang"
           :is-loading="isLoading"
+          :tts-status="tts.ttsState.value"
           :error="isError ? resultText : ''"
           :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
           :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
           @text-copied="onTextCopied"
           @tts-started="onSpeak"
+          @tts-stopped="tts.stop()"
           @history-requested="onHistory"
         />
       </div>
