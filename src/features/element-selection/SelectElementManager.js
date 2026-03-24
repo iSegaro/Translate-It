@@ -118,7 +118,8 @@ class SelectElementManager extends ResourceTracker {
       this.setupCrossFrameCommunication();
 
       // Listen for activation from PageEventBus (Mobile Dashboard)
-      pageEventBus.on(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (data) => {
+      // Use ResourceTracker's addEventListener for automatic cleanup
+      this.addEventListener(pageEventBus, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (data) => {
         this.logger.info('Activation requested via PageEventBus');
         this.activateSelectElementMode(data || {}).catch(err => {
           this.logger.error('Failed to activate from PageEventBus:', err);
@@ -126,7 +127,7 @@ class SelectElementManager extends ResourceTracker {
       });
 
       // Listen for conflicting features (like Whole Page Translation)
-      pageEventBus.on('STOP_CONFLICTING_FEATURES', (data) => {
+      this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
         if (this.isActive && data?.source !== 'select-element') {
           this.logger.info('Stopping Select Element mode due to conflicting feature:', data?.source);
           this.deactivate({ silent: true });
@@ -848,7 +849,7 @@ class SelectElementManager extends ResourceTracker {
   }
 
   setupCancelListener() {
-    pageEventBus.on('cancel-select-element-mode', (data) => {
+    this.addEventListener(pageEventBus, 'cancel-select-element-mode', (data) => {
       this.logger.debug('cancel-select-element-mode event received', {
         data,
         isActive: this.isActive,
@@ -867,7 +868,7 @@ class SelectElementManager extends ResourceTracker {
   // ========== Cross-frame Communication ==========
 
   setupCrossFrameCommunication() {
-    window.addEventListener('message', (event) => {
+    this.addEventListener(window, 'message', (event) => {
       if (event.data?.type === 'DEACTIVATE_ALL_SELECT_MANAGERS') {
         if (event.data.source !== 'translate-it-main') {
           this.deactivate({ fromBackground: true });

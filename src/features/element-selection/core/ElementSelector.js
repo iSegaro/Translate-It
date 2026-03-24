@@ -77,7 +77,7 @@ export class ElementSelector extends ResourceTracker {
     `;
     document.head.appendChild(style);
 
-    this.trackResource(style, 'highlight-styles');
+    this.trackResource(style, 'highlight-styles', { isCritical: true });
   }
 
   /**
