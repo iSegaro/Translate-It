@@ -231,6 +231,9 @@ class SelectElementManager extends ResourceTracker {
       // Notify background script
       await this.notifyBackgroundActivation();
 
+      // Notify UI (ContentApp.vue) to show mobile exit button
+      pageEventBus.emit('select-mode-activated');
+
       this.logger.info('Select element mode activated successfully');
 
       return { isActive: this.isActive, instanceId: this.instanceId };
@@ -302,6 +305,9 @@ class SelectElementManager extends ResourceTracker {
       if (!fromBackground) {
         await this.notifyBackgroundDeactivation();
       }
+
+      // Notify UI (ContentApp.vue) to hide mobile exit button
+      pageEventBus.emit('select-mode-deactivated');
 
       this.logger.info('SelectElementManager deactivated successfully');
     } catch (error) {
