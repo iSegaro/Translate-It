@@ -104,11 +104,12 @@ const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging('mobile-input')
 const { getErrorForDisplay } = useErrorHandler()
 
-const inputText = ref('')
-const targetLang = ref('en')
+// Initialize with store text if available (from SelectionView)
+const inputText = ref(mobileStore.selectionData.text || '')
+const targetLang = ref(mobileStore.selectionData.targetLang || 'en')
 const isLoading = ref(false)
-const resultText = ref('')
-const isError = ref(false)
+const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
+const isError = ref(!!mobileStore.selectionData.error)
 
 const inputDir = computed(() => {
   if (!inputText.value) return 'ltr'

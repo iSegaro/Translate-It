@@ -133,6 +133,7 @@ const activateSelectElement = () => {
 }
 
 const goToInputView = () => {
+  mobileStore.resetSelectionData()
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
   mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
 }

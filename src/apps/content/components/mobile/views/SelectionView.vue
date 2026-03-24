@@ -53,7 +53,7 @@
         <div 
           v-if="selectionData.text"
           class="original-card" 
-          @click="expandSheet"
+          @click="handleSourceTextClick"
           style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; cursor: pointer;"
         >
           <div style="font-size: 10px; font-weight: 800; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.5px;">{{ t('mobile_selection_source_text_title') || 'Source Text' }}</div>
@@ -103,6 +103,14 @@ const originalDir = computed(() => {
 const expandSheet = () => {
   if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
     mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+  }
+}
+
+const handleSourceTextClick = () => {
+  if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) {
+    mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
+  } else {
+    expandSheet()
   }
 }
 
