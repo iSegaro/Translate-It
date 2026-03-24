@@ -9,7 +9,7 @@
       </button>
       
       <button 
-        v-if="!historyStore.isEmpty"
+        v-if="hasHistory"
         @click="clearAll" 
         style="background: #fff5f5; border: 1px solid #ffe3e3; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #fa5252; cursor: pointer; font-weight: 600;"
       >
@@ -19,14 +19,18 @@
 
     <!-- History List -->
     <div class="history-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px;">
-      <div v-if="historyStore.isEmpty" class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #adb5bd; gap: 10px; text-align: center;">
+      <div v-if="isLoading" class="loading-state" style="display: flex; justify-content: center; padding: 40px;">
+        <div class="spinner"></div>
+      </div>
+      
+      <div v-else-if="!hasHistory" class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #adb5bd; gap: 10px; text-align: center;">
         <img src="@/icons/ui/history.svg" style="width: 48px; height: 48px; opacity: 0.2;" />
         <span style="font-size: 15px; font-weight: 500;">{{ t('history_no_history') || 'No translation history yet' }}</span>
       </div>
 
       <div 
-        v-for="item in historyStore.items" 
-        :key="item.id"
+        v-for="(item, index) in historyItems" 
+        :key="item.timestamp || index"
         class="history-card"
         @click="selectItem(item)"
         style="background: white; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"
@@ -34,10 +38,10 @@
         <!-- Card Header: Languages & Delete -->
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div class="lang-badge" style="background: #f1f3f5; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #868e96; text-transform: uppercase;">
-            {{ item.fromLanguage }} → {{ item.toLanguage }}
+            {{ getLangName(item.sourceLanguage) }} → {{ getLangName(item.targetLanguage) }}
           </div>
           <button 
-            @click.stop="removeItem(item.id)"
+            @click.stop="removeItem(index)"
             style="background: none; border: none; padding: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;"
           >
             <img src="@/icons/ui/trash-small.svg" style="width: 16px; height: 16px; opacity: 0.4;" />
@@ -61,33 +65,45 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
-import { useHistoryStore } from '@/features/history/stores/history.js'
+import { useHistory } from '@/features/history/composables/useHistory.js'
+import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 const mobileStore = useMobileStore()
-const historyStore = useHistoryStore()
 const { t } = useI18n()
+const languages = useLanguages()
+const { 
+  historyItems, 
+  isLoading, 
+  hasHistory, 
+  loadHistory, 
+  deleteHistoryItem, 
+  clearAllHistory,
+  formatTime 
+} = useHistory()
+
+onMounted(async () => {
+  await languages.loadLanguages()
+  await loadHistory(true)
+})
+
+const getLangName = (code) => {
+  return languages.getLanguageName(code) || code
+}
 
 const goBack = () => {
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
-const formatTime = (timestamp) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+const removeItem = async (index) => {
+  await deleteHistoryItem(index)
 }
 
-const removeItem = (id) => {
-  historyStore.removeItem(id)
-}
-
-const clearAll = () => {
-  if (confirm(t('CONFIRM_CLEAR_ALL_HISTORY') || 'Are you sure you want to clear all history?')) {
-    historyStore.clear()
-  }
+const clearAll = async () => {
+  await clearAllHistory()
 }
 
 const selectItem = (item) => {
@@ -95,8 +111,8 @@ const selectItem = (item) => {
   mobileStore.updateSelectionData({
     text: item.sourceText,
     translation: item.translatedText,
-    sourceLang: item.fromLanguage,
-    targetLang: item.toLanguage
+    sourceLang: item.sourceLanguage,
+    targetLang: item.targetLanguage
   })
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
   mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
