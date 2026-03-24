@@ -142,6 +142,7 @@ const onTextCopied = () => {
 
 const onHistory = () => {
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
 }
 </script>
 

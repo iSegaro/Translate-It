@@ -149,7 +149,7 @@ const goToInputView = () => {
 
 const goToHistoryView = () => {
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
 }
 
 const openSettings = () => {
