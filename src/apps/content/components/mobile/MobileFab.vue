@@ -55,6 +55,7 @@ const isFabIdle = ref(true);
 let dragStartY = 0;
 let initialFabY = 0;
 let fabIdleTimerId = null;
+let animationFrameId = null;
 
 const startFabIdleTimer = () => {
   if (fabIdleTimerId) {
@@ -93,23 +94,39 @@ const onFabDragMove = (e) => {
   
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
-  
-  const deltaY = dragStartY - point.clientY; // Positive means moving up
-  
-  // Calculate new Y from bottom
-  let newY = initialFabY + deltaY;
-  // Boundary checks (stay within 50px of top/bottom)
-  newY = Math.max(50, Math.min(window.innerHeight - 50, newY));
-  
-  fabPosition.value = { ...fabPosition.value, y: newY };
+  const currentY = point.clientY;
   
   // Prevent page scroll while dragging
   if (e.cancelable) e.preventDefault();
+
+  // If an update is already scheduled for the next frame, skip this one
+  if (animationFrameId) return;
+
+  // Schedule the visual update for the next animation frame (60fps optimization)
+  animationFrameId = requestAnimationFrame(() => {
+    const deltaY = dragStartY - currentY; // Positive means moving up
+    
+    // Calculate new Y from bottom
+    let newY = initialFabY + deltaY;
+    // Boundary checks (stay within 50px of top/bottom)
+    newY = Math.max(50, Math.min(window.innerHeight - 50, newY));
+    
+    fabPosition.value = { ...fabPosition.value, y: newY };
+    
+    // Reset the flag so the next update can be scheduled
+    animationFrameId = null;
+  });
 };
 
 const onFabDragEnd = async (e) => {
   if (!isFabDragging.value) return;
   isFabDragging.value = false;
+
+  // Cancel any pending animation frames
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
   
   const isMouseEvent = e && e.type === 'mouseup';
   if (isMouseEvent) {
@@ -213,6 +230,11 @@ onUnmounted(() => {
   if (fabIdleTimerId) {
     clearTimeout(fabIdleTimerId);
   }
+
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+
   // Ensure global listeners are removed if component is unmounted during drag
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
