@@ -69,6 +69,9 @@ class SelectElementManager extends ResourceTracker {
     // Event handlers (bound)
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
+    this.handleTouchStart = this.handleTouchStart.bind(this);
+    this.handleTouchMove = this.handleTouchMove.bind(this);
+    this.handleTouchEnd = this.handleTouchEnd.bind(this);
     this.handleClick = this.handleClick.bind(this);
     this.handleInteraction = this.handleInteraction.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -338,9 +341,11 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('mouseover', this.handleMouseOver, true);
       window.addEventListener('mouseout', this.handleMouseOut, true);
 
-      // Touch support for highlighting (Mobile)
-      // Use passive: false to allow preventDefault()
+      // Touch support for highlighting (Mobile Scanner Mode)
+      // Use passive: false to allow preventDefault() and smooth scanning
       window.addEventListener('touchstart', this.handleTouchStart, { capture: true, passive: false });
+      window.addEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
+      window.addEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
 
       // Block ALL interaction events in capture phase to prevent any site logic from firing
       // This is the core fix for site navigation/actions interfering with selection
@@ -386,6 +391,8 @@ class SelectElementManager extends ResourceTracker {
     window.removeEventListener('mouseover', this.handleMouseOver, true);
     window.removeEventListener('mouseout', this.handleMouseOut, true);
     window.removeEventListener('touchstart', this.handleTouchStart, { capture: true, passive: false });
+    window.removeEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
+    window.removeEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
     
     // Remove all interaction event blockers
     const interactionEvents = [
@@ -426,20 +433,62 @@ class SelectElementManager extends ResourceTracker {
   }
 
   /**
-   * Handle touch start event for mobile highlighting
+   * Handle touch start event - initialize scanning
    */
   handleTouchStart(event) {
     if (!this.isActive || this.isProcessingClick) return;
     
-    // We only care about the first touch
+    // Check if it's our own UI
+    if (this.elementSelector && this.elementSelector.isOurElement(event.touches[0].target)) {
+      return;
+    }
+
+    // Prevent site scrolling ONLY during the selection scan
+    // This allows the user to 'feel' the elements without the page moving
+    event.preventDefault();
+
     const target = event.touches[0].target;
-    
+    this.elementSelector.handleMouseOver(target);
+  }
+
+  /**
+   * Handle touch move - the core of "Scanner Mode"
+   */
+  handleTouchMove(event) {
+    if (!this.isActive || this.isProcessingClick) return;
+
+    // Prevent scrolling while scanning
+    event.preventDefault();
+
+    // Get the element at the current touch point
+    const touch = event.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (!target) return;
+
     // Skip our own elements
     if (this.elementSelector && this.elementSelector.isOurElement(target)) {
       return;
     }
 
+    // Update highlight
     this.elementSelector.handleMouseOver(target);
+  }
+
+  /**
+   * Handle touch end - finalize selection
+   */
+  handleTouchEnd(event) {
+    if (!this.isActive || this.isProcessingClick) return;
+
+    const highlighted = this.elementSelector.getHighlightedElement();
+    
+    if (highlighted) {
+      this.logger.info('Scanner Mode: Touchend triggered translation for highlighted element');
+      this.handleClick(event).catch(err => {
+        this.logger.error('Error in handleClick after touch scanning:', err);
+      });
+    }
   }
 
   /**

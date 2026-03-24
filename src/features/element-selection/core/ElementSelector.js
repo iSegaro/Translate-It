@@ -65,11 +65,14 @@ export class ElementSelector extends ResourceTracker {
         cursor: crosshair !important;
         user-select: none !important;
         -webkit-user-select: none !important;
+        touch-action: none !important; /* Critical for Scanner Mode: prevent browser scroll */
       }
       
       .translate-it-element-highlighted {
         outline: 2px solid #4a90d9 !important;
         outline-offset: -2px !important;
+        box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.4) !important;
+        transition: outline 0.1s ease, box-shadow 0.1s ease;
       }
     `;
     document.head.appendChild(style);
