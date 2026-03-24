@@ -103,18 +103,13 @@
     </div>
 
     <!-- Result Area -->
-    <div class="result-container" style="min-height: 100px; position: relative; margin-top: 5px;">
-      <div v-if="isLoading" class="result-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; gap: 10px; background: #f8f9fa; border-radius: 12px; border: 1px dashed #ced4da;">
-        <div class="mini-spinner" style="width: 24px; height: 24px; border: 3px solid rgba(26, 115, 232, 0.1); border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-        <span style="font-size: 13px; color: #868e96; font-weight: 500;">{{ t('popup_string_during_translate') || 'Translating...' }}</span>
-      </div>
-      
-      <div v-else-if="resultText || isError" style="animation: slideIn 0.3s ease;">
+    <div class="result-container" style="min-height: 120px; position: relative; margin-top: 5px;">
+      <div v-if="resultText || isLoading || isError" style="animation: slideIn 0.3s ease;">
         <TranslationDisplay
           mode="mobile"
           :content="resultText"
           :target-language="targetLang"
-          :is-loading="false"
+          :is-loading="isLoading"
           :error="isError ? resultText : ''"
           :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
           :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
