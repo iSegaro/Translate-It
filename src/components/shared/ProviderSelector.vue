@@ -287,11 +287,33 @@
     v-else
     class="ti-provider-compact-container"
     v-bind="$attrs"
+    :style="mode === 'compact' ? 'width: 100% !important; display: block !important;' : ''"
   >
     <select
       :value="currentProvider"
       class="ti-provider-select"
       @change="handleProviderChange"
+      :style="mode === 'compact' ? `
+        width: 100% !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+        border: 1px solid #ced4da !important;
+        background-color: white !important;
+        padding: 0 35px 0 12px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        outline: none !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
+        background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23868e96%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E') !important;
+        background-repeat: no-repeat !important;
+        background-position: right 12px center !important;
+        background-size: 16px !important;
+        transition: all 0.2s ease !important;
+      ` : ''"
     >
       <option
         v-for="provider in availableProviders"

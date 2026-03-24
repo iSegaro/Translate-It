@@ -279,13 +279,27 @@ const onHistory = () => {
   border-radius: 12px !important;
   border: 1px solid #ced4da !important;
   background-color: white !important;
-  padding: 0 30px 0 12px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+  padding: 0 12px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   color: #495057 !important;
   appearance: none !important;
   -webkit-appearance: none !important;
   outline: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
+  
+  /* Custom modern arrow */
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23868e96%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 16px !important;
+  transition: all 0.2s ease !important;
+}
+
+:deep(.ti-provider-select:active) {
+  transform: scale(0.98) !important;
+  border-color: #1a73e8 !important;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -298,6 +312,8 @@ const onHistory = () => {
     background-color: #2d2d2d !important;
     border-color: #444 !important;
     color: #dee2e6 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23adb5bd%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
   }
   
   .result-loading { background: #2d2d2d !important; border-color: #444 !important; }
