@@ -41,15 +41,10 @@ export const useMobileStore = defineStore('mobile', () => {
   
   // Actions
   const navigate = (view, state = null) => {
-    // 1. Force keyboard to hide before any transition to prevent layout overlap
-    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-
-    // 2. Set the active view
+    // 1. Set the active view
     activeView.value = view;
 
-    // 3. Determine the smart sheet state if not explicitly provided
+    // 2. Determine the smart sheet state if not explicitly provided
     if (state) {
       sheetState.value = state;
     } else {
@@ -72,10 +67,6 @@ export const useMobileStore = defineStore('mobile', () => {
   }
 
   const closeSheet = () => {
-    // Also blur on close to be safe
-    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
     isOpen.value = false;
     sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED;
   }

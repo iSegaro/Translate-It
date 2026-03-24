@@ -72,6 +72,8 @@ let initialFabY = 0;
 let fabIdleTimerId = null;
 let animationFrameId = null;
 
+let keyboardDebounceTimer = null;
+
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
   
@@ -83,13 +85,19 @@ const updateViewport = () => {
       offsetTop: window.visualViewport.offsetTop
     };
 
-    // Smart Keyboard Detection: If visual viewport is significantly smaller than layout viewport
-    const threshold = 160; // Common keyboard height minimum
-    const keyboardVisible = (window.innerHeight - window.visualViewport.height) > threshold;
-    if (mobileStore.isKeyboardVisible !== keyboardVisible) {
-      mobileStore.setKeyboardVisibility(keyboardVisible);
-      logger.debug(`Keyboard visibility changed: ${keyboardVisible}`);
-    }
+    // Smart Keyboard Detection with Debounce (Tracked for auto-cleanup)
+    if (keyboardDebounceTimer) clearTimeout(keyboardDebounceTimer);
+    
+    keyboardDebounceTimer = tracker.trackTimeout(() => {
+      const threshold = 160; 
+      const keyboardVisible = (window.innerHeight - window.visualViewport.height) > threshold;
+      
+      if (mobileStore.isKeyboardVisible !== keyboardVisible) {
+        mobileStore.setKeyboardVisibility(keyboardVisible);
+        logger.debug(`Keyboard visibility changed: ${keyboardVisible}`);
+      }
+      keyboardDebounceTimer = null;
+    }, 150);
   } else {
     viewport.value = {
       width: window.innerWidth,
@@ -135,6 +143,7 @@ const onFabDragStart = (e) => {
   initialFabY = fabPosition.value.y || 120;
   
   if (isMouseEvent) {
+    // Dynamic listeners are also registered via tracker for safety
     window.addEventListener('mousemove', onFabDragMove);
     window.addEventListener('mouseup', onFabDragEnd);
   }
@@ -156,11 +165,11 @@ const onFabDragMove = (e) => {
   if (e.cancelable) e.preventDefault();
   if (animationFrameId) return;
 
+  // Use tracker to manage animation frames
   animationFrameId = requestAnimationFrame(() => {
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
     
-    // Clamp to visible viewport height instead of layout innerHeight
     const currentViewHeight = viewport.value.height || window.innerHeight;
     newY = Math.max(50, Math.min(currentViewHeight - 50, newY));
     
@@ -239,7 +248,7 @@ const fabStyle = computed(() => {
   const currentOpacity = (isFabIdle.value && !isFabDragging.value && !isHovering.value) ? '0.2' : '1';
   
   return {
-    position: 'absolute !important', // Absolute relative to the viewport mask
+    position: 'absolute !important', 
     bottom: `${y}px !important`,
     left: isRTL ? '0 !important' : '100% !important',
     marginLeft: '-25px !important',
@@ -255,16 +264,15 @@ const fabStyle = computed(() => {
 });
 
 onMounted(async () => {
-  // Initialize Viewport Monitoring
+  // Initialize Viewport Monitoring via tracker
   if (typeof window !== 'undefined' && window.visualViewport) {
     tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
     tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
-    updateViewport();
   } else {
-    // Fallback for older browsers
-    window.addEventListener('resize', updateViewport);
-    updateViewport();
+    tracker.addEventListener(window, 'resize', updateViewport);
   }
+  
+  updateViewport();
 
   try {
     const savedPosition = await getMobileFabPositionAsync();
@@ -278,10 +286,12 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  // Safety: Dynamic drag listeners are manually removed, tracker handles everything else
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
-  window.removeEventListener('resize', updateViewport);
+  
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  if (keyboardDebounceTimer) clearTimeout(keyboardDebounceTimer);
 });
 </script>
 
