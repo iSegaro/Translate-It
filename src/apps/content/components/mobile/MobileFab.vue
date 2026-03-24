@@ -188,7 +188,6 @@ const fabStyle = computed(() => {
     opacity: isFabIdle.value && !isFabDragging.value ? '0.2' : '1',
     zIndex: '2147483647 !important',
     pointerEvents: 'auto !important',
-    cursor: 'ns-resize !important', // Change cursor to indicate vertical drag
     transition: isFabDragging.value ? 'opacity 0.8s ease' : 'opacity 0.8s ease, bottom 0.3s ease'
   };
 });
