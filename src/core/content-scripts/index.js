@@ -2,6 +2,8 @@
 // Minimal footprint with intelligent, interaction-based loading
 
 // Early Trusted Types setup - must run BEFORE any Vue code
+import browser from 'webextension-polyfill';
+window.browser = browser;
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
 
