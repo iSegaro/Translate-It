@@ -34,7 +34,7 @@
       <div v-else class="translation-result" style="display: flex; flex-direction: column; gap: 12px;">
         
         <!-- Result Card using Shared Component -->
-        <div @click="expandSheet" style="cursor: pointer; width: 100%;">
+        <div style="width: 100%;">
           <TranslationDisplay
             mode="mobile"
             :content="selectionData.translation"
@@ -46,6 +46,7 @@
             @text-copied="onTextCopied"
             @tts-started="onSpeak"
             @history-requested="onHistory"
+            @content-click="expandSheet"
           />
         </div>
 

@@ -69,7 +69,9 @@
           ...(cssVariables || {}),
           direction: textDirection?.dir || 'ltr',
           textAlign: textDirection?.textAlign || 'left',
+          cursor: mode === 'mobile' ? 'pointer' : 'default'
         }"
+        @click="handleContentClick"
       >
         <div 
           v-if="hasError" 
@@ -114,7 +116,6 @@
         </div>
 
         <!-- Normal Content with Markdown Support -->
-        <!-- Safe: Content is sanitized with DOMPurify if markdown is enabled -->
         <div
           v-else
           v-html="sanitizedContent"
@@ -314,12 +315,12 @@ const emit = defineEmits([
   "retry-requested",
   "settings-requested",
   "history-requested",
+  "content-click",
 ]);
 
 // Refs
 const contentRef = ref(null);
 const containerRef = ref(null);
-// const showFadeIn = ref(false) // Disabled
 
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
@@ -483,6 +484,10 @@ const handleTTSSpeaking = (data) => {
   emit("tts-speaking", data);
 };
 
+const handleContentClick = () => {
+  emit("content-click");
+};
+
 const handleActionFailed = (error) => {
   emit("action-failed", error);
 };
@@ -490,10 +495,6 @@ const handleActionFailed = (error) => {
 // Mobile Action Handlers
 const handleMobileSpeak = () => {
   emit('tts-started', {
-    text: props.content,
-    language: props.targetLanguage
-  });
-  emit('tts-speaking', {
     text: props.content,
     language: props.targetLanguage
   });
@@ -546,6 +547,7 @@ onMounted(() => {
   border-radius: 8px;
   background-color: var(--bg-result-color, #ffffff);
   transition: min-height 0.2s ease;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 /* Ensure container has height during loading for the overlay to center properly */
@@ -931,21 +933,6 @@ onMounted(() => {
   padding: 2px;
 }
 
-/* Loading overlay */
-.ti-loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(var(--bg-result-color-rgb, 255, 255, 255), 0.8);
-  border-radius: 4px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Animations */
 @keyframes pulse {
   0%,
@@ -975,10 +962,6 @@ onMounted(() => {
   background: var(--toolbar-link-color);
 }
 
-/* --- REMOVED: Old RTL overrides - now using CSS Grid approach --- */
-
-/* --- CLEAN RTL STYLES (using CSS Grid approach) --- */
-
 /* RTL-specific text alignment for bullets and numbers */
 .ti-translation-content[dir="rtl"] :deep(ul > li)::before,
 .ti-translation-content.rtl-content :deep(ul > li)::before {
@@ -995,41 +978,31 @@ onMounted(() => {
   background: #e7f5ff;
   border: 1px solid #d0ebff;
   border-radius: 12px;
+  padding: 15px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
-  padding: 15px !important;
   gap: 12px !important;
   min-height: auto !important;
-  box-sizing: border-box !important;
-  width: 100% !important; /* Force full width */
   max-width: 100% !important;
   align-self: stretch !important;
-}
-
-.ti-translation-display.mobile-mode.has-error {
-  background: #fff5f5 !important;
-  border-color: #ffe3e3 !important;
 }
 
 .ti-translation-display.mobile-mode .ti-translation-content {
   padding: 0;
   font-size: 16px;
   color: #1c7ed6;
-  line-height: 1.5;
-  min-height: auto;
   max-height: 250px;
+  line-height: 1.5;
   width: 100% !important;
-}
-
-.ti-translation-display.mobile-mode.has-error .ti-translation-content {
-  color: #fa5252;
 }
 
 .ti-mobile-actions {
   display: flex !important;
   flex-direction: row !important;
   justify-content: space-between !important;
-  align-items: stretch !important; /* Stretch buttons to same height */
+  align-items: stretch !important;
   gap: 10px !important;
   margin-top: 15px !important;
   padding-top: 15px !important;
@@ -1045,8 +1018,7 @@ onMounted(() => {
   border: 1px solid #d0ebff !important;
   background: white !important;
   display: flex !important;
-  flex: 1 1 0% !important; /* Force equal width distribution */
-  min-width: 0 !important;
+  flex: 1 1 0% !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
@@ -1057,66 +1029,40 @@ onMounted(() => {
   color: #1c7ed6 !important;
   font-weight: 600 !important;
   font-size: 13px !important;
-  -webkit-tap-highlight-color: transparent !important;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.1) !important;
   text-align: center !important;
-}
-
-.mobile-action-btn.icon-only-action {
-  /* Same flex as others to maintain balance */
 }
 
 .mobile-action-btn:active {
   transform: scale(0.95);
-  background: #f1f3f5;
+  background: #f1f3f5 !important;
   box-shadow: none;
 }
 
-.mobile-action-btn img {
-  width: 20px !important;
-  height: 20px !important;
-  max-width: 20px !important;
-  max-height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
-  object-fit: contain !important;
-  display: block !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
 .mobile-action-btn.primary-action {
-  background: #339af0;
-  color: white;
-  border-color: #228be6;
+  background: #339af0 !important;
+  color: white !important;
+  border-color: #228be6 !important;
 }
 
 .mobile-action-btn.primary-action img {
   filter: brightness(0) invert(1);
 }
 
-/* Mobile Dark Mode */
+/* Dark mode */
 @media (prefers-color-scheme: dark) {
-  .ti-translation-display.mobile-mode:not(.has-error) { 
+  .ti-translation-display.mobile-mode { 
     background: rgba(28, 126, 214, 0.1) !important; 
-    border-color: rgba(28, 126, 214, 0.25) !important; 
+    border-color: rgba(28, 126, 214, 0.25) !important;
   }
   
-  .ti-translation-display.mobile-mode.has-error {
-    background: rgba(250, 82, 82, 0.12) !important;
-    border-color: rgba(250, 82, 82, 0.25) !important;
-  }
-
-  .ti-translation-display.mobile-mode .ti-translation-content:not(.has-error) { 
+  .ti-translation-display.mobile-mode .ti-translation-content { 
     color: #74c0fc !important; 
-  }
-  
-  .ti-translation-display.mobile-mode.has-error .ti-translation-content { 
-    color: #ff8787 !important; 
   }
   
   .mobile-action-btn { 
     background: #2d2d2d !important; 
-    border-color: #444 !important;
+    border-color: #444 !important; 
     color: #74c0fc !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   }
@@ -1129,10 +1075,6 @@ onMounted(() => {
   
   .mobile-action-btn:not(.primary-action) img { 
     filter: invert(0.8); 
-  }
-  
-  .ti-mobile-actions {
-    border-top-color: rgba(255, 255, 255, 0.1) !important;
   }
 }
 </style>
