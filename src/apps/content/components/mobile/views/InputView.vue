@@ -62,7 +62,6 @@
       <!-- Provider and Translate -->
       <div class="actions-row" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
         <div class="provider-wrapper" style="flex: 1; max-width: 48%; position: relative;">
-          <!-- Using compact mode which renders a native <select> for best mobile UX -->
           <ProviderSelector
             v-model="currentProvider"
             mode="compact"
@@ -70,7 +69,6 @@
             :show-sync="false"
             class="mobile-native-provider"
           />
-          <!-- Decorative arrow for the select -->
           <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.5; display: flex; align-items: center;">
             <img src="@/icons/ui/dropdown-arrow.svg" style="width: 10px; height: 10px;" />
           </div>
@@ -81,7 +79,8 @@
           :disabled="!inputText || isLoading"
           class="translate-main-btn"
           :style="{
-            backgroundColor: (!inputText || isLoading) ? '#ced4da' : '#1a73e8',
+            backgroundColor: (isLoading || !inputText) ? '#1a73e8' : '#1a73e8',
+            opacity: (isLoading || !inputText) ? '0.7' : '1',
             color: 'white',
             border: 'none',
             padding: '0 20px',
@@ -92,8 +91,8 @@
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: (!inputText || isLoading) ? 'not-allowed' : 'pointer',
-            boxShadow: (!inputText || isLoading) ? 'none' : '0 4px 10px rgba(26, 115, 232, 0.25)',
+            cursor: (isLoading || !inputText) ? 'not-allowed' : 'pointer',
+            boxShadow: '0 4px 10px rgba(26, 115, 232, 0.25)',
             flex: '1.2'
           }"
         >
@@ -103,20 +102,27 @@
       </div>
     </div>
 
-    <!-- Result Card using Shared Component -->
-    <div v-if="resultText || isLoading || isError" style="animation: slideIn 0.3s ease;">
-      <TranslationDisplay
-        mode="mobile"
-        :content="resultText"
-        :target-language="targetLang"
-        :is-loading="isLoading"
-        :error="isError ? resultText : ''"
-        :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
-        :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
-        @text-copied="onTextCopied"
-        @tts-started="onSpeak"
-        @history-requested="onHistory"
-      />
+    <!-- Result Area -->
+    <div class="result-container" style="min-height: 100px; position: relative; margin-top: 5px;">
+      <div v-if="isLoading" class="result-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; gap: 10px; background: #f8f9fa; border-radius: 12px; border: 1px dashed #ced4da;">
+        <div class="mini-spinner" style="width: 24px; height: 24px; border: 3px solid rgba(26, 115, 232, 0.1); border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="font-size: 13px; color: #868e96; font-weight: 500;">{{ t('popup_string_during_translate') || 'Translating...' }}</span>
+      </div>
+      
+      <div v-else-if="resultText || isError" style="animation: slideIn 0.3s ease;">
+        <TranslationDisplay
+          mode="mobile"
+          :content="resultText"
+          :target-language="targetLang"
+          :is-loading="false"
+          :error="isError ? resultText : ''"
+          :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
+          :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+          @text-copied="onTextCopied"
+          @tts-started="onSpeak"
+          @history-requested="onHistory"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -188,7 +194,7 @@ const handleTranslate = async () => {
   if (!inputText.value || isLoading.value) return
   
   isLoading.value = true
-  resultText.value = '' 
+  // Reset error state but keep old text briefly to avoid layout jump
   isError.value = false
   
   try {
@@ -288,6 +294,7 @@ const onHistory = () => {
     color: #dee2e6 !important;
   }
   
+  .result-loading { background: #2d2d2d !important; border-color: #444 !important; }
   .paste-btn { background: rgba(28, 126, 214, 0.1) !important; border-color: rgba(28, 126, 214, 0.3) !important; color: #74c0fc !important; }
   .clear-btn { background: rgba(250, 82, 82, 0.1) !important; border-color: rgba(250, 82, 82, 0.3) !important; color: #ff8787 !important; }
 }
