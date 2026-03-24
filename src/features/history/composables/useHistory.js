@@ -258,7 +258,8 @@ export function useHistory() {
     if (!text) return null;
 
     try {
-      return SimpleMarkdown.render(text);
+      const element = SimpleMarkdown.render(text);
+      return element ? element.innerHTML : null;
     } catch (error) {
       getLogger().error("Error parsing markdown", error);
       return null;

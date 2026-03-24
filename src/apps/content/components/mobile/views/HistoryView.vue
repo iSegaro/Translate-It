@@ -52,8 +52,11 @@
         <div class="source-preview" style="font-size: 14px; color: #495057; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           {{ item.sourceText }}
         </div>
-        <div class="target-preview" style="font-size: 14px; color: #339af0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-          {{ item.translatedText }}
+        <div 
+          class="target-preview markdown-content" 
+          v-html="createMarkdownContent(item.translatedText)"
+          style="font-size: 14px; color: #339af0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;"
+        >
         </div>
         
         <div class="timestamp" style="font-size: 10px; color: #adb5bd; margin-top: 2px;">
@@ -82,7 +85,8 @@ const {
   loadHistory, 
   deleteHistoryItem, 
   clearAllHistory,
-  formatTime 
+  formatTime,
+  createMarkdownContent
 } = useHistory()
 
 onMounted(async () => {
@@ -127,6 +131,16 @@ const selectItem = (item) => {
 
 .history-list::-webkit-scrollbar {
   display: none;
+}
+
+:deep(.markdown-content) p {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline;
+}
+
+:deep(.markdown-content) strong {
+  font-weight: 700;
 }
 
 @media (prefers-color-scheme: dark) {
