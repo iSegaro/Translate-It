@@ -38,6 +38,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import browser from 'webextension-polyfill'
 import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
 import { usePasteAction } from '@/features/text-actions/composables/usePasteAction.js'

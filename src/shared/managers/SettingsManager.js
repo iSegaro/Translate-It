@@ -6,6 +6,7 @@
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js'
+import browser from 'webextension-polyfill'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'

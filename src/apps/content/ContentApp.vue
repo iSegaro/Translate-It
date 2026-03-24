@@ -94,6 +94,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import browser from 'webextension-polyfill';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
@@ -120,7 +121,6 @@ import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
 import { CONFIG, getShowDesktopFabAsync, getExtensionEnabledAsync } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
-import browser from 'webextension-polyfill';
 
 const pageEventBus = window.pageEventBus;
 
