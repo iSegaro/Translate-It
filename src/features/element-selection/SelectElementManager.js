@@ -440,7 +440,13 @@ class SelectElementManager extends ResourceTracker {
    * Handle mouse over event
    */
   handleMouseOver(event) {
-    if (!this.isActive || this.isProcessingClick || this.isCooldownActive() || !this.hasInitialMovementOccurred) return;
+    if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
+
+    // On desktop, the first mouseover after activation counts as intentional movement
+    if (!this.hasInitialMovementOccurred) {
+      this.hasInitialMovementOccurred = true;
+      this.logger.debug('Initial mouse movement detected, enabling Select Element highlighter');
+    }
 
     // Skip our own elements
     if (this.elementSelector && this.elementSelector.isOurElement(event.target)) {
