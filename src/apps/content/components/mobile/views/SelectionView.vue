@@ -28,44 +28,30 @@
         <span style="font-size: 14px; font-weight: 500;">{{ t('mobile_selection_translating_label') || 'Translating...' }}</span>
       </div>
       
-      <!-- Error State -->
-      <div v-else-if="selectionData.error" class="error-state" style="background: #fff5f5; border: 1px solid #ffe3e3; border-radius: 12px; padding: 15px; color: #fa5252; font-size: 14px; text-align: center;">
-        <p style="margin: 0;">{{ selectionData.error }}</p>
-      </div>
+      <!-- Error State handled by TranslationDisplay via error prop -->
 
-      <!-- Success State -->
+      <!-- Combined Result and Original using Shared Component -->
       <div v-else class="translation-result" style="display: flex; flex-direction: column; gap: 12px;">
-        <!-- Translated Text Card (Moved to TOP for better visibility) -->
-        <div 
-          v-if="selectionData.translation" 
-          class="result-card" 
-          @click="expandSheet"
-          style="background: #e7f5ff; border: 1px solid #d0ebff; border-radius: 12px; padding: 15px; animation: slideIn 0.3s ease; display: flex; flex-direction: column; gap: 8px; cursor: pointer;"
-        >
-          <div style="font-size: 10px; font-weight: 800; color: #74c0fc; text-transform: uppercase; letter-spacing: 0.5px;">{{ t('mobile_selection_translation_title') || 'Translation' }}</div>
-          <div 
-            class="translated-text markdown-body" 
-            :dir="detectedDir"
-            style="font-size: 17px; color: #1c7ed6; line-height: 1.6; text-align: start;"
-            v-html="sanitizedResult"
-          ></div>
-          
-          <!-- Quick Actions In Card -->
-          <div style="display: flex; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(51, 154, 240, 0.1);" @click.stop>
-            <button class="action-btn" @click="speak" :title="t('mobile_selection_speak_tooltip') || 'Speak'">
-              <img src="@/icons/ui/speaker.png" :alt="t('mobile_speak_button_alt') || 'Speak'" style="width: 16px !important; height: 16px !important;" />
-            </button>
-            <button class="action-btn" @click="copy" :title="t('mobile_selection_copy_tooltip') || 'Copy'">
-              <img src="@/icons/ui/copy.png" :alt="t('mobile_copy_button_alt') || 'Copy'" style="width: 16px !important; height: 16px !important;" />
-            </button>
-            <button class="action-btn" @click="toggleHistory" :title="t('mobile_selection_history_tooltip') || 'History'">
-              <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 16px !important; height: 16px !important;" />
-            </button>
-          </div>
+        
+        <!-- Result Card using Shared Component -->
+        <div @click="expandSheet" style="cursor: pointer;">
+          <TranslationDisplay
+            mode="mobile"
+            :content="selectionData.translation"
+            :target-language="selectionData.targetLang"
+            :is-loading="selectionData.isLoading"
+            :error="selectionData.error"
+            :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
+            :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+            @text-copied="onTextCopied"
+            @tts-started="onSpeak"
+            @history-requested="onHistory"
+          />
         </div>
 
-        <!-- Original Text Card (Moved to BOTTOM) -->
+        <!-- Original Text Card (Now smaller and at the bottom) -->
         <div 
+          v-if="selectionData.text"
           class="original-card" 
           @click="expandSheet"
           style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; cursor: pointer;"
@@ -91,11 +77,10 @@ import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
-import DOMPurify from "dompurify";
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
@@ -108,29 +93,11 @@ watch(() => selectionData.value.translation, (newTranslation) => {
   }
 }, { immediate: true })
 
-const detectedDir = computed(() => {
-  if (!selectionData.value.translation) return 'ltr'
-  const direction = getTextDirection(selectionData.value.targetLang, selectionData.value.translation)
-  return direction === 'rtl' || shouldApplyRtl(selectionData.value.translation) ? 'rtl' : 'ltr'
-})
-
 const originalDir = computed(() => {
   if (!selectionData.value.text) return 'ltr'
   const lang = selectionData.value.sourceLang && selectionData.value.sourceLang !== 'auto' ? selectionData.value.sourceLang : null;
   const direction = getTextDirection(lang, selectionData.value.text)
   return direction === 'rtl' || shouldApplyRtl(selectionData.value.text) ? 'rtl' : 'ltr'
-})
-
-const sanitizedResult = computed(() => {
-  if (!selectionData.value.translation) return ''
-  try {
-    const markdownElement = SimpleMarkdown.render(selectionData.value.translation)
-    const htmlContent = markdownElement ? markdownElement.innerHTML : selectionData.value.translation.replace(/\n/g, '<br>')
-    return DOMPurify.sanitize(htmlContent)
-  } catch (error) {
-    console.error('[SelectionView] Markdown error:', error)
-    return DOMPurify.sanitize(selectionData.value.translation.replace(/\n/g, '<br>'))
-  }
 })
 
 const expandSheet = () => {
@@ -148,23 +115,24 @@ const closeView = () => {
   mobileStore.closeSheet()
 }
 
-const speak = () => {
+const onSpeak = (data) => {
+  const text = data?.text || selectionData.value.translation;
+  const lang = data?.language || selectionData.value.targetLang;
+  
   pageEventBus.emit(MessageActions.GOOGLE_TTS_SPEAK, {
-    text: selectionData.value.translation,
-    lang: selectionData.value.targetLang
+    text: text,
+    lang: lang
   })
 }
 
-const copy = () => {
-  const plainText = SimpleMarkdown.strip ? SimpleMarkdown.strip(selectionData.value.translation) : selectionData.value.translation;
-  navigator.clipboard.writeText(plainText)
+const onTextCopied = () => {
   pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
     message: t('mobile_selection_copied_message') || 'Translation copied to clipboard',
     type: 'success'
   })
 }
 
-const toggleHistory = () => {
+const onHistory = () => {
   pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
     message: t('mobile_selection_history_unavailable') || 'History feature coming soon to mobile',
     type: 'info'
@@ -192,41 +160,6 @@ const toggleHistory = () => {
   animation: spin 1s linear infinite;
 }
 
-.action-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(51, 154, 240, 0.2);
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-btn:active {
-  transform: scale(0.9);
-  background: #f1f3f5;
-}
-
-.translated-text.markdown-body {
-  word-wrap: break-word;
-}
-
-.translated-text.markdown-body p {
-  margin-bottom: 8px;
-}
-
-.translated-text.markdown-body strong {
-  font-weight: bold;
-}
-
-.translated-text.markdown-body ul, .translated-text.markdown-body ol {
-  padding-inline-start: 20px;
-  margin-bottom: 8px;
-}
-
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   .selection-header { border-bottom-color: #333 !important; }
@@ -234,10 +167,5 @@ const toggleHistory = () => {
   .lang { color: #adb5bd !important; }
   .original-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
   .original-text { color: #dee2e6 !important; }
-  .result-card { background: rgba(28, 126, 214, 0.15) !important; border-color: rgba(28, 126, 214, 0.3) !important; }
-  .translated-text { color: #74c0fc !important; }
-  .action-btn { background: #2d2d2d !important; border-color: #444 !important; }
-  .action-btn img { filter: invert(0.8); }
-  .translated-text.markdown-body code { background: rgba(255,255,255,0.1); }
 }
 </style>
