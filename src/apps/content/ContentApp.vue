@@ -288,9 +288,7 @@ onMounted(async () => {
   let toastIntegration = null;
   try {
     toastIntegration = ToastIntegration.createSingleton(pageEventBus);
-    toastIntegration.initialize({
-      onCancelClick: onCancelClick
-    });
+    toastIntegration.initialize();
     // ToastIntegration initialized successfully
   } catch (error) {
     logger.warn('ToastIntegration initialization failed:', error);
