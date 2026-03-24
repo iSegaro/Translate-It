@@ -24,14 +24,14 @@ The mobile system is built as a modular extension of the existing **UI Host (Sha
 ┌──────────────▼──────────────┐      ┌────────▼──────────────┐
 │      Logic & State Layer    │      │      UI Host Layer    │
 │  - mobile.js (Pinia Store)  │      │  - MobileSheet.vue    │
-│  - useMobileGestures.js     │◀────▶│  - DashboardView.vue  │
-│  - useMobileSheet.js        │      │  - SelectionView.vue  │
+│  - useMobileGestures.js     │◀────▶│  - MobileFab.vue      │
+│  - useMobileSheet.js        │      │  - DashboardView.vue  │
 └──────────────┬──────────────┘      └───────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────────────┐
 │                    INTEGRATION POINTS                       │
 │  - WindowsManager: Routes mobile requests to Sheet          │
-│  - SelectElementManager: Adapts Hover to Tap interaction    │
+│  - SelectElementManager: Manages mode lifecycle             │
 │  - PageTranslationManager: Progress tracking in mobile UI   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -58,10 +58,13 @@ A high-performance composable that handles complex touch interactions.
 - **Swipe-to-Expand**: Moving from "Peek" to "Full" mode for better visibility.
 - **Momentum & Snapping**: Smoothly snapping to predefined vertical positions using CSS transforms.
 
-### 4. UI Host Integration (`MobileSheet.vue`)
-The master container rendered inside the Shadow DOM to prevent site CSS interference.
-- **Encapsulation**: Uses `translate="no"` and `.notranslate` to prevent self-translation.
-- **Dynamic Views**: Utilizes Vue's `<component :is>` or explicit `v-if` logic to switch between functional views without reloading.
+### 4. UI Host Integration (`MobileSheet.vue` & `MobileFab.vue`)
+The mobile UI is divided into two primary entry points:
+- **`MobileSheet.vue`**: The master container for the Bottom Sheet (Dashboard, Selection, etc.).
+- **`MobileFab.vue`**: A dedicated, draggable floating button that provides quick access to translation when the sheet is closed.
+    - **Vertical Drag**: Supports NS-resize dragging to avoid overlapping with site content.
+    - **Persistence**: Remembers its last vertical position across page reloads using `storageManager`.
+    - **Idle State**: Becomes semi-transparent after 1.5s of inactivity to remain non-intrusive.
 
 ---
 
@@ -69,12 +72,12 @@ The master container rendered inside the Shadow DOM to prevent site CSS interfer
 
 ### Text Selection Translation
 - **Desktop**: Shows a floating icon near selection.
-- **Mobile**: Automatically triggers the **Mobile Sheet** in `SelectionView` (Peek mode). The icon is optimized for touch and placed to avoid thumb overlap.
+- **Mobile**: Automatically triggers the **Mobile Sheet** in `SelectionView` (Peek mode). The system-wide FAB or a trigger from `WindowsManager` ensures a smooth transition to the sheet.
 
 ### Select Element Mode
 - **Hover to Tap**: Since mobile lacks hover, the `SelectElementManager` is adapted to use `touchstart` and `touchend`.
 - **Navigation Prevention**: Aggressively applies `preventDefault()` and `stopPropagation()` during the active mode to prevent accidental link clicks.
-- **Mobile Exit FAB**: Displays a sticky, prominent "Exit Mode" button at the bottom of the screen.
+- **Unified Controls**: Instead of a dedicated exit button, the system leverages the **Circuit Breaker Toast** which provides "Cancel" and "Revert" actions, keeping the UI clean and consistent.
 
 ### Whole Page Translation
 - **Dashboard Hub**: Translation is triggered from within the sheet, keeping the user in context.
