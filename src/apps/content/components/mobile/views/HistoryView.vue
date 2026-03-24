@@ -49,13 +49,18 @@
         </div>
 
         <!-- Card Content -->
-        <div class="source-preview" style="font-size: 14px; color: #495057; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <div 
+          class="source-preview" 
+          :dir="shouldApplyRtl(item.sourceText) ? 'rtl' : 'ltr'"
+          style="font-size: 14px; color: #495057; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start;"
+        >
           {{ item.sourceText }}
         </div>
         <div 
           class="target-preview markdown-content" 
           v-html="createMarkdownContent(item.translatedText)"
-          style="font-size: 14px; color: #339af0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;"
+          :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
+          style="font-size: 14px; color: #339af0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-align: start;"
         >
         </div>
         
@@ -74,6 +79,7 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 
 const mobileStore = useMobileStore()
 const { t } = useI18n()

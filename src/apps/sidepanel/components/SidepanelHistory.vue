@@ -62,13 +62,19 @@
             </div>
           </div>
           <div class="history-item-content">
-            <div class="source-text">
+            <div 
+              class="source-text"
+              :dir="shouldApplyRtl(item.sourceText) ? 'rtl' : 'ltr'"
+            >
               {{ truncateText(item.sourceText) || '[No source text]' }}
             </div>
             <div class="arrow">
               ↓
             </div>
-            <div class="translated-text">
+            <div 
+              class="translated-text"
+              :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
+            >
               {{ truncateText(item.translatedText) || '[No translation]' }}
             </div>
           </div>
@@ -149,6 +155,7 @@ import { useUI } from '@/composables/ui/useUI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
+import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -596,9 +603,10 @@ onUnmounted(() => {
     font-size: $font-size-sm;
     color: var(--color-text);
     padding: $spacing-xs;
-    background-color: var(--color-background);
+    background-color: var(--color-surface-alt);
     border-radius: $border-radius-xs;
-    border-left: 3px solid var(--color-primary);
+    border-inline-start: 3px solid var(--color-primary);
+    text-align: start;
   }
 
   .arrow {
@@ -614,7 +622,8 @@ onUnmounted(() => {
     padding: $spacing-xs;
     background-color: var(--color-surface-alt);
     border-radius: $border-radius-xs;
-    border-left: 3px solid var(--color-success);
+    border-inline-start: 3px solid var(--color-success);
+    text-align: start;
   }
 }
 
