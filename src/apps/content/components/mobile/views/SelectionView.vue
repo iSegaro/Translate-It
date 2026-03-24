@@ -80,11 +80,13 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useI18n()
+const tts = useTTSSmart()
 
 // Automatically expand to full if content is long
 watch(() => selectionData.value.translation, (newTranslation) => {
@@ -123,14 +125,13 @@ const closeView = () => {
   mobileStore.closeSheet()
 }
 
-const onSpeak = (data) => {
+const onSpeak = async (data) => {
   const text = data?.text || selectionData.value.translation;
   const lang = data?.language || selectionData.value.targetLang;
   
-  pageEventBus.emit(MessageActions.GOOGLE_TTS_SPEAK, {
-    text: text,
-    lang: lang
-  })
+  if (text) {
+    await tts.speak(text, lang);
+  }
 }
 
 const onTextCopied = () => {
