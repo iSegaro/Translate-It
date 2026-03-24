@@ -69,9 +69,6 @@
             :show-sync="false"
             class="mobile-native-provider"
           />
-          <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.5; display: flex; align-items: center;">
-            <img src="@/icons/ui/dropdown-arrow.svg" style="width: 10px; height: 10px;" />
-          </div>
         </div>
         
         <button 
