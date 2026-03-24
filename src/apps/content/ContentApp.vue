@@ -84,52 +84,10 @@
       />
 
       <!-- Mobile Floating Action Button (FAB) -->
-      <div 
-        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen" 
-        class="mobile-fab notranslate"
-        :class="{ 'is-idle': isFabIdle }"
-        translate="no"
-        :style="{
-          position: 'fixed !important',
-          bottom: '120px !important',
-          left: '100% !important',
-          marginLeft: '-25px !important',
-          width: '50px !important',
-          height: '50px !important',
-          display: 'flex !important',
-          opacity: isFabIdle ? '0.2' : '1',
-          transform: 'none !important',
-          transition: 'opacity 0.8s ease'
-        }"
-        @click="onMobileFabClick"
-        @touchstart="startFabIdleTimer"
-        :title="t('mobile_fab_alt') || 'Translate'"
-      >
-        <img 
-          src="@/icons/extension/extension_icon_64.svg" 
-          :alt="t('mobile_fab_alt') || 'Translate'" 
-          :style="{
-            width: '26px !important',
-            height: '26px !important',
-            objectFit: 'contain',
-            marginLeft: '0 !important',
-            marginRight: 'auto !important',
-            paddingLeft: '6px !important',
-            transition: 'none'
-          }"
-        />
-      </div>
-
-      <!-- Mobile-specific Exit Select Mode button -->
-      <div
-        v-if="isSelectModeActive && isMobileUI"
-        class="mobile-exit-selection notranslate"
-        translate="no"
-        @click="onCancelClick"
-      >
-        <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Exit'" />
-        <span>{{ t('mobile_exit_select_mode') || 'Exit Select Mode' }}</span>
-      </div>
+      <MobileFab
+        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen"
+        :is-rtl="toastRTL"
+      />
     </template>
   </div>
 </template>
@@ -148,6 +106,7 @@ import TranslationWindow from '@/features/windows/components/TranslationWindow.v
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
+import MobileFab from './components/mobile/MobileFab.vue';
 import DesktopFabMenu from './components/desktop/DesktopFabMenu.vue';
 import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js';
@@ -195,43 +154,9 @@ const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { getErrorForDisplay } = useErrorHandler();
 
+
+
 // Debounce cancel requests to prevent event loops
-let isCancelInProgress = false;
-let cancelTimeoutId = null;
-
-const onCancelClick = () => {
-  logger.info('Cancel Select Element mode requested');
-
-  // Prevent multiple cancel requests in quick succession
-  if (isCancelInProgress) {
-    logger.debug('Cancel already in progress, ignoring duplicate request');
-    return;
-  }
-
-  isCancelInProgress = true;
-
-  // Emit event only once with proper error handling
-  try {
-    if (pageEventBus) {
-      pageEventBus.emit('cancel-select-element-mode');
-      logger.debug('cancel-select-element-mode event emitted successfully');
-    }
-  } catch (error) {
-    logger.warn('Error emitting cancel-select-element-mode event:', error);
-  }
-
-  // Reset flag after a delay to prevent event loops using tracker
-  if (cancelTimeoutId) {
-    tracker.clearTimer(cancelTimeoutId);
-  }
-  
-  cancelTimeoutId = tracker.trackTimeout(() => {
-    isCancelInProgress = false;
-    cancelTimeoutId = null;
-    logger.debug('Cancel request flag reset');
-  }, 1000); // 1 second debounce
-};
-
 // Reactive RTL value for toasts (sync access - optimal performance)
 const toastRTL = ref(false);
 
@@ -304,47 +229,7 @@ const getIconRef = (iconId) => {
   return iconRefs.value.get(iconId);
 };
 
-const onMobileFabClick = () => {
-  // 1. Check for active DOM selection
-  const selection = window.getSelection();
-  let selectedText = selection ? selection.toString().trim() : '';
 
-  // 2. Fallback: check WindowsManager state if DOM selection is empty 
-  // (sometimes selection is lost when clicking the FAB)
-  if (!selectedText && window.windowsManagerInstance && window.windowsManagerInstance.state) {
-    selectedText = window.windowsManagerInstance.state.originalText || '';
-  }
-
-  if (selectedText) {
-    logger.info('FAB clicked with selection, opening SelectionView');
-    
-    // Setup selection data
-    mobileStore.updateSelectionData({
-      text: selectedText,
-      isLoading: true,
-      translation: ''
-    });
-    
-    // Open sheet in selection view
-    mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
-    
-    // Trigger actual translation via WindowsManager
-    if (window.windowsManagerInstance) {
-      window.windowsManagerInstance._showMobileSheet(selectedText);
-    }
-  } else {
-    // Smart view recovery (Last View behavior):
-    let viewToOpen = mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD;
-    
-    // Fallback ONLY if selection view is active but has no data
-    if (viewToOpen === MOBILE_CONSTANTS.VIEWS.SELECTION && !mobileStore.selectionData.text) {
-      viewToOpen = MOBILE_CONSTANTS.VIEWS.DASHBOARD;
-    }
-    
-    logger.info(`FAB clicked without selection, restoring last view: ${viewToOpen}`);
-    mobileStore.openSheet(viewToOpen, MOBILE_CONSTANTS.SHEET_STATE.PEEK);
-  }
-};
 
 const onIconClick = (id) => {
   logger.info(`TextFieldIcon clicked: ${id}`);
@@ -365,9 +250,6 @@ const setupOutsideClickHandler = () => {
 };
 
 // Mobile FAB behavior state
-const isFabIdle = ref(true);
-let fabIdleTimerId = null;
-
 const updateFullscreenState = () => {
   const isNowFullscreen = !!(
     document.fullscreenElement ||
@@ -378,17 +260,6 @@ const updateFullscreenState = () => {
   mobileStore.setFullscreen(isNowFullscreen);
 };
 
-const startFabIdleTimer = () => {
-  if (fabIdleTimerId) {
-    tracker.clearTimer(fabIdleTimerId);
-  }
-  isFabIdle.value = false;
-  fabIdleTimerId = tracker.trackTimeout(() => {
-    isFabIdle.value = true;
-    fabIdleTimerId = null;
-  }, 1500); // 1.5 seconds of inactivity to become semi-transparent
-};
-
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
@@ -396,7 +267,8 @@ onMounted(async () => {
   if (!settingsStore.isInitialized) {
     await settingsStore.loadSettings();
   }
-  
+
+
   const isInIframe = window !== window.top;
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
@@ -851,60 +723,6 @@ onUnmounted(async () => {
 /* Individual components inside will override this (e.g., toaster, toolbars) */
 .content-app-container > * {
   pointer-events: all !important; /* Re-enable pointer events for children */
-}
-
-.mobile-exit-selection {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #fa5252;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 12px rgba(250, 82, 82, 0.4);
-  font-weight: 600;
-  font-size: 16px;
-  z-index: 2147483647;
-  pointer-events: auto !important;
-  cursor: pointer;
-  animation: slide-up 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.mobile-exit-selection img {
-  width: 18px;
-  height: 18px;
-  filter: brightness(0) invert(1);
-}
-
-.mobile-fab {
-  background: #339af0 !important;
-  border-radius: 50% !important;
-  align-items: center !important;
-  justify-content: flex-start !important; /* Help position icon in the visible part */
-  box-shadow: 0 4px 16px rgba(51, 154, 240, 0.4) !important;
-  z-index: 2147483647 !important;
-  pointer-events: auto !important;
-  cursor: pointer;
-  transition: opacity 0.8s ease !important;
-  will-change: opacity;
-}
-
-.mobile-fab:active {
-  opacity: 1 !important;
-}
-
-.mobile-fab img {
-  filter: brightness(0) invert(1) !important;
-  transition: none !important;
-}
-
-@keyframes slide-up {
-  from { transform: translate(-50%, 100px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
 /* CRITICAL: Toast text direction for RTL/LTR support */
