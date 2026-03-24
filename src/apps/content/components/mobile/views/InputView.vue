@@ -76,22 +76,22 @@
           :disabled="!inputText || isLoading"
           class="translate-main-btn"
           :style="{
-            backgroundColor: (isLoading || !inputText) ? '#1a73e8' : '#1a73e8',
-            opacity: (isLoading || !inputText) ? '0.6' : '1',
-            color: 'white',
+            backgroundColor: (isLoading || !inputText) ? '#f1f3f5' : '#339af0',
+            color: (isLoading || !inputText) ? '#adb5bd' : 'white',
             border: 'none',
             padding: '0 20px',
             borderRadius: '12px',
-            fontWeight: 'bold',
+            fontWeight: '600',
             fontSize: '15px',
             height: '46px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: (isLoading || !inputText) ? 'not-allowed' : 'pointer',
-            boxShadow: (isLoading || !inputText) ? 'none' : '0 4px 10px rgba(26, 115, 232, 0.25)',
+            boxShadow: (isLoading || !inputText) ? 'none' : '0 4px 12px rgba(51, 154, 240, 0.25)',
             flex: '1.2',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            letterSpacing: '0.3px'
           }"
         >
           {{ t('mobile_input_translate_btn') || 'Translate' }}
