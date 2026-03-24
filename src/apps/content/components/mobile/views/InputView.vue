@@ -45,28 +45,42 @@
     </div>
 
     <!-- Controls -->
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
-      <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
-        <span style="font-size: 14px; color: #868e96; white-space: nowrap;">{{ t('mobile_input_to_label') || 'To:' }}</span>
-        <select v-model="targetLang" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid #ced4da; background: white; font-size: 14px; color: #495057;">
-          <option value="en">English</option>
-          <option value="fa">Persian</option>
-          <option value="de">German</option>
-          <option value="fr">French</option>
-          <option value="ja">Japanese</option>
-        </select>
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+      <!-- Languages -->
+      <div class="language-controls-wrapper" style="border: 1px solid #ced4da; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <LanguageSelector
+          v-model:source-language="sourceLang"
+          v-model:target-language="targetLang"
+          :source-title="t('popup_source_language_title') || 'Source'"
+          :target-title="t('popup_target_language_title') || 'Target'"
+          :swap-title="t('popup_swap_languages_title') || 'Swap'"
+          :auto-detect-label="t('auto_detect') || 'Auto-Detect'"
+        />
       </div>
       
-      <button 
-        @click="handleTranslate"
-        :disabled="!inputText || isLoading"
-        class="translate-main-btn"
-        style="background: #339af0; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; min-width: 110px; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);"
-        :style="{ opacity: (isLoading || !inputText) ? 0.6 : 1 }"
-      >
-        <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
-        {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
-      </button>
+      <!-- Provider and Translate -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+        <div style="flex: 1; max-width: 50%;">
+          <ProviderSelector
+            v-model="currentProvider"
+            mode="button"
+            :is-global="false"
+            :show-sync="false"
+            style="width: 100%; border-radius: 12px;"
+          />
+        </div>
+        
+        <button 
+          @click="handleTranslate"
+          :disabled="!inputText || isLoading"
+          class="translate-main-btn"
+          style="background: #339af0; color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: 1; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(51, 154, 240, 0.25);"
+          :style="{ opacity: (isLoading || !inputText) ? 0.6 : 1 }"
+        >
+          <span v-if="isLoading" class="mini-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>
+          {{ isLoading ? (t('popup_string_during_translate') || '...') : (t('mobile_input_translate_btn') || 'Translate') }}
+        </button>
+      </div>
     </div>
 
     <!-- Result Card using Shared Component -->
@@ -97,16 +111,22 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
 const mobileStore = useMobileStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging('mobile-input')
 const { getErrorForDisplay } = useErrorHandler()
 
 // Initialize with store text if available (from SelectionView)
 const inputText = ref(mobileStore.selectionData.text || '')
+const sourceLang = ref(mobileStore.selectionData.sourceLang || 'auto')
 const targetLang = ref(mobileStore.selectionData.targetLang || 'en')
+const currentProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
 const isLoading = ref(false)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
 const isError = ref(!!mobileStore.selectionData.error)
@@ -154,8 +174,9 @@ const handleTranslate = async () => {
   try {
     const payload = {
       text: inputText.value,
-      sourceLanguage: 'auto',
-      targetLanguage: targetLang.value
+      sourceLanguage: sourceLang.value,
+      targetLanguage: targetLang.value,
+      api: currentProvider.value
     };
 
     const message = createMessage(MessageActions.TRANSLATE, payload);
