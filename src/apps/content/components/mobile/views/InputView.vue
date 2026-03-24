@@ -131,6 +131,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -140,6 +141,7 @@ const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
 const { getErrorForDisplay } = useErrorHandler()
+const tts = useTTSSmart()
 
 // Initialize with immediate store values (defaults if not loaded)
 const inputText = ref(mobileStore.selectionData.text || '')
@@ -251,15 +253,14 @@ const onTextCopied = () => {
   })
 }
 
-const onSpeak = (data) => {
+const onSpeak = async (data) => {
   // Use data from event or fallback to local state
   const text = data?.text || resultText.value;
   const lang = data?.language || targetLang.value;
   
-  pageEventBus.emit(MessageActions.GOOGLE_TTS_SPEAK, {
-    text: text,
-    lang: lang
-  })
+  if (text) {
+    await tts.speak(text, lang);
+  }
 }
 
 const onHistory = () => {
