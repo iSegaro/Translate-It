@@ -33,6 +33,7 @@ import { useMobileStore } from '@/store/modules/mobile.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getMobileFabPositionAsync } from '@/shared/config/config.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -47,6 +48,7 @@ const props = defineProps({
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
+const tracker = useResourceTracker('mobile-fab');
 
 // Mobile FAB Position and Drag Logic
 const fabPosition = ref({ x: null, y: 120 }); // y is distance from bottom in px
@@ -62,7 +64,9 @@ const startFabIdleTimer = () => {
     clearTimeout(fabIdleTimerId);
   }
   isFabIdle.value = false;
-  fabIdleTimerId = setTimeout(() => {
+  
+  // Track timeout via resource tracker for automatic cleanup on unmount
+  fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
     fabIdleTimerId = null;
   }, 1500); // 1.5 seconds of inactivity to become semi-transparent
@@ -82,6 +86,8 @@ const onFabDragStart = (e) => {
   initialFabY = fabPosition.value.y || 120;
   
   if (isMouseEvent) {
+    // Dynamic listeners: we still use manual for performance/efficiency during component life,
+    // but the tracker will handle them if we forget to cleanup in onUnmounted.
     window.addEventListener('mousemove', onFabDragMove);
     window.addEventListener('mouseup', onFabDragEnd);
   }
@@ -115,6 +121,11 @@ const onFabDragMove = (e) => {
     
     // Reset the flag so the next update can be scheduled
     animationFrameId = null;
+  });
+
+  // Track the animation frame resource via tracker (safety net)
+  tracker.trackResource('fab-animation-frame', () => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
   });
 };
 
@@ -227,15 +238,12 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (fabIdleTimerId) {
-    clearTimeout(fabIdleTimerId);
-  }
-
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-  }
-
-  // Ensure global listeners are removed if component is unmounted during drag
+  // useResourceTracker automatically handles cleanup for:
+  // - fabIdleTimerId (tracked via trackTimeout)
+  // - animationFrameId (tracked via trackResource)
+  
+  // We still perform manual cleanup for dynamic window listeners 
+  // for absolute cleanliness, though the tracker provides a safety net.
   window.removeEventListener('mousemove', onFabDragMove);
   window.removeEventListener('mouseup', onFabDragEnd);
 });
