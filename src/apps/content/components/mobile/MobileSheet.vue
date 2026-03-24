@@ -104,7 +104,7 @@ watch(sheetState, (newVal) => {
 
 // Standard height mapping for different views when in PEEK mode
 const PEEK_HEIGHTS = {
-  [MOBILE_CONSTANTS.VIEWS.DASHBOARD]: '22dvh',
+  [MOBILE_CONSTANTS.VIEWS.DASHBOARD]: '30dvh',
   [MOBILE_CONSTANTS.VIEWS.SELECTION]: '40dvh',
   [MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION]: '40dvh',
   [MOBILE_CONSTANTS.VIEWS.INPUT]: '40dvh', // Initial peek before interaction

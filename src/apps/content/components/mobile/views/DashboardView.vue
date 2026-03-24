@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard-view" style="width: 100% !important; margin: 0 !important; padding: 0 !important; background: transparent !important; display: block !important; overflow: hidden !important;">
-    <div class="dashboard-scroll-container" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; overflow-x: auto !important; overflow-y: hidden !important; width: 100% !important; padding: 10px 10px !important; gap: 8px !important; box-sizing: border-box !important; -webkit-overflow-scrolling: touch !important;">
+  <div class="dashboard-view" style="width: 100% !important; margin: 0 !important; padding: 0 !important; background: transparent !important; display: block !important;">
+    <div class="dashboard-scroll-container" style="display: flex !important; flex-flow: row wrap !important; align-items: center !important; justify-content: center !important; width: 100% !important; padding: 12px 10px !important; gap: 8px 4px !important; box-sizing: border-box !important;">
       
       <!-- Translate Page Button -->
       <button class="action-btn" @click="translatePage" :style="btnStyle">
@@ -83,24 +83,24 @@ const btnStyle = {
   justifyContent: 'center',
   background: 'transparent',
   border: 'none',
-  padding: '8px 0',
+  padding: '4px 0',
   cursor: 'pointer',
   outline: 'none',
-  minWidth: '72px',
-  maxWidth: '72px',
-  flex: '0 0 72px',
+  minWidth: '70px',
+  maxWidth: '70px',
+  flex: '0 0 70px',
   boxSizing: 'border-box',
   WebkitTapHighlightColor: 'transparent'
 };
 
 const iconContainerStyle = {
-  width: '42px',
-  height: '42px',
+  width: '40px',
+  height: '40px',
   borderRadius: '12px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  marginBottom: '4px',
+  marginBottom: '2px',
   flexShrink: '0',
   transition: 'transform 0.1s ease'
 };
