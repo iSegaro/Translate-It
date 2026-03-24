@@ -12,6 +12,8 @@
     "watch:firefox": "cross-env NODE_ENV=development VITE_WATCH_MODE=true vite build --config config/vite/vite.config.firefox.js --watch",
     "dev:chrome": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.chrome.js",
     "dev:firefox": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.firefox.js",
+    "dev:android": "node scripts/dev/android-runner.mjs --build",
+    "watch:android": "node scripts/dev/android-runner.mjs",
     "lint": "eslint --config eslint.config.js",
     "lint:styles": "stylelint \"src/assets/styles/**/*.{css,scss}\"",
     "lint:styles:fix": "stylelint \"src/assets/styles/**/*.{css,scss}\" --fix",
