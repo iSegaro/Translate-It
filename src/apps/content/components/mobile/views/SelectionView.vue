@@ -141,10 +141,7 @@ const onTextCopied = () => {
 }
 
 const onHistory = () => {
-  pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, {
-    message: t('mobile_selection_history_unavailable') || 'History feature coming soon to mobile',
-    type: 'info'
-  })
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
 }
 </script>
 

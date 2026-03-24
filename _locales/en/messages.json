@@ -428,6 +428,9 @@
   "mobile_dashboard_revert_label": {
     "message": "Revert"
   },
+  "mobile_dashboard_history_label": {
+    "message": "History"
+  },
   "mobile_selection_auto_label": {
     "message": "Auto"
   },

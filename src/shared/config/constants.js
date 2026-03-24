@@ -206,7 +206,8 @@ export const MOBILE_CONSTANTS = {
     DASHBOARD: 'dashboard',
     SELECTION: 'selection',
     INPUT: 'input',
-    PAGE_TRANSLATION: 'page_translation'
+    PAGE_TRANSLATION: 'page_translation',
+    HISTORY: 'history'
   },
   SHEET_STATE: {
     PEEK: 'peek',

@@ -26,6 +26,14 @@
         <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
       </button>
 
+      <!-- History Button -->
+      <button class="action-btn" @click="goToHistoryView" :style="btnStyle">
+        <div class="icon-container history" :style="[iconContainerStyle, { background: '#fff9db' }]">
+          <img :src="historyIcon" :alt="t('mobile_dashboard_history_label') || 'History'" :style="iconImageStyle" width="24" height="24" />
+        </div>
+        <span class="action-label" :style="labelStyle">{{ t('mobile_dashboard_history_label') || 'History' }}</span>
+      </button>
+
       <!-- Settings Button -->
       <button class="action-btn" @click="openSettings" :style="btnStyle">
         <div class="icon-container settings" :style="[iconContainerStyle, { background: '#fff4e6' }]">
@@ -59,6 +67,7 @@ import selectIcon from '@/icons/ui/select.png';
 import translateIcon from '@/icons/ui/translate.png';
 import settingsIcon from '@/icons/ui/settings.png';
 import revertIcon from '@/icons/ui/revert.png';
+import historyIcon from '@/icons/ui/history.svg';
 
 const mobileStore = useMobileStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
@@ -136,6 +145,11 @@ const goToInputView = () => {
   mobileStore.resetSelectionData()
   mobileStore.setView(MOBILE_CONSTANTS.VIEWS.INPUT)
   mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+}
+
+const goToHistoryView = () => {
+  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
+  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
 }
 
 const openSettings = () => {

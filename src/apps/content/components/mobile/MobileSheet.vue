@@ -40,6 +40,7 @@
         <SelectionView v-if="activeView === MOBILE_CONSTANTS.VIEWS.SELECTION" />
         <InputView v-if="activeView === MOBILE_CONSTANTS.VIEWS.INPUT" />
         <PageTranslationView v-if="activeView === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION" />
+        <HistoryView v-if="activeView === MOBILE_CONSTANTS.VIEWS.HISTORY" />
       </div>
 
       <!-- Footer/Safe Area -->
@@ -61,6 +62,7 @@ import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
 import InputView from './views/InputView.vue'
 import PageTranslationView from './views/PageTranslationView.vue'
+import HistoryView from './views/HistoryView.vue'
 
 const mobileStore = useMobileStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
@@ -109,7 +111,9 @@ const sheetStyle = computed(() => {
     borderRadius: '20px 20px 0 0',
     height: sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
       ? '90vh' 
-      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '22vh' : '40vh'),
+      : (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD 
+          ? '22vh' 
+          : (activeView.value === MOBILE_CONSTANTS.VIEWS.HISTORY ? '60vh' : '40vh')),
     maxHeight: '90vh',
     transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease'
   }

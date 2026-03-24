@@ -431,6 +431,9 @@
   "mobile_dashboard_revert_label": {
     "message": "بازگشت"
   },
+  "mobile_dashboard_history_label": {
+    "message": "تاریخچه"
+  },
   "mobile_selection_auto_label": {
     "message": "خودکار"
   },
