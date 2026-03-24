@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
@@ -149,14 +149,26 @@ const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
 const { getErrorForDisplay } = useErrorHandler()
 
-// Initialize with store text if available (from SelectionView)
+// Initialize with immediate store values (defaults if not loaded)
 const inputText = ref(mobileStore.selectionData.text || '')
-const sourceLang = ref(mobileStore.selectionData.sourceLang || 'auto')
-const targetLang = ref(mobileStore.selectionData.targetLang || 'en')
-const currentProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+const sourceLang = ref(mobileStore.selectionData.sourceLang || settingsStore.settings.SOURCE_LANGUAGE || 'auto')
+const targetLang = ref(mobileStore.selectionData.targetLang || settingsStore.settings.TARGET_LANGUAGE || 'fa')
+const currentProvider = ref(settingsStore.settings.TRANSLATION_API || 'google')
 const isLoading = ref(false)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
 const isError = ref(!!mobileStore.selectionData.error)
+
+// Parallel sync: Update when settings are fully loaded from storage
+watch(() => settingsStore.isInitialized, (initialized) => {
+  if (initialized) {
+    // Only update if we're NOT in "edit mode" from a previous selection
+    if (!mobileStore.selectionData.text) {
+      sourceLang.value = settingsStore.settings.SOURCE_LANGUAGE || 'auto'
+      targetLang.value = settingsStore.settings.TARGET_LANGUAGE || 'fa'
+      currentProvider.value = settingsStore.settings.TRANSLATION_API || 'google'
+    }
+  }
+}, { immediate: true })
 
 const inputDir = computed(() => {
   if (!inputText.value) return 'ltr'
