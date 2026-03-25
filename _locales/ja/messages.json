@@ -972,7 +972,7 @@
     "message": "ホスト名が無効です。有効なドメイン名またはIPアドレスを入力してください。"
   },
   "theme_auto": {
-    "message": "自動（システム設定）"
+    "message": "自動"
   },
   "theme_light": {
     "message": "ライト"
