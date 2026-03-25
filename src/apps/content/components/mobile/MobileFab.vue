@@ -46,12 +46,12 @@ const mobileStore = useMobileStore();
 const tracker = useResourceTracker('mobile-fab');
 
 // State
-const fabPosition = ref({ x: null, y: 120 });
+const fabPosition = ref({ x: null, y: MOBILE_CONSTANTS.FAB.DEFAULT_Y });
 const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
 const isViewportUnstable = ref(true);
-const side = ref('right'); // 'left' or 'right'
+const side = ref(MOBILE_CONSTANTS.FAB.SIDE.RIGHT); // 'left' or 'right'
 let dragStartY = 0;
 let dragStartX = 0;
 let initialFabY = 0;
@@ -134,11 +134,11 @@ const onFabDragStart = (e) => {
   isFabDragging.value = true;
   dragStartY = point.clientY;
   dragStartX = point.clientX;
-  initialFabY = fabPosition.value.y || 120;
+  initialFabY = fabPosition.value.y || MOBILE_CONSTANTS.FAB.DEFAULT_Y;
   
   // Center of the FAB for drag calculations
   const screenWidth = window.innerWidth;
-  initialFabX = side.value === 'right' ? screenWidth - 25 : 25;
+  initialFabX = side.value === MOBILE_CONSTANTS.FAB.SIDE.RIGHT ? screenWidth - 25 : 25;
   
   if (isMouseEvent) {
     window.addEventListener('mousemove', onFabDragMove);
@@ -183,11 +183,11 @@ const onFabDragMove = (e) => {
       // User is deliberately pulling the FAB away from the edge
       if (currentX < snapThreshold) {
         // Snap/Stay on Left
-        newSide = 'left';
+        newSide = MOBILE_CONSTANTS.FAB.SIDE.LEFT;
         newX = null; 
       } else {
         // Snap/Stay on Right
-        newSide = 'right';
+        newSide = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
         newX = null;
       }
     } else {
@@ -219,7 +219,7 @@ const onFabDragEnd = async (e) => {
   // Final snap on release based on center line
   if (fabPosition.value.x !== null) {
     const screenWidth = window.innerWidth;
-    side.value = fabPosition.value.x < screenWidth / 2 ? 'left' : 'right';
+    side.value = fabPosition.value.x < screenWidth / 2 ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
   }
 
   // Ensure it's docked
@@ -257,7 +257,7 @@ const onMobileFabClick = () => {
 };
 
 const fabStyle = computed(() => {
-  const y = fabPosition.value.y || 120;
+  const y = fabPosition.value.y || MOBILE_CONSTANTS.FAB.DEFAULT_Y;
   const x = fabPosition.value.x;
   const currentSide = side.value;
   
@@ -296,7 +296,7 @@ const fabStyle = computed(() => {
     style.justifyContent = 'center !important';
   } else {
     // Snapped/Docked state - PEEK MODE (Half outside)
-    if (currentSide === 'left') {
+    if (currentSide === MOBILE_CONSTANTS.FAB.SIDE.LEFT) {
       style.left = '0 !important';
       style.marginLeft = '-35px !important'; // 25px hidden, 25px visible
       style.justifyContent = 'flex-end !important'; // Push icon to the visible right half

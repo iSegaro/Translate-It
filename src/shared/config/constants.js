@@ -219,6 +219,13 @@ export const MOBILE_CONSTANTS = {
     AUTO: 'auto',
     MOBILE: 'mobile',
     DESKTOP: 'desktop'
+  },
+  FAB: {
+    SIDE: {
+      LEFT: 'left',
+      RIGHT: 'right'
+    },
+    DEFAULT_Y: 120
   }
 };
 
