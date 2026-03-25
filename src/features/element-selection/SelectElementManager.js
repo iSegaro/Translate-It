@@ -217,7 +217,7 @@ class SelectElementManager extends ResourceTracker {
         // Load settings and potentially translation strings in parallel
         const [settings, bingWarning, lingvaWarning] = await Promise.all([
           getSettingsAsync(),
-          getTranslationString('SELECT_ELEMENT_BING_WARNING'),
+          getTranslationString('BING_WPT_WARNING'),
           getTranslationString('LINGVA_WPT_WARNING')
         ]);
 
