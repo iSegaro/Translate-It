@@ -571,6 +571,14 @@ class SelectElementManager extends ResourceTracker {
       return;
     }
 
+    // FIX: During translation processing, allow touch/pointer events to pass through
+    // so the user can scroll the page while waiting for the translation to complete.
+    // We still allow the rest of the function to block 'click' events for navigation prevention.
+    const isScrollRelatedTouch = event.type.startsWith('touch') || event.type.startsWith('pointer');
+    if (this.isProcessingClick && isScrollRelatedTouch) {
+      return;
+    }
+
     // BLOCK EVERYTHING ELSE to prevent site navigation or other extension handlers from firing
     event.preventDefault();
     event.stopPropagation();
