@@ -350,7 +350,8 @@ onMounted(async () => {
     border-bottom: var(--border-width) var(--border-style) var(--color-border);
     flex-direction: row;
     align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: 6px var(--spacing-md);
+    min-height: 50px;
     
     /* Force LTR for the header on mobile/tablet to keep it consistent */
     direction: ltr !important;
@@ -361,7 +362,7 @@ onMounted(async () => {
     flex-direction: row;
     align-items: center;
     width: 100%;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-sm);
     justify-content: space-between; /* Spread items across the header */
   }
 
@@ -439,8 +440,8 @@ onMounted(async () => {
 /* Mobile responsive */
 @media (max-width: 768px) {
   .options-sidebar {
-    padding: var(--spacing-sm);
-    min-height: 60px;
+    padding: 4px var(--spacing-sm);
+    min-height: 44px;
   }
 
   .sidebar-content {
