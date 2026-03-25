@@ -170,8 +170,6 @@ const retryLoading = () => {
 
 .extension-options.rtl {
   direction: rtl;
-  margin-top: 10px;
-  margin-bottom: 10px !important;
   
   .loading-container {
     text-align: right;
