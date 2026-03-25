@@ -176,7 +176,7 @@ export const CONFIG = {
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
-  SHOW_DESKTOP_FAB: false, // نمایش دکمه دسترسی سریع در دسکتاپ
+  SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   DESKTOP_FAB_VERTICAL_POS: -1, // موقعیت عمودی دکمه دسترسی سریع (-1 یعنی پیش‌فرض)
   MOBILE_FAB_POSITION: { x: null, y: null }, // موقعیت دکمه شناور موبایل
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
