@@ -252,7 +252,7 @@
     "message": "拡張機能が更新されました"
   },
   "notification_update_message": {
-    "message": "{appName} がバージョン {version} に正常に更新されました。"
+    "message": "{appName} がバージョン {version} に更新されました。新機能を見る"
   },
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "翻訳がタイムアウトしました。もう一度お試しください。"

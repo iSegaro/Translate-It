@@ -252,7 +252,7 @@
     "message": "Extension Updated"
   },
   "notification_update_message": {
-    "message": "{appName} has been successfully updated to version {version}."
+    "message": "{appName} updated to v{version}. See what's new."
   },
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "Translation timed out. Please try again."

@@ -252,7 +252,7 @@
     "message": "افزونه به‌روز شد"
   },
   "notification_update_message": {
-    "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد."
+    "message": "افزونه {appName} به نسخه {version} به‌روزرسانی شد. تغییرات جدید را ببینید."
   },
   "ERRORS_TRANSLATION_TIMEOUT": {
     "message": "ترجمه با زمان‌انتظار مواجه شد. لطفا دوباره تلاش کنید."
