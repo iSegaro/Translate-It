@@ -81,7 +81,7 @@ export async function setI18nLocale(localeCode) {
 (async () => {
   try {
     const settings = await browser.storage.local.get('APPLICATION_LOCALIZE');
-    const userLocale = settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE || 'English';
+    const userLocale = settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE || 'en';
     const langCode = UI_LOCALE_TO_CODE_MAP[userLocale] || 'en';
     await setI18nLocale(langCode);
   } catch {

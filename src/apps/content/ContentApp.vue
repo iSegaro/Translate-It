@@ -164,7 +164,7 @@ const toastRTL = ref(false);
 const getRTLFromStorage = async () => {
   // Read locale directly from storage - bypass SettingsManager cache entirely
   // ۱. اولویت با تنظیمات کاربر
-  const storage = await browser.storage.local.get({ APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English' });
+  const storage = await browser.storage.local.get({ APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'en' });
   const locale = storage.APPLICATION_LOCALIZE;
 
   // Use centralized locale to language code mapping from languageConstants.js

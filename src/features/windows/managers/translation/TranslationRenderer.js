@@ -196,7 +196,7 @@ export class TranslationRenderer {
     errorContainer.className = 'error-display-container';
     
     // Determine UI language direction for errors
-    const uiLocale = settingsManager.get('APPLICATION_LOCALIZE', CONFIG.APPLICATION_LOCALIZE || 'English');
+    const uiLocale = settingsManager.get('APPLICATION_LOCALIZE', CONFIG.APPLICATION_LOCALIZE || 'en');
     const langCode = UI_LOCALE_TO_CODE_MAP[uiLocale] || uiLocale;
     const isRtlUI = isRTLLanguage(langCode);
     

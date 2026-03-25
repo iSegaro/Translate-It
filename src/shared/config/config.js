@@ -53,7 +53,7 @@ export const CONFIG = {
   APP_NAME: "Translate It",
   // --- Core Settings ---
   DEBUG_MODE: false,
-  APPLICATION_LOCALIZE: "English",
+  APPLICATION_LOCALIZE: "en",
   SOURCE_LANGUAGE: "en",
   TARGET_LANGUAGE: "fa",
   THEME: "auto",

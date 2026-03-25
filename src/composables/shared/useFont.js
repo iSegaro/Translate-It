@@ -303,7 +303,7 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
  * Global font composable for app-wide font management
  */
 export function useGlobalFont() {
-  return useFont(CONFIG.APPLICATION_LOCALIZE || 'English', {
+  return useFont(CONFIG.APPLICATION_LOCALIZE || 'en', {
     enableCSSVariables: true,
     enableSmartDetection: true
   })

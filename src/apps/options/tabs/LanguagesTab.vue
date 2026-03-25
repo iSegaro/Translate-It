@@ -89,7 +89,7 @@ const { t } = useI18n()
 
 // Form values as refs
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
-const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
+const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -213,9 +213,9 @@ watch(() => settingsStore.selectedProvider, (newProvider) => {
   if (!targetSupported) {
     // Fallback to English or first available language (try different code variations)
     const english = filteredTargetLanguages.value.find(l =>
-      l.code === 'en' || l.code === 'English' || getCanonicalCode(l.code) === 'en'
+      l.code === 'en' || getCanonicalCode(l.code) === 'en'
     )
-    targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
+    targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'en'
     logger.debug(`Target language not supported by ${newProvider}, reset to`, targetLanguage.value)
   }
 })
@@ -233,9 +233,9 @@ watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldB
     const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
     if (!targetSupported) {
       const english = filteredTargetLanguages.value.find(l =>
-        l.code === 'en' || l.code === 'English' || getCanonicalCode(l.code) === 'en'
+        l.code === 'en' || getCanonicalCode(l.code) === 'en'
       )
-      targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'English'
+      targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'en'
       logger.debug('Target language not supported with new beta setting, reset to', targetLanguage.value)
     }
   }
@@ -245,7 +245,7 @@ watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldB
 onMounted(async () => {
   await loadLanguages();
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
-  targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'English'
+  targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'fa'
   // Validate on mount to show error if languages are the same
   await validateLanguages()
 })
