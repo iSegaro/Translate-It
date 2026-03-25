@@ -12,8 +12,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
-const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}`
-const FIREFOX_ZIP_PATH = `dist/firefox/Translate-It-v${pkg.version}.zip`
+const args = process.argv.slice(2)
+const isMobile = args.includes('--mobile') || args.includes('--m')
+
+const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`
+const FIREFOX_ZIP_PATH = `dist/firefox/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}.zip`
 
 /**
  * Build Firefox extension with Vue
@@ -37,6 +40,7 @@ async function buildFirefoxExtension() {
     
     process.env.NODE_ENV = 'production'
     process.env.BROWSER = 'firefox'
+    if (isMobile) process.env.IS_MOBILE = 'true'
 
     // Build main extension files
     const buildCommand = `npx vite build --config config/vite/vite.config.firefox.js`

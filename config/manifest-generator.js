@@ -9,6 +9,8 @@ import pkg from '../package.json' with { type: 'json' };
  * @returns {Object} Generated manifest object
  */
 export function generateManifest(browser = 'chrome') {
+  const isMobile = process.env.IS_MOBILE === 'true';
+
   // Base manifest shared across browsers
   const baseManifest = {
     name: browser === 'firefox' ? '__MSG_nameFirefox__' : '__MSG_nameChrome__',
@@ -24,8 +26,7 @@ export function generateManifest(browser = 'chrome') {
       'webNavigation',
       'clipboardWrite',
       'clipboardRead',
-      'notifications',
-      'contextMenus'
+      'notifications'
     ],
 
     host_permissions: ['<all_urls>', 'file://*/*'],
@@ -74,10 +75,12 @@ export function generateManifest(browser = 'chrome') {
       32: 'icons/extension/extension_icon_32.png',
       48: 'icons/extension/extension_icon_48.png',
       128: 'icons/extension/extension_icon_128.png'
-    },
-    
-    // Commands
-    commands: {
+    }
+  };
+
+  // Add commands (Desktop only)
+  if (!isMobile) {
+    baseManifest.commands = {
       'SELECT-ELEMENT-COMMAND': {
         suggested_key: {
           default: 'Alt+A',
@@ -85,8 +88,8 @@ export function generateManifest(browser = 'chrome') {
         },
         description: 'Activate the \'Select Element\' mode for translation.'
       }
-    }
-  };
+    };
+  }
 
   // browser-specific configurations
   if (browser === 'firefox') {
@@ -101,7 +104,9 @@ export function generateManifest(browser = 'chrome') {
  * @private
  */
 function generateChromeManifest(baseManifest) {
-  return {
+  const isMobile = process.env.IS_MOBILE === 'true';
+
+  const manifest = {
     ...baseManifest,
     manifest_version: 3,
     
@@ -114,7 +119,6 @@ function generateChromeManifest(baseManifest) {
     // Chrome-specific permissions
     permissions: [
       ...baseManifest.permissions,
-      'sidePanel',
       'tts',
       'offscreen',
       'proxy'
@@ -132,11 +136,6 @@ function generateChromeManifest(baseManifest) {
       }
     },
     
-    // Chrome side panel
-    side_panel: {
-      default_path: 'html/sidepanel.html'
-    },
-    
     // Options page
     options_page: 'html/options.html',
     
@@ -145,6 +144,17 @@ function generateChromeManifest(baseManifest) {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
     }
   };
+
+  // Add contextMenus and sidePanel permission (Desktop only)
+  if (!isMobile) {
+    manifest.permissions.push('contextMenus');
+    manifest.permissions.push('sidePanel');
+    manifest.side_panel = {
+      default_path: 'html/sidepanel.html'
+    };
+  }
+
+  return manifest;
 }
 
 /**
@@ -152,6 +162,8 @@ function generateChromeManifest(baseManifest) {
  * @private
  */
 function generateFirefoxManifest(baseManifest) {
+  const isMobile = process.env.IS_MOBILE === 'true';
+
   const manifest = {
     ...baseManifest,
     manifest_version: 3,
@@ -179,13 +191,7 @@ function generateFirefoxManifest(baseManifest) {
       extension_pages: "script-src 'self'; object-src 'self'; trusted-types default vue dompurify;"
     },
     
-    // Firefox uses sidebar_action instead of side_panel
-    sidebar_action: {
-      default_panel: 'html/sidepanel.html',
-      default_title: '__MSG_name__'
-    },
-    
-    // Firefox action (popup) - similar to Chrome but with Firefox naming
+    // Action (popup) - similar to Chrome but with Firefox naming
     action: {
       default_popup: 'html/popup.html',
       default_title: '__MSG_name__',
@@ -243,6 +249,15 @@ function generateFirefoxManifest(baseManifest) {
     ]
   };
 
+  // Firefox uses sidebar_action instead of side_panel (Desktop only)
+  if (!isMobile) {
+    manifest.permissions.push('contextMenus');
+    manifest.sidebar_action = {
+      default_panel: 'html/sidepanel.html',
+      default_title: '__MSG_name__'
+    };
+  }
+
   // Ensure no persistent key is present for Firefox MV3
   if (manifest.background && manifest.background.persistent) {
     delete manifest.background.persistent;
@@ -257,9 +272,11 @@ function generateFirefoxManifest(baseManifest) {
  * @returns {Object} browser-specific fields
  */
 export function getbrowserSpecificFields(browser) {
+  const isMobile = process.env.IS_MOBILE === 'true';
+
   if (browser === 'firefox') {
     return {
-      panelKey: 'sidebar_action',
+      panelKey: isMobile ? null : 'sidebar_action',
       backgroundType: 'service-worker', // Firefox MV3 with service worker
       hasOffscreen: false,
       hasSidePanel: false,
@@ -268,10 +285,10 @@ export function getbrowserSpecificFields(browser) {
     };
   } else {
     return {
-      panelKey: 'side_panel',
+      panelKey: isMobile ? null : 'side_panel',
       backgroundType: 'service-worker',
       hasOffscreen: true,
-      hasSidePanel: true, 
+      hasSidePanel: !isMobile, 
       hasTTS: true,
       manifestVersion: 3
     };

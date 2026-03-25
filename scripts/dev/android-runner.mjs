@@ -65,7 +65,7 @@ if (!deviceIp) {
   console.log(` No device detected. Falling back to default: ${deviceIp}`)
 }
 
-const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}`
+const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}-mobile`
 
 /**
  * Detect installed Firefox packages on the device
@@ -98,7 +98,7 @@ async function runAndroid() {
     if (shouldBuild) {
       logStep('Building Firefox extension for Android...')
       // dev:firefox is used for development builds as per package.json
-      execSync('pnpm run dev:firefox', { stdio: 'inherit', cwd: rootDir })
+      execSync('cross-env IS_MOBILE=true pnpm run dev:firefox', { stdio: 'inherit', cwd: rootDir })
       logSuccess('Firefox build completed')
     }
 

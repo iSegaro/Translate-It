@@ -6,6 +6,9 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
+const isMobile = process.env.IS_MOBILE === 'true';
+const baseOutDir = `dist/chrome/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`;
+
 // Import production config for production builds
 let productionConfig = null;
 if (process.env.NODE_ENV === 'production') {
@@ -157,7 +160,7 @@ function fixExtensionPaths() {
           console.log('🔄 HTML file updated, fixing paths...');
           
           // Get the output directory from build options
-          const outDir = resolve(process.cwd(), `dist/chrome/Translate-It-v${pkg.version}`);
+          const outDir = baseOutDir;
           
           // Only fix paths if the output directory exists (not in pure dev mode)
           if (await fs.pathExists(outDir)) {
@@ -193,9 +196,16 @@ const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
 
 export default defineConfig({
   ...finalConfig,
+  // Chrome-specific build definitions
+  define: {
+    ...(finalConfig.define || {}),
+    __BROWSER__: JSON.stringify('chrome'),
+    __MANIFEST_VERSION__: 3,
+    __IS_MOBILE__: isMobile
+  },
   build: {
     ...(finalConfig.build || {}),
-    outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+    outDir: baseOutDir,
     rollupOptions: {
       ...(finalConfig.build?.rollupOptions || {}),
       // Override entry points to remove them from production config
@@ -223,7 +233,7 @@ export default defineConfig({
         ...baseConfig,
         build: {
           ...baseConfig.build,
-          outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+          outDir: baseOutDir,
           modulePreload: false,
           rollupOptions: {
             output: {
@@ -254,7 +264,7 @@ export default defineConfig({
         ...baseConfig,
         build: {
           ...baseConfig.build,
-          outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+          outDir: baseOutDir,
           emptyOutDir: false,
           rollupOptions: {
             output: { format: 'es' }
@@ -262,7 +272,7 @@ export default defineConfig({
         }
       },
       transformManifest: async (manifest) => {
-        const outDir = `dist/chrome/Translate-It-v${pkg.version}`;
+        const outDir = baseOutDir;
         await fs.ensureDir(outDir);
         await fs.ensureDir(resolve(outDir, 'html'));
         

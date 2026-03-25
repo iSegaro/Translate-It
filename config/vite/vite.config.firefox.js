@@ -6,6 +6,9 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
+const isMobile = process.env.IS_MOBILE === 'true';
+const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`;
+
 // Import production config for production builds
 let productionConfig = null;
 if (process.env.NODE_ENV === 'production') {
@@ -32,7 +35,7 @@ function copyFirefoxAssets() {
         if (await fs.pathExists(stylesDir)) {
           await fs.ensureDir(outStylesDir);
           await fs.copy(stylesDir, outStylesDir);
-          console.log('✅ Copied CSS files from src/styles/ to Firefox build directory');
+          console.log(`✅ Copied CSS files from src/styles/ to Firefox build directory: ${options.dir}`);
         }
 
         // Icons are copied later in transformManifest, skip here to avoid duplication
@@ -48,12 +51,13 @@ export default defineConfig({
   define: {
     ...(finalConfig.define || {}),
     __BROWSER__: JSON.stringify('firefox'),
-    __MANIFEST_VERSION__: 3
+    __MANIFEST_VERSION__: 3,
+    __IS_MOBILE__: isMobile
   },
 
   build: {
     ...(finalConfig.build || {}),
-    outDir: `dist/firefox/Translate-It-v${pkg.version}`,
+    outDir: baseOutDir,
   },
   
   plugins: [
@@ -77,7 +81,7 @@ export default defineConfig({
         },
         build: {
           ...baseConfig.build,
-          outDir: `dist/firefox/Translate-It-v${pkg.version}`,
+          outDir: baseOutDir,
           modulePreload: false,
           rollupOptions: {
             output: {
@@ -110,7 +114,7 @@ export default defineConfig({
         ...baseConfig,
         build: {
           ...baseConfig.build,
-          outDir: `dist/firefox/Translate-It-v${pkg.version}`,
+          outDir: baseOutDir,
           emptyOutDir: false,
           rollupOptions: {
             output: { format: 'es' }
@@ -120,7 +124,7 @@ export default defineConfig({
 
       // Write generated manifest.json to disk for dev mode to enable extension auto-install
       transformManifest: async (manifest) => {
-        const outDir = `dist/firefox/Translate-It-v${pkg.version}`;
+        const outDir = baseOutDir;
         await fs.ensureDir(outDir);
         await fs.ensureDir(resolve(outDir, 'html'));
         
