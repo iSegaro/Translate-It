@@ -131,21 +131,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: $spacing-md;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: none;
   border-radius: $border-radius-lg;
   padding: $spacing-sm $spacing-lg;
   cursor: pointer;
   transition: all $transition-base;
   min-width: 140px;
   justify-content: flex-start;
-  box-shadow: $shadow-sm;
 
   &:hover {
-    border-color: var(--color-primary);
     background: var(--color-surface);
     transform: translateY(-1px);
-    box-shadow: $shadow-base;
   }
 
   &:active {
