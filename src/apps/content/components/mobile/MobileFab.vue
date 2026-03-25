@@ -292,17 +292,17 @@ const fabStyle = computed(() => {
   if (isFabDragging.value && x !== null) {
     // During horizontal drag (Floating)
     style.left = `${x}px !important`;
-    style.marginLeft = '-25px !important';
+    style.marginLeft = '-20px !important';
     style.justifyContent = 'center !important';
   } else {
     // Snapped/Docked state - PEEK MODE (Half outside)
     if (currentSide === 'left') {
       style.left = '0 !important';
-      style.marginLeft = '-25px !important'; // 25px hidden, 25px visible
+      style.marginLeft = '-35px !important'; // 25px hidden, 25px visible
       style.justifyContent = 'flex-end !important'; // Push icon to the visible right half
     } else {
       style.left = '100% !important';
-      style.marginLeft = '-25px !important'; // 25px hidden, 25px visible
+      style.marginLeft = '-20px !important'; // 25px hidden, 25px visible
       style.justifyContent = 'flex-start !important'; // Push icon to the visible left half
     }
   }
