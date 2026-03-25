@@ -17,6 +17,8 @@ import {
   getModeProvidersAsync,
   TranslationMode
 } from '@/config.js';
+
+import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -249,14 +251,14 @@ export class PageTranslationManager extends ResourceTracker {
         this.notificationManager.show(
           warningMessage || 'Lingva may have issues with long texts during page translation.',
           'warning',
-          PAGE_TRANSLATION_TIMING.WARNING_DURATION
+          NOTIFICATION_TIME.WARNING_PROVIDER
         );
       } else if (this.settings.translationApi === ProviderRegistryIds.BING) {
         const warningMessage = await getTranslationString('BING_WPT_WARNING');
         this.notificationManager.show(
           warningMessage || 'Bing may have issues with long texts during page translation.',
           'warning',
-          PAGE_TRANSLATION_TIMING.WARNING_DURATION
+          NOTIFICATION_TIME.WARNING_PROVIDER
         );
       }
 

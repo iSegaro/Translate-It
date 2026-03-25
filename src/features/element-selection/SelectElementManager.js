@@ -227,14 +227,14 @@ class SelectElementManager extends ResourceTracker {
           pageEventBus.emit('show-notification', {
             type: 'warning',
             message: bingWarning || 'Bing may have issues with Select Element. Try another provider.',
-            duration: NOTIFICATION_TIME.WARNING,
+            duration: NOTIFICATION_TIME.WARNING_PROVIDER,
             id: `bing-warning-${this.instanceId}`,
           });
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
           pageEventBus.emit('show-notification', {
             type: 'warning',
             message: lingvaWarning || 'Lingva may have issues with long texts. Try another provider.',
-            duration: NOTIFICATION_TIME.WARNING,
+            duration: NOTIFICATION_TIME.WARNING_PROVIDER,
             id: `lingva-warning-${this.instanceId}`,
           });
         }
