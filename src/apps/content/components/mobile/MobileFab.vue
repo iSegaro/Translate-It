@@ -55,9 +55,9 @@ const tracker = useResourceTracker('mobile-fab');
 // State
 const fabPosition = ref({ x: null, y: 120 });
 const isFabDragging = ref(false);
-const isFabIdle = ref(false);
+const isFabIdle = ref(true);
 const isHovering = ref(false);
-const isViewportUnstable = ref(false);
+const isViewportUnstable = ref(true);
 let dragStartY = 0;
 let initialFabY = 0;
 let fabIdleTimerId = null;
@@ -278,7 +278,6 @@ onMounted(async () => {
   } catch (err) {
     logger.error('Failed to load mobile FAB position:', err);
   }
-  startFabIdleTimer();
 });
 
 onUnmounted(() => {
