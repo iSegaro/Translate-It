@@ -69,6 +69,13 @@ const mobileStore = useMobileStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
 const tts = useTTSSmart()
 
+// Watch for activeView changes to stop TTS playback when navigating between views
+watch(activeView, () => {
+  if (tts && typeof tts.stopAll === 'function') {
+    tts.stopAll();
+  }
+});
+
 // Watch for isOpen changes to sync state with WindowsManager and stop audio
 watch(isOpen, (newVal) => {
   if (!newVal) {
