@@ -178,7 +178,7 @@ export const CONFIG = {
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   DESKTOP_FAB_VERTICAL_POS: -1, // موقعیت عمودی دکمه دسترسی سریع (-1 یعنی پیش‌فرض)
-  MOBILE_FAB_POSITION: { x: null, y: null }, // موقعیت دکمه شناور موبایل
+  MOBILE_FAB_POSITION: { side: "right", y: 120 }, // موقعیت دکمه شناور موبایل (سمت و ارتفاع)
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
