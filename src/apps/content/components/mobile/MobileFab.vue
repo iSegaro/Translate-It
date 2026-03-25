@@ -189,6 +189,16 @@ const onFabDragEnd = async (e) => {
   startFabIdleTimer();
 };
 
+const handleSelectionChange = () => {
+  const selection = window.getSelection();
+  const selectedText = selection ? selection.toString().trim() : '';
+  
+  if (selectedText) {
+    // Wake up FAB when text is selected (Fade in)
+    startFabIdleTimer();
+  }
+};
+
 const onMobileFabClick = () => {
   const selection = window.getSelection();
   let selectedText = selection ? selection.toString().trim() : '';
@@ -250,6 +260,9 @@ const fabStyle = computed(() => {
 
 onMounted(async () => {
   if (typeof window !== 'undefined') {
+    // Listen for text selection changes to wake up FAB
+    tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
+
     if (window.visualViewport) {
       tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
       tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
