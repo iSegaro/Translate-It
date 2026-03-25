@@ -241,6 +241,13 @@ export class ContextMenuManager extends ResourceTracker {
     try {
       this.browser = browser;
 
+      // Check if contextMenus API is available (not available on mobile)
+      if (!this.browser.contextMenus) {
+        logger.info("Context menus API not available, skipping initialization");
+        this.initialized = true;
+        return;
+      }
+
       logger.info("Initializing context menu manager", force ? '(forced)' : '');
 
       // Set up default context menus (this clears existing ones)
@@ -268,6 +275,11 @@ export class ContextMenuManager extends ResourceTracker {
   _menuSetupLock = false;
   _pendingSetupPromise = null;
   async setupDefaultMenus(locale = null) {
+    if (!this.browser?.contextMenus && !browser?.contextMenus) {
+      logger.debug("Skipping setupDefaultMenus: contextMenus API not available");
+      return;
+    }
+
     logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
 
     // Global lock to prevent any race conditions across the entire extension

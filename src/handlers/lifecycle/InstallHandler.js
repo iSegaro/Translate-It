@@ -258,6 +258,12 @@ async function handleExtensionUpdate() {
  */
 async function setupContextMenus() {
   try {
+    // Check if contextMenus API is available (not available on mobile)
+    if (!browser.contextMenus) {
+      logger.info('Context menus API not available, skipping setup');
+      return;
+    }
+
     // Only clear menus if this is a fresh install, not on extension update/reload
     // to prevent interfering with existing working menus
     const details = arguments[0] || {};
