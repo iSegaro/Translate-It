@@ -20,10 +20,8 @@
         width: '26px !important',
         height: '26px !important',
         objectFit: 'contain',
-        marginLeft: '0 !important',
-        marginRight: 'auto !important',
-        paddingLeft: '6px !important',
-        transition: 'none'
+        transform: side === 'left' ? 'scaleX(-1) !important' : 'none !important',
+        transition: 'transform 0.3s ease'
       }"
     />
   </div>
@@ -53,8 +51,11 @@ const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
 const isViewportUnstable = ref(true);
+const side = ref('right'); // 'left' or 'right'
 let dragStartY = 0;
+let dragStartX = 0;
 let initialFabY = 0;
+let initialFabX = 0;
 let fabIdleTimerId = null;
 let animationFrameId = null;
 
@@ -132,7 +133,12 @@ const onFabDragStart = (e) => {
   const point = isMouseEvent ? e : e.touches[0];
   isFabDragging.value = true;
   dragStartY = point.clientY;
+  dragStartX = point.clientX;
   initialFabY = fabPosition.value.y || 120;
+  
+  // Center of the FAB for drag calculations
+  const screenWidth = window.innerWidth;
+  initialFabX = side.value === 'right' ? screenWidth - 25 : 25;
   
   if (isMouseEvent) {
     window.addEventListener('mousemove', onFabDragMove);
@@ -152,18 +158,45 @@ const onFabDragMove = (e) => {
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
   const currentY = point.clientY;
+  const currentX = point.clientX;
   
   if (e.cancelable) e.preventDefault();
   if (animationFrameId) return;
 
   animationFrameId = requestAnimationFrame(() => {
+    // 1. Vertical Movement (Always allowed)
     const deltaY = dragStartY - currentY;
     let newY = initialFabY + deltaY;
-    
-    // Clamp to layout viewport
     newY = Math.max(50, Math.min(window.innerHeight - 50, newY));
     
-    fabPosition.value = { ...fabPosition.value, y: newY };
+    // 2. Horizontal Magnetic Logic
+    const screenWidth = window.innerWidth;
+    const snapThreshold = screenWidth / 2; // Snap as soon as it crosses the midpoint
+    const breakThreshold = 40; // Horizontal pull needed to detach from current side
+    
+    let newX = null;
+    let newSide = side.value;
+
+    const deltaXFromStart = Math.abs(currentX - dragStartX);
+
+    if (deltaXFromStart > breakThreshold) {
+      // User is deliberately pulling the FAB away from the edge
+      if (currentX < snapThreshold) {
+        // Snap/Stay on Left
+        newSide = 'left';
+        newX = null; 
+      } else {
+        // Snap/Stay on Right
+        newSide = 'right';
+        newX = null;
+      }
+    } else {
+      // Stay pinned to the current side (Vertical movement only)
+      newX = null;
+    }
+    
+    fabPosition.value = { x: newX, y: newY };
+    side.value = newSide;
     animationFrameId = null;
   });
 };
@@ -182,10 +215,22 @@ const onFabDragEnd = async (e) => {
     window.removeEventListener('mousemove', onFabDragMove);
     window.removeEventListener('mouseup', onFabDragEnd);
   }
+
+  // Final snap on release based on center line
+  if (fabPosition.value.x !== null) {
+    const screenWidth = window.innerWidth;
+    side.value = fabPosition.value.x < screenWidth / 2 ? 'left' : 'right';
+  }
+
+  // Ensure it's docked
+  fabPosition.value.x = null;
   
   try {
     await storageManager.set({ 
-      MOBILE_FAB_POSITION: { x: null, y: fabPosition.value.y } 
+      MOBILE_FAB_POSITION: { 
+        side: side.value,
+        y: fabPosition.value.y 
+      } 
     });
   } catch (err) {
     logger.error('Failed to save mobile FAB position:', err);
@@ -213,12 +258,9 @@ const onMobileFabClick = () => {
 
 const fabStyle = computed(() => {
   const y = fabPosition.value.y || 120;
+  const x = fabPosition.value.x;
+  const currentSide = side.value;
   
-  // Visibility Logic: 
-  // 1. If dragging or hovering: Full visibility
-  // 2. If scrolling/unstable: Completely hidden (0)
-  // 3. If idle: Faint (0.2)
-  // 4. Default: Active (1)
   let currentOpacity = '1';
   let pointerEvents = 'auto';
 
@@ -233,22 +275,40 @@ const fabStyle = computed(() => {
     pointerEvents = 'auto';
   }
   
-  return {
+  const style = {
     position: 'fixed !important',
     bottom: `${y}px !important`,
-    left: '100% !important',
-    marginLeft: '-25px !important',
     width: '50px !important',
     height: '50px !important',
     display: 'flex !important',
+    alignItems: 'center !important',
     zIndex: '2147483647 !important',
     pointerEvents: `${pointerEvents} !important`,
     '--fab-opacity-val': currentOpacity,
     opacity: 'var(--fab-opacity-val) !important',
-    transition: isFabDragging.value ? 'none' : 'opacity 0.25s ease, bottom 0.1s ease-out'
+    transition: isFabDragging.value ? 'none' : 'opacity 0.25s ease, bottom 0.1s ease-out, left 0.3s ease-out, margin 0.3s ease-out'
   };
-});
 
+  if (isFabDragging.value && x !== null) {
+    // During horizontal drag (Floating)
+    style.left = `${x}px !important`;
+    style.marginLeft = '-25px !important';
+    style.justifyContent = 'center !important';
+  } else {
+    // Snapped/Docked state - PEEK MODE (Half outside)
+    if (currentSide === 'left') {
+      style.left = '0 !important';
+      style.marginLeft = '-25px !important'; // 25px hidden, 25px visible
+      style.justifyContent = 'flex-end !important'; // Push icon to the visible right half
+    } else {
+      style.left = '100% !important';
+      style.marginLeft = '-25px !important'; // 25px hidden, 25px visible
+      style.justifyContent = 'flex-start !important'; // Push icon to the visible left half
+    }
+  }
+
+  return style;
+  });
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     // Listen for text selection changes to wake up FAB
@@ -265,9 +325,11 @@ onMounted(async () => {
   updateViewport();
 
   try {
-    const savedPosition = await getMobileFabPositionAsync();
-    if (savedPosition && savedPosition.y !== null) {
-      fabPosition.value.y = savedPosition.y;
+    const savedData = await storageManager.get('MOBILE_FAB_POSITION');
+    const pos = savedData.MOBILE_FAB_POSITION;
+    if (pos) {
+      if (pos.y !== null) fabPosition.value.y = pos.y;
+      if (pos.side) side.value = pos.side;
     }
   } catch (err) {
     logger.error('Failed to load mobile FAB position:', err);
