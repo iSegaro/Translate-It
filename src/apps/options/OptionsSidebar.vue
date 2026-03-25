@@ -351,6 +351,10 @@ onMounted(async () => {
     flex-direction: row;
     align-items: center;
     padding: var(--spacing-sm) var(--spacing-md);
+    
+    /* Force LTR for the header on mobile/tablet to keep it consistent */
+    direction: ltr !important;
+    text-align: left !important;
   }
 
   .sidebar-content {
