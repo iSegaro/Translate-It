@@ -128,14 +128,18 @@ const labelStyle = {
 const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   
-  // Navigate with implicit state (PAGE_TRANSLATION uses FULL state by default in navigate logic)
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  
-  // Emit translation event BEFORE closing the sheet to ensure it fires
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
-  
-  // Close the sheet to let user see the page
-  mobileStore.closeSheet()
+  const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || 
+                                mobileStore.pageTranslationData.isAutoTranslating ||
+                                mobileStore.pageTranslationData.isTranslated;
+
+  if (isCurrentlyTranslating) {
+    // If already translating or translated, just show the status view
+    mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
+  } else {
+    // If not translating, start translation and close the sheet
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+    mobileStore.closeSheet()
+  }
 }
 
 const activateSelectElement = () => {
