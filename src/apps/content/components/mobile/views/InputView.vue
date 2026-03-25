@@ -185,14 +185,14 @@ const handlePaste = async () => {
     if (text) {
       inputText.value = text;
       pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
-        message: t('mobile_input_pasted_message') || 'Pasted from clipboard', 
+        message: t('mobile_input_pasted_message'), 
         type: 'success' 
       });
     }
   } catch (error) {
     console.error('[InputView] Paste failed:', error);
     pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
-      message: 'Paste failed. Please allow clipboard access.', 
+      message: t('mobile_input_paste_failed'), 
       type: 'error' 
     });
   }

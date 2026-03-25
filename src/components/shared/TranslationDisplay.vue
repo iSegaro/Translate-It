@@ -133,7 +133,7 @@
           class="mobile-action-btn primary-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
           @click="handleMobileSpeak" 
-          :title="ttsStatus === 'playing' ? (t('mobile_selection_stop_tooltip') || 'Stop') : ttsTitle"
+          :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle"
         >
           <svg
             v-if="ttsStatus === 'playing'"
@@ -152,7 +152,7 @@
             style="width: 16px !important; height: 16px !important; object-fit: contain !important;" 
           />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
-            {{ ttsStatus === 'playing' ? (t('mobile_selection_stop_label') || 'Stop') : (t('mobile_selection_speak_tooltip') || 'Speak') }}
+            {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
           </span>
         </button>
         
@@ -164,7 +164,7 @@
         >
           <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
-            {{ t('mobile_selection_copy_tooltip') || 'Copy' }}
+            {{ t('mobile_selection_copy_tooltip') }}
           </span>
         </button>
         
@@ -172,9 +172,9 @@
           class="mobile-action-btn icon-only-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important;"
           @click="handleMobileHistory" 
-          :title="t('mobile_selection_history_tooltip') || 'History'"
+          :title="t('mobile_selection_history_tooltip')"
         >
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt') || 'History'" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
         </button>
       </div>
     </template>

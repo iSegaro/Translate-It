@@ -437,9 +437,6 @@
   "mobile_selection_translating_label": {
     "message": "Translating..."
   },
-  "mobile_selection_translation_title": {
-    "message": "Translation"
-  },
   "mobile_selection_source_text_title": {
     "message": "Source Text"
   },
@@ -460,9 +457,6 @@
   },
   "mobile_selection_copied_message": {
     "message": "Translation copied to clipboard"
-  },
-  "mobile_selection_history_unavailable": {
-    "message": "History feature coming soon to mobile"
   },
   "mobile_page_dashboard_btn": {
     "message": "Dashboard"
@@ -512,9 +506,6 @@
   "mobile_fab_alt": {
     "message": "Translate"
   },
-  "mobile_exit_select_mode": {
-    "message": "Exit Select Mode"
-  },
   "mobile_back_button_alt": {
     "message": "Back"
   },
@@ -523,12 +514,6 @@
   },
   "mobile_swap_languages_alt": {
     "message": "To"
-  },
-  "mobile_speak_button_alt": {
-    "message": "Speak"
-  },
-  "mobile_copy_button_alt": {
-    "message": "Copy"
   },
   "mobile_history_button_alt": {
     "message": "History"
@@ -587,9 +572,6 @@
   "mobile_input_clear_btn": {
     "message": "Clear"
   },
-  "mobile_input_to_label": {
-    "message": "To:"
-  },
   "mobile_input_translate_btn": {
     "message": "Translate"
   },
@@ -601,6 +583,12 @@
   },
   "mobile_input_copied_message": {
     "message": "Copied"
+  },
+  "mobile_input_pasted_message": {
+    "message": "Pasted from clipboard"
+  },
+  "mobile_input_paste_failed": {
+    "message": "Paste failed. Please allow clipboard access."
   },
   "options_textField_mode_copy": {
     "message": "Copy to Clipboard"

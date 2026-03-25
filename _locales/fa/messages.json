@@ -440,9 +440,6 @@
   "mobile_selection_translating_label": {
     "message": "در حال ترجمه..."
   },
-  "mobile_selection_translation_title": {
-    "message": "ترجمه"
-  },
   "mobile_selection_source_text_title": {
     "message": "متن اصلی"
   },
@@ -463,9 +460,6 @@
   },
   "mobile_selection_copied_message": {
     "message": "ترجمه در حافظه کپی شد"
-  },
-  "mobile_selection_history_unavailable": {
-    "message": "ویژگی تاریخچه به زودی به موبایل اضافه می‌شود"
   },
   "mobile_page_dashboard_btn": {
     "message": "داشبورد"
@@ -515,9 +509,6 @@
   "mobile_fab_alt": {
     "message": "ترجمه"
   },
-  "mobile_exit_select_mode": {
-    "message": "خروج از حالت انتخاب"
-  },
   "mobile_back_button_alt": {
     "message": "بازگشت"
   },
@@ -526,12 +517,6 @@
   },
   "mobile_swap_languages_alt": {
     "message": "به"
-  },
-  "mobile_speak_button_alt": {
-    "message": "پخش صدا"
-  },
-  "mobile_copy_button_alt": {
-    "message": "کپی"
   },
   "mobile_history_button_alt": {
     "message": "تاریخچه"
@@ -590,9 +575,6 @@
   "mobile_input_clear_btn": {
     "message": "پاک کردن"
   },
-  "mobile_input_to_label": {
-    "message": "به:"
-  },
   "mobile_input_translate_btn": {
     "message": "ترجمه"
   },
@@ -604,6 +586,12 @@
   },
   "mobile_input_copied_message": {
     "message": "کپی شد"
+  },
+  "mobile_input_pasted_message": {
+    "message": "از حافظه جایگذاری شد"
+  },
+  "mobile_input_paste_failed": {
+    "message": "خطا در جایگذاری. لطفاً دسترسی به حافظه را اجازه دهید."
   },
   "options_textField_mode_copy": {
     "message": "کپی در حافظه"
