@@ -184,7 +184,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { getTextDirection, isRTLLanguage } from "@/features/element-selection/utils/textDirection.js";
+import { getTextDirection, isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -386,6 +386,7 @@ try {
         enableSmartDetection: true,
         fallbackFont: "system",
         enableCSSVariables: true,
+        forcedDirection: computed(() => textDirection.value.dir) // Pass detected direction
       },
     );
 
@@ -427,7 +428,7 @@ try {
   });
 }
 
-// Enhanced text direction computation with target language awareness
+// Enhanced text direction computation with content-first detection
 const textDirection = computed(() => {
   // If we have an error, follow UI language direction strictly
   if (hasError.value) {
@@ -440,17 +441,17 @@ const textDirection = computed(() => {
   }
 
   const textToCheck = props.content || "";
+  if (!textToCheck.trim()) {
+    const direction = isRTLLanguage(props.targetLanguage) ? 'rtl' : 'ltr';
+    return { dir: direction, textAlign: direction === 'rtl' ? 'right' : 'left' };
+  }
 
-  // Use new target-language-first detection
-  const direction = getTextDirection(props.targetLanguage || 'fa', textToCheck);
-  const isRtl = direction === 'rtl';
-
-  // Fallback to basic detection if advanced detection fails
-  const finalDirection = isRtl || shouldApplyRtl(textToCheck);
+  // Use advanced content-based detection
+  const direction = detectTextDirectionFromContent(textToCheck, props.targetLanguage);
 
   return {
-    dir: finalDirection ? "rtl" : "ltr",
-    textAlign: finalDirection ? "right" : "left",
+    dir: direction,
+    textAlign: direction === 'rtl' ? 'right' : 'left',
   };
 });
 

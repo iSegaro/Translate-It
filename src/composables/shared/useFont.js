@@ -68,7 +68,8 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
   const {
     enableSmartDetection = true,
     fallbackFont = 'system',
-    enableCSSVariables = true
+    enableCSSVariables = true,
+    forcedDirection = null // New option to force direction regardless of language
   } = options
 
   // Handle both string and computed ref for targetLanguage
@@ -79,6 +80,16 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
       return targetLanguage.value
     }
     return CONFIG.TARGET_LANGUAGE || 'fa'
+  })
+  
+  // Handle both string and computed ref for forcedDirection
+  const computedForcedDirection = computed(() => {
+    if (typeof forcedDirection === 'string') {
+      return forcedDirection
+    } else if (forcedDirection && typeof forcedDirection.value !== 'undefined') {
+      return forcedDirection.value
+    }
+    return null
   })
   
   // Get settings store
@@ -139,6 +150,10 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
   
   // Check if language is RTL
   const isRTL = computed(() => {
+    // If direction is forced, use that
+    if (computedForcedDirection.value) {
+      return computedForcedDirection.value === 'rtl'
+    }
     return RTL_LANGUAGES.includes(computedTargetLanguage.value?.toLowerCase())
   })
   
