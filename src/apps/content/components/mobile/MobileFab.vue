@@ -106,6 +106,16 @@ const startFabIdleTimer = () => {
   }, 750);
 };
 
+const handleSelectionChange = () => {
+  const selection = window.getSelection();
+  const selectedText = selection ? selection.toString().trim() : '';
+  
+  if (selectedText) {
+    // Wake up FAB when text is selected (Fade in)
+    startFabIdleTimer();
+  }
+};
+
 const onMouseEnter = () => {
   isHovering.value = true;
   isFabIdle.value = false;
@@ -189,36 +199,18 @@ const onFabDragEnd = async (e) => {
   startFabIdleTimer();
 };
 
-const handleSelectionChange = () => {
-  const selection = window.getSelection();
-  const selectedText = selection ? selection.toString().trim() : '';
-  
-  if (selectedText) {
-    // Wake up FAB when text is selected (Fade in)
-    startFabIdleTimer();
-  }
-};
-
 const onMobileFabClick = () => {
-  // 1. Try to get text already captured by WindowsManager state
+  // 1. Get selected text (prefer captured, fallback to manual)
   let selectedText = window.windowsManagerInstance?.state?.originalText || '';
-
-  // 2. Fallback: Manual detection (useful if WindowsManager features are disabled in settings)
   if (!selectedText) {
-    const selection = window.getSelection();
-    selectedText = selection ? selection.toString().trim() : '';
+    selectedText = window.getSelection()?.toString().trim() || '';
   }
 
-  if (selectedText) {
-    // Delegate to WindowsManager if available to handle the full translation lifecycle
-    if (window.windowsManagerInstance) {
-      window.windowsManagerInstance._showMobileSheet(selectedText);
-    } else {
-      // Pure manual fallback
-      mobileStore.updateSelectionData({ text: selectedText, isLoading: true, translation: '' });
-      mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION);
-    }
+  if (selectedText && window.windowsManagerInstance) {
+    // 2. Delegate to WindowsManager which handles the full translation & UI lifecycle
+    window.windowsManagerInstance._showMobileSheet(selectedText);
   } else {
+    // 3. Fallback: Open dashboard/active view
     let viewToOpen = mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD;
     mobileStore.openSheet(viewToOpen);
   }
