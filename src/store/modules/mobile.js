@@ -51,8 +51,7 @@ export const useMobileStore = defineStore('mobile', () => {
       // Default logic: Fullscreen for complex interaction views, Peek for others
       const fullViews = [
         MOBILE_CONSTANTS.VIEWS.INPUT, 
-        MOBILE_CONSTANTS.VIEWS.HISTORY,
-        MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION
+        MOBILE_CONSTANTS.VIEWS.HISTORY
       ];
       
       sheetState.value = fullViews.includes(view)
