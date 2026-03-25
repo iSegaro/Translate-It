@@ -212,6 +212,8 @@ const saveAllSettings = async () => {
 
 .save-button {
   width: auto;
+  min-width: max-content;
+  white-space: nowrap;
   padding: $spacing-sm $spacing-lg;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
@@ -291,6 +293,7 @@ const saveAllSettings = async () => {
       border-top: none;
       padding: 0 $spacing-md;
       border-left: $border-width $border-style var(--color-border);
+      flex-shrink: 0;
     }
   }
 }
@@ -345,6 +348,8 @@ const saveAllSettings = async () => {
 
       .save-button {
         width: auto;
+        min-width: max-content;
+        white-space: nowrap;
         padding: $spacing-xs $spacing-lg;
         margin-bottom: 0; 
       }
