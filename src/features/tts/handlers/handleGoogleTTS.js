@@ -411,12 +411,13 @@ const playGoogleTTSAudio = (ttsUrl) => {
         reject(new Error(`Background Google TTS failed: ${error.message}`));
       };
       
-      audio.play().catch((playError) => {
+      audio.play().then(() => {
+        logger.debug('Background Google TTS audio started');
+        resolve({ success: true, processedVia: 'firefox-direct-audio' });
+      }).catch((playError) => {
         clearTimeout(timeout);
         reject(new Error(`Background Google TTS play failed: ${playError.message}`));
       });
-      
-      logger.debug('Background Google TTS audio started');
       
     } catch (error) {
       reject(error);
