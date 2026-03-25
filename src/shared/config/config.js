@@ -48,6 +48,9 @@ export const TRANSLATION_ERRORS = {
   CONTEXT_LOST: "Extension context lost",
 };
 
+// Detect environment
+const isFirefox = typeof __BROWSER__ !== 'undefined' ? __BROWSER__ === 'firefox' : false;
+
 // Shared configuration (initial defaults)
 export const CONFIG = {
   APP_NAME: "Translate It",
@@ -65,7 +68,7 @@ export const CONFIG = {
 
 
   // --- API Settings ---
-  TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+  TRANSLATION_API: isFirefox ? ProviderRegistryIds.GOOGLE : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(
