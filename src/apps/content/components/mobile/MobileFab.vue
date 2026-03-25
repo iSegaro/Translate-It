@@ -200,18 +200,23 @@ const handleSelectionChange = () => {
 };
 
 const onMobileFabClick = () => {
-  const selection = window.getSelection();
-  let selectedText = selection ? selection.toString().trim() : '';
+  // 1. Try to get text already captured by WindowsManager state
+  let selectedText = window.windowsManagerInstance?.state?.originalText || '';
 
-  if (!selectedText && window.windowsManagerInstance && window.windowsManagerInstance.state) {
-    selectedText = window.windowsManagerInstance.state.originalText || '';
+  // 2. Fallback: Manual detection (useful if WindowsManager features are disabled in settings)
+  if (!selectedText) {
+    const selection = window.getSelection();
+    selectedText = selection ? selection.toString().trim() : '';
   }
 
   if (selectedText) {
-    mobileStore.updateSelectionData({ text: selectedText, isLoading: true, translation: '' });
-    mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION);
+    // Delegate to WindowsManager if available to handle the full translation lifecycle
     if (window.windowsManagerInstance) {
       window.windowsManagerInstance._showMobileSheet(selectedText);
+    } else {
+      // Pure manual fallback
+      mobileStore.updateSelectionData({ text: selectedText, isLoading: true, translation: '' });
+      mobileStore.openSheet(MOBILE_CONSTANTS.VIEWS.SELECTION);
     }
   } else {
     let viewToOpen = mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD;
