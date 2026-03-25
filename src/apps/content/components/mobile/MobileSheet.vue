@@ -9,7 +9,7 @@
     <div 
       class="mobile-sheet notranslate"
       translate="no"
-      :class="[`state-${sheetState}`]"
+      :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
       :style="[sheetStyle, activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? { touchAction: 'none !important' } : {}]"
       @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
       @touchmove="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragMove($event) : null"
@@ -23,7 +23,7 @@
         @touchmove="onDragMove"
         @touchend="onDragEnd"
       >
-        <div style="width: 32px !important; height: 4px !important; background: #e0e0e0 !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
+        <div class="drag-handle" style="width: 32px !important; height: 4px !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
       </div>
 
       <!-- Main Content Container -->
@@ -32,7 +32,6 @@
         :style="{ 
           flex: '1 !important', 
           overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
-          background: 'white !important', 
           padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important' 
         }"
       >
@@ -44,7 +43,7 @@
       </div>
 
       <!-- Footer/Safe Area -->
-      <div class="notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px; background: white;"></div>
+      <div class="sheet-footer-area notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px;"></div>
     </div>
   </div>
 </template>
@@ -53,6 +52,7 @@
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useMobileGestures } from '@/composables/ui/useMobileGestures.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
@@ -66,6 +66,7 @@ import PageTranslationView from './views/PageTranslationView.vue'
 import HistoryView from './views/HistoryView.vue'
 
 const mobileStore = useMobileStore()
+const settingsStore = useSettingsStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
 const tts = useTTSSmart()
 
@@ -127,17 +128,19 @@ const sheetStyle = computed(() => {
     ? '88dvh' 
     : (PEEK_HEIGHTS[activeView.value] || '40dvh');
 
+  const isDark = settingsStore.isDarkTheme;
+
   return {
     transform: `translateY(${y}px)`,
     position: 'fixed',
     bottom: '0',
     left: '0',
     right: '0',
-    backgroundColor: 'white',
+    backgroundColor: isDark ? '#1a1a1a' : 'white',
     zIndex: '2147483647',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 -5px 25px rgba(0,0,0,0.2)',
+    boxShadow: isDark ? '0 -5px 25px rgba(0,0,0,0.4)' : '0 -5px 25px rgba(0,0,0,0.2)',
     borderRadius: '20px 20px 0 0',
     height: targetHeight,
     maxHeight: '95dvh', // Absolute limit
@@ -157,18 +160,38 @@ const closeSheet = () => {
   box-sizing: border-box !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  .mobile-sheet {
-    background-color: #1a1a1a !important;
-  }
-  .sheet-header div {
-    background-color: #444 !important;
-  }
-  .sheet-content {
-    background-color: #1a1a1a !important;
-  }
-  .sheet-footer-area {
-    background-color: #1a1a1a !important;
-  }
+/* Base theme styles */
+.mobile-sheet {
+  background-color: white !important;
+  color: #333 !important;
+}
+
+.mobile-sheet.is-dark {
+  background-color: #1a1a1a !important;
+  color: #dee2e6 !important;
+}
+
+.drag-handle {
+  background-color: #e0e0e0 !important;
+}
+
+.mobile-sheet.is-dark .drag-handle {
+  background-color: #444 !important;
+}
+
+.sheet-content {
+  background-color: white !important;
+}
+
+.mobile-sheet.is-dark .sheet-content {
+  background-color: #1a1a1a !important;
+}
+
+.sheet-footer-area {
+  background-color: white !important;
+}
+
+.mobile-sheet.is-dark .sheet-footer-area {
+  background-color: #1a1a1a !important;
 }
 </style>

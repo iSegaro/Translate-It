@@ -1,26 +1,26 @@
 <template>
-  <div class="input-view" style="display: flex; flex-direction: column; height: 100%; font-family: sans-serif; gap: 15px;">
+  <div class="input-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important;">
     
     <!-- Header -->
-    <div style="display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-      <button @click="goBack" style="background: none; border: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0; height: 44px; min-width: 44px; -webkit-tap-highlight-color: transparent;">
-        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" style="width: 20px; height: 20px; transform: rotate(90deg); opacity: 0.6;" />
-        <span style="font-weight: bold; font-size: 17px; color: #333;" class="header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+    <div class="view-header" :style="`display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: ${settingsStore.isDarkTheme ? '1px solid #333' : '1px solid #eee'} !important;`" >
+      <button @click="goBack" class="back-btn" :style="`background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: ${settingsStore.isDarkTheme ? '#adb5bd' : '#333'} !important;`" >
+        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" :style="`width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; opacity: 0.6 !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
+        <span class="header-title" :style="`font-weight: bold !important; font-size: 17px !important; color: ${settingsStore.isDarkTheme ? '#adb5bd' : '#333'} !important;`" >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
 
     <!-- Input Card -->
-    <div class="input-card" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 11px; font-weight: 800; color: #adb5bd; text-transform: uppercase;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
+    <div class="input-card" :style="{ border: settingsStore.isDarkTheme ? '1px solid #3d3d3d !important' : '1px solid #e9ecef !important', background: settingsStore.isDarkTheme ? '#2d2d2d !important' : '#f8f9fa !important', borderRadius: '12px !important', padding: '12px !important', display: 'flex !important', flexDirection: 'column !important', gap: '10px !important' }">
+      <div style="display: flex !important; justify-content: space-between !important; align-items: center !important;">
+        <div style="font-size: 11px !important; font-weight: 800 !important; color: #adb5bd !important; text-transform: uppercase !important;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
         
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex !important; gap: 8px !important;">
            <button 
             class="input-action-btn paste-btn" 
             @click="handlePaste" 
-            style="background: #e7f5ff; border: 1px solid #d0ebff; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #1c7ed6; cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: 600;"
+            :style="`padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; display: flex !important; align-items: center !important; gap: 5px !important; font-weight: 600 !important; background: ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.2)' : '#e7f5ff'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.3)' : '#d0ebff'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important;`"
           >
-            <img src="@/icons/ui/paste.png" style="width: 14px; height: 14px; filter: brightness(0.8);" />
+            <img src="@/icons/ui/paste.png" :style="`width: 14px !important; height: 14px !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : 'filter: brightness(0.8) !important;'}`" />
             {{ t('action_paste_from_clipboard') || 'Paste' }}
           </button>
           
@@ -28,7 +28,7 @@
             v-if="inputText"
             class="input-action-btn clear-btn" 
             @click="inputText = ''" 
-            style="background: #fff5f5; border: 1px solid #ffe3e3; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #fa5252; cursor: pointer; font-weight: 600;"
+            :style="`padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; background: ${settingsStore.isDarkTheme ? 'rgba(250, 82, 82, 0.2)' : '#fff5f5'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(250, 82, 82, 0.3)' : '#ffe3e3'} !important; color: ${settingsStore.isDarkTheme ? '#ff8787' : '#fa5252'} !important;`"
           >
             {{ t('mobile_input_clear_btn') || 'Clear' }}
           </button>
@@ -39,15 +39,15 @@
         v-model="inputText"
         :placeholder="t('mobile_input_placeholder') || 'Type here...'"
         :dir="inputDir"
-        style="width: 100%; min-height: 100px; border: none; background: transparent; font-size: 16px; color: #495057; resize: none; outline: none; padding: 4px 0; text-align: start; line-height: 1.5;"
+        :style="{ width: '100% !important', minHeight: '100px !important', border: 'none !important', background: 'transparent !important', fontSize: '16px !important', color: settingsStore.isDarkTheme ? '#dee2e6 !important' : '#495057 !important', resize: 'none !important', outline: 'none !important', padding: '4px 0 !important', textAlign: 'start !important', lineHeight: '1.5 !important' }"
         @focus="onFocus"
       ></textarea>
     </div>
 
     <!-- Controls -->
-    <div class="input-controls" style="display: flex; flex-direction: column; gap: 12px; position: relative;">
+    <div class="input-controls" style="display: flex !important; flex-direction: column !important; gap: 12px !important; position: relative !important;">
       <!-- Languages -->
-      <div class="language-controls-card" style="border: 1px solid #ced4da; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-top: 5px;">
+      <div class="language-controls-card" :style="{ border: settingsStore.isDarkTheme ? '1px solid #444 !important' : '1px solid #ced4da !important', borderRadius: '12px !important', background: settingsStore.isDarkTheme ? '#2d2d2d !important' : 'white !important', overflow: 'hidden !important', boxShadow: '0 2px 4px rgba(0,0,0,0.02) !important', marginTop: '5px !important' }">
         <LanguageSelector
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
@@ -60,8 +60,8 @@
       </div>
       
       <!-- Provider and Translate -->
-      <div class="actions-row" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-        <div class="provider-wrapper" style="flex: 1; max-width: 48%; position: relative;">
+      <div class="actions-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 10px !important;">
+        <div class="provider-wrapper" style="flex: 1 !important; max-width: 48% !important; position: relative !important;">
           <ProviderSelector
             v-model="currentProvider"
             mode="compact"
@@ -76,22 +76,22 @@
           :disabled="!inputText || isLoading"
           class="translate-main-btn"
           :style="{
-            backgroundColor: (isLoading || !inputText) ? '#f1f3f5' : '#339af0',
-            color: (isLoading || !inputText) ? '#adb5bd' : 'white',
-            border: 'none',
-            padding: '0 20px',
-            borderRadius: '12px',
-            fontWeight: '600',
-            fontSize: '15px',
-            height: '46px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            backgroundColor: (isLoading || !inputText) ? (settingsStore.isDarkTheme ? '#1a1a1a' : '#f1f3f5') : (settingsStore.isDarkTheme ? '#8ab4f8' : '#339af0'),
+            color: (isLoading || !inputText) ? '#444' : (settingsStore.isDarkTheme ? '#202124' : 'white'),
+            border: 'none !important',
+            padding: '0 20px !important',
+            borderRadius: '12px !important',
+            fontWeight: '600 !important',
+            fontSize: '15px !important',
+            height: '46px !important',
+            display: 'flex !important',
+            alignItems: 'center !important',
+            justifyContent: 'center !important',
             cursor: (isLoading || !inputText) ? 'not-allowed' : 'pointer',
-            boxShadow: (isLoading || !inputText) ? 'none' : '0 4px 12px rgba(51, 154, 240, 0.25)',
-            flex: '1.2',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            letterSpacing: '0.3px'
+            boxShadow: (isLoading || !inputText) ? 'none !important' : '0 4px 12px rgba(51, 154, 240, 0.25) !important',
+            flex: '1.2 !important',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important',
+            letterSpacing: '0.3px !important'
           }"
         >
           {{ t('mobile_input_translate_btn') || 'Translate' }}
@@ -100,7 +100,7 @@
     </div>
 
     <!-- Result Area -->
-    <div class="result-container" style="min-height: 120px; position: relative; margin-top: 5px;">
+    <div class="result-container" style="min-height: 120px !important; position: relative !important; margin-top: 5px !important;">
       <div v-if="resultText || isLoading || isError" style="animation: slideIn 0.3s ease;">
         <TranslationDisplay
           mode="mobile"
@@ -125,6 +125,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
@@ -132,7 +133,6 @@ import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -145,7 +145,6 @@ const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANS
 const { getErrorForDisplay } = useErrorHandler()
 const tts = useTTSSmart()
 
-// Initialize with immediate store values (defaults if not loaded)
 const inputText = ref(mobileStore.selectionData.text || '')
 const sourceLang = ref(mobileStore.selectionData.sourceLang || settingsStore.settings.SOURCE_LANGUAGE || 'auto')
 const targetLang = ref(mobileStore.selectionData.targetLang || settingsStore.settings.TARGET_LANGUAGE || 'fa')
@@ -154,10 +153,8 @@ const isLoading = ref(false)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
 const isError = ref(!!mobileStore.selectionData.error)
 
-// Parallel sync: Update when settings are fully loaded from storage
 watch(() => settingsStore.isInitialized, (initialized) => {
   if (initialized) {
-    // Only update if we're NOT in "edit mode" from a previous selection
     if (!mobileStore.selectionData.text) {
       sourceLang.value = settingsStore.settings.SOURCE_LANGUAGE || 'auto'
       targetLang.value = settingsStore.settings.TARGET_LANGUAGE || 'fa'
@@ -171,170 +168,70 @@ const inputDir = computed(() => {
   return shouldApplyRtl(inputText.value) ? 'rtl' : 'ltr'
 })
 
-const goBack = () => {
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
-}
-
-const onFocus = () => {
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
-}
+const goBack = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) }
+const onFocus = () => { mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL) }
 
 const handlePaste = async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (text) {
       inputText.value = text;
-      pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
-        message: t('mobile_input_pasted_message'), 
-        type: 'success' 
-      });
+      pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_pasted_message'), type: 'success' });
     }
   } catch (error) {
-    console.error('[InputView] Paste failed:', error);
-    pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
-      message: t('mobile_input_paste_failed'), 
-      type: 'error' 
-    });
+    pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_paste_failed'), type: 'error' });
   }
 }
 
 const handleTranslate = async () => {
   if (!inputText.value || isLoading.value) return
-  
   isLoading.value = true
-  // Reset error state but keep old text briefly to avoid layout jump
   isError.value = false
-  
   try {
-    const payload = {
-      text: inputText.value,
-      sourceLanguage: sourceLang.value,
-      targetLanguage: targetLang.value,
-      provider: currentProvider.value,
-      mode: TranslationMode.Mobile_Translate
-    };
-
+    const payload = { text: inputText.value, sourceLanguage: sourceLang.value, targetLanguage: targetLang.value, provider: currentProvider.value, mode: TranslationMode.Mobile_Translate };
     const message = createMessage(MessageActions.TRANSLATE, payload);
-    
-    if (typeof message.messageId !== 'string') {
-      message.messageId = `input-${Date.now()}`;
-    }
-
     const response = await sendMessage(message);
-
     if (response && response.success) {
-      const translated = response.translatedText || 
-                         (response.data && response.data.translatedText) || 
-                         (response.result && response.result.translatedText);
-                         
-      if (translated) {
-        resultText.value = translated;
-      } else {
-        resultText.value = t('mobile_input_no_result_error') || "No translation found. Please try again.";
-      }
+      const translated = response.translatedText || (response.data && response.data.translatedText) || (response.result && response.result.translatedText);
+      if (translated) resultText.value = translated;
+      else resultText.value = t('mobile_input_no_result_error') || "No translation found.";
     } else {
       isError.value = true;
-      const errorInfo = await getErrorForDisplay(response?.error || (t('mobile_input_default_error') || "Translation failed."), 'mobile-input');
+      const errorInfo = await getErrorForDisplay(response?.error || "Translation failed.", 'mobile-input');
       resultText.value = errorInfo.message;
     }
   } catch (error) {
-    console.error('[MobileInput] Unexpected error:', error);
     isError.value = true;
     const errorInfo = await getErrorForDisplay(error, 'mobile-input');
     resultText.value = errorInfo.message;
-  } finally {
-    isLoading.value = false;
-  }
+  } finally { isLoading.value = false; }
 }
 
-const onTextCopied = () => {
-  pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { 
-    message: t('mobile_input_copied_message') || 'Copied', 
-    type: 'success' 
-  })
-}
-
-const onSpeak = async (data) => {
-  // Use data from event or fallback to local state
-  const text = data?.text || resultText.value;
-  const lang = data?.language || targetLang.value;
-  
-  if (text) {
-    await tts.speak(text, lang);
-  }
-}
-
-const onHistory = () => {
-  mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY)
-  mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
-}
+const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message') || 'Copied', type: 'success' }) }
+const onSpeak = async (data) => { const text = data?.text || resultText.value; const lang = data?.language || targetLang.value; if (text) await tts.speak(text, lang); }
+const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL); }
 </script>
 
 <style scoped>
-@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Force styles for the native select used in compact mode */
-:deep(.ti-provider-select) {
-  width: 100% !important;
-  height: 46px !important;
-  border-radius: 12px !important;
-  border: 1px solid #ced4da !important;
-  background-color: white !important;
-  padding: 0 12px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: #495057 !important;
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  outline: none !important;
-  cursor: pointer !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
-  
-  /* Custom modern arrow */
-  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23868e96%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 10px center !important;
-  background-size: 16px !important;
-  transition: all 0.2s ease !important;
+/* Deep selectors for language dropdowns in dark mode */
+.is-dark :deep(.ti-language-selector-title) { color: #adb5bd !important; }
+.is-dark :deep(.ti-language-name) { color: #dee2e6 !important; }
+.is-dark :deep(.ti-language-dropdown) { background-color: #2d2d2d !important; border-color: #444 !important; }
+.is-dark :deep(.ti-language-item) { color: #dee2e6 !important; }
+.is-dark :deep(.ti-language-item:hover) { background-color: #3d3d3d !important; }
+
+/* Provider dropdown override */
+.is-dark :deep(.ti-provider-select) {
+  background-color: #2d2d2d !important;
+  border-color: #444 !important;
+  color: #dee2e6 !important;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23adb5bd%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
 }
 
-:deep(.ti-provider-select:active) {
-  transform: scale(0.98) !important;
-  border-color: #1a73e8 !important;
-}
-
-@media (prefers-color-scheme: dark) {
-  .header-title { color: #adb5bd !important; }
-  .input-card { background: #2d2d2d !important; border-color: #3d3d3d !important; }
-  .input-card textarea { color: #dee2e6 !important; }
-  .language-controls-card { background: #2d2d2d !important; border-color: #444 !important; }
-  
-  :deep(.ti-provider-select) {
-    background-color: #2d2d2d !important;
-    border-color: #444 !important;
-    color: #dee2e6 !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23adb5bd%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
-  }
-  
-  .result-loading { background: #2d2d2d !important; border-color: #444 !important; }
-  .paste-btn { background: rgba(28, 126, 214, 0.1) !important; border-color: rgba(28, 126, 214, 0.3) !important; color: #74c0fc !important; }
-  .clear-btn { background: rgba(250, 82, 82, 0.1) !important; border-color: rgba(250, 82, 82, 0.3) !important; color: #ff8787 !important; }
-}
-</style>
-
-<style>
-/* Global active feedback for Translate button */
 .input-view .translate-main-btn:active:not(:disabled) {
   transform: scale(0.96) !important;
   filter: brightness(0.9) !important;
-}
-
-@media (prefers-color-scheme: dark) {
-  .input-view .translate-main-btn:not(:disabled) {
-    background-color: #8ab4f8 !important;
-    color: #202124 !important;
-  }
 }
 </style>

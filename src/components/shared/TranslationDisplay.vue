@@ -13,15 +13,16 @@
         'sidepanel-mode': mode === 'sidepanel',
         'selection-mode': mode === 'selection',
         'mobile-mode': mode === 'mobile',
+        'is-dark': settingsStore.isDarkTheme,
       },
       containerClass,
     ]"
-    :style="cssVariables || {}"
+    :style="mode === 'mobile' ? `background: ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.15)' : '#e7f5ff'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.3)' : '#d0ebff'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important;` : (cssVariables || {})"
   >
     <!-- Simplified Loading State -->
     <div
       v-if="isLoading"
-      style="display: flex; align-items: center; justify-content: center; min-height: 100px; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 100; background: var(--bg-result-color, #ffffff); border-radius: 8px; direction: ltr;"
+      :style="`display: flex !important; align-items: center !important; justify-content: center !important; min-height: 100px !important; width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; z-index: 100 !important; background: ${settingsStore.isDarkTheme ? (mode === 'mobile' ? 'transparent' : '#2d2d2d') : 'white'} !important; border-radius: 8px !important; direction: ltr !important;`"
     >
       <LoadingSpinner
         type="animated"
@@ -64,7 +65,7 @@
           { 'rtl-content': textDirection?.dir === 'rtl' },
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="{
+        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; padding: 0 !important; font-size: 16px !important; line-height: 1.5 !important;` : {
           ...(fontStyles || {}),
           ...(cssVariables || {}),
           direction: textDirection?.dir || 'ltr',
@@ -126,12 +127,12 @@
       <div 
         v-if="mode === 'mobile' && hasContent"
         class="ti-mobile-actions"
-        style="display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid rgba(51, 154, 240, 0.15) !important; box-sizing: border-box !important; justify-content: space-between !important;"
+        :style="`display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid ${settingsStore.isDarkTheme ? 'rgba(116, 192, 252, 0.2)' : 'rgba(51, 154, 240, 0.15)'} !important; box-sizing: border-box !important; justify-content: space-between !important;`"
         @click.stop
       >
         <button 
           class="mobile-action-btn primary-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
+          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
           @click="handleMobileSpeak" 
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle"
         >
@@ -149,7 +150,7 @@
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
-            style="width: 16px !important; height: 16px !important; object-fit: contain !important;" 
+            :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" 
           />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
@@ -158,11 +159,11 @@
         
         <button 
           class="mobile-action-btn secondary-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important;"
+          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
           @click="handleMobileCopy" 
           :title="copyTitle"
         >
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ t('mobile_selection_copy_tooltip') }}
           </span>
@@ -170,11 +171,11 @@
         
         <button 
           class="mobile-action-btn icon-only-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important;"
+          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
           @click="handleMobileHistory" 
           :title="t('mobile_selection_history_tooltip')"
         >
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" style="width: 16px !important; height: 16px !important; object-fit: contain !important;" />
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
         </button>
       </div>
     </template>
@@ -183,6 +184,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection, isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
@@ -196,6 +198,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
 // Localization
 const { t, locale } = useUnifiedI18n();
+const settingsStore = useSettingsStore();
 
 // Props
 const props = defineProps({
@@ -1109,32 +1112,62 @@ onMounted(() => {
   filter: brightness(0) invert(1);
 }
 
-/* Dark mode */
+/* Dark mode support using .is-dark class */
+.ti-translation-display.is-dark.mobile-mode { 
+  background: rgba(28, 126, 214, 0.15) !important; 
+  border-color: rgba(28, 126, 214, 0.3) !important;
+}
+
+.ti-translation-display.is-dark.mobile-mode .ti-translation-content { 
+  color: #74c0fc !important; 
+}
+
+.ti-translation-display.is-dark .mobile-action-btn { 
+  background: #2d2d2d !important; 
+  border-color: #444 !important; 
+  color: #74c0fc !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+.ti-translation-display.is-dark .mobile-action-btn.primary-action {
+  background: #1971c2 !important;
+  color: white !important;
+  border-color: #1864ab !important;
+}
+
+.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) img,
+.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) svg { 
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.8 !important;
+}
+
+/* Original media query as fallback */
 @media (prefers-color-scheme: dark) {
-  .ti-translation-display.mobile-mode { 
+  .ti-translation-display.mobile-mode:not(.is-dark) { 
     background: rgba(28, 126, 214, 0.1) !important; 
     border-color: rgba(28, 126, 214, 0.25) !important;
   }
   
-  .ti-translation-display.mobile-mode .ti-translation-content { 
+  .ti-translation-display.mobile-mode:not(.is-dark) .ti-translation-content { 
     color: #74c0fc !important; 
   }
   
-  .mobile-action-btn { 
+  .ti-translation-display:not(.is-dark) .mobile-action-btn { 
     background: #2d2d2d !important; 
     border-color: #444 !important; 
     color: #74c0fc !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
   }
 
-  .mobile-action-btn.primary-action {
+  .ti-translation-display:not(.is-dark) .mobile-action-btn.primary-action {
     background: #1971c2 !important;
     color: white !important;
     border-color: #1864ab !important;
   }
   
-  .mobile-action-btn:not(.primary-action) img { 
-    filter: invert(0.8); 
+  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) img,
+  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) svg { 
+    filter: invert(0.8) !important; 
   }
 }
 </style>
