@@ -352,6 +352,7 @@ onMounted(async () => {
     align-items: center;
     padding: 6px var(--spacing-md);
     min-height: 50px;
+    position: relative; /* Ensure it stays in flow */
     
     /* Force LTR for the header on mobile/tablet to keep it consistent */
     direction: ltr !important;

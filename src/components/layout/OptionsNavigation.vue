@@ -313,6 +313,7 @@ const saveAllSettings = async () => {
     position: sticky;
     top: 0;
     z-index: 10;
+    background-color: var(--color-surface);
     
     .tab-button {
       flex-shrink: 0;

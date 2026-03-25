@@ -143,15 +143,30 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
 @media (max-width: #{$breakpoint-lg}) {
   .options-layout {
     flex-direction: column !important; /* Force stack layout for sidebar header */
-    width: 95vw;
-    height: 90vh;
-    margin-top: 20px;
+    width: 100%;
+    height: 100vh;
+    height: 100svh;
+    margin: 0;
+    border-radius: 0;
+    border: none;
   }
   
   .options-main {
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    overflow: hidden; 
+  }
+
+  .tab-content-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding: $spacing-md;
+    
+    :global(.tab-content) {
+      padding-bottom: 80px; /* Space for sticky nav/header if needed */
+    }
   }
 }
 
@@ -167,7 +182,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     border: none !important;
     max-width: none !important;
     min-width: 0 !important;
-    padding-bottom: env(safe-area-inset-bottom, 20px) !important; /* Respect Android Nav Bar */
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important; /* Respect Android Nav Bar */
   }
 
   .options-main {
@@ -176,16 +191,18 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
     height: auto !important;
     min-height: 0 !important;
     border-radius: 0 !important;
+    overflow: hidden; /* Prevent body scroll, use container scroll */
   }
 
   .tab-content-container {
-    padding: 0 !important;
+    padding: $spacing-md !important;
     flex: 1 !important;
     overflow-y: auto !important;
+    min-height: 0;
     
     // Additional padding for the content itself
     :global(.tab-content) {
-      padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
     }
   }
 }
