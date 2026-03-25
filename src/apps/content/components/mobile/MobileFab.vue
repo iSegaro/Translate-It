@@ -40,12 +40,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const props = defineProps({
-  isRtl: {
-    type: Boolean,
-    default: false
-  }
-});
+const props = defineProps({});
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -217,7 +212,6 @@ const onMobileFabClick = () => {
 };
 
 const fabStyle = computed(() => {
-  const isRTL = props.isRtl;
   const y = fabPosition.value.y || 120;
   
   // Visibility Logic: 
@@ -242,7 +236,7 @@ const fabStyle = computed(() => {
   return {
     position: 'fixed !important',
     bottom: `${y}px !important`,
-    left: isRTL ? '0 !important' : '100% !important',
+    left: '100% !important',
     marginLeft: '-25px !important',
     width: '50px !important',
     height: '50px !important',

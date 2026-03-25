@@ -86,7 +86,6 @@
       <!-- Mobile Floating Action Button (FAB) -->
       <MobileFab
         v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen"
-        :is-rtl="toastRTL"
       />
     </template>
   </div>
