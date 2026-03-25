@@ -1,113 +1,31 @@
 <template>
-  <div class="theme-selector">
-    <div class="theme-control-group">
-      <div class="theme-switch-row">
-        <!-- Sun icon -->
-        <svg
-          class="theme-icon-svg"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+  <div class="theme-selector-container">
+    <button
+      class="theme-cycle-btn"
+      :title="t('theme_toggle_title')"
+      :aria-label="themeLabel"
+      @click="cycleTheme"
+    >
+      <div class="icon-wrapper">
+        <transition
+          name="theme-fade"
+          mode="out-in"
         >
-          <circle
-            cx="12"
-            cy="12"
-            r="5"
-          />
-          <line
-            x1="12"
-            y1="1"
-            x2="12"
-            y2="3"
-          />
-          <line
-            x1="12"
-            y1="21"
-            x2="12"
-            y2="23"
-          />
-          <line
-            x1="4.22"
-            y1="4.22"
-            x2="5.64"
-            y2="5.64"
-          />
-          <line
-            x1="18.36"
-            y1="18.36"
-            x2="19.78"
-            y2="19.78"
-          />
-          <line
-            x1="1"
-            y1="12"
-            x2="3"
-            y2="12"
-          />
-          <line
-            x1="21"
-            y1="12"
-            x2="23"
-            y2="12"
-          />
-          <line
-            x1="4.22"
-            y1="19.78"
-            x2="5.64"
-            y2="18.36"
-          />
-          <line
-            x1="18.36"
-            y1="5.64"
-            x2="19.78"
-            y2="4.22"
-          />
-        </svg>
-
-        <label
-          class="switch"
-          :title="t('theme_toggle_title') || 'Toggle Light/Dark Theme'"
-        >
-          <input 
-            v-model="isDarkMode" 
-            type="checkbox" 
-            :disabled="isAutoMode"
+          <img
+            :key="currentTheme"
+            :src="currentIcon"
+            class="theme-img-icon"
+            :alt="currentTheme"
           >
-          <span class="slider round" />
-        </label>
-
-        <!-- Moon icon -->
-        <svg
-          class="theme-icon-svg"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
+        </transition>
       </div>
-      
-      <label class="theme-auto-label">
-        <input
-          v-model="isAutoMode"
-          type="checkbox"
-        >
-        <span>{{ t('theme_auto') || 'System Theme' }}</span>
-      </label>
-    </div>
+      <span class="theme-btn-label">{{ themeLabel }}</span>
+    </button>
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
@@ -115,12 +33,35 @@ import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
+// Import PNG Icons
+import autoIcon from '@/icons/ui/theme-auto.png'
+import darkIcon from '@/icons/ui/theme-dark.png'
+import lightIcon from '@/icons/ui/theme-light.png'
+
 const settingsStore = useSettingsStore()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ThemeSelector')
 const { t } = useI18n()
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('theme-selector')
+
+const currentTheme = computed(() => settingsStore.settings.THEME || 'auto')
+
+const themeLabel = computed(() => {
+  switch (currentTheme.value) {
+    case 'light': return t('theme_light')
+    case 'dark': return t('theme_dark')
+    default: return t('theme_auto')
+  }
+})
+
+const currentIcon = computed(() => {
+  switch (currentTheme.value) {
+    case 'light': return darkIcon
+    case 'dark': return lightIcon
+    default: return autoIcon
+  }
+})
 
 const broadcastThemeChange = (theme) => {
   browser.runtime.sendMessage({
@@ -131,33 +72,22 @@ const broadcastThemeChange = (theme) => {
   });
 }
 
-// Theme state management
-const isDarkMode = computed({
-  get: () => settingsStore.settings.THEME === 'dark',
-  set: (value) => {
-    if (!isAutoMode.value) {
-      const newTheme = value ? 'dark' : 'light';
-      settingsStore.updateSettingAndPersist('THEME', newTheme)
-      broadcastThemeChange(newTheme);
-    }
-  }
-})
+const setTheme = (theme) => {
+  settingsStore.updateSettingAndPersist('THEME', theme)
+  broadcastThemeChange(theme)
+}
 
-const isAutoMode = computed({
-  get: () => settingsStore.settings.THEME === 'auto',
-  set: (value) => {
-    if (value) {
-      settingsStore.updateSettingAndPersist('THEME', 'auto')
-      broadcastThemeChange('auto');
-    } else {
-      // When disabling auto mode, set to current system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const newTheme = prefersDark ? 'dark' : 'light';
-      settingsStore.updateSettingAndPersist('THEME', newTheme)
-      broadcastThemeChange(newTheme);
-    }
+const cycleTheme = () => {
+  let nextTheme;
+  if (currentTheme.value === 'light') {
+    nextTheme = 'dark'
+  } else if (currentTheme.value === 'dark') {
+    nextTheme = 'auto'
+  } else {
+    nextTheme = 'light'
   }
-})
+  setTheme(nextTheme)
+}
 
 // Apply theme to document
 const applyTheme = (theme) => {
@@ -177,123 +107,114 @@ watch(() => settingsStore.settings.THEME, (newTheme) => {
 }, { immediate: true })
 
 // Listen for system theme changes when in auto mode
-// Setup media query listener for auto theme with automatic cleanup
-const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-tracker.addEventListener(mediaQuery, 'change', () => {
-  if (settingsStore.settings.THEME === 'auto') {
-    applyTheme('auto')
-  }
+onMounted(() => {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  tracker.addEventListener(mediaQuery, 'change', () => {
+    if (settingsStore.settings.THEME === 'auto') {
+      applyTheme('auto')
+    }
+  })
 })
 </script>
 
 <style lang="scss" scoped>
 @use "@/assets/styles/base/variables" as *;
 
-.theme-control-group {
+.theme-selector-container {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: $spacing-base;
-}
-
-.theme-switch-row {
-  display: flex;
-  justify-content: center; /* Center alignment */
-  align-items: center;
+  justify-content: center;
   width: 100%;
+  padding: $spacing-xs 0;
 }
 
-.theme-icon-svg {
-  width: 20px;
-  height: 20px;
-  color: var(--color-text-secondary);
-  opacity: 0.7;
-  filter: var(--icon-filter);
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-  
-  input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-}
-
-.slider {
-  position: absolute;
+.theme-cycle-btn {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: $border-radius-lg;
+  padding: $spacing-sm $spacing-lg;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: $transition-base;
-  border-radius: 20px;
-  
-  &:before {
-    position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: $transition-base;
-    border-radius: 50%;
+  transition: all $transition-base;
+  min-width: 140px;
+  justify-content: flex-start;
+  box-shadow: $shadow-sm;
+
+  &:hover {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+    transform: translateY(-1px);
+    box-shadow: $shadow-base;
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 
-input:checked + .slider {
-  background-color: var(--color-primary);
-}
-
-input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-input:disabled + .slider {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.theme-auto-label {
+.icon-wrapper {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
-  margin-left: 0;
-  width: 100%;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.theme-img-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  transition: filter $transition-base;
+}
+
+// Ensure icon visibility in dark mode (if PNGs have dark lines/fills)
+:root.theme-dark .theme-img-icon {
+  filter: invert(0.9) brightness(1.5);
+}
+
+.theme-btn-label {
   font-size: $font-size-sm;
-  font-weight: $font-weight-normal;
-  cursor: pointer;
-  margin-bottom: 0;
-  padding: $spacing-xs;
-  
-  input[type="checkbox"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-  }
-
-  span {
-    line-height: normal;
-    margin-top: 3px;
-  }
+  font-weight: $font-weight-medium;
+  color: var(--color-text);
+  white-space: nowrap;
 }
 
-// RTL Support
-.rtl .theme-switch-row {
-  flex-direction: row-reverse;
-  justify-content: center; /* Keep centered in RTL */
+/* Transition for icon change */
+.theme-fade-enter-active,
+.theme-fade-leave-active {
+  transition: all 0.25s ease;
 }
 
-.rtl .theme-switch-row input[type="checkbox"] {
-  margin-left: auto; /* Move checkbox to the right in RTL */
-  margin-right: 0; /* Reset any left margin */
+.theme-fade-enter-from,
+.theme-fade-leave-to {
+  opacity: 0;
+  transform: rotate(-30deg) scale(0.8);
+}
+
+// Responsive adjustments for sidebar header
+@media (max-width: 1024px) {
+  .theme-selector-container {
+    width: auto;
+    padding: 0;
+  }
+
+  .theme-cycle-btn {
+    min-width: auto;
+    padding: $spacing-xs $spacing-sm;
+    gap: $spacing-xs;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+
+    &:hover {
+      background: rgba(var(--color-primary-rgb), 0.1);
+    }
+  }
+
+  .theme-btn-label {
+    display: none; /* Hide label in condensed header mode */
+  }
 }
 </style>
