@@ -30,43 +30,14 @@
         <h2>{{ t('localization_section_title') }}</h2>
         
         <!-- Desktop Language List -->
-        <ul :class="['language-list', 'desktop-only', { 'rtl': selectedLanguage === 'fa' }]">
-          <li
-            v-for="lang in interfaceLanguages"
-            :key="lang.code"
-            class="language-list-item"
-            :class="{ selected: selectedLanguage === lang.code }"
-            @click="selectedLanguage = lang.code"
-          >
-            <img
-              :src="getFlagUrl(lang.code)"
-              class="language-flag-image"
-              :alt="lang.name"
-            >
-            <span>{{ lang.name }}</span>
-          </li>
-        </ul>
+        <div class="desktop-only">
+          <InterfaceLocaleSelector mode="list" />
+        </div>
 
         <!-- Mobile Language Dropdown -->
-        <select
-          v-model="selectedLanguage"
-          class="language-select mobile-only"
-        >
-          <option
-            v-if="!interfaceLanguages || interfaceLanguages.length === 0"
-            disabled
-            value=""
-          >
-            ...
-          </option>
-          <option
-            v-for="lang in interfaceLanguages"
-            :key="lang.code"
-            :value="lang.code"
-          >
-            {{ lang.name }}
-          </option>
-        </select>
+        <div class="mobile-only">
+          <InterfaceLocaleSelector mode="dropdown" />
+        </div>
       </div>
       <div class="sidebar-footer">
         <a
@@ -109,48 +80,16 @@ import { ref, computed, onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
-import { useLanguages } from '@/composables/shared/useLanguages.js'
+import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getLocaleInfo } from '@/shared/config/LocaleManifest.js'
 import { REPO_URLS } from '@/shared/config/constants.js'
 import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
-const { t, changeLanguage } = useUnifiedI18n()
-const settingsStore = useSettingsStore()
-const { getInterfaceLanguages } = useLanguages()
+const { t } = useUnifiedI18n()
 const manifestVersion = ref('v0.0.0')
-
-const getFlagUrl = (code) => {
-  const locale = getLocaleInfo(code);
-  const flag = locale?.flag || code;
-  try {
-    return browser.runtime.getURL(`icons/flags/${flag}.svg`)
-  } catch (error) {
-    logger.error(`Failed to load flag for ${code}:`, error);
-    return '';
-  }
-};
-const interfaceLanguages = computed(() => getInterfaceLanguages())
-// Use reactive reference that stays in sync with settings
-const selectedLanguage = computed({
-  get: () => settingsStore.settings?.APPLICATION_LOCALIZE || 'en',
-  set: async (value) => {
-    try {
-      await changeLanguage(value)
-      browser.runtime.sendMessage({
-        action: 'LANGUAGE_CHANGED',
-        payload: { lang: value }
-      }).catch(error => {
-        logger.debug('Could not send LANGUAGE_CHANGED message, probably sidepanel is closed:', error.message);
-      });
-    } catch (error) {
-      logger.error('Failed to change language:', error)
-    }
-  }
-})
 
 // Dynamic copyright year logic based on build time
 const copyrightYear = computed(() => {
@@ -308,29 +247,6 @@ onMounted(async () => {
   display: none;
 }
 
-/* Custom dropdown style */
-.language-select {
-  width: 100%;
-  padding: var(--spacing-sm);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  outline: none;
-  transition: border-color var(--transition-base);
-
-  &:hover {
-    border-color: var(--color-primary);
-  }
-
-  &:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
-  }
-}
-
 /* Tablet responsive */
 @media (max-width: #{$breakpoint-lg}) {
   .desktop-only {
@@ -353,6 +269,8 @@ onMounted(async () => {
     padding: 6px var(--spacing-md);
     min-height: 50px;
     position: relative; /* Ensure it stays in flow */
+    overflow: visible !important; /* Allow dropdowns to show outside the header */
+    z-index: 100; /* Ensure header is above main content */
     
     /* Force LTR for the header on mobile/tablet to keep it consistent */
     direction: ltr !important;
@@ -471,58 +389,7 @@ onMounted(async () => {
 }
 
 .localization-controls {
-  .language-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    max-height: 160px; /* Slightly smaller to save space */
-    overflow-y: auto;
-    
-    /* Better scrollbar for the list */
-    &::-webkit-scrollbar { width: 3px; }
-    &::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
-  }
-  .language-list-item {
-    cursor: pointer;
-    padding: 8px 12px;
-    border-radius: var(--border-radius-md);
-    display: flex;
-    align-items: center;
-    font-size: var(--font-size-sm);
-    transition: background-color var(--transition-fast);
-
-    &:hover {
-      background-color: var(--color-background-hover, #f0f0f0);
-    }
-
-    &.selected {
-      background-color: var(--color-active-background, #e8f0fe);
-      color: var(--color-active-text, #1967d2);
-      font-weight: var(--font-weight-medium);
-    }
-
-    /* Dark mode styling for selected item */
-    :root.theme-dark &.selected {
-      background-color: #1a365d; /* Dark navy blue */
-      color: white;
-    }
-  }
-
-  .language-flag-image {
-    width: 18px;
-    height: 14px;
-    margin-right: 12px;
-    border: 1px solid var(--color-border);
-    object-fit: cover;
-    vertical-align: middle;
-    border-radius: 2px;
-  }
-
-  /* RTL support using local class */
-  .language-list.rtl .language-flag-image {
-    margin-right: 0;
-    margin-left: 16px;
-  }
+  // Empty or minimal styles since InterfaceLocaleSelector handles it
 }
 
 .sidebar-section.theme-controls {
@@ -533,10 +400,6 @@ onMounted(async () => {
 
 :global(.options-layout.rtl) {
   .sidebar-section h2 {
-    text-align: right;
-  }
-
-  .language-list-item {
     text-align: right;
   }
 }
