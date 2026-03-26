@@ -65,7 +65,7 @@
           { 'rtl-content': textDirection?.dir === 'rtl' },
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: var(--ti-mobile-accent) !important; padding: 0 !important; font-size: 16px !important; line-height: 1.5 !important;` : {
+        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: var(--ti-mobile-accent) !important; padding: 4px 8px !important; font-size: 16px !important; line-height: 1.5 !important;` : {
           ...(fontStyles || {}),
           ...(cssVariables || {}),
           direction: textDirection?.dir || 'ltr',
@@ -1037,7 +1037,7 @@ onMounted(() => {
 }
 
 .ti-translation-display.mobile-mode .ti-translation-content {
-  padding: 0;
+  padding: 4px 8px;
   font-size: 16px;
   color: #1c7ed6;
   max-height: 250px;
