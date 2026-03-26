@@ -1,10 +1,12 @@
 <template>
-  <div class="ti-m-history-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
+  <div class="ti-m-history-view" :class="{ 'is-dark': settingsStore.isDarkTheme }" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
     
     <!-- Header -->
     <div class="ti-m-view-header" style="display: flex !important; align-items: center !important; justify-content: space-between !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important; min-height: 48px !important;">
       <button @click="goBack" class="ti-m-back-btn" style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;">
-        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" class="ti-m-icon-img ti-m-back-icon" style="width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; filter: var(--ti-mobile-icon-filter) !important;" />
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 6 4" fill="none" style="transform: rotate(90deg) !important;">
+          <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <span class="ti-m-header-title" style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;">{{ t('history_title') || 'Translation History' }}</span>
       </button>
       
@@ -78,12 +80,14 @@
 import { onMounted } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 
 const mobileStore = useMobileStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const languages = useLanguages()
 const { 
@@ -145,7 +149,14 @@ const selectItem = (item) => {
 }
 
 .ti-m-icon-img, .ti-m-icon-img-small, .ti-m-empty-icon {
-  filter: var(--ti-mobile-icon-filter) !important;
+  filter: var(--ti-mobile-icon-filter, none) !important;
+}
+
+/* Force filter if the root has is-dark class */
+.ti-m-history-view.is-dark .ti-m-icon-img,
+.ti-m-history-view.is-dark .ti-m-icon-img-small,
+.ti-m-history-view.is-dark .ti-m-empty-icon {
+  filter: brightness(0) invert(1) !important;
 }
 
 .ti-m-back-icon {

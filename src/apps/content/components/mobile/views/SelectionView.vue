@@ -1,22 +1,24 @@
 <template>
-  <div class="ti-m-selection-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 12px !important; background-color: inherit !important;">
+  <div class="ti-m-selection-view" :class="{ 'is-dark': settingsStore.isDarkTheme }" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 12px !important; background-color: inherit !important;">
     
     <!-- Header -->
     <div class="ti-m-selection-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding-bottom: 12px !important; min-height: 48px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;">
       <div style="display: flex !important; align-items: center !important; gap: 4px !important;">
-        <button class="ti-m-back-btn" @click="goBack" style="background: none !important; border: none !important; width: 44px !important; height: 44px !important; padding: 0 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; -webkit-tap-highlight-color: transparent !important;">
-          <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" class="ti-m-icon-img ti-m-back-icon" style="width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; opacity: 0.6 !important;" />
+        <button class="ti-m-back-btn" @click="goBack" style="background: none !important; border: none !important; width: 44px !important; height: 44px !important; padding: 0 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 6 4" fill="none" style="transform: rotate(90deg) !important;">
+            <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </button>
         <div class="ti-m-lang-pair" style="display: flex !important; align-items: center !important; gap: 8px !important; padding: 6px 14px !important; border-radius: 20px !important; background-color: var(--ti-mobile-card-bg) !important;">
           <span style="font-size: 11px !important; font-weight: 800 !important; text-transform: uppercase !important; color: var(--ti-mobile-accent) !important;">{{ selectionData.targetLang }}</span>
-          <img src="@/icons/ui/swap.png" class="ti-m-swap-icon ti-m-icon-img" :alt="t('mobile_swap_languages_alt') || 'to'" style="width: 12px !important; height: 12px !important; opacity: 0.5 !important;" />
+          <img src="@/icons/ui/swap.png" class="ti-m-swap-icon ti-m-icon-img" :alt="t('mobile_swap_languages_alt') || 'to'" style="width: 12px !important; height: 12px !important; opacity: 0.6 !important;" />
           <span class="ti-m-lang-source" style="font-size: 11px !important; font-weight: 800 !important; text-transform: uppercase !important; color: var(--ti-mobile-text-secondary) !important;">{{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}</span>
         </div>
       </div>
       
       <div style="display: flex !important; align-items: center !important;">
         <button class="ti-m-close-btn" @click="closeView" style="background: none !important; border: none !important; width: 44px !important; height: 44px !important; padding: 0 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; -webkit-tap-highlight-color: transparent !important;">
-          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" class="ti-m-icon-img ti-m-close-icon" style="width: 22px !important; height: 22px !important; opacity: 0.4 !important;" />
+          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" class="ti-m-icon-img ti-m-close-icon" style="width: 22px !important; height: 22px !important; opacity: 0.5 !important;" />
         </button>
       </div>
     </div>
@@ -76,6 +78,7 @@ import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
@@ -85,6 +88,7 @@ import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
+const settingsStore = useSettingsStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useI18n()
 const tts = useTTSSmart()
@@ -117,6 +121,20 @@ const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 
 .ti-m-icon-img {
   object-fit: contain !important;
-  filter: var(--ti-mobile-icon-filter) !important;
+  filter: var(--ti-mobile-icon-filter, none) !important;
+}
+
+/* Force filter if the root has is-dark class */
+.ti-m-selection-view.is-dark .ti-m-icon-img {
+  filter: brightness(0) invert(1) !important;
+}
+
+.ti-m-close-icon, .ti-m-swap-icon {
+  opacity: 0.6 !important;
+}
+
+.ti-m-selection-view.is-dark .ti-m-close-icon, 
+.ti-m-selection-view.is-dark .ti-m-swap-icon {
+  opacity: 0.8 !important;
 }
 </style>

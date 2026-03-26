@@ -1,10 +1,12 @@
 <template>
-  <div class="ti-m-input-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
+  <div class="ti-m-input-view" :class="{ 'is-dark': settingsStore.isDarkTheme }" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
     
     <!-- Header -->
     <div class="ti-m-view-header" style="display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;">
       <button @click="goBack" class="ti-m-back-btn" style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;">
-        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" class="ti-m-icon-img ti-m-back-icon" style="width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; filter: var(--ti-mobile-icon-filter) !important;" />
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 6 4" fill="none" style="transform: rotate(90deg) !important;">
+          <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <span class="ti-m-header-title" style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
@@ -199,7 +201,13 @@ const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); m
 @keyframes ti-m-slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .ti-m-icon-img, .ti-m-icon-img-small {
-  filter: var(--ti-mobile-icon-filter) !important;
+  filter: var(--ti-mobile-icon-filter, none) !important;
+}
+
+/* Force filter if the root has is-dark class */
+.ti-m-input-view.is-dark .ti-m-icon-img,
+.ti-m-input-view.is-dark .ti-m-icon-img-small {
+  filter: brightness(0) invert(1) !important;
 }
 
 .ti-m-back-icon {

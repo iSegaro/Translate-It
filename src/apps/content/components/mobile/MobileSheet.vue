@@ -176,6 +176,7 @@ const closeSheet = () => {
   --ti-mobile-text-secondary: #adb5bd;
   --ti-mobile-accent: #74c0fc;
   --ti-mobile-shadow: rgba(0, 0, 0, 0.4);
+  --ti-mobile-icon-filter: brightness(0) invert(1);
 }
 
 .ti-m-sheet {
