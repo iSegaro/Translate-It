@@ -75,9 +75,26 @@
         
         <button 
           @click="handleTranslate"
-          :disabled="!inputText || isLoading"
+          :disabled="isTranslateDisabled"
           class="ti-m-translate-main-btn"
-          style="border: none !important; padding: 0 20px !important; border-radius: 12px !important; font-weight: 600 !important; font-size: 15px !important; height: 46px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex: 1.2 !important; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; letter-spacing: 0.3px !important; background-color: var(--ti-mobile-accent) !important; color: white !important;"
+          :style="{
+            'border': 'none !important',
+            'padding': '0 20px !important',
+            'border-radius': '12px !important',
+            'font-weight': '600 !important',
+            'font-size': '15px !important',
+            'height': '46px !important',
+            'display': 'flex !important',
+            'align-items': 'center !important',
+            'justify-content': 'center !important',
+            'flex': '1.2 !important',
+            'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important',
+            'letter-spacing': '0.3px !important',
+            'background-color': isTranslateDisabled ? '#ccc !important' : '#339af0 !important',
+            'color': isTranslateDisabled ? '#888 !important' : 'white !important',
+            'cursor': isTranslateDisabled ? 'not-allowed !important' : 'pointer !important',
+            'box-shadow': isTranslateDisabled ? 'none !important' : '0 4px 12px rgba(51, 154, 240, 0.25) !important'
+          }"
         >
           {{ t('mobile_input_translate_btn') || 'Translate' }}
         </button>
@@ -137,6 +154,11 @@ const currentProvider = ref(settingsStore.settings.TRANSLATION_API || 'google')
 const isLoading = ref(false)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
 const isError = ref(!!mobileStore.selectionData.error)
+
+const isTranslateDisabled = computed(() => {
+  const text = inputText.value || '';
+  return text.trim().length === 0 || isLoading.value;
+})
 
 watch(() => settingsStore.isInitialized, (initialized) => {
   if (initialized) {
@@ -221,17 +243,18 @@ const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); m
 }
 
 .ti-m-translate-main-btn {
-  background-color: var(--ti-mobile-accent) !important;
+  background-color: #339af0 !important;
   color: white !important;
   cursor: pointer !important;
   box-shadow: 0 4px 12px rgba(51, 154, 240, 0.25) !important;
 }
 
 .ti-m-translate-main-btn:disabled {
-  background-color: var(--ti-mobile-card-bg) !important;
-  color: var(--ti-mobile-text-muted) !important;
+  background-color: #ccc !important;
+  color: #888 !important;
   cursor: not-allowed !important;
   box-shadow: none !important;
+  opacity: 0.6 !important;
 }
 
 .ti-m-translate-main-btn:active:not(:disabled) {
@@ -239,8 +262,14 @@ const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); m
   filter: brightness(0.9) !important;
 }
 
+/* Ensure consistent look in dark mode */
 .is-dark .ti-m-translate-main-btn:not(:disabled) {
-  background-color: var(--ti-mobile-accent) !important;
-  color: #1a1a1a !important;
+  background-color: #339af0 !important;
+  color: white !important;
+}
+
+.is-dark .ti-m-translate-main-btn:disabled {
+  background-color: #2a2a2a !important;
+  color: #555555 !important;
 }
 </style>
