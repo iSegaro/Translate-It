@@ -201,13 +201,7 @@ const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); m
 @keyframes ti-m-slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .ti-m-icon-img, .ti-m-icon-img-small {
-  filter: var(--ti-mobile-icon-filter, none) !important;
-}
-
-/* Force filter if the root has is-dark class */
-.ti-m-input-view.is-dark .ti-m-icon-img,
-.ti-m-input-view.is-dark .ti-m-icon-img-small {
-  filter: brightness(0) invert(1) !important;
+  object-fit: contain !important;
 }
 
 .ti-m-back-icon {

@@ -149,14 +149,7 @@ const selectItem = (item) => {
 }
 
 .ti-m-icon-img, .ti-m-icon-img-small, .ti-m-empty-icon {
-  filter: var(--ti-mobile-icon-filter, none) !important;
-}
-
-/* Force filter if the root has is-dark class */
-.ti-m-history-view.is-dark .ti-m-icon-img,
-.ti-m-history-view.is-dark .ti-m-icon-img-small,
-.ti-m-history-view.is-dark .ti-m-empty-icon {
-  filter: brightness(0) invert(1) !important;
+  object-fit: contain !important;
 }
 
 .ti-m-back-icon {

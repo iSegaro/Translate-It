@@ -176,7 +176,7 @@ const closeSheet = () => {
   --ti-mobile-text-secondary: #adb5bd;
   --ti-mobile-accent: #74c0fc;
   --ti-mobile-shadow: rgba(0, 0, 0, 0.4);
-  --ti-mobile-icon-filter: brightness(0) invert(1);
+  --ti-mobile-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
 }
 
 .ti-m-sheet {
@@ -196,6 +196,16 @@ const closeSheet = () => {
 .ti-m-sheet-overlay img {
   max-width: none !important;
   display: block !important;
+}
+
+/* GLOBAL ICON FILTERING (SHADOW DOM COMPATIBLE) */
+.ti-m-icon-img, .ti-toolbar-icon {
+  filter: none !important;
+}
+
+.is-dark .ti-m-icon-img, 
+.is-dark .ti-toolbar-icon {
+  filter: var(--ti-mobile-icon-filter) !important;
 }
 
 .ti-m-drag-handle {

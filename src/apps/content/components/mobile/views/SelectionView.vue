@@ -121,20 +121,9 @@ const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 
 .ti-m-icon-img {
   object-fit: contain !important;
-  filter: var(--ti-mobile-icon-filter, none) !important;
-}
-
-/* Force filter if the root has is-dark class */
-.ti-m-selection-view.is-dark .ti-m-icon-img {
-  filter: brightness(0) invert(1) !important;
 }
 
 .ti-m-close-icon, .ti-m-swap-icon {
   opacity: 0.6 !important;
-}
-
-.ti-m-selection-view.is-dark .ti-m-close-icon, 
-.ti-m-selection-view.is-dark .ti-m-swap-icon {
-  opacity: 0.8 !important;
 }
 </style>
