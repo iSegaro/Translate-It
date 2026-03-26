@@ -54,14 +54,18 @@ class SystemFontDetector {
       'Shabnam', 'Tanha', 'IranNastaliq', 'B Nazanin', 'B Titr',
       'Noto Sans Arabic', 'Arial Unicode MS',
       
-      // Mac fonts
+      // Mac/iOS fonts
       'San Francisco', 'Helvetica Neue', 'Helvetica', 'Avenir',
       'Avenir Next', 'Futura', 'Gill Sans', 'Optima', 'Palatino',
       'American Typewriter', 'Baskerville', 'Big Caslon',
       
+      // Android/Mobile-specific fonts
+      'Roboto', 'Noto Sans', 'Droid Sans', 'SamsungOne', 'MiSans', 
+      'OnePlus Sans', 'Oppo Sans', 'Vivo Sans',
+
       // Linux fonts
       'DejaVu Sans', 'DejaVu Serif', 'Liberation Sans', 'Liberation Serif',
-      'Ubuntu', 'Droid Sans', 'Noto Sans', 'Noto Serif'
+      'Ubuntu', 'FreeSans', 'FreeSerif'
     ]
   }
 

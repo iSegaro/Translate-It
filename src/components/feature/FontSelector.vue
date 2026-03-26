@@ -5,7 +5,7 @@
       <label for="font-family-search">{{ t('font_family_label') || 'Font Family' }}</label>
       
       <!-- Searchable Font Selector -->
-      <div class="font-search-container">
+      <div class="font-search-container" ref="fontDropdownRef">
         <div
           class="font-dropdown"
           :class="{ 'is-open': isDropdownOpen }"
@@ -180,6 +180,7 @@ const { t } = useUnifiedI18n()
 // Refs
 const fontSearchInput = ref(null)
 const fontOptionsRef = ref(null)
+const fontDropdownRef = ref(null)
 
 // Local reactive values
 const localFontFamily = ref(props.fontFamily)
@@ -435,8 +436,7 @@ watch(searchQuery, () => {
 
 // Click outside to close dropdown
 const handleClickOutside = (event) => {
-  const container = document.querySelector('.font-dropdown')
-  if (container && !container.contains(event.target)) {
+  if (fontDropdownRef.value && !fontDropdownRef.value.contains(event.target)) {
     isDropdownOpen.value = false
     searchQuery.value = ''
   }
