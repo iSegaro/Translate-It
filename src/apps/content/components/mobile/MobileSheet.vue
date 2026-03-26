@@ -20,13 +20,19 @@
       <!-- Drag Handle Header -->
       <div 
         class="ti-m-sheet-header" 
-        style="width: 100% !important; height: 16px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
+        style="width: 100% !important; height: 24px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important; padding-top: 4px !important;"
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
         @mousedown="onDragStart"
       >
-        <div class="ti-m-drag-handle" style="width: 32px !important; height: 4px !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
+        <div class="ti-m-drag-handle" :style="{ 
+          width: '40px !important', 
+          height: '5px !important', 
+          borderRadius: '3px !important', 
+          backgroundColor: 'var(--ti-mobile-drag-handle) !important',
+          opacity: '0.8 !important' 
+        }"></div>
       </div>
 
       <!-- Main Content Container -->
@@ -85,7 +91,7 @@ const themeVariables = computed(() => {
     '--ti-mobile-card-bg': isDark ? '#2d2d2d' : '#f8f9fa',
     '--ti-mobile-btn-bg': isDark ? '#3d3d3d' : '#ffffff',
     '--ti-mobile-btn-border': isDark ? '#555555' : '#dee2e6',
-    '--ti-mobile-drag-handle': isDark ? '#666666' : '#e0e0e0',
+    '--ti-mobile-drag-handle': isDark ? '#444444' : '#bdbdbd',
     '--ti-mobile-shadow': isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.2)',
     '--ti-mobile-icon-filter': isDark ? 'brightness(0) invert(1)' : 'none',
     '--ti-mobile-error': isDark ? '#ff8787' : '#fa5252',
