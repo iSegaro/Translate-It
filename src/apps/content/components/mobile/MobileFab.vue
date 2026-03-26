@@ -68,6 +68,17 @@ let animationFrameId = null;
 let instabilityTimer = null;
 let fabIdleTimerId = null;
 
+const handleSelectionChange = () => {
+  if (typeof window === 'undefined') return;
+  const selection = window.getSelection();
+  const selectedText = selection ? selection.toString().trim() : '';
+  
+  if (selectedText) {
+    // Wake up FAB when text is selected (Fade in)
+    startFabIdleTimer();
+  }
+};
+
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
   isViewportUnstable.value = true;
@@ -85,9 +96,12 @@ const updateViewport = () => {
 };
 
 onMounted(async () => {
-  // Use tracker for window events
-  tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
-  tracker.addEventListener(window, 'resize', updateViewport);
+  // Use tracker for window and document events
+  if (typeof window !== 'undefined') {
+    tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
+    tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
+    tracker.addEventListener(window, 'resize', updateViewport);
+  }
 
   try {
     const savedData = await storageManager.get('MOBILE_FAB_POSITION');
