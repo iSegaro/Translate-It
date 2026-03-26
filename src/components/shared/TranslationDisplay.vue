@@ -131,8 +131,8 @@
         @click.stop
       >
         <button 
-          class="mobile-action-btn primary-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-accent) !important; color: white !important; border: none !important;"
+          class="mobile-action-btn secondary-action" 
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
           @click="handleMobileSpeak" 
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle"
         >
@@ -150,7 +150,7 @@
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
-            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: brightness(0) invert(1) !important;" 
+            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" 
           />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
