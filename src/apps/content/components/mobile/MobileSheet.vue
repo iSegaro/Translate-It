@@ -1,38 +1,40 @@
 <template>
   <div 
     v-if="isOpen && !isFullscreen"
-    class="mobile-sheet-overlay notranslate"
+    class="ti-m-sheet-overlay notranslate"
     translate="no"
+    :class="{ 'is-dark': settingsStore.isDarkTheme }"
     style="position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
     @click.self="closeSheet"
   >
     <div 
-      class="mobile-sheet notranslate"
+      class="ti-m-sheet notranslate"
       translate="no"
       :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
-      :style="[sheetStyle, activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? { touchAction: 'none !important' } : {}]"
+      :style="[sheetStyle, themeVariables]"
       @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
       @touchmove="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragMove($event) : null"
       @touchend="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragEnd($event) : null"
     >
       <!-- Drag Handle Header -->
       <div 
-        class="sheet-header" 
+        class="ti-m-sheet-header" 
         style="width: 100% !important; height: 16px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important;"
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
       >
-        <div class="drag-handle" style="width: 32px !important; height: 4px !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
+        <div class="ti-m-drag-handle" style="width: 32px !important; height: 4px !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
       </div>
 
       <!-- Main Content Container -->
       <div 
-        class="sheet-content" 
+        class="ti-m-sheet-content" 
         :style="{ 
           flex: '1 !important', 
           overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
-          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important' 
+          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important',
+          backgroundColor: 'inherit !important'
         }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
@@ -43,22 +45,18 @@
       </div>
 
       <!-- Footer/Safe Area -->
-      <div class="sheet-footer-area notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px;"></div>
+      <div class="ti-m-sheet-footer-area notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px; background-color: inherit !important;"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useMobileGestures } from '@/composables/ui/useMobileGestures.js'
-import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
-import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
-// Import Mobile Views
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
 import InputView from './views/InputView.vue'
@@ -68,83 +66,80 @@ import HistoryView from './views/HistoryView.vue'
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
-const tts = useTTSSmart()
 
-// Watch for activeView changes to stop TTS playback when navigating between views
-watch(activeView, () => {
-  if (tts && typeof tts.stopAll === 'function') {
-    tts.stopAll();
+// Theme variables to be injected as inline styles for maximum reliability
+const themeVariables = computed(() => {
+  const isDark = settingsStore.isDarkTheme
+  return {
+    '--ti-mobile-bg': isDark ? '#1a1a1a' : '#ffffff',
+    '--ti-mobile-text': isDark ? '#ffffff' : '#333333',
+    '--ti-mobile-text-secondary': isDark ? '#e9ecef' : '#495057',
+    '--ti-mobile-text-muted': isDark ? '#adb5bd' : '#868e96',
+    '--ti-mobile-accent': isDark ? '#90caf9' : '#339af0',
+    '--ti-mobile-accent-hover': isDark ? '#e3f2fd' : '#1c7ed6',
+    '--ti-mobile-accent-bg': isDark ? 'rgba(144, 202, 249, 0.15)' : '#e7f5ff',
+    '--ti-mobile-border': isDark ? '#444444' : '#dee2e6',
+    '--ti-mobile-header-border': isDark ? '#333333' : '#f1f3f5',
+    '--ti-mobile-card-bg': isDark ? '#2d2d2d' : '#f8f9fa',
+    '--ti-mobile-btn-bg': isDark ? '#3d3d3d' : '#ffffff',
+    '--ti-mobile-btn-border': isDark ? '#555555' : '#dee2e6',
+    '--ti-mobile-drag-handle': isDark ? '#666666' : '#e0e0e0',
+    '--ti-mobile-shadow': isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.2)',
+    '--ti-mobile-icon-filter': isDark ? 'brightness(0) invert(1)' : 'none',
+    '--ti-mobile-error': isDark ? '#ff8787' : '#fa5252',
+    '--ti-mobile-error-bg': isDark ? 'rgba(255, 135, 135, 0.15)' : '#fff5f5',
+    '--ti-mobile-warning': isDark ? '#ffd43b' : '#ffa94d',
+    '--ti-mobile-warning-bg': isDark ? 'rgba(255, 212, 59, 0.15)' : '#fff4e6',
+    '--ti-mobile-success': isDark ? '#8ce99a' : '#51cf66',
+    'background-color': isDark ? '#1a1a1a !important' : '#ffffff !important'
   }
-});
-
-// Watch for isOpen changes to sync state with WindowsManager and stop audio
-watch(isOpen, (newVal) => {
-  if (!newVal) {
-    pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id: 'mobile-sheet' });
-    
-    // Auto-stop any TTS playback when the mobile sheet is closed
-    if (tts && typeof tts.stopAll === 'function') {
-      tts.stopAll();
-    }
-  }
-});
-
-const {
-  isDragging,
-  sheetTranslation,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
-  syncState
-} = useMobileGestures({
-  onClose: () => mobileStore.closeSheet(),
-  onExpand: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL),
-  onPeek: () => mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK),
-  initialState: sheetState.value
 })
 
-// Sync internal gesture state with store state changes
-watch(sheetState, (newVal) => {
-  if (typeof syncState === 'function') {
-    syncState(newVal);
-  }
-}, { immediate: true });
+// Drag and drop logic
+const startY = ref(0)
+const currentY = ref(0)
+const isDragging = ref(false)
 
-// Standard height mapping for different views when in PEEK mode
-const PEEK_HEIGHTS = {
-  [MOBILE_CONSTANTS.VIEWS.DASHBOARD]: '30dvh',
-  [MOBILE_CONSTANTS.VIEWS.SELECTION]: '40dvh',
-  [MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION]: '40dvh',
-  [MOBILE_CONSTANTS.VIEWS.INPUT]: '40dvh', // Initial peek before interaction
-  [MOBILE_CONSTANTS.VIEWS.HISTORY]: '60dvh'
+const onDragStart = (e) => {
+  isDragging.value = true
+  startY.value = e.touches ? e.touches[0].clientY : e.clientY
+  currentY.value = 0
+}
+
+const onDragMove = (e) => {
+  if (!isDragging.value) return
+  const y = e.touches ? e.touches[0].clientY : e.clientY
+  currentY.value = Math.max(0, y - startY.value)
+}
+
+const onDragEnd = () => {
+  if (!isDragging.value) return
+  isDragging.value = false
+  
+  if (currentY.value > 100) {
+    mobileStore.closeSheet()
+  }
+  currentY.value = 0
 }
 
 const sheetStyle = computed(() => {
-  const y = isDragging.value ? sheetTranslation.value : 0;
+  const y = isDragging.value ? currentY.value : 0
+  const targetHeight = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK ? '30dvh' : '75dvh'
   
-  // Use FULL height (prefer dvh for mobile to account for toolbars) or specific PEEK height
-  // We use 88vh/88dvh instead of 90 to give a bit more breathing room at the top for browser toolbars
-  const targetHeight = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL 
-    ? '88dvh' 
-    : (PEEK_HEIGHTS[activeView.value] || '40dvh');
-
-  const isDark = settingsStore.isDarkTheme;
-
   return {
     transform: `translateY(${y}px)`,
     position: 'fixed',
     bottom: '0',
     left: '0',
     right: '0',
-    backgroundColor: isDark ? '#1a1a1a' : 'white',
     zIndex: '2147483647',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: isDark ? '0 -5px 25px rgba(0,0,0,0.4)' : '0 -5px 25px rgba(0,0,0,0.2)',
+    boxShadow: '0 -5px 25px var(--ti-mobile-shadow)',
     borderRadius: '20px 20px 0 0',
     height: targetHeight,
-    maxHeight: '95dvh', // Absolute limit
-    paddingTop: 'env(safe-area-inset-top, 0px)', // Support for notch/status bars
+    maxHeight: '95dvh', 
+    paddingTop: 'env(safe-area-inset-top, 0px)',
     transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease-in-out',
     overflow: 'hidden'
   }
@@ -156,42 +151,58 @@ const closeSheet = () => {
 </script>
 
 <style>
-.mobile-sheet-overlay * {
+/* 
+  MOBILE THEME SYSTEM (Shadow DOM Compatible)
+*/
+:host {
+  --ti-mobile-bg: #ffffff;
+  --ti-mobile-shadow: rgba(0, 0, 0, 0.2);
+}
+
+.ti-m-sheet-overlay {
+  /* LIGHT THEME (DEFAULT) */
+  --ti-mobile-bg: #ffffff;
+  --ti-mobile-text: #333333;
+  --ti-mobile-text-secondary: #495057;
+  --ti-mobile-accent: #339af0;
+  --ti-mobile-shadow: rgba(0, 0, 0, 0.2);
+}
+
+.ti-m-sheet-overlay.is-dark,
+.ti-m-sheet.is-dark {
+  /* DARK THEME OVERRIDES */
+  --ti-mobile-bg: #1a1a1a;
+  --ti-mobile-text: #dee2e6;
+  --ti-mobile-text-secondary: #adb5bd;
+  --ti-mobile-accent: #74c0fc;
+  --ti-mobile-shadow: rgba(0, 0, 0, 0.4);
+}
+
+.ti-m-sheet {
+  background-color: var(--ti-mobile-bg, #ffffff) !important;
+  color: var(--ti-mobile-text, #333333) !important;
+}
+
+.ti-m-sheet-content,
+.ti-m-sheet-footer-area {
+  background-color: inherit !important;
+}
+
+.ti-m-sheet-overlay * {
   box-sizing: border-box !important;
 }
 
-/* Base theme styles */
-.mobile-sheet {
-  background-color: white !important;
-  color: #333 !important;
+.ti-m-sheet-overlay img {
+  max-width: none !important;
+  display: block !important;
 }
 
-.mobile-sheet.is-dark {
-  background-color: #1a1a1a !important;
-  color: #dee2e6 !important;
+.ti-m-drag-handle {
+  background-color: var(--ti-mobile-drag-handle, #e0e0e0) !important;
 }
 
-.drag-handle {
-  background-color: #e0e0e0 !important;
-}
-
-.mobile-sheet.is-dark .drag-handle {
-  background-color: #444 !important;
-}
-
-.sheet-content {
-  background-color: white !important;
-}
-
-.mobile-sheet.is-dark .sheet-content {
-  background-color: #1a1a1a !important;
-}
-
-.sheet-footer-area {
-  background-color: white !important;
-}
-
-.mobile-sheet.is-dark .sheet-footer-area {
-  background-color: #1a1a1a !important;
-}
+@keyframes pulse-mobile { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }
+@keyframes indeterminate-mobile { 0% { transform: translateX(-100%) scaleX(0.2); } 50% { transform: translateX(0%) scaleX(0.5); } 100% { transform: translateX(100%) scaleX(0.2); } }
+.ti-m-progress-bar-fill.indeterminate { animation: indeterminate-mobile 2s infinite linear !important; transform-origin: 0% 50% !important; }
+button:active { transform: scale(0.98) !important; opacity: 0.8 !important; }
 </style>

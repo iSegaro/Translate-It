@@ -17,12 +17,12 @@
       },
       containerClass,
     ]"
-    :style="mode === 'mobile' ? `background: ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.15)' : '#e7f5ff'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.3)' : '#d0ebff'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important;` : (cssVariables || {})"
+    :style="mode === 'mobile' ? `background: var(--ti-mobile-accent-bg) !important; border: 1px solid var(--ti-mobile-border) !important; color: var(--ti-mobile-accent) !important;` : (cssVariables || {})"
   >
     <!-- Simplified Loading State -->
     <div
       v-if="isLoading"
-      :style="`display: flex !important; align-items: center !important; justify-content: center !important; min-height: 100px !important; width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; z-index: 100 !important; background: ${settingsStore.isDarkTheme ? (mode === 'mobile' ? 'transparent' : '#2d2d2d') : 'white'} !important; border-radius: 8px !important; direction: ltr !important;`"
+      :style="`display: flex !important; align-items: center !important; justify-content: center !important; min-height: 100px !important; width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; z-index: 100 !important; background: ${mode === 'mobile' ? 'transparent' : 'var(--ti-mobile-bg)'} !important; border-radius: 8px !important; direction: ltr !important;`"
     >
       <LoadingSpinner
         type="animated"
@@ -65,7 +65,7 @@
           { 'rtl-content': textDirection?.dir === 'rtl' },
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; padding: 0 !important; font-size: 16px !important; line-height: 1.5 !important;` : {
+        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: var(--ti-mobile-accent) !important; padding: 0 !important; font-size: 16px !important; line-height: 1.5 !important;` : {
           ...(fontStyles || {}),
           ...(cssVariables || {}),
           direction: textDirection?.dir || 'ltr',
@@ -127,12 +127,12 @@
       <div 
         v-if="mode === 'mobile' && hasContent"
         class="ti-mobile-actions"
-        :style="`display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid ${settingsStore.isDarkTheme ? 'rgba(116, 192, 252, 0.2)' : 'rgba(51, 154, 240, 0.15)'} !important; box-sizing: border-box !important; justify-content: space-between !important;`"
+        style="display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid var(--ti-mobile-header-border) !important; box-sizing: border-box !important; justify-content: space-between !important;"
         @click.stop
       >
         <button 
           class="mobile-action-btn primary-action" 
-          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-accent) !important; color: white !important; border: none !important;"
           @click="handleMobileSpeak" 
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle"
         >
@@ -150,7 +150,7 @@
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
-            :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" 
+            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: brightness(0) invert(1) !important;" 
           />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
@@ -159,11 +159,11 @@
         
         <button 
           class="mobile-action-btn secondary-action" 
-          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
           @click="handleMobileCopy" 
           :title="copyTitle"
         >
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ t('mobile_selection_copy_tooltip') }}
           </span>
@@ -171,11 +171,11 @@
         
         <button 
           class="mobile-action-btn icon-only-action" 
-          :style="`flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important; background: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important; border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#d0ebff'} !important;`"
+          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
           @click="handleMobileHistory" 
           :title="t('mobile_selection_history_tooltip')"
         >
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" :style="`width: 16px !important; height: 16px !important; object-fit: contain !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
         </button>
       </div>
     </template>

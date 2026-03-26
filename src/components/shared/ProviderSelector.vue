@@ -298,12 +298,12 @@
         width: 100% !important;
         height: 46px !important;
         border-radius: 12px !important;
-        border: 1px solid ${settingsStore.isDarkTheme ? '#444' : '#ced4da'} !important;
-        background-color: ${settingsStore.isDarkTheme ? '#2d2d2d' : 'white'} !important;
+        border: 1px solid var(--ti-mobile-border) !important;
+        background-color: var(--ti-mobile-btn-bg) !important;
         padding: 0 35px 0 12px !important;
         font-size: 14px !important;
         font-weight: 600 !important;
-        color: ${settingsStore.isDarkTheme ? '#dee2e6' : '#495057'} !important;
+        color: var(--ti-mobile-text) !important;
         appearance: none !important;
         -webkit-appearance: none !important;
         outline: none !important;

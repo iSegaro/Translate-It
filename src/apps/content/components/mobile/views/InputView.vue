@@ -1,34 +1,34 @@
 <template>
-  <div class="input-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important;">
+  <div class="ti-m-input-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
     
     <!-- Header -->
-    <div class="view-header" :style="`display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: ${settingsStore.isDarkTheme ? '1px solid #333' : '1px solid #eee'} !important;`" >
-      <button @click="goBack" class="back-btn" :style="`background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: ${settingsStore.isDarkTheme ? '#adb5bd' : '#333'} !important;`" >
-        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" :style="`width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; opacity: 0.6 !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : ''}`" />
-        <span class="header-title" :style="`font-weight: bold !important; font-size: 17px !important; color: ${settingsStore.isDarkTheme ? '#adb5bd' : '#333'} !important;`" >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+    <div class="ti-m-view-header" style="display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;">
+      <button @click="goBack" class="ti-m-back-btn" style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;">
+        <img src="@/icons/ui/dropdown-arrow.svg" :alt="t('mobile_back_button_alt') || 'Back'" class="ti-m-icon-img ti-m-back-icon" style="width: 20px !important; height: 20px !important; transform: rotate(90deg) !important; filter: var(--ti-mobile-icon-filter) !important;" />
+        <span class="ti-m-header-title" style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
 
     <!-- Input Card -->
-    <div class="input-card" :style="{ border: settingsStore.isDarkTheme ? '1px solid #3d3d3d !important' : '1px solid #e9ecef !important', background: settingsStore.isDarkTheme ? '#2d2d2d !important' : '#f8f9fa !important', borderRadius: '12px !important', padding: '12px !important', display: 'flex !important', flexDirection: 'column !important', gap: '10px !important' }">
+    <div class="ti-m-input-card" style="border: 1px solid var(--ti-mobile-border) !important; background: var(--ti-mobile-card-bg) !important; border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 10px !important;">
       <div style="display: flex !important; justify-content: space-between !important; align-items: center !important;">
-        <div style="font-size: 11px !important; font-weight: 800 !important; color: #adb5bd !important; text-transform: uppercase !important;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
+        <div style="font-size: 11px !important; font-weight: 800 !important; color: var(--ti-mobile-text-muted) !important; text-transform: uppercase !important;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
         
         <div style="display: flex !important; gap: 8px !important;">
            <button 
-            class="input-action-btn paste-btn" 
+            class="ti-m-input-action-btn ti-m-paste-btn" 
             @click="handlePaste" 
-            :style="`padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; display: flex !important; align-items: center !important; gap: 5px !important; font-weight: 600 !important; background: ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.2)' : '#e7f5ff'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(28, 126, 214, 0.3)' : '#d0ebff'} !important; color: ${settingsStore.isDarkTheme ? '#74c0fc' : '#1c7ed6'} !important;`"
+            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; display: flex !important; align-items: center !important; gap: 5px !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-accent-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-accent-bg) !important;"
           >
-            <img src="@/icons/ui/paste.png" :style="`width: 14px !important; height: 14px !important; ${settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : 'filter: brightness(0.8) !important;'}`" />
+            <img src="@/icons/ui/paste.png" class="ti-m-icon-img-small" style="width: 14px !important; height: 14px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
             {{ t('action_paste_from_clipboard') || 'Paste' }}
           </button>
           
           <button 
             v-if="inputText"
-            class="input-action-btn clear-btn" 
+            class="ti-m-input-action-btn ti-m-clear-btn" 
             @click="inputText = ''" 
-            :style="`padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; background: ${settingsStore.isDarkTheme ? 'rgba(250, 82, 82, 0.2)' : '#fff5f5'} !important; border: 1px solid ${settingsStore.isDarkTheme ? 'rgba(250, 82, 82, 0.3)' : '#ffe3e3'} !important; color: ${settingsStore.isDarkTheme ? '#ff8787' : '#fa5252'} !important;`"
+            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-error-bg) !important; color: var(--ti-mobile-error) !important; border: 1px solid var(--ti-mobile-error-bg) !important;"
           >
             {{ t('mobile_input_clear_btn') || 'Clear' }}
           </button>
@@ -39,15 +39,15 @@
         v-model="inputText"
         :placeholder="t('mobile_input_placeholder') || 'Type here...'"
         :dir="inputDir"
-        :style="{ width: '100% !important', minHeight: '100px !important', border: 'none !important', background: 'transparent !important', fontSize: '16px !important', color: settingsStore.isDarkTheme ? '#dee2e6 !important' : '#495057 !important', resize: 'none !important', outline: 'none !important', padding: '4px 0 !important', textAlign: 'start !important', lineHeight: '1.5 !important' }"
+        style="width: 100% !important; min-height: 100px !important; border: none !important; background: transparent !important; font-size: 16px !important; color: var(--ti-mobile-text-secondary) !important; resize: none !important; outline: none !important; padding: 4px 0 !important; text-align: start !important; line-height: 1.5 !important;"
         @focus="onFocus"
       ></textarea>
     </div>
 
     <!-- Controls -->
-    <div class="input-controls" style="display: flex !important; flex-direction: column !important; gap: 12px !important; position: relative !important;">
+    <div class="ti-m-input-controls" style="display: flex !important; flex-direction: column !important; gap: 12px !important; position: relative !important;">
       <!-- Languages -->
-      <div class="language-controls-card" :style="{ border: settingsStore.isDarkTheme ? '1px solid #444 !important' : '1px solid #ced4da !important', borderRadius: '12px !important', background: settingsStore.isDarkTheme ? '#2d2d2d !important' : 'white !important', overflow: 'hidden !important', boxShadow: '0 2px 4px rgba(0,0,0,0.02) !important', marginTop: '5px !important' }">
+      <div class="ti-m-language-controls-card" style="border: 1px solid var(--ti-mobile-btn-border) !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; overflow: hidden !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; margin-top: 5px !important;">
         <LanguageSelector
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
@@ -60,8 +60,8 @@
       </div>
       
       <!-- Provider and Translate -->
-      <div class="actions-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 10px !important;">
-        <div class="provider-wrapper" style="flex: 1 !important; max-width: 48% !important; position: relative !important;">
+      <div class="ti-m-actions-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 10px !important;">
+        <div class="ti-m-provider-wrapper" style="flex: 1 !important; max-width: 48% !important; position: relative !important;">
           <ProviderSelector
             v-model="currentProvider"
             mode="compact"
@@ -74,25 +74,8 @@
         <button 
           @click="handleTranslate"
           :disabled="!inputText || isLoading"
-          class="translate-main-btn"
-          :style="{
-            backgroundColor: (isLoading || !inputText) ? (settingsStore.isDarkTheme ? '#1a1a1a' : '#f1f3f5') : (settingsStore.isDarkTheme ? '#8ab4f8' : '#339af0'),
-            color: (isLoading || !inputText) ? '#444' : (settingsStore.isDarkTheme ? '#202124' : 'white'),
-            border: 'none !important',
-            padding: '0 20px !important',
-            borderRadius: '12px !important',
-            fontWeight: '600 !important',
-            fontSize: '15px !important',
-            height: '46px !important',
-            display: 'flex !important',
-            alignItems: 'center !important',
-            justifyContent: 'center !important',
-            cursor: (isLoading || !inputText) ? 'not-allowed' : 'pointer',
-            boxShadow: (isLoading || !inputText) ? 'none !important' : '0 4px 12px rgba(51, 154, 240, 0.25) !important',
-            flex: '1.2 !important',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important',
-            letterSpacing: '0.3px !important'
-          }"
+          class="ti-m-translate-main-btn"
+          style="border: none !important; padding: 0 20px !important; border-radius: 12px !important; font-weight: 600 !important; font-size: 15px !important; height: 46px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex: 1.2 !important; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; letter-spacing: 0.3px !important; background-color: var(--ti-mobile-accent) !important; color: white !important;"
         >
           {{ t('mobile_input_translate_btn') || 'Translate' }}
         </button>
@@ -100,8 +83,8 @@
     </div>
 
     <!-- Result Area -->
-    <div class="result-container" style="min-height: 120px !important; position: relative !important; margin-top: 5px !important;">
-      <div v-if="resultText || isLoading || isError" style="animation: slideIn 0.3s ease;">
+    <div class="ti-m-result-container" style="min-height: 120px !important; position: relative !important; margin-top: 5px !important;">
+      <div v-if="resultText || isLoading || isError" style="animation: ti-m-slideIn 0.3s ease;">
         <TranslationDisplay
           mode="mobile"
           :content="resultText"
@@ -213,25 +196,49 @@ const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); m
 </script>
 
 <style scoped>
-@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ti-m-slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Deep selectors for language dropdowns in dark mode */
-.is-dark :deep(.ti-language-selector-title) { color: #adb5bd !important; }
-.is-dark :deep(.ti-language-name) { color: #dee2e6 !important; }
-.is-dark :deep(.ti-language-dropdown) { background-color: #2d2d2d !important; border-color: #444 !important; }
-.is-dark :deep(.ti-language-item) { color: #dee2e6 !important; }
-.is-dark :deep(.ti-language-item:hover) { background-color: #3d3d3d !important; }
-
-/* Provider dropdown override */
-.is-dark :deep(.ti-provider-select) {
-  background-color: #2d2d2d !important;
-  border-color: #444 !important;
-  color: #dee2e6 !important;
-  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23adb5bd%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+.ti-m-icon-img, .ti-m-icon-img-small {
+  filter: var(--ti-mobile-icon-filter) !important;
 }
 
-.input-view .translate-main-btn:active:not(:disabled) {
+.ti-m-back-icon {
+  transform: rotate(90deg) !important;
+}
+
+.ti-m-paste-btn {
+  background: var(--ti-mobile-accent-bg) !important;
+  color: var(--ti-mobile-accent) !important;
+  border: 1px solid var(--ti-mobile-accent-bg) !important;
+}
+
+.ti-m-clear-btn {
+  background: var(--ti-mobile-error-bg) !important;
+  color: var(--ti-mobile-error) !important;
+  border: 1px solid var(--ti-mobile-error-bg) !important;
+}
+
+.ti-m-translate-main-btn {
+  background-color: var(--ti-mobile-accent) !important;
+  color: white !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(51, 154, 240, 0.25) !important;
+}
+
+.ti-m-translate-main-btn:disabled {
+  background-color: var(--ti-mobile-card-bg) !important;
+  color: var(--ti-mobile-text-muted) !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.ti-m-translate-main-btn:active:not(:disabled) {
   transform: scale(0.96) !important;
   filter: brightness(0.9) !important;
+}
+
+.is-dark .ti-m-translate-main-btn:not(:disabled) {
+  background-color: var(--ti-mobile-accent) !important;
+  color: #1a1a1a !important;
 }
 </style>
