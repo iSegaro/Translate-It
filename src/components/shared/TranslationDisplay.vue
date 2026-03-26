@@ -17,7 +17,12 @@
       },
       containerClass,
     ]"
-    :style="mode === 'mobile' ? `background: var(--ti-mobile-accent-bg) !important; border: 1px solid var(--ti-mobile-border) !important; color: var(--ti-mobile-accent) !important;` : (cssVariables || {})"
+    :style="mode === 'mobile' ? {
+      background: 'var(--ti-mobile-accent-bg) !important',
+      border: '1px solid var(--ti-mobile-border) !important',
+      color: 'var(--ti-mobile-accent) !important',
+      ...cssVariables
+    } : (cssVariables || {})"
   >
     <!-- Simplified Loading State -->
     <div
@@ -65,9 +70,19 @@
           { 'rtl-content': textDirection?.dir === 'rtl' },
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="mode === 'mobile' ? `direction: ${textDirection?.dir || 'ltr'} !important; text-align: ${textDirection?.textAlign || 'left'} !important; cursor: pointer !important; color: var(--ti-mobile-accent) !important; padding: 4px 8px !important; font-size: 16px !important; line-height: 1.5 !important;` : {
-          ...(fontStyles || {}),
-          ...(cssVariables || {}),
+        :style="mode === 'mobile' ? {
+          ...fontStyles.value,
+          ...cssVariables.value,
+          direction: textDirection?.dir || 'ltr',
+          textAlign: textDirection?.textAlign || 'left',
+          cursor: 'pointer',
+          color: 'var(--ti-mobile-accent)',
+          padding: '4px 8px',
+          fontSize: '16px',
+          lineHeight: '1.5'
+        } : {
+          ...(fontStyles.value || {}),
+          ...(cssVariables.value || {}),
           direction: textDirection?.dir || 'ltr',
           textAlign: textDirection?.textAlign || 'left',
           cursor: mode === 'mobile' ? 'pointer' : 'default'
@@ -376,6 +391,33 @@ const currentUiLang = computed(() => {
   return String(lang).toLowerCase();
 });
 
+// Enhanced text direction computation with content-first detection
+const textDirection = computed(() => {
+  // If we have an error, follow UI language direction strictly
+  if (hasError.value) {
+    const lang = currentUiLang.value;
+    const direction = isRTLLanguage(lang) ? 'rtl' : 'ltr';
+    return {
+      dir: direction,
+      textAlign: direction === 'rtl' ? 'right' : 'left',
+    };
+  }
+
+  const textToCheck = props.content || "";
+  if (!textToCheck.trim()) {
+    const direction = isRTLLanguage(props.targetLanguage) ? 'rtl' : 'ltr';
+    return { dir: direction, textAlign: direction === 'rtl' ? 'right' : 'left' };
+  }
+
+  // Use advanced content-based detection
+  const direction = detectTextDirectionFromContent(textToCheck, props.targetLanguage);
+
+  return {
+    dir: direction,
+    textAlign: direction === 'rtl' ? 'right' : 'left',
+  };
+});
+
 // Font management with safe error handling and RTL-aware CSS variables
 let fontStyles = ref({});
 let cssVariables = ref({});
@@ -430,33 +472,6 @@ try {
     };
   });
 }
-
-// Enhanced text direction computation with content-first detection
-const textDirection = computed(() => {
-  // If we have an error, follow UI language direction strictly
-  if (hasError.value) {
-    const lang = currentUiLang.value;
-    const direction = isRTLLanguage(lang) ? 'rtl' : 'ltr';
-    return {
-      dir: direction,
-      textAlign: direction === 'rtl' ? 'right' : 'left',
-    };
-  }
-
-  const textToCheck = props.content || "";
-  if (!textToCheck.trim()) {
-    const direction = isRTLLanguage(props.targetLanguage) ? 'rtl' : 'ltr';
-    return { dir: direction, textAlign: direction === 'rtl' ? 'right' : 'left' };
-  }
-
-  // Use advanced content-based detection
-  const direction = detectTextDirectionFromContent(textToCheck, props.targetLanguage);
-
-  return {
-    dir: direction,
-    textAlign: direction === 'rtl' ? 'right' : 'left',
-  };
-});
 
 // Sanitized content computed property
 const sanitizedContent = computed(() => {
@@ -1043,6 +1058,10 @@ onMounted(() => {
   max-height: 250px;
   line-height: 1.5;
   width: 100% !important;
+}
+
+.ti-translation-display.mobile-mode .ti-translation-content * {
+  font-family: inherit !important;
 }
 
 .ti-mobile-actions {
