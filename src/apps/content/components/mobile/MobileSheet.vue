@@ -64,6 +64,7 @@ import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
@@ -74,6 +75,9 @@ import HistoryView from './views/HistoryView.vue'
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
+
+// MEMORY MANAGEMENT
+const tracker = useResourceTracker('mobile-sheet')
 
 // Theme variables to be injected as inline styles for maximum reliability
 const themeVariables = computed(() => {
@@ -114,8 +118,8 @@ const onDragStart = (e) => {
   currentY.value = 0
   
   if (!e.touches) {
-    window.addEventListener('mousemove', onDragMove)
-    window.addEventListener('mouseup', onDragEnd)
+    tracker.addEventListener(window, 'mousemove', onDragMove)
+    tracker.addEventListener(window, 'mouseup', onDragEnd)
   }
 }
 
@@ -125,12 +129,15 @@ const onDragMove = (e) => {
   currentY.value = y - startY.value
 }
 
-const onDragEnd = () => {
+const onDragEnd = (e) => {
   if (!isDragging.value) return
   isDragging.value = false
   
-  window.removeEventListener('mousemove', onDragMove)
-  window.removeEventListener('mouseup', onDragEnd)
+  const isMouseEvent = e && e.type === 'mouseup';
+  if (isMouseEvent) {
+    tracker.removeEventListener(window, 'mousemove', onDragMove)
+    tracker.removeEventListener(window, 'mouseup', onDragEnd)
+  }
   
   // Logic for state transitions based on drag distance
   if (currentY.value > 100) {
