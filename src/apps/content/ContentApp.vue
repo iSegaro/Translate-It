@@ -25,7 +25,7 @@
         }
       }"
     />
-    <template v-if="isExtensionEnabled">
+    <template v-if="isExtensionEnabled && settingsStore.isInitialized">
       <TextFieldIcon
         v-for="icon in activeIcons"
         :id="icon.id"
