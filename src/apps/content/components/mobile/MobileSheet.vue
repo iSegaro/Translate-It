@@ -15,6 +15,7 @@
       @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
       @touchmove="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragMove($event) : null"
       @touchend="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragEnd($event) : null"
+      @mousedown="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
     >
       <!-- Drag Handle Header -->
       <div 
@@ -23,6 +24,7 @@
         @touchstart="onDragStart"
         @touchmove="onDragMove"
         @touchend="onDragEnd"
+        @mousedown="onDragStart"
       >
         <div class="ti-m-drag-handle" style="width: 32px !important; height: 4px !important; border-radius: 2px !important; margin-top: 8px !important;"></div>
       </div>
@@ -104,30 +106,63 @@ const onDragStart = (e) => {
   isDragging.value = true
   startY.value = e.touches ? e.touches[0].clientY : e.clientY
   currentY.value = 0
+  
+  if (!e.touches) {
+    window.addEventListener('mousemove', onDragMove)
+    window.addEventListener('mouseup', onDragEnd)
+  }
 }
 
 const onDragMove = (e) => {
   if (!isDragging.value) return
   const y = e.touches ? e.touches[0].clientY : e.clientY
-  currentY.value = Math.max(0, y - startY.value)
+  currentY.value = y - startY.value
 }
 
 const onDragEnd = () => {
   if (!isDragging.value) return
   isDragging.value = false
   
+  window.removeEventListener('mousemove', onDragMove)
+  window.removeEventListener('mouseup', onDragEnd)
+  
+  // Logic for state transitions based on drag distance
   if (currentY.value > 100) {
+    // Dragged down significantly -> Close
     mobileStore.closeSheet()
+  } else if (currentY.value < -70) {
+    // Dragged up significantly -> Expand to FULL
+    if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
+      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+    }
+  } else if (currentY.value > 70 && sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) {
+    // Dragged down from FULL -> Back to PEEK
+    mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
   }
+  
   currentY.value = 0
 }
 
 const sheetStyle = computed(() => {
   const y = isDragging.value ? currentY.value : 0
-  const targetHeight = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK ? '30dvh' : '75dvh'
+  const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK
+  const targetHeight = isPeek ? '30dvh' : '75dvh'
   
+  let transformValue = 'translateY(0)'
+  let heightValue = targetHeight
+
+  if (isDragging.value) {
+    if (y > 0) {
+      // Dragging down: move the entire sheet
+      transformValue = `translateY(${y}px)`
+    } else {
+      // Dragging up: increase height to prevent detaching from bottom
+      heightValue = `calc(${targetHeight} + ${Math.abs(y)}px)`
+    }
+  }
+
   return {
-    transform: `translateY(${y}px)`,
+    transform: transformValue,
     position: 'fixed',
     bottom: '0',
     left: '0',
@@ -137,11 +172,12 @@ const sheetStyle = computed(() => {
     flexDirection: 'column',
     boxShadow: '0 -5px 25px var(--ti-mobile-shadow)',
     borderRadius: '20px 20px 0 0',
-    height: targetHeight,
+    height: heightValue,
     maxHeight: '95dvh', 
     paddingTop: 'env(safe-area-inset-top, 0px)',
-    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease-in-out',
-    overflow: 'hidden'
+    transition: isDragging.value ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1), height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1)',
+    overflow: 'hidden',
+    touchAction: 'none'
   }
 })
 
