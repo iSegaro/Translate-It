@@ -41,6 +41,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
+
+/**
+ * MEMORY MANAGEMENT: Use the centralized ResourceTracker
+ * This handles automatic cleanup of:
+ * - Event Listeners (DOM & Extension)
+ * - Timers (Timeout/Interval)
+ * - Animation Frames
+ */
 const tracker = useResourceTracker('mobile-fab');
 
 // State
@@ -53,31 +61,33 @@ const isHovering = ref(false);
 const isViewportUnstable = ref(false);
 const side = ref(null); 
 
-// Internal variables
+// Internal variables (Tracked via tracker)
 let dragStartY = 0;
 let initialFabY = 0;
 let animationFrameId = null;
-let fabIdleTimerId = null;
 let instabilityTimer = null;
+let fabIdleTimerId = null;
 
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
-  
-  // Mark viewport as unstable (scrolling/resizing)
   isViewportUnstable.value = true;
   
-  if (instabilityTimer) clearTimeout(instabilityTimer);
+  if (instabilityTimer) {
+    // TRACKER INTEGRATION: Clear and unregister from memory tracking
+    tracker.clearTimer(instabilityTimer);
+    instabilityTimer = null;
+  }
+  
   instabilityTimer = tracker.trackTimeout(() => {
     isViewportUnstable.value = false;
     instabilityTimer = null;
-  }, 250); // Reappear 250ms after scroll stops
+  }, 250);
 };
 
 onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
-    tracker.addEventListener(window, 'resize', updateViewport);
-  }
+  // Use tracker for window events
+  tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
+  tracker.addEventListener(window, 'resize', updateViewport);
 
   try {
     const savedData = await storageManager.get('MOBILE_FAB_POSITION');
@@ -91,9 +101,10 @@ onMounted(async () => {
       side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     }
     
-    setTimeout(() => {
+    // TRACKED TIMERS: Important for preventing memory leaks on fast unmounts
+    tracker.trackTimeout(() => {
       isReady.value = true;
-      setTimeout(() => {
+      tracker.trackTimeout(() => {
         isPositioning.value = false;
       }, 500);
     }, 150);
@@ -117,7 +128,6 @@ const fabStyle = computed(() => {
   let currentOpacity = '1';
   let pointerEvents = 'auto';
 
-  // SCROLL LOGIC: Hide when scrolling
   if (isViewportUnstable.value && !isFabDragging.value) {
     currentOpacity = '0';
     pointerEvents = 'none';
@@ -138,7 +148,6 @@ const fabStyle = computed(() => {
     borderRadius: '50% !important',
     cursor: 'pointer !important',
     willChange: 'opacity, bottom, left',
-    // Smooth transition for appearing/disappearing
     transition: (isFabDragging.value || isPositioning.value) ? 'none !important' : 'opacity 0.2s ease, bottom 0.1s ease-out, left 0.3s ease-out, margin 0.3s ease-out'
   };
 
@@ -165,13 +174,17 @@ const onFabDragStart = (e) => {
   const isMouseEvent = e.type === 'mousedown';
   if (isMouseEvent && e.button !== 0) return;
   const point = isMouseEvent ? e : e.touches[0];
+  
   isFabDragging.value = true;
   dragStartY = point.clientY;
   initialFabY = fabPosition.value.y;
+
+  // DYNAMIC TRACKING: Use tracker even for temporary listeners
   if (isMouseEvent) {
-    window.addEventListener('mousemove', onFabDragMove);
-    window.addEventListener('mouseup', onFabDragEnd);
+    tracker.addEventListener(window, 'mousemove', onFabDragMove);
+    tracker.addEventListener(window, 'mouseup', onFabDragEnd);
   }
+  
   isFabIdle.value = false;
 };
 
@@ -180,6 +193,7 @@ const onFabDragMove = (e) => {
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
   const currentY = point.clientY;
+  
   if (e.cancelable) e.preventDefault();
   
   if (!animationFrameId) {
@@ -195,12 +209,24 @@ const onFabDragMove = (e) => {
 };
 
 const onFabDragEnd = async (e) => {
+  if (!isFabDragging.value) return;
   isFabDragging.value = false;
-  window.removeEventListener('mousemove', onFabDragMove);
-  window.removeEventListener('mouseup', onFabDragEnd);
+  
+  // DYNAMIC CLEANUP: Respect tracker by using removeEventListener
+  const isMouseEvent = e && e.type === 'mouseup';
+  if (isMouseEvent) {
+    tracker.removeEventListener(window, 'mousemove', onFabDragMove);
+    tracker.removeEventListener(window, 'mouseup', onFabDragEnd);
+  }
+
   try {
-    await storageManager.set({ MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y } });
-  } catch (err) {}
+    await storageManager.set({ 
+      MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y } 
+    });
+  } catch (err) {
+    logger.error('Failed to save mobile FAB position:', err);
+  }
+  
   startFabIdleTimer();
 };
 
@@ -215,7 +241,8 @@ const onMouseLeave = () => { isHovering.value = false; startFabIdleTimer(); };
 
 const startFabIdleTimer = () => {
   if (isHovering.value || isFabDragging.value) return;
-  if (fabIdleTimerId) clearTimeout(fabIdleTimerId);
+  if (fabIdleTimerId) tracker.clearTimer(fabIdleTimerId);
+  
   isFabIdle.value = false;
   fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
@@ -224,9 +251,9 @@ const startFabIdleTimer = () => {
 };
 
 onUnmounted(() => {
-  window.removeEventListener('mousemove', onFabDragMove);
-  window.removeEventListener('mouseup', onFabDragEnd);
-  if (instabilityTimer) clearTimeout(instabilityTimer);
+  // NO MANUAL CLEANUP NEEDED: useResourceTracker handles window events and timers.
+  // We only cancel the Animation Frame as it's a specific non-timer resource.
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
 });
 </script>
 
