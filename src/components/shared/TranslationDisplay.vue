@@ -71,8 +71,8 @@
         ]"
         :dir="textDirection?.dir || 'ltr'"
         :style="mode === 'mobile' ? {
-          ...fontStyles.value,
-          ...cssVariables.value,
+          ...fontStyles,
+          ...cssVariables,
           direction: textDirection?.dir || 'ltr',
           textAlign: textDirection?.textAlign || 'left',
           cursor: 'pointer',
@@ -81,8 +81,8 @@
           fontSize: '16px',
           lineHeight: '1.5'
         } : {
-          ...(fontStyles.value || {}),
-          ...(cssVariables.value || {}),
+          ...(fontStyles || {}),
+          ...(cssVariables || {}),
           direction: textDirection?.dir || 'ltr',
           textAlign: textDirection?.textAlign || 'left',
           cursor: mode === 'mobile' ? 'pointer' : 'default'
@@ -1060,7 +1060,7 @@ onMounted(() => {
   width: 100% !important;
 }
 
-.ti-translation-display.mobile-mode .ti-translation-content * {
+.ti-translation-display.mobile-mode .ti-translation-content :deep(*) {
   font-family: inherit !important;
 }
 
