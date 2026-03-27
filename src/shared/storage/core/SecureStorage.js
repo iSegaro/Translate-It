@@ -183,6 +183,7 @@ class SecureStorage {
       "DEEPSEEK_API_KEY",
       "DEEPL_API_KEY",
       "CUSTOM_API_KEY",
+      "PROXY_PASSWORD",
     ];
 
     keyFields.forEach((field) => {
@@ -195,13 +196,13 @@ class SecureStorage {
   }
 
   /**
-   * Create settings object without API keys
+   * Create settings object without API keys and large user data
    * @param {object} settings - All settings
-   * @returns {object} Settings without API keys
+   * @returns {object} Settings without API keys and history
    */
-  removeApiKeys(settings) {
+  removeSensitiveAndLargeData(settings) {
     const cleanSettings = { ...settings };
-    const keyFields = [
+    const excludeFields = [
       "API_KEY", // Legacy Gemini Key
       "GEMINI_API_KEY",
       "OPENAI_API_KEY",
@@ -209,9 +210,12 @@ class SecureStorage {
       "DEEPSEEK_API_KEY",
       "DEEPL_API_KEY",
       "CUSTOM_API_KEY",
+      "PROXY_USERNAME",
+      "PROXY_PASSWORD",
+      "translationHistory", // Exclude history from settings export
     ];
 
-    keyFields.forEach((field) => {
+    excludeFields.forEach((field) => {
       delete cleanSettings[field];
     });
 
@@ -226,7 +230,7 @@ class SecureStorage {
    */
   async prepareForExport(settings, password = null) {
     const apiKeys = this.extractApiKeys(settings);
-    const cleanSettings = this.removeApiKeys(settings);
+    const cleanSettings = this.removeSensitiveAndLargeData(settings);
 
     if (password && password.trim() !== "") {
       // Encrypt API keys

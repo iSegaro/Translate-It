@@ -251,23 +251,29 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const exportSettings = async (password = '') => {
     try {
-      // Lazy read manifest version (avoid hardcoding); fallback to undefined if runtime not available.
+      const settingsToExport = await loadSettings();
+      
+      // Use the centralized secureStorage utility for consistent export behavior
+      // This will handle API key encryption and exclude large data like history
+      const exportData = await secureStorage.prepareForExport(
+        settingsToExport,
+        password
+      );
+
+      // Add additional metadata for the export
       let version;
       try { 
         version = browser.runtime.getManifest()?.version; 
       } catch {
         // Browser runtime not available, use undefined
       }
-      const exportData = {
-        ...settings.value,
+
+      return {
+        ...exportData,
         _exported: true,
         _timestamp: new Date().toISOString(),
         _version: version
       };
-      if (password) {
-        exportData._hasEncryptedKeys = true; // placeholder flag
-      }
-      return exportData;
     } catch (error) {
       logger.error('Failed to export settings:', error);
       throw error;
