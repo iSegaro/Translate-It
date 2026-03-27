@@ -147,7 +147,7 @@ export const deviceDetector = {
   },
 
   shouldEnableMobileUI() {
-    return this.isMobile() && typeof window !== 'undefined' && window.innerWidth <= 1024;
+    return this.isMobile();
   }
 };
 
