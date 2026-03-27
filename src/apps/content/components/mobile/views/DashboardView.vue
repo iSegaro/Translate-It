@@ -172,7 +172,6 @@ const settingsStore = useSettingsStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
 const { t } = useI18n()
 const pageEventBus = window.pageEventBus
-const tracker = useResourceTracker('mobile-dashboard')
 
 const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }

@@ -120,7 +120,7 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { getSelectElementNotificationManager } from '@/features/element-selection/SelectElementNotificationManager.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
-import { CONFIG, getShowDesktopFabAsync, getExtensionEnabledAsync } from '@/shared/config/config.js';
+import { CONFIG } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 
@@ -129,7 +129,7 @@ const pageEventBus = window.pageEventBus;
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
 // Localization helper for template (Standard project approach)
-const { t } = useUnifiedI18n();
+useUnifiedI18n();
 
 // Use WindowsManager composable
 const {

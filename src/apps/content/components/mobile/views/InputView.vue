@@ -238,7 +238,7 @@ const handlePaste = async () => {
       inputText.value = text;
       pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_pasted_message'), type: 'success' });
     }
-  } catch (error) {
+  } catch {
     pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_paste_failed'), type: 'error' });
   }
 }

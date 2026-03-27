@@ -167,7 +167,6 @@ import restoreIcon from '@/icons/ui/restore.svg';
 const mobileStore = useMobileStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useI18n()
-const tracker = useResourceTracker('mobile-page-translation')
 
 const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'completed') return 100;

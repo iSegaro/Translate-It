@@ -249,8 +249,6 @@ const onFabDragEnd = async (e) => {
 
 const onMobileFabClick = () => {
   const selection = window.getSelection()?.toString().trim() || '';
-  const storedText = window.windowsManagerInstance?.state?.originalText || '';
-  const currentText = selection || storedText;
 
   // We should navigate to SelectionView ONLY IF:
   // 1. There is an active selection AND it's "dirty" (just selected or re-selected)
