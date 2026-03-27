@@ -179,7 +179,6 @@ const translatePage = (event) => {
   else { 
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
     mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
-    mobileStore.closeSheet();
   }
 }
 
