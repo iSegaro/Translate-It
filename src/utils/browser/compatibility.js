@@ -82,10 +82,42 @@ export async function isFirefox() {
 }
 
 /**
+ * Detect if we're running in Edge
+ */
+export async function isEdge() {
+  if (typeof navigator !== "undefined" && navigator.userAgent) {
+    return navigator.userAgent.includes("Edg");
+  }
+  return false;
+}
+
+/**
+ * Get unified browser and platform information (Synchronous version for immediate use)
+ * @returns {Object} Browser info object
+ */
+export function getBrowserInfoSync() {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isFirefoxSync = ua.includes('Firefox');
+  const isEdgeSync = ua.includes('Edg');
+  const isMobileSync = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const isChromeSync = ua.includes('Chrome') && !isEdgeSync && !isFirefoxSync;
+
+  return {
+    isFirefox: isFirefoxSync,
+    isMobile: isMobileSync,
+    isChrome: isChromeSync,
+    isEdge: isEdgeSync,
+    name: isFirefoxSync ? 'Firefox' : (isEdgeSync ? 'Edge' : (isChromeSync ? 'Chrome' : 'Unknown'))
+  };
+}
+
+/**
  * Detect if we're running in Chrome
  */
 export async function isChrome() {
-  return !(await isFirefox());
+  const firefox = await isFirefox();
+  const edge = await isEdge();
+  return !firefox && !edge;
 }
 
 // Legacy TTS manager functions removed - using unified GOOGLE_TTS_SPEAK system

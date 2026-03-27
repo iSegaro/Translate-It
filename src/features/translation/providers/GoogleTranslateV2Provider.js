@@ -5,6 +5,7 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
   getEnableDictionaryAsync,
   TranslationMode,
@@ -76,11 +77,16 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
    * Implement translation for a single chunk
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
-    // Use the hardcoded TKK
+    const info = getBrowserInfoSync();
+    const isStableClient = info.isFirefox || info.isMobile;
+    
+    // For Firefox/Mobile, we use client 'gtx' which is more stable and doesn't require complex tokens.
+    // For Chrome, we use client 't' which provides richer dictionary data.
+    const client = isStableClient ? 'gtx' : 't';
     const tkk = GOOGLE_TKK;
     
     const combinedText = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
-    const tk = this._generateToken(combinedText, tkk);
+    const tk = isStableClient ? null : this._generateToken(combinedText, tkk);
 
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
@@ -98,7 +104,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const apiUrl = await getGoogleTranslateV2UrlAsync();
     const url = new URL(apiUrl);
     const params = {
-      client: 't',
+      client: client,
       sl: sl,
       tl: tl,
       hl: tl,
@@ -108,9 +114,10 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       otf: '1',
       ssel: '0',
       tsel: '0',
-      kc: '7',
-      tk: tk
+      kc: '7'
     };
+
+    if (tk) params.tk = tk;
 
     Object.entries(params).forEach(([key, value]) => {
       if (Array.isArray(value)) {

@@ -10,6 +10,7 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
+import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -23,6 +24,41 @@ export class BaseProvider {
     this.sessionContext = null;
     this.providerSettingKey = null; // To be set by subclasses that use API keys
     this._initializeProxy();
+  }
+
+  /**
+   * Internal helper to adapt request headers based on the environment (Browser/Platform)
+   * This is crucial for stability in Firefox and Mobile browsers where some headers
+   * like Sec-Fetch-* or Referer might cause issues or are ignored.
+   * @protected
+   */
+  _prepareHeaders(headers = {}, providerName = "") {
+    const info = getBrowserInfoSync();
+    const finalHeaders = { ...headers };
+
+    // 1. Remove Chrome-only sensitive headers if not in a Chromium-based browser
+    // Firefox might block or fail requests if we try to set these "Forbidden Headers"
+    if (info.isFirefox || info.isMobile) {
+      delete finalHeaders['Sec-Fetch-Dest'];
+      delete finalHeaders['Sec-Fetch-Mode'];
+      delete finalHeaders['Sec-Fetch-Site'];
+      delete finalHeaders['Sec-Fetch-User'];
+      delete finalHeaders['Sec-Fetch-Storage-Access'];
+      
+      // Some providers like Google Translate V2 use a Referer that Firefox blocks 
+      // when set manually in a fetch request from an extension.
+      if (info.isFirefox) {
+        delete finalHeaders['Referer'];
+      }
+    }
+
+    // 2. Identity Spoofing for specific providers in non-native environments
+    // For Microsoft Edge provider, we MUST look like Edge/Chromium to get tokens
+    if (providerName === ProviderNames.MICROSOFT_EDGE && (info.isFirefox || info.isMobile)) {
+      finalHeaders['User-Agent'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    }
+
+    return finalHeaders;
   }
 
   /**
@@ -313,6 +349,11 @@ export class BaseProvider {
       const finalFetchOptions = { ...fetchOptions };
       if (abortController) {
         finalFetchOptions.signal = abortController.signal;
+      }
+
+      // Adapt headers for the current environment
+      if (finalFetchOptions.headers) {
+        finalFetchOptions.headers = this._prepareHeaders(finalFetchOptions.headers, this.providerName);
       }
 
       // Ensure proxy is initialized with latest settings before request
