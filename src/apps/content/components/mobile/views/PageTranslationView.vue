@@ -42,18 +42,49 @@
         </div>
       </button>
 
-      <button
-        class="ti-m-close-btn"
-        style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;"
-        @click="closeView"
-      >
-        <img
-          src="@/icons/ui/close.png"
-          :alt="t('mobile_close_button_alt') || 'Close'"
-          class="ti-m-icon-img-close"
-          style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;"
+      <div style="display: flex !important; align-items: center !important; gap: 12px !important;">
+        <!-- Auto Close Toggle Button (Using Inline Styles for guaranteed application) -->
+        <button 
+          :title="t('mobile_page_auto_close_tooltip') || 'Close automatically after starting'"
+          :style="{
+            backgroundColor: settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ? 'var(--ti-mobile-accent)' : 'var(--ti-mobile-btn-bg)',
+            color: settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ? '#ffffff' : 'var(--ti-mobile-text-muted)',
+            border: `1px solid ${settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ? 'var(--ti-mobile-accent)' : 'var(--ti-mobile-border)'}`,
+            padding: '0 8px',
+            height: '24px',
+            borderRadius: '6px',
+            fontSize: '9px',
+            fontWeight: '800',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            textTransform: 'uppercase',
+            letterSpacing: '0.3px',
+            transition: 'all 0.2s ease',
+            boxShadow: settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ? '0 1px 4px rgba(51, 154, 240, 0.3)' : 'none',
+            outline: 'none',
+            webkitTapHighlightColor: 'transparent'
+          }"
+          @click="toggleAutoClose"
         >
-      </button>
+          {{ t('mobile_page_auto_close_label') || 'Auto Close' }}
+        </button>
+
+        <button
+          class="ti-m-close-btn"
+          style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;"
+          @click="closeView"
+        >
+          <img
+            src="@/icons/ui/close.png"
+            :alt="t('mobile_close_button_alt') || 'Close'"
+            class="ti-m-icon-img-close"
+            style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;"
+          >
+        </button>
+      </div>
     </div>
 
     <!-- Progress Card -->
@@ -161,6 +192,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
@@ -171,6 +203,7 @@ import eyeHideIcon from '@/icons/ui/eye-hide.svg';
 import restoreIcon from '@/icons/ui/restore.svg';
 
 const mobileStore = useMobileStore()
+const settingsStore = useSettingsStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useI18n()
 
@@ -218,7 +251,23 @@ const primaryAction = computed(() => {
 
 const goToDashboard = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) }
 const closeView = () => { mobileStore.closeSheet() }
-const startTranslation = () => { pageEventBus.emit(MessageActions.PAGE_TRANSLATE); mobileStore.closeSheet() }
+
+const toggleAutoClose = async () => {
+  const currentValue = settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE || false
+  try {
+    await settingsStore.updateSettingAndPersist('MOBILE_PAGE_TRANSLATION_AUTO_CLOSE', !currentValue)
+  } catch (err) {
+    console.error('Failed to save auto-close setting:', err)
+  }
+}
+
+const startTranslation = () => { 
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
+  if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
+    mobileStore.closeSheet() 
+  }
+}
+
 const stopAutoTranslation = () => { pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO) }
 const restorePage = () => { pageEventBus.emit(MessageActions.PAGE_RESTORE) }
 </script>
@@ -231,6 +280,45 @@ const restorePage = () => { pageEventBus.emit(MessageActions.PAGE_RESTORE) }
 
 .ti-m-icon-img-close {
   filter: var(--ti-mobile-icon-filter) !important;
+}
+
+/* Mobile Toggle Button Styles - More Prominent */
+.ti-m-auto-close-btn {
+  background-color: var(--ti-mobile-card-bg) !important;
+  color: var(--ti-mobile-text-secondary) !important;
+  border: 1.5px solid var(--ti-mobile-border) !important;
+  padding: 0 14px !important;
+  height: 30px !important;
+  border-radius: 8px !important; /* Squarish rounded corners for more button feel */
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Hover state for desktop testing */
+.ti-m-auto-close-btn:hover {
+  background-color: var(--ti-mobile-border) !important;
+}
+
+.ti-m-auto-close-btn.is-active {
+  background-color: var(--ti-mobile-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--ti-mobile-accent) !important;
+  box-shadow: 0 2px 6px rgba(51, 154, 240, 0.4) !important;
+}
+
+.ti-m-auto-close-btn:active {
+  transform: scale(0.92) !important;
+  box-shadow: none !important;
 }
 
 @keyframes pulse-mobile { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }

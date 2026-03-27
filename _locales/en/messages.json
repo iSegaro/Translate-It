@@ -503,6 +503,12 @@
   "mobile_page_start_btn": {
     "message": "Start Translation"
   },
+  "mobile_page_auto_close_label": {
+    "message": "Auto Close"
+  },
+  "mobile_page_auto_close_tooltip": {
+    "message": "Close dashboard automatically after starting translation"
+  },
   "mobile_fab_alt": {
     "message": "Translate"
   },

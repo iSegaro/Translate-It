@@ -179,6 +179,11 @@ const translatePage = (event) => {
   else { 
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
     mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
+    
+    // Respect the auto-close setting
+    if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
+      mobileStore.closeSheet();
+    }
   }
 }
 

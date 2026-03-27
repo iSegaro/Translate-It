@@ -193,6 +193,7 @@ export const CONFIG = {
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
+  MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Whole Page Translation Settings (NEW) ---
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -641,6 +642,10 @@ export const getEnableDictionaryAsync = async () => {
 
 export const getMobileUiModeAsync = async () => {
   return getSettingValueAsync("MOBILE_UI_MODE", CONFIG.MOBILE_UI_MODE);
+};
+
+export const getMobilePageTranslationAutoCloseAsync = async () => {
+  return getSettingValueAsync("MOBILE_PAGE_TRANSLATION_AUTO_CLOSE", CONFIG.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE);
 };
 
 export const getPromptAsync = async () => {

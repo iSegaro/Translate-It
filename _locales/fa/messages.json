@@ -506,6 +506,12 @@
   "mobile_page_start_btn": {
     "message": "شروع ترجمه"
   },
+  "mobile_page_auto_close_label": {
+    "message": "بستن خودکار"
+  },
+  "mobile_page_auto_close_tooltip": {
+    "message": "بستن خودکار دشبورد پس از شروع ترجمه"
+  },
   "mobile_fab_alt": {
     "message": "ترجمه"
   },

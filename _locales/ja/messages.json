@@ -503,6 +503,12 @@
   "mobile_page_start_btn": {
     "message": "翻訳を開始"
   },
+  "mobile_page_auto_close_label": {
+    "message": "自動で閉じる"
+  },
+  "mobile_page_auto_close_tooltip": {
+    "message": "翻訳開始後にダッシュボードを自動的に閉じます"
+  },
   "mobile_fab_alt": {
     "message": "翻訳"
   },
