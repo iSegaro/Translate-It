@@ -124,8 +124,14 @@ const testKeys = async (providerName) => {
   testResult.value = null
 
   try {
-    // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(openaiApiKey.value, providerName)
+    // Test keys directly from textbox value, passing current Model context
+    const result = await ApiKeyManager.testKeysDirect(
+      openaiApiKey.value, 
+      providerName,
+      {
+        apiModel: openaiApiModel.value === 'custom' ? openaiCustomModel.value : openaiApiModel.value
+      }
+    )
 
     // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {

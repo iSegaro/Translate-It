@@ -265,10 +265,10 @@ class ApiKeyManager {
 
     // Import provider classes dynamically
     const providerTests = {
-      'OpenAI': async (key) => await this._testOpenAIKey(key),
-      'Gemini': async (key) => await this._testGeminiKey(key),
-      'DeepSeek': async (key) => await this._testDeepSeekKey(key),
-      'OpenRouter': async (key) => await this._testOpenRouterKey(key),
+      'OpenAI': async (key) => await this._testOpenAIKey(key, context),
+      'Gemini': async (key) => await this._testGeminiKey(key, context),
+      'DeepSeek': async (key) => await this._testDeepSeekKey(key, context),
+      'OpenRouter': async (key) => await this._testOpenRouterKey(key, context),
       'DeepL': async (key) => await this._testDeepLKey(key),
       'Custom': async (key) => await this._testCustomKey(key, context)
     };
@@ -320,13 +320,15 @@ class ApiKeyManager {
   /**
    * Test OpenAI API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional context with URL
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testOpenAIKey(key) {
+  static async _testOpenAIKey(key, context = {}) {
     try {
+      const apiUrl = context.apiUrl || 'https://api.openai.com/v1/models';
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch('https://api.openai.com/v1/models', {
+      const response = await proxyManager.fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -341,17 +343,34 @@ class ApiKeyManager {
   /**
    * Test Gemini API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional context with URL
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testGeminiKey(key) {
+  static async _testGeminiKey(key, context = {}) {
     try {
+      let apiUrl = context.apiUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
+      
+      // If a full endpoint was provided, try to get the base models URL
+      if (apiUrl.includes(':generateContent')) {
+        apiUrl = apiUrl.split(':generateContent')[0];
+        // If it was a specific model URL like .../models/gemini-pro:generateContent
+        // we want the parent .../models URL or just the models list
+        if (apiUrl.includes('/models/')) {
+          apiUrl = apiUrl.split('/models/')[0] + '/models';
+        }
+      } else if (!apiUrl.endsWith('/models') && !apiUrl.includes('/models/')) {
+        // If it's just a base URL, append /models
+        if (apiUrl.endsWith('/')) apiUrl += 'v1beta/models';
+        else if (!apiUrl.includes('v1beta')) apiUrl += '/v1beta/models';
+        else apiUrl += '/models';
+      }
+      
+      const urlObj = new URL(apiUrl);
+      urlObj.searchParams.set('key', key);
+      
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      // Use a simple API call to test the key
-      const response = await proxyManager.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
-        { method: 'GET' }
-      );
+      const response = await proxyManager.fetch(urlObj.toString(), { method: 'GET' });
       return response.ok;
     } catch {
       return false;
@@ -361,13 +380,15 @@ class ApiKeyManager {
   /**
    * Test DeepSeek API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional context with URL
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testDeepSeekKey(key) {
+  static async _testDeepSeekKey(key, context = {}) {
     try {
+      const apiUrl = context.apiUrl || 'https://api.deepseek.com/models';
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch('https://api.deepseek.com/models', {
+      const response = await proxyManager.fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -382,13 +403,15 @@ class ApiKeyManager {
   /**
    * Test OpenRouter API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional context with URL
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testOpenRouterKey(key) {
+  static async _testOpenRouterKey(key, context = {}) {
     try {
+      const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/models';
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch('https://openrouter.ai/api/v1/models', {
+      const response = await proxyManager.fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`

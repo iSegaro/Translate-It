@@ -124,8 +124,14 @@ const testKeys = async (providerName) => {
   testResult.value = null
 
   try {
-    // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(openrouterApiKey.value, providerName)
+    // Test keys directly from textbox value, passing current Model context
+    const result = await ApiKeyManager.testKeysDirect(
+      openrouterApiKey.value, 
+      providerName,
+      {
+        apiModel: openrouterApiModel.value === 'custom' ? openrouterCustomModel.value : openrouterApiModel.value
+      }
+    )
 
     // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {
