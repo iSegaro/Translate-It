@@ -73,8 +73,15 @@ const testKeys = async (providerName) => {
   testResult.value = null
 
   try {
-    // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(customApiKey.value, providerName)
+    // Test keys directly from textbox value, passing current URL and Model context
+    const result = await ApiKeyManager.testKeysDirect(
+      customApiKey.value, 
+      providerName,
+      {
+        apiUrl: customApiUrl.value,
+        apiModel: customApiModel.value
+      }
+    )
 
     // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {

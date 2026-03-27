@@ -247,9 +247,10 @@ class ApiKeyManager {
    * Test keys directly from provided value (without reading from storage)
    * @param {string} keysString - Keys string (one per line)
    * @param {string} providerName - Provider name for testing
+   * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model)
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
-  static async testKeysDirect(keysString, providerName) {
+  static async testKeysDirect(keysString, providerName, context = {}) {
     // Parse keys from string
     const keys = this.parseKeys(keysString);
 
@@ -269,7 +270,7 @@ class ApiKeyManager {
       'DeepSeek': async (key) => await this._testDeepSeekKey(key),
       'OpenRouter': async (key) => await this._testOpenRouterKey(key),
       'DeepL': async (key) => await this._testDeepLKey(key),
-      'Custom': async (key) => await this._testCustomKey(key)
+      'Custom': async (key) => await this._testCustomKey(key, context)
     };
 
     const testFunc = providerTests[providerName];
@@ -432,16 +433,81 @@ class ApiKeyManager {
 
   /**
    * Test Custom API key
-   * For custom provider, we can't test without URL configuration
-   * Just check if key is not empty
+   * For custom provider, we use the provided context or fallback to storage
    * @param {string} key - API key to test
-   * @returns {Promise<boolean>} - True if key is not empty
+   * @param {Object} [context={}] - Optional context with URL and Model
+   * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testCustomKey(key) {
-    // For custom provider, just verify key is not empty
-    // Actual validation will happen when the API is called
-    return key && key.length > 0;
+  static async _testCustomKey(key, context = {}) {
+    try {
+      if (!key || key.trim() === '') return false;
+
+      // Priority: use provided context values, fallback to storage
+      let apiUrl = context.apiUrl;
+      let apiModel = context.apiModel;
+
+      if (!apiUrl) {
+        const settings = await storageManager.get({
+          CUSTOM_API_URL: '',
+          CUSTOM_API_MODEL: ''
+        });
+        apiUrl = settings.CUSTOM_API_URL;
+        apiModel = settings.CUSTOM_API_MODEL;
+      }
+
+      if (!apiUrl) {
+        logger.warn('[ApiKeyManager] Custom API URL is not configured, cannot test key');
+        return true; 
+      }
+
+      // Try to determine models endpoint
+      let modelsUrl = apiUrl;
+      if (apiUrl.endsWith('/chat/completions')) {
+        modelsUrl = apiUrl.replace('/chat/completions', '/models');
+      } else if (apiUrl.endsWith('/v1/chat/completions')) {
+        modelsUrl = apiUrl.replace('/v1/chat/completions', '/v1/models');
+      }
+
+      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
+      
+      try {
+        // Try models endpoint first
+        const response = await proxyManager.fetch(modelsUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${key}`
+          }
+        });
+
+        if (response.ok) return true;
+        
+        // If models endpoint failed, try minimal chat completion
+        if (response.status === 404 || response.status === 405) {
+          const chatResponse = await proxyManager.fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${key}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: apiModel || 'gpt-3.5-turbo',
+              messages: [{ role: 'user', content: 'hi' }],
+              max_tokens: 1
+            })
+          });
+          return chatResponse.ok;
+        }
+
+        return false;
+      } catch (err) {
+        logger.error('[ApiKeyManager] Custom API test error:', err);
+        return false;
+      }
+    } catch (error) {
+      logger.error('[ApiKeyManager] Custom API test failed:', error);
+      return false;
+    }
   }
 
   /**
