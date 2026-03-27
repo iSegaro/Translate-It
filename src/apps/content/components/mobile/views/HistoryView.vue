@@ -155,11 +155,12 @@
           {{ item.sourceText }}
         </div>
         <div 
-          class="ti-m-target-preview ti-m-markdown-content" 
+          class="ti-m-target-preview" 
           :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
           style="font-size: 14px !important; color: var(--ti-mobile-accent) !important; line-height: 1.4 !important; display: -webkit-box !important; -webkit-line-clamp: 3 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; text-align: start !important;"
-          v-html="createMarkdownContent(item.translatedText)"
-        />
+        >
+          {{ truncateText(item.translatedText) }}
+        </div>
         
         <div
           class="ti-m-timestamp"
@@ -194,14 +195,29 @@ const {
   deleteHistoryItem, 
   clearAllHistory,
   exportHistory,
-  formatTime,
-  createMarkdownContent
+  formatTime
 } = useHistory()
 
 onMounted(async () => {
   await languages.loadLanguages()
   await loadHistory(true)
 })
+
+// Truncate long text for display and handle dictionary results
+const truncateText = (text, maxLength = 200) => {
+  if (!text) return ''
+  
+  // For dictionary results, extract just the main translation (first line)
+  // Dictionary results often follow the pattern: Word\n**pos** translation
+  if (text.includes('\n**')) {
+    const firstLine = text.split('\n')[0].trim()
+    if (firstLine) {
+      return firstLine.length > maxLength ? firstLine.substring(0, maxLength) + '...' : firstLine
+    }
+  }
+  
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
 
 const getLangName = (code) => {
   return languages.getLanguageName(code) || code
@@ -296,15 +312,5 @@ const selectItem = (item) => {
 .ti-m-lang-badge {
   background: var(--ti-mobile-card-bg) !important;
   color: var(--ti-mobile-text-muted) !important;
-}
-
-:deep(.ti-m-markdown-content) p {
-  margin: 0 !important;
-  padding: 0 !important;
-  display: inline;
-}
-
-:deep(.ti-m-markdown-content) strong {
-  font-weight: 700;
 }
 </style>
