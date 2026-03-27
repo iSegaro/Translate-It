@@ -6,7 +6,6 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
-import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";

@@ -63,7 +63,7 @@ export class ErrorHandler {
         } else {
           raw = String(err || 'Unknown error');
         }
-      } catch (e) {
+      } catch {
         raw = 'Error processing failed';
       }
 

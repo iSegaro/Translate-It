@@ -158,7 +158,6 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
-import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';

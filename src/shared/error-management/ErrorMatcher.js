@@ -236,7 +236,7 @@ export function matchErrorToType(rawOrError = "") {
                    (typeof rawOrError.message === 'string' ? rawOrError.message : 
                    (rawOrError.code || rawOrError.status || ""))));
     msg = String(rawMsg || "").toLowerCase().trim();
-  } catch (e) {
+  } catch {
     msg = "unknown error";
   }
 

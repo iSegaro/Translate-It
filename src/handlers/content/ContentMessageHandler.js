@@ -531,10 +531,6 @@ export class ContentMessageHandler extends ResourceTracker {
         this.logger.warn(`No handler for translation result mode: ${translationMode}`);
         return false;
     }
-
-    // This part is reached if the Select_Element case is hit but selectElementManager is null
-    this.logger.warn(`Handler for ${translationMode} was not properly configured.`);
-    return false;
   }
 
   async handleRevertTranslation() {

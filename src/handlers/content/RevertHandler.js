@@ -5,7 +5,6 @@ import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
-import { deviceDetector } from '@/utils/browser/deviceDetector.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');

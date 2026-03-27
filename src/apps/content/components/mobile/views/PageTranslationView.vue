@@ -157,7 +157,6 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
-import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import closeIcon from '@/icons/ui/close.png';
