@@ -81,7 +81,11 @@ const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
   if (isCurrentlyTranslating) mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  else { pageEventBus.emit(MessageActions.PAGE_TRANSLATE); mobileStore.closeSheet() }
+  else { 
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
+    mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
+    mobileStore.closeSheet();
+  }
 }
 
 const activateSelectElement = () => { mobileStore.closeSheet(); pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) }
