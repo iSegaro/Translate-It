@@ -287,13 +287,13 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("http 403") || msg.includes("403 error") || msg.includes("forbidden") || msg.includes("access denied")) return ErrorTypes.FORBIDDEN_ERROR;
   if (msg.includes("http 404") || msg.includes("404 error") || msg.includes("not found")) {
     if (msg.includes("model")) return ErrorTypes.MODEL_MISSING;
-    return ErrorTypes.API_URL_MISSING;
+    return ErrorTypes.API_ENDPOINT_INVALID;
   }
   if (msg.includes("http 429") || msg.includes("429 error") || msg.includes("status 429") || msg.includes("rate limit") || msg.includes("too many requests")) return ErrorTypes.RATE_LIMIT_REACHED;
   if (msg.includes("http 456") || msg.includes("456 error") || (msg.includes("deepl") && (msg.includes("quota exceeded") || msg.includes("character limit")))) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
   if (msg.includes("500") || msg.includes("502") || msg.includes("503") || msg.includes("504") || msg.includes("internal server error") || msg.includes("service unavailable") || msg.includes("gateway timeout")) return ErrorTypes.SERVER_ERROR;
 
-  if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg.includes("api_url_missing")) return ErrorTypes.API_URL_MISSING;
+  if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg === "api_url_missing") return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
   if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded")) return ErrorTypes.MODEL_OVERLOADED;
   if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
@@ -312,4 +312,3 @@ export function matchErrorToType(rawOrError = "") {
 
   return ErrorTypes.UNKNOWN;
 }
-

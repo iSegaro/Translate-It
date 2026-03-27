@@ -1353,6 +1353,9 @@
     "message": "APIキーが無効または認証されていません。"
   },
   "ERRORS_API_URL_MISSING": {
+    "message": "API URLが設定されていません。"
+  },
+  "ERRORS_API_ENDPOINT_INVALID": {
     "message": "APIアドレスが無効です（404エラー）。"
   },
   "ERRORS_MODEL_MISSING": {
