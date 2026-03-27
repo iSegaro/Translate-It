@@ -14,13 +14,6 @@ export function useMobileGestures(options = {}) {
   const startY = ref(0)
   const currentSheetState = ref(initialState)
 
-  // Snap points (as percentage of viewport height)
-  const SNAP_POINTS = {
-    [MOBILE_CONSTANTS.SHEET_STATE.PEEK]: 35,
-    [MOBILE_CONSTANTS.SHEET_STATE.FULL]: 90,
-    [MOBILE_CONSTANTS.SHEET_STATE.CLOSED]: 0
-  }
-
   const sheetTranslation = computed(() => {
     if (isDragging.value) {
       return dragY.value

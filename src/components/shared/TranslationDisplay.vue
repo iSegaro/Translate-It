@@ -214,8 +214,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
-import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { getTextDirection, isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
+import { isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";

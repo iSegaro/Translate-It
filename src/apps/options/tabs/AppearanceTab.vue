@@ -33,11 +33,6 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import FontSelector from '@/components/feature/FontSelector.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-
-// Logger
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AppearanceTab')
 
 const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()

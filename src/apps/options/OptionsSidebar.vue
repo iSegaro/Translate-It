@@ -78,7 +78,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
