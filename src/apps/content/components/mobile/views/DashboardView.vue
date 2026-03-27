@@ -6,7 +6,7 @@
   >
     <div
       class="ti-m-dashboard-scroll-container"
-      style="display: flex !important; flex-flow: row nowrap !important; align-items: center !important; justify-content: flex-start !important; width: 100% !important; padding: 12px 15px !important; gap: 8px !important; box-sizing: border-box !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important;"
+      style="display: flex; flex-flow: row nowrap; align-items: center; justify-content: center; width: 100%; padding: 12px 15px; gap: 8px; box-sizing: border-box; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x;"
     >
       <!-- Translate Page Button -->
       <button

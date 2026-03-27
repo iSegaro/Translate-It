@@ -4,7 +4,7 @@
     class="ti-m-sheet-overlay notranslate"
     translate="no"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    style="position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.5) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
+    style="position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.4) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
     @click.self="closeSheet"
   >
     <div 
@@ -17,10 +17,10 @@
       <div 
         class="ti-m-sheet-header" 
         style="width: 100% !important; height: 24px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important; padding-top: 4px !important;"
-        @touchstart="onDragStart"
-        @touchmove="onDragMove"
-        @touchend="onDragEnd"
-        @mousedown="onDragStart"
+        @touchstart.stop.prevent="onDragStart"
+        @touchmove.stop.prevent="onDragMove"
+        @touchend.stop="onDragEnd"
+        @mousedown.stop="onDragStart"
       >
         <div
           class="ti-m-drag-handle"
@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -158,14 +158,25 @@ const onDragEnd = (e) => {
   currentY.value = 0
 }
 
+// Watch for isOpen to lock/unlock body scroll
+watch(isOpen, (newValue) => {
+  if (newValue) {
+    document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+  } else {
+    document.body.style.overflow = ''
+    document.body.style.touchAction = ''
+  }
+}, { immediate: true })
+
 const sheetStyle = computed(() => {
   const y = isDragging.value ? currentY.value : 0
   const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK
   
   // Dynamic height for peek mode based on view
-  let targetHeight = isPeek ? '35dvh' : '75dvh'
+  let targetHeight = isPeek ? '35vh' : '75vh'
   if (isPeek && activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
-    targetHeight = '145px' // Reduced from 180px for a tighter fit
+    targetHeight = '145px'
   }
   
   let transformValue = 'translateY(0)'
@@ -173,10 +184,8 @@ const sheetStyle = computed(() => {
 
   if (isDragging.value) {
     if (y > 0) {
-      // Dragging down: move the entire sheet
       transformValue = `translateY(${y}px)`
     } else {
-      // Dragging up: increase height to prevent detaching from bottom
       heightValue = `calc(${targetHeight} + ${Math.abs(y)}px)`
     }
   }
@@ -193,17 +202,26 @@ const sheetStyle = computed(() => {
     boxShadow: '0 -5px 25px var(--ti-mobile-shadow)',
     borderRadius: '20px 20px 0 0',
     height: heightValue,
-    maxHeight: '95dvh', 
+    maxHeight: '95vh', 
     paddingTop: 'env(safe-area-inset-top, 0px)',
-    transition: isDragging.value ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1), height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1)',
+    transition: isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
     overflow: 'hidden',
-    touchAction: 'none'
+    touchAction: 'none !important',
+    overscrollBehavior: 'none'
   }
 })
 
 const closeSheet = () => {
+  // Ensure body is unlocked before closing
+  document.body.style.overflow = ''
+  document.body.style.touchAction = ''
   mobileStore.closeSheet()
 }
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  document.body.style.touchAction = ''
+})
 </script>
 
 <style>
