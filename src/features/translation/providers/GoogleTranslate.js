@@ -7,7 +7,6 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
-import { TranslationSegmentMapper } from "@/utils/translation/TranslationSegmentMapper.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";

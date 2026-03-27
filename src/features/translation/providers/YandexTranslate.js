@@ -5,9 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import {
-  getEnableDictionaryAsync,
-  getYandexTranslateUrlAsync,
-  getYandexDetectUrlAsync
+  getYandexTranslateUrlAsync
 } from "@/shared/config/config.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";

@@ -8,7 +8,6 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'Custom');
 
@@ -76,27 +75,30 @@ export class CustomProvider extends BaseAIProvider {
     };
 
     // Use unified API request handler
-    try {
-      const result = await this._executeRequest({
-        url: apiUrl,
-        fetchOptions,
-        extractResponse: (data) => data?.choices?.[0]?.message?.content,
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-        updateApiKey: (newKey, options) => {
-          options.headers.Authorization = `Bearer ${newKey}`;
-        }
-      });
-
-      // Update session history
-      if (sessionId && result) {
-        await this._updateSessionHistory(sessionId, userText, result);
+    const result = await this._executeRequest({
+      url: apiUrl,
+      fetchOptions,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
       }
+    });
 
-      logger.info(`[Custom] Translation completed successfully`);
-      return this._cleanAIResponse(result);
-    } catch (error) {
-      throw error;
+    // Update session history
+    if (sessionId && result) {
+      await this._updateSessionHistory(sessionId, userText, result);
     }
+
+    logger.info(`[Custom] Translation completed successfully`);
+    return this._cleanAIResponse(result);
+  }
+
+  /**
+   * AI-specific validation for custom providers
+   */
+  _validateConfig(config, requiredFields, context) {
+    super._validateConfig(config, requiredFields, context);
   }
 }

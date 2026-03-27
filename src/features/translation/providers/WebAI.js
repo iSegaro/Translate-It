@@ -8,7 +8,6 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
@@ -69,22 +68,18 @@ export class WebAIProvider extends BaseAIProvider {
       }),
     };
 
-    try {
-      // Use unified API request handler
-      const result = await this._executeRequest({
-        url: apiUrl,
-        fetchOptions,
-        extractResponse: (data) =>
-          typeof data.response === "string" ? data.response : undefined,
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-      });
+    // Use unified API request handler
+    const result = await this._executeRequest({
+      url: apiUrl,
+      fetchOptions,
+      extractResponse: (data) =>
+        typeof data.response === "string" ? data.response : undefined,
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+    });
 
-      logger.info(`[WebAI] Translation completed successfully`);
-      this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
-      return this._cleanAIResponse(result);
-      } catch (error) {
-      throw error;
-      }
-    }
+    logger.info(`[WebAI] Translation completed successfully`);
+    this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
+    return this._cleanAIResponse(result);
   }
+}
