@@ -47,7 +47,10 @@
       :style="compact ? `flex: 0 1 120px !important; max-width: 130px !important; text-align: center !important; border: none !important; background-color: transparent !important; height: 44px !important; font-size: 15px !important; appearance: none !important; -webkit-appearance: none !important; padding: 0 10px !important; color: var(--ti-mobile-text-secondary) !important; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%225%22%20viewBox%3D%220%200%2010%205%22%3E%3Cpath%20fill%3D%22${settingsStore.isDarkTheme ? '%23adb5bd' : '%236c757d'}%22%20d%3D%22M0%200l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E') !important; background-repeat: no-repeat !important; background-position: right 8px center !important; background-size: 10px 5px !important; color-scheme: ${settingsStore.isDarkTheme ? 'dark' : 'light'} !important;` : ''"
       @click="handleDropdownClick"
     >
-      <option value="auto" :style="settingsStore.isDarkTheme ? 'background-color: var(--ti-mobile-bg) !important; color: var(--ti-mobile-text) !important;' : ''">
+      <option
+        value="auto"
+        :style="settingsStore.isDarkTheme ? 'background-color: var(--ti-mobile-bg) !important; color: var(--ti-mobile-text) !important;' : ''"
+      >
         {{ autoDetectLabel }}
       </option>
       <option

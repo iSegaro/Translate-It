@@ -1,6 +1,9 @@
 <template>
   <!-- Direct DOM Manipulation - no template needed -->
-  <div v-show="!isFullscreen" style="display: none;" />
+  <div
+    v-show="!isFullscreen"
+    style="display: none;"
+  />
 </template>
 
 <script setup>

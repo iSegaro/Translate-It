@@ -1,5 +1,8 @@
 <template>
-  <div :class="['content-app-container', TRANSLATION_HTML.NO_TRANSLATE_CLASS]" :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE">
+  <div
+    :class="['content-app-container', TRANSLATION_HTML.NO_TRANSLATE_CLASS]"
+    :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE"
+  >
     <!-- نمونه استفاده از ترجمه -->
     <!--{{ $t('app_welcome') }} -->
     

@@ -1,5 +1,8 @@
 <template>
-  <div v-if="!isFullscreen" class="element-highlight-overlay">
+  <div
+    v-if="!isFullscreen"
+    class="element-highlight-overlay"
+  >
     <div 
       v-for="highlight in activeHighlights" 
       :key="highlight.id"

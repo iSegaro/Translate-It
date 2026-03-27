@@ -55,8 +55,15 @@
           :title="t('window_copy_translation')"
           @click.stop="handleCopy"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+            />
           </svg>
         </button>
         <button
@@ -66,9 +73,23 @@
           :title="getEnhancedTTSButtonTitle"
           @click.stop="handleSmartTTS"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" class="ti-smart-tts-icon" :class="{ 'ti-original-icon': ttsMode === 'original' }">
-            <path v-if="!isSpeaking" fill="currentColor" :d="ttsMode === 'original' ? originalTextTTSIcon : translatedTextTTSIcon"/>
-            <path v-else fill="currentColor" d="M6 6h12v12H6z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            class="ti-smart-tts-icon"
+            :class="{ 'ti-original-icon': ttsMode === 'original' }"
+          >
+            <path
+              v-if="!isSpeaking"
+              fill="currentColor"
+              :d="ttsMode === 'original' ? originalTextTTSIcon : translatedTextTTSIcon"
+            />
+            <path
+              v-else
+              fill="currentColor"
+              d="M6 6h12v12H6z"
+            />
           </svg>
         </button>
         <button
@@ -77,8 +98,15 @@
           :title="getOriginalButtonTitle"
           @click.stop="toggleShowOriginal"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"
+            />
           </svg>
         </button>
       </div>
@@ -88,17 +116,32 @@
           :title="t('window_close')"
           @click.stop="handleClose"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            />
           </svg>
         </button>
       </div>
     </div>
 
     <div class="ti-window-body">
-      <Transition name="ti-original-text" appear>
-        <div v-if="showOriginal && !isLoading" class="ti-original-text-section">
-          <div class="ti-original-text">{{ originalText }}</div>
+      <Transition
+        name="ti-original-text"
+        appear
+      >
+        <div
+          v-if="showOriginal && !isLoading"
+          class="ti-original-text-section"
+        >
+          <div class="ti-original-text">
+            {{ originalText }}
+          </div>
         </div>
       </Transition>
       <TranslationDisplay

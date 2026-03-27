@@ -26,13 +26,16 @@
         @touchend="onDragEnd"
         @mousedown="onDragStart"
       >
-        <div class="ti-m-drag-handle" :style="{ 
-          width: '40px !important', 
-          height: '5px !important', 
-          borderRadius: '3px !important', 
-          backgroundColor: 'var(--ti-mobile-drag-handle) !important',
-          opacity: '0.8 !important' 
-        }"></div>
+        <div
+          class="ti-m-drag-handle"
+          :style="{ 
+            width: '40px !important', 
+            height: '5px !important', 
+            borderRadius: '3px !important', 
+            backgroundColor: 'var(--ti-mobile-drag-handle) !important',
+            opacity: '0.8 !important' 
+          }"
+        />
       </div>
 
       <!-- Main Content Container -->
@@ -53,7 +56,10 @@
       </div>
 
       <!-- Footer/Safe Area -->
-      <div class="ti-m-sheet-footer-area notranslate" style="height: env(safe-area-inset-bottom); min-height: 20px; background-color: inherit !important;"></div>
+      <div
+        class="ti-m-sheet-footer-area notranslate"
+        style="height: env(safe-area-inset-bottom); min-height: 20px; background-color: inherit !important;"
+      />
     </div>
   </div>
 </template>

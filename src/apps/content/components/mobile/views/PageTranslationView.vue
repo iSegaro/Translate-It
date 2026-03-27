@@ -1,23 +1,50 @@
 <template>
-  <div class="ti-m-page-translation-view" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
-    
+  <div
+    class="ti-m-page-translation-view"
+    style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;"
+  >
     <!-- Header -->
-    <div class="ti-m-status-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding-bottom: 12px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;">
-      <div class="ti-m-status-info" style="display: flex !important; align-items: center !important; gap: 10px !important;">
-        <span class="ti-m-status-dot" :class="pageTranslationData.status" style="width: 10px !important; height: 10px !important; border-radius: 50% !important; display: block !important;"></span>
-        <span class="ti-m-status-text" style="font-weight: 800 !important; font-size: 16px !important; color: var(--ti-mobile-text) !important;">{{ statusMessage }}</span>
+    <div
+      class="ti-m-status-header"
+      style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding-bottom: 12px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;"
+    >
+      <div
+        class="ti-m-status-info"
+        style="display: flex !important; align-items: center !important; gap: 10px !important;"
+      >
+        <span
+          class="ti-m-status-dot"
+          :class="pageTranslationData.status"
+          style="width: 10px !important; height: 10px !important; border-radius: 50% !important; display: block !important;"
+        />
+        <span
+          class="ti-m-status-text"
+          style="font-weight: 800 !important; font-size: 16px !important; color: var(--ti-mobile-text) !important;"
+        >{{ statusMessage }}</span>
       </div>
-      <div class="ti-m-header-actions" style="display: flex !important; align-items: center !important; gap: 8px !important;">
+      <div
+        class="ti-m-header-actions"
+        style="display: flex !important; align-items: center !important; gap: 8px !important;"
+      >
         <button 
           class="ti-m-header-action-btn ti-m-dashboard-link" 
-          @click="goToDashboard" 
-          style="border: none !important; padding: 0 12px !important; height: 28px !important; border-radius: 20px !important; font-size: 11px !important; font-weight: 800 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-text-secondary) !important;"
+          style="border: none !important; padding: 0 12px !important; height: 28px !important; border-radius: 20px !important; font-size: 11px !important; font-weight: 800 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-text-secondary) !important;" 
+          @click="goToDashboard"
         >
           {{ t('mobile_page_dashboard_btn') || 'Dashboard' }}
         </button>
         
-        <button class="ti-m-close-btn" @click="closeView" style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;">
-          <img src="@/icons/ui/close.png" :alt="t('mobile_close_button_alt') || 'Close'" class="ti-m-icon-img-close" style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;" />
+        <button
+          class="ti-m-close-btn"
+          style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;"
+          @click="closeView"
+        >
+          <img
+            src="@/icons/ui/close.png"
+            :alt="t('mobile_close_button_alt') || 'Close'"
+            class="ti-m-icon-img-close"
+            style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;"
+          >
         </button>
       </div>
     </div>
@@ -61,11 +88,18 @@
       </div>
 
       <!-- Error Message in Progress Card -->
-      <div v-if="pageTranslationData.status === 'error'" style="font-size: 13px !important; color: var(--ti-mobile-error) !important; font-weight: 600 !important; line-height: 1.4 !important;">
+      <div
+        v-if="pageTranslationData.status === 'error'"
+        style="font-size: 13px !important; color: var(--ti-mobile-error) !important; font-weight: 600 !important; line-height: 1.4 !important;"
+      >
         {{ pageTranslationData.errorMessage || (t('mobile_page_unknown_error') || 'Unknown translation error') }}
       </div>
 
-      <div class="ti-m-progress-bar-container" style="height: 10px !important; border-radius: 5px !important; overflow: hidden !important; position: relative !important;" :style="{ background: pageTranslationData.status === 'error' ? 'var(--ti-mobile-error-bg)' : 'var(--ti-mobile-header-border)' }">
+      <div
+        class="ti-m-progress-bar-container"
+        style="height: 10px !important; border-radius: 5px !important; overflow: hidden !important; position: relative !important;"
+        :style="{ background: pageTranslationData.status === 'error' ? 'var(--ti-mobile-error-bg)' : 'var(--ti-mobile-header-border)' }"
+      >
         <div 
           class="ti-m-progress-bar-fill" 
           :style="{ 
@@ -74,16 +108,17 @@
           }"
           :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
           style="height: 100% !important; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; box-shadow: 0 0 10px rgba(51, 154, 240, 0.3) !important;"
-        ></div>
+        />
       </div>
     </div>
 
     <!-- Unified Action Area -->
-    <div class="ti-m-action-column" style="margin-top: auto !important; padding-top: 10px !important;">
-      
+    <div
+      class="ti-m-action-column"
+      style="margin-top: auto !important; padding-top: 10px !important;"
+    >
       <!-- Single Multi-state Button -->
       <button 
-        @click.stop="primaryAction.handler"
         class="ti-m-primary-action-btn"
         :style="{
           width: '100% !important',
@@ -101,15 +136,15 @@
           gap: '8px !important',
           transition: 'all 0.2s ease !important'
         }"
+        @click.stop="primaryAction.handler"
       >
         <img 
           :src="primaryAction.icon" 
           style="width: 18px !important; height: 18px !important;" 
           :style="{ filter: primaryAction.iconFilter }"
-        />
+        >
         {{ primaryAction.label }}
       </button>
-
     </div>
   </div>
 </template>

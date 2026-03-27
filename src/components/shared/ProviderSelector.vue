@@ -293,7 +293,6 @@
       :value="currentProvider"
       class="ti-provider-select"
       :class="{ 'is-dark': settingsStore.isDarkTheme }"
-      @change="handleProviderChange"
       :style="mode === 'compact' ? `
         width: 100% !important;
         height: 46px !important;
@@ -315,6 +314,7 @@
         background-size: 16px !important;
         transition: all 0.2s ease !important;
       ` : ''"
+      @change="handleProviderChange"
     >
       <option
         v-for="provider in availableProviders"

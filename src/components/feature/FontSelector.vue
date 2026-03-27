@@ -5,7 +5,10 @@
       <label for="font-family-search">{{ t('font_family_label') || 'Font Family' }}</label>
       
       <!-- Searchable Font Selector -->
-      <div class="font-search-container" ref="fontDropdownRef">
+      <div
+        ref="fontDropdownRef"
+        class="font-search-container"
+      >
         <div
           class="font-dropdown"
           :class="{ 'is-open': isDropdownOpen }"

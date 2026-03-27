@@ -1,9 +1,9 @@
 <template>
   <div
     v-show="!isFullscreen"
+    ref="fabContainerRef"
     class="desktop-fab-container notranslate"
     translate="no"
-    ref="fabContainerRef"
     :style="containerStyle"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
@@ -13,14 +13,18 @@
       <div 
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
-        @click.stop="handleRevert"
         :title="t('desktop_fab_revert_tooltip')"
         style="position: absolute !important; bottom: 42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(250, 82, 82, 0.3) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important;"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.15)' : 'scale(1)') }"
+        @click.stop="handleRevert"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.15)' : 'scale(1)') }"
       >
-        <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')" style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;" />
+        <img
+          :src="IconRevert"
+          :alt="t('desktop_fab_revert_tooltip')"
+          style="width: 16px !important; height: 16px !important; filter: brightness(0) invert(1) !important;"
+        >
       </div>
     </Transition>
 
@@ -36,9 +40,9 @@
           :key="item.id" 
           class="fab-menu-item"
           :class="{ 'is-disabled': item.disabled }"
-          @click.stop="item.disabled ? null : handleMenuItemClick(item)"
           style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; color: #374151 !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
           :style="item.disabled ? 'opacity: 0.5 !important; cursor: default !important; pointer-events: none !important;' : ''"
+          @click.stop="item.disabled ? null : handleMenuItemClick(item)"
         >
           <div style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; margin-right: 12px !important; flex-shrink: 0 !important;">
             <img 
@@ -46,7 +50,7 @@
               :src="item.icon" 
               :alt="item.label" 
               style="width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important;"
-            />
+            >
           </div>
           <span style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
         </div>
@@ -57,16 +61,16 @@
     <div
       class="desktop-fab-button"
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
-      @mousedown="startDrag"
-      @click.stop="toggleMenu"
       :title="t('desktop_fab_tooltip')"
       :style="{ transform: isHovered || isMenuOpen ? 'translateX(-18px)' : 'translateX(0)' }"
+      @mousedown="startDrag"
+      @click.stop="toggleMenu"
     >
       <img 
         src="@/icons/extension/extension_icon_64.svg" 
         :alt="t('desktop_fab_alt')" 
         style="width: 32px !important; height: 32px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
-      />
+      >
     </div>
 
     <!-- Settings Button (below main button when open) -->
@@ -74,14 +78,18 @@
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
-        @click.stop="handleOpenSettings"
         :title="t('desktop_fab_settings_tooltip')"
         style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important; border: 1px solid rgba(0,0,0,0.05) !important;"
+        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }"
+        @click.stop="handleOpenSettings"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }"
       >
-        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')" style="width: 16px !important; height: 16px !important; filter: opacity(0.7) !important;" />
+        <img
+          :src="IconSettings"
+          :alt="t('desktop_fab_settings_tooltip')"
+          style="width: 16px !important; height: 16px !important; filter: opacity(0.7) !important;"
+        >
       </div>
     </Transition>
   </div>

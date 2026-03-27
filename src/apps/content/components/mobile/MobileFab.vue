@@ -5,6 +5,7 @@
     :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
     translate="no"
     :style="fabStyle"
+    :title="t('mobile_fab_alt') || 'Translate'"
     @click="onMobileFabClick"
     @mousedown="onFabDragStart"
     @touchstart="onFabDragStart"
@@ -12,7 +13,6 @@
     @touchend="onFabDragEnd"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
-    :title="t('mobile_fab_alt') || 'Translate'"
   >
     <img 
       src="@/icons/extension/extension_icon_64.svg" 
@@ -24,7 +24,7 @@
         transform: side === 'left' ? 'scaleX(-1) !important' : 'none !important',
         transition: 'transform 0.3s ease'
       }"
-    />
+    >
   </div>
 </template>
 

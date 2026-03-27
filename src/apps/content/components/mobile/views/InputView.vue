@@ -1,36 +1,71 @@
 <template>
-  <div class="ti-m-input-view" :class="{ 'is-dark': settingsStore.isDarkTheme }" style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;">
-    
+  <div
+    class="ti-m-input-view"
+    :class="{ 'is-dark': settingsStore.isDarkTheme }"
+    style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;"
+  >
     <!-- Header -->
-    <div class="ti-m-view-header" style="display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;">
-      <button @click="goBack" class="ti-m-back-btn" style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 6 4" fill="none" style="transform: rotate(90deg) !important;">
-          <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <div
+      class="ti-m-view-header"
+      style="display: flex !important; align-items: center !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;"
+    >
+      <button
+        class="ti-m-back-btn"
+        style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;"
+        @click="goBack"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 6 4"
+          fill="none"
+          style="transform: rotate(90deg) !important;"
+        >
+          <path
+            d="M1 1L3 3L5 1"
+            stroke="currentColor"
+            stroke-width="0.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
-        <span class="ti-m-header-title" style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+        <span
+          class="ti-m-header-title"
+          style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;"
+        >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
     </div>
 
     <!-- Input Card -->
-    <div class="ti-m-input-card" style="border: 1px solid var(--ti-mobile-border) !important; background: var(--ti-mobile-card-bg) !important; border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 10px !important;">
+    <div
+      class="ti-m-input-card"
+      style="border: 1px solid var(--ti-mobile-border) !important; background: var(--ti-mobile-card-bg) !important; border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 10px !important;"
+    >
       <div style="display: flex !important; justify-content: space-between !important; align-items: center !important;">
-        <div style="font-size: 11px !important; font-weight: 800 !important; color: var(--ti-mobile-text-muted) !important; text-transform: uppercase !important;">{{ t('mobile_input_source_text_label') || 'Source Text' }}</div>
+        <div style="font-size: 11px !important; font-weight: 800 !important; color: var(--ti-mobile-text-muted) !important; text-transform: uppercase !important;">
+          {{ t('mobile_input_source_text_label') || 'Source Text' }}
+        </div>
         
         <div style="display: flex !important; gap: 8px !important;">
-           <button 
+          <button 
             class="ti-m-input-action-btn ti-m-paste-btn" 
-            @click="handlePaste" 
-            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; display: flex !important; align-items: center !important; gap: 5px !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-accent-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-accent-bg) !important;"
+            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; display: flex !important; align-items: center !important; gap: 5px !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-accent-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-accent-bg) !important;" 
+            @click="handlePaste"
           >
-            <img src="@/icons/ui/paste.png" class="ti-m-icon-img-small" style="width: 14px !important; height: 14px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
+            <img
+              src="@/icons/ui/paste.png"
+              class="ti-m-icon-img-small"
+              style="width: 14px !important; height: 14px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;"
+            >
             {{ t('action_paste_from_clipboard') || 'Paste' }}
           </button>
           
           <button 
             v-if="inputText"
             class="ti-m-input-action-btn ti-m-clear-btn" 
-            @click="inputText = ''" 
-            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-error-bg) !important; color: var(--ti-mobile-error) !important; border: 1px solid var(--ti-mobile-error-bg) !important;"
+            style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; transition: all 0.2s ease !important; background: var(--ti-mobile-error-bg) !important; color: var(--ti-mobile-error) !important; border: 1px solid var(--ti-mobile-error-bg) !important;" 
+            @click="inputText = ''"
           >
             {{ t('mobile_input_clear_btn') || 'Clear' }}
           </button>
@@ -43,13 +78,19 @@
         :dir="inputDir"
         style="width: 100% !important; min-height: 100px !important; border: none !important; background: transparent !important; font-size: 16px !important; color: var(--ti-mobile-text-secondary) !important; resize: none !important; outline: none !important; padding: 4px 0 !important; text-align: start !important; line-height: 1.5 !important;"
         @focus="onFocus"
-      ></textarea>
+      />
     </div>
 
     <!-- Controls -->
-    <div class="ti-m-input-controls" style="display: flex !important; flex-direction: column !important; gap: 12px !important; position: relative !important;">
+    <div
+      class="ti-m-input-controls"
+      style="display: flex !important; flex-direction: column !important; gap: 12px !important; position: relative !important;"
+    >
       <!-- Languages -->
-      <div class="ti-m-language-controls-card" style="border: 1px solid var(--ti-mobile-btn-border) !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; overflow: hidden !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; margin-top: 5px !important;">
+      <div
+        class="ti-m-language-controls-card"
+        style="border: 1px solid var(--ti-mobile-btn-border) !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; overflow: hidden !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; margin-top: 5px !important;"
+      >
         <LanguageSelector
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
@@ -62,8 +103,14 @@
       </div>
       
       <!-- Provider and Translate -->
-      <div class="ti-m-actions-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 10px !important;">
-        <div class="ti-m-provider-wrapper" style="flex: 1 !important; max-width: 48% !important; position: relative !important;">
+      <div
+        class="ti-m-actions-row"
+        style="display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 10px !important;"
+      >
+        <div
+          class="ti-m-provider-wrapper"
+          style="flex: 1 !important; max-width: 48% !important; position: relative !important;"
+        >
           <ProviderSelector
             v-model="currentProvider"
             mode="compact"
@@ -74,7 +121,6 @@
         </div>
         
         <button 
-          @click="handleTranslate"
           :disabled="isTranslateDisabled"
           class="ti-m-translate-main-btn"
           :style="{
@@ -95,6 +141,7 @@
             'cursor': isTranslateDisabled ? 'not-allowed !important' : 'pointer !important',
             'box-shadow': isTranslateDisabled ? 'none !important' : '0 4px 12px rgba(51, 154, 240, 0.25) !important'
           }"
+          @click="handleTranslate"
         >
           {{ t('mobile_input_translate_btn') || 'Translate' }}
         </button>
@@ -102,8 +149,14 @@
     </div>
 
     <!-- Result Area -->
-    <div class="ti-m-result-container" style="min-height: 120px !important; position: relative !important; margin-top: 5px !important;">
-      <div v-if="resultText || isLoading || isError" style="animation: ti-m-slideIn 0.3s ease;">
+    <div
+      class="ti-m-result-container"
+      style="min-height: 120px !important; position: relative !important; margin-top: 5px !important;"
+    >
+      <div
+        v-if="resultText || isLoading || isError"
+        style="animation: ti-m-slideIn 0.3s ease;"
+      >
         <TranslationDisplay
           mode="mobile"
           :content="resultText"

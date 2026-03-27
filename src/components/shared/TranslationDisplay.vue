@@ -148,8 +148,8 @@
         <button 
           class="mobile-action-btn secondary-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
-          @click="handleMobileSpeak" 
-          :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle"
+          :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle" 
+          @click="handleMobileSpeak"
         >
           <svg
             v-if="ttsStatus === 'playing'"
@@ -159,14 +159,20 @@
             fill="currentColor"
             style="flex-shrink: 0 !important; display: block !important;"
           >
-            <rect x="6" y="6" width="12" height="12" rx="1.5" />
+            <rect
+              x="6"
+              y="6"
+              width="12"
+              height="12"
+              rx="1.5"
+            />
           </svg>
           <img 
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
             style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" 
-          />
+          >
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
           </span>
@@ -175,10 +181,14 @@
         <button 
           class="mobile-action-btn secondary-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
-          @click="handleMobileCopy" 
-          :title="copyTitle"
+          :title="copyTitle" 
+          @click="handleMobileCopy"
         >
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
+          <img
+            src="@/icons/ui/copy.png"
+            :alt="copyAlt"
+            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;"
+          >
           <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
             {{ t('mobile_selection_copy_tooltip') }}
           </span>
@@ -187,10 +197,14 @@
         <button 
           class="mobile-action-btn icon-only-action" 
           style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
-          @click="handleMobileHistory" 
-          :title="t('mobile_selection_history_tooltip')"
+          :title="t('mobile_selection_history_tooltip')" 
+          @click="handleMobileHistory"
         >
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" />
+          <img
+            src="@/icons/ui/history.svg"
+            :alt="t('mobile_history_button_alt')"
+            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;"
+          >
         </button>
       </div>
     </template>
