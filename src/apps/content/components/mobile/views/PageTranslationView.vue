@@ -1,12 +1,12 @@
 <template>
   <div
     class="ti-m-page-translation-view"
-    style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 15px !important; background-color: inherit !important;"
+    style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 10px !important; background-color: inherit !important;"
   >
     <!-- Header -->
     <div
       class="ti-m-view-header"
-      style="display: flex !important; align-items: center !important; justify-content: space-between !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important; min-height: 48px !important;"
+      style="display: flex !important; align-items: center !important; justify-content: space-between !important; padding-bottom: 8px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important; min-height: 44px !important;"
     >
       <button
         class="ti-m-back-btn"
@@ -62,11 +62,11 @@
       :style="{
         background: pageTranslationData.status === 'error' ? 'var(--ti-mobile-error-bg)' : 'var(--ti-mobile-card-bg)',
         border: `1px solid ${pageTranslationData.status === 'error' ? 'var(--ti-mobile-error)' : 'var(--ti-mobile-border)'} !important`,
-        borderRadius: '16px !important',
-        padding: '20px !important',
+        borderRadius: '14px !important',
+        padding: '12px 15px !important',
         display: 'flex !important',
         flexDirection: 'column !important',
-        gap: '12px !important',
+        gap: '8px !important',
         transition: 'all 0.3s ease !important'
       }"
     >
@@ -122,7 +122,7 @@
     <!-- Unified Action Area -->
     <div
       class="ti-m-action-column"
-      style="margin-top: auto !important; padding-top: 10px !important;"
+      style="margin-top: auto !important; padding-top: 5px !important;"
     >
       <!-- Single Multi-state Button -->
       <button 
@@ -131,7 +131,7 @@
           width: '100% !important',
           background: primaryAction.bgColor,
           border: primaryAction.border + ' !important',
-          padding: '14px !important',
+          padding: '12px !important',
           borderRadius: '12px !important',
           color: primaryAction.textColor + ' !important',
           fontWeight: '700 !important',
