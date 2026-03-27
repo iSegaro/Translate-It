@@ -122,9 +122,14 @@ export async function translateErrorMessage(error) {
   
   try {
     const translated = await getErrorMessage(type);
-    if (translated) return translated;
+    if (translated && translated !== errorMessages[ErrorTypes.UNKNOWN]) return translated;
   } catch {
     // Fallback if i18n fails
+  }
+
+  // If we have a known error type message, use it before falling back to raw error
+  if (type && errorMessages[type]) {
+    return errorMessages[type];
   }
 
   // Final fallback to raw message
