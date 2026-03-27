@@ -10,14 +10,38 @@
         <span class="ti-m-header-title" style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;">{{ t('history_title') || 'Translation History' }}</span>
       </button>
       
-      <button 
-        v-if="hasHistory"
-        @click="clearAll" 
-        class="ti-m-clear-all-btn"
-        style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; background: var(--ti-mobile-error-bg) !important; color: var(--ti-mobile-error) !important; border: 1px solid var(--ti-mobile-error-bg) !important;"
-      >
-        {{ t('history_clear_all') || 'Clear All' }}
-      </button>
+      <div v-if="hasHistory" style="display: flex !important; gap: 8px !important; align-items: center !important;">
+        <!-- Native Export Select Container -->
+        <div style="position: relative !important; display: flex !important; align-items: center !important;">
+          <div 
+            class="ti-m-export-btn"
+            style="padding: 6px 10px !important; border-radius: 8px !important; font-size: 12px !important; font-weight: 600 !important; background: var(--ti-mobile-accent-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-accent-bg) !important; display: flex !important; align-items: center !important; gap: 4px !important; pointer-events: none !important;"
+          >
+            <img src="@/icons/ui/copy.png" style="width: 14px !important; height: 14px !important; filter: var(--ti-mobile-icon-filter) !important;" />
+            {{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}
+          </div>
+          
+          <!-- Native Select Overlay (Invisible but clickable) -->
+          <select 
+            @change="handleNativeExport"
+            style="position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; opacity: 0 !important; cursor: pointer !important; -webkit-appearance: none !important;"
+          >
+            <option value="" disabled selected>{{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}</option>
+            <option value="json_clean">{{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'JSON (Clean)' }}</option>
+            <option value="json_raw">{{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'JSON (Raw)' }}</option>
+            <option value="csv">{{ t('SIDEPANEL_EXPORT_CSV') || 'CSV' }}</option>
+            <option value="anki">{{ t('SIDEPANEL_EXPORT_ANKI') || 'Anki' }}</option>
+          </select>
+        </div>
+
+        <button 
+          @click="clearAll" 
+          class="ti-m-clear-all-btn"
+          style="padding: 6px 12px !important; border-radius: 8px !important; font-size: 12px !important; cursor: pointer !important; font-weight: 600 !important; background: var(--ti-mobile-error-bg) !important; color: var(--ti-mobile-error) !important; border: 1px solid var(--ti-mobile-error-bg) !important;"
+        >
+          {{ t('history_clear_all') || 'Clear All' }}
+        </button>
+      </div>
     </div>
 
     <!-- History List -->
@@ -77,7 +101,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -97,6 +121,7 @@ const {
   loadHistory, 
   deleteHistoryItem, 
   clearAllHistory,
+  exportHistory,
   formatTime,
   createMarkdownContent
 } = useHistory()
@@ -108,6 +133,15 @@ onMounted(async () => {
 
 const getLangName = (code) => {
   return languages.getLanguageName(code) || code
+}
+
+const handleNativeExport = (event) => {
+  const format = event.target.value
+  if (format) {
+    exportHistory(format)
+    // Reset selection to placeholder
+    event.target.value = ""
+  }
 }
 
 const goBack = () => {
@@ -160,9 +194,31 @@ const selectItem = (item) => {
 .ti-m-spinner { animation: spin-mobile 1s linear infinite !important; }
 
 .ti-m-clear-all-btn {
-  background: var(--ti-mobile-error-bg) !important;
-  border: 1px solid var(--ti-mobile-error-bg) !important;
-  color: var(--ti-mobile-error) !important;
+  background: var(--ti-m-error-bg) !important;
+  border: 1px solid var(--ti-m-error-bg) !important;
+  color: var(--ti-m-error) !important;
+}
+
+.ti-m-menu-item {
+  padding: 12px 16px !important;
+  background: none !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ti-mobile-header-border) !important;
+  color: var(--ti-mobile-text) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.ti-m-menu-item:last-child {
+  border-bottom: none !important;
+}
+
+.ti-m-menu-item:active {
+  background: var(--ti-mobile-card-bg) !important;
 }
 
 .ti-m-lang-badge {
