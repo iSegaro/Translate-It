@@ -58,7 +58,7 @@
       <!-- Footer/Safe Area -->
       <div
         class="ti-m-sheet-footer-area notranslate"
-        style="height: env(safe-area-inset-bottom); min-height: 20px; background-color: inherit !important;"
+        style="height: env(safe-area-inset-bottom, 10px); background-color: inherit !important; flex-shrink: 0 !important;"
       />
     </div>
   </div>
@@ -165,7 +165,12 @@ const onDragEnd = (e) => {
 const sheetStyle = computed(() => {
   const y = isDragging.value ? currentY.value : 0
   const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK
-  const targetHeight = isPeek ? '30dvh' : '75dvh'
+  
+  // Dynamic height for peek mode based on view
+  let targetHeight = isPeek ? '35dvh' : '75dvh'
+  if (isPeek && activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
+    targetHeight = '145px' // Reduced from 180px for a tighter fit
+  }
   
   let transformValue = 'translateY(0)'
   let heightValue = targetHeight
