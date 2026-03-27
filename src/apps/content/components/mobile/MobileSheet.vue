@@ -12,10 +12,6 @@
       translate="no"
       :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
       :style="[sheetStyle, themeVariables]"
-      @touchstart="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
-      @touchmove="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragMove($event) : null"
-      @touchend="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragEnd($event) : null"
-      @mousedown="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? onDragStart($event) : null"
     >
       <!-- Drag Handle Header -->
       <div 
