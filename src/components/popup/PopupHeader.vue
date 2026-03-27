@@ -9,6 +9,7 @@
     </div>
     <div class="toolbar-right-group">
       <IconButton
+        v-if="!IsMobile"
         ref="sidePanelButton"
         icon="side-panel.png"
         :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
@@ -78,6 +79,7 @@ import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { getBrowserInfoSync } from '@/utils/browser/compatibility.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupHeader');
 
@@ -116,6 +118,10 @@ const { t } = useUnifiedI18n()
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
 
 // Computed
+const IsMobile = computed(() => {
+  return getBrowserInfoSync().isMobile
+})
+
 const isExtensionEnabledGlobal = computed(() => {
   return settingsStore.settings?.EXTENSION_ENABLED ?? true
 })
