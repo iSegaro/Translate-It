@@ -8,9 +8,6 @@ import {
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
@@ -22,8 +19,8 @@ export class OpenAIProvider extends BaseAIProvider {
   static reliableJsonMode = true;
   static supportsDictionary = true;
 
-  // AI Provider capabilities
-  static supportsStreaming = true;
+  // AI Provider capabilities - Conservative settings for OpenAI
+  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
@@ -50,8 +47,8 @@ export class OpenAIProvider extends BaseAIProvider {
 
     // Validate configuration
     this._validateConfig(
-      { apiKey, apiUrl },
-      ["apiKey", "apiUrl"],
+      { apiKey },
+      ["apiKey"],
       `${this.providerName.toLowerCase()}-translation`
     );
 
@@ -80,7 +77,7 @@ export class OpenAIProvider extends BaseAIProvider {
 
     // Use unified API request handler
     const result = await this._executeRequest({
-      url: apiUrl,
+      url: apiUrl || "https://api.openai.com/v1/chat/completions",
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
@@ -95,51 +92,48 @@ export class OpenAIProvider extends BaseAIProvider {
       await this._updateSessionHistory(sessionId, userText, result);
     }
 
+    logger.info(`[OpenAI] Translation completed successfully`);
     return this._cleanAIResponse(result);
   }
 
   /**
-   * Translate text from image using OpenAI Vision
-   * @param {string} imageData - Base64 encoded image data
+   * AI-specific validation for OpenAI
+   */
+  _validateConfig(config, requiredFields, context) {
+    super._validateConfig(config, requiredFields, context);
+  }
+
+  /**
+   * Handle image translation for OpenAI
+   * @param {string} base64Image - Base64 encoded image
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
-   * @returns {Promise<string>} - Translated text
+   * @returns {Promise<string>} Translated text
    */
-  async translateImage(imageData, sourceLang, targetLang) {
-    if (this._isSameLanguage(sourceLang, targetLang)) return null;
-
-    const [apiKeys, apiUrl, model] = await Promise.all([
+  async translateImage(base64Image, _sourceLang, targetLang) {
+    const [apiKeys, apiUrl, model, promptBase] = await Promise.all([
       getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
+      getPromptBASEScreenCaptureAsync()
     ]);
 
-    // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
+    const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
 
-    // Validate configuration
-    this._validateConfig(
-      { apiKey, apiUrl },
-      ["apiKey", "apiUrl"],
-      `${this.providerName.toLowerCase()}-image-translation`
-    );
-
-    logger.info(`[OpenAI] Starting image translation`);
-
-    // Build prompt for screen capture translation
-    const basePrompt = await getPromptBASEScreenCaptureAsync();
-    const prompt = basePrompt
-      .replace(/\$_\{TARGET\}/g, targetLang)
-      .replace(/\$_\{SOURCE\}/g, sourceLang);
-
-    // Prepare message with image
+    // OpenAI uses specific message format for vision models
     const messages = [
       {
         role: "user",
         content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: imageData } }
+          { type: "text", text: systemPrompt },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/png;base64,${base64Image}`
+            }
+          }
         ]
       }
     ];
@@ -151,7 +145,7 @@ export class OpenAIProvider extends BaseAIProvider {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "gpt-4o",
+        model: model || "gpt-4-vision-preview",
         messages: messages,
         max_tokens: 1000
       }),
@@ -159,22 +153,17 @@ export class OpenAIProvider extends BaseAIProvider {
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
 
-    try {
-      const result = await this._executeRequest({
-        url: apiUrl,
-        fetchOptions,
-        extractResponse: (data) => data?.choices?.[0]?.message?.content,
-        context: context,
-        updateApiKey: (newKey, options) => {
-          options.headers.Authorization = `Bearer ${newKey}`;
-        }
-      });
+    const result = await this._executeRequest({
+      url: apiUrl,
+      fetchOptions,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: context,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
+      }
+    });
 
-      logger.info(`[OpenAI] Image translation completed successfully`);
-      return result;
-    } catch (error) {
-      // Errors are already handled and logged by _executeRequest
-      throw error;
-    }
+    logger.info(`[OpenAI] Image translation completed successfully`);
+    return result;
   }
 }
