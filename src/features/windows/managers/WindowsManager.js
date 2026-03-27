@@ -20,7 +20,7 @@ import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 
 /**

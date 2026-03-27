@@ -31,6 +31,16 @@ const getLogger = () => {
 };
 
 /**
+ * OS Platforms Constants
+ */
+export const OS_PLATFORMS = {
+  MAC: 'MAC',
+  WINDOWS: 'WINDOWS',
+  LINUX: 'LINUX',
+  UNKNOWN: 'UNKNOWN'
+};
+
+/**
  * Modern browser detection without deprecated APIs
  * Detect if we're running in Firefox
  */
@@ -49,13 +59,11 @@ export async function isFirefox() {
     
     // Method 2: Check for Firefox-specific APIs that are not deprecated
     if (typeof browser !== "undefined" && browser.runtime) {
-      // Firefox has different manifest structure and API availability
       const manifest = browser.runtime.getManifest();
       if (manifest && manifest.manifest_version === 3) {
-        // Firefox MV3 specific checks
         const hasFirefoxSpecificAPI = 
-          browser.sidebarAction || // Firefox has sidebarAction instead of sidePanel
-          (browser.contextMenus && browser.contextMenus.OverrideContext); // Firefox-specific enum
+          browser.sidebarAction || 
+          (browser.contextMenus && browser.contextMenus.OverrideContext);
         if (hasFirefoxSpecificAPI) {
           return true;
         }
@@ -67,13 +75,7 @@ export async function isFirefox() {
       return navigator.userAgent.includes("Firefox");
     }
     
-    // Method 4: Chrome API presence check (inverse detection)
-    if (typeof chrome === "undefined") {
-      // If chrome global is not available, likely Firefox with polyfill
-      return true;
-    }
-    
-    return false;
+    return typeof chrome === "undefined";
   } catch (error) {
     const handler = ErrorHandler.getInstance();
     handler.handle(error, { type: ErrorTypes.CONTEXT, context: 'browserCompat-isFirefox' });
@@ -92,26 +94,6 @@ export async function isEdge() {
 }
 
 /**
- * Get unified browser and platform information (Synchronous version for immediate use)
- * @returns {Object} Browser info object
- */
-export function getBrowserInfoSync() {
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const isFirefoxSync = ua.includes('Firefox');
-  const isEdgeSync = ua.includes('Edg');
-  const isMobileSync = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-  const isChromeSync = ua.includes('Chrome') && !isEdgeSync && !isFirefoxSync;
-
-  return {
-    isFirefox: isFirefoxSync,
-    isMobile: isMobileSync,
-    isChrome: isChromeSync,
-    isEdge: isEdgeSync,
-    name: isFirefoxSync ? 'Firefox' : (isEdgeSync ? 'Edge' : (isChromeSync ? 'Chrome' : 'Unknown'))
-  };
-}
-
-/**
  * Detect if we're running in Chrome
  */
 export async function isChrome() {
@@ -119,5 +101,74 @@ export async function isChrome() {
   const edge = await isEdge();
   return !firefox && !edge;
 }
+
+/**
+ * Detect Operating System
+ * @returns {string} One of OS_PLATFORMS
+ */
+export function detectOS() {
+  if (typeof navigator === 'undefined') {
+    return OS_PLATFORMS.UNKNOWN;
+  }
+  const platform = navigator.platform.toLowerCase();
+  if (platform.startsWith('mac')) {
+    return OS_PLATFORMS.MAC;
+  }
+  if (platform.startsWith('win')) {
+    return OS_PLATFORMS.WINDOWS;
+  }
+  if (platform.includes('linux')) {
+    return OS_PLATFORMS.LINUX;
+  }
+  return OS_PLATFORMS.UNKNOWN;
+}
+
+/**
+ * Device and Touch detection (formerly deviceDetector)
+ */
+export const deviceDetector = {
+  isMobile() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || (window && window.opera) || "";
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isTouch = this.isTouchDevice();
+    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+    return isMobileUA || (isTouch && typeof window !== 'undefined' && window.innerWidth <= 1024) || isIPadOS;
+  },
+
+  isTouchDevice() {
+    if (typeof navigator === 'undefined') return false;
+    return (typeof window !== 'undefined' && 'ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  },
+
+  shouldEnableMobileUI() {
+    return this.isMobile() && typeof window !== 'undefined' && window.innerWidth <= 1024;
+  }
+};
+
+/**
+ * Get unified browser, OS, and device information (Synchronous)
+ * @returns {Object} Comprehensive info object
+ */
+export function getBrowserInfoSync() {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isFirefoxSync = ua.includes('Firefox');
+  const isEdgeSync = ua.includes('Edg');
+  const isMobileSync = deviceDetector.isMobile();
+  const isChromeSync = ua.includes('Chrome') && !isEdgeSync && !isFirefoxSync;
+  const os = detectOS();
+
+  return {
+    isFirefox: isFirefoxSync,
+    isMobile: isMobileSync,
+    isChrome: isChromeSync,
+    isEdge: isEdgeSync,
+    isTouch: deviceDetector.isTouchDevice(),
+    os: os,
+    name: isFirefoxSync ? 'Firefox' : (isEdgeSync ? 'Edge' : (isChromeSync ? 'Chrome' : 'Unknown'))
+  };
+}
+
 
 // Legacy TTS manager functions removed - using unified GOOGLE_TTS_SPEAK system

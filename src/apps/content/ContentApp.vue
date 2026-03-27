@@ -111,7 +111,7 @@ import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import MobileSheet from './components/mobile/MobileSheet.vue';
 import MobileFab from './components/mobile/MobileFab.vue';
 import DesktopFabMenu from './components/desktop/DesktopFabMenu.vue';
-import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

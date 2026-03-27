@@ -18,7 +18,7 @@ The mobile system is built as a modular extension of the existing **UI Host (Sha
 ┌─────────────────────────────────────────────────────────────┐
 │                  MOBILE SYSTEM ARCHITECTURE                 │
 ├─────────────────────────────────────────────────────────────┤
-│  Infrastructure Layer: deviceDetector.js (isMobile detection)│
+│  Infrastructure Layer: compatibility.js (isMobile detection)│
 └──────────────┬──────────────────────────────┬───────────────┘
                │                              │
 ┌──────────────▼──────────────┐      ┌────────▼──────────────┐
@@ -40,7 +40,7 @@ The mobile system is built as a modular extension of the existing **UI Host (Sha
 
 ## Core Components
 
-### 1. Device Detection (`deviceDetector.js`)
+### 1. Device Detection (`compatibility.js`)
 A robust utility that identifies mobile environments using a combination of UserAgent analysis, touch point detection (`maxTouchPoints`), and viewport width.
 - **`isMobile()`**: General detection for Android/iOS.
 - **`shouldEnableMobileUI()`**: Decision logic to switch from Windows to Sheet.

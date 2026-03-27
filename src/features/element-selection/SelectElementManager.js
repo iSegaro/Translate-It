@@ -15,7 +15,7 @@ import { getSettingsAsync } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
-import { deviceDetector } from '@/utils/browser/deviceDetector.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 
 // Import new simplified services

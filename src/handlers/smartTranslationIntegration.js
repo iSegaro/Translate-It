@@ -4,7 +4,7 @@ import { pageEventBus } from "../core/PageEventBus.js";
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import ExtensionContextManager from "../core/extensionContext.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { detectPlatform, Platform } from "../utils/browser/platform.js";
+import { detectOS as detectPlatform, OS_PLATFORMS as Platform } from "../utils/browser/compatibility.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

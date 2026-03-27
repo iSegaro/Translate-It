@@ -14,7 +14,7 @@ import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { debounce } from "../core/debounce.js";
 import { state, TranslationMode } from "@/shared/config/config.js";
 import { logMethod } from "../core/helpers.js";
-import { detectPlatform, Platform } from "../utils/browser/platform.js";
+import { detectOS as detectPlatform, OS_PLATFORMS as Platform } from "../utils/browser/compatibility.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";

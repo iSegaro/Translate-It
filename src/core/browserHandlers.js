@@ -3,6 +3,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { isFirefox as checkIsFirefox, isChrome as checkIsChrome, isEdge as checkIsEdge, getBrowserInfoSync } from '@/utils/browser/compatibility.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BrowserHandlers');
 
@@ -11,11 +12,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BrowserHandlers');
  * @returns {boolean} True if Chromium-based, false otherwise
  */
 export const isChromium = () => {
-  // Check for Chromium-based browsers (Chrome, Edge, Opera, Brave, etc.)
-  return /chrome/i.test(navigator.userAgent || '') || 
-         /chromium/i.test(navigator.userAgent || '') ||
-         /edg/i.test(navigator.userAgent || '') ||  // Modern Edge
-         /opera|opr/i.test(navigator.userAgent || '');
+  const info = getBrowserInfoSync();
+  return info.isChrome || info.isEdge || /chromium|opera|opr/i.test(navigator.userAgent || '');
 };
 
 /**
@@ -23,10 +21,7 @@ export const isChromium = () => {
  * @returns {boolean} True if Chrome, false otherwise  
  */
 export const isChrome = () => {
-  return /chrome/i.test(navigator.userAgent || '') && 
-         !/edge/i.test(navigator.userAgent || '') &&
-         !/edg/i.test(navigator.userAgent || '') &&
-         !/opera|opr/i.test(navigator.userAgent || '');
+  return getBrowserInfoSync().isChrome;
 };
 
 /**
@@ -34,7 +29,7 @@ export const isChrome = () => {
  * @returns {boolean} True if Firefox, false otherwise
  */
 export const isFirefox = () => {
-  return /firefox/i.test(navigator.userAgent || '');
+  return getBrowserInfoSync().isFirefox;
 };
 
 /**

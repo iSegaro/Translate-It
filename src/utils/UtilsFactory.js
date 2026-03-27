@@ -247,21 +247,25 @@ class UtilsFactory {
     getLogger().debug('Loading browser utils lazily');
 
     const [
-      platformUtils,
       eventsUtils,
       compatibilityUtils,
       iconManagerModule
     ] = await Promise.all([
-      import('./browser/platform.js'),
       import('./browser/events.js'),
       import('./browser/compatibility.js'),
       import('./browser/ActionbarIconManager.js')
     ]);
 
-    return {
-      ...platformUtils,
-      ...eventsUtils,
+    // Map new names to old names for backward compatibility within the factory's returned object
+    const legacyCompatibility = {
       ...compatibilityUtils,
+      detectPlatform: compatibilityUtils.detectOS,
+      Platform: compatibilityUtils.OS_PLATFORMS
+    };
+
+    return {
+      ...eventsUtils,
+      ...legacyCompatibility,
       ActionbarIconManager: iconManagerModule.default || iconManagerModule.ActionbarIconManager,
       getActionbarIconManager: iconManagerModule.getActionbarIconManager
     };

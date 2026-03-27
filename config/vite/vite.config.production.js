@@ -368,7 +368,6 @@ export default defineConfig({
       'src/utils/i18n/languages.js',
       'src/utils/i18n/plugin.js',
       'src/utils/browser/compatibility.js',
-      'src/utils/browser/platform.js',
       'src/utils/browser/events.js',
       'src/utils/browser/ActionbarIconManager.js',
       'src/utils/rendering/TranslationRenderer.js',
