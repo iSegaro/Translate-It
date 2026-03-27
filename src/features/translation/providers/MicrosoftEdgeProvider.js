@@ -12,6 +12,9 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MicrosoftEdge');
 
+// Source:
+// https://github.com/translate-tools/core/blob/master/src/translators/MicrosoftTranslator/index.ts
+
 export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   static type = "translate";
   static displayName = "Microsoft Edge";
@@ -116,15 +119,9 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
           "Accept": "*/*",
-          "Accept-Language": "zh-TW,zh;q=0.9,ja;q=0.8,zh-CN;q=0.7,en-US;q=0.6,en;q=0.5",
           "Cache-Control": "no-cache",
           "Pragma": "no-cache",
-          "Priority": "u=1, i",
-          "Referrer-Policy": "strict-origin-when-cross-origin",
-          "Sec-Fetch-Dest": "empty",
-          "Sec-Fetch-Mode": "cors",
-          "Sec-Fetch-Site": "none",
-          "Sec-Fetch-Storage-Access": "active"
+          "Priority": "u=1, i"
         },
         body: JSON.stringify(body)
       },
