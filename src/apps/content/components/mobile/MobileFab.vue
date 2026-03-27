@@ -245,9 +245,23 @@ const onFabDragEnd = async (e) => {
 };
 
 const onMobileFabClick = () => {
-  let text = window.windowsManagerInstance?.state?.originalText || window.getSelection()?.toString().trim() || '';
-  if (text) window.windowsManagerInstance?._showMobileSheet(text);
-  else mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+  const selection = window.getSelection()?.toString().trim() || '';
+  const storedText = window.windowsManagerInstance?.state?.originalText || '';
+  const currentText = selection || storedText;
+
+  if (currentText) {
+    // If it's a new selection, we show the selection view
+    // Otherwise, we respect the last active view (e.g., if user went to Dashboard and closed the sheet)
+    const isNewText = currentText !== mobileStore.selectionData.text;
+    
+    if (isNewText) {
+      window.windowsManagerInstance?._showMobileSheet(currentText);
+    } else {
+      mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+    }
+  } else {
+    mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+  }
 };
 
 const onMouseEnter = () => { isHovering.value = true; isFabIdle.value = false; };
