@@ -299,7 +299,8 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   if ((msg.includes("quota exceeded") && msg.includes("region")) || msg.includes("location is not supported") || msg.includes("gemini_quota_region")) return ErrorTypes.GEMINI_QUOTA_REGION;
-  if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("insufficient balance") || msg.includes("quota_exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
+  if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("quota_exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
+  if (msg.includes("insufficient balance") || msg.includes("insufficient_balance") || msg.includes("billing") || msg.includes("check your plan")) return ErrorTypes.INSUFFICIENT_BALANCE;
 
   if (msg.includes("failed to fetch") || msg.includes("network failure") || msg.includes("networkerror")) return ErrorTypes.NETWORK_ERROR;
   if (msg.includes("http error") || msg.includes("http status") || msg.includes("the operation was aborted.")) return ErrorTypes.HTTP_ERROR;
