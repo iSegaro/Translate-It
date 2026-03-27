@@ -60,6 +60,7 @@ const isFabIdle = ref(true);
 const isHovering = ref(false);
 const isViewportUnstable = ref(false);
 const side = ref(null); 
+const isSelectionDirty = ref(false);
 
 // Internal variables (Tracked via tracker)
 let dragStartY = 0;
@@ -74,6 +75,8 @@ const handleSelectionChange = () => {
   const selectedText = selection ? selection.toString().trim() : '';
   
   if (selectedText) {
+    // Mark that a selection interaction occurred (could be a re-selection of the same text)
+    isSelectionDirty.value = true;
     // Wake up FAB when text is selected (Fade in)
     startFabIdleTimer();
   }
@@ -249,17 +252,16 @@ const onMobileFabClick = () => {
   const storedText = window.windowsManagerInstance?.state?.originalText || '';
   const currentText = selection || storedText;
 
-  if (currentText) {
-    // If it's a new selection, we show the selection view
-    // Otherwise, we respect the last active view (e.g., if user went to Dashboard and closed the sheet)
-    const isNewText = currentText !== mobileStore.selectionData.text;
-    
-    if (isNewText) {
-      window.windowsManagerInstance?._showMobileSheet(currentText);
-    } else {
-      mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
-    }
+  // We should navigate to SelectionView ONLY IF:
+  // 1. There is an active selection AND it's "dirty" (just selected or re-selected)
+  // 2. OR the selection string is different from what we last handled
+  const hasFreshSelection = selection && (isSelectionDirty.value || selection !== mobileStore.selectionData.text);
+
+  if (hasFreshSelection) {
+    window.windowsManagerInstance?._showMobileSheet(selection);
+    isSelectionDirty.value = false;
   } else {
+    // Default: respect the last active view (Dashboard, History, etc.)
     mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
   }
 };
