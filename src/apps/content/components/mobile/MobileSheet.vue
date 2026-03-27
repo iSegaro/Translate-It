@@ -141,18 +141,27 @@ const onDragEnd = (e) => {
     tracker.removeEventListener(window, 'mouseup', onDragEnd)
   }
   
-  // Logic for state transitions based on drag distance
-  if (currentY.value > 100) {
-    // Dragged down significantly -> Close
-    mobileStore.closeSheet()
-  } else if (currentY.value < -70) {
-    // Dragged up significantly -> Expand to FULL
-    if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
+  const dragDistance = currentY.value
+  const isFullState = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL
+  
+  // State-aware navigation logic
+  if (isFullState) {
+    if (dragDistance > 250) {
+      // Very large drag down from FULL -> Close
+      mobileStore.closeSheet()
+    } else if (dragDistance > 70) {
+      // Moderate drag down from FULL -> Go to PEEK
+      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+    }
+  } else {
+    // We are in PEEK state
+    if (dragDistance > 100) {
+      // Drag down from PEEK -> Close
+      mobileStore.closeSheet()
+    } else if (dragDistance < -70) {
+      // Drag up from PEEK -> Go to FULL
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
     }
-  } else if (currentY.value > 70 && sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) {
-    // Dragged down from FULL -> Back to PEEK
-    mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
   }
   
   currentY.value = 0
