@@ -5,48 +5,55 @@
   >
     <!-- Header -->
     <div
-      class="ti-m-status-header"
-      style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding-bottom: 12px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;"
+      class="ti-m-view-header"
+      style="display: flex !important; align-items: center !important; justify-content: space-between !important; padding-bottom: 10px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important; min-height: 48px !important;"
     >
-      <div
-        class="ti-m-status-info"
-        style="display: flex !important; align-items: center !important; gap: 10px !important;"
+      <button
+        class="ti-m-back-btn"
+        style="background: none !important; border: none !important; display: flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; padding: 0 !important; height: 44px !important; min-width: 44px !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;"
+        @click="goToDashboard"
       >
-        <span
-          class="ti-m-status-dot"
-          :class="pageTranslationData.status"
-          style="width: 10px !important; height: 10px !important; border-radius: 50% !important; display: block !important;"
-        />
-        <span
-          class="ti-m-status-text"
-          style="font-weight: 800 !important; font-size: 16px !important; color: var(--ti-mobile-text) !important;"
-        >{{ statusMessage }}</span>
-      </div>
-      <div
-        class="ti-m-header-actions"
-        style="display: flex !important; align-items: center !important; gap: 8px !important;"
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 6 4"
+          fill="none"
+          style="transform: rotate(90deg) !important;"
+        >
+          <path
+            d="M1 1L3 3L5 1"
+            stroke="currentColor"
+            stroke-width="0.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <div style="display: flex !important; align-items: center !important; gap: 10px !important;">
+          <span
+            class="ti-m-status-dot"
+            :class="pageTranslationData.status"
+            style="width: 10px !important; height: 10px !important; border-radius: 50% !important; display: block !important;"
+          />
+          <span
+            class="ti-m-header-title"
+            style="font-weight: bold !important; font-size: 17px !important; color: var(--ti-mobile-text) !important;"
+          >{{ statusMessage }}</span>
+        </div>
+      </button>
+
+      <button
+        class="ti-m-close-btn"
+        style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;"
+        @click="closeView"
       >
-        <button 
-          class="ti-m-header-action-btn ti-m-dashboard-link" 
-          style="border: none !important; padding: 0 12px !important; height: 28px !important; border-radius: 20px !important; font-size: 11px !important; font-weight: 800 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-text-secondary) !important;" 
-          @click="goToDashboard"
+        <img
+          src="@/icons/ui/close.png"
+          :alt="t('mobile_close_button_alt') || 'Close'"
+          class="ti-m-icon-img-close"
+          style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;"
         >
-          {{ t('mobile_page_dashboard_btn') || 'Dashboard' }}
-        </button>
-        
-        <button
-          class="ti-m-close-btn"
-          style="background: none !important; border: none !important; padding: 4px !important; cursor: pointer !important; display: flex !important; align-items: center !important;"
-          @click="closeView"
-        >
-          <img
-            src="@/icons/ui/close.png"
-            :alt="t('mobile_close_button_alt') || 'Close'"
-            class="ti-m-icon-img-close"
-            style="width: 20px !important; height: 20px !important; opacity: 0.4 !important;"
-          >
-        </button>
-      </div>
+      </button>
     </div>
 
     <!-- Progress Card -->
