@@ -172,7 +172,7 @@ function runMainMigration(currentSettings) {
 
   // 5. Handle legacy API_KEY migration to GEMINI_API_KEY
   // This migrates single API_KEY to new GEMINI_API_KEY (multi-key support)
-  // Note: This is now handled by import-export.js during import, so this only runs
+  // Note: This is now handled by import-export during import, so this only runs
   // for extension updates, not for file imports
   if ('API_KEY' in currentSettings && currentSettings.API_KEY && currentSettings.API_KEY.trim() !== '') {
     // Only migrate if GEMINI_API_KEY doesn't exist or is empty

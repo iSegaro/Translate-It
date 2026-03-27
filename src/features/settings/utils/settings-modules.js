@@ -42,10 +42,6 @@ export const loadSettingsModules = async () => {
         getLogger().warn("Failed to load providers module:", e.message);
         return null;
       }),
-      import("@/store/modules/import-export.js").catch((e) => {
-        getLogger().warn("Failed to load import-export module:", e.message);
-        return null;
-      }),
       import("@/store/modules/backup.js").catch((e) => {
         getLogger().warn("Failed to load backup module:", e.message);
         return null;
