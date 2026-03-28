@@ -10,7 +10,7 @@
     @mouseleave="handleMouseLeave"
   >
     <!-- Revert Action (Small Badge Button) -->
-    <Transition name="fade-scale">
+    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
       <div 
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
@@ -29,7 +29,6 @@
             'cursor': 'pointer !important', 
             'box-shadow': side === 'right' ? '-4px 4px 12px rgba(250, 82, 82, 0.3) !important' : '4px 4px 12px rgba(250, 82, 82, 0.3) !important', 
             'z-index': '2147483647 !important', 
-            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, left 0.5s ease, right 0.5s ease !important', 
             'pointer-events': 'auto !important' 
           },
           side === 'right' ? { 'right': '15px !important' } : { 'left': '15px !important' },
@@ -48,7 +47,7 @@
     </Transition>
 
     <!-- Menu -->
-    <Transition name="fab-menu">
+    <Transition name="fab-menu" :duration="{ enter: 400, leave: 0 }">
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
@@ -68,7 +67,6 @@
             'overflow': 'hidden !important', 
             'margin': '0 !important',
             'pointer-events': 'auto !important',
-            'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s ease, right 0.5s ease !important',
             'transform-origin': side === 'right' ? 'bottom right' : 'bottom left'
           }
         ]"
@@ -163,7 +161,7 @@
     </div>
 
     <!-- Settings Button (Dynamic position based on TTS visibility) -->
-    <Transition name="fade-scale">
+    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
@@ -181,7 +179,6 @@
             'align-items': 'center !important', 
             'cursor': 'pointer !important', 
             'z-index': '2147483647 !important', 
-            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s ease, right 0.5s ease !important', 
             'pointer-events': 'auto !important',
             'bottom': (isTTSActive && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important',
             'transform': getBadgeTransform(isHovered || isMenuOpen, isSettingsHovered)
@@ -201,7 +198,7 @@
     </Transition>
 
     <!-- TTS Button (Visible when selection present OR when playing) -->
-    <Transition name="fade-scale">
+    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
@@ -220,7 +217,6 @@
             'align-items': 'center !important', 
             'cursor': 'pointer !important', 
             'z-index': '2147483647 !important', 
-            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, background-color 0.3s ease, left 0.5s ease, right 0.5s ease !important', 
             'pointer-events': 'auto !important',
             'background-color': tts.isPlaying.value ? '#4A90E2 !important' : (settingsStore.isDarkTheme ? '#3d3d3d !important' : '#ffffff !important'),
             'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
@@ -499,9 +495,16 @@ const containerStyle = computed(() => {
   const baseStyle = {
     'position': 'fixed !important',
     'z-index': '2147483647 !important',
-    'transition': 'opacity 0.8s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s cubic-bezier(0.4, 0, 0.2, 1), right 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important',
+    'transition': 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s cubic-bezier(0.4, 0, 0.2, 1), right 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important',
     'opacity': `${opacityValue} !important`,
   };
+
+  // Only add opacity transition when NOT closing the menu to avoid ghosting
+  if (!isMenuOpen.value) {
+    baseStyle['transition'] += ', opacity 0.3s ease !important';
+  } else {
+    baseStyle['transition'] += ', opacity 0.8s ease !important';
+  }
 
   if (isRight) {
     baseStyle.right = '-25px !important';
@@ -793,7 +796,7 @@ onMounted(async () => {
 }
 
 .fade-scale-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 1, 1) !important;
+  transition: none !important;
 }
 
 .fade-scale-enter-from,
@@ -803,17 +806,17 @@ onMounted(async () => {
 }
 
 .fab-menu-enter-active {
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
 .fab-menu-leave-active {
-  transition: opacity 0.2s cubic-bezier(0.4, 0, 1, 1), transform 0.25s cubic-bezier(0.4, 0, 1, 1);
+  transition: none !important;
 }
 
 .fab-menu-enter-from,
 .fab-menu-leave-to {
-  opacity: 0;
-  transform: scale(0.9) translateY(10px);
+  opacity: 0 !important;
+  transform: scale(0.9) translateY(10px) !important;
 }
 
 @keyframes fab-spin {
