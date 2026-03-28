@@ -10,7 +10,7 @@
     @mouseleave="handleMouseLeave"
   >
     <!-- Revert Action (Small Badge Button) -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
       <div 
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
@@ -47,7 +47,7 @@
     </Transition>
 
     <!-- Menu -->
-    <Transition name="fab-menu" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
+    <Transition name="fab-menu" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
@@ -146,23 +146,25 @@
         ]"
       >
       <!-- Pending Selection Badge (ONLY in onFabClick mode) -->
-      <Transition name="fade-scale">
+      <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
         <div 
           v-if="pendingSelection.hasSelection && pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK"
           class="fab-translate-badge"
-          :style="side === 'right' ? { 'left': '-5px !important' } : { 'right': '-5px !important' }"
-          style="position: absolute !important; top: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
+          :style="[
+            translateBadgeStyle,
+            side === 'right' ? { 'left': '-6px !important' } : { 'right': '-6px !important' }
+          ]"
+          @click.stop="triggerTranslation"
         >
-          <img
-            :src="IconTranslateSelection"
-            style="width: 12px !important; height: 12px !important; filter: brightness(0) invert(1) !important;"
-          >
+          <!-- Pulsing Background (Moved to inner div to avoid Transition conflict) -->
+          <div class="fab-badge-pulse-glow"></div>
+          <div style="width: 4px !important; height: 4px !important; background-color: white !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(255, 255, 255, 0.8) !important; z-index: 1;"></div>
         </div>
       </Transition>
     </div>
 
     <!-- Settings Button (Dynamic position based on TTS visibility) -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
@@ -199,7 +201,7 @@
     </Transition>
 
     <!-- TTS Button (Visible when selection present OR when playing) -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
@@ -363,6 +365,25 @@ const menuItemTextStyle = computed(() => {
   return {
     'color': settingsStore.isDarkTheme ? '#f8fafc !important' : '#1e293b !important',
     'letter-spacing': '-0.01em !important'
+  };
+});
+
+const translateBadgeStyle = computed(() => {
+  return {
+    'position': 'absolute !important',
+    'top': '-6px !important',
+    'width': '20px !important',
+    'height': '20px !important',
+    'border-radius': '50% !important',
+    'display': 'flex !important',
+    'justify-content': 'center !important',
+    'align-items': 'center !important',
+    'z-index': '2147483647 !important',
+    'cursor': 'pointer !important',
+    'background': 'linear-gradient(135deg, #FF9800, #F44336) !important',
+    'border': '1.5px solid #ffffff !important',
+    'box-shadow': '0 2px 8px rgba(244, 67, 54, 0.4) !important',
+    'transition': 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)'
   };
 });
 
@@ -743,7 +764,16 @@ onMounted(async () => {
 
   // Listen for selection pending from WindowsManager
   tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
-    logger.debug('Received desktop selection pending event', { mode: detail.mode });
+    logger.debug('Received DESKTOP_SELECTION_PENDING', { 
+      text: detail?.text?.substring(0, 10), 
+      mode: detail?.mode 
+    });
+    
+    // Safety: ignore if text is empty - should be handled by DESKTOP_SELECTION_CLEAR
+    if (!detail || !detail.text || detail.text.trim().length === 0) {
+      logger.debug('Ignoring empty selection in PENDING event');
+      return;
+    }
     
     // ONLY wake up the FAB (unfade) if we are in onFabClick mode
     if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK) {
@@ -760,13 +790,15 @@ onMounted(async () => {
 
   // Listen for clear selection
   tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_CLEAR, () => {
-    logger.debug('Received desktop selection clear event');
+    logger.debug('Received DESKTOP_SELECTION_CLEAR event');
+    
     pendingSelection.value = {
       hasSelection: false,
       text: '',
       position: null,
       mode: SelectionTranslationMode.ON_CLICK
     };
+    logger.debug('Selection state cleared in FAB');
   });
 });
 
@@ -857,8 +889,27 @@ onMounted(async () => {
   transform: scale(0.9) translateY(10px) !important;
 }
 
+.fab-badge-pulse-glow {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  border-radius: 50% !important;
+  background: inherit !important;
+  animation: pulse-glow 1.5s infinite ease-in-out !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
 @keyframes fab-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); transform: scale(1); }
+  50% { box-shadow: 0 0 0 8px rgba(244, 67, 54, 0); transform: scale(1.1); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); transform: scale(1); }
 }
 </style>
