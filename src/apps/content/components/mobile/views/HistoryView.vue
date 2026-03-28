@@ -122,7 +122,8 @@
         v-for="(item, index) in historyItems" 
         :key="item.timestamp || index"
         class="ti-m-history-card"
-        style="border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 8px !important; cursor: pointer !important; position: relative !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; transition: all 0.2s ease !important;"
+        :style="historyCardStyle"
+        style="border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 8px !important; cursor: pointer !important; position: relative !important; transition: all 0.2s ease !important;"
         @click="selectItem(item)"
       >
         <!-- Card Header: Languages & Delete -->
@@ -141,7 +142,7 @@
             <img
               src="@/icons/ui/trash-small.svg"
               class="ti-m-icon-img-small"
-              style="width: 16px !important; height: 16px !important; opacity: 0.4 !important; filter: var(--ti-mobile-icon-filter) !important;"
+              :style="trashIconStyle"
             >
           </button>
         </div>
@@ -174,7 +175,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -223,6 +224,20 @@ const getLangName = (code) => {
   return languages.getLanguageName(code) || code
 }
 
+// Mobile Action Handlers
+const historyCardStyle = computed(() => {
+  if (settingsStore.isDarkTheme) {
+    return "background: #333333 !important; border: 1px solid #444444 !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;";
+  }
+  return "background: #fcfcfc !important; border: 1px solid #e0e6ed !important; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;";
+});
+
+const trashIconStyle = computed(() => {
+  return settingsStore.isDarkTheme 
+    ? "width: 16px !important; height: 16px !important; opacity: 0.7 !important; filter: brightness(1.5) !important;"
+    : "width: 16px !important; height: 16px !important; opacity: 0.4 !important;";
+});
+
 const handleNativeExport = (event) => {
   const format = event.target.value
   if (format) {
@@ -261,8 +276,27 @@ const selectItem = (item) => {
 .ti-m-history-list { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 
 .ti-m-history-card {
-  background: var(--ti-mobile-bg) !important;
+  background: var(--ti-mobile-card-bg) !important;
   border: 1px solid var(--ti-mobile-border) !important;
+}
+
+/* Enhanced separation for dark mode */
+.is-dark .ti-m-history-card {
+  background: #252525 !important;
+  border-color: #333333 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+.ti-m-history-card:hover {
+  border-color: var(--ti-mobile-accent) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.is-dark .ti-m-history-card:hover {
+  background: #2a2a2a !important;
+  border-color: var(--ti-mobile-accent) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
 .ti-m-history-card:active {
