@@ -62,7 +62,11 @@
       class="desktop-fab-button"
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
       :title="t('desktop_fab_tooltip')"
-      :style="{ transform: isHovered || isMenuOpen ? 'translateX(-18px)' : 'translateX(0)' }"
+      :style="{ 
+        transform: isHovered || isMenuOpen ? 'translateX(-18px)' : 'translateX(0)',
+        cursor: 'pointer !important',
+        pointerEvents: 'auto !important'
+      }"
       @mousedown="startDrag"
       @click.stop="toggleMenu"
     >
@@ -460,7 +464,7 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  cursor: pointer;
+  cursor: pointer !important;
   pointer-events: auto;
   user-select: none;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease;
