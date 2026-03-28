@@ -387,12 +387,14 @@ const handleMouseEnter = () => {
 };
 
 const handleMouseLeave = () => {
-  // Combine hover and fade reset into one quick action
-  hoverTimerId = tracker.trackTimeout(() => {
-    isHovered.value = false;
+  // Execute both immediately to make them simultaneous
+  isHovered.value = false;
+  isFaded.value = true;
+  
+  if (hoverTimerId) {
+    tracker.clearTimer(hoverTimerId);
     hoverTimerId = null;
-    isFaded.value = true; // Directly fade out after hover ends
-  }, 200);
+  }
 };
 
 const menuItems = computed(() => {
@@ -497,12 +499,12 @@ const containerStyle = computed(() => {
   
   // Construct transition parts without !important
   const transitions = [
-    'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-    'left 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-    'right 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+    'transform 0.5s ease-in-out',
+    'left 0.5s ease-in-out',
+    'right 0.5s ease-in-out'
   ];
 
-  // Use fast transition for Fade In (opacity 1) and slower for Fade Out (opacity 0.2)
+  // Use consistent duration for both opacity and transform
   if (!isMenuOpen.value) {
     const duration = opacityValue === 1 ? '0.2s' : '0.5s';
     transitions.push(`opacity ${duration} ease-in-out`);
@@ -766,7 +768,7 @@ onMounted(async () => {
   cursor: pointer !important;
   pointer-events: auto;
   user-select: none;
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease;
+  transition: transform 0.5s ease-in-out, background-color 0.2s ease, box-shadow 0.3s ease;
 }
 
 .desktop-fab-button:hover {
