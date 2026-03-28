@@ -143,6 +143,7 @@ const isSettingsHovered = ref(false);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 const fabContainerRef = ref(null);
 let hoverTimerId = null;
+let fadeTimerId = null;
 
 const pendingSelection = ref({
   hasSelection: false,
@@ -150,20 +151,37 @@ const pendingSelection = ref({
   position: null
 });
 
+const startFadeTimer = () => {
+  if (fadeTimerId) {
+    tracker.clearTimer(fadeTimerId);
+  }
+  isFaded.value = false;
+  fadeTimerId = tracker.trackTimeout(() => {
+    isFaded.value = true;
+    fadeTimerId = null;
+  }, 1000); // Set to 1s as requested
+};
+
 const handleMouseEnter = () => {
   if (hoverTimerId) {
     tracker.clearTimer(hoverTimerId);
     hoverTimerId = null;
   }
+  if (fadeTimerId) {
+    tracker.clearTimer(fadeTimerId);
+    fadeTimerId = null;
+  }
   isHovered.value = true;
-  isFaded.value = false; // Unfade when hovered
+  isFaded.value = false;
 };
 
 const handleMouseLeave = () => {
+  // Combine hover and fade reset into one quick action
   hoverTimerId = tracker.trackTimeout(() => {
     isHovered.value = false;
     hoverTimerId = null;
-  }, 1000);
+    isFaded.value = true; // Directly fade out after hover ends
+  }, 200);
 };
 
 const menuItems = computed(() => {
@@ -388,9 +406,7 @@ onMounted(async () => {
     logger.info('Failed to load FAB position:', err);
   }
 
-  tracker.trackTimeout(() => {
-    isFaded.value = true;
-  }, 2000);
+  startFadeTimer();
 
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
@@ -405,7 +421,7 @@ onMounted(async () => {
   // Listen for selection pending from WindowsManager
   tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
     logger.debug('Received desktop selection pending event');
-    isFaded.value = false; // Unfade when selection is pending
+    startFadeTimer(); // Trigger unfade and then auto-fade
     pendingSelection.value = {
       hasSelection: true,
       text: detail.text,
