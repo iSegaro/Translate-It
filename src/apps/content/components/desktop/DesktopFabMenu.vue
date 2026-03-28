@@ -54,44 +54,70 @@
         class="desktop-fab-menu"
         :style="[
           menuStyle,
-          side === 'right' ? { 'right': '85px !important' } : { 'left': '85px !important' },
+          side === 'right' ? { 'right': '80px !important' } : { 'left': '80px !important' },
           { 
             'position': 'absolute !important', 
             'bottom': '0px !important', 
             'border-radius': '14px !important', 
-            'padding': '8px 0 !important', 
-            'min-width': '230px !important', 
+            'padding': '5px !important', 
+            'min-width': '190px !important', 
             'width': 'max-content !important', 
             'display': 'flex !important', 
             'flex-direction': 'column !important', 
             'z-index': '2147483647 !important', 
             'overflow': 'hidden !important', 
             'margin': '0 !important',
-            'transition': 'all 0.3s ease, left 0.5s ease, right 0.5s ease !important',
+            'pointer-events': 'auto !important',
+            'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s ease, right 0.5s ease !important',
             'transform-origin': side === 'right' ? 'bottom right' : 'bottom left'
           }
         ]"
       >
-        <div 
-          v-for="item in menuItems" 
-          :key="item.id" 
-          class="fab-menu-item"
-          :class="{ 'is-disabled': item.disabled }"
-          style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
-          :style="item.disabled ? { 'opacity': '0.5 !important', 'cursor': 'default !important', 'pointer-events': 'none !important' } : {}"
-          @click.stop="item.disabled ? null : handleMenuItemClick(item)"
-        >
-          <div :style="{ marginRight: side === 'right' ? '12px !important' : '0 !important', marginLeft: side === 'left' ? '12px !important' : '0 !important', order: side === 'left' ? 2 : 0 }" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; flex-shrink: 0 !important;">
-            <img 
-              v-if="item.icon" 
-              :src="item.icon" 
-              :alt="item.label" 
-              class="fab-menu-icon"
-              :style="getMenuIconStyle(item.id)"
+        <template v-for="(item, index) in menuItems" :key="item.id">
+          <!-- Divider -->
+          <div 
+            v-if="index > 0" 
+            style="height: 1px !important; width: calc(100% - 10px) !important; margin: 1px auto !important; opacity: 0.06 !important;"
+            :style="{ backgroundColor: settingsStore.isDarkTheme ? '#ffffff' : '#000000' }"
+          ></div>
+
+          <div 
+            class="fab-menu-item"
+            :class="{ 'is-disabled': item.disabled }"
+            style="display: flex !important; align-items: center !important; padding: 7px 9px !important; cursor: pointer !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s ease !important; border-radius: 9px !important; pointer-events: auto !important;"
+            :style="[
+              item.disabled ? { 'opacity': '0.35 !important', 'cursor': 'default !important', 'pointer-events': 'none !important' } : {},
+              hoveredItemIndex === index ? { 
+                'background-color': settingsStore.isDarkTheme ? 'rgba(255, 255, 255, 0.08) !important' : 'rgba(74, 144, 226, 0.1) !important',
+                'transform': 'scale(1.015) !important'
+              } : {}
+            ]"
+            @click.stop="item.disabled ? null : handleMenuItemClick(item)"
+            @mouseenter="hoveredItemIndex = index"
+            @mouseleave="hoveredItemIndex = -1"
+          >
+            <div 
+              :style="{ 
+                marginRight: side === 'right' ? '10px !important' : '0 !important', 
+                marginLeft: side === 'left' ? '10px !important' : '0 !important', 
+                order: side === 'left' ? 2 : 0,
+                backgroundColor: settingsStore.isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                transform: hoveredItemIndex === index ? 'scale(1.05)' : 'scale(1)'
+              }" 
+              style="display: flex !important; align-items: center !important; justify-content: center !important; width: 28px !important; height: 28px !important; flex-shrink: 0 !important; border-radius: 7px !important; transition: all 0.2s ease !important;"
+              class="menu-icon-wrapper"
             >
+              <img 
+                v-if="item.icon" 
+                :src="item.icon" 
+                :alt="item.label" 
+                class="fab-menu-icon"
+                :style="getMenuIconStyle(item.id)"
+              >
+            </div>
+            <span :style="[menuItemTextStyle, { 'text-align': side === 'right' ? 'left' : 'right' }]" style="font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.2 !important; flex: 1 !important;">{{ item.label }}</span>
           </div>
-          <span :style="[menuItemTextStyle, { 'text-align': side === 'right' ? 'left' : 'right' }]" style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
-        </div>
+        </template>
       </div>
     </Transition>
 
@@ -255,54 +281,59 @@ const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
 const isTTSHovered = ref(false);
+const hoveredItemIndex = ref(-1);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 
 // Theme-aware styles as OBJECTS
 const menuStyle = computed(() => {
   if (settingsStore.isDarkTheme) {
     return {
-      'background-color': '#2d2d2d !important',
-      'border': '1px solid rgba(255, 255, 255, 0.1) !important',
-      'box-shadow': '0 10px 30px -5px rgba(0, 0, 0, 0.5) !important'
+      'background-color': 'rgba(40, 40, 40, 0.95) !important',
+      'backdrop-filter': 'blur(16px) saturate(180%) !important',
+      'border': '1px solid rgba(255, 255, 255, 0.12) !important',
+      'box-shadow': '0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 12px 20px -10px rgba(0, 0, 0, 0.4) !important'
     };
   }
   return {
-    'background-color': '#ffffff !important',
-    'border': '1px solid rgba(0, 0, 0, 0.06) !important',
-    'box-shadow': '0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important'
+    'background-color': 'rgba(255, 255, 255, 0.92) !important',
+    'backdrop-filter': 'blur(16px) saturate(180%) !important',
+    'border': '1px solid rgba(0, 0, 0, 0.08) !important',
+    'box-shadow': '0 20px 40px -12px rgba(0, 0, 0, 0.18), 0 12px 20px -8px rgba(0, 0, 0, 0.1) !important'
   };
 });
 
 const settingsBadgeStyle = computed(() => {
   if (settingsStore.isDarkTheme) {
     return {
-      'background-color': '#3d3d3d !important',
+      'background-color': 'rgba(50, 50, 50, 0.9) !important',
+      'backdrop-filter': 'blur(12px) !important',
       'border': '1px solid rgba(255, 255, 255, 0.1) !important',
-      'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.4) !important'
+      'box-shadow': '0 8px 24px rgba(0, 0, 0, 0.4) !important'
     };
   }
   return {
-    'background-color': '#ffffff !important',
-    'border': '1px solid rgba(0, 0, 0, 0.05) !important',
-    'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.1) !important'
+    'background-color': 'rgba(255, 255, 255, 0.9) !important',
+    'backdrop-filter': 'blur(12px) !important',
+    'border': '1px solid rgba(0, 0, 0, 0.06) !important',
+    'box-shadow': '0 8px 24px rgba(0, 0, 0, 0.12) !important'
   };
 });
 
 const getMenuIconStyle = (itemId) => {
-  const isColored = itemId === 'translate_page';
+  const isColored = itemId === 'translate_page' || itemId === 'translate_selection';
   const filter = (settingsStore.isDarkTheme && !isColored) 
     ? 'brightness(0) invert(1) !important' 
     : 'none !important';
 
-  return `width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; filter: ${filter};`;
+  return `width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; filter: ${filter}; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;`;
 };
 
 const settingsIconStyle = computed(() => {
   const filter = settingsStore.isDarkTheme 
     ? 'brightness(0) invert(1) !important' 
-    : 'opacity(0.7) !important';
+    : 'opacity(0.8) !important';
     
-  return `width: 16px !important; height: 16px !important; filter: ${filter};`;
+  return `width: 18px !important; height: 18px !important; filter: ${filter}; transition: transform 0.3s ease !important;`;
 });
 
 const ttsIconStyle = computed(() => {
@@ -312,12 +343,13 @@ const ttsIconStyle = computed(() => {
     ? 'brightness(0) invert(1) !important' 
     : 'none !important';
 
-  return `width: 16px !important; height: 16px !important; filter: ${filter};`;
+  return `width: 18px !important; height: 18px !important; filter: ${filter}; transition: transform 0.3s ease !important;`;
 });
 
 const menuItemTextStyle = computed(() => {
   return {
-    'color': settingsStore.isDarkTheme ? '#f3f4f6 !important' : '#374151 !important'
+    'color': settingsStore.isDarkTheme ? '#f8fafc !important' : '#1e293b !important',
+    'letter-spacing': '-0.01em !important'
   };
 });
 
@@ -733,17 +765,26 @@ onMounted(async () => {
 }
 
 .fab-menu-item:hover { 
-  background-color: #f9fafb !important; 
+  background-color: rgba(74, 144, 226, 0.08) !important; 
+  transform: scale(1.015) !important;
+}
+
+.fab-menu-item:hover .menu-icon-wrapper {
+  background-color: rgba(74, 144, 226, 0.15) !important;
+  transform: scale(1.05) !important;
+}
+
+.fab-menu-item:hover .fab-menu-icon {
+  transform: scale(1.1);
+}
+
+.fab-menu-item:active {
+  transform: scale(0.98);
 }
 
 /* Dark mode overrides */
 .is-dark .fab-menu-item:hover {
-  background-color: #3d3d3d !important;
-}
-
-/* Base icon specificity */
-.fab-menu-icon {
-  transition: filter 0.2s ease !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Transitions */
@@ -762,19 +803,17 @@ onMounted(async () => {
 }
 
 .fab-menu-enter-active {
-  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: bottom right;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .fab-menu-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 1, 1);
-  transform-origin: bottom right;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 1, 1), transform 0.25s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .fab-menu-enter-from,
 .fab-menu-leave-to {
   opacity: 0;
-  transform: scale(0.85) translateX(20px);
+  transform: scale(0.9) translateY(10px);
 }
 
 @keyframes fab-spin {
