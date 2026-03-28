@@ -23,12 +23,17 @@ export function useWindowsManager() {
    * Event handlers
    */
   const handleShowWindow = (detail) => {
-    logger.debug('Show window event received', {
-      id: detail.id,
-      hasText: !!detail.selectedText,
-      position: detail.position,
-      hasTranslation: !!(detail.initialTranslatedText || detail.translatedText)
-    });
+    // SECURITY/DUPLICATION FIX: Only handle the window if it's meant for this specific frame.
+    const currentFrameId = window.windowsManagerInstance?.crossFrameManager?.frameId;
+    
+    // If the event is targeted to a specific frame, we MUST have a matching currentFrameId
+    if (detail.frameId) {
+      if (!currentFrameId || detail.frameId !== currentFrameId) {
+        return;
+      }
+    }
+
+    logger.debug('Show window event received', { id: detail.id, frameId: detail.frameId });
     
     // Check if we're updating an existing window
     const existingWindowIndex = translationWindows.value.findIndex(w => w.id === detail.id);
@@ -63,7 +68,17 @@ export function useWindowsManager() {
   };
 
   const handleShowIcon = (detail) => {
-    logger.debug('Show icon event received', { id: detail.id, textLength: detail.text?.length });
+    // SECURITY/DUPLICATION FIX: Only handle the icon if it's meant for this specific frame.
+    const currentFrameId = window.windowsManagerInstance?.crossFrameManager?.frameId;
+    
+    // If the event is targeted to a specific frame, we MUST have a matching currentFrameId
+    if (detail.frameId) {
+      if (!currentFrameId || detail.frameId !== currentFrameId) {
+        return;
+      }
+    }
+
+    logger.debug('Show icon event received', { id: detail.id, frameId: detail.frameId });
 
     // Remove existing icons first (single icon at a time)
     translationIcons.value = [];
@@ -82,7 +97,17 @@ export function useWindowsManager() {
   };
 
   const handleUpdateWindow = (detail) => {
-    logger.debug('Update window event', { id: detail.id });
+    // SECURITY/DUPLICATION FIX: Only handle the update if it's meant for this specific frame.
+    const currentFrameId = window.windowsManagerInstance?.crossFrameManager?.frameId;
+    
+    // If the event is targeted to a specific frame, we MUST have a matching currentFrameId
+    if (detail.frameId) {
+      if (!currentFrameId || detail.frameId !== currentFrameId) {
+        return;
+      }
+    }
+
+    logger.debug('Update window event', { id: detail.id, frameId: detail.frameId });
 
     const existingWindowIndex = translationWindows.value.findIndex(w => w.id === detail.id);
     if (existingWindowIndex >= 0) {

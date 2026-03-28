@@ -442,7 +442,8 @@ export class WindowsManager extends ResourceTracker {
     WindowsManagerEvents.showIcon({
       id: iconId,
       text: selectedText,
-      position: positionToUse
+      position: positionToUse,
+      frameId: this.crossFrameManager.frameId
     });
     
     // Store context for click handling
@@ -806,7 +807,8 @@ export class WindowsManager extends ResourceTracker {
       mode: 'window',
       theme,
       initialSize: 'small',
-      isLoading: true
+      isLoading: true,
+      frameId: this.crossFrameManager.frameId
     });
     
     // Store state for this window
