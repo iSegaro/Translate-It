@@ -595,6 +595,16 @@ onMounted(async () => {
 
   // Listen for TextFieldIcon events
   tracker.addEventListener(pageEventBus, 'add-field-icon', (detail) => {
+    // SECURITY/DUPLICATION FIX: Only handle the icon if it's meant for this specific frame.
+    // We check if the target element exists in this document to avoid duplicate icons 
+    // in same-origin parent/iframe scenarios.
+    const isForThisFrame = detail.targetElement && document.contains(detail.targetElement);
+    
+    if (!isForThisFrame) {
+      logger.debug('Field icon requested, but target element is not in this frame. Skipping.');
+      return;
+    }
+
     logger.info('Event: add-field-icon', detail);
     // Ensure no duplicate icons for the same ID
     if (!activeIcons.value.some(icon => icon.id === detail.id)) {
