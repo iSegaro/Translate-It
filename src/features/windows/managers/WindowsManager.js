@@ -324,16 +324,19 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
+      // Notify FAB about selection (for TTS button availability in all modes)
+      // Pass the current mode explicitly to ensure FAB knows how to handle the click
+      this.logger.debug('Notifying FAB about new selection', { mode: selectionTranslationMode });
+      WindowsManagerEvents.desktopSelectionPending({
+        text: selectedText,
+        position: position,
+        mode: selectionTranslationMode // Explicitly pass the mode
+      });
+
       if (selectionTranslationMode === "onFabClick") {
         this.logger.info('onFabClick mode: storing selection for FAB trigger', { textLength: selectedText?.length });
         this.state.setPendingFabTrigger(true);
         this.state.setOriginalText(selectedText);
-        
-        this.logger.debug('Emitting DESKTOP_SELECTION_PENDING event');
-        WindowsManagerEvents.desktopSelectionPending({
-          text: selectedText,
-          position: position
-        });
         
         // Add dismiss listener to clear if user clicks away
         this._addDismissListener();
@@ -1459,10 +1462,11 @@ export class WindowsManager extends ResourceTracker {
       reason: this._isDismissingDueToTyping ? 'user_typing' : 'user_action'
     });
 
+    // Always clear FAB selection state on dismiss
     if (this.state.pendingFabTrigger) {
       this.state.setPendingFabTrigger(false);
-      WindowsManagerEvents.desktopSelectionClear();
     }
+    WindowsManagerEvents.desktopSelectionClear();
 
     if (this.shouldUseMobileUI()) {
       WindowsManagerEvents.mobileSelectionClear();

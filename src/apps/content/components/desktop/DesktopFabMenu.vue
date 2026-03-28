@@ -78,10 +78,10 @@
         :alt="t('desktop_fab_alt')" 
         style="width: 32px !important; height: 32px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
       >
-      <!-- Pending Selection Badge -->
+      <!-- Pending Selection Badge (ONLY in onFabClick mode) -->
       <Transition name="fade-scale">
         <div 
-          v-if="pendingSelection.hasSelection"
+          v-if="pendingSelection.hasSelection && pendingSelection.mode === 'onFabClick'"
           class="fab-translate-badge"
           style="position: absolute !important; top: -5px !important; left: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
         >
@@ -93,14 +93,20 @@
       </Transition>
     </div>
 
-    <!-- Settings Button (below main button when open) -->
+    <!-- Settings Button (Dynamic position based on TTS visibility) -->
     <Transition name="fade-scale">
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
         :title="t('desktop_fab_settings_tooltip')"
-        :style="[settingsBadgeStyle, { transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }]"
-        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important;"
+        :style="[
+          settingsBadgeStyle, 
+          { 
+            transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)'),
+            bottom: (pendingSelection.hasSelection && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important'
+          }
+        ]"
+        style="position: absolute !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; pointer-events: auto !important;"
         @click.stop="handleOpenSettings"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
@@ -110,6 +116,35 @@
           :alt="t('desktop_fab_settings_tooltip')"
           class="fab-menu-icon"
           :style="settingsIconStyle"
+        >
+      </div>
+    </Transition>
+
+    <!-- TTS Button (Always in the first slot below main button when visible) -->
+    <Transition name="fade-scale">
+      <div 
+        v-if="pendingSelection.hasSelection && (isHovered || isMenuOpen)" 
+        class="fab-tts-badge"
+        :title="tts.isPlaying.value ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
+        :style="[
+          settingsBadgeStyle, 
+          { 
+            transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isTTSHovered ? 'scale(1.15)' : 'scale(1)') ,
+            backgroundColor: tts.isPlaying.value ? '#4A90E2 !important' : (settingsStore.isDarkTheme ? '#3d3d3d !important' : '#ffffff !important')
+          }
+        ]"
+        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, background-color 0.3s ease !important; pointer-events: auto !important;"
+        @click.stop="handleTTS"
+        @mouseenter="isTTSHovered = true"
+        @mouseleave="isTTSHovered = false"
+      >
+        <div v-if="tts.isLoading.value" class="fab-tts-loader" style="width: 16px !important; height: 16px !important; border: 2px solid rgba(74, 144, 226, 0.3) !important; border-top-color: #4A90E2 !important; border-radius: 50% !important; animation: fab-spin 0.8s linear infinite !important;"></div>
+        <img
+          v-else
+          :src="IconTTS"
+          :alt="t('desktop_fab_tts_tooltip')"
+          class="fab-menu-icon"
+          :style="[settingsIconStyle, { filter: tts.isPlaying.value ? 'brightness(0) invert(1) !important' : settingsIconStyle.filter }]"
         >
       </div>
     </Transition>
@@ -130,6 +165,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getDesktopFabVerticalPosAsync } from '@/shared/config/config.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -138,18 +174,21 @@ import IconRestore from '@/icons/ui/restore.svg';
 import IconClear from '@/icons/ui/clear.png';
 import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
+import IconTTS from '@/icons/ui/speaker.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
 const tracker = useResourceTracker('desktop-fab-menu');
+const tts = useTTSSmart();
 
 const isMenuOpen = ref(false);
 const isFaded = ref(false);
 const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
+const isTTSHovered = ref(false);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 
 // Theme-aware styles
@@ -188,7 +227,8 @@ let fadeTimerId = null;
 const pendingSelection = ref({
   hasSelection: false,
   text: '',
-  position: null
+  position: null,
+  mode: 'onClick' // Track which mode triggered the selection
 });
 
 const startFadeTimer = () => {
@@ -227,8 +267,8 @@ const handleMouseLeave = () => {
 const menuItems = computed(() => {
   const items = [];
 
-  // Add Translate Selection if available
-  if (pendingSelection.value.hasSelection) {
+  // Add Translate Selection ONLY if specifically in onFabClick mode
+  if (pendingSelection.value.hasSelection && pendingSelection.value.mode === 'onFabClick') {
     items.push({
       id: 'translate_selection',
       label: t('desktop_fab_translate_selection_label'),
@@ -325,17 +365,21 @@ const toggleMenu = () => {
   if (isDragging.value) return;
   
   /**
-   * DIRECT TRANSLATION MODE (onFabClick)
-   * On first click with selection: trigger translation and skip menu.
-   * On subsequent clicks: allow menu to open so other tools are accessible.
+   * IMPORTANT: FAB Behavior Logic
+   * 1. If mode is 'onFabClick' AND text is selected: Translate immediately.
+   * 2. In ALL other cases (onClick, immediate, or no selection): JUST open the menu.
+   * This ensures the TTS button is available without forcing a translation.
    */
-  if (pendingSelection.value.hasSelection) {
+  const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === 'onFabClick';
+  
+  if (isOnFabClickMode) {
+    logger.info('FAB executing direct translation (onFabClick mode)');
     triggerTranslation();
     isMenuOpen.value = false;
-    return;
+  } else {
+    logger.debug('FAB opening menu (Standard mode)');
+    isMenuOpen.value = !isMenuOpen.value;
   }
-  
-  isMenuOpen.value = !isMenuOpen.value;
 };
 
 const triggerTranslation = () => {
@@ -354,7 +398,8 @@ const triggerTranslation = () => {
   pendingSelection.value = {
     hasSelection: false,
     text: '',
-    position: null
+    position: null,
+    mode: 'onClick'
   };
 };
 
@@ -383,6 +428,16 @@ const handleRevert = async () => {
     await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
   } catch (err) {
     logger.error('Failed to revert translations from FAB:', err);
+  }
+};
+
+const handleTTS = async () => {
+  if (tts.isPlaying.value) {
+    logger.info('Stopping TTS from Desktop FAB');
+    await tts.stop();
+  } else if (pendingSelection.value.hasSelection) {
+    logger.info('Starting TTS from Desktop FAB for selected text');
+    await tts.speak(pendingSelection.value.text);
   }
 };
 
@@ -460,12 +515,13 @@ onMounted(async () => {
 
   // Listen for selection pending from WindowsManager
   tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
-    logger.debug('Received desktop selection pending event');
+    logger.debug('Received desktop selection pending event', { mode: detail.mode });
     startFadeTimer(); // Trigger unfade and then auto-fade
     pendingSelection.value = {
       hasSelection: true,
       text: detail.text,
-      position: detail.position
+      position: detail.position,
+      mode: detail.mode || 'onClick'
     };
   });
 
@@ -475,7 +531,8 @@ onMounted(async () => {
     pendingSelection.value = {
       hasSelection: false,
       text: '',
-      position: null
+      position: null,
+      mode: 'onClick'
     };
   });
 });
@@ -558,5 +615,10 @@ onMounted(async () => {
 .fab-menu-leave-to {
   opacity: 0;
   transform: scale(0.85) translateX(20px);
+}
+
+@keyframes fab-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
