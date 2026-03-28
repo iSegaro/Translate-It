@@ -494,19 +494,28 @@ const containerStyle = computed(() => {
   }
 
   const isRight = side.value === 'right';
+  
+  // Construct transition parts without !important
+  const transitions = [
+    'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    'left 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+    'right 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+  ];
+
+  // Use fast transition for Fade In (opacity 1) and slower for Fade Out (opacity 0.2)
+  if (!isMenuOpen.value) {
+    const duration = opacityValue === 1 ? '0.2s' : '0.5s';
+    transitions.push(`opacity ${duration} ease-in-out`);
+  } else {
+    transitions.push('opacity 0.3s ease');
+  }
+
   const baseStyle = {
     'position': 'fixed !important',
     'z-index': '2147483647 !important',
-    'transition': 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s cubic-bezier(0.4, 0, 0.2, 1), right 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important',
+    'transition': `${transitions.join(', ')} !important`,
     'opacity': `${opacityValue} !important`,
   };
-
-  // Only add opacity transition when NOT closing the menu to avoid ghosting
-  if (!isMenuOpen.value) {
-    baseStyle['transition'] += ', opacity 0.3s ease !important';
-  } else {
-    baseStyle['transition'] += ', opacity 0.8s ease !important';
-  }
 
   if (isRight) {
     baseStyle.right = '-25px !important';
