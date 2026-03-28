@@ -5,7 +5,7 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -703,6 +703,9 @@ class SelectElementManager extends ResourceTracker {
           // Show Revert button as soon as we start, as state is already stored
           const mobileStore = useMobileStore();
           mobileStore.setHasElementTranslations(true);
+          
+          // Notify other frames (especially main frame) to show Revert badge
+          pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE);
         },
         onComplete: async (status) => {
           this.logger.debug('Translation completed:', status);
@@ -823,6 +826,9 @@ class SelectElementManager extends ResourceTracker {
     // Reset store status
     const mobileStore = useMobileStore();
     mobileStore.setHasElementTranslations(false);
+    
+    // Notify other frames to hide Revert badge
+    pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_CLEARED);
 
     this.logger.info('Translation revert completed', { revertedCount });
 

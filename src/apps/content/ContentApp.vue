@@ -686,6 +686,17 @@ onMounted(async () => {
     }
   });
 
+  // Sync Element Translation state across frames
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE, () => {
+    logger.debug('Received ELEMENT_TRANSLATIONS_AVAILABLE event');
+    mobileStore.setHasElementTranslations(true);
+  });
+
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_CLEARED, () => {
+    logger.debug('Received ELEMENT_TRANSLATIONS_CLEARED event');
+    mobileStore.setHasElementTranslations(false);
+  });
+
   // Setup WindowsManager event listeners through composable
   setupEventListeners();
   

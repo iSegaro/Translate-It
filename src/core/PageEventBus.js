@@ -99,6 +99,10 @@ export const WINDOWS_MANAGER_EVENTS = {
   MOBILE_SELECTION_PENDING: 'windows-manager-mobile-selection-pending',
   MOBILE_SELECTION_CLEAR: 'windows-manager-mobile-selection-clear',
   
+  // Element Translation Sync
+  ELEMENT_TRANSLATIONS_AVAILABLE: 'element-translations-available',
+  ELEMENT_TRANSLATIONS_CLEARED: 'element-translations-cleared',
+  
   // Settings
   OPEN_SETTINGS: 'open-options-page',
   
