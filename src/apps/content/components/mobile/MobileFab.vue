@@ -38,6 +38,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -63,6 +64,7 @@ const isHovering = ref(false);
 const isViewportUnstable = ref(false);
 const side = ref(null); 
 const isSelectionDirty = ref(false);
+const pendingText = ref('');
 
 // Internal variables (Tracked via tracker)
 let dragStartY = 0;
@@ -128,16 +130,18 @@ onMounted(async () => {
     tracker.addEventListener(window, 'resize', updateViewport);
   }
 
-  // Listen for mobile selection events on pageEventBus
-  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, (detail) => {
-    logger.debug('Received mobile selection pending event');
+  // Listen for global selection events (Coordinator Pattern)
+  tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
+    logger.debug('Received global selection change event in Mobile FAB');
     isSelectionDirty.value = true;
+    pendingText.value = detail?.text || '';
     startFabIdleTimer();
   });
 
-  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR, () => {
-    logger.debug('Received mobile selection clear event');
+  tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, () => {
+    logger.debug('Received global selection clear event in Mobile FAB');
     isSelectionDirty.value = false;
+    pendingText.value = '';
   });
 
   try {
@@ -289,10 +293,9 @@ const onFabDragEnd = async (e) => {
 const onMobileFabClick = () => {
   const selection = window.getSelection()?.toString().trim() || '';
 
-  // Check WindowsManager state for relayed selection (cross-frame)
-  // This is important because selection in an iframe won't be visible to window.getSelection() in the top frame
-  const storedSelection = window.windowsManagerInstance?.state?.originalText || '';
-  const effectiveSelection = selection || storedSelection;
+  // Use local pendingText (from Coordinator) as priority, fallback to native selection
+  // This handles cross-frame selections (iframes) without peering into WindowsManager internals
+  const effectiveSelection = pendingText.value || selection;
 
   // We should navigate to SelectionView ONLY IF:
   // 1. There is an active selection AND it's "dirty" (just selected or re-selected)

@@ -257,6 +257,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
+import useFabSelection from '@/apps/content/composables/useFabSelection.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -391,11 +392,14 @@ const fabContainerRef = ref(null);
 let hoverTimerId = null;
 let fadeTimerId = null;
 
-const pendingSelection = ref({
-  hasSelection: false,
-  text: '',
-  position: null,
-  mode: SelectionTranslationMode.ON_CLICK // Track which mode triggered the selection
+// Initialize FAB selection logic (Decoupled from WindowsManager)
+const { pendingSelection, triggerTranslation } = useFabSelection({
+  onSelectionPending: (detail) => {
+    // ONLY wake up the FAB (unfade) if we are in onFabClick mode
+    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK) {
+      startFadeTimer();
+    }
+  }
 });
 
 const startFadeTimer = (forceVisible = true) => {
@@ -602,27 +606,6 @@ const toggleMenu = () => {
   }
 };
 
-const triggerTranslation = () => {
-  if (!pendingSelection.value.hasSelection) return;
-  
-  logger.info('Triggering pending translation from FAB');
-  WindowsManagerEvents.desktopSelectionTrigger({
-    text: pendingSelection.value.text,
-    position: pendingSelection.value.position
-  });
-  
-  // State is reset immediately for better responsiveness.
-  // If you need the 'Translate Selection' menu item to stay visible during 
-  // animation, add a small setTimeout here.
-  // OR comment the below code to keep the Item visible
-  pendingSelection.value = {
-    hasSelection: false,
-    text: '',
-    position: null,
-    mode: SelectionTranslationMode.ON_CLICK
-  };
-};
-
 const handleMenuItemClick = async (item) => {
   if (item.closeMenu) {
     isMenuOpen.value = false;
@@ -761,45 +744,6 @@ onMounted(async () => {
   };
 
   tracker.addEventListener(window, 'click', handleClickOutside);
-
-  // Listen for selection pending from WindowsManager
-  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
-    logger.debug('Received DESKTOP_SELECTION_PENDING', { 
-      text: detail?.text?.substring(0, 10), 
-      mode: detail?.mode 
-    });
-    
-    // Safety: ignore if text is empty - should be handled by DESKTOP_SELECTION_CLEAR
-    if (!detail || !detail.text || detail.text.trim().length === 0) {
-      logger.debug('Ignoring empty selection in PENDING event');
-      return;
-    }
-    
-    // ONLY wake up the FAB (unfade) if we are in onFabClick mode
-    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK) {
-      startFadeTimer();
-    }
-
-    pendingSelection.value = {
-      hasSelection: true,
-      text: detail.text,
-      position: detail.position,
-      mode: detail.mode || SelectionTranslationMode.ON_CLICK
-    };
-  });
-
-  // Listen for clear selection
-  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_CLEAR, () => {
-    logger.debug('Received DESKTOP_SELECTION_CLEAR event');
-    
-    pendingSelection.value = {
-      hasSelection: false,
-      text: '',
-      position: null,
-      mode: SelectionTranslationMode.ON_CLICK
-    };
-    logger.debug('Selection state cleared in FAB');
-  });
 });
 
 // onBeforeUnmount is handled by tracker

@@ -19,6 +19,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
@@ -185,12 +186,23 @@ export class WindowsManager extends ResourceTracker {
       pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
       pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
 
-      // Listen for FAB trigger events
-      this._fabTriggerHandler = (payload) => {
-        this._handleFabTrigger(payload);
+      // Listen for generic selection trigger events (Coordinator Pattern)
+      // This allows FAB or any other module to request a window display independently
+      this._selectionTriggerHandler = (payload) => {
+        this._handleSelectionTrigger(payload);
       };
-      pageEventBus.off(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, this._fabTriggerHandler);
-      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, this._fabTriggerHandler);
+      pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, this._selectionTriggerHandler);
+      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, this._selectionTriggerHandler);
+
+      // Listen for global selection clear events
+      this._selectionClearHandler = () => {
+        if (this.state.isVisible || this.state.isIconMode) {
+          this.logger.debug('Global selection clear received, dismissing UI');
+          this.dismiss(false);
+        }
+      };
+      pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, this._selectionClearHandler);
+      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, this._selectionClearHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
@@ -215,14 +227,11 @@ export class WindowsManager extends ResourceTracker {
   }
 
   /**
-   * Handle translation trigger from Desktop FAB
+   * Handle translation trigger for pending selections (Coordinator Pattern)
    */
-  async _handleFabTrigger(payload) {
+  async _handleSelectionTrigger(payload) {
     const { text, position } = payload;
-    this.logger.info('FAB trigger received', { textLength: text?.length });
-    
-    // Clear pending trigger state
-    this.state.setPendingFabTrigger(false);
+    this.logger.info('Selection trigger received (Global)', { textLength: text?.length });
     
     if (text && position) {
       await this._showWindow(text, position);
@@ -287,29 +296,21 @@ export class WindowsManager extends ResourceTracker {
 
     // Mobile specific: Do NOT show bottom sheet automatically on selection
     // to preserve native browser selection menu.
-    // Instead, we just store the selected text in state and wait for manual trigger
     if (this.shouldUseMobileUI()) {
       this.logger.info('Mobile environment detected, skipping automatic mobile sheet to preserve native menu');
       this.state.setOriginalText(selectedText);
       
-      // Notify MobileFab about pending selection
-      WindowsManagerEvents.mobileSelectionPending({
-        text: selectedText
-      });
-
       // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
-      // this ensures that clicking the FAB later won't translate "old" selection
       this.clickManager.addOutsideClickListener();
-      
       return;
     }
     
-    // Check if this is an icon->window transition OR we're in onClick mode, preserve selection if so
-    // In onClick mode, we show icons first and user will click later, so preserve selection
+    // Check if this is an icon->window transition OR we're in onClick/onFabClick mode, preserve selection if so
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
     const isOnClickMode = selectionTranslationMode === SelectionTranslationMode.ON_CLICK;
-    const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
+    const isOnFabClickMode = selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK;
+    const preserveSelection = this._isIconToWindowTransition || isOnClickMode || isOnFabClickMode;
     
     // Clear manual provider override for completely new selections
     if (!this._isIconToWindowTransition) {
@@ -326,18 +327,8 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      // Notify FAB about selection (for TTS button availability in all modes)
-      // Pass the current mode explicitly to ensure FAB knows how to handle the click
-      this.logger.debug('Notifying FAB about new selection', { mode: selectionTranslationMode });
-      WindowsManagerEvents.desktopSelectionPending({
-        text: selectedText,
-        position: position,
-        mode: selectionTranslationMode // Explicitly pass the mode
-      });
-
       if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
-        this.logger.info('onFabClick mode: storing selection for FAB trigger', { textLength: selectedText?.length });
-        this.state.setPendingFabTrigger(true);
+        this.logger.info('onFabClick mode: selection handled by external UI (like FAB)', { textLength: selectedText?.length });
         this.state.setOriginalText(selectedText);
         
         // Add dismiss listener to clear if user clicks away
@@ -413,8 +404,7 @@ export class WindowsManager extends ResourceTracker {
     
     // 1. Check if the same text is already being handled by any active UI element
     const isAlreadyVisible = this.state.isVisible || 
-                            this.state.isIconMode || 
-                            this.state.pendingFabTrigger;
+                            this.state.isIconMode;
                             
     if (isAlreadyVisible && this.state.originalText === selectedText) {
       return true;
@@ -508,8 +498,8 @@ export class WindowsManager extends ResourceTracker {
 
     // Create bound handler for reuse
     this._dismissHandler = (event) => {
-      // Handle icon mode, visible window mode, or pending FAB trigger
-      if (!this.state.isIconMode && !this.state.isVisible && !this.state.pendingFabTrigger) return;
+      // Handle icon mode or visible window mode
+      if (!this.state.isIconMode && !this.state.isVisible) return;
 
       // Don't dismiss during Shift+Click operations
       if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
@@ -1477,20 +1467,19 @@ export class WindowsManager extends ResourceTracker {
     // Mark that we're starting dismissal
     this._isDismissing = true;
 
-    const dismissMode = this.state.isIconMode ? 'icon' : (this.state.pendingFabTrigger ? 'fab-pending' : 'window');
+    const dismissMode = this.state.isIconMode ? 'icon' : 'window';
     this.logger.debug('Dismissing translation UI', {
       mode: dismissMode,
       reason: this._isDismissingDueToTyping ? 'user_typing' : 'user_action'
     });
 
-    // Always clear FAB selection state on dismiss
-    if (this.state.pendingFabTrigger) {
-      this.state.setPendingFabTrigger(false);
-    }
-    WindowsManagerEvents.desktopSelectionClear();
-
-    if (this.shouldUseMobileUI()) {
-      WindowsManagerEvents.mobileSelectionClear();
+    // Notify other modules to clear selection state (Coordinator Pattern)
+    // ONLY if we are not preserving the selection for a new UI element
+    if (!preserveSelection) {
+      pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, { 
+        reason: this._isDismissingDueToTyping ? 'user_typing' : 'user_action',
+        mode: dismissMode 
+      });
     }
 
     this.logger.debug('Dismiss called', {

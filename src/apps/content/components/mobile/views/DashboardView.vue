@@ -187,6 +187,7 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -247,7 +248,7 @@ const handleTTS = async () => {
 };
 
 const handleSelectionPending = (detail) => {
-  logger.debug('Received mobile selection pending event in Dashboard', { textLength: detail.text?.length });
+  logger.debug('Received global selection change event in Dashboard', { textLength: detail.text?.length });
   pendingSelection.value = {
     text: detail.text,
     hasSelection: !!detail.text
@@ -255,7 +256,7 @@ const handleSelectionPending = (detail) => {
 };
 
 const handleSelectionClear = () => {
-  logger.debug('Received mobile selection clear event in Dashboard');
+  logger.debug('Received global selection clear event in Dashboard');
   pendingSelection.value = {
     text: '',
     hasSelection: false
@@ -286,17 +287,17 @@ onMounted(() => {
     };
   }
 
-  // Listen for selection events
+  // Listen for global selection events (Coordinator Pattern)
   if (pageEventBus) {
-    pageEventBus.on(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, handleSelectionPending);
-    pageEventBus.on(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR, handleSelectionClear);
+    pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleSelectionPending);
+    pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, handleSelectionClear);
   }
 });
 
 onUnmounted(() => {
   if (pageEventBus) {
-    pageEventBus.off(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, handleSelectionPending);
-    pageEventBus.off(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR, handleSelectionClear);
+    pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleSelectionPending);
+    pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, handleSelectionClear);
   }
 });
 </script>

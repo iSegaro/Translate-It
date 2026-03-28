@@ -5,6 +5,10 @@ import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import settingsManager from '@/shared/managers/SettingsManager.js';
+import { SelectionTranslationMode } from '@/shared/config/config.js';
 
 /**
  * SelectionManager - Simplified text selection management
@@ -234,6 +238,21 @@ export class SelectionManager extends ResourceTracker {
    * Show translation UI (icon or window based on settings)
    */
   async showTranslationUI(selectedText, position) {
+    // Get current mode from settings
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+
+    // 1. Emit global selection event (Coordinator Pattern)
+    // This allows any module (like FAB) to react independently
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
+      text: selectedText,
+      position: position,
+      mode: selectionTranslationMode,
+      context: {
+        frameId: this.frameId,
+        isIframe: window !== window.top
+      }
+    });
+
     // Check if WindowsManager should be allowed
     if (!(await this.shouldProcessWindowsManager())) {
       this.logger.info('WindowsManager is blocked by exclusion, skipping translation UI');
@@ -309,6 +328,11 @@ export class SelectionManager extends ResourceTracker {
    * Dismiss any visible translation windows
    */
   dismissWindow() {
+    // 1. Emit global clear event
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
+      reason: 'selection_cleared'
+    });
+
     const windowsManager = this.getWindowsManager();
     if (windowsManager) {
       this.logger.debug('Translation window dismissed');
@@ -327,8 +351,7 @@ export class SelectionManager extends ResourceTracker {
     const windowsManager = this.getWindowsManager();
     if (windowsManager) {
       return windowsManager.state.isVisible || 
-             windowsManager.state.isIconMode || 
-             windowsManager.state.pendingFabTrigger;
+             windowsManager.state.isIconMode;
     }
 
     // Fallback: check shadow DOM
@@ -338,7 +361,8 @@ export class SelectionManager extends ResourceTracker {
     if (shadowHost && shadowHost.shadowRoot) {
       const activeWindows = shadowHost.shadowRoot.querySelectorAll('.translation-window');
       const activeIcons = shadowHost.shadowRoot.querySelectorAll('.translation-icon');
-      return activeWindows.length > 0 || activeIcons.length > 0;
+      const activeFabBadges = shadowHost.shadowRoot.querySelectorAll('.fab-translate-badge');
+      return activeWindows.length > 0 || activeIcons.length > 0 || activeFabBadges.length > 0;
     }
 
     return false;

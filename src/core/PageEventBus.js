@@ -96,8 +96,6 @@ export const WINDOWS_MANAGER_EVENTS = {
   
   // Mobile specific
   SHOW_MOBILE_SHEET: 'windows-manager-show-mobile-sheet',
-  MOBILE_SELECTION_PENDING: 'windows-manager-mobile-selection-pending',
-  MOBILE_SELECTION_CLEAR: 'windows-manager-mobile-selection-clear',
   
   // Element Translation Sync
   ELEMENT_TRANSLATIONS_AVAILABLE: 'element-translations-available',
@@ -107,12 +105,7 @@ export const WINDOWS_MANAGER_EVENTS = {
   OPEN_SETTINGS: 'open-options-page',
   
   // Icon interaction
-  ICON_CLICKED: 'windows-manager-icon-clicked',
-  
-  // Desktop selection trigger
-  DESKTOP_SELECTION_PENDING: 'windows-manager-desktop-selection-pending',
-  DESKTOP_SELECTION_CLEAR: 'windows-manager-desktop-selection-clear',
-  DESKTOP_SELECTION_TRIGGER: 'windows-manager-desktop-selection-trigger'
+  ICON_CLICKED: 'windows-manager-icon-clicked'
 };
 
 // Helper functions for essential WindowsManager events
@@ -124,14 +117,7 @@ export const WindowsManagerEvents = {
   dismissWindow: (id, withAnimation = true) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id, withAnimation }),
   dismissIcon: (id) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, { id }),
   showMobileSheet: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_MOBILE_SHEET, detail),
-  mobileSelectionPending: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, detail),
-  mobileSelectionClear: () => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR),
   
   // Icon interactions
-  iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail),
-
-  // Desktop selection trigger helpers
-  desktopSelectionPending: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, detail),
-  desktopSelectionClear: () => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_CLEAR),
-  desktopSelectionTrigger: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, detail)
+  iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail)
 };
