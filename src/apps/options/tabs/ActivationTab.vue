@@ -226,6 +226,13 @@
             :disabled="!extensionEnabled"
             :label="t('options_selection_mode_onclick') || 'On Click'"
           />
+          <BaseRadio
+            v-model="selectionTranslationMode"
+            value="onFabClick"
+            name="selectionTranslationMode"
+            :disabled="!extensionEnabled || !showDesktopFab"
+            :label="t('options_selection_mode_onfabclick') || 'Use Desktop FAB'"
+          />
         </div>
 
         <div class="setting-group sub-setting-group">

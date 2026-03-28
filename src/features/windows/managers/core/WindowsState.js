@@ -19,6 +19,7 @@ export class WindowsState {
     this.isVisible = false;
     this.isIconMode = false;
     this.pendingTranslationWindow = false;
+    this.pendingFabTrigger = false;
 
     // Translation states
     this.isTranslationCancelled = false;
@@ -68,6 +69,11 @@ export class WindowsState {
   setPendingTranslationWindow(pending) {
     this.pendingTranslationWindow = pending;
     this.logger.debug('Pending translation window', { pending });
+  }
+
+  setPendingFabTrigger(pending) {
+    this.pendingFabTrigger = pending;
+    this.logger.debug('Pending FAB trigger', { pending });
   }
 
   // Translation management

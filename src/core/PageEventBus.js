@@ -53,12 +53,23 @@ class EventBus {
   }
 }
 
-export const pageEventBus = new EventBus();
+// Create the instance, but favor an existing window instance for cross-bundle singleton behavior
+const createEventBusInstance = () => {
+  if (typeof window !== 'undefined' && window.pageEventBus) {
+    return window.pageEventBus;
+  }
+  return new EventBus();
+};
+
+export const pageEventBus = createEventBusInstance();
 
 // Attach to window for global access (fix for cross-context event delivery)
 if (typeof window !== 'undefined') {
   const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'PageEventBus');
-  window.pageEventBus = pageEventBus;
+  
+  if (!window.pageEventBus) {
+    window.pageEventBus = pageEventBus;
+  }
   
   // For iframe contexts, also ensure event bus is available in parent context
   if (window !== window.top && window.parent) {
@@ -90,7 +101,12 @@ export const WINDOWS_MANAGER_EVENTS = {
   OPEN_SETTINGS: 'open-options-page',
   
   // Icon interaction
-  ICON_CLICKED: 'windows-manager-icon-clicked'
+  ICON_CLICKED: 'windows-manager-icon-clicked',
+  
+  // Desktop selection trigger
+  DESKTOP_SELECTION_PENDING: 'windows-manager-desktop-selection-pending',
+  DESKTOP_SELECTION_CLEAR: 'windows-manager-desktop-selection-clear',
+  DESKTOP_SELECTION_TRIGGER: 'windows-manager-desktop-selection-trigger'
 };
 
 // Helper functions for essential WindowsManager events
@@ -104,5 +120,10 @@ export const WindowsManagerEvents = {
   showMobileSheet: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_MOBILE_SHEET, detail),
   
   // Icon interactions
-  iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail)
+  iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail),
+
+  // Desktop selection trigger helpers
+  desktopSelectionPending: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, detail),
+  desktopSelectionClear: () => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_CLEAR),
+  desktopSelectionTrigger: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, detail)
 };

@@ -18,7 +18,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
-import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
+import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
@@ -31,13 +31,6 @@ import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config
 let windowsManagerInstance = null;
 
 export class WindowsManager extends ResourceTracker {
-  /**
-   * Get pageEventBus instance at runtime
-   */
-  get pageEventBus() {
-    return window.pageEventBus;
-  }
-
   constructor(options = {}) {
     // Initialize ResourceTracker first
     super('windows-manager');
@@ -156,7 +149,7 @@ export class WindowsManager extends ResourceTracker {
       onIconClick: this._handleIconClick.bind(this)
     });
     // Listen for events from the Vue UI Host
-    if (this.pageEventBus) {
+    if (pageEventBus) {
       // Create bound handler to enable proper cleanup
       this._iconClickHandler = (payload) => {
         this._handleIconClickFromVue(payload);
@@ -166,17 +159,17 @@ export class WindowsManager extends ResourceTracker {
       this._changeProviderRequestHandler = this._handleChangeProviderRequest.bind(this);
       
       // Remove any existing listener first to prevent duplicates
-      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
-      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
+      pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
+      pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
       
-      this.pageEventBus.off('translation-window-speak', this._speakRequestHandler);
-      this.pageEventBus.on('translation-window-speak', this._speakRequestHandler);
+      pageEventBus.off('translation-window-speak', this._speakRequestHandler);
+      pageEventBus.on('translation-window-speak', this._speakRequestHandler);
       
-      this.pageEventBus.off('translation-window-retry', this._retryRequestHandler);
-      this.pageEventBus.on('translation-window-retry', this._retryRequestHandler);
+      pageEventBus.off('translation-window-retry', this._retryRequestHandler);
+      pageEventBus.on('translation-window-retry', this._retryRequestHandler);
 
-      this.pageEventBus.off('translation-window-change-provider', this._changeProviderRequestHandler);
-      this.pageEventBus.on('translation-window-change-provider', this._changeProviderRequestHandler);
+      pageEventBus.off('translation-window-change-provider', this._changeProviderRequestHandler);
+      pageEventBus.on('translation-window-change-provider', this._changeProviderRequestHandler);
 
       // Listen for dismissal events from the UI to sync state
       this._dismissRequestHandler = (payload) => {
@@ -184,11 +177,18 @@ export class WindowsManager extends ResourceTracker {
         this.dismiss(false); // UI already handled animation/removal
       };
       
-      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
-      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
+      pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
+      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, this._dismissRequestHandler);
       
-      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
-      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
+      pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
+      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, this._dismissRequestHandler);
+
+      // Listen for FAB trigger events
+      this._fabTriggerHandler = (payload) => {
+        this._handleFabTrigger(payload);
+      };
+      pageEventBus.off(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, this._fabTriggerHandler);
+      pageEventBus.on(WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_TRIGGER, this._fabTriggerHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }
@@ -210,6 +210,21 @@ export class WindowsManager extends ResourceTracker {
     }
     
     this.logger.info(`Renderer toggled to: ${newRendererType ? 'Enhanced' : 'Classic'}`);
+  }
+
+  /**
+   * Handle translation trigger from Desktop FAB
+   */
+  async _handleFabTrigger(payload) {
+    const { text, position } = payload;
+    this.logger.info('FAB trigger received', { textLength: text?.length });
+    
+    // Clear pending trigger state
+    this.state.setPendingFabTrigger(false);
+    
+    if (text && position) {
+      await this._showWindow(text, position);
+    }
   }
 
   /**
@@ -285,6 +300,7 @@ export class WindowsManager extends ResourceTracker {
     // Check if this is an icon->window transition OR we're in onClick mode, preserve selection if so
     // In onClick mode, we show icons first and user will click later, so preserve selection
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
+
     const isOnClickMode = selectionTranslationMode === 'onClick';
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
     
@@ -303,7 +319,20 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      if (selectionTranslationMode === "onClick") {
+      if (selectionTranslationMode === "onFabClick") {
+        this.logger.info('onFabClick mode: storing selection for FAB trigger', { textLength: selectedText?.length });
+        this.state.setPendingFabTrigger(true);
+        this.state.setOriginalText(selectedText);
+        
+        this.logger.debug('Emitting DESKTOP_SELECTION_PENDING event');
+        WindowsManagerEvents.desktopSelectionPending({
+          text: selectedText,
+          position: position
+        });
+        
+        // Add dismiss listener to clear if user clicks away
+        this._addDismissListener();
+      } else if (selectionTranslationMode === "onClick") {
         await this._showIcon(selectedText, position);
       } else {
         await this._showWindow(selectedText, position);
@@ -449,8 +478,8 @@ export class WindowsManager extends ResourceTracker {
 
     // Create bound handler for reuse
     this._dismissHandler = (event) => {
-      // Handle both icon mode and visible window mode
-      if (!this.state.isIconMode && !this.state.isVisible) return;
+      // Handle icon mode, visible window mode, or pending FAB trigger
+      if (!this.state.isIconMode && !this.state.isVisible && !this.state.pendingFabTrigger) return;
 
       // Don't dismiss during Shift+Click operations
       if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
@@ -1417,11 +1446,16 @@ export class WindowsManager extends ResourceTracker {
     // Mark that we're starting dismissal
     this._isDismissing = true;
 
-    const dismissMode = this.state.isIconMode ? 'icon' : 'window';
+    const dismissMode = this.state.isIconMode ? 'icon' : (this.state.pendingFabTrigger ? 'fab-pending' : 'window');
     this.logger.debug('Dismissing translation UI', {
       mode: dismissMode,
       reason: this._isDismissingDueToTyping ? 'user_typing' : 'user_action'
     });
+
+    if (this.state.pendingFabTrigger) {
+      this.state.setPendingFabTrigger(false);
+      WindowsManagerEvents.desktopSelectionClear();
+    }
 
     this.logger.debug('Dismiss called', {
       withFadeOut,

@@ -61,7 +61,8 @@ export const CONFIG = {
   TARGET_LANGUAGE: "fa",
   THEME: "auto",
   TIMEOUT: 30000,
-  selectionTranslationMode: "onClick", // "immediate",
+  selectionTranslationMode: "onClick", // "immediate", "onFabClick"
+
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",

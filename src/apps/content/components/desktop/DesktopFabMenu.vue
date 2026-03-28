@@ -71,6 +71,19 @@
         :alt="t('desktop_fab_alt')" 
         style="width: 32px !important; height: 32px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
       >
+      <!-- Pending Selection Badge -->
+      <Transition name="fade-scale">
+        <div 
+          v-if="pendingSelection.hasSelection"
+          class="fab-translate-badge"
+          style="position: absolute !important; top: -5px !important; left: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
+        >
+          <img
+            :src="IconTranslateSelection"
+            style="width: 12px !important; height: 12px !important; filter: brightness(0) invert(1) !important;"
+          >
+        </div>
+      </Transition>
     </div>
 
     <!-- Settings Button (below main button when open) -->
@@ -107,6 +120,7 @@ import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getDesktopFabVerticalPosAsync } from '@/shared/config/config.js';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
@@ -114,9 +128,9 @@ import IconRevert from '@/icons/ui/revert.png';
 import IconRestore from '@/icons/ui/restore.svg';
 import IconClear from '@/icons/ui/clear.png';
 import IconSettings from '@/icons/ui/settings.png';
+import IconTranslateSelection from '@/icons/ui/translate.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
-const pageEventBus = window.pageEventBus;
 const mobileStore = useMobileStore();
 const { t } = useUnifiedI18n();
 const tracker = useResourceTracker('desktop-fab-menu');
@@ -130,12 +144,19 @@ const isFullscreen = computed(() => mobileStore.isFullscreen);
 const fabContainerRef = ref(null);
 let hoverTimerId = null;
 
+const pendingSelection = ref({
+  hasSelection: false,
+  text: '',
+  position: null
+});
+
 const handleMouseEnter = () => {
   if (hoverTimerId) {
     tracker.clearTimer(hoverTimerId);
     hoverTimerId = null;
   }
   isHovered.value = true;
+  isFaded.value = false; // Unfade when hovered
 };
 
 const handleMouseLeave = () => {
@@ -146,8 +167,20 @@ const handleMouseLeave = () => {
 };
 
 const menuItems = computed(() => {
-  const items = [
-    {
+  const items = [];
+
+  // Add Translate Selection if available
+  if (pendingSelection.value.hasSelection) {
+    items.push({
+      id: 'translate_selection',
+      label: t('desktop_fab_translate_selection_label'),
+      icon: IconTranslateSelection,
+      closeMenu: true,
+      action: () => triggerTranslation()
+    });
+  }
+
+  items.push({
       id: 'select_element',
       label: t('desktop_fab_select_element_label'),
       icon: IconSelectElement,
@@ -160,7 +193,7 @@ const menuItems = computed(() => {
         }
       }
     }
-  ];
+  );
 
   const pageData = mobileStore.pageTranslationData;
   const isCurrentlyBusy = pageData.status === TRANSLATION_STATUS.TRANSLATING;
@@ -232,7 +265,39 @@ const containerStyle = computed(() => {
 
 const toggleMenu = () => {
   if (isDragging.value) return;
+  
+  /**
+   * DIRECT TRANSLATION MODE (onFabClick)
+   * On first click with selection: trigger translation and skip menu.
+   * On subsequent clicks: allow menu to open so other tools are accessible.
+   */
+  if (pendingSelection.value.hasSelection) {
+    triggerTranslation();
+    isMenuOpen.value = false;
+    return;
+  }
+  
   isMenuOpen.value = !isMenuOpen.value;
+};
+
+const triggerTranslation = () => {
+  if (!pendingSelection.value.hasSelection) return;
+  
+  logger.info('Triggering pending translation from FAB');
+  WindowsManagerEvents.desktopSelectionTrigger({
+    text: pendingSelection.value.text,
+    position: pendingSelection.value.position
+  });
+  
+  // State is reset immediately for better responsiveness.
+  // If you need the 'Translate Selection' menu item to stay visible during 
+  // animation, add a small setTimeout here.
+  // OR comment the below code to keep the Item visible
+  pendingSelection.value = {
+    hasSelection: false,
+    text: '',
+    position: null
+  };
 };
 
 const handleMenuItemClick = async (item) => {
@@ -336,6 +401,27 @@ onMounted(async () => {
   };
 
   tracker.addEventListener(window, 'click', handleClickOutside);
+
+  // Listen for selection pending from WindowsManager
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
+    logger.debug('Received desktop selection pending event');
+    isFaded.value = false; // Unfade when selection is pending
+    pendingSelection.value = {
+      hasSelection: true,
+      text: detail.text,
+      position: detail.position
+    };
+  });
+
+  // Listen for clear selection
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_CLEAR, () => {
+    logger.debug('Received desktop selection clear event');
+    pendingSelection.value = {
+      hasSelection: false,
+      text: '',
+      position: null
+    };
+  });
 });
 
 // onBeforeUnmount is handled by tracker

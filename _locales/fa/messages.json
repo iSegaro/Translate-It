@@ -542,6 +542,9 @@
   "desktop_fab_select_element_label": {
     "message": "انتخاب المان"
   },
+  "desktop_fab_translate_selection_label": {
+    "message": "ترجمه متن انتخاب شده"
+  },
   "desktop_fab_stop_auto_translating_label": {
     "message": "توقف ترجمه خودکار"
   },
@@ -616,6 +619,9 @@
   },
   "options_selection_mode_onclick": {
     "message": "نمایش آیکون بجای ترجمه فوری"
+  },
+  "options_selection_mode_onfabclick": {
+    "message": "استفاده از دکمه شناور دسکتاپ برای ترجمه"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "الزام استفاده از کلید Ctrl برای ترجمه متن"

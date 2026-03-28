@@ -539,6 +539,9 @@
   "desktop_fab_select_element_label": {
     "message": "Select Element"
   },
+  "desktop_fab_translate_selection_label": {
+    "message": "Translate Selection"
+  },
   "desktop_fab_stop_auto_translating_label": {
     "message": "Stop Auto Translating"
   },
@@ -613,6 +616,9 @@
   },
   "options_selection_mode_onclick": {
     "message": "Show icon to translate on click"
+  },
+  "options_selection_mode_onfabclick": {
+    "message": "Use Desktop FAB to translate"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "Require Ctrl key for text selection translation"

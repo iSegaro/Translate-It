@@ -539,6 +539,9 @@
   "desktop_fab_select_element_label": {
     "message": "要素を選択"
   },
+  "desktop_fab_translate_selection_label": {
+    "message": "選択範囲を翻訳"
+  },
   "desktop_fab_stop_auto_translating_label": {
     "message": "自動翻訳を停止"
   },
@@ -613,6 +616,9 @@
   },
   "options_selection_mode_onclick": {
     "message": "アイコンをクリックして翻訳"
+  },
+  "options_selection_mode_onfabclick": {
+    "message": "デスクトップFABを使用して翻訳"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "テキスト選択翻訳にCtrlキーを必要とする"

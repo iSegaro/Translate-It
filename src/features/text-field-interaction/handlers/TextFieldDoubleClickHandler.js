@@ -856,16 +856,18 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
           context: 'main-frame'
         });
 
-        // For text fields, always show icon first
-        await windowsManager._showIcon(selectedText, position);
+        // Use the standard show() method which respects selectionTranslationMode (onClick, immediate, onFabClick)
+        await windowsManager.show(selectedText, position);
 
-        // NEW: Setup direct typing listener for the created icon
-        const iconId = windowsManager.state.iconClickContext?.iconId;
-        if (iconId) {
-          // Use actualTextField if available, otherwise fall back to the focused element
-          const textField = actualTextField || document.activeElement;
-          if (textField && this.isTextField(textField)) {
-            this._setupTypingListenerForIcon(textField, iconId);
+        // Setup typing listener if an icon was actually created (onClick mode)
+        if (windowsManager.state.isIconMode) {
+          const iconId = windowsManager.state.iconClickContext?.iconId;
+          if (iconId) {
+            // Use actualTextField if available, otherwise fall back to the focused element
+            const textField = actualTextField || document.activeElement;
+            if (textField && this.isTextField(textField)) {
+              this._setupTypingListenerForIcon(textField, iconId);
+            }
           }
         }
       } else {
