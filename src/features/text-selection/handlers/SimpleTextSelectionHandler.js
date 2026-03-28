@@ -613,12 +613,34 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    */
   async shouldProcessSelection() {
     try {
-      // Check if extension and text selection feature are enabled
+      // Check if extension is enabled
       const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', false);
-      const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', false);
-
-      if (!isExtensionEnabled || !isTextSelectionEnabled) {
+      if (!isExtensionEnabled) {
+        logger.debug('Extension disabled, skipping selection');
         return false;
+      }
+
+      // Check if either the main text selection feature OR the Desktop FAB is enabled
+      // This is the key: FAB needs selection even if WindowsManager is disabled
+      const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', false);
+      const isFabEnabled = settingsManager.get('SHOW_DESKTOP_FAB', false);
+
+      logger.debug('Checking selection requirements', {
+        isTextSelectionEnabled,
+        isFabEnabled,
+        isExtensionEnabled
+      });
+
+      if (!isTextSelectionEnabled && !isFabEnabled) {
+        logger.debug('Both text selection and FAB are disabled, skipping');
+        return false;
+      }
+
+      // If text selection translation is disabled, we still allow it for the Global Coordinator (like FAB)
+      // and we skip the Ctrl requirement check because it only applies to immediate translation.
+      if (!isTextSelectionEnabled) {
+        logger.debug('Main text selection disabled but FAB is enabled, allowing for global coordinator');
+        return true;
       }
 
       const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);

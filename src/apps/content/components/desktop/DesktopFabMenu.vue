@@ -145,10 +145,10 @@
           side === 'right' ? { 'margin-right': '15px !important', 'transform': 'scaleX(1)' } : { 'margin-left': '15px !important', 'transform': 'scaleX(-1)' }
         ]"
       >
-      <!-- Pending Selection Badge (ONLY in onFabClick mode) -->
+      <!-- Pending Selection Badge (ONLY in onFabClick mode OR when WindowsManager is disabled) -->
       <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
         <div 
-          v-if="pendingSelection.hasSelection && pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK"
+          v-if="pendingSelection.hasSelection && (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled)"
           class="fab-translate-badge"
           :style="[
             translateBadgeStyle,
@@ -299,6 +299,7 @@ const isSettingsHovered = ref(false);
 const isTTSHovered = ref(false);
 const hoveredItemIndex = ref(-1);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
+const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
 
 // Theme-aware styles as OBJECTS
 const menuStyle = computed(() => {

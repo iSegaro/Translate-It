@@ -264,25 +264,12 @@ const handleSelectionClear = () => {
 };
 
 onMounted(() => {
-  // Check for existing selection from WindowsManager
-  let storedSelection = window.windowsManagerInstance?.state?.originalText || '';
+  // Check for existing native selection
   const nativeSelection = window.getSelection()?.toString().trim();
 
-  // If native selection is empty and nothing is playing, the selection might have been cleared while dashboard was closed
-  if (!nativeSelection && !tts.isPlaying.value) {
-    storedSelection = '';
-    // Sync back to WindowsManager to avoid "stickiness"
-    if (window.windowsManagerInstance?.state) {
-      window.windowsManagerInstance.state.setOriginalText('');
-    }
-  } else if (nativeSelection) {
-    // Native selection always wins if it exists
-    storedSelection = nativeSelection;
-  }
-
-  if (storedSelection) {
+  if (nativeSelection) {
     pendingSelection.value = {
-      text: storedSelection,
+      text: nativeSelection,
       hasSelection: true
     };
   }

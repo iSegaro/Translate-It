@@ -304,12 +304,24 @@ export class WindowsManager extends ResourceTracker {
       this.clickManager.addOutsideClickListener();
       return;
     }
+
+    const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
     
     // Check if this is an icon->window transition OR we're in onClick/onFabClick mode, preserve selection if so
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
     const isOnClickMode = selectionTranslationMode === SelectionTranslationMode.ON_CLICK;
     const isOnFabClickMode = selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK;
+    
+    // If the main feature is disabled, we MUST preserve selection for external modules (like FAB)
+    // and skip our own internal UI display.
+    if (!isTextSelectionEnabled) {
+      this.logger.debug('TRANSLATE_ON_TEXT_SELECTION is disabled, preserving for external modules and skipping internal UI');
+      this.state.setOriginalText(selectedText);
+      await this.dismiss(false, true); // Force preserveSelection = true
+      return;
+    }
+
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode || isOnFabClickMode;
     
     // Clear manual provider override for completely new selections

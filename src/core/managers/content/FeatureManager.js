@@ -379,6 +379,7 @@ export class FeatureManager extends ResourceTracker {
         'TRANSLATE_ON_TEXT_FIELDS',
         'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
         'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
+        'SHOW_DESKTOP_FAB',
         'EXCLUDED_SITES'
       ];
       

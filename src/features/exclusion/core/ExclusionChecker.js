@@ -109,7 +109,8 @@ export class ExclusionChecker {
         'TRANSLATE_WITH_SELECT_ELEMENT',
         'TRANSLATE_ON_TEXT_SELECTION',
         'TRANSLATE_ON_TEXT_FIELDS',
-        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS'
+        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
+        'SHOW_DESKTOP_FAB'
       ];
 
       featureSettings.forEach(setting => {
@@ -192,38 +193,36 @@ export class ExclusionChecker {
   }
 
   isFeatureEnabled(featureName) {
-    const featureSettingsMap = {
-      'selectElement': 'TRANSLATE_WITH_SELECT_ELEMENT',
-      'textSelection': 'TRANSLATE_ON_TEXT_SELECTION',
-      'textFieldIcon': 'TRANSLATE_ON_TEXT_SELECTION', // Changed from TRANSLATE_ON_TEXT_FIELDS since it's under On-Page Selection
-      'shortcut': 'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-      'windowsManager': 'TRANSLATE_ON_TEXT_SELECTION',
-      'pageTranslation': 'WHOLE_PAGE_TRANSLATION_ENABLED'
-    };
-
-    // Default values for each feature
-    const featureDefaults = {
-      'selectElement': true,
-      'textSelection': true,
-      'textFieldIcon': false,
-      'shortcut': true,
-      'windowsManager': true,
-      'pageTranslation': true
-    };
-
+    // Core features that are always enabled
     if (featureName === 'contentMessageHandler') {
-      return true; // Core feature, always enabled
+      return true;
     }
 
-    const settingKey = featureSettingsMap[featureName];
-    if (!settingKey) {
-      // Unknown feature - logged at TRACE level for detailed debugging
-      // logger.warn(`Unknown feature name: ${featureName}`);
-      return false;
-    }
+    const isFabEnabled = settingsManager.get('SHOW_DESKTOP_FAB', true);
+    const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
 
-    const defaultValue = featureDefaults[featureName] ?? false;
-    return settingsManager.get(settingKey, defaultValue);
+    // Feature-specific activation logic
+    switch (featureName) {
+      case 'textSelection':
+      case 'windowsManager':
+        // These features are required if EITHER automatic translation is on OR the Desktop FAB is active
+        return isTextSelectionEnabled || isFabEnabled;
+
+      case 'selectElement':
+        return settingsManager.get('TRANSLATE_WITH_SELECT_ELEMENT', true);
+
+      case 'textFieldIcon':
+        return isTextSelectionEnabled;
+
+      case 'shortcut':
+        return settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', true);
+
+      case 'pageTranslation':
+        return settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
+
+      default:
+        return false;
+    }
   }
 
   async isUrlExcludedForFeature(featureName) {

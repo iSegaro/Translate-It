@@ -95,22 +95,36 @@ export class SelectionManager extends ResourceTracker {
       return;
     }
 
+    // 1. Emit global selection event (Coordinator Pattern) - DO THIS FIRST
+    // This allows any module (like FAB or TTS) to react independently
+    // even if WindowsManager is disabled or URL is excluded for windows.
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
+      text: selectedText,
+      position: this.calculateSelectionPosition(selection), // We need position even for global event
+      mode: selectionTranslationMode,
+      context: {
+        frameId: this.frameId,
+        isIframe: window !== window.top
+      }
+    });
+
     if (await this.checkExclusion()) {
-      this.logger.debug('URL excluded, skipping selection processing');
+      this.logger.debug('URL excluded, skipping translation UI display');
       return;
     }
 
     const currentTime = Date.now();
 
-    // Prevent duplicate processing of same text
+    // Prevent duplicate processing of same text for the UI display part
     if (this.isDuplicateSelection(selectedText, currentTime)) {
-      this.logger.debug('Skipping duplicate selection', {
+      this.logger.debug('Skipping duplicate selection UI display', {
         text: selectedText.substring(0, 30) + '...'
       });
       return;
     }
 
-    this.logger.debug('Processing new selection', {
+    this.logger.debug('Processing new selection for UI', {
       text: selectedText.substring(0, 30) + '...',
       length: selectedText.length
     });
@@ -118,17 +132,10 @@ export class SelectionManager extends ResourceTracker {
     // Calculate position for the translation UI
     const position = this.calculateSelectionPosition(selection);
     if (!position) {
-      this.logger.debug('Could not calculate position for selection', {
-        text: selectedText.substring(0, 30) + '...',
-        selectionType: selection?.type,
-        rangeCount: selection?.rangeCount,
-        anchorNode: selection?.anchorNode?.nodeName,
-        focusNode: selection?.focusNode?.nodeName
-      });
       return;
     }
 
-    // Show translation UI
+    // Show translation UI (This part is still dependent on WindowsManager being allowed)
     await this.showTranslationUI(selectedText, position);
 
     // Track this selection

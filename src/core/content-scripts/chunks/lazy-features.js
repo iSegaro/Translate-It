@@ -167,12 +167,15 @@ async function loadTextSelectionFeature() {
 
     // Check if feature should be activated first
     const shouldActivate = await featureManager.shouldActivateFeature('textSelection');
+    logger.debug(`TextSelection shouldActivate evaluation: ${shouldActivate}`);
 
     if (shouldActivate) {
       // Load and activate text selection through FeatureManager
+      logger.debug('Activating textSelection feature via FeatureManager...');
       await featureManager.activateFeature('textSelection');
+      logger.debug('textSelection feature activation command sent');
     } else {
-      logger.debug('TextSelection is blocked by exclusion, skipping activation');
+      logger.debug('TextSelection is blocked by exclusion (via FeatureManager), skipping activation');
       return null;
     }
 

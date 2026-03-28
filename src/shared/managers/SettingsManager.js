@@ -82,6 +82,8 @@ class SettingsManager {
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false,
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
+      SHOW_DESKTOP_FAB: true,
+      DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
       // Whole Page Translation Defaults
       WHOLE_PAGE_TRANSLATION_ENABLED: true,
       WHOLE_PAGE_LAZY_LOADING: true,
@@ -480,7 +482,8 @@ class SettingsManager {
       'TRANSLATE_WITH_SELECT_ELEMENT',
       'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
       'ENABLE_DICTIONARY',
-      'ENHANCED_TRIPLE_CLICK_DRAG'
+      'ENHANCED_TRIPLE_CLICK_DRAG',
+      'SHOW_DESKTOP_FAB'
     ]
 
     for (const key of frequentlyAccessed) {
