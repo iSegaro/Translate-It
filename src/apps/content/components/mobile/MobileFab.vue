@@ -37,7 +37,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
