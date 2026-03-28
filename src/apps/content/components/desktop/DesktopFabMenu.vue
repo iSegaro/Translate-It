@@ -127,6 +127,7 @@
       :style="[
         { 
           'transform': (isHovered || isMenuOpen ? (side === 'right' ? 'translateX(-18px)' : 'translateX(18px)') : 'translateX(0)'),
+          'transition': `transform ${isHovered || isMenuOpen ? '0.4s' : '1.0s'} cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease, box-shadow 0.3s ease !important`,
           'cursor': 'pointer !important',
           'pointer-events': 'auto !important',
           'box-shadow': side === 'right' ? '-4px 0 20px rgba(0, 0, 0, 0.2)' : '4px 0 20px rgba(0, 0, 0, 0.2)'
@@ -496,18 +497,20 @@ const containerStyle = computed(() => {
   }
 
   const isRight = side.value === 'right';
+  const isActive = isHovered.value || isMenuOpen.value;
+  const moveDuration = isActive ? '0.4s' : '1.0s';
   
   // Construct transition parts without !important
   const transitions = [
-    'transform 0.5s ease-in-out',
-    'left 0.5s ease-in-out',
-    'right 0.5s ease-in-out'
+    `transform ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`,
+    `left ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`,
+    `right ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`
   ];
 
-  // Use consistent duration for both opacity and transform
+  // Use fast transition for Fade In (opacity 1) and slower for Fade Out (opacity 0.2)
   if (!isMenuOpen.value) {
-    const duration = opacityValue === 1 ? '0.2s' : '0.5s';
-    transitions.push(`opacity ${duration} ease-in-out`);
+    const opacityDuration = opacityValue === 1 ? '0.2s' : '1.0s';
+    transitions.push(`opacity ${opacityDuration} cubic-bezier(0.22, 1, 0.36, 1)`);
   } else {
     transitions.push('opacity 0.3s ease');
   }
@@ -768,7 +771,7 @@ onMounted(async () => {
   cursor: pointer !important;
   pointer-events: auto;
   user-select: none;
-  transition: transform 0.5s ease-in-out, background-color 0.2s ease, box-shadow 0.3s ease;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease;
 }
 
 .desktop-fab-button:hover {
