@@ -81,13 +81,13 @@
           :style="item.disabled ? { 'opacity': '0.5 !important', 'cursor': 'default !important', 'pointer-events': 'none !important' } : {}"
           @click.stop="item.disabled ? null : handleMenuItemClick(item)"
         >
-          <div :style="{ 'margin-right': side === 'right' ? '12px !important' : '0 !important', 'margin-left': side === 'left' ? '12px !important' : '0 !important', 'order': side === 'left' ? 2 : 0 }" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; flex-shrink: 0 !important;">
+          <div :style="{ marginRight: side === 'right' ? '12px !important' : '0 !important', marginLeft: side === 'left' ? '12px !important' : '0 !important', order: side === 'left' ? 2 : 0 }" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; flex-shrink: 0 !important;">
             <img 
               v-if="item.icon" 
               :src="item.icon" 
               :alt="item.label" 
               class="fab-menu-icon"
-              :style="menuIconStyle"
+              :style="getMenuIconStyle(item.id)"
             >
           </div>
           <span :style="[menuItemTextStyle, { 'text-align': side === 'right' ? 'left' : 'right' }]" style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
@@ -288,17 +288,14 @@ const settingsBadgeStyle = computed(() => {
   };
 });
 
-const menuIconStyle = computed(() => {
-  return {
-    'width': '20px !important',
-    'height': '20px !important',
-    'object-fit': 'contain !important',
-    'display': 'block !important',
-    'border': 'none !important',
-    'padding': '0 !important',
-    'filter': settingsStore.isDarkTheme ? 'invert(1) brightness(2) !important' : 'none !important'
-  };
-});
+const getMenuIconStyle = (itemId) => {
+  const isColored = itemId === 'translate_page';
+  const filter = (settingsStore.isDarkTheme && !isColored) 
+    ? 'brightness(0) invert(1) !important' 
+    : 'none !important';
+
+  return `width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; filter: ${filter};`;
+};
 
 const settingsIconStyle = computed(() => {
   const filter = settingsStore.isDarkTheme 
