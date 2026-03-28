@@ -3,6 +3,7 @@
     v-show="!isFullscreen"
     ref="fabContainerRef"
     class="desktop-fab-container notranslate"
+    :class="[settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light', { 'is-dark': settingsStore.isDarkTheme }]"
     translate="no"
     :style="containerStyle"
     @mouseenter="handleMouseEnter"
@@ -33,14 +34,15 @@
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        style="position: absolute !important; bottom: 0px !important; right: 85px !important; background-color: #ffffff !important; border-radius: 14px !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important; padding: 8px 0 !important; min-width: 230px !important; width: max-content !important; border: 1px solid rgba(0, 0, 0, 0.06) !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        :style="menuStyle"
+        style="position: absolute !important; bottom: 0px !important; right: 85px !important; border-radius: 14px !important; padding: 8px 0 !important; min-width: 230px !important; width: max-content !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
       >
         <div 
           v-for="item in menuItems" 
           :key="item.id" 
           class="fab-menu-item"
           :class="{ 'is-disabled': item.disabled }"
-          style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; color: #374151 !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
+          style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
           :style="item.disabled ? 'opacity: 0.5 !important; cursor: default !important; pointer-events: none !important;' : ''"
           @click.stop="item.disabled ? null : handleMenuItemClick(item)"
         >
@@ -49,10 +51,11 @@
               v-if="item.icon" 
               :src="item.icon" 
               :alt="item.label" 
-              style="width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important;"
+              class="fab-menu-icon"
+              :style="menuIconStyle"
             >
           </div>
-          <span style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
+          <span :style="menuItemTextStyle" style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
         </div>
       </div>
     </Transition>
@@ -96,8 +99,8 @@
         v-if="isMenuOpen" 
         class="fab-settings-badge"
         :title="t('desktop_fab_settings_tooltip')"
-        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important; border: 1px solid rgba(0,0,0,0.05) !important;"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }"
+        :style="[settingsBadgeStyle, { transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)') }]"
+        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important;"
         @click.stop="handleOpenSettings"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
@@ -105,7 +108,8 @@
         <img
           :src="IconSettings"
           :alt="t('desktop_fab_settings_tooltip')"
-          style="width: 16px !important; height: 16px !important; filter: opacity(0.7) !important;"
+          class="fab-menu-icon"
+          :style="settingsIconStyle"
         >
       </div>
     </Transition>
@@ -120,6 +124,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import useSettingsStore from '@/features/settings/stores/settings.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -136,6 +141,7 @@ import IconTranslateSelection from '@/icons/ui/translate.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
 const mobileStore = useMobileStore();
+const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
 const tracker = useResourceTracker('desktop-fab-menu');
 
@@ -145,6 +151,36 @@ const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
+
+// Theme-aware styles
+const menuStyle = computed(() => {
+  if (settingsStore.isDarkTheme) {
+    return "background-color: #2d2d2d !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5) !important;";
+  }
+  return "background-color: #ffffff !important; border: 1px solid rgba(0, 0, 0, 0.06) !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important;";
+});
+
+const settingsBadgeStyle = computed(() => {
+  if (settingsStore.isDarkTheme) {
+    return "background-color: #3d3d3d !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;";
+  }
+  return "background-color: #ffffff !important; border: 1px solid rgba(0, 0, 0, 0.05) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;";
+});
+
+const menuIconStyle = computed(() => {
+  const filter = settingsStore.isDarkTheme ? "invert(1) brightness(2)" : "none";
+  return `width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; filter: ${filter} !important;`;
+});
+
+const settingsIconStyle = computed(() => {
+  const filter = settingsStore.isDarkTheme ? "invert(1) brightness(2)" : "opacity(0.7)";
+  return `width: 16px !important; height: 16px !important; filter: ${filter} !important;`;
+});
+
+const menuItemTextStyle = computed(() => {
+  return settingsStore.isDarkTheme ? "color: #f3f4f6 !important;" : "color: #374151 !important;";
+});
+
 const fabContainerRef = ref(null);
 let hoverTimerId = null;
 let fadeTimerId = null;
@@ -481,7 +517,16 @@ onMounted(async () => {
 
 .fab-menu-item:hover { 
   background-color: #f9fafb !important; 
-  color: #111827 !important;
+}
+
+/* Dark mode overrides */
+.is-dark .fab-menu-item:hover {
+  background-color: #3d3d3d !important;
+}
+
+/* Base icon specificity */
+.fab-menu-icon {
+  transition: filter 0.2s ease !important;
 }
 
 /* Transitions */
