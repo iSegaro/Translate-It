@@ -12,6 +12,7 @@
     
     <!-- This will host all in-page UI components -->
     <Toaster
+      v-if="shouldShowGlobalUI"
       rich-colors
       position="bottom-right"
       expand
@@ -134,6 +135,20 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
 // Detection for iframe vs main frame
 const isTopFrame = window === window.top;
+
+// Check if we can access the top frame (Same-Origin check)
+const canAccessTop = (() => {
+  try {
+    return !!(window.top && window.top.location && window.top.location.href);
+  } catch (e) {
+    return false;
+  }
+})();
+
+// A frame should show its own global UI (Toaster, FABs) if:
+// 1. It is the top frame
+// 2. OR it is a cross-origin iframe (isolated from top frame's UI/Events)
+const shouldShowGlobalUI = computed(() => isTopFrame || !canAccessTop);
 
 // Localization helper for template (Standard project approach)
 useUnifiedI18n();
