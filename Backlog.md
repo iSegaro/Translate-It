@@ -5,7 +5,6 @@ List of features, enhancements, and ideas planned for future development.
 ## Features and Enhancements
 
 - **PDF Support**: Enable direct translation of text within PDF files.
-- **Quick Voice Button**: Add a text-to-speech button next to the `Text Selection` translator icon to hear pronunciation without requiring a full translation.
 
 ---
 
