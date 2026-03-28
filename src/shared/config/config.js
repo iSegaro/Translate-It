@@ -178,7 +178,10 @@ export const CONFIG = {
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
-  DESKTOP_FAB_VERTICAL_POS: -1, // موقعیت عمودی دکمه دسترسی سریع (-1 یعنی پیش‌فرض)
+  DESKTOP_FAB_POSITION: { 
+    side: 'right', 
+    y: -1 
+  }, // موقعیت دکمه شناور دسکتاپ (سمت و ارتفاع)
   MOBILE_FAB_POSITION: { 
     side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
     y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
@@ -785,10 +788,10 @@ export const getShowDesktopFabAsync = async () => {
   );
 };
 
-export const getDesktopFabVerticalPosAsync = async () => {
+export const getDesktopFabPositionAsync = async () => {
   return getSettingValueAsync(
-    "DESKTOP_FAB_VERTICAL_POS",
-    CONFIG.DESKTOP_FAB_VERTICAL_POS
+    "DESKTOP_FAB_POSITION",
+    CONFIG.DESKTOP_FAB_POSITION
   );
 };
 

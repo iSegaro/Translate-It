@@ -15,8 +15,26 @@
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
         :title="t('desktop_fab_revert_tooltip')"
-        style="position: absolute !important; bottom: 42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; background-color: #fa5252 !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; box-shadow: 0 4px 12px rgba(250, 82, 82, 0.3) !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease !important; pointer-events: auto !important;"
-        :style="{ transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isRevertHovered ? 'scale(1.15)' : 'scale(1)') }"
+        :style="[
+          { 
+            'position': 'absolute !important', 
+            'bottom': '42px !important', 
+            'width': '32px !important', 
+            'height': '32px !important', 
+            'border-radius': '50% !important', 
+            'background-color': '#fa5252 !important', 
+            'display': 'flex !important', 
+            'justify-content': 'center !important', 
+            'align-items': 'center !important', 
+            'cursor': 'pointer !important', 
+            'box-shadow': side === 'right' ? '-4px 4px 12px rgba(250, 82, 82, 0.3) !important' : '4px 4px 12px rgba(250, 82, 82, 0.3) !important', 
+            'z-index': '2147483647 !important', 
+            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, left 0.5s ease, right 0.5s ease !important', 
+            'pointer-events': 'auto !important' 
+          },
+          side === 'right' ? { 'right': '15px !important' } : { 'left': '15px !important' },
+          { 'transform': getBadgeTransform(isHovered || isMenuOpen, isRevertHovered) }
+        ]"
         @click.stop="handleRevert"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
@@ -34,8 +52,25 @@
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
-        :style="menuStyle"
-        style="position: absolute !important; bottom: 0px !important; right: 85px !important; border-radius: 14px !important; padding: 8px 0 !important; min-width: 230px !important; width: max-content !important; display: flex !important; flex-direction: column !important; z-index: 2147483647 !important; overflow: hidden !important; margin: 0 !important;"
+        :style="[
+          menuStyle,
+          side === 'right' ? { 'right': '85px !important' } : { 'left': '85px !important' },
+          { 
+            'position': 'absolute !important', 
+            'bottom': '0px !important', 
+            'border-radius': '14px !important', 
+            'padding': '8px 0 !important', 
+            'min-width': '230px !important', 
+            'width': 'max-content !important', 
+            'display': 'flex !important', 
+            'flex-direction': 'column !important', 
+            'z-index': '2147483647 !important', 
+            'overflow': 'hidden !important', 
+            'margin': '0 !important',
+            'transition': 'all 0.3s ease, left 0.5s ease, right 0.5s ease !important',
+            'transform-origin': side === 'right' ? 'bottom right' : 'bottom left'
+          }
+        ]"
       >
         <div 
           v-for="item in menuItems" 
@@ -43,10 +78,10 @@
           class="fab-menu-item"
           :class="{ 'is-disabled': item.disabled }"
           style="display: flex !important; align-items: center !important; padding: 12px 18px !important; cursor: pointer !important; width: 100% !important; box-sizing: border-box !important; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;"
-          :style="item.disabled ? 'opacity: 0.5 !important; cursor: default !important; pointer-events: none !important;' : ''"
+          :style="item.disabled ? { 'opacity': '0.5 !important', 'cursor': 'default !important', 'pointer-events': 'none !important' } : {}"
           @click.stop="item.disabled ? null : handleMenuItemClick(item)"
         >
-          <div style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; margin-right: 12px !important; flex-shrink: 0 !important;">
+          <div :style="{ 'margin-right': side === 'right' ? '12px !important' : '0 !important', 'margin-left': side === 'left' ? '12px !important' : '0 !important', 'order': side === 'left' ? 2 : 0 }" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 24px !important; flex-shrink: 0 !important;">
             <img 
               v-if="item.icon" 
               :src="item.icon" 
@@ -55,7 +90,7 @@
               :style="menuIconStyle"
             >
           </div>
-          <span :style="menuItemTextStyle" style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
+          <span :style="[menuItemTextStyle, { 'text-align': side === 'right' ? 'left' : 'right' }]" style="font-size: 14px !important; font-weight: 500 !important; white-space: nowrap !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; line-height: 1.4 !important; flex: 1 !important;">{{ item.label }}</span>
         </div>
       </div>
     </Transition>
@@ -65,25 +100,33 @@
       class="desktop-fab-button"
       :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
       :title="t('desktop_fab_tooltip')"
-      :style="{ 
-        transform: isHovered || isMenuOpen ? 'translateX(-18px)' : 'translateX(0)',
-        cursor: 'pointer !important',
-        pointerEvents: 'auto !important'
-      }"
+      :style="[
+        { 
+          'transform': (isHovered || isMenuOpen ? (side === 'right' ? 'translateX(-18px)' : 'translateX(18px)') : 'translateX(0)'),
+          'cursor': 'pointer !important',
+          'pointer-events': 'auto !important',
+          'box-shadow': side === 'right' ? '-4px 0 20px rgba(0, 0, 0, 0.2)' : '4px 0 20px rgba(0, 0, 0, 0.2)'
+        },
+        side === 'right' ? { 'border-radius': '50% 0 0 50% !important' } : { 'border-radius': '0 50% 50% 0 !important' }
+      ]"
       @mousedown="startDrag"
       @click.stop="toggleMenu"
     >
       <img 
         src="@/icons/extension/extension_icon_64.svg" 
         :alt="t('desktop_fab_alt')" 
-        style="width: 32px !important; height: 32px !important; display: block !important; pointer-events: none !important; margin-right: 15px !important; object-fit: contain !important; filter: none !important; opacity: 1 !important; visibility: visible !important;"
+        :style="[
+          { 'width': '32px !important', 'height': '32px !important', 'display': 'block !important', 'pointer-events': 'none !important', 'object-fit': 'contain !important', 'filter': 'none !important', 'opacity': '1 !important', 'visibility': 'visible !important', 'transition': 'transform 0.5s ease !important' },
+          side === 'right' ? { 'margin-right': '15px !important', 'transform': 'scaleX(1)' } : { 'margin-left': '15px !important', 'transform': 'scaleX(-1)' }
+        ]"
       >
       <!-- Pending Selection Badge (ONLY in onFabClick mode) -->
       <Transition name="fade-scale">
         <div 
           v-if="pendingSelection.hasSelection && pendingSelection.mode === 'onFabClick'"
           class="fab-translate-badge"
-          style="position: absolute !important; top: -5px !important; left: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
+          :style="side === 'right' ? { 'left': '-5px !important' } : { 'right': '-5px !important' }"
+          style="position: absolute !important; top: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
         >
           <img
             :src="IconTranslateSelection"
@@ -101,12 +144,23 @@
         :title="t('desktop_fab_settings_tooltip')"
         :style="[
           settingsBadgeStyle, 
+          side === 'right' ? { 'right': '15px !important' } : { 'left': '15px !important' },
           { 
-            transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isSettingsHovered ? 'scale(1.15)' : 'scale(1)'),
-            bottom: (pendingSelection.hasSelection && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important'
+            'position': 'absolute !important', 
+            'width': '32px !important', 
+            'height': '32px !important', 
+            'border-radius': '50% !important', 
+            'display': 'flex !important', 
+            'justify-content': 'center !important', 
+            'align-items': 'center !important', 
+            'cursor': 'pointer !important', 
+            'z-index': '2147483647 !important', 
+            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s ease, right 0.5s ease !important', 
+            'pointer-events': 'auto !important',
+            'bottom': (pendingSelection.hasSelection && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important',
+            'transform': getBadgeTransform(isHovered || isMenuOpen, isSettingsHovered)
           }
         ]"
-        style="position: absolute !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; pointer-events: auto !important;"
         @click.stop="handleOpenSettings"
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
@@ -128,12 +182,24 @@
         :title="tts.isPlaying.value ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
         :style="[
           settingsBadgeStyle, 
+          side === 'right' ? { 'right': '15px !important' } : { 'left': '15px !important' },
           { 
-            transform: (isHovered || isMenuOpen ? 'translateX(-18px) ' : 'translateX(0) ') + (isTTSHovered ? 'scale(1.15)' : 'scale(1)') ,
-            backgroundColor: tts.isPlaying.value ? '#4A90E2 !important' : (settingsStore.isDarkTheme ? '#3d3d3d !important' : '#ffffff !important')
+            'position': 'absolute !important', 
+            'bottom': '-42px !important', 
+            'width': '32px !important', 
+            'height': '32px !important', 
+            'border-radius': '50% !important', 
+            'display': 'flex !important', 
+            'justify-content': 'center !important', 
+            'align-items': 'center !important', 
+            'cursor': 'pointer !important', 
+            'z-index': '2147483647 !important', 
+            'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, background-color 0.3s ease, left 0.5s ease, right 0.5s ease !important', 
+            'pointer-events': 'auto !important',
+            'background-color': tts.isPlaying.value ? '#4A90E2 !important' : (settingsStore.isDarkTheme ? '#3d3d3d !important' : '#ffffff !important'),
+            'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
           }
         ]"
-        style="position: absolute !important; bottom: -42px !important; right: 15px !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; justify-content: center !important; align-items: center !important; cursor: pointer !important; z-index: 2147483647 !important; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, background-color 0.3s ease !important; pointer-events: auto !important;"
         @click.stop="handleTTS"
         @mouseenter="isTTSHovered = true"
         @mouseleave="isTTSHovered = false"
@@ -144,7 +210,7 @@
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
           class="fab-menu-icon"
-          :style="[settingsIconStyle, { filter: tts.isPlaying.value ? 'brightness(0) invert(1) !important' : settingsIconStyle.filter }]"
+          :style="[settingsIconStyle, { 'filter': tts.isPlaying.value ? 'brightness(0) invert(1) !important' : (settingsIconStyle.filter || '') }]"
         >
       </div>
     </Transition>
@@ -163,7 +229,7 @@ import useSettingsStore from '@/features/settings/stores/settings.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getDesktopFabVerticalPosAsync } from '@/shared/config/config.js';
+import { getDesktopFabPositionAsync } from '@/shared/config/config.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 
@@ -191,33 +257,61 @@ const isSettingsHovered = ref(false);
 const isTTSHovered = ref(false);
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 
-// Theme-aware styles
+// Theme-aware styles as OBJECTS
 const menuStyle = computed(() => {
   if (settingsStore.isDarkTheme) {
-    return "background-color: #2d2d2d !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5) !important;";
+    return {
+      'background-color': '#2d2d2d !important',
+      'border': '1px solid rgba(255, 255, 255, 0.1) !important',
+      'box-shadow': '0 10px 30px -5px rgba(0, 0, 0, 0.5) !important'
+    };
   }
-  return "background-color: #ffffff !important; border: 1px solid rgba(0, 0, 0, 0.06) !important; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important;";
+  return {
+    'background-color': '#ffffff !important',
+    'border': '1px solid rgba(0, 0, 0, 0.06) !important',
+    'box-shadow': '0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 8px 15px -6px rgba(0, 0, 0, 0.1) !important'
+  };
 });
 
 const settingsBadgeStyle = computed(() => {
   if (settingsStore.isDarkTheme) {
-    return "background-color: #3d3d3d !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;";
+    return {
+      'background-color': '#3d3d3d !important',
+      'border': '1px solid rgba(255, 255, 255, 0.1) !important',
+      'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.4) !important'
+    };
   }
-  return "background-color: #ffffff !important; border: 1px solid rgba(0, 0, 0, 0.05) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;";
+  return {
+    'background-color': '#ffffff !important',
+    'border': '1px solid rgba(0, 0, 0, 0.05) !important',
+    'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.1) !important'
+  };
 });
 
 const menuIconStyle = computed(() => {
-  const filter = settingsStore.isDarkTheme ? "invert(1) brightness(2)" : "none";
-  return `width: 20px !important; height: 20px !important; object-fit: contain !important; display: block !important; border: none !important; padding: 0 !important; filter: ${filter} !important;`;
+  return {
+    'width': '20px !important',
+    'height': '20px !important',
+    'object-fit': 'contain !important',
+    'display': 'block !important',
+    'border': 'none !important',
+    'padding': '0 !important',
+    'filter': settingsStore.isDarkTheme ? 'invert(1) brightness(2) !important' : 'none !important'
+  };
 });
 
 const settingsIconStyle = computed(() => {
-  const filter = settingsStore.isDarkTheme ? "invert(1) brightness(2)" : "opacity(0.7)";
-  return `width: 16px !important; height: 16px !important; filter: ${filter} !important;`;
+  return {
+    'width': '16px !important',
+    'height': '16px !important',
+    'filter': settingsStore.isDarkTheme ? 'invert(1) brightness(2) !important' : 'opacity(0.7) !important'
+  };
 });
 
 const menuItemTextStyle = computed(() => {
-  return settingsStore.isDarkTheme ? "color: #f3f4f6 !important;" : "color: #374151 !important;";
+  return {
+    'color': settingsStore.isDarkTheme ? '#f3f4f6 !important' : '#374151 !important'
+  };
 });
 
 const fabContainerRef = ref(null);
@@ -337,8 +431,10 @@ const menuItems = computed(() => {
 });
 
 const verticalPos = ref(-1);
+const side = ref('right'); // 'right' or 'left'
 const isDragging = ref(false);
 let startY = 0;
+let startX = 0;
 
 const containerStyle = computed(() => {
   let opacityValue = 1;
@@ -346,20 +442,34 @@ const containerStyle = computed(() => {
     opacityValue = 0.2; 
   }
 
+  const isRight = side.value === 'right';
   const baseStyle = {
-    position: 'fixed !important',
-    right: '-25px !important',
-    zIndex: 2147483647,
-    transition: 'opacity 0.8s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important',
-    opacity: `${opacityValue} !important`,
-    left: 'auto !important'
+    'position': 'fixed !important',
+    'z-index': '2147483647 !important',
+    'transition': 'opacity 0.8s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s cubic-bezier(0.4, 0, 0.2, 1), right 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important',
+    'opacity': `${opacityValue} !important`,
   };
 
-  if (verticalPos.value === -1) {
-    return { ...baseStyle, bottom: '150px !important', top: 'auto !important' };
+  if (isRight) {
+    baseStyle.right = '-25px !important';
+    baseStyle.left = 'auto !important';
+  } else {
+    baseStyle.left = '-25px !important';
+    baseStyle.right = 'auto !important';
   }
-  return { ...baseStyle, top: `${verticalPos.value}px !important`, bottom: 'auto !important' };
+
+  if (verticalPos.value === -1) {
+    return { ...baseStyle, 'bottom': '150px !important', 'top': 'auto !important' };
+  }
+  return { ...baseStyle, 'top': `${verticalPos.value}px !important`, 'bottom': 'auto !important' };
 });
+
+const getBadgeTransform = (isHoveredOrOpen, isIndividualHovered) => {
+  const isRight = side.value === 'right';
+  const translateAmount = isRight ? -18 : 18;
+  const scale = isIndividualHovered ? 1.15 : 1;
+  return `translateX(${isHoveredOrOpen ? translateAmount : 0}px) scale(${scale})`;
+};
 
 const toggleMenu = () => {
   if (isDragging.value) return;
@@ -449,6 +559,7 @@ const startDrag = (e) => {
   }
   isDragging.value = false;
   startY = e.clientY - verticalPos.value;
+  startX = e.clientX;
   
   // Track temporary drag listeners through resource tracker
   tracker.addEventListener(window, 'mousemove', onDrag);
@@ -458,17 +569,28 @@ const startDrag = (e) => {
 const onDrag = (e) => {
   if (!isDragging.value) {
     const dy = e.clientY - startY - verticalPos.value;
-    if (Math.abs(dy) > 5) {
+    const dx = e.clientX - startX;
+    if (Math.abs(dy) > 5 || Math.abs(dx) > 10) {
       isDragging.value = true;
       isMenuOpen.value = false;
     }
   }
   if (isDragging.value) {
     e.preventDefault();
+    
+    // Vertical movement
     let newY = e.clientY - startY;
     const maxY = window.innerHeight - 60;
     newY = Math.max(10, Math.min(newY, maxY));
     verticalPos.value = newY;
+
+    // Horizontal detection for side switching
+    const screenWidth = window.innerWidth;
+    const currentSide = e.clientX > screenWidth / 2 ? 'right' : 'left';
+    if (currentSide !== side.value) {
+      side.value = currentSide;
+      logger.debug('FAB side switched:', side.value);
+    }
   }
 };
 
@@ -479,26 +601,35 @@ const stopDrag = () => {
   
   setTimeout(async () => { 
     isDragging.value = false; 
-    // Save position after drag ends
-    if (verticalPos.value !== -1) {
-      try {
-        await storageManager.set({ DESKTOP_FAB_VERTICAL_POS: verticalPos.value });
-      } catch (err) {
-        logger.info('Failed to save FAB position:', err);
-      }
+    // Save position and side after drag ends
+    try {
+      const position = {
+        side: side.value,
+        y: verticalPos.value
+      };
+      
+      await storageManager.set({ DESKTOP_FAB_POSITION: position });
+      logger.debug('Saved FAB position:', position);
+    } catch (err) {
+      logger.info('Failed to save FAB state:', err);
     }
   }, 100);
 };
 
 onMounted(async () => {
-  // Load saved position
+  // Load saved state
   try {
-    const savedPos = await getDesktopFabVerticalPosAsync();
-    if (savedPos !== -1) {
-      verticalPos.value = savedPos;
+    const position = await getDesktopFabPositionAsync();
+    if (position) {
+      if (position.y !== undefined && position.y !== -1) {
+        verticalPos.value = position.y;
+      }
+      if (position.side) {
+        side.value = position.side;
+      }
     }
   } catch (err) {
-    logger.info('Failed to load FAB position:', err);
+    logger.info('Failed to load FAB state:', err);
   }
 
   startFadeTimer();
