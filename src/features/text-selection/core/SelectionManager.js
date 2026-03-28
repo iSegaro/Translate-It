@@ -326,7 +326,9 @@ export class SelectionManager extends ResourceTracker {
   isWindowVisible() {
     const windowsManager = this.getWindowsManager();
     if (windowsManager) {
-      return windowsManager.state.isVisible || windowsManager.state.isIconMode;
+      return windowsManager.state.isVisible || 
+             windowsManager.state.isIconMode || 
+             windowsManager.state.pendingFabTrigger;
     }
 
     // Fallback: check shadow DOM

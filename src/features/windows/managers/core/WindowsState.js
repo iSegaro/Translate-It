@@ -147,7 +147,7 @@ export class WindowsState {
   }
 
   get hasActiveElements() {
-    return this.isVisible || this.isIconMode;
+    return this.isVisible || this.isIconMode || this.pendingFabTrigger;
   }
 
   get shouldPreventDismissal() {
