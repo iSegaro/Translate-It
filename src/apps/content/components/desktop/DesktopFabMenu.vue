@@ -157,7 +157,7 @@
             'z-index': '2147483647 !important', 
             'transition': 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.5s ease, right 0.5s ease !important', 
             'pointer-events': 'auto !important',
-            'bottom': (pendingSelection.hasSelection && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important',
+            'bottom': (isTTSActive && (isHovered || isMenuOpen) ? '-84px' : '-42px') + ' !important',
             'transform': getBadgeTransform(isHovered || isMenuOpen, isSettingsHovered)
           }
         ]"
@@ -174,10 +174,10 @@
       </div>
     </Transition>
 
-    <!-- TTS Button (Always in the first slot below main button when visible) -->
+    <!-- TTS Button (Visible when selection present OR when playing) -->
     <Transition name="fade-scale">
       <div 
-        v-if="pendingSelection.hasSelection && (isHovered || isMenuOpen)" 
+        v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
         :title="tts.isPlaying.value ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
         :style="[
@@ -429,6 +429,9 @@ const menuItems = computed(() => {
 
   return items;
 });
+
+// UI Helpers
+const isTTSActive = computed(() => pendingSelection.value.hasSelection || tts.isPlaying.value);
 
 const verticalPos = ref(-1);
 const side = ref('right'); // 'right' or 'left'
