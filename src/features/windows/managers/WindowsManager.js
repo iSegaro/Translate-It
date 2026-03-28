@@ -13,7 +13,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
 import settingsManager from '@/shared/managers/SettingsManager.js';
-import { state } from "@/shared/config/config.js";
+import { state, SelectionTranslationMode } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
@@ -304,9 +304,9 @@ export class WindowsManager extends ResourceTracker {
     
     // Check if this is an icon->window transition OR we're in onClick mode, preserve selection if so
     // In onClick mode, we show icons first and user will click later, so preserve selection
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
-    const isOnClickMode = selectionTranslationMode === 'onClick';
+    const isOnClickMode = selectionTranslationMode === SelectionTranslationMode.ON_CLICK;
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
     
     // Clear manual provider override for completely new selections
@@ -333,14 +333,14 @@ export class WindowsManager extends ResourceTracker {
         mode: selectionTranslationMode // Explicitly pass the mode
       });
 
-      if (selectionTranslationMode === "onFabClick") {
+      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
         this.logger.info('onFabClick mode: storing selection for FAB trigger', { textLength: selectedText?.length });
         this.state.setPendingFabTrigger(true);
         this.state.setOriginalText(selectedText);
         
         // Add dismiss listener to clear if user clicks away
         this._addDismissListener();
-      } else if (selectionTranslationMode === "onClick") {
+      } else if (selectionTranslationMode === SelectionTranslationMode.ON_CLICK) {
         await this._showIcon(selectedText, position);
       } else {
         await this._showWindow(selectedText, position);

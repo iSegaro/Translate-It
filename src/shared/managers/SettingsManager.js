@@ -12,6 +12,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { SelectionTranslationMode } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
 // Lazy logger initialization to avoid TDZ issues
@@ -71,7 +72,7 @@ class SettingsManager {
       TRANSLATE_ON_TEXT_FIELDS: false,
       TRANSLATE_ON_TEXT_SELECTION: true,
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
-      selectionTranslationMode: 'onClick',
+      selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
       SOURCE_LANGUAGE: 'auto',
       TARGET_LANGUAGE: 'fa',

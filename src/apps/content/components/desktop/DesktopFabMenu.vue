@@ -148,7 +148,7 @@
       <!-- Pending Selection Badge (ONLY in onFabClick mode) -->
       <Transition name="fade-scale">
         <div 
-          v-if="pendingSelection.hasSelection && pendingSelection.mode === 'onFabClick'"
+          v-if="pendingSelection.hasSelection && pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK"
           class="fab-translate-badge"
           :style="side === 'right' ? { 'left': '-5px !important' } : { 'right': '-5px !important' }"
           style="position: absolute !important; top: -5px !important; width: 22px !important; height: 22px !important; border-radius: 50% !important; background-color: #4A90E2 !important; border: 2px solid #ffffff !important; display: flex !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; z-index: 2147483647 !important;"
@@ -252,7 +252,7 @@ import useSettingsStore from '@/features/settings/stores/settings.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getDesktopFabPositionAsync } from '@/shared/config/config.js';
+import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 
@@ -374,7 +374,7 @@ const pendingSelection = ref({
   hasSelection: false,
   text: '',
   position: null,
-  mode: 'onClick' // Track which mode triggered the selection
+  mode: SelectionTranslationMode.ON_CLICK // Track which mode triggered the selection
 });
 
 const startFadeTimer = (forceVisible = true) => {
@@ -416,7 +416,7 @@ const menuItems = computed(() => {
   const items = [];
 
   // Add Translate Selection ONLY if specifically in onFabClick mode
-  if (pendingSelection.value.hasSelection && pendingSelection.value.mode === 'onFabClick') {
+  if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
     items.push({
       id: 'translate_selection',
       label: t('desktop_fab_translate_selection_label'),
@@ -565,11 +565,11 @@ const toggleMenu = () => {
   
   /**
    * IMPORTANT: FAB Behavior Logic
-   * 1. If mode is 'onFabClick' AND text is selected: Translate immediately.
+   * 1. If mode is SelectionTranslationMode.ON_FAB_CLICK AND text is selected: Translate immediately.
    * 2. In ALL other cases (onClick, immediate, or no selection): JUST open the menu.
    * This ensures the TTS button is available without forcing a translation.
    */
-  const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === 'onFabClick';
+  const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK;
   
   if (isOnFabClickMode) {
     logger.info('FAB executing direct translation (onFabClick mode)');
@@ -598,7 +598,7 @@ const triggerTranslation = () => {
     hasSelection: false,
     text: '',
     position: null,
-    mode: 'onClick'
+    mode: SelectionTranslationMode.ON_CLICK
   };
 };
 
@@ -746,7 +746,7 @@ onMounted(async () => {
     logger.debug('Received desktop selection pending event', { mode: detail.mode });
     
     // ONLY wake up the FAB (unfade) if we are in onFabClick mode
-    if (detail.mode === 'onFabClick') {
+    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK) {
       startFadeTimer();
     }
 
@@ -754,7 +754,7 @@ onMounted(async () => {
       hasSelection: true,
       text: detail.text,
       position: detail.position,
-      mode: detail.mode || 'onClick'
+      mode: detail.mode || SelectionTranslationMode.ON_CLICK
     };
   });
 
@@ -765,7 +765,7 @@ onMounted(async () => {
       hasSelection: false,
       text: '',
       position: null,
-      mode: 'onClick'
+      mode: SelectionTranslationMode.ON_CLICK
     };
   });
 });

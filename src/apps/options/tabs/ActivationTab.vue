@@ -214,21 +214,21 @@
         <div class="radio-group">
           <BaseRadio
             v-model="selectionTranslationMode"
-            value="immediate"
+            :value="SelectionTranslationMode.IMMEDIATE"
             name="selectionTranslationMode"
             :disabled="!extensionEnabled"
             :label="t('options_selection_mode_immediate') || 'Immediate'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
-            value="onClick"
+            :value="SelectionTranslationMode.ON_CLICK"
             name="selectionTranslationMode"
             :disabled="!extensionEnabled"
             :label="t('options_selection_mode_onclick') || 'On Click'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
-            value="onFabClick"
+            :value="SelectionTranslationMode.ON_FAB_CLICK"
             name="selectionTranslationMode"
             :disabled="!extensionEnabled || !showDesktopFab"
             :label="t('options_selection_mode_onfabclick') || 'Use Desktop FAB'"
@@ -238,7 +238,7 @@
         <div class="setting-group sub-setting-group">
           <BaseCheckbox
             v-model="requireCtrlForTextSelection"
-            :disabled="!extensionEnabled || selectionTranslationMode !== 'immediate'"
+            :disabled="!extensionEnabled || selectionTranslationMode !== SelectionTranslationMode.IMMEDIATE"
             :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
           />
         </div>
@@ -450,7 +450,7 @@ const translateOnTextSelection = computed({
 })
 
 const selectionTranslationMode = computed({
-  get: () => settingsStore.settings?.selectionTranslationMode || 'immediate',
+  get: () => settingsStore.settings?.selectionTranslationMode || SelectionTranslationMode.IMMEDIATE,
   set: (value) => settingsStore.updateSettingLocally('selectionTranslationMode', value)
 })
 
@@ -496,7 +496,7 @@ const wholePageShowOriginal = computed({
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
 })
 
-import { TranslationMode } from '@/shared/config/config.js'
+import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // --- Mode Specific Providers ---

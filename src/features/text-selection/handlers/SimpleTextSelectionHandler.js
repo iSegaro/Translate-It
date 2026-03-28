@@ -7,6 +7,7 @@ import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { SelectionTranslationMode } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
@@ -324,7 +325,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this._settingsListeners.push(
         settingsManager.onChange('selectionTranslationMode', (newValue) => {
           logger.debug('selectionTranslationMode changed:', newValue);
-          if (newValue === 'onClick' && this.selectionManager) {
+          if (newValue === SelectionTranslationMode.ON_CLICK && this.selectionManager) {
             this.selectionManager.dismissWindow();
           }
         }, 'simple-text-selection')
@@ -620,11 +621,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         return false;
       }
 
-      const selectionTranslationMode = settingsManager.get('selectionTranslationMode', 'onClick');
+      const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
       logger.debug('Selection translation mode:', selectionTranslationMode);
 
       // Only check Ctrl requirement in immediate mode
-      if (selectionTranslationMode === "immediate") {
+      if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
         const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
         const isCtrlPressed = this.isCtrlRecentlyPressed();
         logger.debug('Ctrl requirement check:', { requireCtrl, ctrlPressed: isCtrlPressed });

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
-import { CONFIG, TranslationMode } from '@/shared/config/config.js'
+import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
@@ -31,7 +31,7 @@ function getDefaultSettings() {
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
     TIMEOUT: CONFIG.TIMEOUT || 30000,
-    selectionTranslationMode: CONFIG.selectionTranslationMode || 'onClick',
+    selectionTranslationMode: CONFIG.selectionTranslationMode || SelectionTranslationMode.ON_CLICK,
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'replace',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',

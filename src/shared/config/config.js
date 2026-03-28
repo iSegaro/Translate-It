@@ -34,6 +34,15 @@ export const TranslationMode = {
   LEGACY_DICTIONARY: 'dictionary'
 };
 
+/**
+ * Selection Translation Modes
+ */
+export const SelectionTranslationMode = {
+  IMMEDIATE: 'immediate',
+  ON_FAB_CLICK: 'onFabClick',
+  ON_CLICK: 'onClick'
+};
+
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
     "Extension context invalid. Please refresh the page to continue.",
@@ -61,7 +70,7 @@ export const CONFIG = {
   TARGET_LANGUAGE: "fa",
   THEME: "auto",
   TIMEOUT: 30000,
-  selectionTranslationMode: "onClick", // "immediate", "onFabClick"
+  selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
