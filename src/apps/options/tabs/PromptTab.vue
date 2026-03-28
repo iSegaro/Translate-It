@@ -17,7 +17,7 @@
       <BaseTextarea
         v-model="promptTemplate"
         :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
-        :rows="5"
+        :rows="10"
         class="prompt-template-input"
         dir="ltr"
       />
@@ -173,7 +173,7 @@ const resetPrompt = async () => {
     line-height: 1.6;
     background-color: var(--input-bg-color, var(--color-background));
     color: var(--input-text-color, var(--color-text));
-    min-height: 150px;
+    min-height: 280px;
     
     &.highlight-on-reset {
       animation: strong-highlight 1s ease-out;
