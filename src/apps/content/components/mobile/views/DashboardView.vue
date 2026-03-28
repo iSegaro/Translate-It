@@ -65,7 +65,7 @@
           style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
         >
           <img
-            :src="translateIcon"
+            :src="inputIcon"
             :alt="t('mobile_dashboard_input_label') || 'Input'"
             class="ti-toolbar-icon"
             style="width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important;"
@@ -194,7 +194,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
-import translateIcon from '@/icons/ui/translate.png';
+import inputIcon from '@/icons/extension/extension_icon_128.svg';
 import settingsIcon from '@/icons/ui/settings.png';
 import revertIcon from '@/icons/ui/revert.png';
 import historyIcon from '@/icons/ui/history.svg';
