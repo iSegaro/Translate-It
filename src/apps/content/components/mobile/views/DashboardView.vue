@@ -6,12 +6,12 @@
   >
     <div
       class="ti-m-dashboard-scroll-container"
-      style="display: flex; flex-flow: row nowrap; align-items: center; justify-content: center; width: 100%; padding: 12px 15px; gap: 8px; box-sizing: border-box; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x;"
+      style="display: flex; flex-flow: row nowrap; align-items: center; justify-content: center; width: 100%; padding: 12px 10px; gap: 4px; box-sizing: border-box; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x;"
     >
       <!-- Translate Page Button -->
       <button
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="translatePage"
       >
         <div
@@ -34,7 +34,7 @@
       <!-- Select Element Button -->
       <button
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="activateSelectElement"
       >
         <div
@@ -57,7 +57,7 @@
       <!-- Manual Translation Button -->
       <button
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="goToInputView"
       >
         <div
@@ -80,7 +80,7 @@
       <!-- History Button -->
       <button
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="goToHistoryView"
       >
         <div
@@ -104,7 +104,7 @@
       <button
         v-if="hasElementTranslations"
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="revertTranslations"
       >
         <div
@@ -127,7 +127,7 @@
       <!-- Settings Button -->
       <button
         class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
         @click="openSettings"
       >
         <div
