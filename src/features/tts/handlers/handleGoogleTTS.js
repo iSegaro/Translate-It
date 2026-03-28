@@ -133,6 +133,27 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     
     // Create Google TTS URL with better parameters to avoid HTTP 400
     let finalText = trimmedText;
+
+    // Smart Extraction: If text looks like a dictionary or list, only take the first meaningful line
+    // This improves UX by not reading out technical dictionary terms or long AI bullet lists
+    const lines = finalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const isComplexContent = lines.length > 1 && (
+      finalText.includes('**') || // Markdown bold (often headers)
+      finalText.includes('###') || // Markdown headers
+      lines[0].includes(':') ||    // Definition style
+      /^[•\-\*\d\.]/.test(lines[0]) // Starts with bullet or number
+    );
+
+    if (isComplexContent) {
+      logger.debug('Complex content detected, extracting primary line');
+      // Take the first line as the primary translation
+      finalText = lines[0];
+      
+      // If the first line is just a header (like "### Translation:"), try the second line
+      if (finalText.toLowerCase().includes('translation:') && lines.length > 1) {
+        finalText = lines[1];
+      }
+    }
     
     // Clean text for TTS (remove markdown, extra whitespace, special chars)
     finalText = finalText
@@ -141,6 +162,8 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
       .replace(/__(.*?)__/g, '$1')     // Remove __underline__
       .replace(/_([^_]+)_/g, '$1')     // Remove _emphasis_
+      // Remove common list/bullet prefixes
+      .replace(/^[•\-\*\d\.]+\s+/, '')
       // Remove definition patterns (noun:, verb:, adj:, etc.)
       .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
       .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
