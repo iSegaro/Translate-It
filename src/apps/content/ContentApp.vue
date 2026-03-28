@@ -364,6 +364,9 @@ onMounted(async () => {
     
   
   tracker.addEventListener(pageEventBus, 'show-notification', async (detail) => {
+    // Only process notifications if this frame is responsible for showing global UI
+    if (!shouldShowGlobalUI.value) return;
+
     // Create a unique key for this notification
     const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
 
