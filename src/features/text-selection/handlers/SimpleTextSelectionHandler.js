@@ -496,11 +496,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       });
 
       if (!selectedText) {
-        // Check if preservation is active - if so, skip dismissal
-        if (this._isPreservationActive()) {
-          logger.debug('Selection preservation active - skipping dismissal', {
-            reason: this._preservationState.reason,
-            remainingTime: this._preservationState.duration - (Date.now() - this._preservationState.timestamp)
+        // Only skip dismissal if preservation is active AND we are dragging
+        // If the user clicked to unselect (not dragging), we should dismiss regardless of preservation
+        if (this._isPreservationActive() && this.isDragging) {
+          logger.debug('Selection preservation active during drag - skipping dismissal', {
+            reason: this._preservationState.reason
           });
           return;
         }
