@@ -27,7 +27,7 @@
   
   // Neutral colors (mapped from theme)
   --color-background: var(--bg-color, #ffffff);
-  --color-surface: var(--sidebar-bg-color, #f5f5f5);
+  --color-surface: #f5f5f5;
   --color-surface-alt: var(--main-bg-color, #fafafa);
   --color-textarea-background: var(--textarea-bg-color, #f1f3f4);
   --color-border: var(--border-color, #e0e0e0);
@@ -135,6 +135,7 @@
   --color-background: var(--bg-color, #ffffff);
   --color-background-secondary: var(--bg-result-color, #f8f9fa);
   --color-background-soft: var(--sidebar-bg-color, #fffbe6);
+  --color-surface: #f5f5f5;
   --color-border: var(--border-color, #e0e0e0);
   --color-border-light: rgba(0, 0, 0, 0.05);
   --color-primary: var(--link-color, #1a73e8);
