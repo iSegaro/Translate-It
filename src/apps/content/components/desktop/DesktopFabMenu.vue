@@ -283,6 +283,7 @@ const ANIMATION_CONFIG = {
   SOFT_EASING: 'cubic-bezier(0.22, 1, 0.36, 1)',
   STANDARD_EASING: 'ease',
   IDLE_TIMEOUT: 500,
+  LEAVE_DELAY: 400, // Grace period before starting the exit animation
   OPACITY_DIMMED: 0.2,
   OPACITY_FULL: 1
 };
@@ -403,14 +404,12 @@ const handleMouseEnter = () => {
 };
 
 const handleMouseLeave = () => {
-  // Execute both immediately to make them simultaneous
-  isHovered.value = false;
-  isFaded.value = true;
-  
-  if (hoverTimerId) {
-    tracker.clearTimer(hoverTimerId);
+  // Start a timer before closing/fading to give user a grace period
+  hoverTimerId = tracker.trackTimeout(() => {
+    isHovered.value = false;
+    isFaded.value = true;
     hoverTimerId = null;
-  }
+  }, ANIMATION_CONFIG.LEAVE_DELAY);
 };
 
 const menuItems = computed(() => {
