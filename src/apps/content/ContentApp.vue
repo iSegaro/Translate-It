@@ -83,16 +83,16 @@
       <ElementHighlightOverlay />
 
       <!-- Mobile Bottom Sheet -->
-      <MobileSheet v-if="isMobileUI" />
+      <MobileSheet v-if="isMobileUI && isTopFrame" />
 
       <!-- Desktop FAB Menu -->
       <DesktopFabMenu 
-        v-if="!isMobileUI && showDesktopFab" 
+        v-if="!isMobileUI && showDesktopFab && isTopFrame" 
       />
 
       <!-- Mobile Floating Action Button (FAB) -->
       <MobileFab
-        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen"
+        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen && isTopFrame"
       />
     </template>
   </div>
@@ -131,6 +131,9 @@ import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 const pageEventBus = window.pageEventBus;
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
+
+// Detection for iframe vs main frame
+const isTopFrame = window === window.top;
 
 // Localization helper for template (Standard project approach)
 useUnifiedI18n();
