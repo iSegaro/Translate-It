@@ -108,10 +108,11 @@ export class RevertHandler extends ResourceTracker {
           pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
           logger.info('Success notification sent');
         } else {
-          const { getTranslationString } = await utilsFactory.getI18nUtils();
-          const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
-          pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
-          logger.info('Warning notification sent - no translations found');
+          // const { getTranslationString } = await utilsFactory.getI18nUtils();
+          // const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
+          // pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
+          // logger.info('Warning notification sent - no translations found');
+          logger.info('No translations found to revert');
         }
       } else {
         logger.debug('Skipping notification emission in same-origin iframe (top frame will handle it)');

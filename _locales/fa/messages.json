@@ -1226,7 +1226,7 @@
     "message": "بازگردانی شد"
   },
   "STATUS_REVERT_NOT_FOUND": {
-    "message": "متنی برای بازگردانی یافت نشد."
+    "message": "ترجمه‌ای برای بازگردانی وجود ندارد."
   },
   "STATUS_FROM_MEMORY": {
     "message": "از حافظه"

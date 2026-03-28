@@ -1233,7 +1233,7 @@
     "message": "元に戻しました"
   },
   "STATUS_REVERT_NOT_FOUND": {
-    "message": "元に戻すテキストが見つかりません。"
+    "message": "元に戻せる翻訳はありません。"
   },
   "STATUS_FROM_MEMORY": {
     "message": "キャッシュから取得"

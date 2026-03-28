@@ -1233,7 +1233,7 @@
     "message": "Reverted"
   },
   "STATUS_REVERT_NOT_FOUND": {
-    "message": "No text found to revert."
+    "message": "No translations found to revert."
   },
   "STATUS_FROM_MEMORY": {
     "message": "From Memory"
