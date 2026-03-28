@@ -744,7 +744,12 @@ onMounted(async () => {
   // Listen for selection pending from WindowsManager
   tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.DESKTOP_SELECTION_PENDING, (detail) => {
     logger.debug('Received desktop selection pending event', { mode: detail.mode });
-    startFadeTimer(); // Trigger unfade and then auto-fade
+    
+    // ONLY wake up the FAB (unfade) if we are in onFabClick mode
+    if (detail.mode === 'onFabClick') {
+      startFadeTimer();
+    }
+
     pendingSelection.value = {
       hasSelection: true,
       text: detail.text,
