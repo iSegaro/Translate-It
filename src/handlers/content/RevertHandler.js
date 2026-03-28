@@ -92,16 +92,29 @@ export class RevertHandler extends ResourceTracker {
       }
 
       // Show a single, unified notification
-      if (totalRevertedCount > 0) {
-        const { getTranslationString } = await utilsFactory.getI18nUtils();
-        const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
-        pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
-        logger.info('Success notification sent');
+      // CRITICAL: Only the top frame or cross-origin iframes should emit notifications
+      // same-origin iframes share the event bus and UI with the top frame, so we avoid duplicate toasts
+      const isTopFrame = window === window.top;
+      const canAccessTop = (() => {
+        try { return !!(window.top && window.top.location && window.top.location.href); }
+        catch (e) { return false; }
+      })();
+      const shouldEmitNotification = isTopFrame || !canAccessTop;
+
+      if (shouldEmitNotification) {
+        if (totalRevertedCount > 0) {
+          const { getTranslationString } = await utilsFactory.getI18nUtils();
+          const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
+          pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
+          logger.info('Success notification sent');
+        } else {
+          const { getTranslationString } = await utilsFactory.getI18nUtils();
+          const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
+          pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
+          logger.info('Warning notification sent - no translations found');
+        }
       } else {
-        const { getTranslationString } = await utilsFactory.getI18nUtils();
-        const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
-        pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
-        logger.info('Warning notification sent - no translations found');
+        logger.debug('Skipping notification emission in same-origin iframe (top frame will handle it)');
       }
 
       const result = {
