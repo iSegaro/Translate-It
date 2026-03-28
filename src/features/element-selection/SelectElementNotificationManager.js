@@ -4,6 +4,7 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
@@ -301,7 +302,15 @@ class SelectElementNotificationManager extends ResourceTracker {
     // Get localized strings
     const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
     const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';
-    const message = await getTranslationString('SELECT_ELEMENT_MODE_ACTIVATED') || 'Element selection mode activated. Click on any text element to translate.';
+    
+    // Select appropriate message based on device type
+    const isMobile = deviceDetector.isMobile();
+    const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
+    const defaultMessage = isMobile 
+      ? 'Drag your finger over any text to translate.' 
+      : 'Click on any text element to translate.';
+    
+    const message = await getTranslationString(messageKey) || defaultMessage;
 
     const baseActions = [
       {

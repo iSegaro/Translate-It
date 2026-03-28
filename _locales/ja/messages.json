@@ -1488,7 +1488,10 @@
     "message": "フォントの読み込みに失敗しました"
   },
   "SELECT_ELEMENT_MODE_ACTIVATED": {
-    "message": "要素選択モードが有効です。翻訳したいテキスト要素をクリックしてください。"
+    "message": "翻訳したいテキスト要素をクリックしてください。"
+  },
+  "SELECT_ELEMENT_MODE_ACTIVATED_MOBILE": {
+    "message": "翻訳したいテキストを指でなぞってください。"
   },
   "SELECT_ELEMENT_TRANSLATING": {
     "message": "翻訳中..."

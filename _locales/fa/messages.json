@@ -1479,7 +1479,10 @@
     "message": "خطا در بارگذاری فونت‌ها"
   },
   "SELECT_ELEMENT_MODE_ACTIVATED": {
-    "message": "حالت انتخاب فعال شد. روی متنی که می‌خواهید ترجمه شود کلیک کنید."
+    "message": "روی متنی که می‌خواهید ترجمه شود کلیک کنید."
+  },
+  "SELECT_ELEMENT_MODE_ACTIVATED_MOBILE": {
+    "message": "انگشت خود را روی متن بکشید تا ترجمه شود."
   },
   "SELECT_ELEMENT_TRANSLATING": {
     "message": "در حال ترجمه..."
