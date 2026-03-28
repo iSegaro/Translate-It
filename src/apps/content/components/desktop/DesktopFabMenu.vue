@@ -441,10 +441,21 @@ const menuItems = computed(() => {
 const isTTSActive = computed(() => pendingSelection.value.hasSelection || tts.isPlaying.value);
 
 const verticalPos = ref(-1);
+const userPreferredY = ref(null); // The position user actually set
 const side = ref('right'); // 'right' or 'left'
 const isDragging = ref(false);
 let startY = 0;
 let startX = 0;
+
+const checkBounds = () => {
+  if (typeof window === 'undefined' || userPreferredY.value === null) return;
+  
+  // Constrain FAB within visible area (10px from top, 60px from bottom)
+  const maxY = window.innerHeight - 60;
+  verticalPos.value = Math.max(10, Math.min(userPreferredY.value, maxY));
+  
+  logger.debug('Desktop FAB bounds checked', { current: verticalPos.value, preferred: userPreferredY.value });
+};
 
 const containerStyle = computed(() => {
   let opacityValue = 1;
@@ -613,6 +624,7 @@ const stopDrag = () => {
     isDragging.value = false; 
     // Save position and side after drag ends
     try {
+      userPreferredY.value = verticalPos.value;
       const position = {
         side: side.value,
         y: verticalPos.value
@@ -632,15 +644,22 @@ onMounted(async () => {
     const position = await getDesktopFabPositionAsync();
     if (position) {
       if (position.y !== undefined && position.y !== -1) {
+        userPreferredY.value = position.y;
         verticalPos.value = position.y;
       }
       if (position.side) {
         side.value = position.side;
       }
     }
+    
+    // Initial bounds check
+    checkBounds();
   } catch (err) {
     logger.info('Failed to load FAB state:', err);
   }
+
+  // Add resize listener using tracker
+  tracker.addEventListener(window, 'resize', checkBounds);
 
   startFadeTimer();
 
