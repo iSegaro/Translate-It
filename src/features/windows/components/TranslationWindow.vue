@@ -4,7 +4,7 @@
     v-if="currentSize === 'small'"
     v-show="!isFullscreen"
     ref="windowElement"
-    class="ti-window aiwc-selection-popup-host ti-loading-window"
+    class="ti-window translation-window aiwc-selection-popup-host ti-loading-window"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     data-translate-ui="true"
@@ -23,7 +23,7 @@
     v-else
     v-show="!isFullscreen"
     ref="windowElement"
-    class="ti-window aiwc-selection-popup-host normal-window"
+    class="ti-window translation-window aiwc-selection-popup-host normal-window"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     data-translate-ui="true"
@@ -353,11 +353,14 @@ const handleStartDrag = (event) => {
 </script>
 
 <style scoped>
+.ti-window { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+.ti-window.light { background-color: #ffffff !important; color: #2c3e50 !important; border: 1px solid #e8e8e8 !important; }
+.ti-window.dark { background-color: #2d2d2d !important; color: #e0e0e0 !important; border: 1px solid #424242 !important; }
 .ti-window-header { display: flex !important; align-items: center !important; justify-content: space-between !important; padding: 8px 12px !important; cursor: move !important; user-select: none !important; }
-.translation-window.light .ti-window-header { background-color: #f7f7f7 !important; border-bottom: 1px solid #e8e8e8 !important; }
-.translation-window.light .ti-action-btn { background-color: #f0f0f0 !important; color: #555 !important; }
-.translation-window.dark .ti-window-header { background-color: #333333 !important; border-bottom: 1px solid #424242 !important; }
-.translation-window.dark .ti-action-btn { background-color: #424242 !important; color: #e0e0e0 !important; }
+.ti-window.light .ti-window-header { background-color: #f7f7f7 !important; border-bottom: 1px solid #e8e8e8 !important; }
+.ti-window.light .ti-action-btn { background-color: #f0f0f0 !important; color: #555 !important; }
+.ti-window.dark .ti-window-header { background-color: #333333 !important; border-bottom: 1px solid #424242 !important; }
+.ti-window.dark .ti-action-btn { background-color: #424242 !important; color: #e0e0e0 !important; }
 .ti-header-actions { display: flex; align-items: center; gap: 8px; }
 .ti-header-close { display: flex; align-items: center; }
 .ti-action-btn { display: flex !important; align-items: center !important; justify-content: center !important; width: 28px !important; height: 28px !important; border: none !important; border-radius: 6px !important; cursor: pointer !important; transition: background-color 0.2s ease !important; }
@@ -369,5 +372,6 @@ const handleStartDrag = (event) => {
 .ti-smart-tts-btn:not(.ti-original-mode) { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important; }
 .ti-window-body { padding: 16px !important; min-height: 100px !important; display: flex !important; flex-direction: column !important; }
 .ti-window-translation-display { flex: 1; min-height: 80px; position: relative; contain: layout style; overflow: clip; min-width: 0; width: 100%; }
-.translation-window.loading-window { width: 60px !important; height: 40px !important; border-radius: 20px !important; display: flex !important; align-items: center !important; justify-content: center !important; background: #fff !important; border: 1px solid rgba(0, 0, 0, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important; }
+.ti-window.loading-window { width: 60px !important; height: 40px !important; border-radius: 20px !important; display: flex !important; align-items: center !important; justify-content: center !important; background: #fff !important; border: 1px solid rgba(0, 0, 0, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important; }
+.ti-window.dark.loading-window { background: #333 !important; border-color: #444 !important; }
 </style>

@@ -167,7 +167,8 @@ onMounted(() => {
 }
 
 // Ensure icon visibility in dark mode (if PNGs have dark lines/fills)
-:root.theme-dark .theme-img-icon {
+:root.theme-dark .theme-img-icon,
+.theme-dark .theme-img-icon {
   filter: invert(0.9) brightness(1.5);
 }
 

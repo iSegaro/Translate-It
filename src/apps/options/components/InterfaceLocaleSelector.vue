@@ -277,9 +277,10 @@ onUnmounted(() => {
     font-weight: var(--font-weight-medium);
   }
 
-  :root.theme-dark &.selected {
-    background-color: #1a365d;
-    color: white;
+  :root.theme-dark &.selected,
+  .theme-dark &.selected {
+    background-color: var(--color-active-background, #1a365d);
+    color: var(--color-active-text, white);
   }
 }
 
@@ -315,9 +316,10 @@ onUnmounted(() => {
     font-weight: var(--font-weight-medium);
   }
 
-  :root.theme-dark &.selected {
-    background-color: #1a365d;
-    color: white;
+  :root.theme-dark &.selected,
+  .theme-dark &.selected {
+    background-color: var(--color-active-background, #1a365d);
+    color: var(--color-active-text, white);
   }
 }
 

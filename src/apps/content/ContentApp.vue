@@ -1,6 +1,10 @@
 <template>
   <div
-    :class="['content-app-container', TRANSLATION_HTML.NO_TRANSLATE_CLASS]"
+    :class="[
+      'content-app-container', 
+      TRANSLATION_HTML.NO_TRANSLATE_CLASS,
+      settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light'
+    ]"
     :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE"
   >
     <!-- نمونه استفاده از ترجمه -->

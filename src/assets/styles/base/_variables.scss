@@ -1,6 +1,79 @@
+// Z-index CSS Custom Properties
+:root {
+  // Z-index layers
+  --ti-z-base: 1;
+  --ti-z-dropdown: 1000;
+  --ti-z-tooltip: 1010;
+  --ti-z-modal: 1020;
+  --ti-z-notification: 1030;
+  --ti-z-overlay: 1040;
+  --ti-z-selection: 1050;
+  --ti-z-field-icon: 1060;
+  --ti-z-max: 2147483647;
+}
+
+// Map theme variables to component variables with fallbacks
+// These definitions should be first so theme-specific blocks can override them if needed
+:root {
+  // Primary colors (mapped from theme)
+  --color-primary: var(--tab-button-active-color, #1976d2);
+  --color-primary-light: #42a5f5;
+  --color-primary-dark: var(--button-hover-bg-color, #1565c0);
+  
+  // Secondary colors
+  --color-secondary: #dc004e;
+  --color-secondary-light: #ff6090;
+  --color-secondary-dark: #9a0036;
+  
+  // Neutral colors (mapped from theme)
+  --color-background: var(--bg-color, #ffffff);
+  --color-surface: var(--sidebar-bg-color, #f5f5f5);
+  --color-surface-alt: var(--main-bg-color, #fafafa);
+  --color-textarea-background: var(--textarea-bg-color, #f1f3f4);
+  --color-border: var(--border-color, #e0e0e0);
+  --color-text: var(--text-color, #212121);
+  --color-text-secondary: var(--tab-button-color, #757575);
+  --color-text-disabled: #bdbdbd;
+  
+  // Component-specific variables (mapped from theme)  
+  --color-bg-secondary: var(--sidebar-bg-color, #f8f9fa);
+  --color-text-placeholder: var(--placeholder-color, #9aa0a6);
+    
+  // Default fallback values for provider icon filtering (light theme bias)
+  --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
+  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  
+  /* Spacing */
+  --spacing-md: 16px;
+  --spacing-sm: 8px;
+
+  /* Theme-aware Color Variables */
+  --color-background-hover: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+  --color-active-background: var(--tab-button-active-bg, #e8f0fe);
+  --color-active-text: var(--tab-button-active-color, #1967d2);
+  --color-primary-alpha: var(--accent-color-alpha, rgba(25, 103, 210, 0.2));
+  --color-surface-shadow: var(--provider-icon-active-shadow, rgba(0, 0, 0, 0.1));
+
+  /* Typography */
+  --font-size-xxl: 24px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-weight-medium: 500;
+
+  /* Borders */
+  --border-width: 1px;
+  --border-style: solid;
+
+  /* Transitions */
+  --transition-base: 0.2s ease;
+
+  /* Border Radius */
+  --border-radius-lg: 12px;
+}
+
 // Theme Variables for Options Page (from OLD CSS)
 // Modern SCSS using @forward for shared variables
-:root.theme-light {
+:root.theme-light, .theme-light {
   // Base colors
   --bg-color: #ffffff;
   --text-color: #202124;
@@ -59,14 +132,19 @@
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);
   --color-text-secondary: var(--placeholder-color, #9aa0a6);
-  --color-background: var(--bg-color, #202124);
-  --color-background-soft: var(--sidebar-bg-color, #303741);
-  --color-border: var(--border-color, #3c4043);
-  --color-primary: var(--link-color, #8ab4f8);
+  --color-background: var(--bg-color, #ffffff);
+  --color-background-secondary: var(--bg-result-color, #f8f9fa);
+  --color-background-soft: var(--sidebar-bg-color, #fffbe6);
+  --color-border: var(--border-color, #e0e0e0);
+  --color-border-light: rgba(0, 0, 0, 0.05);
+  --color-primary: var(--link-color, #1a73e8);
   --color-error: #ef5350;
+  --color-success: #4caf50;
+  --color-success-alpha: rgba(76, 175, 80, 0.1);
+  --color-info: #2196f3;
 }
 
-:root.theme-dark {
+:root.theme-dark, .theme-dark {
   // Base colors
   --bg-color: #202124;
   --text-color: #e8eaed;
@@ -133,88 +211,17 @@
   --color-text: var(--text-color, #e8eaed);
   --color-text-secondary: var(--placeholder-color, #888);
   --color-background: var(--bg-color, #202124);
+  --color-background-secondary: var(--bg-result-color, #0e0e0e);
   --color-background-soft: var(--sidebar-bg-color, #303741);
   --color-border: var(--border-color, #3c4043);
+  --color-border-light: rgba(255, 255, 255, 0.1);
   --color-primary: var(--link-color, #8ab4f8);
   --color-error: #ef5350;
+  --color-success: #66bb6a;
+  --color-success-alpha: rgba(102, 187, 106, 0.1);
+  --color-info: #42a5f5;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
-}
-
-// Z-index CSS Custom Properties
-:root {
-  // Z-index layers
-  --ti-z-base: 1;
-  --ti-z-dropdown: 1000;
-  --ti-z-tooltip: 1010;
-  --ti-z-modal: 1020;
-  --ti-z-notification: 1030;
-  --ti-z-overlay: 1040;
-  --ti-z-selection: 1050;
-  --ti-z-field-icon: 1060;
-  --ti-z-max: 2147483647;
-}
-
-// Map theme variables to component variables
-:root {
-  // Primary colors (mapped from theme)
-  --color-primary: var(--tab-button-active-color, #1976d2);
-  --color-primary-light: #42a5f5;
-  --color-primary-dark: var(--button-hover-bg-color, #1565c0);
-  
-  // Secondary colors
-  --color-secondary: #dc004e;
-  --color-secondary-light: #ff6090;
-  --color-secondary-dark: #9a0036;
-  
-  // Neutral colors (mapped from theme)
-  --color-background: var(--bg-color, #ffffff);
-  --color-surface: var(--sidebar-bg-color, #f5f5f5);
-  --color-surface-alt: var(--main-bg-color, #fafafa);
-  --color-textarea-background: var(--textarea-bg-color, #f1f3f4);
-  --color-border: var(--border-color, #e0e0e0);
-  --color-text: var(--text-color, #212121);
-  --color-text-secondary: var(--tab-button-color, #757575);
-  --color-text-disabled: #bdbdbd;
-  
-  // Component-specific variables (mapped from theme)  
-  --color-bg-secondary: var(--sidebar-bg-color, #f8f9fa);
-  --color-text-placeholder: var(--placeholder-color, #9aa0a6);
-    
-  // Default fallback values for provider icon filtering (light theme bias)
-  --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
-  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  
-  /* Spacing */
-  --spacing-md: 16px;
-  --spacing-sm: 8px;
-
-  /* Colors */
-  --color-surface: #f5f5f5;
-  --color-background-hover: rgba(0, 0, 0, 0.1);
-  --color-active-background: #e8f0fe;
-  --color-active-text: #1967d2;
-  --color-primary-alpha: rgba(25, 103, 210, 0.2);
-  --color-surface-shadow: rgba(0, 0, 0, 0.1);
-
-  /* Typography */
-  --font-size-xxl: 24px;
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-weight-medium: 500;
-
-  /* Borders */
-  --border-width: 1px;
-  --border-style: solid;
-  --color-border: #e0e0e0;
-
-  /* Transitions */
-  --transition-base: 0.2s ease;
-
-  /* Primary Color */
-  --color-primary: #1976d2;
-  
-  --border-radius-lg: 12px; /* Added for large border radius */
 }
 
 // SCSS Variables (for Sass functions like darken, lighten)

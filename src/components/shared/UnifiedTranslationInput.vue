@@ -744,18 +744,21 @@ defineExpose({
 /* Dark theme support */
 /* Theme-specific styles now handled by unified theme variables in _variables.scss */
 
+:root.theme-dark .status-message.success,
 .theme-dark .status-message.success {
   color: #4caf50;
   background-color: rgba(76, 175, 80, 0.1);
   border-color: rgba(76, 175, 80, 0.2);
 }
 
+:root.theme-dark .status-message.error,
 .theme-dark .status-message.error {
   color: #f44336;
   background-color: rgba(244, 67, 54, 0.1);
   border-color: rgba(244, 67, 54, 0.2);
 }
 
+:root.theme-dark .status-message.info,
 .theme-dark .status-message.info {
   color: #2196f3;
   background-color: rgba(33, 150, 243, 0.1);

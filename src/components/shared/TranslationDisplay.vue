@@ -1145,6 +1145,19 @@ onMounted(() => {
 }
 
 /* Dark mode support using .is-dark class */
+.ti-translation-display.is-dark {
+  background-color: #1a1a1a !important;
+  border-color: #444 !important;
+}
+
+.ti-translation-display.is-dark .ti-translation-content {
+  color: #e8eaed !important;
+}
+
+.ti-translation-display.is-dark .placeholder-message {
+  color: #9aa0a6 !important;
+}
+
 .ti-translation-display.is-dark.mobile-mode { 
   background: rgba(28, 126, 214, 0.15) !important; 
   border-color: rgba(28, 126, 214, 0.3) !important;
