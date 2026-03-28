@@ -210,7 +210,7 @@
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
           class="fab-menu-icon"
-          :style="[settingsIconStyle, { 'filter': tts.isPlaying.value ? 'brightness(0) invert(1) !important' : (settingsIconStyle.filter || '') }]"
+          :style="ttsIconStyle"
         >
       </div>
     </Transition>
@@ -301,11 +301,21 @@ const menuIconStyle = computed(() => {
 });
 
 const settingsIconStyle = computed(() => {
-  return {
-    'width': '16px !important',
-    'height': '16px !important',
-    'filter': settingsStore.isDarkTheme ? 'invert(1) brightness(2) !important' : 'opacity(0.7) !important'
-  };
+  const filter = settingsStore.isDarkTheme 
+    ? 'brightness(0) invert(1) !important' 
+    : 'opacity(0.7) !important';
+    
+  return `width: 16px !important; height: 16px !important; filter: ${filter};`;
+});
+
+const ttsIconStyle = computed(() => {
+  // If playing (blue background) or in Dark Mode, the icon should be white
+  const shouldBeWhite = tts.isPlaying.value || settingsStore.isDarkTheme;
+  const filter = shouldBeWhite 
+    ? 'brightness(0) invert(1) !important' 
+    : 'none !important';
+
+  return `width: 16px !important; height: 16px !important; filter: ${filter};`;
 });
 
 const menuItemTextStyle = computed(() => {
