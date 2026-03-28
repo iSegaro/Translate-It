@@ -87,8 +87,10 @@ export class WindowsManager extends ResourceTracker {
     this._isDismissingDueToTyping = false;
     this._preserveSelectionForTyping = false;
 
-    // State flag for preventing duplicate dismiss calls
+    // State flags for preventing duplicate dismiss calls
     this._isDismissing = false;
+    this._lastDismissTime = 0;
+    this._lastDismissedText = null;
 
     // State flag for preventing dismiss during Shift+Click operations
     this._isInShiftClickOperation = false;
@@ -407,11 +409,30 @@ export class WindowsManager extends ResourceTracker {
    * Check if we should skip showing (duplicate text)
    */
   _shouldSkipShow(selectedText) {
-    if (selectedText &&
-        this.state.isVisible &&
-        this.state.originalText === selectedText) {
+    if (!selectedText) return true;
+    
+    // 1. Check if the same text is already being handled by any active UI element
+    const isAlreadyVisible = this.state.isVisible || 
+                            this.state.isIconMode || 
+                            this.state.pendingFabTrigger;
+                            
+    if (isAlreadyVisible && this.state.originalText === selectedText) {
       return true;
     }
+    
+    // 2. Race condition protection: Ignore if we just dismissed the SAME text
+    // This happens if browser selection change events arrive LATE (after unselect click)
+    const now = Date.now();
+    const dismissGracePeriod = 500; // 500ms is safe for browser event settlement
+    
+    if (this._lastDismissedText === selectedText && (now - this._lastDismissTime < dismissGracePeriod)) {
+      this.logger.debug('Skipping show() - text was dismissed very recently (race protection)', {
+        text: selectedText.substring(0, 10),
+        elapsed: now - this._lastDismissTime
+      });
+      return true;
+    }
+    
     return false;
   }
 
@@ -1530,6 +1551,10 @@ export class WindowsManager extends ResourceTracker {
 
     // Enhanced selection preservation logic
     const hasRecentActivity = this._hasRecentSelectionActivity();
+    
+    // Check if there is actually any text selected in the browser right now
+    const currentSelection = window.getSelection();
+    const hasActualSelection = currentSelection && currentSelection.toString().trim().length > 0;
 
     const shouldClearSelection = this.state.isIconMode &&
                                ExtensionContextManager.isValidSync() &&
@@ -1539,16 +1564,15 @@ export class WindowsManager extends ResourceTracker {
                                !this._preserveSelectionForTyping &&
                                !this._isDismissingDueToTyping &&
                                !isInTextField && // NEVER clear selection if in text field
-                               !hasRecentActivity; // NEW: Don't clear if recent selection activity
+                               (!hasRecentActivity || !hasActualSelection); // Clear if no recent activity OR if text is already gone
     this.logger.debug('Dismiss selection logic', {
       shouldClearSelection,
+      hasActualSelection,
+      hasRecentActivity,
       preserveSelection,
       preventDismissDueToDrag,
       preventDismissDueToShiftClick,
-      isInTextField,
-      hasRecentActivity,
-      activeElementTag: activeElement?.tagName,
-      activeElementType: activeElement?.type || 'contenteditable'
+      isInTextField
     });
     
     if (shouldClearSelection) {
@@ -1602,6 +1626,10 @@ export class WindowsManager extends ResourceTracker {
       }
     }
 
+    // Capture current text before state reset to prevent race conditions
+    this._lastDismissedText = this.state.originalText;
+    this._lastDismissTime = Date.now();
+
     // Reset flags
     this._resetState();
     this.state.setProcessing(false); // Ensure processing is reset on dismiss
@@ -1609,12 +1637,10 @@ export class WindowsManager extends ResourceTracker {
     // Reset dismissing flag and cleanup tracking
     this._isDismissing = false;
 
-    // Clear dismissal tracking after a short delay to prevent immediate re-creation
-    setTimeout(() => {
-      this._lastDismissTime = null;
-    }, 200);
-
-    this.logger.debug('Translation UI dismissed successfully');
+    this.logger.debug('Translation UI dismissed successfully', { 
+      text: this._lastDismissedText?.substring(0, 10),
+      timestamp: this._lastDismissTime 
+    });
   }
 
   /**
