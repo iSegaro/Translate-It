@@ -10,7 +10,7 @@
     @mouseleave="handleMouseLeave"
   >
     <!-- Revert Action (Small Badge Button) -->
-    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
       <div 
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
@@ -47,7 +47,7 @@
     </Transition>
 
     <!-- Menu -->
-    <Transition name="fab-menu" :duration="{ enter: 400, leave: 0 }">
+    <Transition name="fab-menu" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
       <div 
         v-if="isMenuOpen" 
         class="desktop-fab-menu"
@@ -127,7 +127,7 @@
       :style="[
         { 
           'transform': (isHovered || isMenuOpen ? (side === 'right' ? 'translateX(-18px)' : 'translateX(18px)') : 'translateX(0)'),
-          'transition': `transform ${isHovered || isMenuOpen ? '0.4s' : '1.0s'} cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease, box-shadow 0.3s ease !important`,
+          'transition': `transform ${isHovered || isMenuOpen ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT} ${ANIMATION_CONFIG.SOFT_EASING}, background-color 0.2s ease, box-shadow 0.3s ease !important`,
           'cursor': 'pointer !important',
           'pointer-events': 'auto !important',
           'box-shadow': side === 'right' ? '-4px 0 20px rgba(0, 0, 0, 0.2)' : '4px 0 20px rgba(0, 0, 0, 0.2)'
@@ -162,7 +162,7 @@
     </div>
 
     <!-- Settings Button (Dynamic position based on TTS visibility) -->
-    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
@@ -199,7 +199,7 @@
     </Transition>
 
     <!-- TTS Button (Visible when selection present OR when playing) -->
-    <Transition name="fade-scale" :duration="{ enter: 400, leave: 0 }">
+    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER, leave: 0 }">
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
@@ -271,6 +271,21 @@ const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
 const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
+
+// Centralized Animation Configuration for Maintainability
+const ANIMATION_CONFIG = {
+  MOVE_IN: '0.4s',
+  MOVE_OUT: '1.0s',
+  FADE_IN: '0.2s',
+  FADE_OUT: '1.0s', // Matches MOVE_OUT for simultaneity
+  QUICK_FADE: '0.3s', // Used for instant feedback when menu is open
+  MENU_ENTER: 400,
+  SOFT_EASING: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  STANDARD_EASING: 'ease',
+  IDLE_TIMEOUT: 500,
+  OPACITY_DIMMED: 0.2,
+  OPACITY_FULL: 1
+};
 
 const isMenuOpen = ref(false);
 const isFaded = ref(true); // Start faded on page load
@@ -371,7 +386,7 @@ const startFadeTimer = (forceVisible = true) => {
   fadeTimerId = tracker.trackTimeout(() => {
     isFaded.value = true;
     fadeTimerId = null;
-  }, 500); // Reduced to 0.5s for faster fade-out
+  }, ANIMATION_CONFIG.IDLE_TIMEOUT);
 };
 
 const handleMouseEnter = () => {
@@ -491,28 +506,31 @@ const checkBounds = () => {
 };
 
 const containerStyle = computed(() => {
-  let opacityValue = 1;
+  let opacityValue = ANIMATION_CONFIG.OPACITY_FULL;
   if (isFaded.value && !isHovered.value && !isMenuOpen.value) {
-    opacityValue = 0.2; 
+    opacityValue = ANIMATION_CONFIG.OPACITY_DIMMED; 
   }
 
   const isRight = side.value === 'right';
   const isActive = isHovered.value || isMenuOpen.value;
-  const moveDuration = isActive ? '0.4s' : '1.0s';
+  const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
+  const easing = ANIMATION_CONFIG.SOFT_EASING;
   
   // Construct transition parts without !important
   const transitions = [
-    `transform ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`,
-    `left ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`,
-    `right ${moveDuration} cubic-bezier(0.22, 1, 0.36, 1)`
+    `transform ${moveDuration} ${easing}`,
+    `left ${moveDuration} ${easing}`,
+    `right ${moveDuration} ${easing}`
   ];
 
   // Use fast transition for Fade In (opacity 1) and slower for Fade Out (opacity 0.2)
   if (!isMenuOpen.value) {
-    const opacityDuration = opacityValue === 1 ? '0.2s' : '1.0s';
-    transitions.push(`opacity ${opacityDuration} cubic-bezier(0.22, 1, 0.36, 1)`);
+    const opacityDuration = opacityValue === ANIMATION_CONFIG.OPACITY_FULL 
+      ? ANIMATION_CONFIG.FADE_IN 
+      : ANIMATION_CONFIG.FADE_OUT;
+    transitions.push(`opacity ${opacityDuration} ${easing}`);
   } else {
-    transitions.push('opacity 0.3s ease');
+    transitions.push(`opacity ${ANIMATION_CONFIG.QUICK_FADE} ${ANIMATION_CONFIG.STANDARD_EASING}`);
   }
 
   const baseStyle = {
