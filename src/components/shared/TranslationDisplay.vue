@@ -142,12 +142,12 @@
       <div 
         v-if="mode === 'mobile' && hasContent"
         class="ti-mobile-actions"
-        style="display: flex !important; width: 100% !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid var(--ti-mobile-header-border) !important; box-sizing: border-box !important; justify-content: space-between !important;"
+        :style="mobileActionsStyle"
         @click.stop
       >
         <button 
           class="mobile-action-btn secondary-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
+          :style="mobileButtonStyle"
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle" 
           @click="handleMobileSpeak"
         >
@@ -157,7 +157,8 @@
             width="16"
             height="16"
             fill="currentColor"
-            style="flex-shrink: 0 !important; display: block !important;"
+            class="mobile-action-icon"
+            :style="mobileIconStyle"
           >
             <rect
               x="6"
@@ -171,39 +172,42 @@
             v-else
             src="@/icons/ui/speaker.png" 
             :alt="ttsAlt" 
-            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;" 
+            class="mobile-action-icon"
+            :style="mobileIconStyle"
           >
-          <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
+          <span class="mobile-action-label" style="display: flex !important; align-items: center !important; line-height: 1 !important; white-space: nowrap !important;">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
           </span>
         </button>
         
         <button 
           class="mobile-action-btn secondary-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
+          :style="mobileButtonStyle"
           :title="copyTitle" 
           @click="handleMobileCopy"
         >
           <img
             src="@/icons/ui/copy.png"
             :alt="copyAlt"
-            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;"
+            class="mobile-action-icon"
+            :style="mobileIconStyle"
           >
-          <span style="display: flex !important; align-items: center !important; line-height: 1 !important;">
+          <span class="mobile-action-label" style="display: flex !important; align-items: center !important; line-height: 1 !important; white-space: nowrap !important;">
             {{ t('mobile_selection_copy_tooltip') }}
           </span>
         </button>
         
         <button 
           class="mobile-action-btn icon-only-action" 
-          style="flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; border: 1px solid var(--ti-mobile-btn-border) !important;"
+          :style="mobileButtonStyle"
           :title="t('mobile_selection_history_tooltip')" 
           @click="handleMobileHistory"
         >
           <img
             src="@/icons/ui/history.svg"
             :alt="t('mobile_history_button_alt')"
-            style="width: 16px !important; height: 16px !important; object-fit: contain !important; filter: var(--ti-mobile-icon-filter) !important;"
+            class="mobile-action-icon"
+            :style="mobileIconStyle"
           >
         </button>
       </div>
@@ -549,6 +553,19 @@ const handleActionFailed = (error) => {
 };
 
 // Mobile Action Handlers
+const mobileActionsStyle = computed(() => {
+  return "display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: stretch !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid var(--ti-mobile-header-border) !important; width: 100% !important; min-width: 100% !important; box-sizing: border-box !important; flex-shrink: 0 !important;";
+});
+
+const mobileButtonStyle = computed(() => {
+  return "flex: 1 1 0% !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important; box-sizing: border-box !important; min-width: 0 !important; cursor: pointer !important; padding: 0 4px !important; transition: all 0.2s ease !important;";
+});
+
+const mobileIconStyle = computed(() => {
+  const filter = settingsStore.isDarkTheme ? 'invert(1) brightness(2)' : 'none';
+  return `width: 16px !important; height: 16px !important; max-width: 16px !important; max-height: 16px !important; filter: ${filter} !important; object-fit: contain !important; display: inline-block !important;`;
+});
+
 const handleMobileSpeak = () => {
   if (props.ttsStatus === 'playing') {
     emit('tts-stopped');
@@ -1062,6 +1079,7 @@ onMounted(() => {
   min-height: auto !important;
   max-width: 100% !important;
   align-self: stretch !important;
+  overflow: visible !important;
 }
 
 .ti-translation-display.mobile-mode .ti-translation-content {
@@ -1071,13 +1089,14 @@ onMounted(() => {
   max-height: 250px;
   line-height: 1.5;
   width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .ti-translation-display.mobile-mode .ti-translation-content :deep(*) {
   font-family: inherit !important;
 }
 
-.ti-mobile-actions {
+.ti-translation-display.mobile-mode .ti-mobile-actions {
   display: flex !important;
   flex-direction: row !important;
   justify-content: space-between !important;
@@ -1085,19 +1104,21 @@ onMounted(() => {
   gap: 10px !important;
   margin-top: 15px !important;
   padding-top: 15px !important;
-  border-top: 1px solid rgba(51, 154, 240, 0.15) !important;
+  border-top: 1px solid var(--ti-mobile-header-border, rgba(51, 154, 240, 0.15)) !important;
   width: 100% !important;
   min-width: 100% !important;
   box-sizing: border-box !important;
+  flex-shrink: 0 !important;
 }
 
-.mobile-action-btn {
+.ti-translation-display.mobile-mode .mobile-action-btn {
   height: 46px !important;
   border-radius: 12px !important;
-  border: 1px solid #d0ebff !important;
-  background: white !important;
+  border: 1px solid var(--ti-mobile-btn-border, #d0ebff) !important;
+  background: var(--ti-mobile-btn-bg, white) !important;
   display: flex !important;
   flex: 1 1 0% !important;
+  min-width: 0 !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
@@ -1105,49 +1126,46 @@ onMounted(() => {
   padding: 0 4px !important;
   gap: 6px !important;
   box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
-  color: #1c7ed6 !important;
+  color: var(--ti-mobile-accent, #1c7ed6) !important;
   font-weight: 600 !important;
   font-size: 13px !important;
   -webkit-tap-highlight-color: rgba(0,0,0,0.1) !important;
   text-align: center !important;
-  line-height: 1 !important; /* Ensure vertical centering for text */
+  line-height: 1 !important;
+  box-sizing: border-box !important;
 }
 
-.mobile-action-btn:active {
+.ti-translation-display.mobile-mode .mobile-action-label {
+  display: flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.ti-translation-display.mobile-mode .mobile-action-btn:active {
   transform: scale(0.95);
   background: #f1f3f5 !important;
   box-shadow: none;
 }
 
-/* Ensure icons in mobile buttons have proper sizing and alignment */
-.mobile-action-btn img,
-.mobile-action-btn svg {
-  width: 16px !important;
-  height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
-  flex-shrink: 0 !important;
-  object-fit: contain !important;
-}
-
-.mobile-action-btn img {
-  display: block !important;
-}
-
-.mobile-action-btn.primary-action {
+.ti-translation-display.mobile-mode .mobile-action-btn.primary-action {
   background: #339af0 !important;
   color: white !important;
   border-color: #228be6 !important;
 }
 
-.mobile-action-btn.primary-action img {
-  filter: brightness(0) invert(1);
+.ti-translation-display.mobile-mode .mobile-action-btn.primary-action .mobile-action-icon {
+  filter: brightness(0) invert(1) !important;
 }
 
 /* Dark mode support using .is-dark class */
 .ti-translation-display.is-dark {
   background-color: #1a1a1a !important;
   border-color: #444 !important;
+  --ti-mobile-icon-filter: invert(1) brightness(2) !important;
+  --ti-mobile-header-border: rgba(255, 255, 255, 0.1) !important;
+  --ti-mobile-btn-bg: #2d2d2d !important;
+  --ti-mobile-btn-border: #444 !important;
 }
 
 .ti-translation-display.is-dark .ti-translation-content {
@@ -1168,8 +1186,8 @@ onMounted(() => {
 }
 
 .ti-translation-display.is-dark .mobile-action-btn { 
-  background: #2d2d2d !important; 
-  border-color: #444 !important; 
+  background: var(--ti-mobile-btn-bg, #2d2d2d) !important; 
+  border-color: var(--ti-mobile-btn-border, #444) !important; 
   color: #74c0fc !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
 }
@@ -1180,14 +1198,20 @@ onMounted(() => {
   border-color: #1864ab !important;
 }
 
-.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) img,
-.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) svg { 
-  filter: brightness(0) invert(1) !important;
+.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) .mobile-action-icon { 
+  filter: var(--ti-mobile-icon-filter, brightness(0) invert(1)) !important;
   opacity: 0.8 !important;
 }
 
 /* Original media query as fallback */
 @media (prefers-color-scheme: dark) {
+  .ti-translation-display:not(.is-dark) {
+    --ti-mobile-icon-filter: invert(1) brightness(2) !important;
+    --ti-mobile-header-border: rgba(255, 255, 255, 0.1) !important;
+    --ti-mobile-btn-bg: #2d2d2d !important;
+    --ti-mobile-btn-border: #444 !important;
+  }
+
   .ti-translation-display.mobile-mode:not(.is-dark) { 
     background: rgba(28, 126, 214, 0.1) !important; 
     border-color: rgba(28, 126, 214, 0.25) !important;
@@ -1198,8 +1222,8 @@ onMounted(() => {
   }
   
   .ti-translation-display:not(.is-dark) .mobile-action-btn { 
-    background: #2d2d2d !important; 
-    border-color: #444 !important; 
+    background: var(--ti-mobile-btn-bg, #2d2d2d) !important; 
+    border-color: var(--ti-mobile-btn-border, #444) !important; 
     color: #74c0fc !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
   }
@@ -1210,9 +1234,23 @@ onMounted(() => {
     border-color: #1864ab !important;
   }
   
-  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) img,
-  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) svg { 
-    filter: invert(0.8) !important; 
+  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) .mobile-action-icon { 
+    filter: var(--ti-mobile-icon-filter, invert(0.8)) !important; 
   }
+}
+
+/* Authoritative icon sizing and filtering */
+.mobile-action-icon {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  flex-shrink: 0 !important;
+  object-fit: contain !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  filter: var(--ti-mobile-icon-filter, none) !important;
 }
 </style>
