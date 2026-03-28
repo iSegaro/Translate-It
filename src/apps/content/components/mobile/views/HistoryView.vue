@@ -48,7 +48,7 @@
           >
             <img
               src="@/icons/ui/copy.png"
-              style="width: 14px !important; height: 14px !important; filter: var(--ti-mobile-icon-filter) !important;"
+              :style="exportIconStyle"
             >
             {{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}
           </div>
@@ -236,6 +236,11 @@ const trashIconStyle = computed(() => {
   return settingsStore.isDarkTheme 
     ? "width: 16px !important; height: 16px !important; opacity: 0.7 !important; filter: brightness(1.5) !important;"
     : "width: 16px !important; height: 16px !important; opacity: 0.4 !important;";
+});
+
+const exportIconStyle = computed(() => {
+  const filter = settingsStore.isDarkTheme ? 'invert(1) brightness(2)' : 'none';
+  return `width: 14px !important; height: 14px !important; filter: ${filter} !important;`;
 });
 
 const handleNativeExport = (event) => {
