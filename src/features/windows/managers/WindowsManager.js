@@ -290,6 +290,11 @@ export class WindowsManager extends ResourceTracker {
       this.logger.info('Mobile environment detected, skipping automatic mobile sheet to preserve native menu');
       this.state.setOriginalText(selectedText);
       
+      // Notify MobileFab about pending selection
+      WindowsManagerEvents.mobileSelectionPending({
+        text: selectedText
+      });
+
       // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
       // this ensures that clicking the FAB later won't translate "old" selection
       this.clickManager.addOutsideClickListener();
@@ -1455,6 +1460,10 @@ export class WindowsManager extends ResourceTracker {
     if (this.state.pendingFabTrigger) {
       this.state.setPendingFabTrigger(false);
       WindowsManagerEvents.desktopSelectionClear();
+    }
+
+    if (this.shouldUseMobileUI()) {
+      WindowsManagerEvents.mobileSelectionClear();
     }
 
     this.logger.debug('Dismiss called', {

@@ -37,6 +37,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -105,6 +106,18 @@ onMounted(async () => {
     tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
     tracker.addEventListener(window, 'resize', updateViewport);
   }
+
+  // Listen for mobile selection events on pageEventBus
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, (detail) => {
+    logger.debug('Received mobile selection pending event');
+    isSelectionDirty.value = true;
+    startFabIdleTimer();
+  });
+
+  tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR, () => {
+    logger.debug('Received mobile selection clear event');
+    isSelectionDirty.value = false;
+  });
 
   try {
     const savedData = await storageManager.get('MOBILE_FAB_POSITION');
@@ -250,13 +263,18 @@ const onFabDragEnd = async (e) => {
 const onMobileFabClick = () => {
   const selection = window.getSelection()?.toString().trim() || '';
 
+  // Check WindowsManager state for relayed selection (cross-frame)
+  // This is important because selection in an iframe won't be visible to window.getSelection() in the top frame
+  const storedSelection = window.windowsManagerInstance?.state?.originalText || '';
+  const effectiveSelection = selection || storedSelection;
+
   // We should navigate to SelectionView ONLY IF:
   // 1. There is an active selection AND it's "dirty" (just selected or re-selected)
   // 2. OR the selection string is different from what we last handled
-  const hasFreshSelection = selection && (isSelectionDirty.value || selection !== mobileStore.selectionData.text);
+  const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);
 
   if (hasFreshSelection) {
-    window.windowsManagerInstance?._showMobileSheet(selection);
+    window.windowsManagerInstance?._showMobileSheet(effectiveSelection);
     isSelectionDirty.value = false;
   } else {
     // Default: respect the last active view (Dashboard, History, etc.)

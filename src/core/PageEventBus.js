@@ -96,6 +96,8 @@ export const WINDOWS_MANAGER_EVENTS = {
   
   // Mobile specific
   SHOW_MOBILE_SHEET: 'windows-manager-show-mobile-sheet',
+  MOBILE_SELECTION_PENDING: 'windows-manager-mobile-selection-pending',
+  MOBILE_SELECTION_CLEAR: 'windows-manager-mobile-selection-clear',
   
   // Settings
   OPEN_SETTINGS: 'open-options-page',
@@ -118,6 +120,8 @@ export const WindowsManagerEvents = {
   dismissWindow: (id, withAnimation = true) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id, withAnimation }),
   dismissIcon: (id) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, { id }),
   showMobileSheet: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_MOBILE_SHEET, detail),
+  mobileSelectionPending: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_PENDING, detail),
+  mobileSelectionClear: () => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.MOBILE_SELECTION_CLEAR),
   
   // Icon interactions
   iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail),
