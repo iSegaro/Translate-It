@@ -56,6 +56,7 @@ const tracker = useResourceTracker('mobile-fab');
 const isReady = ref(false);
 const isPositioning = ref(true);
 const fabPosition = ref({ x: null, y: null });
+const userPreferredY = ref(null); // Keep track of where the user actually wants the FAB
 const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
@@ -90,9 +91,22 @@ const handleSelectionChange = () => {
   }
 };
 
+const checkBounds = () => {
+  if (typeof window === 'undefined' || !userPreferredY.value) return;
+  
+  // Constrain to the visible area
+  const maxY = window.innerHeight - 60;
+  fabPosition.value.y = Math.max(50, Math.min(userPreferredY.value, maxY));
+  
+  logger.debug('FAB bounds checked', { current: fabPosition.value.y, preferred: userPreferredY.value });
+};
+
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
   isViewportUnstable.value = true;
+  
+  // Adjust position based on new viewport size
+  checkBounds();
   
   if (instabilityTimer) {
     // TRACKER INTEGRATION: Clear and unregister from memory tracking
@@ -131,12 +145,15 @@ onMounted(async () => {
     const pos = savedData.MOBILE_FAB_POSITION;
     
     if (pos) {
-      fabPosition.value.y = pos.y !== null ? pos.y : MOBILE_CONSTANTS.FAB.DEFAULT_Y;
+      userPreferredY.value = pos.y !== null ? pos.y : MOBILE_CONSTANTS.FAB.DEFAULT_Y;
       side.value = pos.side || MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     } else {
-      fabPosition.value.y = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
+      userPreferredY.value = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
       side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     }
+    
+    // Initial bounds check
+    checkBounds();
     
     // TRACKED TIMERS: Important for preventing memory leaks on fast unmounts
     tracker.trackTimeout(() => {
@@ -147,7 +164,8 @@ onMounted(async () => {
     }, 150);
   } catch (err) {
     logger.error('Failed to load mobile FAB position:', err);
-    fabPosition.value.y = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
+    userPreferredY.value = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
+    fabPosition.value.y = userPreferredY.value;
     side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     isReady.value = true;
   }
@@ -257,6 +275,7 @@ const onFabDragEnd = async (e) => {
   }
 
   try {
+    userPreferredY.value = fabPosition.value.y;
     await storageManager.set({ 
       MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y } 
     });
