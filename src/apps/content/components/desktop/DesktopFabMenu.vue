@@ -272,7 +272,7 @@ const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
 
 const isMenuOpen = ref(false);
-const isFaded = ref(false);
+const isFaded = ref(true); // Start faded on page load
 const isHovered = ref(false);
 const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
@@ -360,15 +360,17 @@ const pendingSelection = ref({
   mode: 'onClick' // Track which mode triggered the selection
 });
 
-const startFadeTimer = () => {
+const startFadeTimer = (forceVisible = true) => {
   if (fadeTimerId) {
     tracker.clearTimer(fadeTimerId);
   }
-  isFaded.value = false;
+  if (forceVisible) {
+    isFaded.value = false;
+  }
   fadeTimerId = tracker.trackTimeout(() => {
     isFaded.value = true;
     fadeTimerId = null;
-  }, 1000); // Set to 1s as requested
+  }, 500); // Reduced to 0.5s for faster fade-out
 };
 
 const handleMouseEnter = () => {
@@ -696,7 +698,7 @@ onMounted(async () => {
   // Add resize listener using tracker
   tracker.addEventListener(window, 'resize', checkBounds);
 
-  startFadeTimer();
+  startFadeTimer(false); // Initialize timer but keep initial faded state
 
   const handleClickOutside = (e) => {
     if (!isMenuOpen.value) return;
