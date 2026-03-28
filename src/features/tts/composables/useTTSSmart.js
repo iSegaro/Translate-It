@@ -8,19 +8,19 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 
 // Logger will be initialized inside the function to avoid TDZ
 
+// Shared state across all instances
+const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
+const currentTTSId = ref(null);
+const errorMessage = ref('');
+const errorType = ref('');
+const progress = ref(0);
+const lastText = ref('');
+const lastLanguage = ref('auto');
+const isProcessing = ref(false); // Prevent duplicate requests
+
 export function useTTSSmart() {
   // Initialize logger to avoid TDZ
   const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
-
-  // Simplified state management
-  const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
-  const currentTTSId = ref(null);
-  const errorMessage = ref('');
-  const errorType = ref('');
-  const progress = ref(0);
-  const lastText = ref('');
-  const lastLanguage = ref('auto');
-  const isProcessing = ref(false); // Prevent duplicate requests
 
   // Backward compatibility
   const isPlaying = computed(() => ttsState.value === 'playing');
@@ -422,66 +422,6 @@ export function useTTSSmart() {
 
   const isAvailable = () => true;
 
-  // Emergency timeout for completion detection (event-driven system with safety net)
-  let completionTimeout = null;
-
-  const startCompletionTimeout = () => {
-    if (completionTimeout) {
-      clearTimeout(completionTimeout);
-    }
-
-    // Safety timeout started - logged at TRACE level for detailed debugging
-    // logger.debug("[useTTSSmart] Starting completion safety timeout (30s)");
-
-    // Safety net: if no GOOGLE_TTS_ENDED event received within 30 seconds, assume completion
-    completionTimeout = setTimeout(() => {
-      if (ttsState.value === 'playing') {
-        logger.warn("[useTTSSmart] No completion event received within 30s - assuming completion");
-        handleTTSCompletion();
-      }
-      completionTimeout = null;
-    }, 30000); // 30 second safety timeout
-  };
-  
-  const handleTTSCompletion = () => {
-    // Handling TTS completion - logged at TRACE level for detailed debugging
-    // logger.debug("[useTTSSmart] Handling TTS completion");
-    
-    if (ttsState.value === 'playing') {
-      ttsState.value = 'idle';
-      currentTTSId.value = null;
-      progress.value = 100; // Mark as completed
-      errorMessage.value = '';
-      errorType.value = '';
-      
-      // Set progress back to 0 after a short delay for visual feedback
-      setTimeout(() => {
-        if (ttsState.value === 'idle') {
-          progress.value = 0;
-        }
-      }, 1000);
-    }
-  };
-
-  // Listen for TTS completion messages from offscreen (event-driven system)
-  // Use cross-browser compatible approach
-  const browserAPI = typeof browser !== "undefined" ? browser : chrome;
-  if (browserAPI?.runtime) {
-    browserAPI.runtime.onMessage.addListener((message) => {
-      if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
-        logger.info("[useTTSSmart] TTS completed successfully");
-
-        // Clear safety timeout since we received the completion event
-        if (completionTimeout) {
-          clearTimeout(completionTimeout);
-          completionTimeout = null;
-        }
-
-        handleTTSCompletion();
-      }
-    });
-  }
-
   return { 
     // Core methods
     speak, 
@@ -517,4 +457,55 @@ export function useTTSSmart() {
     isLoading, 
     isAvailable 
   };
+}
+
+// Emergency timeout for completion detection (event-driven system with safety net)
+let completionTimeout = null;
+
+const startCompletionTimeout = () => {
+  if (completionTimeout) {
+    clearTimeout(completionTimeout);
+  }
+
+  // Safety net: if no GOOGLE_TTS_ENDED event received within 30 seconds, assume completion
+  completionTimeout = setTimeout(() => {
+    if (ttsState.value === 'playing') {
+      handleTTSCompletion();
+    }
+    completionTimeout = null;
+  }, 30000); // 30 second safety timeout
+};
+
+const handleTTSCompletion = () => {
+  if (ttsState.value === 'playing') {
+    ttsState.value = 'idle';
+    currentTTSId.value = null;
+    progress.value = 100; // Mark as completed
+    errorMessage.value = '';
+    errorType.value = '';
+    
+    // Set progress back to 0 after a short delay for visual feedback
+    setTimeout(() => {
+      if (ttsState.value === 'idle') {
+        progress.value = 0;
+      }
+    }, 1000);
+  }
+};
+
+// Listen for TTS completion messages from offscreen (event-driven system)
+// Use cross-browser compatible approach
+const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+if (browserAPI?.runtime) {
+  browserAPI.runtime.onMessage.addListener((message) => {
+    if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
+      // Clear safety timeout since we received the completion event
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+        completionTimeout = null;
+      }
+
+      handleTTSCompletion();
+    }
+  });
 }

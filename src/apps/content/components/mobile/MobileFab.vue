@@ -80,6 +80,13 @@ const handleSelectionChange = () => {
     isSelectionDirty.value = true;
     // Wake up FAB when text is selected (Fade in)
     startFabIdleTimer();
+  } else if (isSelectionDirty.value) {
+    // Selection was cleared natively
+    isSelectionDirty.value = false;
+    if (window.windowsManagerInstance) {
+      window.windowsManagerInstance.state.setOriginalText('');
+      WindowsManagerEvents.mobileSelectionClear();
+    }
   }
 };
 
