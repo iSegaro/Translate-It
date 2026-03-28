@@ -100,29 +100,6 @@
         >{{ t('mobile_dashboard_history_label') || 'History' }}</span>
       </button>
 
-      <!-- Settings Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="openSettings"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-settings"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="settingsIcon"
-            :alt="t('mobile_dashboard_settings_label') || 'Settings'"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
-          >
-        </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
-      </button>
-
       <!-- Revert Element Translations (Dynamic) -->
       <button
         v-if="hasElementTranslations"
@@ -145,6 +122,29 @@
           class="ti-m-action-label"
           style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
         >{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
+      </button>
+
+      <!-- Settings Button -->
+      <button
+        class="ti-m-action-btn"
+        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 70px !important; max-width: 70px !important; flex: 0 0 70px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
+        @click="openSettings"
+      >
+        <div
+          class="ti-m-icon-container ti-m-icon-settings"
+          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
+        >
+          <img
+            :src="settingsIcon"
+            :alt="t('mobile_dashboard_settings_label') || 'Settings'"
+            class="ti-toolbar-icon"
+            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
+          >
+        </div>
+        <span
+          class="ti-m-action-label"
+          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
+        >{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
       </button>
     </div>
   </div>
