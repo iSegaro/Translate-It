@@ -380,6 +380,7 @@ export class FeatureManager extends ResourceTracker {
         'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
         'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
         'SHOW_DESKTOP_FAB',
+        'MOBILE_UI_MODE',
         'EXCLUDED_SITES'
       ];
       

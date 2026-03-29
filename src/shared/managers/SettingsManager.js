@@ -84,6 +84,7 @@ class SettingsManager {
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       SHOW_DESKTOP_FAB: true,
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
+      MOBILE_FAB_POSITION: { side: 'right', y: 150 }, // Standard default for mobile
       // Whole Page Translation Defaults
       WHOLE_PAGE_TRANSLATION_ENABLED: true,
       WHOLE_PAGE_LAZY_LOADING: true,
@@ -483,7 +484,8 @@ class SettingsManager {
       'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
       'ENABLE_DICTIONARY',
       'ENHANCED_TRIPLE_CLICK_DRAG',
-      'SHOW_DESKTOP_FAB'
+      'SHOW_DESKTOP_FAB',
+      'MOBILE_UI_MODE'
     ]
 
     for (const key of frequentlyAccessed) {

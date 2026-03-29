@@ -4,6 +4,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'ExclusionChecker');
 
@@ -200,13 +202,21 @@ export class ExclusionChecker {
 
     const isFabEnabled = settingsManager.get('SHOW_DESKTOP_FAB', true);
     const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
+    
+    // Check if we are in mobile mode (manually forced or auto-detected)
+    const mobileMode = settingsManager.get('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AUTO);
+    const isMobileUI = mobileMode === MOBILE_CONSTANTS.UI_MODE.MOBILE || 
+                      (mobileMode === MOBILE_CONSTANTS.UI_MODE.AUTO && deviceDetector.shouldEnableMobileUI());
 
     // Feature-specific activation logic
     switch (featureName) {
       case 'textSelection':
       case 'windowsManager':
-        // These features are required if EITHER automatic translation is on OR the Desktop FAB is active
-        return isTextSelectionEnabled || isFabEnabled;
+        // These features are required if:
+        // 1. Automatic translation is on
+        // 2. OR the Desktop FAB is active
+        // 3. OR we are in Mobile mode (where FAB is always active for interaction)
+        return isTextSelectionEnabled || isFabEnabled || isMobileUI;
 
       case 'selectElement':
         return settingsManager.get('TRANSLATE_WITH_SELECT_ELEMENT', true);
