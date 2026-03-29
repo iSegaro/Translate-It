@@ -288,28 +288,38 @@ export class WindowsManager extends ResourceTracker {
       position
     });
 
+    // Get current mode from settings (fixed initialization order)
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+
     // Prevent showing same text multiple times
     if (this._shouldSkipShow(selectedText)) {
       this.logger.debug('Skipping show() - same text already visible');
       return;
     }
 
-    // Mobile specific: Do NOT show bottom sheet automatically on selection
-    // to preserve native browser selection menu.
+    // Mobile specific: Determine behavior based on translation mode
     if (this.shouldUseMobileUI()) {
-      this.logger.info('Mobile environment detected, skipping automatic mobile sheet to preserve native menu');
-      this.state.setOriginalText(selectedText);
+      if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+        this.logger.info('Mobile + Immediate mode: showing mobile sheet immediately');
+        await this._showMobileSheet(selectedText);
+        return;
+      } 
       
-      // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
-      this.clickManager.addOutsideClickListener();
-      return;
+      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
+        this.logger.info('Mobile + onFabClick mode: preserving for FAB trigger');
+        this.state.setOriginalText(selectedText);
+        // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
+        this.clickManager.addOutsideClickListener();
+        return;
+      }
+      
+      // If mode is ON_CLICK, we fall through to show the desktop-style icon even on mobile
+      this.logger.info('Mobile + onClick mode: showing translation icon as requested');
     }
 
     const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
     
     // Check if this is an icon->window transition OR we're in onClick/onFabClick mode, preserve selection if so
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
-
     const isOnClickMode = selectionTranslationMode === SelectionTranslationMode.ON_CLICK;
     const isOnFabClickMode = selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK;
     
