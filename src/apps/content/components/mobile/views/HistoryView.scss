@@ -7,88 +7,112 @@
   font-family: sans-serif !important;
   gap: 15px !important;
   background-color: inherit !important;
+  padding: 0 15px !important; /* پدینگ سراسری مشابه InputView */
 }
 
 .ti-m-view-header {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  padding-bottom: 10px !important;
+  padding: 10px 0 !important;
   border-bottom: 1px solid var(--ti-mobile-header-border) !important;
-  min-height: 48px !important;
+  margin: 0 -15px 15px !important;
+  padding-left: 10px !important;
+  padding-right: 15px !important;
 }
 
 .ti-m-back-btn {
   background: none !important;
   border: none !important;
+  width: 40px !important;
+  height: 40px !important;
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: center !important;
   cursor: pointer !important;
-  padding: 0 !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  -webkit-tap-highlight-color: transparent !important;
+  border-radius: 50% !important;
   color: var(--ti-mobile-text) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: background-color 0.2s ease !important;
+  margin-right: 5px !important;
+
+  &:active {
+    background-color: var(--ti-mobile-header-border) !important;
+  }
 
   svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0 !important;
     transform: rotate(90deg) !important;
+    stroke: currentColor !important;
+    stroke-width: 1.2px !important;
   }
 }
 
 .ti-m-header-title {
-  font-weight: bold !important;
-  font-size: 17px !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
   color: var(--ti-mobile-text) !important;
+  cursor: pointer !important;
+  flex: 1 !important;
 }
 
 .ti-m-header-actions {
   display: flex !important;
-  gap: 8px !important;
   align-items: center !important;
+  gap: 8px !important;
 }
 
+/* Export select handling (Invisible native select overlay) */
 .ti-m-export-container {
   position: relative !important;
-  display: flex !important;
-  align-items: center !important;
+  overflow: hidden !important;
 }
 
 .ti-m-export-btn {
-  padding: 6px 10px !important;
-  border-radius: 8px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  background: var(--ti-mobile-accent-bg) !important;
-  color: var(--ti-mobile-accent) !important;
-  border: 1px solid var(--ti-mobile-accent-bg) !important;
   display: flex !important;
   align-items: center !important;
-  gap: 4px !important;
+  gap: 6px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--ti-mobile-border) !important;
+  background: var(--ti-mobile-btn-bg) !important;
+  color: var(--ti-mobile-text) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
   pointer-events: none !important;
 }
 
 .ti-m-native-select {
   position: absolute !important;
   inset: 0 !important;
+  opacity: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  opacity: 0 !important;
   cursor: pointer !important;
   -webkit-appearance: none !important;
 }
 
 .ti-m-clear-all-btn {
-  padding: 6px 12px !important;
-  border-radius: 8px !important;
-  font-size: 12px !important;
-  cursor: pointer !important;
-  font-weight: 600 !important;
-  background: var(--ti-mobile-error-bg) !important;
+  background: transparent !important;
+  border: 1px solid var(--ti-mobile-error) !important;
   color: var(--ti-mobile-error) !important;
-  border: 1px solid var(--ti-mobile-error-bg) !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
 }
 
+.ti-m-clear-all-btn:active {
+  background: var(--ti-mobile-error-bg) !important;
+}
+
+/* History Items */
 .ti-m-history-list {
   flex: 1 !important;
   overflow-y: auto !important;
@@ -96,73 +120,22 @@
   flex-direction: column !important;
   gap: 12px !important;
   padding-bottom: 20px !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-
-  &::-webkit-scrollbar {
-    display: none !important;
-  }
-}
-
-.ti-m-spinner-container {
-  display: flex !important;
-  justify-content: center !important;
-  padding: 40px !important;
-}
-
-.ti-m-spinner {
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 50% !important;
-  border: 3px solid var(--ti-mobile-border) !important;
-  border-top-color: var(--ti-mobile-accent) !important;
-  animation: spin-mobile 1s linear infinite !important;
-}
-
-.ti-m-empty-state {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 60px 20px !important;
-  color: var(--ti-mobile-text-muted) !important;
-  gap: 10px !important;
-  text-align: center !important;
-
-  .ti-m-empty-icon {
-    width: 48px !important;
-    height: 48px !important;
-    opacity: 0.2 !important;
-  }
-
-  span {
-    font-size: 15px !important;
-    font-weight: 500 !important;
-  }
+  margin: 0 -5px !important; /* جبران فاصله جانبی برای کارتها */
+  padding: 0 5px !important;
 }
 
 .ti-m-history-card {
-  background: var(--ti-mobile-card-bg) !important;
-  border: 1px solid var(--ti-mobile-border) !important;
   border-radius: 12px !important;
   padding: 12px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
   cursor: pointer !important;
-  position: relative !important;
-  transition: all 0.2s ease !important;
+  transition: transform 0.1s ease !important;
+}
 
-  &:hover {
-    border-color: var(--ti-mobile-accent) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-  }
-
-  &:active {
-    transform: scale(0.98) !important;
-    filter: brightness(0.9) !important;
-  }
+.ti-m-history-card:active {
+  transform: scale(0.98) !important;
 }
 
 .ti-m-card-header {
@@ -181,21 +154,28 @@
   color: var(--ti-mobile-accent) !important;
   border: 1px solid var(--ti-mobile-border) !important;
 }
+
 .ti-m-delete-btn {
   background: transparent !important;
   border: none !important;
-  padding: 8px !important; /* فضای کلیک بزرگتر */
-  margin: -8px !important; /* خنثی کردن پدینگ برای تراز ماندن آیکون */
+  padding: 8px !important;
+  margin: -8px !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   border-radius: 50% !important;
-  -webkit-tap-highlight-color: rgba(255, 0, 0, 0.1) !important;
+  -webkit-tap-highlight-color: rgba(244, 67, 54, 0.1) !important;
+}
 
-  &:active {
-    background-color: rgba(244, 67, 54, 0.1) !important;
-  }
+.ti-m-delete-btn:active {
+  background-color: rgba(244, 67, 54, 0.1) !important;
+}
+
+.ti-m-icon-img-small {
+  width: 16px !important;
+  height: 16px !important;
+  object-fit: contain !important;
 }
 
 .ti-m-source-preview {
@@ -216,35 +196,42 @@
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
   overflow: hidden !important;
+  text-overflow: ellipsis !important;
   text-align: start !important;
 }
 
 .ti-m-timestamp {
   font-size: 10px !important;
   color: var(--ti-mobile-text-muted) !important;
-  margin-top: 2px !important;
+  text-align: end !important;
 }
 
-/* Enhanced separation for dark mode */
-:host-context(.theme-dark) .ti-m-history-card {
-  background: #252525 !important;
-  border-color: #333333 !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
-
-  &:hover {
-    background: #2a2a2a !important;
-    border-color: var(--ti-mobile-accent) !important;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
-  }
+/* States */
+.ti-m-spinner-container, .ti-m-empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 40px 0 !important;
+  color: var(--ti-mobile-text-muted) !important;
+  gap: 12px !important;
 }
 
-.ti-m-icon-img, 
-.ti-m-icon-img-small, 
 .ti-m-empty-icon {
-  object-fit: contain !important;
+  width: 48px !important;
+  height: 48px !important;
+  opacity: 0.3 !important;
 }
 
-@keyframes spin-mobile { 
-  0% { transform: rotate(0deg); } 
-  100% { transform: rotate(360deg); } 
+.ti-m-spinner {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  border: 3px solid var(--ti-mobile-border) !important;
+  border-top-color: var(--ti-mobile-accent) !important;
+  animation: ti-m-spin 0.8s linear infinite !important;
+}
+
+@keyframes ti-m-spin {
+  to { transform: rotate(360deg); }
 }

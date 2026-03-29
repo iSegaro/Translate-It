@@ -24,8 +24,8 @@
             stroke-linejoin="round"
           />
         </svg>
-        <span class="ti-m-header-title">{{ t('history_title') || 'Translation History' }}</span>
       </button>
+      <span class="ti-m-header-title" @click="goBack">{{ t('history_title') || 'Translation History' }}</span>
       
       <div
         v-if="hasHistory"
