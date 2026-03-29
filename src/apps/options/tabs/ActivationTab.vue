@@ -42,7 +42,6 @@
             >
               <div class="radio-label-content">
                 <span class="label-title">{{ t('mobile_ui_mode_auto') }}</span>
-                <span class="label-description">{{ t('mobile_ui_mode_auto_desc') }}</span>
               </div>
             </BaseRadio>
             <BaseRadio

@@ -555,22 +555,19 @@
     "message": "ترجمه صفحه"
   },
   "mobile_ui_mode_auto": {
-    "message": "خودکار"
-  },
-  "mobile_ui_mode_auto_desc": {
-    "message": "(بر اساس سایز صفحه)"
+    "message": "پیروی از سیستم"
   },
   "mobile_ui_mode_mobile": {
     "message": "همیشه موبایل"
   },
   "mobile_ui_mode_mobile_desc": {
-    "message": "(منوی پایین صفحه - بهینه شده برای لمس)"
+    "message": "بهینه شده برای لمسی"
   },
   "mobile_ui_mode_desktop": {
     "message": "همیشه دسکتاپ"
   },
   "mobile_ui_mode_desktop_desc": {
-    "message": "(پنجره شناور - برای دسکتاپ)"
+    "message": "پنجره شناور"
   },
   "mobile_input_header_title": {
     "message": "ورودی دستی"

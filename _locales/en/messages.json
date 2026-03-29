@@ -552,22 +552,19 @@
     "message": "Translate Page"
   },
   "mobile_ui_mode_auto": {
-    "message": "Auto"
-  },
-  "mobile_ui_mode_auto_desc": {
-    "message": "(Based on screen size)"
+    "message": "Follow system (OS)"
   },
   "mobile_ui_mode_mobile": {
     "message": "Always Mobile"
   },
   "mobile_ui_mode_mobile_desc": {
-    "message": "(Bottom Sheet - optimized for touch)"
+    "message": "Otimized for touch"
   },
   "mobile_ui_mode_desktop": {
     "message": "Always Desktop"
   },
   "mobile_ui_mode_desktop_desc": {
-    "message": "(Floating Window - for Desktop)"
+    "message": "Floating Window"
   },
   "mobile_input_header_title": {
     "message": "Manual Input"

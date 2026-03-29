@@ -552,22 +552,19 @@
     "message": "ページを翻訳"
   },
   "mobile_ui_mode_auto": {
-    "message": "自動"
-  },
-  "mobile_ui_mode_auto_desc": {
-    "message": "（画面サイズに基づく）"
+    "message": "システムに従う"
   },
   "mobile_ui_mode_mobile": {
     "message": "常にモバイル"
   },
   "mobile_ui_mode_mobile_desc": {
-    "message": "（ボトムシート - タッチ操作に最適化）"
+    "message": "タッチ操作に最適化"
   },
   "mobile_ui_mode_desktop": {
     "message": "常にデスクトップ"
   },
   "mobile_ui_mode_desktop_desc": {
-    "message": "（フローティングウィンドウ - デスクトップ用）"
+    "message": "デスクトップ用"
   },
   "mobile_input_header_title": {
     "message": "手動入力"
