@@ -12,7 +12,7 @@ The **Mobile Support** system provides a native-like, touch-friendly translation
 
 ## Architecture
 
-The mobile system is built as a modular extension of the existing **UI Host (Shadow DOM)**. It follows a decoupled, event-driven pattern where the business logic resides in managers, and the presentation is handled by specialized mobile Vue components.
+The mobile system is built as a modular extension of the existing **UI Host (Shadow DOM)**. It follows a decoupled, event-driven pattern where presenters (MobileFab, MobileSheet) subscribe to global selection events via the **Selection Coordinator**.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,16 +23,16 @@ The mobile system is built as a modular extension of the existing **UI Host (Sha
                │                              │
 ┌──────────────▼──────────────┐      ┌────────▼──────────────┐
 │      Logic & State Layer    │      │      UI Host Layer    │
-│  - mobile.js (Pinia Store)  │      │  - MobileSheet.vue    │
-│  - useMobileGestures.js     │◀────▶│  - MobileFab.vue      │
-│  - useMobileSheet.js        │      │  - DashboardView.vue  │
+│  - GLOBAL_SELECTION events  │◀────▶│  - MobileSheet.vue    │
+│  - mobile.js (Pinia Store)  │      │  - MobileFab.vue      │
+│  - useMobileGestures.js     │      │  - DashboardView.vue  │
 └──────────────┬──────────────┘      └───────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────────────┐
 │                    INTEGRATION POINTS                       │
-│  - WindowsManager: Routes mobile requests to Sheet          │
-│  - SelectElementManager: Manages mode lifecycle             │
-│  - PageTranslationManager: Progress tracking in mobile UI   │
+│  - Selection Coordinator: Unified event-driven selection    │
+│  - WindowsManager: Subscription-based UI display            │
+│  - Independence: Works even if WindowsManager is disabled   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,18 +61,22 @@ A high-performance composable that handles complex touch interactions.
 ### 4. UI Host Integration (`MobileSheet.vue` & `MobileFab.vue`)
 The mobile UI is divided into two primary entry points:
 - **`MobileSheet.vue`**: The master container for the Bottom Sheet (Dashboard, Selection, etc.).
-- **`MobileFab.vue`**: A dedicated, draggable floating button that provides quick access to translation when the sheet is closed.
+- **`MobileFab.vue`**: A dedicated, draggable floating button that provides quick access to translation.
+    - **Independence**: Subscribes directly to `GLOBAL_SELECTION_CHANGE` to store pending text locally, removing dependency on `WindowsManager` state.
     - **Vertical Drag**: Supports NS-resize dragging to avoid overlapping with site content.
     - **Persistence**: Remembers its last vertical position across page reloads using `storageManager`.
-    - **Idle State**: Becomes semi-transparent after 1.5s of inactivity to remain non-intrusive.
+    - **Idle State**: Becomes semi-transparent after 1.5s of inactivity.
 
 ---
 
 ## Feature Adaptations
 
 ### Text Selection Translation
-- **Desktop**: Shows a floating icon near selection.
-- **Mobile**: Automatically triggers the **Mobile Sheet** in `SelectionView` (Peek mode). The system-wide FAB or a trigger from `WindowsManager` ensures a smooth transition to the sheet.
+- **Desktop**: Shows a floating icon or FAB badge near selection.
+- **Mobile**:
+    - **Immediate**: Automatically triggers the **Mobile Sheet** in `SelectionView` (Peek mode).
+    - **On FAB Click**: Remains silent and waits for manual FAB interaction (Native menu friendly).
+    - **On Click**: Shows a floating translation icon (Desktop-parity mode).
 
 ### Select Element Mode
 - **Hover to Tap**: Since mobile lacks hover, the `SelectElementManager` is adapted to use `touchstart` and `touchend`.
@@ -98,8 +102,10 @@ To overcome Shadow DOM style isolation, the mobile system uses:
 Using the **Visual Viewport API**, the system detects when the virtual keyboard is active. During manual input (`InputView`), the sheet automatically snaps to **Full-screen** mode to remain visible above the keyboard.
 
 ### Event Bus Communication
-The mobile system communicates with core managers via the `PageEventBus`:
-- `SHOW_MOBILE_SHEET`: Triggered by `WindowsManager`.
+The mobile system communicates with core managers and other modules via the `PageEventBus`:
+- `GLOBAL_SELECTION_CHANGE`: Listened to by `MobileFab` and `DashboardView` to sync selection state.
+- `GLOBAL_SELECTION_CLEAR`: Unified signal to reset selection-aware UI.
+- `SHOW_MOBILE_SHEET`: Directly requested when a translation result is ready.
 - `PAGE_TRANSLATE_PROGRESS`: Listened to by `PageTranslationView`.
 - `ACTIVATE_SELECT_ELEMENT_MODE`: Emitted by `DashboardView`.
 

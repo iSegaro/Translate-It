@@ -15,19 +15,17 @@ The **Desktop FAB (Floating Action Button)** is a persistent, unobtrusive interf
 The Desktop FAB system is primarily contained within the following files:
 
 - **Core Component**: `src/apps/content/components/desktop/DesktopFabMenu.vue`
-- **State Management**: `src/store/modules/mobile.js` (Tracks page translation and element-specific state)
-- **Lifecycle & Memory**: `src/composables/core/useResourceTracker.js` (Manages event listeners and timers)
-- **Messaging & Actions**:
-  - `src/shared/messaging/core/MessageActions.js` (Action constants)
-  - `src/shared/messaging/core/UnifiedMessaging.js` (Background communication)
-- **Event Bus**: `src/core/PageEventBus.js` (In-page event orchestration)
-- **Assets**: `src/icons/ui/` (Icons for select, translate, revert, and settings)
+- **Logic Handler**: `src/apps/content/composables/useFabSelection.js` (NEW: Decoupled logic)
+- **State Management**: `src/store/modules/mobile.js` (Tracks page translation)
+- **Coordinator**: `src/features/text-selection/events/SelectionEvents.js`
+- **Lifecycle & Memory**: `src/composables/core/useResourceTracker.js`
+- **Event Bus**: `src/core/PageEventBus.js`
 
 ---
 
 ## Architecture
 
-The Desktop FAB is implemented as a specialized Vue component within the **UI Host (Shadow DOM)**. It operates by bridging the gap between the user's viewport and the underlying core managers through an event-driven approach.
+The Desktop FAB is now a fully autonomous module. It no longer relies on `WindowsManager` to receive selection events. Instead, it follows the **Selection Coordinator** pattern.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -38,16 +36,16 @@ The Desktop FAB is implemented as a specialized Vue component within the **UI Ho
                │                              │
 ┌──────────────▼──────────────┐      ┌────────▼──────────────┐
 │      Logic & State Layer    │      │      UI Host Layer    │
-│  - mobile.js (Pinia Store)  │      │  - DesktopFabMenu.vue │
-│  - useResourceTracker.js    │◀────▶│  - Menu Transitions   │
-│  - useUnifiedI18n.js        │      │  - Draggable Engine   │
+│  - useFabSelection.js       │◀────▶│  - DesktopFabMenu.vue │
+│  - GLOBAL_SELECTION events  │      │  - Menu Transitions   │
+│  - MobileStore (Pinia)      │      │  - Draggable Engine   │
 └──────────────┬──────────────┘      └───────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────────────┐
 │                    INTEGRATION POINTS                       │
-│  - PageEventBus: Controls Page Translation lifecycle        │
-│  - UnifiedMessaging: Activates Select Element/Settings      │
-│  - MobileStore: Tracks global translation state & progress  │
+│  - Selection Coordinator: Receives all page selections      │
+│  - Translation Handler: Direct trigger for results          │
+│  - Independence: Works even if WindowsManager is disabled   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -55,10 +53,17 @@ The Desktop FAB is implemented as a specialized Vue component within the **UI Ho
 
 ## Core Components
 
-### 1. Draggable Container (`DesktopFabMenu.vue`)
-The main container uses `fixed` positioning and high `z-index` to remain visible across all sites.
-- **Vertical Dragging**: Allows users to reposition the FAB vertically to avoid overlapping site-specific UI elements.
-- **Smart Fading**: Automatically reduces opacity to `0.2` after 2 seconds of inactivity to minimize visual distraction.
+### 1. useFabSelection Composable
+This is the "brain" of the FAB. It:
+- Subscribes to `GLOBAL_SELECTION_CHANGE` and `GLOBAL_SELECTION_CLEAR`.
+- Manages the `pendingSelection` state independently.
+- Determines if the FAB should "wake up" based on translation modes or feature status.
+- Emits `GLOBAL_SELECTION_TRIGGER` to request a translation display.
+
+### 2. Draggable Container (`DesktopFabMenu.vue`)
+The main container remains responsible for visuals and positioning.
+- **Independence**: The badge and TTS features remain active even if the main translation UI (WindowsManager) is toggled off by the user.
+- **Smart Fading**: Improved to unfade in any selection mode if the primary WindowsManager is disabled.
 
 ### 2. State-Aware Menu System
 The menu dynamically computes its items based on the current state of the page:

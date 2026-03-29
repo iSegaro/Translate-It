@@ -18,6 +18,23 @@ This document describes the successful migration of the WindowsManager system to
 - Complete separation of concerns
 - Full CSS/JS isolation from host webpage
 
+## Selection Coordinator Integration (2026)
+
+The WindowsManager has been further decoupled from text selection detection. It no longer acts as a gateway for other UI modules (like FAB). Instead, it operates as a subscriber to global selection events.
+
+### Global Selection Flow
+1.  **Selection Detection**: `SelectionManager` or `TextFieldDoubleClickHandler` detects text.
+2.  **Broadcasting**: A `GLOBAL_SELECTION_CHANGE` event is emitted via `PageEventBus`.
+3.  **Reaction**: `WindowsManager` receives the event and independently decides whether to show its UI based on:
+    - User settings (onClick vs Immediate).
+    - Keyboard modifiers (Ctrl key requirement).
+    - URL exclusions.
+
+### Key Benefits of Decoupling
+- **Resilience**: The FAB and TTS systems work even if `WindowsManager` is disabled or fails.
+- **Simplification**: `WindowsState` no longer carries FAB-specific flags like `pendingFabTrigger`.
+- **Platform Parity**: Mobile and Desktop now follow the exact same event-driven flow.
+
 ## Event-Based Communication
 
 ### Event Types

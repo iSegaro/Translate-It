@@ -94,11 +94,13 @@ The feature respects these configuration flags:
 ## 🚀 Integration
 
 This feature integrates with:
-- **Translation System** - Sends text for translation processing
-- **Windows Manager** - Displays translation results
-- **Error Management** - Handles and reports errors
-- **Settings Storage** - Respects user preferences
-- **UI Host System** - Renders components in shadow DOM
+- **Selection Coordinator**: Broadcasts `GLOBAL_SELECTION_CHANGE` on double-click to sync with FAB and TTS.
+- **Translation System**: Sends text for translation processing
+- **Windows Manager**: Displays translation results
+- **Error Management**: Handles and reports errors
+- **Settings Storage**: Respects user preferences
+- **UI Host System**: Renders components in shadow DOM
+
 
 ## 📱 Platform Support
 

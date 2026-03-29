@@ -20,6 +20,7 @@
 - **Cross-Frame Communication** - Advanced iframe support
 - **IFrame Support System** - Streamlined iframe functionality with ResourceTracker integration
 - **Unified TTS System (2025)** - Complete TTS unification with automatic language fallback
+- **Selection Coordinator System (2026)** - Decoupled Pub/Sub architecture for multi-module selection awareness (Windows, FAB, TTS)
 - **Text Selection System (2025)** - Modular architecture with SiteHandlerRegistry
 - **Unified Translation Service (2025)** - Centralized translation coordination
 - **Storage Management** - Centralized storage with caching
@@ -58,6 +59,7 @@
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
 - **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - **Modular Architecture (2025)** - Static import system, site handler registry, professional editor support with drag detection
+- **[Selection Coordinator](SELECTION_COORDINATOR.md)** - **Decoupled Architecture (2026)** - Pub/Sub model for selection events between managers (Windows, FAB, TTS)
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
