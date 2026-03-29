@@ -89,7 +89,7 @@ export class SelectionManager extends ResourceTracker {
   /**
    * Process text selection and show translation UI
    */
-  async processSelection(selectedText, selection) {
+  async processSelection(selectedText, selection, options = {}) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, skipping selection processing');
       return;
@@ -97,17 +97,35 @@ export class SelectionManager extends ResourceTracker {
 
     // 1. Emit global selection event (Coordinator Pattern) - DO THIS FIRST
     // This allows any module (like FAB or TTS) to react independently
-    // even if WindowsManager is disabled or URL is excluded for windows.
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
       text: selectedText,
-      position: this.calculateSelectionPosition(selection), // We need position even for global event
+      position: this.calculateSelectionPosition(selection),
       mode: selectionTranslationMode,
       context: {
         frameId: this.frameId,
         isIframe: window !== window.top
       }
     });
+
+    // 2. Check if we should skip showing our own UI (WindowsManager)
+    const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
+    if (!isTextSelectionEnabled) {
+      return;
+    }
+
+    // Check for Ctrl requirement if in IMMEDIATE mode
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+      const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
+      if (requireCtrl) {
+        // If required but not pressed, skip. 
+        // Note: we check if ctrlPressed is explicitly TRUE.
+        if (!options || options.ctrlPressed !== true) {
+          this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
+          return;
+        }
+      }
+    }
 
     if (await this.checkExclusion()) {
       this.logger.debug('URL excluded, skipping translation UI display');
@@ -301,7 +319,7 @@ export class SelectionManager extends ResourceTracker {
         }
       });
 
-      this.requestWindowCreationInMainFrame(selectedText, position);
+      this.requestWindowCreationInMainFrame(selectedText, position, options);
 
     } else {
       this.logger.warn('WindowsManager not available and not in iframe context');
@@ -311,13 +329,14 @@ export class SelectionManager extends ResourceTracker {
   /**
    * Request window creation in main frame (for iframe context)
    */
-  requestWindowCreationInMainFrame(selectedText, position) {
+  requestWindowCreationInMainFrame(selectedText, position, options = {}) {
     try {
       const message = {
         type: WindowsConfig.CROSS_FRAME.TEXT_SELECTION_WINDOW_REQUEST,
         frameId: this.frameId,
         selectedText: selectedText,
         position: position,
+        options: options, // Pass keyboard state
         timestamp: Date.now()
       };
 

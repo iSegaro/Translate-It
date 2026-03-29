@@ -273,7 +273,7 @@ export class WindowsManager extends ResourceTracker {
     return deviceDetector.shouldEnableMobileUI();
   }
 
-  async show(selectedText, position) {
+  async show(selectedText, position, options = {}) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, aborting show()');
       return;
@@ -1274,7 +1274,7 @@ export class WindowsManager extends ResourceTracker {
         adjustedPosition._isViewportRelative = true;
       }
 
-      await this.show(data.selectedText, adjustedPosition);
+      await this.show(data.selectedText, adjustedPosition, data.options);
 
     } catch (error) {
       this.logger.error('Failed to handle text selection window request from iframe:', error);

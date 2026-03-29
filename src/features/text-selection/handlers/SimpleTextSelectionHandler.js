@@ -571,12 +571,6 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         return;
       }
 
-      // Check Ctrl key requirement
-      if (!(await this.shouldProcessSelection())) {
-        logger.debug('Ctrl requirement not met, skipping selection');
-        return;
-      }
-
       // Detect selection type and start preservation
       const selectionType = this._detectSelectionType();
       this._startSelectionPreservation(selectionType);
@@ -586,9 +580,15 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         this.logger.debug('Processing valid text selection', {
           textLength: selectedText.length,
           sourceElement: selection?.anchorNode?.nodeName || 'unknown',
-          selectionType: selectionType
+          selectionType: selectionType,
+          ctrlPressed: this.ctrlKeyPressed
         });
-        await this.selectionManager.processSelection(selectedText, selection);
+        
+        // Pass the keyboard state to selection manager
+        await this.selectionManager.processSelection(selectedText, selection, {
+          ctrlPressed: this.ctrlKeyPressed,
+          shiftPressed: this.shiftKeyPressed
+        });
       } else {
         logger.warn('SelectionManager is null - this should not happen with critical protection');
       }
@@ -621,40 +621,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       }
 
       // Check if either the main text selection feature OR the Desktop FAB is enabled
-      // This is the key: FAB needs selection even if WindowsManager is disabled
       const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', false);
       const isFabEnabled = settingsManager.get('SHOW_DESKTOP_FAB', false);
-
-      logger.debug('Checking selection requirements', {
-        isTextSelectionEnabled,
-        isFabEnabled,
-        isExtensionEnabled
-      });
 
       if (!isTextSelectionEnabled && !isFabEnabled) {
         logger.debug('Both text selection and FAB are disabled, skipping');
         return false;
-      }
-
-      // If text selection translation is disabled, we still allow it for the Global Coordinator (like FAB)
-      // and we skip the Ctrl requirement check because it only applies to immediate translation.
-      if (!isTextSelectionEnabled) {
-        logger.debug('Main text selection disabled but FAB is enabled, allowing for global coordinator');
-        return true;
-      }
-
-      const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
-      logger.debug('Selection translation mode:', selectionTranslationMode);
-
-      // Only check Ctrl requirement in immediate mode
-      if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
-        const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
-        const isCtrlPressed = this.isCtrlRecentlyPressed();
-        logger.debug('Ctrl requirement check:', { requireCtrl, ctrlPressed: isCtrlPressed });
-        if (requireCtrl && !isCtrlPressed) {
-          logger.debug('Ctrl key required but not pressed, skipping selection');
-          return false;
-        }
       }
 
       return true;
