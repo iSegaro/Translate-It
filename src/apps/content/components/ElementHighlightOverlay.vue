@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="!isFullscreen"
+    v-if="!isFullscreen && activeHighlights.length > 0"
     class="element-highlight-overlay"
   >
     <div 
@@ -119,7 +119,7 @@ const onElementClick = (element, highlightId) => {
 };
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .element-highlight-overlay {
   position: fixed;
   top: 0;
