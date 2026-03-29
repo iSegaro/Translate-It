@@ -352,8 +352,14 @@ const handleStartDrag = (event) => {
 };
 </script>
 
-<style scoped>
-.ti-window { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+<style lang="scss" scoped>
+.ti-window { 
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important; 
+  overflow: hidden !important; 
+  display: flex !important; 
+  flex-direction: column !important; 
+  z-index: 2147483647 !important;
+}
 .ti-window.light { background-color: #ffffff !important; color: #2c3e50 !important; border: 1px solid #e8e8e8 !important; }
 .ti-window.dark { background-color: #2d2d2d !important; color: #e0e0e0 !important; border: 1px solid #424242 !important; }
 .ti-window-header { display: flex !important; align-items: center !important; justify-content: space-between !important; padding: 8px 12px !important; cursor: move !important; user-select: none !important; }

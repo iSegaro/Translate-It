@@ -752,12 +752,14 @@ onMounted(async () => {
 // onBeforeUnmount is handled by tracker
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .desktop-fab-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  pointer-events: none;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  pointer-events: none !important;
+  width: fit-content !important;
+  height: fit-content !important;
 }
 
 .desktop-fab-button {
