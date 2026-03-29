@@ -86,10 +86,12 @@ const handleSelectionChange = () => {
   } else if (isSelectionDirty.value) {
     // Selection was cleared natively
     isSelectionDirty.value = false;
-    if (window.windowsManagerInstance) {
-      window.windowsManagerInstance.state.setOriginalText('');
-      WindowsManagerEvents.mobileSelectionClear();
-    }
+    pendingText.value = '';
+    
+    // Notify global coordinator
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
+      reason: 'native_selection_clear'
+    });
   }
 };
 
