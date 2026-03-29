@@ -368,13 +368,103 @@ defineExpose({
     }
   }
 
-  // Make all API settings inputs align with language dropdowns
-  // Language dropdowns are flex: 0 0 250px, so we limit API inputs similarly
-  :deep(.api-key-section) .ti-textarea,
-  :deep(.setting-group) .ti-select,
-  :deep(.setting-group) .ti-input,
-  :deep(.setting-group) .ti-provider-select {
-    max-width: var(--input-max-width, 620px);
+  // --- Alignment for API Settings ---
+  
+  .provider-settings {
+    // Make all provider settings stacked (Label top, Input bottom)
+    :deep(.setting-group):not(.api-key-info) {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      width: 100% !important;
+      gap: 4px !important; // Consistent tight gap
+
+      label {
+        flex: 0 0 auto !important;
+        margin-bottom: 0 !important;
+        width: 100% !important;
+      }
+
+      // All inputs/selects should be full width to be consistent with API Key field
+      .ti-select, 
+      .ti-input, 
+      .ti-provider-select,
+      .tier-select,
+      .formality-select,
+      .api-key-input-wrapper {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .setting-description:not(.api-key-info *) {
+        flex: 0 0 100%;
+        margin-top: 0;
+        opacity: 0.8;
+      }
+    }
+
+    // Fix for API Key Info row (ensure it stays inline/row)
+    :deep(.api-key-info) {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-md !important;
+
+      .setting-description {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        display: inline !important;
+      }
+
+      .api-link {
+        margin: 0 $spacing-xs;
+      }
+    }
+
+    // Special handling for the API Key label row
+    :deep(.label-with-toggle) {
+      display: grid !important;
+      grid-template-columns: 1fr auto !important; 
+      align-items: center !important;
+      width: 100% !important;
+      gap: $spacing-md !important;
+      margin-bottom: 0 !important;
+
+      label {
+        margin: 0 !important;
+        min-width: 0 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .toggle-visibility-button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important; // Fixed button size
+        height: 32px !important;
+        padding: 0 !important;
+        background: none !important;
+        border: none !important;
+        margin: 0 !important;
+        cursor: pointer;
+        opacity: 0.7;
+
+        &:hover {
+          opacity: 1;
+        }
+
+        .toggle-icon {
+          width: 16px;
+          height: 16px;
+          display: block;
+        }
+      }
+    }
   }
 }
 
