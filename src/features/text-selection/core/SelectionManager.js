@@ -95,12 +95,23 @@ export class SelectionManager extends ResourceTracker {
       return;
     }
 
-    // 1. Emit global selection event (Coordinator Pattern) - DO THIS FIRST
+    // Calculate position for the translation UI
+    const position = this.calculateSelectionPosition(selection);
+    
+    // CRITICAL: If we can't calculate a valid position, it's almost certainly 
+    // a selection inside a Shadow DOM (our own UI) or an invalid range.
+    // In this case, we MUST NOT emit events or show any UI.
+    if (!position) {
+      this.logger.debug('Skipping selection: Invalid position (likely inside Shadow DOM)');
+      return;
+    }
+
+    // 1. Emit global selection event (Coordinator Pattern)
     // This allows any module (like FAB or TTS) to react independently
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
       text: selectedText,
-      position: this.calculateSelectionPosition(selection),
+      position: position,
       mode: selectionTranslationMode,
       context: {
         frameId: this.frameId,
@@ -146,12 +157,6 @@ export class SelectionManager extends ResourceTracker {
       text: selectedText.substring(0, 30) + '...',
       length: selectedText.length
     });
-
-    // Calculate position for the translation UI
-    const position = this.calculateSelectionPosition(selection);
-    if (!position) {
-      return;
-    }
 
     // Show translation UI (This part is still dependent on WindowsManager being allowed)
     await this.showTranslationUI(selectedText, position);

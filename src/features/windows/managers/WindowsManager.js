@@ -290,6 +290,11 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
+    if (!selectedText || !position) {
+      this.logger.debug('Aborting show(): Missing text or position');
+      return;
+    }
+
     if (this.state.isProcessing) {
       return;
     }
@@ -465,6 +470,11 @@ export class WindowsManager extends ResourceTracker {
   async _showIcon(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, cannot create icon');
+      return;
+    }
+
+    if (!position) {
+      this.logger.debug('Aborting _showIcon(): Missing position');
       return;
     }
 
