@@ -2,8 +2,8 @@
   <div
     v-if="isVisible"
     ref="tooltipRef"
-    class="page-translation-tooltip-shadow-safe"
-    :direction="direction"
+    class="ti-page-translation-tooltip"
+    :dir="direction"
     :style="tooltipDynamicStyle"
   >
     {{ text }}
@@ -30,14 +30,13 @@ const tracker = useResourceTracker('page-translation-tooltip');
 /**
  * Optimized Dynamic Styling:
  * Only handling transformation for performance.
- * Static styles are now in src/assets/styles/components/_page-translation-tooltip.scss
+ * Visual properties like direction are now handled via CSS attribute selectors.
  */
 const tooltipDynamicStyle = computed(() => {
   if (!isVisible.value) return 'display: none !important;';
 
   return {
-    transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0) !important`,
-    direction: direction.value === 'rtl' ? 'rtl !important' : 'ltr !important'
+    transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0) !important`
   };
 });
 
