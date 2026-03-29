@@ -1,0 +1,86 @@
+/* src/apps/content/components/mobile/MobileFab.scss */
+
+.mobile-fab {
+  /* Default values for CSS Variables */
+  --fab-y: 100px;
+  --fab-opacity: 1;
+  --fab-pointer-events: auto;
+  --fab-left: 100%;
+  --fab-margin-left: -15px;
+  --fab-justify-content: flex-start;
+  --fab-transition: opacity 0.2s ease, bottom 0.1s ease-out, left 0.3s ease-out, margin 0.3s ease-out;
+
+  position: fixed !important;
+  bottom: var(--fab-y) !important;
+  left: var(--fab-left) !important;
+  margin-left: var(--fab-margin-left) !important;
+  
+  width: 50px !important;
+  height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: var(--fab-justify-content) !important;
+  
+  z-index: 2147483647 !important;
+  opacity: var(--fab-opacity) !important;
+  pointer-events: var(--fab-pointer-events) !important;
+  
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  
+  will-change: opacity, bottom, left;
+  transition: var(--fab-transition) !important;
+  -webkit-tap-highlight-color: transparent !important;
+
+  &.is-idle:not(.is-dragging):not(:hover) {
+    --fab-opacity: 0.2 !important;
+  }
+
+  &.is-dragging,
+  &.is-positioning {
+    --fab-transition: none !important;
+  }
+
+  &.is-dragging {
+    --fab-justify-content: center !important;
+    --fab-margin-left: -20px !important; /* جبران پهنای آیکون در زمان درگ */
+  }
+
+  &.is-left {
+    --fab-left: 0 !important;
+    --fab-margin-left: -35px !important;
+    --fab-justify-content: flex-end !important;
+
+    img {
+      transform: scaleX(-1) !important;
+    }
+  }
+
+  &.is-right {
+    --fab-left: 100% !important;
+    --fab-margin-left: -15px !important;
+    --fab-justify-content: flex-start !important;
+
+    img {
+      transform: none !important;
+    }
+  }
+
+  img {
+    width: 26px !important; 
+    height: 26px !important;
+    display: block !important;
+    object-fit: contain !important;
+    transition: transform 0.3s ease !important;
+    filter: none !important; 
+    pointer-events: none !important;
+  }
+
+  /* افکت کلیک اورجینال */
+  &:active {
+    opacity: 0.8 !important;
+    transform: scale(0.98) !important;
+  }
+}

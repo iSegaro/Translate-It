@@ -2,9 +2,15 @@
   <div 
     v-if="isReady"
     class="mobile-fab notranslate"
-    :class="{ 'is-idle': isFabIdle && !isFabDragging && !isHovering }"
+    :class="{ 
+      'is-idle': isFabIdle && !isFabDragging && !isHovering,
+      'is-dragging': isFabDragging,
+      'is-positioning': isPositioning,
+      'is-left': side === 'left',
+      'is-right': side === 'right'
+    }"
     translate="no"
-    :style="fabStyle"
+    :style="dynamicVars"
     :title="t('mobile_fab_alt') || 'Translate'"
     @click="onMobileFabClick"
     @mousedown="onFabDragStart"
@@ -17,13 +23,6 @@
     <img 
       src="@/icons/extension/extension_icon_64.svg" 
       :alt="t('mobile_fab_alt') || 'Translate'" 
-      :style="{
-        width: '26px !important',
-        height: '26px !important',
-        objectFit: 'contain',
-        transform: side === 'left' ? 'scaleX(-1) !important' : 'none !important',
-        transition: 'transform 0.3s ease'
-      }"
     >
   </div>
 </template>
@@ -37,7 +36,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
@@ -46,10 +45,6 @@ const mobileStore = useMobileStore();
 
 /**
  * MEMORY MANAGEMENT: Use the centralized ResourceTracker
- * This handles automatic cleanup of:
- * - Event Listeners (DOM & Extension)
- * - Timers (Timeout/Interval)
- * - Animation Frames
  */
 const tracker = useResourceTracker('mobile-fab');
 
@@ -57,7 +52,7 @@ const tracker = useResourceTracker('mobile-fab');
 const isReady = ref(false);
 const isPositioning = ref(true);
 const fabPosition = ref({ x: null, y: null });
-const userPreferredY = ref(null); // Keep track of where the user actually wants the FAB
+const userPreferredY = ref(null); 
 const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
@@ -66,7 +61,7 @@ const side = ref(null);
 const isSelectionDirty = ref(false);
 const pendingText = ref('');
 
-// Internal variables (Tracked via tracker)
+// Internal variables
 let dragStartY = 0;
 let initialFabY = 0;
 let animationFrameId = null;
@@ -79,41 +74,27 @@ const handleSelectionChange = () => {
   const selectedText = selection ? selection.toString().trim() : '';
   
   if (selectedText) {
-    // Mark that a selection interaction occurred (could be a re-selection of the same text)
     isSelectionDirty.value = true;
-    // Wake up FAB when text is selected (Fade in)
     startFabIdleTimer();
   } else if (isSelectionDirty.value) {
-    // Selection was cleared natively
     isSelectionDirty.value = false;
     pendingText.value = '';
-    
-    // Notify global coordinator
-    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
-      reason: 'native_selection_clear'
-    });
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, { reason: 'native_selection_clear' });
   }
 };
 
 const checkBounds = () => {
   if (typeof window === 'undefined' || !userPreferredY.value) return;
-  
-  // Constrain to the visible area
   const maxY = window.innerHeight - 60;
   fabPosition.value.y = Math.max(50, Math.min(userPreferredY.value, maxY));
-  
-  logger.debug('FAB bounds checked', { current: fabPosition.value.y, preferred: userPreferredY.value });
 };
 
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
   isViewportUnstable.value = true;
-  
-  // Adjust position based on new viewport size
   checkBounds();
   
   if (instabilityTimer) {
-    // TRACKER INTEGRATION: Clear and unregister from memory tracking
     tracker.clearTimer(instabilityTimer);
     instabilityTimer = null;
   }
@@ -125,23 +106,19 @@ const updateViewport = () => {
 };
 
 onMounted(async () => {
-  // Use tracker for window and document events
   if (typeof window !== 'undefined') {
     tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
     tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
     tracker.addEventListener(window, 'resize', updateViewport);
   }
 
-  // Listen for global selection events (Coordinator Pattern)
   tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
-    logger.debug('Received global selection change event in Mobile FAB');
     isSelectionDirty.value = true;
     pendingText.value = detail?.text || '';
     startFabIdleTimer();
   });
 
   tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, () => {
-    logger.debug('Received global selection clear event in Mobile FAB');
     isSelectionDirty.value = false;
     pendingText.value = '';
   });
@@ -158,15 +135,10 @@ onMounted(async () => {
       side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     }
     
-    // Initial bounds check
     checkBounds();
-    
-    // TRACKED TIMERS: Important for preventing memory leaks on fast unmounts
     tracker.trackTimeout(() => {
       isReady.value = true;
-      tracker.trackTimeout(() => {
-        isPositioning.value = false;
-      }, 500);
+      tracker.trackTimeout(() => { isPositioning.value = false; }, 500);
     }, 150);
   } catch (err) {
     logger.error('Failed to load mobile FAB position:', err);
@@ -177,14 +149,13 @@ onMounted(async () => {
   }
 });
 
-const fabStyle = computed(() => {
+/**
+ * NEW: Reactive CSS Variables for smooth dragging and positioning
+ */
+const dynamicVars = computed(() => {
   if (!isReady.value || side.value === null || fabPosition.value.y === null) {
     return { display: 'none !important' };
   }
-  
-  const y = fabPosition.value.y;
-  const currentSide = side.value;
-  const x = fabPosition.value.x;
   
   let currentOpacity = '1';
   let pointerEvents = 'auto';
@@ -196,38 +167,17 @@ const fabStyle = computed(() => {
     currentOpacity = '0.2';
   }
   
-  const style = {
-    position: 'fixed !important',
-    bottom: `${y}px !important`,
-    width: '50px !important',
-    height: '50px !important',
-    display: 'flex !important',
-    alignItems: 'center !important',
-    zIndex: '2147483647 !important',
-    opacity: `${currentOpacity} !important`,
-    pointerEvents: `${pointerEvents} !important`,
-    borderRadius: '50% !important',
-    cursor: 'pointer !important',
-    willChange: 'opacity, bottom, left',
-    transition: (isFabDragging.value || isPositioning.value) ? 'none !important' : 'opacity 0.2s ease, bottom 0.1s ease-out, left 0.3s ease-out, margin 0.3s ease-out'
+  const vars = {
+    '--fab-y': `${fabPosition.value.y}px`,
+    '--fab-opacity': currentOpacity,
+    '--fab-pointer-events': pointerEvents
   };
 
-  if (isFabDragging.value && x !== null) {
-    style.left = `${x}px !important`;
-    style.marginLeft = '-20px !important';
-    style.justifyContent = 'center !important';
-  } else {
-    if (currentSide === MOBILE_CONSTANTS.FAB.SIDE.LEFT) {
-      style.left = '0 !important';
-      style.marginLeft = '-35px !important';
-      style.justifyContent = 'flex-end !important';
-    } else {
-      style.left = '100% !important';
-      style.marginLeft = '-15px !important';
-      style.justifyContent = 'flex-start !important';
-    }
+  if (isFabDragging.value && fabPosition.value.x !== null) {
+    vars['--fab-left'] = `${fabPosition.value.x}px`;
   }
-  return style;
+
+  return vars;
 });
 
 // Event Handlers
@@ -239,8 +189,10 @@ const onFabDragStart = (e) => {
   isFabDragging.value = true;
   dragStartY = point.clientY;
   initialFabY = fabPosition.value.y;
+  
+  // Initialize X position immediately to prevent jumping during click/start
+  fabPosition.value.x = point.clientX;
 
-  // DYNAMIC TRACKING: Use tracker even for temporary listeners
   if (isMouseEvent) {
     tracker.addEventListener(window, 'mousemove', onFabDragMove);
     tracker.addEventListener(window, 'mouseup', onFabDragEnd);
@@ -264,6 +216,10 @@ const onFabDragMove = (e) => {
       
       const snapThreshold = window.innerWidth / 2;
       side.value = point.clientX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
+      
+      // Track X position during drag for smooth visualization
+      fabPosition.value.x = point.clientX;
+      
       animationFrameId = null;
     });
   }
@@ -273,7 +229,6 @@ const onFabDragEnd = async (e) => {
   if (!isFabDragging.value) return;
   isFabDragging.value = false;
   
-  // DYNAMIC CLEANUP: Respect tracker by using removeEventListener
   const isMouseEvent = e && e.type === 'mouseup';
   if (isMouseEvent) {
     tracker.removeEventListener(window, 'mousemove', onFabDragMove);
@@ -294,21 +249,13 @@ const onFabDragEnd = async (e) => {
 
 const onMobileFabClick = () => {
   const selection = window.getSelection()?.toString().trim() || '';
-
-  // Use local pendingText (from Coordinator) as priority, fallback to native selection
-  // This handles cross-frame selections (iframes) without peering into WindowsManager internals
   const effectiveSelection = pendingText.value || selection;
-
-  // We should navigate to SelectionView ONLY IF:
-  // 1. There is an active selection AND it's "dirty" (just selected or re-selected)
-  // 2. OR the selection string is different from what we last handled
   const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);
 
   if (hasFreshSelection) {
     window.windowsManagerInstance?._showMobileSheet(effectiveSelection);
     isSelectionDirty.value = false;
   } else {
-    // Default: respect the last active view (Dashboard, History, etc.)
     mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
   }
 };
@@ -328,12 +275,6 @@ const startFabIdleTimer = () => {
 };
 
 onUnmounted(() => {
-  // NO MANUAL CLEANUP NEEDED: useResourceTracker handles window events and timers.
-  // We only cancel the Animation Frame as it's a specific non-timer resource.
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
 });
 </script>
-
-<style scoped>
-.mobile-fab img { filter: brightness(0) invert(1) !important; }
-</style>
