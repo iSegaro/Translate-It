@@ -396,8 +396,10 @@ let fadeTimerId = null;
 // Initialize FAB selection logic (Decoupled from WindowsManager)
 const { pendingSelection, triggerTranslation } = useFabSelection({
   onSelectionPending: (detail) => {
-    // ONLY wake up the FAB (unfade) if we are in onFabClick mode
-    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK) {
+    // Wake up the FAB (unfade) if:
+    // 1. We are in onFabClick mode
+    // 2. OR if WindowsManager is disabled (FAB is the primary handler)
+    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled.value) {
       startFadeTimer();
     }
   }
