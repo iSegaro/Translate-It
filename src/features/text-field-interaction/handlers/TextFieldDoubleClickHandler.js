@@ -6,6 +6,10 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { INPUT_TYPES } from '@/shared/config/constants.js';
 import { IFRAME_CONFIG, POSITION_CONFIG, ConfigUtils } from '../config/TextFieldConfig.js';
 import IframePositionCalculator from '../utils/IframePositionCalculator.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import { SelectionTranslationMode } from '@/shared/config/config.js';
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDoubleClickHandler');
 
@@ -459,6 +463,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       textField: this.typingDetection.detectedTextField?.tagName
     });
 
+    // Notify global coordinator to clear state
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
+      reason: 'text_field_typing_end'
+    });
+
     // Clean up typing detection
     this.cleanupTypingDetection();
 
@@ -836,6 +845,19 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    * Show translation UI using the same pattern as TextSelection system
    */
   async showTranslationUI(selectedText, position, actualTextField = null) {
+    // 1. Emit global selection event (Coordinator Pattern)
+    // This allows FAB or other modules to react to text field selections
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
+      text: selectedText,
+      position: position,
+      mode: selectionTranslationMode,
+      context: {
+        isTextField: true,
+        isIframe: window !== window.top
+      }
+    });
+
     // Check if WindowsManager should be allowed
     if (!(await this.shouldProcessWindowsManager())) {
       logger.info('WindowsManager is blocked by exclusion, skipping text field translation UI');
