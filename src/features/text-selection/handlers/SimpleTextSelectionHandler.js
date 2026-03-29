@@ -575,6 +575,13 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
       // Detect selection type and start preservation
       const selectionType = this._detectSelectionType();
+
+      // CRITICAL: Ignore selections originating from our own UI
+      if (this.isSelectionInsideUI(selection)) {
+        logger.debug('Selection is inside extension UI, ignoring');
+        return;
+      }
+
       this._startSelectionPreservation(selectionType);
 
       // Process the selection
@@ -608,6 +615,39 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         logger.error('ErrorHandler not available when processing selection:', handlerError);
       }
     }
+  }
+
+  /**
+   * Check if the selection originated from inside our own UI elements
+   */
+  isSelectionInsideUI(selection) {
+    // 1. Check if the last mouse up was inside our UI (highly reliable)
+    if (this.isClickInsideTranslationWindow()) {
+      return true;
+    }
+
+    if (!selection || !selection.anchorNode) return false;
+
+    try {
+      // 2. Check anchorNode (where selection started)
+      const anchorElement = selection.anchorNode.nodeType === Node.TEXT_NODE ? 
+                           selection.anchorNode.parentElement : selection.anchorNode;
+      
+      if (this.elementDetection.isUIElement(anchorElement)) {
+        return true;
+      }
+
+      // 3. Check if nodes are in a Shadow Root (most reliable indicator for UI components)
+      const root = selection.anchorNode.getRootNode();
+      if (root instanceof ShadowRoot) {
+        return true;
+      }
+
+    } catch (error) {
+      logger.debug('Error checking if selection is inside UI:', error);
+    }
+
+    return false;
   }
 
   /**
