@@ -1,4 +1,4 @@
-# CSS Architecture Guide (2025)
+# CSS Architecture Guide
 
 ## Overview
 
@@ -22,51 +22,62 @@ This document describes the modern, principled CSS architecture implemented in t
 - Prevents external page style interference
 - Maintains predictable styling in web page context
 
+## When to use `<style scoped>` vs. Adjacent SCSS
+
+The extension operates in two distinct environments. Your choice of styling method depends entirely on **where** the component will be rendered.
+
+### 1. Content Scripts (Shadow DOM)
+**Environment:** UI injected into third-party websites (e.g., Tooltip, FAB, Translation Window).
+- **🚫 Internal `<style scoped>` is PROHIBITED:** Styles are injected into the host page's `<head>` and cannot penetrate the Shadow Root.
+- **✅ Use Component-Adjacent SCSS:** Create a matching `.scss` file. It will be automatically injected into the Shadow Root via the Glob Pipeline.
+- **Requirement:** Must use `!important` for all visual properties.
+
+### 2. Standard UI Pages (Popup, Options, Sidepanel)
+**Environment:** Extension-owned pages that render in their own isolated document.
+- **✅ Internal `<style scoped>` is ALLOWED:** Since these are standard web pages (not Shadow DOM), Vue's default scoping works perfectly.
+- **Optional:** You can still use Adjacent SCSS for consistency, but it's not strictly required here.
+- **Requirement:** Standard CSS rules apply (no mandatory `!important`).
+
+### Summary Comparison
+
+| Environment | UI Type | Recommended Style Method | `!important` Required? |
+| :--- | :--- | :--- | :--- |
+| **Content Script** | Shadow DOM | **Component-Adjacent SCSS** | **Yes (Mandatory)** |
+| **Popup** | Standard Page | Standard Vue `<style scoped>` | No |
+| **Sidepanel** | Standard Page | Standard Vue `<style scoped>` | No |
+| **Options** | Standard Page | Standard Vue `<style scoped>` | No |
+
+---
+
 ## Shadow DOM Isolation
 
 ### CSS Isolation Strategy
-The Translate-It extension renders all UI components in a Shadow DOM to prevent style conflicts with host pages. This requires special CSS considerations:
+The Translate-It extension renders all UI components in a Shadow DOM. We use a **Robust Automated SCSS Injection Pipeline** to manage styles.
 
-#### 1. **Minimal Reset Approach**
-```scss
-:host {
-  display: block !important;
-  position: fixed !important;
-  direction: ltr !important;
-  text-align: left !important;
-}
-```
+#### 1. Component-Adjacent SCSS (The Standard Pattern)
+For every Vue component (e.g., `MyComponent.vue`), a matching SCSS file (e.g., `MyComponent.scss`) must be created in the same directory.
 
-#### 2. **Component-Specific Direction**
-- WindowsManager containers (header, window frame) are forced LTR
-- TranslationDisplay maintains dynamic direction based on content
-- All interactive components use LTR for consistent UI
+- **Why?** Internal `<style scoped>` blocks in `.vue` files are NOT supported for Shadow DOM components because Vite's string-injection mechanism is fragile with SFC styles.
+- **Mechanism:** `src/core/content-scripts/chunks/lazy-vue-app.js` uses Vite's `import.meta.glob` to automatically discover and inject all these SCSS files into the Shadow Root at runtime.
+- **Benefit:** 100% build stability, zero manual registration, and perfect isolation.
 
-#### 3. **Selective !important Usage**
-```scss
-.ti-field-icon {
-  /* Essential properties need !important for Shadow DOM */
-  position: fixed !important;
-  pointer-events: all !important;
-  z-index: 2147483647 !important;
+#### 2. Strategic !important Usage
+Inside the Shadow DOM, `!important` is **mandatory** for all visual properties. This prevents host website styles from leaking into the extension or breaking the UI via global resets (like `all: initial`).
 
-  /* Non-essential properties follow natural cascade */
-  transition: all 0.25s ease;
-}
-```
+---
 
 ### Best Practices for Shadow DOM Styling
 
 #### DO ✅
-- Use !important for positioning and z-index in Shadow DOM
-- Force LTR on UI containers but keep content dynamic
-- Test on pages with aggressive CSS resets
-- Use `unicode-bidi: plaintext` for proper text direction
+- **Create Matching SCSS Files**: Always create `ComponentName.scss` next to `ComponentName.vue`.
+- **Use !important**: Apply it to all visual properties in the SCSS file.
+- **Use Design Tokens**: Utilize CSS variables from `_variables.scss` for theming.
+- **Use Namespace Classes**: Wrap your SCSS in a component-specific class (e.g., `.ti-my-component { ... }`).
 
 #### DON'T ❌
-- Apply global resets with `all: initial/unset`
-- Override text direction in translation content
-- Neglect cross-browser Shadow DOM behavior
+- **Avoid <style scoped>**: Do not write styles inside `.vue` files for content components; they will not be injected into the Shadow DOM.
+- **Avoid Inline Styles**: Minimize the use of `:style` for static visual properties.
+- **Manual Registration**: You no longer need to `@use` every component's SCSS in a global file; the system finds them automatically.
 
 ## Architecture Components
 
@@ -286,33 +297,35 @@ $font-size-base: 14px;
 
 ## Migration Patterns
 
-### From Legacy CSS
-```scss
-// ❌ Before
-.component {
-  width: 300px !important;
-  background: #fff !important;
-}
+### From SFC Internal Styles
+```vue
+<!-- ❌ Before (MyComponent.vue) -->
+<template><div class="ti-item" /></template>
+<style scoped>.ti-item { color: red; }</style>
 
-// ✅ After
-.component {
-  width: #{css-var('component-width', 300px)};
-  background: var(--bg-color, #ffffff);
-}
+<!-- ✅ After (MyComponent.vue) -->
+<template><div class="ti-item" /></template>
+<!-- No style block here -->
+
+<!-- ✅ After (MyComponent.scss in same folder) -->
+.ti-item { color: red !important; }
 ```
 
-### From Hardcoded Values
-```scss
-// ❌ Before
-:root {
-  --ti-width: #{$undefined-variable}; // Potential runtime error
-}
+### From Legacy Inline JS
+```vue
+<!-- ❌ Before (Inline Hacks) -->
+<template>
+  <div :style="`background: ${settingsStore.isDark ? '#222' : '#fff'} !important;`" />
+</template>
 
-// ✅ After
-:root {
-  @include css-properties('ti', (
-    'width': $safe-variable // Compile-time safety
-  ));
+<!-- ✅ After (Component-Adjacent SCSS) -->
+<template>
+  <div class="ti-component" />
+</template>
+
+/* In MyComponent.scss */
+.ti-component {
+  background: var(--bg-color, #ffffff) !important;
 }
 ```
 
@@ -397,5 +410,4 @@ The modern CSS architecture provides a solid foundation for maintainable, perfor
 
 ---
 
-*Last Updated: 2025-09-16*
-*Next Review: 2025-12-16*
+*Last Update: March 2026*
