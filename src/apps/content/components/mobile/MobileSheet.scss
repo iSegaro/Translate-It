@@ -1,4 +1,4 @@
-// src/assets/styles/components/_mobile-sheet.scss
+/* src/apps/content/components/mobile/MobileSheet.scss */
 
 .ti-m-sheet-overlay {
   position: fixed !important;
@@ -9,7 +9,7 @@
   display: block !important;
   box-sizing: border-box !important;
 
-  // Theme Variables (Light by default)
+  /* Theme Variables (Light by default) */
   --ti-mobile-bg: #ffffff;
   --ti-mobile-text: #333333;
   --ti-mobile-text-secondary: #495057;
@@ -57,11 +57,6 @@
   * {
     box-sizing: border-box !important;
   }
-
-  img {
-    max-width: none !important;
-    display: block !important;
-  }
 }
 
 .ti-m-sheet {
@@ -81,55 +76,65 @@
   overscroll-behavior: none !important;
   background-color: var(--ti-mobile-bg) !important;
   color: var(--ti-mobile-text) !important;
+}
 
-  .ti-m-sheet-header {
-    width: 100% !important;
-    height: 24px !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    background: transparent !important;
-    cursor: grab !important;
-    touch-action: none !important;
-    padding-top: 4px !important;
-    flex-shrink: 0 !important;
-  }
+.ti-m-sheet-header {
+  width: 100% !important;
+  height: 24px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: transparent !important;
+  cursor: grab !important;
+  touch-action: none !important;
+  padding-top: 4px !important;
+  flex-shrink: 0 !important;
+}
 
-  .ti-m-drag-handle {
-    width: 40px !important;
-    height: 5px !important;
-    border-radius: 3px !important;
-    background-color: var(--ti-mobile-drag-handle) !important;
-    opacity: 0.8 !important;
-  }
+.ti-m-drag-handle {
+  width: 40px !important;
+  height: 5px !important;
+  border-radius: 3px !important;
+  background-color: var(--ti-mobile-drag-handle) !important;
+  opacity: 0.8 !important;
+}
 
-  .ti-m-sheet-content {
-    flex: 1 !important;
-    background-color: inherit !important;
-    overflow-y: auto !important;
-    padding: 15px !important;
-    
-    // Specific padding for dashboard view
-    // Note: Since activeView isn't available in CSS, we apply general padding
-    // and can override it via a class if needed.
-  }
+.ti-m-sheet-content {
+  flex: 1 !important;
+  background-color: inherit !important;
+  overflow-y: auto !important;
+  padding: 15px !important;
 
-  .ti-m-sheet-footer-area {
-    height: env(safe-area-inset-bottom, 10px) !important;
-    background-color: inherit !important;
-    flex-shrink: 0 !important;
+  /* Dashboard specific styles previously handled by inline-style */
+  &.view-dashboard {
+    overflow-y: hidden !important;
+    padding: 0 !important;
   }
 }
 
-// Global Icon Filtering
-.is-dark .ti-m-icon-img, 
-.is-dark .ti-toolbar-icon {
+.ti-m-sheet-footer-area {
+  height: env(safe-area-inset-bottom, 10px) !important;
+  background-color: inherit !important;
+  flex-shrink: 0 !important;
+}
+
+/* Global Icon Filtering via host-context */
+:host-context(.theme-dark) .ti-m-icon-img, 
+:host-context(.theme-dark) .ti-toolbar-icon {
   filter: var(--ti-mobile-icon-filter) !important;
 }
 
-// Animations
-@keyframes pulse-mobile { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }
-@keyframes indeterminate-mobile { 0% { transform: translateX(-100%) scaleX(0.2); } 50% { transform: translateX(0%) scaleX(0.5); } 100% { transform: translateX(100%) scaleX(0.2); } }
+@keyframes pulse-mobile { 
+  0% { transform: scale(0.95); opacity: 1; } 
+  50% { transform: scale(1.1); opacity: 0.7; } 
+  100% { transform: scale(0.95); opacity: 1; } 
+}
+
+@keyframes indeterminate-mobile { 
+  0% { transform: translateX(-100%) scaleX(0.2); } 
+  50% { transform: translateX(0%) scaleX(0.5); } 
+  100% { transform: translateX(100%) scaleX(0.2); } 
+}
 
 .ti-m-progress-bar-fill.indeterminate { 
   animation: indeterminate-mobile 2s infinite linear !important; 

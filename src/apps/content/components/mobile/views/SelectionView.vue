@@ -2,17 +2,12 @@
   <div
     class="ti-m-selection-view"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    style="display: flex !important; flex-direction: column !important; height: 100% !important; font-family: sans-serif !important; gap: 12px !important; background-color: inherit !important;"
   >
     <!-- Header -->
-    <div
-      class="ti-m-selection-header"
-      style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding-bottom: 12px !important; min-height: 48px !important; border-bottom: 1px solid var(--ti-mobile-header-border) !important;"
-    >
-      <div style="display: flex !important; align-items: center !important; gap: 4px !important;">
+    <div class="ti-m-selection-header">
+      <div class="ti-m-header-left">
         <button
           class="ti-m-back-btn"
-          style="background: none !important; border: none !important; width: 44px !important; height: 44px !important; padding: 0 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; -webkit-tap-highlight-color: transparent !important; color: var(--ti-mobile-text) !important;"
           @click="goBack"
         >
           <svg
@@ -21,7 +16,6 @@
             height="20"
             viewBox="0 0 6 4"
             fill="none"
-            style="transform: rotate(90deg) !important;"
           >
             <path
               d="M1 1L3 3L5 1"
@@ -32,60 +26,47 @@
             />
           </svg>
         </button>
-        <div
-          class="ti-m-lang-pair"
-          style="display: flex !important; align-items: center !important; gap: 8px !important; padding: 6px 14px !important; border-radius: 20px !important; background-color: var(--ti-mobile-card-bg) !important;"
-        >
-          <span style="font-size: 11px !important; font-weight: 800 !important; text-transform: uppercase !important; color: var(--ti-mobile-accent) !important;">{{ selectionData.targetLang }}</span>
+        <div class="ti-m-lang-pair">
+          <span class="ti-m-lang-target">{{ selectionData.targetLang }}</span>
           <img
             src="@/icons/ui/swap.png"
             class="ti-m-swap-icon ti-m-icon-img"
             :alt="t('mobile_swap_languages_alt') || 'to'"
-            style="width: 12px !important; height: 12px !important; opacity: 0.6 !important;"
           >
-          <span
-            class="ti-m-lang-source"
-            style="font-size: 11px !important; font-weight: 800 !important; text-transform: uppercase !important; color: var(--ti-mobile-text-secondary) !important;"
-          >{{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}</span>
+          <span class="ti-m-lang-source">
+            {{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}
+          </span>
         </div>
       </div>
       
       <div style="display: flex !important; align-items: center !important;">
         <button
           class="ti-m-close-btn"
-          style="background: none !important; border: none !important; width: 44px !important; height: 44px !important; padding: 0 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; -webkit-tap-highlight-color: transparent !important;"
           @click="closeView"
         >
           <img
             src="@/icons/ui/close.png"
             :alt="t('mobile_close_button_alt') || 'Close'"
             class="ti-m-icon-img ti-m-close-icon"
-            style="width: 22px !important; height: 22px !important; opacity: 0.5 !important;"
           >
         </button>
       </div>
     </div>
 
-    <div
-      class="ti-m-content-area"
-      style="flex: 1 !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 15px !important;"
-    >
+    <div class="ti-m-content-area">
       <!-- Loading State -->
       <div
         v-if="selectionData.isLoading"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; padding: 40px 0 !important; color: var(--ti-mobile-text-muted) !important; gap: 10px !important;"
+        class="ti-m-loading-container"
       >
-        <div
-          class="ti-m-spinner"
-          style="width: 28px !important; height: 28px !important; border-radius: 50% !important; border: 3px solid var(--ti-mobile-border) !important; border-top-color: var(--ti-mobile-accent) !important;"
-        />
-        <span style="font-size: 14px !important; font-weight: 500 !important;">{{ t('mobile_selection_translating_label') || 'Translating...' }}</span>
+        <div class="ti-m-spinner" />
+        <span>{{ t('mobile_selection_translating_label') || 'Translating...' }}</span>
       </div>
       
       <!-- Combined Result and Original using Shared Component -->
       <div
         v-else
-        style="display: flex !important; flex-direction: column !important; gap: 12px !important;"
+        class="ti-m-results-stack"
       >
         <!-- Result Card -->
         <div style="width: 100% !important;">
@@ -110,16 +91,14 @@
         <div 
           v-if="selectionData.text"
           class="ti-m-original-card" 
-          style="border: 1px solid var(--ti-mobile-border) !important; border-radius: 12px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 6px !important; cursor: pointer !important; background: var(--ti-mobile-card-bg) !important;"
           @click="handleSourceTextClick"
         >
-          <div style="font-size: 10px !important; font-weight: 800 !important; color: var(--ti-mobile-text-muted) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important;">
+          <div class="ti-m-original-title">
             {{ t('mobile_selection_source_text_title') || 'Source Text' }}
           </div>
           <div 
             class="ti-m-original-text" 
             :dir="originalDir"
-            style="font-size: 14px !important; line-height: 1.5 !important; text-align: start !important; word-wrap: break-word !important; color: var(--ti-mobile-text-secondary) !important;"
           >
             {{ selectionData.text }}
           </div>
@@ -170,16 +149,3 @@ const onSpeak = async (data) => { const text = data?.text || selectionData.value
 const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_selection_copied_message') || 'Copied', type: 'success' }) }
 const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 </script>
-
-<style scoped>
-@keyframes spin-mobile { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.ti-m-spinner { animation: spin-mobile 1s linear infinite !important; }
-
-.ti-m-icon-img {
-  object-fit: contain !important;
-}
-
-.ti-m-close-icon, .ti-m-swap-icon {
-  opacity: 0.6 !important;
-}
-</style>

@@ -2,178 +2,66 @@
   <div
     class="ti-m-dashboard-view"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    style="width: 100% !important; margin: 0 !important; padding: 0 !important; display: block !important; background: transparent !important;"
   >
-    <div
-      class="ti-m-dashboard-scroll-container"
-      style="display: flex; flex-flow: row nowrap; align-items: center; justify-content: center; width: 100%; padding: 12px 10px; gap: 4px; box-sizing: border-box; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x;"
-    >
+    <div class="ti-m-dashboard-scroll-container">
       <!-- Translate Page Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="translatePage"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-translate-page"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="wholePageIcon"
-            :alt="t('mobile_dashboard_page_label') || 'Page'"
-            class="ti-toolbar-icon"
-            style="width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important;"
-          >
+      <button class="ti-m-action-btn" @click="translatePage">
+        <div class="ti-m-icon-container ti-m-icon-translate-page">
+          <img :src="wholePageIcon" :alt="t('mobile_dashboard_page_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
       </button>
 
       <!-- Select Element Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="activateSelectElement"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-select-element"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="selectIcon"
-            :alt="t('mobile_dashboard_select_label') || 'Select'"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
-          >
+      <button class="ti-m-action-btn" @click="activateSelectElement">
+        <div class="ti-m-icon-container ti-m-icon-select-element">
+          <img :src="selectIcon" :alt="t('mobile_dashboard_select_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
       </button>
 
       <!-- Manual Translation Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="goToInputView"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-manual-input"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="inputIcon"
-            :alt="t('mobile_dashboard_input_label') || 'Input'"
-            class="ti-toolbar-icon"
-            style="width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important;"
-          >
+      <button class="ti-m-action-btn" @click="goToInputView">
+        <div class="ti-m-icon-container ti-m-icon-manual-input">
+          <img :src="inputIcon" :alt="t('mobile_dashboard_input_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
       </button>
 
       <!-- History Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="goToHistoryView"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-history"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="historyIcon"
-            :alt="t('mobile_dashboard_history_label') || 'History'"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
-          >
+      <button class="ti-m-action-btn" @click="goToHistoryView">
+        <div class="ti-m-icon-container ti-m-icon-history">
+          <img :src="historyIcon" :alt="t('mobile_dashboard_history_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_history_label') || 'History' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_history_label') || 'History' }}</span>
       </button>
 
       <!-- TTS Button (Dynamic) -->
-      <button
-        v-if="isTTSVisible"
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="handleTTS"
-      >
+      <button v-if="isTTSVisible" class="ti-m-action-btn" @click="handleTTS">
         <div
           class="ti-m-icon-container ti-m-icon-tts"
-          :style="[
-            { width: '40px !important', height: '40px !important', borderRadius: '12px !important', display: 'flex !important', alignItems: 'center !important', justifyContent: 'center !important', marginBottom: '2px !important', flexShrink: '0 !important', transition: 'all 0.2s ease !important' },
-            tts.isPlaying.value ? { background: '#4A90E2 !important' } : {}
-          ]"
+          :class="{ 'is-playing': tts.isPlaying.value }"
         >
-          <div v-if="tts.isLoading.value" class="ti-m-tts-loader" style="width: 18px !important; height: 18px !important; border: 2px solid rgba(74, 144, 226, 0.3) !important; border-top-color: #4A90E2 !important; border-radius: 50% !important; animation: ti-m-spin 0.8s linear infinite !important;"></div>
-          <img
-            v-else
-            :src="ttsIcon"
-            :alt="tts.isPlaying.value ? t('mobile_selection_stop_tooltip') : t('mobile_selection_speak_tooltip')"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (tts.isPlaying.value || settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : 'filter: none !important;')"
-          >
+          <div v-if="tts.isLoading.value" class="ti-m-tts-loader"></div>
+          <img v-else :src="ttsIcon" :alt="t('mobile_selection_speak_tooltip')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ tts.isPlaying.value ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}</span>
+        <span class="ti-m-action-label">{{ tts.isPlaying.value ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}</span>
       </button>
 
       <!-- Revert Element Translations (Dynamic) -->
-      <button
-        v-if="hasElementTranslations"
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="revertTranslations"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-revert"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="revertIcon"
-            :alt="t('mobile_dashboard_revert_label') || 'Revert'"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
-          >
+      <button v-if="hasElementTranslations" class="ti-m-action-btn" @click="revertTranslations">
+        <div class="ti-m-icon-container ti-m-icon-revert">
+          <img :src="revertIcon" :alt="t('mobile_dashboard_revert_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
       </button>
 
       <!-- Settings Button -->
-      <button
-        class="ti-m-action-btn"
-        style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: transparent !important; border: none !important; padding: 4px 0 !important; cursor: pointer !important; outline: none !important; min-width: 65px !important; max-width: 80px !important; flex: 1 1 0px !important; box-sizing: border-box !important; -webkit-tap-highlight-color: transparent !important;"
-        @click="openSettings"
-      >
-        <div
-          class="ti-m-icon-container ti-m-icon-settings"
-          style="width: 40px !important; height: 40px !important; border-radius: 12px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 2px !important; flex-shrink: 0 !important; transition: transform 0.1s ease !important;"
-        >
-          <img
-            :src="settingsIcon"
-            :alt="t('mobile_dashboard_settings_label') || 'Settings'"
-            class="ti-toolbar-icon"
-            :style="'width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; max-width: 24px !important; max-height: 24px !important; object-fit: contain !important; display: block !important; ' + (settingsStore.isDarkTheme ? 'filter: brightness(0) invert(1) !important;' : '')"
-          >
+      <button class="ti-m-action-btn" @click="openSettings">
+        <div class="ti-m-icon-container ti-m-icon-settings">
+          <img :src="settingsIcon" :alt="t('mobile_dashboard_settings_label')" class="ti-toolbar-icon">
         </div>
-        <span
-          class="ti-m-action-label"
-          style="font-size: 11px !important; font-weight: 600 !important; text-align: center !important; white-space: nowrap !important; width: 100% !important; color: var(--ti-mobile-text) !important;"
-        >{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
       </button>
     </div>
   </div>
@@ -286,50 +174,5 @@ onUnmounted(() => {
     pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleSelectionPending);
     pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, handleSelectionClear);
   }
-});
-</script>
-
-<style scoped>
-.ti-m-dashboard-scroll-container::-webkit-scrollbar { display: none !important; }
-.ti-m-dashboard-scroll-container { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-
-/* Dashboard Icon Filtering (Like Popup) */
-.ti-toolbar-icon {
-  filter: none !important;
-}
-
-.is-dark .ti-toolbar-icon {
-  filter: var(--ti-mobile-icon-filter) !important;
-}
-
-.ti-m-action-label {
-  color: var(--ti-mobile-text) !important;
-}
-
-/* Specific Icon Colors with Dark Mode Overrides */
-.ti-m-icon-translate-page { background: #e7f5ff !important; }
-.is-dark .ti-m-icon-translate-page { background: rgba(24, 100, 171, 0.25) !important; }
-
-.ti-m-icon-select-element { background: #f3f0ff !important; }
-.is-dark .ti-m-icon-select-element { background: rgba(151, 119, 250, 0.4) !important; }
-
-.ti-m-icon-manual-input { background: #ebfbee !important; }
-.is-dark .ti-m-icon-manual-input { background: rgba(43, 138, 62, 0.4) !important; }
-
-.ti-m-icon-history { background: #fff9db !important; }
-.is-dark .ti-m-icon-history { background: rgba(252, 196, 25, 0.4) !important; }
-
-.ti-m-icon-settings { background: #fff4e6 !important; }
-.is-dark .ti-m-icon-settings { background: rgba(255, 146, 43, 0.4) !important; }
-
-.ti-m-icon-revert { background: #fff5f5 !important; }
-.is-dark .ti-m-icon-revert { background: rgba(255, 107, 107, 0.4) !important; }
-
-.ti-m-icon-tts { background: #e7f5ff !important; }
-.is-dark .ti-m-icon-tts { background: rgba(24, 100, 171, 0.25) !important; }
-
-@keyframes ti-m-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-</style>
+  });
+  </script>

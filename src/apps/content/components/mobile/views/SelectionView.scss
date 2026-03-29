@@ -1,0 +1,160 @@
+/* src/apps/content/components/mobile/views/SelectionView.scss */
+
+.ti-m-selection-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  font-family: sans-serif !important;
+  gap: 12px !important;
+  background-color: inherit !important;
+}
+
+.ti-m-selection-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding-bottom: 12px !important;
+  min-height: 48px !important;
+  border-bottom: 1px solid var(--ti-mobile-header-border) !important;
+}
+
+.ti-m-header-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.ti-m-back-btn {
+  background: none !important;
+  border: none !important;
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  -webkit-tap-highlight-color: transparent !important;
+  color: var(--ti-mobile-text) !important;
+
+  svg {
+    transform: rotate(90deg) !important;
+  }
+}
+
+.ti-m-lang-pair {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  background-color: var(--ti-mobile-card-bg) !important;
+}
+
+.ti-m-lang-target {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  color: var(--ti-mobile-accent) !important;
+}
+
+.ti-m-lang-source {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  color: var(--ti-mobile-text-secondary) !important;
+}
+
+.ti-m-close-btn {
+  background: none !important;
+  border: none !important;
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.ti-m-content-area {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+}
+
+.ti-m-loading-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 40px 0 !important;
+  color: var(--ti-mobile-text-muted) !important;
+  gap: 10px !important;
+}
+
+.ti-m-spinner {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  border: 3px solid var(--ti-mobile-border) !important;
+  border-top-color: var(--ti-mobile-accent) !important;
+  animation: spin-mobile 1s linear infinite !important;
+}
+
+.ti-m-results-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.ti-m-original-card {
+  border: 1px solid var(--ti-mobile-border) !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  background: var(--ti-mobile-card-bg) !important;
+}
+
+.ti-m-original-title {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: var(--ti-mobile-text-muted) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.ti-m-original-text {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  text-align: start !important;
+  word-wrap: break-word !important;
+  color: var(--ti-mobile-text-secondary) !important;
+}
+
+.ti-m-icon-img {
+  object-fit: contain !important;
+}
+
+.ti-m-swap-icon {
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.6 !important;
+}
+
+.ti-m-close-icon {
+  width: 22px !important;
+  height: 22px !important;
+  opacity: 0.5 !important;
+}
+
+@keyframes spin-mobile { 
+  0% { transform: rotate(0deg); } 
+  100% { transform: rotate(360deg); } 
+}

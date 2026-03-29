@@ -1,0 +1,244 @@
+/* src/apps/content/components/mobile/views/HistoryView.scss */
+
+.ti-m-history-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  font-family: sans-serif !important;
+  gap: 15px !important;
+  background-color: inherit !important;
+}
+
+.ti-m-view-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--ti-mobile-header-border) !important;
+  min-height: 48px !important;
+}
+
+.ti-m-back-btn {
+  background: none !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  -webkit-tap-highlight-color: transparent !important;
+  color: var(--ti-mobile-text) !important;
+
+  svg {
+    transform: rotate(90deg) !important;
+  }
+}
+
+.ti-m-header-title {
+  font-weight: bold !important;
+  font-size: 17px !important;
+  color: var(--ti-mobile-text) !important;
+}
+
+.ti-m-header-actions {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.ti-m-export-container {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.ti-m-export-btn {
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  background: var(--ti-mobile-accent-bg) !important;
+  color: var(--ti-mobile-accent) !important;
+  border: 1px solid var(--ti-mobile-accent-bg) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  pointer-events: none !important;
+}
+
+.ti-m-native-select {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  -webkit-appearance: none !important;
+}
+
+.ti-m-clear-all-btn {
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  font-weight: 600 !important;
+  background: var(--ti-mobile-error-bg) !important;
+  color: var(--ti-mobile-error) !important;
+  border: 1px solid var(--ti-mobile-error-bg) !important;
+}
+
+.ti-m-history-list {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  padding-bottom: 20px !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+
+  &::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
+.ti-m-spinner-container {
+  display: flex !important;
+  justify-content: center !important;
+  padding: 40px !important;
+}
+
+.ti-m-spinner {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  border: 3px solid var(--ti-mobile-border) !important;
+  border-top-color: var(--ti-mobile-accent) !important;
+  animation: spin-mobile 1s linear infinite !important;
+}
+
+.ti-m-empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 60px 20px !important;
+  color: var(--ti-mobile-text-muted) !important;
+  gap: 10px !important;
+  text-align: center !important;
+
+  .ti-m-empty-icon {
+    width: 48px !important;
+    height: 48px !important;
+    opacity: 0.2 !important;
+  }
+
+  span {
+    font-size: 15px !important;
+    font-weight: 500 !important;
+  }
+}
+
+.ti-m-history-card {
+  background: var(--ti-mobile-card-bg) !important;
+  border: 1px solid var(--ti-mobile-border) !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: all 0.2s ease !important;
+
+  &:hover {
+    border-color: var(--ti-mobile-accent) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  &:active {
+    transform: scale(0.98) !important;
+    filter: brightness(0.9) !important;
+  }
+}
+
+.ti-m-card-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.ti-m-lang-badge {
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  background: var(--ti-mobile-card-bg) !important;
+  color: var(--ti-mobile-accent) !important;
+  border: 1px solid var(--ti-mobile-border) !important;
+}
+
+.ti-m-delete-btn {
+  background: none !important;
+  border: none !important;
+  padding: 8px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ti-m-source-preview {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--ti-mobile-text-secondary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-align: start !important;
+}
+
+.ti-m-target-preview {
+  font-size: 14px !important;
+  color: var(--ti-mobile-accent) !important;
+  line-height: 1.4 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-align: start !important;
+}
+
+.ti-m-timestamp {
+  font-size: 10px !important;
+  color: var(--ti-mobile-text-muted) !important;
+  margin-top: 2px !important;
+}
+
+/* Enhanced separation for dark mode */
+:host-context(.theme-dark) .ti-m-history-card {
+  background: #252525 !important;
+  border-color: #333333 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+
+  &:hover {
+    background: #2a2a2a !important;
+    border-color: var(--ti-mobile-accent) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
+  }
+}
+
+.ti-m-icon-img, 
+.ti-m-icon-img-small, 
+.ti-m-empty-icon {
+  object-fit: contain !important;
+}
+
+@keyframes spin-mobile { 
+  0% { transform: rotate(0deg); } 
+  100% { transform: rotate(360deg); } 
+}

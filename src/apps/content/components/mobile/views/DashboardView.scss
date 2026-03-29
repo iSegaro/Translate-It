@@ -1,0 +1,107 @@
+/* src/apps/content/components/mobile/views/DashboardView.scss */
+
+.ti-m-dashboard-view {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  background: transparent !important;
+}
+
+.ti-m-dashboard-scroll-container {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  padding: 12px 10px !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+
+  &::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
+.ti-m-action-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 0 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  min-width: 65px !important;
+  max-width: 80px !important;
+  flex: 1 1 0px !important;
+  box-sizing: border-box !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.ti-m-icon-container {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 2px !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.1s ease, background-color 0.2s ease !important;
+
+  img {
+    width: 24px !important;
+    height: 24px !important;
+    object-fit: contain !important;
+    display: block !important;
+  }
+}
+
+.ti-m-action-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  width: 100% !important;
+  color: var(--ti-mobile-text) !important;
+}
+
+/* Specific Icon Colors */
+.ti-m-icon-translate-page { background: #e7f5ff !important; }
+.ti-m-icon-select-element { background: #f3f0ff !important; }
+.ti-m-icon-manual-input { background: #ebfbee !important; }
+.ti-m-icon-history { background: #fff9db !important; }
+.ti-m-icon-settings { background: #fff4e6 !important; }
+.ti-m-icon-revert { background: #fff5f5 !important; }
+.ti-m-icon-tts { background: #e7f5ff !important; }
+
+/* Dark Mode Overrides */
+:host-context(.theme-dark) {
+  .ti-m-icon-translate-page { background: rgba(24, 100, 171, 0.25) !important; }
+  .ti-m-icon-select-element { background: rgba(151, 119, 250, 0.4) !important; }
+  .ti-m-icon-manual-input { background: rgba(43, 138, 62, 0.4) !important; }
+  .ti-m-icon-history { background: rgba(252, 196, 25, 0.4) !important; }
+  .ti-m-icon-settings { background: rgba(255, 146, 43, 0.4) !important; }
+  .ti-m-icon-revert { background: rgba(255, 107, 107, 0.4) !important; }
+  .ti-m-icon-tts { background: rgba(24, 100, 171, 0.25) !important; }
+  
+  .ti-toolbar-icon {
+    filter: var(--ti-mobile-icon-filter) !important;
+  }
+}
+
+@keyframes ti-m-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ti-m-tts-loader {
+  animation: ti-m-spin 0.8s linear infinite !important;
+}

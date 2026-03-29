@@ -26,10 +26,7 @@
       <!-- Main Content Container -->
       <div 
         class="ti-m-sheet-content" 
-        :style="{ 
-          overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
-          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important'
-        }"
+        :class="{ 'view-dashboard': activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
         <SelectionView v-if="activeView === MOBILE_CONSTANTS.VIEWS.SELECTION" />
@@ -157,22 +154,8 @@ const sheetStyle = computed(() => {
 
   return {
     transform: transformValue,
-    position: 'fixed',
-    bottom: '0',
-    left: '0',
-    right: '0',
-    zIndex: '2147483647',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 -5px 25px var(--ti-mobile-shadow)',
-    borderRadius: '20px 20px 0 0',
-    height: heightValue,
-    maxHeight: '95vh', 
-    paddingTop: 'env(safe-area-inset-top, 0px)',
     transition: isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
-    overflow: 'hidden',
-    touchAction: 'none !important',
-    overscrollBehavior: 'none'
+    height: heightValue
   }
 })
 
@@ -188,71 +171,3 @@ onUnmounted(() => {
   document.body.style.touchAction = ''
 })
 </script>
-
-<style>
-/* 
-  MOBILE THEME SYSTEM (Shadow DOM Compatible)
-*/
-:host {
-  --ti-mobile-bg: #ffffff;
-  --ti-mobile-shadow: rgba(0, 0, 0, 0.2);
-}
-
-.ti-m-sheet-overlay {
-  /* LIGHT THEME (DEFAULT) */
-  --ti-mobile-bg: #ffffff;
-  --ti-mobile-text: #333333;
-  --ti-mobile-text-secondary: #495057;
-  --ti-mobile-accent: #339af0;
-  --ti-mobile-shadow: rgba(0, 0, 0, 0.2);
-}
-
-.ti-m-sheet-overlay.is-dark,
-.ti-m-sheet.is-dark {
-  /* DARK THEME OVERRIDES */
-  --ti-mobile-bg: #1a1a1a;
-  --ti-mobile-text: #dee2e6;
-  --ti-mobile-text-secondary: #adb5bd;
-  --ti-mobile-accent: #74c0fc;
-  --ti-mobile-shadow: rgba(0, 0, 0, 0.4);
-  --ti-mobile-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
-}
-
-.ti-m-sheet {
-  background-color: var(--ti-mobile-bg, #ffffff) !important;
-  color: var(--ti-mobile-text, #333333) !important;
-}
-
-.ti-m-sheet-content,
-.ti-m-sheet-footer-area {
-  background-color: inherit !important;
-}
-
-.ti-m-sheet-overlay * {
-  box-sizing: border-box !important;
-}
-
-.ti-m-sheet-overlay img {
-  max-width: none !important;
-  display: block !important;
-}
-
-/* GLOBAL ICON FILTERING (SHADOW DOM COMPATIBLE) */
-.ti-m-icon-img, .ti-toolbar-icon {
-  filter: none !important;
-}
-
-.is-dark .ti-m-icon-img, 
-.is-dark .ti-toolbar-icon {
-  filter: var(--ti-mobile-icon-filter) !important;
-}
-
-.ti-m-drag-handle {
-  background-color: var(--ti-mobile-drag-handle, #e0e0e0) !important;
-}
-
-@keyframes pulse-mobile { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(0.95); opacity: 1; } }
-@keyframes indeterminate-mobile { 0% { transform: translateX(-100%) scaleX(0.2); } 50% { transform: translateX(0%) scaleX(0.5); } 100% { transform: translateX(100%) scaleX(0.2); } }
-.ti-m-progress-bar-fill.indeterminate { animation: indeterminate-mobile 2s infinite linear !important; transform-origin: 0% 50% !important; }
-button:active { transform: scale(0.98) !important; opacity: 0.8 !important; }
-</style>
