@@ -26,7 +26,7 @@
             />
           </svg>
         </button>
-        <div class="ti-m-lang-pair">
+        <div class="ti-m-lang-pair" @click="goBack">
           <span class="ti-m-lang-target">{{ selectionData.targetLang }}</span>
           <img
             src="@/icons/ui/swap.png"
@@ -39,7 +39,7 @@
         </div>
       </div>
       
-      <div style="display: flex !important; align-items: center !important;">
+      <div class="ti-m-header-right">
         <button
           class="ti-m-close-btn"
           @click="closeView"

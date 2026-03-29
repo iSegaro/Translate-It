@@ -5,40 +5,60 @@
   flex-direction: column !important;
   height: 100% !important;
   font-family: sans-serif !important;
-  gap: 12px !important;
+  gap: 15px !important;
   background-color: inherit !important;
+  padding: 0 15px !important; /* پدینگ سراسری مشابه بقیه صفحات */
 }
 
 .ti-m-selection-header {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  padding-bottom: 12px !important;
-  min-height: 48px !important;
+  padding: 10px 0 !important;
   border-bottom: 1px solid var(--ti-mobile-header-border) !important;
+  margin: 0 -15px 15px !important;
+  padding-left: 10px !important;
+  padding-right: 15px !important;
 }
 
 .ti-m-header-left {
   display: flex !important;
   align-items: center !important;
-  gap: 4px !important;
+  gap: 5px !important;
+  flex: 1 !important;
+}
+
+.ti-m-header-right {
+  display: flex !important;
+  align-items: center !important;
 }
 
 .ti-m-back-btn {
   background: none !important;
   border: none !important;
-  width: 44px !important;
-  height: 44px !important;
-  padding: 0 !important;
-  cursor: pointer !important;
+  width: 40px !important;
+  height: 40px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  -webkit-tap-highlight-color: transparent !important;
+  cursor: pointer !important;
+  border-radius: 50% !important;
   color: var(--ti-mobile-text) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: background-color 0.2s ease !important;
+
+  &:active {
+    background-color: var(--ti-mobile-header-border) !important;
+  }
 
   svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0 !important;
     transform: rotate(90deg) !important;
+    stroke: currentColor !important;
+    stroke-width: 1.2px !important;
   }
 }
 
@@ -46,9 +66,10 @@
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 6px 14px !important;
+  padding: 6px 12px !important;
   border-radius: 20px !important;
   background-color: var(--ti-mobile-card-bg) !important;
+  cursor: pointer !important;
 }
 
 .ti-m-lang-target {
@@ -68,14 +89,19 @@
 .ti-m-close-btn {
   background: none !important;
   border: none !important;
-  width: 44px !important;
-  height: 44px !important;
+  width: 40px !important;
+  height: 40px !important;
   padding: 0 !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  border-radius: 50% !important;
   -webkit-tap-highlight-color: transparent !important;
+
+  &:active {
+    background-color: var(--ti-mobile-header-border) !important;
+  }
 }
 
 .ti-m-content-area {
@@ -84,6 +110,7 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 15px !important;
+  padding-bottom: 20px !important;
 }
 
 .ti-m-loading-container {
@@ -120,6 +147,11 @@
   gap: 6px !important;
   cursor: pointer !important;
   background: var(--ti-mobile-card-bg) !important;
+  transition: transform 0.1s ease !important;
+
+  &:active {
+    transform: scale(0.98) !important;
+  }
 }
 
 .ti-m-original-title {
@@ -152,6 +184,7 @@
   width: 22px !important;
   height: 22px !important;
   opacity: 0.5 !important;
+  filter: var(--ti-mobile-icon-filter) !important;
 }
 
 @keyframes spin-mobile { 
