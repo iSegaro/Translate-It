@@ -84,7 +84,10 @@ class SettingsManager {
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       SHOW_DESKTOP_FAB: true,
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
-      MOBILE_FAB_POSITION: { side: 'right', y: 150 }, // Standard default for mobile
+      MOBILE_FAB_POSITION: { 
+        side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
+        y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
+      },
       // Whole Page Translation Defaults
       WHOLE_PAGE_TRANSLATION_ENABLED: true,
       WHOLE_PAGE_LAZY_LOADING: true,
