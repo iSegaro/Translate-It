@@ -8,19 +8,39 @@ The UI Host system is a centralized Vue.js application that manages all in-page 
 
 ### Components
 
-1. **ContentApp.vue** - The root Vue component that hosts all in-page UI elements
-2. **PageEventBus.js** - Lightweight event bus for communication between vanilla JS and Vue components
-3. **NotificationManager.js** - Clean API wrapper for showing notifications via the event bus
+1. **ContentApp.vue** - The root Vue component that hosts all in-page UI elements.
+2. **Selection Coordinator** - Pub/Sub system that broadcasts text selection events to all UI modules.
+3. **PageEventBus.js** - Lightweight event bus for communication between vanilla JS and Vue components.
+4. **NotificationManager.js** - Clean API wrapper for showing notifications via the event bus.
 
 ### Key Features
 
-- **Shadow DOM Isolation**: All UI elements are rendered within a Shadow DOM to prevent CSS conflicts
-- **Event-Based Communication**: Uses a custom event bus for seamless communication between vanilla JS and Vue
-- **Desktop FAB Integration**: Provides a persistent, draggable menu for quick access to extension features
-- **Centralized Management**: All in-page UI (notifications, toolbars, icons) is managed by a single Vue app
-- **Performance Optimized**: Minimizes DOM manipulation and leverages Vue's reactivity system
+- **Shadow DOM Isolation**: All UI elements are rendered within a Shadow DOM to prevent CSS conflicts.
+- **Selection Coordinator Integration**: Decoupled selection awareness for FAB, Windows, and TTS.
+- **Event-Based Communication**: Uses a custom event bus for seamless communication between vanilla JS and Vue.
+- **Centralized Management**: All in-page UI (notifications, toolbars, icons) is managed by a single Vue app.
+- **Performance Optimized**: Minimizes DOM manipulation and leverages Vue's reactivity system.
 
 ## Communication Pattern
+
+### Selection Coordination (Pub/Sub)
+
+```javascript
+// In Detectors (SelectionManager / TextFieldHandler)
+import { pageEventBus } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+
+pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
+  text: 'selected text',
+  position: { x, y },
+  mode: 'immediate'
+});
+
+// In Subscribers (useFabSelection.js / WindowsManager.js)
+pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
+  // React independently to selection
+});
+```
 
 ### Vanilla JS → Vue (Event Emission)
 
@@ -111,28 +131,29 @@ The central UI container for mobile browsers. It provides a touch-friendly "Bott
 ## Integration Points
 
 The system integrates with:
-- `SelectElementManager.js` - For select mode toolbar
-- `Desktop FAB System` - For the persistent floating action menu
-- `Mobile Support System` - For the touch-friendly mobile interface
-- `smartTranslationIntegration.js` - For translation status notifications
-- `RevertHandler.js` - For revert operation notifications
-- `ErrorHandler.js` - For error notifications
-- Text field detection systems - For field icon management
+- **Selection Coordinator**: Centralized selection signal management.
+- **WindowsManager.js**: For translation windows and icons (now a Subscriber).
+- **Desktop FAB System**: For the persistent floating action menu (via `useFabSelection`).
+- **Mobile Support System**: For the touch-friendly mobile interface.
+- **ErrorHandler.js**: For error notifications and state-aware UI recovery.
 
 ## File Structure
 
 ```
 src/
-├── views/content/
+├── apps/content/
 │   ├── ContentApp.vue          # Root UI Host component
-│   ├── main.js                 # Vue app initialization
-│   └── components/
-│       ├── SelectModeToolbar.vue
-│       └── TextFieldIcon.vue
-├── utils/core/
-│   └── PageEventBus.js         # Event communication system
-└── managers/core/
-    └── NotificationManager.js   # Notification API wrapper
+│   └── components/             # Sub-components (FAB, Windows, Icons)
+├── core/
+│   ├── PageEventBus.js         # Event communication system
+│   └── managers/core/
+│       └── NotificationManager.js # Notification API wrapper
+├── features/
+│   └── text-selection/
+│       └── events/
+│           └── SelectionEvents.js # Global coordinator constants
+└── apps/content/composables/
+    └── useFabSelection.js      # Decoupled UI logic handler
 ```
 
 ## Best Practices
