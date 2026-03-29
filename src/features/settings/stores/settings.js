@@ -190,9 +190,31 @@ export const useSettingsStore = defineStore('settings', () => {
       __saveTimer = setTimeout(() => performSave().then(resolve).catch(reject), 120);
     });
   }
+
+  /**
+   * Sanitizes settings before saving to prevent logical inconsistencies.
+   * - If Desktop FAB is disabled, ensure selectionTranslationMode is not set to ON_FAB_CLICK.
+   */
+  const sanitizeSettings = () => {
+    const s = settings.value;
+    
+    // 1. FAB Consistency: If FAB is disabled, we can't use it for translation trigger.
+    // Fallback to ON_CLICK (Show icon) to ensure user has a way to translate.
+    if (s.SHOW_DESKTOP_FAB === false && s.selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
+      logger.info('Sanitizing settings: FAB disabled, falling back selectionTranslationMode to ON_CLICK');
+      s.selectionTranslationMode = SelectionTranslationMode.ON_CLICK;
+    }
+    
+    // 2. Extension State: If extension is disabled, ensure we still allow some internal state to be consistent
+    // (Add more sanitization rules here if needed in the future)
+  }
+
   async function performSave() {
     isSaving.value = true;
     try {
+      // Run sanitization before saving
+      sanitizeSettings();
+      
       await storageManager.set(settings.value);
       return true;
     } catch (error) {
