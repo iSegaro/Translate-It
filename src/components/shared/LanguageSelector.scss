@@ -1,0 +1,269 @@
+/* src/components/shared/LanguageSelector.scss */
+@use "@/assets/styles/base/variables" as *;
+@use "@/assets/styles/base/mixins" as *;
+
+.ti-language-controls {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 6px 12px !important;
+  gap: 6px !important;
+  background: var(--language-controls-bg-color, transparent) !important;
+  margin: 8px 12px 0 12px !important;
+  box-sizing: border-box !important;
+
+  /* Vertical layout for small sidepanel widths */
+  &.ti-language-controls--vertical {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    padding: 4px 12px !important;
+    min-height: fit-content !important;
+
+    .ti-language-select {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: auto !important;
+      order: 1 !important;
+
+      &:first-of-type {
+        order: 3 !important;
+      }
+    }
+
+    .ti-swap-button {
+      order: 2 !important;
+      align-self: center !important;
+      margin: 1px 0 !important;
+    }
+  }
+
+  /* Compact Mode (Mobile/Input View) */
+  &.ti-compact-mode {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    background: transparent !important;
+
+    .ti-language-select {
+      flex: 0 1 120px !important;
+      max-width: 130px !important;
+      text-align: center !important;
+      border: none !important;
+      background-color: transparent !important;
+      height: 44px !important;
+      font-size: 15px !important;
+      padding: 0 10px !important;
+      color: var(--ti-mobile-text-secondary, #1c7ed6) !important;
+      background-position: right 8px center !important;
+      background-size: 10px 5px !important;
+
+      option {
+        background-color: var(--ti-mobile-bg, #ffffff) !important;
+        color: var(--ti-mobile-text, #212529) !important;
+      }
+    }
+
+    .ti-swap-button {
+      width: 32px !important;
+      height: 32px !important;
+      min-width: 32px !important;
+      margin: 0 10px !important;
+      background: var(--ti-mobile-card-bg, #f1f3f5) !important;
+      border-radius: 50% !important;
+      border: 1px solid var(--header-border-color, #dee2e6) !important;
+      padding: 0 !important;
+
+      img {
+        width: 16px !important;
+        height: 16px !important;
+        min-width: 16px !important;
+        max-width: 16px !important;
+        filter: var(--ti-mobile-icon-filter, none) !important;
+      }
+    }
+  }
+}
+
+.ti-language-select {
+  flex: 1 1 80px !important;
+  min-width: 70px !important;
+  max-width: 120px !important;
+  padding: 7px 8px !important;
+  font-size: 14px !important;
+  border: 1px solid var(--color-border, #dee2e6) !important;
+  border-radius: 4px !important;
+  background-color: var(--color-background, #ffffff) !important;
+  color: var(--color-text, #212529) !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 10px 5px !important;
+  padding-right: 25px !important;
+  vertical-align: middle !important;
+  cursor: pointer !important;
+  transition: border-color 0.2s ease !important;
+
+  // Default Arrow (Light)
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%225%22%20viewBox%3D%220%200%2010%205%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M0%200l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E') !important;
+
+  :is(.theme-dark, .is-dark) & {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%225%22%20viewBox%3D%220%200%2010%205%22%3E%3Cpath%20fill%3D%22%23adb5bd%22%20d%3D%22M0%200l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E') !important;
+    color-scheme: dark !important;
+  }
+
+  &:focus {
+    outline: none !important;
+    border-color: var(--primary-color, #007bff) !important;
+  }
+
+  &:disabled {
+    background-color: var(--bg-disabled, #e9ecef) !important;
+    color: var(--text-disabled, #6c757d) !important;
+    cursor: not-allowed !important;
+  }
+}
+
+.ti-swap-button {
+  background: none !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  transition: background-color 0.2s ease, filter 0.2s ease-in-out !important;
+  flex-shrink: 0 !important;
+
+  &:hover:not(:disabled) {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
+  }
+
+  &:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.5 !important;
+  }
+
+  img {
+    width: 16px !important;
+    height: 16px !important;
+    opacity: var(--icon-opacity, 0.8) !important;
+    filter: var(--icon-filter, none) !important;
+    transition: opacity 0.2s ease-in-out !important;
+    object-fit: contain !important;
+  }
+
+  &:hover:not(:disabled) img {
+    opacity: var(--icon-hover-opacity, 1) !important;
+  }
+}
+
+/* Context-specific adjustments */
+
+// Popup Mode
+.popup-wrapper {
+  .ti-language-controls {
+    height: 28px !important;
+    justify-content: flex-end !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 6px !important;
+  }
+
+  .ti-language-select {
+    padding: 0 22px 0 6px !important;
+    font-size: 13px !important;
+    max-width: 110px !important;
+    height: 28px !important;
+  }
+
+  .ti-swap-button {
+    width: 24px !important;
+    height: 24px !important;
+    
+    img {
+      width: 18px !important;
+      height: 18px !important;
+    }
+  }
+}
+
+// Sidepanel Mode
+.sidepanel-wrapper {
+  .ti-language-controls {
+    height: 40px !important;
+    padding: 4px 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    
+    &.ti-language-controls--vertical {
+      height: auto !important;
+      padding: 2px 0 !important;
+
+      .ti-language-select {
+        height: 32px !important;
+      }
+    }
+  }
+
+  .ti-language-select {
+    padding: 6px 30px 6px 10px !important;
+    font-size: 14px !important;
+    height: 32px !important;
+    max-width: 140px !important;
+  }
+
+  .ti-swap-button {
+    width: 32px !important;
+    height: 32px !important;
+    
+    img {
+      width: 18px !important;
+      height: 18px !important;
+    }
+  }
+}
+
+/* RTL Adjustments */
+:is([dir="rtl"], html[dir="rtl"]) {
+  .ti-language-select {
+    background-position: left 8px center !important;
+    padding-right: 8px !important;
+    padding-left: 25px !important;
+  }
+  
+  .ti-compact-mode .ti-language-select {
+    background-position: left 8px center !important;
+  }
+}
+
+/* Mobile Media Queries (Legacy support) */
+@media (max-width: 480px) {
+  .ti-language-controls:not(.ti-compact-mode) {
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-direction: row !important;
+    
+    .ti-language-select {
+      height: 44px !important;
+      font-size: 16px !important;
+      max-width: none !important;
+      flex: 1 !important;
+    }
+
+    .ti-swap-button {
+      width: 44px !important;
+      height: 44px !important;
+      
+      img {
+        width: 24px !important;
+        height: 24px !important;
+      }
+    }
+  }
+}
