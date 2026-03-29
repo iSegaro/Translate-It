@@ -121,3 +121,16 @@ export const WindowsManagerEvents = {
   // Icon interactions
   iconClicked: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail)
 };
+
+// Page Translation Hover events
+export const PAGE_TRANSLATION_EVENTS = {
+  SHOW_TOOLTIP: 'page-translation-show-tooltip',
+  HIDE_TOOLTIP: 'page-translation-hide-tooltip',
+  UPDATE_TOOLTIP_POSITION: 'page-translation-update-tooltip-position'
+};
+
+export const PageTranslationEvents = {
+  showTooltip: (detail) => pageEventBus.emit(PAGE_TRANSLATION_EVENTS.SHOW_TOOLTIP, detail),
+  hideTooltip: () => pageEventBus.emit(PAGE_TRANSLATION_EVENTS.HIDE_TOOLTIP),
+  updateTooltipPosition: (detail) => pageEventBus.emit(PAGE_TRANSLATION_EVENTS.UPDATE_TOOLTIP_POSITION, detail)
+};
