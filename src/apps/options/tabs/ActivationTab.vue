@@ -627,8 +627,11 @@ const dictionaryProvider = computed({
     margin-bottom: $spacing-base;
 
     &.ui-mode-radio-group {
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: stretch;
       gap: $spacing-lg;
+      width: 100%;
 
       .radio-label-content {
         display: flex;
@@ -678,6 +681,10 @@ const dictionaryProvider = computed({
       flex-direction: column;
       align-items: stretch;
       gap: $spacing-base;
+
+      &.ui-mode-radio-group {
+        grid-template-columns: 1fr;
+      }
     }
     
     .sub-setting-group {
