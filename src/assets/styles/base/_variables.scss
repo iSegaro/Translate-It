@@ -179,16 +179,16 @@
   --input-border-color: #5f6368;
   --input-focus-border-color: #8ab4f8;
   --input-focus-shadow-color: rgba(138, 180, 248, 0.3);
-  --button-bg-color: #8ab4f8;
-  --button-text-color: #202124;
-  --button-hover-bg-color: #9ac0f9;
-  --link-color: #8ab4f8;
-  --link-hover-color: #a7c8fa;
+  --button-bg-color: #1a73e8;
+  --button-text-color: #fff;
+  --button-hover-bg-color: #185abc;
+  --link-color: #1a73e8;
+  --link-hover-color: #185abc;
   --section-title-border: #5f6368;
   
   // Component specific colors
-  --accent-color: #58a6ff;
-  --accent-color-alpha: rgba(88, 166, 255, 0.1);
+  --accent-color: #1a73e8;
+  --accent-color-alpha: rgba(26, 115, 232, 0.2);
   --placeholder-color: #888;
   
   // Icon filters
@@ -202,7 +202,7 @@
   --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
   
   --color-surface: #242d44; /* Ensure dark theme background is blue */
-  --color-primary-alpha: rgba(88, 166, 255, 0.3);
+  --color-primary-alpha: rgba(26, 115, 232, 0.3);
   --color-surface-shadow: rgba(255, 255, 255, 0.1);
   --color-background-hover: rgba(255, 255, 255, 0.1);
   --color-button-surface: rgba(32, 33, 36, 0.95);
@@ -216,7 +216,7 @@
   --color-background-soft: var(--sidebar-bg-color, #303741);
   --color-border: var(--border-color, #3c4043);
   --color-border-light: rgba(255, 255, 255, 0.1);
-  --color-primary: var(--link-color, #8ab4f8);
+  --color-primary: #1a73e8;
   --color-error: #ef5350;
   --color-success: #66bb6a;
   --color-success-alpha: rgba(102, 187, 106, 0.1);
