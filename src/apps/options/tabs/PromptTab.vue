@@ -196,7 +196,7 @@ const resetPrompt = async () => {
   }
   
   ul {
-    padding-left: $spacing-lg;
+    padding-inline-start: $spacing-lg;
     margin: 0;
   }
   

@@ -23,7 +23,7 @@
         />
         <span
           class="setting-description"
-          style="margin-left: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;"
+          style="margin-inline-start: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;"
         >
           {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
         </span>
@@ -603,13 +603,13 @@ const dictionaryProvider = computed({
 .shortcut-setting-compact {
   width: 100%;
   margin-top: $spacing-sm;
-  margin-left: $spacing-lg;
+  margin-inline-start: $spacing-lg;
   display: flex;
   align-items: center;
 }
 
 .setting-description {
-  padding-left: $spacing-xl;
+  padding-inline-start: $spacing-xl;
   margin-top: $spacing-xs;
 }
 

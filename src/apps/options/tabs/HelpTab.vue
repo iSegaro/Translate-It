@@ -241,7 +241,7 @@ onMounted(() => {
     .accordion-icon {
       font-size: $font-size-lg;
       font-weight: $font-weight-bold;
-      margin-left: $spacing-sm;
+      margin-inline-start: $spacing-sm;
       transition: transform $transition-base;
       min-width: 20px;
       text-align: center;
@@ -271,7 +271,7 @@ onMounted(() => {
 
         :deep(ol), :deep(ul) {
           margin: 0 0 $spacing-md 0;
-          padding-left: $spacing-xl;
+          padding-inline-start: $spacing-xl;
 
           li {
             margin-bottom: $spacing-sm;

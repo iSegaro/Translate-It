@@ -313,12 +313,12 @@ const importSettings = async () => {
 .setting-description {
   &.export-info {
     flex-basis: auto;
-    padding-left: 0;
+    padding-inline-start: 0;
   }
 
   &.import-warning {
     flex-basis: auto;
-    padding-left: 0;
+    padding-inline-start: 0;
     color: var(--color-warning);
   }
 }
