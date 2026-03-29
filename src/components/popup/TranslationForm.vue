@@ -1,6 +1,6 @@
 <template>
   <form
-    class="translation-form"
+    class="ti-translation-form"
     @submit.prevent="handleTranslate"
   >
     <!-- Source Input Field -->
@@ -59,6 +59,9 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+
+// Import adjacent SCSS
+import './TranslationForm.scss';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupTranslationForm');
 
@@ -309,81 +312,3 @@ defineExpose({
   clearFields: clearStorage
 })
 </script>
-
-<style scoped>
-.translation-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  height: 100%;
-  flex: 1;
-}
-
-/* Popup-specific adjustments */
-.translation-form :deep(.textarea-container) {
-  position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background-color: var(--color-textarea-background);
-  padding: 5px;
-  margin: 4px 8px;
-}
-
-.translation-form :deep(.translation-textarea) {
-  min-height: 50px;
-  max-height: 120px;
-  font-size: 14px;
-  padding: 42px 8px 8px 8px;
-}
-
-.translation-form :deep(.ti-translation-display.popup-mode .ti-translation-content) {
-  padding-top: 42px !important; /* Force space from the toolbar */
-}
-
-.translation-form :deep(.result-content) {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  font-size: 14px;
-  height: 100%;
-}
-
-/* Responsive Adjustments using Media Queries */
-@media (max-width: 480px) {
-  .translation-form :deep(.textarea-container) {
-    margin: 8px 8px;
-    border-radius: 8px;
-  }
-
-  .translation-form :deep(.translation-textarea) {
-    font-size: 16px;
-    max-height: 200px;
-  }
-
-  .translation-form :deep(.translation-display.popup-mode) {
-    margin: 0 8px 8px 8px;
-  }
-
-  .translation-form :deep(.result-content) {
-    font-size: 16px;
-    padding: 12px;
-  }
-}
-
-@media (min-width: 481px) {
-  .translation-form :deep(.translation-textarea) {
-    font-size: 15px;
-  }
-  
-  .translation-form :deep(.result-content) {
-    font-size: 15px;
-  }
-}
-
-.result {
-  background-color: var(--bg-result-color);
-  white-space: normal !important;
-  word-wrap: break-word;
-  overflow-y: auto;
-}
-</style>

@@ -1,0 +1,80 @@
+/* src/components/popup/TranslationForm.scss */
+@use "@/assets/styles/base/variables" as *;
+@use "@/assets/styles/base/mixins" as *;
+
+.ti-translation-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  height: 100% !important;
+  flex: 1 !important;
+
+  /* Popup-specific overrides for Shared Components */
+  
+  // Input Field Overrides
+  .ti-textarea-container {
+    position: relative !important;
+    border: 1px solid var(--color-border, #dee2e6) !important;
+    border-radius: 4px !important;
+    background-color: var(--color-textarea-background, #ffffff) !important;
+    padding: 5px !important;
+    margin: 4px 8px !important;
+  }
+
+  .ti-translation-textarea {
+    min-height: 50px !important;
+    max-height: 120px !important;
+    font-size: 14px !important;
+    padding: 42px 8px 8px 8px !important;
+    
+    @media (min-width: 481px) {
+      font-size: 15px !important;
+    }
+  }
+
+  // Display Field Overrides
+  .ti-translation-display.popup-mode {
+    .ti-translation-content {
+      padding-top: 42px !important; /* Force space from the toolbar */
+      flex: 1 !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      font-size: 14px !important;
+      height: 100% !important;
+
+      @media (min-width: 481px) {
+        font-size: 15px !important;
+      }
+    }
+  }
+
+  /* Legacy Result Support */
+  .result {
+    background-color: var(--bg-result-color, transparent) !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-y: auto !important;
+  }
+
+  /* Mobile Responsive Adjustments */
+  @media (max-width: 480px) {
+    .ti-textarea-container {
+      margin: 8px 8px !important;
+      border-radius: 8px !important;
+    }
+
+    .ti-translation-textarea {
+      font-size: 16px !important;
+      max-height: 200px !important;
+    }
+
+    .ti-translation-display.popup-mode {
+      margin: 0 8px 8px 8px !important;
+      
+      .ti-translation-content {
+        font-size: 16px !important;
+        padding: 12px !important;
+      }
+    }
+  }
+}
