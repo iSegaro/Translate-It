@@ -24,8 +24,8 @@
             stroke-linejoin="round"
           />
         </svg>
-        <span class="ti-m-header-title">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
       </button>
+      <span class="ti-m-header-title" @click="goBack">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
     </div>
 
     <!-- Input Card -->
