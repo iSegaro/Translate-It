@@ -5,34 +5,48 @@
   flex-direction: column !important;
   height: 100% !important;
   font-family: sans-serif !important;
-  gap: 10px !important;
+  gap: 15px !important;
   background-color: inherit !important;
+  padding: 0 15px !important; /* پدینگ سراسری */
 }
 
 .ti-m-view-header {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  padding-bottom: 8px !important;
+  padding: 10px 0 !important;
   border-bottom: 1px solid var(--ti-mobile-header-border) !important;
-  min-height: 44px !important;
+  margin: 0 -15px 15px !important;
+  padding-left: 10px !important;
+  padding-right: 15px !important;
 }
 
 .ti-m-back-btn {
   background: none !important;
   border: none !important;
+  width: 40px !important;
+  height: 40px !important;
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: center !important;
   cursor: pointer !important;
-  padding: 0 !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  -webkit-tap-highlight-color: transparent !important;
+  border-radius: 50% !important;
   color: var(--ti-mobile-text) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: background-color 0.2s ease !important;
+  margin-right: 5px !important;
+
+  &:active {
+    background-color: var(--ti-mobile-header-border) !important;
+  }
 
   svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0 !important;
     transform: rotate(90deg) !important;
+    stroke: currentColor !important;
+    stroke-width: 1.2px !important;
   }
 }
 
@@ -40,6 +54,8 @@
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
+  flex: 1 !important;
+  cursor: pointer !important;
 }
 
 .ti-m-status-dot {
@@ -48,6 +64,7 @@
   border-radius: 50% !important;
   display: block !important;
   background: var(--ti-mobile-text-muted) !important;
+  flex-shrink: 0 !important;
 
   &.translating { 
     background: var(--ti-mobile-accent) !important; 
@@ -66,9 +83,10 @@
 }
 
 .ti-m-header-title {
-  font-weight: bold !important;
+  font-weight: 700 !important;
   font-size: 17px !important;
   color: var(--ti-mobile-text) !important;
+  white-space: nowrap !important;
 }
 
 .ti-m-header-actions {
@@ -78,10 +96,10 @@
 }
 
 .ti-m-auto-close-btn {
-  padding: 0 8px !important;
-  height: 24px !important;
-  border-radius: 6px !important;
-  font-size: 9px !important;
+  padding: 0 10px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
+  font-size: 10px !important;
   font-weight: 800 !important;
   cursor: pointer !important;
   display: flex !important;
@@ -94,14 +112,14 @@
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
   background-color: var(--ti-mobile-btn-bg) !important;
-  color: var(--ti-mobile-text-muted) !important;
+  color: var(--ti-mobile-text-secondary) !important;
   border: 1px solid var(--ti-mobile-border) !important;
 
   &.is-active {
     background-color: var(--ti-mobile-accent) !important;
     color: #ffffff !important;
     border-color: var(--ti-mobile-accent) !important;
-    box-shadow: 0 1px 4px rgba(51, 154, 240, 0.3) !important;
+    box-shadow: 0 2px 6px rgba(51, 154, 240, 0.3) !important;
   }
 }
 
@@ -114,8 +132,8 @@
   align-items: center !important;
 
   .ti-m-icon-img-close {
-    width: 20px !important;
-    height: 20px !important;
+    width: 22px !important;
+    height: 22px !important;
     opacity: 0.4 !important;
     filter: var(--ti-mobile-icon-filter) !important;
   }
@@ -219,31 +237,33 @@
 
 .ti-m-action-column {
   margin-top: auto !important;
-  padding-top: 5px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
 }
 
 .ti-m-primary-action-btn {
   width: 100% !important;
-  padding: 12px !important;
-  border-radius: 12px !important;
+  padding: 14px !important;
+  border-radius: 14px !important;
   font-weight: 700 !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   transition: all 0.2s ease !important;
   border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 
   img {
-    width: 18px !important;
-    height: 18px !important;
+    width: 20px !important;
+    height: 20px !important;
   }
 
   &:active { 
     transform: scale(0.98) !important; 
-    opacity: 0.8 !important; 
+    opacity: 0.9 !important; 
   }
 }
 

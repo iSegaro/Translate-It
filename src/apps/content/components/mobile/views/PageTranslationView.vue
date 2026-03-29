@@ -24,14 +24,15 @@
             stroke-linejoin="round"
           />
         </svg>
-        <div class="ti-m-header-title-container">
-          <span
-            class="ti-m-status-dot"
-            :class="pageTranslationData.status"
-          />
-          <span class="ti-m-header-title">{{ statusMessage }}</span>
-        </div>
       </button>
+      
+      <div class="ti-m-header-title-container" @click="goToDashboard">
+        <span
+          class="ti-m-status-dot"
+          :class="pageTranslationData.status"
+        />
+        <span class="ti-m-header-title">{{ statusMessage }}</span>
+      </div>
 
       <div class="ti-m-header-actions">
         <!-- Auto Close Toggle Button -->
