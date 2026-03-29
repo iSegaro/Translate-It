@@ -13,26 +13,15 @@
         'sidepanel-mode': mode === 'sidepanel',
         'selection-mode': mode === 'selection',
         'mobile-mode': mode === 'mobile',
-        'is-dark': settingsStore.isDarkTheme,
+        'theme-dark': settingsStore.isDarkTheme,
       },
       containerClass,
     ]"
-    :style="mode === 'mobile' ? {
-      background: 'var(--ti-mobile-accent-bg) !important',
-      border: '1px solid var(--ti-mobile-border) !important',
-      color: 'var(--ti-mobile-accent) !important',
-      ...cssVariables
-    } : (cssVariables || {})"
+    :style="cssVariables"
   >
     <!-- Simplified Loading State -->
-    <div
-      v-if="isLoading"
-      :style="`display: flex !important; align-items: center !important; justify-content: center !important; min-height: 100px !important; width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; z-index: 100 !important; background: ${mode === 'mobile' ? 'transparent' : 'var(--ti-mobile-bg)'} !important; border-radius: 8px !important; direction: ltr !important;`"
-    >
-      <LoadingSpinner
-        type="animated"
-        size="lg"
-      />
+    <div v-if="isLoading" class="ti-loading-overlay">
+      <LoadingSpinner type="animated" size="lg" />
     </div>
 
     <!-- Main Content State -->
@@ -61,154 +50,57 @@
         ref="contentRef"
         class="ti-translation-content"
         :class="[
-          {
-            'fade-in': false /* Animation disabled */,
-            /* 'loading-dim': isLoading */
-            'has-error': hasError
-          },
+          { 'has-error': hasError, 'rtl-content': textDirection?.dir === 'rtl' },
           contentClass,
-          { 'rtl-content': textDirection?.dir === 'rtl' },
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="mode === 'mobile' ? {
-          ...fontStyles,
-          ...cssVariables,
-          direction: textDirection?.dir || 'ltr',
-          textAlign: textDirection?.textAlign || 'left',
-          cursor: 'pointer',
-          color: 'var(--ti-mobile-accent)',
-          padding: '4px 8px',
-          fontSize: '16px',
-          lineHeight: '1.5'
-        } : {
-          ...(fontStyles || {}),
-          ...(cssVariables || {}),
-          direction: textDirection?.dir || 'ltr',
-          textAlign: textDirection?.textAlign || 'left',
-          cursor: mode === 'mobile' ? 'pointer' : 'default'
-        }"
+        :style="mode === 'mobile' ? { ...fontStyles, ...cssVariables } : { ...(fontStyles || {}), ...(cssVariables || {}) }"
         @click="handleContentClick"
       >
-        <div 
-          v-if="hasError" 
-          class="error-message"
-          style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100% !important; gap: 8px !important; padding: 12px 8px !important; box-sizing: border-box !important; margin: 4px auto !important; white-space: normal !important;"
-        >
-          <div 
-            class="error-text"
-            style="display: block !important; width: 100% !important; margin: 0px !important; text-align: center !important; color: rgb(176, 42, 55) !important; font-weight: 500 !important; font-size: 13px !important; line-height: 1.4 !important;"
-          >
-            ⚠️ {{ displayErrorMessage }}
-          </div>
-
-          <div 
-            v-if="canRetry || canOpenSettings" 
-            class="error-actions"
-            style="display: flex !important; gap: 8px !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin-top: 4px !important;"
-          >
-            <button 
-              v-if="canRetry" 
-              class="error-action retry-btn" 
-              @click="handleRetry"
-            >
+        <div v-if="hasError" class="error-message">
+          <div class="error-text">⚠️ {{ displayErrorMessage }}</div>
+          <div v-if="canRetry || canOpenSettings" class="error-actions">
+            <button v-if="canRetry" class="error-action retry-btn" @click="handleRetry">
               🔄 {{ t('action_retry') }}
             </button>
-            <button 
-              v-if="canOpenSettings" 
-              class="error-action settings-btn" 
-              @click="handleSettings"
-            >
+            <button v-if="canOpenSettings" class="error-action settings-btn" @click="handleSettings">
               ⚙️ {{ t('action_settings') }}
             </button>
           </div>
         </div>
 
         <!-- Placeholder State -->
-        <div
-          v-else-if="!content"
-          class="placeholder-message"
-        >
+        <div v-else-if="!content" class="placeholder-message">
           {{ placeholder }}
         </div>
 
         <!-- Normal Content with Markdown Support -->
-        <div
-          v-else
-          v-html="sanitizedContent"
-        />
+        <div v-else v-html="sanitizedContent" />
       </div>
 
       <!-- Mobile Actions Row -->
-      <div 
-        v-if="mode === 'mobile' && hasContent"
-        class="ti-mobile-actions"
-        :style="mobileActionsStyle"
-        @click.stop
-      >
+      <div v-if="mode === 'mobile' && hasContent" class="ti-mobile-actions" @click.stop>
         <button 
           class="mobile-action-btn secondary-action" 
-          :style="mobileButtonStyle"
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle" 
           @click="handleMobileSpeak"
         >
-          <svg
-            v-if="ttsStatus === 'playing'"
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            fill="currentColor"
-            class="mobile-action-icon"
-            :style="mobileIconStyle"
-          >
-            <rect
-              x="6"
-              y="6"
-              width="12"
-              height="12"
-              rx="1.5"
-            />
+          <svg v-if="ttsStatus === 'playing'" viewBox="0 0 24 24" class="mobile-action-icon">
+            <rect x="6" y="6" width="12" height="12" rx="1.5" />
           </svg>
-          <img 
-            v-else
-            src="@/icons/ui/speaker.png" 
-            :alt="ttsAlt" 
-            class="mobile-action-icon"
-            :style="mobileIconStyle"
-          >
-          <span class="mobile-action-label" style="display: flex !important; align-items: center !important; line-height: 1 !important; white-space: nowrap !important;">
+          <img v-else src="@/icons/ui/speaker.png" :alt="ttsAlt" class="mobile-action-icon">
+          <span class="mobile-action-label">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
           </span>
         </button>
         
-        <button 
-          class="mobile-action-btn secondary-action" 
-          :style="mobileButtonStyle"
-          :title="copyTitle" 
-          @click="handleMobileCopy"
-        >
-          <img
-            src="@/icons/ui/copy.png"
-            :alt="copyAlt"
-            class="mobile-action-icon"
-            :style="mobileIconStyle"
-          >
-          <span class="mobile-action-label" style="display: flex !important; align-items: center !important; line-height: 1 !important; white-space: nowrap !important;">
-            {{ t('mobile_selection_copy_tooltip') }}
-          </span>
+        <button class="mobile-action-btn secondary-action" :title="copyTitle" @click="handleMobileCopy">
+          <img src="@/icons/ui/copy.png" :alt="copyAlt" class="mobile-action-icon">
+          <span class="mobile-action-label">{{ t('mobile_selection_copy_tooltip') }}</span>
         </button>
         
-        <button 
-          class="mobile-action-btn icon-only-action" 
-          :style="mobileButtonStyle"
-          :title="t('mobile_selection_history_tooltip')" 
-          @click="handleMobileHistory"
-        >
-          <img
-            src="@/icons/ui/history.svg"
-            :alt="t('mobile_history_button_alt')"
-            class="mobile-action-icon"
-            :style="mobileIconStyle"
-          >
+        <button class="mobile-action-btn icon-only-action" :title="t('mobile_selection_history_tooltip')" @click="handleMobileHistory">
+          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" class="mobile-action-icon">
         </button>
       </div>
     </template>
@@ -216,6 +108,7 @@
 </template>
 
 <script setup>
+import './TranslationDisplay.scss';
 import { ref, computed, watch, onMounted } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
@@ -552,20 +445,6 @@ const handleActionFailed = (error) => {
   emit("action-failed", error);
 };
 
-// Mobile Action Handlers
-const mobileActionsStyle = computed(() => {
-  return "display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: stretch !important; gap: 10px !important; margin-top: 15px !important; padding-top: 15px !important; border-top: 1px solid var(--ti-mobile-header-border) !important; width: 100% !important; min-width: 100% !important; box-sizing: border-box !important; flex-shrink: 0 !important;";
-});
-
-const mobileButtonStyle = computed(() => {
-  return "flex: 1 1 0% !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; height: 46px !important; border-radius: 12px !important; background: var(--ti-mobile-btn-bg) !important; color: var(--ti-mobile-accent) !important; border: 1px solid var(--ti-mobile-btn-border) !important; box-sizing: border-box !important; min-width: 0 !important; cursor: pointer !important; padding: 0 4px !important; transition: all 0.2s ease !important;";
-});
-
-const mobileIconStyle = computed(() => {
-  const filter = settingsStore.isDarkTheme ? 'invert(1) brightness(2)' : 'none';
-  return `width: 16px !important; height: 16px !important; max-width: 16px !important; max-height: 16px !important; filter: ${filter} !important; object-fit: contain !important; display: inline-block !important;`;
-});
-
 const handleMobileSpeak = () => {
   if (props.ttsStatus === 'playing') {
     emit('tts-stopped');
@@ -613,644 +492,3 @@ onMounted(() => {
   }
 });
 </script>
-
-<style scoped>
-/* Base container */
-.ti-translation-display {
-  position: relative;
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--color-border, #dee2e6);
-  border-radius: 8px;
-  background-color: var(--bg-result-color, #ffffff);
-  transition: min-height 0.2s ease;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* Ensure container has height during loading for the overlay to center properly */
-.ti-translation-display.is-loading {
-  min-height: 120px !important;
-}
-
-/* Perfect Centered Overlay */
-.ti-loading-overlay {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background-color: var(--bg-result-color, #ffffff) !important;
-  z-index: 30 !important;
-  border-radius: 8px !important;
-  direction: ltr !important; /* Prevent RTL shifting */
-}
-
-/* Mode-specific containers */
-.ti-translation-display.popup-mode {
-  height: 100%;
-  width: auto; /* Allow parent margins to work correctly */
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.ti-translation-display.sidepanel-mode {
-  flex-grow: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
-}
-
-.ti-translation-display.selection-mode {
-  width: 100%;
-  max-width: 400px;
-  border-radius: 8px;
-  background-color: var(--sw-bg-color, #f8f8f8);
-  border: 1px solid var(--sw-border-color, #ddd);
-  box-shadow: 0 4px 12px var(--sw-shadow-color, rgba(0, 0, 0, 0.1));
-}
-
-.ti-translation-display.compact-mode {
-  padding: 8px;
-}
-
-/* Content container */
-.ti-translation-content {
-  width: 100%;
-  padding: 32px 10px 10px 10px;
-  border-radius: 8px;
-  /* Use CSS variables for font settings with fallbacks */
-  font-family: var(--translation-font-family, inherit);
-  font-size: var(--translation-font-size, 14px);
-  direction: var(--translation-direction, ltr);
-  text-align: var(--translation-text-align, left);
-  box-sizing: border-box;
-  min-height: 50px;
-  background-color: transparent;
-  color: var(--text-color, #212529);
-  border: none;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.ti-translation-content.has-error {
-  padding-top: 2px !important;
-}
-
-/*
-  ROOT-CAUSE FIX: CSS Grid-based List Layout
-  - Eliminates absolute positioning issues
-  - Works identically for LTR and RTL
-  - No cascade or specificity conflicts
-*/
-.ti-translation-content :deep(ul),
-.ti-translation-content :deep(ol) {
-  list-style: none !important;
-  padding: 0 !important;
-  margin: 6px 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 4px !important; /* Consistent spacing between list items */
-}
-
-.ti-translation-content :deep(li) {
-  display: grid !important;
-  grid-template-columns: auto 1fr !important;
-  align-items: start !important;
-  gap: 0.5em !important; /* Consistent gap between bullet/number and text */
-  line-height: 1.4 !important;
-  margin: 0 !important;
-  min-height: 1.2em !important; /* Ensure consistent height */
-}
-
-/* Bullet container for LTR */
-.ti-translation-content :deep(ul > li)::before {
-  content: "•" !important;
-  font-weight: bold !important;
-  color: inherit !important;
-  grid-column: 1 !important;
-  text-align: left !important;
-}
-
-/* Bullet container for RTL */
-.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
-.ti-translation-content.rtl-content :deep(ul > li)::before {
-  text-align: right !important;
-}
-
-/* Number container for ordered lists */
-.ti-translation-content :deep(ol) {
-  counter-reset: list-counter !important;
-}
-.ti-translation-content :deep(ol > li) {
-  counter-increment: list-counter !important;
-}
-.ti-translation-content :deep(ol > li)::before {
-  content: counter(list-counter) "." !important;
-  font-weight: normal !important;
-  color: inherit !important;
-  grid-column: 1 !important;
-  text-align: left !important;
-  min-width: 1.5em !important;
-}
-
-/* Number container for RTL ordered lists */
-.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
-.ti-translation-content.rtl-content :deep(ol > li)::before {
-  text-align: right !important;
-}
-
-/* Text content container */
-.ti-translation-content :deep(ul > li > span),
-.ti-translation-content :deep(ol > li > span),
-.ti-translation-content :deep(ul > li > *),
-.ti-translation-content :deep(ol > li > *) {
-  grid-column: 2 !important;
-}
-
-/* Sidepanel content adjustments */
-.ti-sidepanel-mode .ti-translation-content {
-  height: 100%;
-  flex-grow: 1;
-  border: none;
-  border-radius: 8px;
-  padding: 42px 5px 0px 5px;
-}
-
-.ti-sidepanel-mode .ti-translation-content.has-error {
-  padding-top: 2px !important;
-}
-
-/* Selection window adjustments */
-.ti-selection-mode .ti-translation-content {
-  border: none;
-  border-radius: 0 0 8px 8px;
-  background-color: transparent;
-  padding: 12px;
-  min-height: auto;
-  font-size: 14px;
-}
-
-/* Popup mode specific adjustments */
-.ti-popup-mode .ti-translation-content {
-  height: 100%;
-  flex: 1;
-  font-size: 13px;
-  padding: 40px 12px 12px 12px;
-}
-
-.ti-popup-mode .ti-translation-content.has-error {
-  padding-top: 2px !important;
-}
-
-/* Message styling */
-.ti-translation-content .placeholder-message {
-  color: #6c757d;
-  font-style: italic;
-  opacity: 0.7;
-  text-align: center;
-  padding: 16px;
-}
-
-.error-message {
-  color: #dc3545 !important;
-  font-style: normal !important;
-  padding: 24px 16px !important;
-  border-radius: 12px !important;
-  line-height: 1.6 !important;
-  background-color: rgba(220, 53, 69, 0.08) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  min-height: 140px !important;
-  gap: 20px !important;
-  border: 1px solid rgba(220, 53, 69, 0.2) !important;
-  margin: 12px 0 !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  position: relative !important;
-}
-
-.error-text {
-  margin: 0 !important;
-  width: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  font-weight: 500 !important;
-  flex-grow: 1 !important;
-  color: #b02a37 !important;
-  font-size: 14px !important;
-}
-
-.error-actions {
-  display: flex !important;
-  gap: 12px !important;
-  margin-top: auto !important;
-  margin-bottom: 4px !important;
-  flex-wrap: wrap !important;
-  justify-content: center !important;
-  align-items: center !important;
-  width: 100% !important;
-}
-
-.error-action {
-  background: #dc3545;
-  color: white !important;
-  border: none !important;
-  padding: 8px 20px !important;
-  border-radius: 8px !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  font-weight: 600 !important;
-  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3) !important;
-  text-decoration: none !important;
-  min-width: 120px !important;
-  white-space: nowrap !important;
-}
-
-.error-action:hover {
-  background: #c82333 !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 5px 12px rgba(220, 53, 69, 0.4) !important;
-}
-
-.error-action:active {
-  transform: translateY(0) !important;
-}
-
-.error-action.retry-btn {
-  background: #1967d2 !important;
-  box-shadow: 0 2px 6px rgba(25, 103, 210, 0.3) !important;
-}
-
-.error-action.retry-btn:hover {
-  background: #1557b0 !important;
-  box-shadow: 0 5px 12px rgba(25, 103, 210, 0.4) !important;
-}
-
-.error-action.settings-btn {
-  background: #5f6368 !important;
-  box-shadow: 0 2px 6px rgba(95, 99, 104, 0.3) !important;
-}
-
-.error-action.settings-btn:hover {
-  background: #4a4e52 !important;
-  box-shadow: 0 5px 12px rgba(95, 99, 104, 0.4) !important;
-}
-
-.ti-translation-content .loading-message {
-  color: var(--accent-color, #1967d2);
-  text-align: center;
-  padding: 16px;
-  font-family: var(--translation-font-family, inherit);
-  font-size: var(--translation-font-size, 14px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.ti-translation-content :deep(.placeholder-message) {
-  color: var(--text-secondary, #6c757d);
-  font-style: italic;
-  opacity: 0.7;
-  text-align: center;
-  padding: 16px;
-  font-family: var(--translation-font-family, inherit);
-  font-size: var(--translation-font-size, 14px);
-}
-
-/* General Markdown styling */
-.ti-translation-content :deep(h1),
-.ti-translation-content :deep(h2),
-.ti-translation-content :deep(h3) {
-  margin-top: 16px;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.ti-translation-content :deep(h1) {
-  font-size: 18px;
-}
-.ti-translation-content :deep(h2) {
-  font-size: 16px;
-}
-.ti-translation-content :deep(h3) {
-  font-size: 15px;
-}
-
-.ti-translation-content :deep(p) {
-  margin-bottom: 8px;
-}
-
-.ti-translation-content :deep(code) {
-  background: var(--bg-secondary, #f8f9fa);
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-family: "Courier New", monospace;
-  font-size: 13px;
-}
-
-.ti-translation-content :deep(pre) {
-  background: var(--bg-secondary, #f8f9fa);
-  padding: 12px;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-family: "Courier New", monospace;
-  font-size: 13px;
-  margin: 8px 0;
-}
-
-.ti-translation-content :deep(blockquote) {
-  border-inline-start: 3px solid var(--accent-color, #007bff);
-  padding-inline-start: 12px;
-  margin-inline-start: 0;
-  color: var(--text-secondary, #6c757d);
-  font-style: italic;
-}
-
-.ti-translation-content :deep(a) {
-  color: var(--accent-color, #007bff);
-  text-decoration: none;
-}
-
-.ti-translation-content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-/* Enhanced Display Toolbar */
-.ti-display-toolbar {
-  position: absolute;
-  top: 6px;
-  left: 12px;
-  /* z-index: 10; */
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(4px);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-/* Loading overlay */
-.ti-loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(var(--bg-result-color-rgb, 255, 255, 255), 0.8);
-  border-radius: 4px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Animations */
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.8;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-/* Custom scrollbar */
-.ti-translation-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ti-translation-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ti-translation-content::-webkit-scrollbar-thumb {
-  background: var(--header-border-color);
-  border-radius: 3px;
-}
-
-.ti-translation-content::-webkit-scrollbar-thumb:hover {
-  background: var(--toolbar-link-color);
-}
-
-/* RTL-specific text alignment for bullets and numbers */
-.ti-translation-content[dir="rtl"] :deep(ul > li)::before,
-.ti-translation-content.rtl-content :deep(ul > li)::before {
-  text-align: right !important;
-}
-
-.ti-translation-content[dir="rtl"] :deep(ol > li)::before,
-.ti-translation-content.rtl-content :deep(ol > li)::before {
-  text-align: right !important;
-}
-
-/* --- Mobile Mode Styles --- */
-.ti-translation-display.mobile-mode {
-  background: #e7f5ff;
-  border: 1px solid #d0ebff;
-  border-radius: 12px;
-  padding: 15px !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  min-height: auto !important;
-  max-width: 100% !important;
-  align-self: stretch !important;
-  overflow: visible !important;
-}
-
-.ti-translation-display.mobile-mode .ti-translation-content {
-  padding: 4px 8px;
-  font-size: 16px;
-  color: #1c7ed6;
-  max-height: 250px;
-  line-height: 1.5;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-.ti-translation-display.mobile-mode .ti-translation-content :deep(*) {
-  font-family: inherit !important;
-}
-
-.ti-translation-display.mobile-mode .ti-mobile-actions {
-  display: flex !important;
-  flex-direction: row !important;
-  justify-content: space-between !important;
-  align-items: stretch !important;
-  gap: 10px !important;
-  margin-top: 15px !important;
-  padding-top: 15px !important;
-  border-top: 1px solid var(--ti-mobile-header-border, rgba(51, 154, 240, 0.15)) !important;
-  width: 100% !important;
-  min-width: 100% !important;
-  box-sizing: border-box !important;
-  flex-shrink: 0 !important;
-}
-
-.ti-translation-display.mobile-mode .mobile-action-btn {
-  height: 46px !important;
-  border-radius: 12px !important;
-  border: 1px solid var(--ti-mobile-btn-border, #d0ebff) !important;
-  background: var(--ti-mobile-btn-bg, white) !important;
-  display: flex !important;
-  flex: 1 1 0% !important;
-  min-width: 0 !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  padding: 0 4px !important;
-  gap: 6px !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
-  color: var(--ti-mobile-accent, #1c7ed6) !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  -webkit-tap-highlight-color: rgba(0,0,0,0.1) !important;
-  text-align: center !important;
-  line-height: 1 !important;
-  box-sizing: border-box !important;
-}
-
-.ti-translation-display.mobile-mode .mobile-action-label {
-  display: flex !important;
-  align-items: center !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-}
-
-.ti-translation-display.mobile-mode .mobile-action-btn:active {
-  transform: scale(0.95);
-  background: #f1f3f5 !important;
-  box-shadow: none;
-}
-
-.ti-translation-display.mobile-mode .mobile-action-btn.primary-action {
-  background: #339af0 !important;
-  color: white !important;
-  border-color: #228be6 !important;
-}
-
-.ti-translation-display.mobile-mode .mobile-action-btn.primary-action .mobile-action-icon {
-  filter: brightness(0) invert(1) !important;
-}
-
-/* Dark mode support using .is-dark class */
-.ti-translation-display.is-dark {
-  background-color: #1a1a1a !important;
-  border-color: #444 !important;
-  --ti-mobile-icon-filter: invert(1) brightness(2) !important;
-  --ti-mobile-header-border: rgba(255, 255, 255, 0.1) !important;
-  --ti-mobile-btn-bg: #2d2d2d !important;
-  --ti-mobile-btn-border: #444 !important;
-}
-
-.ti-translation-display.is-dark .ti-translation-content {
-  color: #e8eaed !important;
-}
-
-.ti-translation-display.is-dark .placeholder-message {
-  color: #9aa0a6 !important;
-}
-
-.ti-translation-display.is-dark.mobile-mode { 
-  background: rgba(28, 126, 214, 0.15) !important; 
-  border-color: rgba(28, 126, 214, 0.3) !important;
-}
-
-.ti-translation-display.is-dark.mobile-mode .ti-translation-content { 
-  color: #74c0fc !important; 
-}
-
-.ti-translation-display.is-dark .mobile-action-btn { 
-  background: var(--ti-mobile-btn-bg, #2d2d2d) !important; 
-  border-color: var(--ti-mobile-btn-border, #444) !important; 
-  color: #74c0fc !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-}
-
-.ti-translation-display.is-dark .mobile-action-btn.primary-action {
-  background: #1971c2 !important;
-  color: white !important;
-  border-color: #1864ab !important;
-}
-
-.ti-translation-display.is-dark .mobile-action-btn:not(.primary-action) .mobile-action-icon { 
-  filter: var(--ti-mobile-icon-filter, brightness(0) invert(1)) !important;
-  opacity: 0.8 !important;
-}
-
-/* Original media query as fallback */
-@media (prefers-color-scheme: dark) {
-  .ti-translation-display:not(.is-dark) {
-    --ti-mobile-icon-filter: invert(1) brightness(2) !important;
-    --ti-mobile-header-border: rgba(255, 255, 255, 0.1) !important;
-    --ti-mobile-btn-bg: #2d2d2d !important;
-    --ti-mobile-btn-border: #444 !important;
-  }
-
-  .ti-translation-display.mobile-mode:not(.is-dark) { 
-    background: rgba(28, 126, 214, 0.1) !important; 
-    border-color: rgba(28, 126, 214, 0.25) !important;
-  }
-  
-  .ti-translation-display.mobile-mode:not(.is-dark) .ti-translation-content { 
-    color: #74c0fc !important; 
-  }
-  
-  .ti-translation-display:not(.is-dark) .mobile-action-btn { 
-    background: var(--ti-mobile-btn-bg, #2d2d2d) !important; 
-    border-color: var(--ti-mobile-btn-border, #444) !important; 
-    color: #74c0fc !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-  }
-
-  .ti-translation-display:not(.is-dark) .mobile-action-btn.primary-action {
-    background: #1971c2 !important;
-    color: white !important;
-    border-color: #1864ab !important;
-  }
-  
-  .ti-translation-display:not(.is-dark) .mobile-action-btn:not(.primary-action) .mobile-action-icon { 
-    filter: var(--ti-mobile-icon-filter, invert(0.8)) !important; 
-  }
-}
-
-/* Authoritative icon sizing and filtering */
-.mobile-action-icon {
-  width: 16px !important;
-  height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
-  flex-shrink: 0 !important;
-  object-fit: contain !important;
-  display: inline-block !important;
-  vertical-align: middle !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  filter: var(--ti-mobile-icon-filter, none) !important;
-}
-</style>
