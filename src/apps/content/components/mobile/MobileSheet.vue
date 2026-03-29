@@ -4,44 +4,31 @@
     class="ti-m-sheet-overlay notranslate"
     translate="no"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    style="position: fixed !important; inset: 0 !important; background: rgba(0, 0, 0, 0.4) !important; z-index: 2147483646 !important; pointer-events: auto !important; display: block !important;"
     @click.self="closeSheet"
   >
     <div 
       class="ti-m-sheet notranslate"
       translate="no"
       :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
-      :style="[sheetStyle, themeVariables]"
+      :style="sheetStyle"
     >
       <!-- Drag Handle Header -->
       <div 
         class="ti-m-sheet-header" 
-        style="width: 100% !important; height: 24px !important; display: flex !important; justify-content: center !important; align-items: center !important; background: transparent !important; cursor: grab !important; touch-action: none !important; padding-top: 4px !important;"
         @touchstart.stop.prevent="onDragStart"
         @touchmove.stop.prevent="onDragMove"
         @touchend.stop="onDragEnd"
         @mousedown.stop="onDragStart"
       >
-        <div
-          class="ti-m-drag-handle"
-          :style="{ 
-            width: '40px !important', 
-            height: '5px !important', 
-            borderRadius: '3px !important', 
-            backgroundColor: 'var(--ti-mobile-drag-handle) !important',
-            opacity: '0.8 !important' 
-          }"
-        />
+        <div class="ti-m-drag-handle" />
       </div>
 
       <!-- Main Content Container -->
       <div 
         class="ti-m-sheet-content" 
         :style="{ 
-          flex: '1 !important', 
           overflowY: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? 'hidden !important' : 'auto !important', 
-          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important',
-          backgroundColor: 'inherit !important'
+          padding: activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD ? '0 !important' : '15px !important'
         }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
@@ -52,10 +39,7 @@
       </div>
 
       <!-- Footer/Safe Area -->
-      <div
-        class="ti-m-sheet-footer-area notranslate"
-        style="height: env(safe-area-inset-bottom, 10px); background-color: inherit !important; flex-shrink: 0 !important;"
-      />
+      <div class="ti-m-sheet-footer-area notranslate" />
     </div>
   </div>
 </template>
@@ -80,34 +64,6 @@ const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore
 
 // MEMORY MANAGEMENT
 const tracker = useResourceTracker('mobile-sheet')
-
-// Theme variables to be injected as inline styles for maximum reliability
-const themeVariables = computed(() => {
-  const isDark = settingsStore.isDarkTheme
-  return {
-    '--ti-mobile-bg': isDark ? '#1a1a1a' : '#ffffff',
-    '--ti-mobile-text': isDark ? '#ffffff' : '#333333',
-    '--ti-mobile-text-secondary': isDark ? '#e9ecef' : '#495057',
-    '--ti-mobile-text-muted': isDark ? '#adb5bd' : '#868e96',
-    '--ti-mobile-accent': isDark ? '#90caf9' : '#339af0',
-    '--ti-mobile-accent-hover': isDark ? '#e3f2fd' : '#1c7ed6',
-    '--ti-mobile-accent-bg': isDark ? 'rgba(144, 202, 249, 0.15)' : '#e7f5ff',
-    '--ti-mobile-border': isDark ? '#444444' : '#dee2e6',
-    '--ti-mobile-header-border': isDark ? '#333333' : '#f1f3f5',
-    '--ti-mobile-card-bg': isDark ? '#2d2d2d' : '#f8f9fa',
-    '--ti-mobile-btn-bg': isDark ? '#3d3d3d' : '#ffffff',
-    '--ti-mobile-btn-border': isDark ? '#555555' : '#dee2e6',
-    '--ti-mobile-drag-handle': isDark ? '#444444' : '#bdbdbd',
-    '--ti-mobile-shadow': isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.2)',
-    '--ti-mobile-icon-filter': isDark ? 'brightness(0) invert(1)' : 'none',
-    '--ti-mobile-error': isDark ? '#ff8787' : '#fa5252',
-    '--ti-mobile-error-bg': isDark ? 'rgba(255, 135, 135, 0.15)' : '#fff5f5',
-    '--ti-mobile-warning': isDark ? '#ffd43b' : '#ffa94d',
-    '--ti-mobile-warning-bg': isDark ? 'rgba(255, 212, 59, 0.15)' : '#fff4e6',
-    '--ti-mobile-success': isDark ? '#8ce99a' : '#51cf66',
-    'background-color': isDark ? '#1a1a1a !important' : '#ffffff !important'
-  }
-})
 
 // Drag and drop logic
 const startY = ref(0)
