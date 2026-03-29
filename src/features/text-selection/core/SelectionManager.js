@@ -235,94 +235,22 @@ export class SelectionManager extends ResourceTracker {
   }
 
   /**
-   * Check if windowsManager should be allowed to operate
-   */
-  async shouldProcessWindowsManager() {
-    if (!this.featureManager) {
-      this.logger.debug('FeatureManager not available for WindowsManager check');
-      return false;
-    }
-
-    try {
-      const exclusionChecker = this.featureManager.exclusionChecker;
-      if (!exclusionChecker) {
-        this.logger.debug('ExclusionChecker not available');
-        return false;
-      }
-
-      const allowed = await exclusionChecker.isFeatureAllowed('windowsManager');
-      this.logger.debug(`WindowsManager check: ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
-      return allowed;
-    } catch (error) {
-      this.logger.error('Error checking WindowsManager permission:', error);
-      return false;
-    }
-  }
-
-  /**
    * Show translation UI (icon or window based on settings)
    */
-  async showTranslationUI(selectedText, position) {
-    // Get current mode from settings
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+  async showTranslationUI(selectedText, position, options = {}) {
+    // Note: We no longer call WindowsManager.show() directly here.
+    // The GLOBAL_SELECTION_CHANGE event emitted in processSelection() 
+    // triggers all UI managers independently (Decoupled Architecture).
 
-    // 1. Emit global selection event (Coordinator Pattern)
-    // This allows any module (like FAB) to react independently
-    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
-      text: selectedText,
-      position: position,
-      mode: selectionTranslationMode,
-      context: {
+    // Only handle cross-frame relaying if we are in an iframe
+    // because the local PageEventBus won't reach the main frame's WindowsManager.
+    if (window !== window.top) {
+      this.logger.info('Relaying translation window request from iframe to parent', {
         frameId: this.frameId,
-        isIframe: window !== window.top
-      }
-    });
-
-    // Check if WindowsManager should be allowed
-    if (!(await this.shouldProcessWindowsManager())) {
-      this.logger.info('WindowsManager is blocked by exclusion, skipping translation UI');
-      return;
-    }
-
-    const windowsManager = this.getWindowsManager();
-
-    if (windowsManager) {
-      // Main frame - use WindowsManager directly
-      this.logger.debug('Showing translation UI via WindowsManager', {
-        text: selectedText.substring(0, 30) + '...',
-        position,
-        windowsManagerType: typeof windowsManager,
-        hasShowMethod: typeof windowsManager.show === 'function'
-      });
-
-      // Show translation UI
-      this.logger.info('Translation UI requested', {
-        textLength: selectedText.length,
-        position: {
-          x: Math.round(position.x),
-          y: Math.round(position.y)
-        },
-        context: windowsManager ? 'main-frame' : 'iframe'
-      });
-
-      await windowsManager.show(selectedText, position);
-      this.logger.debug('WindowsManager.show() completed');
-
-    } else if (window !== window.top) {
-      // Iframe - request window creation in main frame
-      this.logger.info('Requesting translation window from iframe', {
-        frameId: this.frameId,
-        textLength: selectedText.length,
-        position: {
-          x: Math.round(position.x),
-          y: Math.round(position.y)
-        }
+        textLength: selectedText.length
       });
 
       this.requestWindowCreationInMainFrame(selectedText, position, options);
-
-    } else {
-      this.logger.warn('WindowsManager not available and not in iframe context');
     }
   }
 
@@ -354,16 +282,11 @@ export class SelectionManager extends ResourceTracker {
    * Dismiss any visible translation windows
    */
   dismissWindow() {
-    // 1. Emit global clear event
+    // 1. Emit global clear event (Coordinator Pattern)
+    // This allows any module (WindowsManager, FAB, etc.) to clear its state
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
       reason: 'selection_cleared'
     });
-
-    const windowsManager = this.getWindowsManager();
-    if (windowsManager) {
-      this.logger.debug('Translation window dismissed');
-      windowsManager.dismiss();
-    }
 
     // Clear tracking
     this.lastProcessedText = null;
@@ -371,16 +294,10 @@ export class SelectionManager extends ResourceTracker {
   }
 
   /**
-   * Check if translation window is visible
+   * Check if translation UI is visible on screen
+   * Uses Shadow DOM check as the final source of truth (Decoupled)
    */
   isWindowVisible() {
-    const windowsManager = this.getWindowsManager();
-    if (windowsManager) {
-      return windowsManager.state.isVisible || 
-             windowsManager.state.isIconMode;
-    }
-
-    // Fallback: check shadow DOM
     const shadowHost = document.getElementById(UI_HOST_IDS.MAIN) ||
                       document.getElementById(UI_HOST_IDS.IFRAME);
 
@@ -413,7 +330,7 @@ export class SelectionManager extends ResourceTracker {
   getInfo() {
     return {
       initialized: true,
-      hasWindowsManager: !!this.getWindowsManager(),
+      uiVisible: this.isWindowVisible(),
       isExcluded: this.isExcluded,
       frameId: this.frameId,
       lastProcessedText: this.lastProcessedText ? this.lastProcessedText.substring(0, 50) + '...' : null,

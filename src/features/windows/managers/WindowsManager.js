@@ -203,6 +203,17 @@ export class WindowsManager extends ResourceTracker {
       };
       pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, this._selectionClearHandler);
       pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, this._selectionClearHandler);
+
+      // Listen for global selection change events (Coordinator Pattern)
+      // This allows the manager to show its UI without being called directly
+      this._selectionChangeHandler = (detail) => {
+        // Only react to selection change if we are not already processing or showing
+        // And ensure it's from the same frame (PageEventBus is local, so this is natural)
+        this.logger.debug('Global selection change received in WindowsManager');
+        this.show(detail.text, detail.position, detail.options);
+      };
+      pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, this._selectionChangeHandler);
+      pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, this._selectionChangeHandler);
     } else {
       this.logger.warn('PageEventBus not available during setup');
     }

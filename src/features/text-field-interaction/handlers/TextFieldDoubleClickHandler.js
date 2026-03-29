@@ -817,162 +817,6 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
 
   
   /**
-   * Check if WindowsManager should be allowed to operate
-   */
-  async shouldProcessWindowsManager() {
-    if (!this.featureManager) {
-      logger.debug('FeatureManager not available for WindowsManager check');
-      return false;
-    }
-
-    try {
-      const exclusionChecker = this.featureManager.exclusionChecker;
-      if (!exclusionChecker) {
-        logger.debug('ExclusionChecker not available');
-        return false;
-      }
-
-      const allowed = await exclusionChecker.isFeatureAllowed('windowsManager');
-      logger.debug(`WindowsManager check for text field: ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
-      return allowed;
-    } catch (error) {
-      logger.error('Error checking WindowsManager permission:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Show translation UI using the same pattern as TextSelection system
-   */
-  async showTranslationUI(selectedText, position, actualTextField = null) {
-    // 1. Emit global selection event (Coordinator Pattern)
-    // This allows FAB or other modules to react to text field selections
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
-    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
-      text: selectedText,
-      position: position,
-      mode: selectionTranslationMode,
-      context: {
-        isTextField: true,
-        isIframe: window !== window.top
-      }
-    });
-
-    // Check if WindowsManager should be allowed
-    if (!(await this.shouldProcessWindowsManager())) {
-      logger.info('WindowsManager is blocked by exclusion, skipping text field translation UI');
-      return;
-    }
-
-    // Use the same approach as TextSelection system
-    if (window !== window.top) {
-      // Iframe - request window creation in main frame (same as SelectionManager)
-      this.requestWindowCreationInMainFrame(selectedText, position, actualTextField);
-    } else {
-      // Main frame - use WindowsManager directly
-      const windowsManager = this.getWindowsManager();
-      if (windowsManager) {
-        logger.debug('Showing translation UI via WindowsManager', {
-          text: selectedText.substring(0, 30) + '...',
-          position,
-          context: 'main-frame'
-        });
-
-        // Use the standard show() method which respects selectionTranslationMode (onClick, immediate, onFabClick)
-        await windowsManager.show(selectedText, position);
-
-        // Setup typing listener if an icon was actually created (onClick mode)
-        if (windowsManager.state.isIconMode) {
-          const iconId = windowsManager.state.iconClickContext?.iconId;
-          if (iconId) {
-            // Use actualTextField if available, otherwise fall back to the focused element
-            const textField = actualTextField || document.activeElement;
-            if (textField && this.isTextField(textField)) {
-              this._setupTypingListenerForIcon(textField, iconId);
-            }
-          }
-        }
-      } else {
-        logger.warn('WindowsManager not available in main frame');
-      }
-    }
-  }
-
-  /**
-   * Request window creation in main frame (copied from SelectionManager)
-   */
-  requestWindowCreationInMainFrame(selectedText, position, actualTextField = null) {
-    try {
-      // Import module for side effects (ensure module is loaded)
-      import('@/features/windows/managers/core/WindowsConfig.js').then(() => {
-        const message = {
-          type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
-          frameId: ConfigUtils.generateFrameId(),
-          selectedText: selectedText,
-          position: position,
-          timestamp: Date.now(),
-          // NEW: Include text field info for typing detection
-          textFieldInfo: actualTextField ? {
-            tagName: actualTextField.tagName,
-            id: actualTextField.id,
-            className: actualTextField.className
-          } : null
-        };
-
-        if (window.parent !== window) {
-          window.parent.postMessage(message, '*');
-          logger.info('Text field translation window request sent to parent frame', {
-            frameId: message.frameId,
-            textLength: selectedText.length,
-            position: {
-              x: Math.round(position.x),
-              y: Math.round(position.y)
-            }
-          });
-        }
-      });
-
-    } catch (error) {
-      logger.error('Failed to request window creation in main frame:', error);
-    }
-  }
-
-  /**
-   * Get WindowsManager instance
-   */
-  getWindowsManager() {
-    if (!this.featureManager) {
-      logger.info('WindowsManager: FeatureManager not available');
-      return null;
-    }
-
-    const windowsHandler = this.featureManager.getFeatureHandler('windowsManager');
-    if (!windowsHandler) {
-      logger.info('WindowsManager: WindowsHandler not available');
-      return null;
-    }
-
-    if (!windowsHandler.getIsActive()) {
-      logger.info('WindowsManager: WindowsHandler is not active');
-      return null;
-    }
-
-    // Debug WindowsHandler state
-    logger.info('WindowsManager: WindowsHandler available and active, checking getWindowsManager()');
-
-    const windowsManager = windowsHandler.getWindowsManager();
-    if (!windowsManager) {
-      logger.info('WindowsManager: getWindowsManager() returned null', {
-        hasGetWindowsManager: typeof windowsHandler.getWindowsManager === 'function',
-        windowsHandlerMethods: Object.getOwnPropertyNames(windowsHandler).filter(name => typeof windowsHandler[name] === 'function')
-      });
-      return null;
-    }
-
-    return windowsManager;
-  }
-
-  /**
    * Check if text field icons are enabled in settings
    */
   async isTextFieldIconsEnabled() {
@@ -996,34 +840,74 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
   }
 
   /**
+   * Show translation UI using the same pattern as TextSelection system
+   */
+  async showTranslationUI(selectedText, position, actualTextField = null) {
+    // 1. Emit global selection event (Coordinator Pattern)
+    // This allows FAB or other modules to react to text field selections
+    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, {
+      text: selectedText,
+      position: position,
+      mode: selectionTranslationMode,
+      context: {
+        isTextField: true,
+        isIframe: window !== window.top
+      }
+    });
+
+    // Only handle cross-frame relaying if we are in an iframe
+    // because the local PageEventBus won't reach the main frame's WindowsManager.
+    if (window !== window.top) {
+      this.requestWindowCreationInMainFrame(selectedText, position, actualTextField);
+    }
+  }
+
+  /**
+   * Request window creation in main frame
+   */
+  requestWindowCreationInMainFrame(selectedText, position, actualTextField = null) {
+    try {
+      // Import module for side effects (ensure module is loaded)
+      import('@/features/windows/managers/core/WindowsConfig.js').then(() => {
+        const message = {
+          type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
+          frameId: ConfigUtils.generateFrameId(),
+          selectedText: selectedText,
+          position: position,
+          timestamp: Date.now(),
+          // Include text field info for typing detection
+          textFieldInfo: actualTextField ? {
+            tagName: actualTextField.tagName,
+            id: actualTextField.id,
+            className: actualTextField.className
+          } : null
+        };
+
+        if (window.parent !== window) {
+          window.parent.postMessage(message, '*');
+          logger.info('Text field translation window request sent to parent frame', {
+            frameId: message.frameId,
+            textLength: selectedText.length
+          });
+        }
+      });
+
+    } catch (error) {
+      logger.error('Failed to request window creation in main frame:', error);
+    }
+  }
+
+  /**
    * Setup direct typing listener for text field icons
-   * Simple and reliable approach: add one-time listener to detect first typing
    */
   _setupTypingListenerForIcon(textField, iconId) {
-    if (!textField || !iconId) {
-      logger.warn('Cannot setup typing listener - missing textField or iconId');
-      return;
-    }
-
-    logger.debug('Setting up direct typing listener for icon', {
-      textField: textField.tagName,
-      iconId: iconId
-    });
+    if (!textField || !iconId) return;
 
     // Create handler for first typing detection
     const handleFirstTyping = (event) => {
-      // Make sure this is the same text field
       if (event.target === textField) {
-        logger.debug('First typing detected in text field - dismissing icon', {
-          textField: textField.tagName,
-          iconId: iconId,
-          eventType: event.type
-        });
-
-        // Dismiss the icon
         this._dismissIconForTyping(iconId);
-
-        // Clean up listeners
         this._cleanupTypingListener(iconId);
       }
     };
@@ -1034,30 +918,22 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       handlers: [handleFirstTyping]
     });
 
-    // Add one-time listeners (both input and keydown for comprehensive coverage)
     textField.addEventListener('input', handleFirstTyping);
     textField.addEventListener('keydown', handleFirstTyping);
-
-    logger.debug('Direct typing listener setup complete');
   }
 
   /**
    * Dismiss icon when user starts typing
    */
   _dismissIconForTyping(iconId) {
-    try {
-      const windowsManager = this.getWindowsManager();
-      if (windowsManager && windowsManager.state.isIconMode) {
-        logger.debug('Dismissing icon due to typing', { iconId });
-
-        // Use WindowsManager to dismiss the icon
-        windowsManager.dismiss();
-      } else {
-        logger.debug('Icon already dismissed or WindowsManager not available', { iconId });
-      }
-    } catch (error) {
-      logger.error('Error dismissing icon for typing:', error);
-    }
+    logger.debug('Dismissing text field icon due to typing', { iconId });
+    
+    // Notify global coordinator to clear selection state (Coordinator Pattern)
+    // This will trigger dismissal in WindowsManager and state clear in FAB
+    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, {
+      reason: 'text_field_typing',
+      iconId
+    });
   }
 
   /**
