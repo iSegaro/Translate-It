@@ -19,6 +19,7 @@
           :src="currentProviderIcon"
           alt="API Provider"
           class="ti-api-provider-icon"
+          :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
         >
         <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
       </button>
@@ -53,6 +54,7 @@
         <img
           :src="getProviderIcon(provider.icon)"
           :alt="provider.name"
+          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
         >
         <span>{{ provider.name }}</span>
       </div>
@@ -77,6 +79,7 @@
           <img
             :src="getEffectiveIcon('page')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
             alt="Target Provider"
           >
         </button>
@@ -96,6 +99,7 @@
           <img
             :src="getEffectiveIcon('element')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
             alt="Target Provider"
           >
         </button>
@@ -119,6 +123,7 @@
         :src="currentProviderIcon"
         alt="API Provider"
         class="ti-api-provider-icon"
+        :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
       >
       <span>{{ currentProviderName }}</span>
       <IconButton
@@ -146,6 +151,7 @@
         <img
           :src="getProviderIcon(provider.icon)"
           :alt="provider.name"
+          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
         >
         <span>{{ provider.name }}</span>
       </div>
@@ -170,6 +176,7 @@
           <img
             :src="getEffectiveIcon('page')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
             alt="Target Provider"
           >
         </button>
@@ -189,6 +196,7 @@
           <img
             :src="getEffectiveIcon('element')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
             alt="Target Provider"
           >
         </button>
@@ -213,6 +221,7 @@
         :src="currentProviderIcon"
         alt="API Provider"
         class="ti-provider-icon-only"
+        :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
       >
     </button>
     
@@ -232,6 +241,7 @@
         <img
           :src="getProviderIcon(provider.icon)"
           :alt="provider.name"
+          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
         >
         <span>{{ provider.name }}</span>
       </div>
@@ -256,6 +266,7 @@
           <img
             :src="getEffectiveIcon('page')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
             alt="Target Provider"
           >
         </button>
@@ -275,6 +286,7 @@
           <img
             :src="getEffectiveIcon('element')"
             class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
             alt="Target Provider"
           >
         </button>
@@ -426,6 +438,23 @@ const currentProviderName = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return provider?.name || 'Google Translate'
 })
+
+// Helper to determine if a provider icon should be inverted in dark mode
+const isProviderInverted = (providerId) => {
+  const blackIcons = ['deepl', 'openai', 'openrouter']
+  return blackIcons.includes(providerId)
+}
+
+// Helper to get effective provider ID for sync icons
+const getEffectiveProviderId = (type) => {
+  const isSynced = ephemeralSync.value[type]
+  if (isSynced) return currentProvider.value
+  
+  if (type === 'page') {
+    return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Page] || settingsStore.settings.TRANSLATION_API
+  }
+  return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Select_Element] || settingsStore.settings.TRANSLATION_API
+}
 
 // Methods
 const getProviderIcon = (iconPath) => {
@@ -649,6 +678,14 @@ onUnmounted(() => {
   opacity: var(--icon-opacity);
   transition: opacity 0.2s ease-in-out;
   object-fit: contain;
+
+  // Invert black icons in dark mode
+  &.ti-invert-dark {
+    :root.theme-dark &,
+    .theme-dark & {
+      filter: invert(1) brightness(1.8);
+    }
+  }
 }
 
 .ti-provider-dropdown-area {
@@ -735,6 +772,14 @@ onUnmounted(() => {
   object-fit: contain;
   opacity: var(--icon-opacity);
   transition: opacity 0.2s ease-in-out;
+
+  // Invert black icons in dark mode
+  &.ti-invert-dark {
+    :root.theme-dark &,
+    .theme-dark & {
+      filter: invert(1) brightness(1.8);
+    }
+  }
 }
 
 /* Right-aligned dropdown for icon-only mode */
@@ -866,6 +911,14 @@ onUnmounted(() => {
   opacity: var(--icon-opacity);
   object-fit: contain;
   flex-shrink: 0;
+
+  // Invert black icons in dark mode
+  &.ti-invert-dark {
+    :root.theme-dark &,
+    .theme-dark & {
+      filter: invert(1) brightness(1.8);
+    }
+  }
 }
 
 .ti-dropdown-item span {
@@ -943,6 +996,14 @@ onUnmounted(() => {
   object-fit: contain;
   opacity: 0.8;
   flex-shrink: 0;
+
+  // Invert black icons in dark mode
+  &.ti-invert-dark {
+    :root.theme-dark &,
+    .theme-dark & {
+      filter: invert(1) brightness(1.8);
+    }
+  }
 }
 
 /* Responsive adjustments using Media Queries */
