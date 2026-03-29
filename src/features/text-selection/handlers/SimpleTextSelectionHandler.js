@@ -318,6 +318,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
       this._settingsListeners.push(
         settingsManager.onChange('REQUIRE_CTRL_FOR_TEXT_SELECTION', (newValue) => {
           logger.debug('REQUIRE_CTRL_FOR_TEXT_SELECTION changed:', newValue);
+          // Reset Ctrl state when setting changes to avoid stale "stuck" keys
+          this.ctrlKeyPressed = false;
         }, 'simple-text-selection')
       );
 
@@ -907,9 +909,11 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.isDragging = true;
     this.mouseDownTime = Date.now();
 
-    // Update Ctrl state from mouse event if available
-    if (event.ctrlKey || event.metaKey) {
-      this.ctrlKeyPressed = true;
+    // Update modifier states from mouse event (Sync both TRUE and FALSE states)
+    this.ctrlKeyPressed = event.ctrlKey || event.metaKey;
+    this.shiftKeyPressed = event.shiftKey;
+
+    if (this.ctrlKeyPressed) {
       this.lastKeyEventTime = Date.now();
     }
 
@@ -944,14 +948,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.lastMouseEventTime = Date.now();
     this.lastMouseUpEvent = event; // Store for translation window detection
 
-    // Update Ctrl and Shift state from mouse event if available
-    if (event.ctrlKey || event.metaKey) {
-      this.ctrlKeyPressed = true;
-      this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
-    }
-    if (event.shiftKey) {
-      this.shiftKeyPressed = true;
-      this.lastKeyEventTime = Date.now(); // Update to extend the "recent" window
+    // Update modifier states from mouse event (Sync both TRUE and FALSE states)
+    this.ctrlKeyPressed = event.ctrlKey || event.metaKey;
+    this.shiftKeyPressed = event.shiftKey;
+
+    if (this.ctrlKeyPressed) {
+      this.lastKeyEventTime = Date.now();
     }
 
     // For Shift+Click operations, we need special handling to preserve selection
