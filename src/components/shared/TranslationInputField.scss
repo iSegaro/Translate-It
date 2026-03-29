@@ -61,7 +61,7 @@
   backdrop-filter: blur(4px) !important;
   border-radius: 6px !important;
   padding: 4px !important;
-  z-index: 10 !important;
+  z-index: 1 !important; // لایه پایین‌تر از دراپ‌داون‌های سراسری
   display: flex !important;
   align-items: center !important;
   pointer-events: auto !important;
