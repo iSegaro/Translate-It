@@ -462,6 +462,13 @@ defineExpose({
           width: 16px;
           height: 16px;
           display: block;
+          transition: filter var(--transition-base, 0.2s);
+
+          // Invert icon color in dark mode (from black to white/light gray)
+          :root.theme-dark &,
+          .theme-dark & {
+            filter: invert(1) brightness(1.5);
+          }
         }
       }
     }
