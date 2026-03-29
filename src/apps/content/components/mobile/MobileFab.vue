@@ -76,10 +76,6 @@ const handleSelectionChange = () => {
   if (selectedText) {
     isSelectionDirty.value = true;
     startFabIdleTimer();
-  } else if (isSelectionDirty.value) {
-    isSelectionDirty.value = false;
-    pendingText.value = '';
-    pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, { reason: 'native_selection_clear' });
   }
 };
 
@@ -184,6 +180,12 @@ const dynamicVars = computed(() => {
 const onFabDragStart = (e) => {
   const isMouseEvent = e.type === 'mousedown';
   if (isMouseEvent && e.button !== 0) return;
+  
+  // PREVENT SELECTION CLEAR: This ensures clicking the FAB doesn't kill the page selection
+  if (isMouseEvent) {
+    e.preventDefault();
+  }
+  
   const point = isMouseEvent ? e : e.touches[0];
   
   isFabDragging.value = true;
