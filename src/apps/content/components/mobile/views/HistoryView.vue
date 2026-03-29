@@ -97,7 +97,7 @@
           </div>
           <button 
             class="ti-m-delete-btn"
-            @click.stop="removeItem(index)"
+            @click.stop="(e) => removeItem(index, e)"
           >
             <img
               src="@/icons/ui/trash-small.svg"
@@ -208,7 +208,11 @@ const goBack = () => {
   mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
 }
 
-const removeItem = async (index) => {
+const removeItem = async (index, event) => {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
   await deleteHistoryItem(index)
 }
 

@@ -181,15 +181,21 @@
   color: var(--ti-mobile-accent) !important;
   border: 1px solid var(--ti-mobile-border) !important;
 }
-
 .ti-m-delete-btn {
-  background: none !important;
+  background: transparent !important;
   border: none !important;
-  padding: 8px !important;
+  padding: 8px !important; /* فضای کلیک بزرگتر */
+  margin: -8px !important; /* خنثی کردن پدینگ برای تراز ماندن آیکون */
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  border-radius: 50% !important;
+  -webkit-tap-highlight-color: rgba(255, 0, 0, 0.1) !important;
+
+  &:active {
+    background-color: rgba(244, 67, 54, 0.1) !important;
+  }
 }
 
 .ti-m-source-preview {
