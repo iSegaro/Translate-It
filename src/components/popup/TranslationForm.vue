@@ -336,11 +336,8 @@ defineExpose({
   padding: 42px 8px 8px 8px;
 }
 
-.translation-form :deep(.translation-display.popup-mode) {
-  margin: 4px 8px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.translation-form :deep(.ti-translation-display.popup-mode .ti-translation-content) {
+  padding-top: 42px !important; /* Force space from the toolbar */
 }
 
 .translation-form :deep(.result-content) {
