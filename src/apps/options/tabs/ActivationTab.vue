@@ -614,9 +614,9 @@ const dictionaryProvider = computed({
 }
 
 .sub-options-group {
-  padding-left: $spacing-lg;
-  margin-left: $spacing-md;
-  border-left: 2px solid var(--color-border);
+  padding-inline-start: $spacing-lg;
+  margin-inline-start: $spacing-md;
+  border-inline-start: 2px solid var(--color-border);
   margin-top: $spacing-base;
   padding-top: $spacing-base;
   
@@ -655,9 +655,9 @@ const dictionaryProvider = computed({
   }
   
   .sub-setting-group {
-    margin-left: $spacing-lg;
-    padding-left: $spacing-md;
-    border-left: 2px solid var(--color-border);
+    margin-inline-start: $spacing-lg;
+    padding-inline-start: $spacing-md;
+    border-inline-start: 2px solid var(--color-border);
   }
 }
 
@@ -670,12 +670,12 @@ const dictionaryProvider = computed({
   }
 
   .setting-description {
-    padding-left: 0;
+    padding-inline-start: 0;
   }
   
   .sub-options-group {
-    padding-left: $spacing-base;
-    margin-left: $spacing-sm;
+    padding-inline-start: $spacing-base;
+    margin-inline-start: $spacing-sm;
     
     .radio-group {
       flex-direction: column;
@@ -688,8 +688,8 @@ const dictionaryProvider = computed({
     }
     
     .sub-setting-group {
-      margin-left: $spacing-base;
-      padding-left: $spacing-sm;
+      margin-inline-start: $spacing-base;
+      padding-inline-start: $spacing-sm;
     }
   }
 }
