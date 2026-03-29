@@ -3,7 +3,8 @@
     v-if="isVisible"
     ref="tooltipRef"
     class="page-translation-tooltip-shadow-safe"
-    :style="tooltipFullStyle"
+    :direction="direction"
+    :style="tooltipDynamicStyle"
   >
     {{ text }}
   </div>
@@ -27,49 +28,17 @@ const settingsStore = useSettingsStore();
 const tracker = useResourceTracker('page-translation-tooltip');
 
 /**
- * Unified Shadow DOM Robust Styling:
- * Combining all styles (visual + dynamic) into a single string with !important.
- * This is the ONLY 100% reliable way to ensure styling in a strict Shadow DOM
- * where external CSS injection might fail.
+ * Optimized Dynamic Styling:
+ * Only handling transformation for performance.
+ * Static styles are now in src/assets/styles/components/_page-translation-tooltip.scss
  */
-const tooltipFullStyle = computed(() => {
+const tooltipDynamicStyle = computed(() => {
   if (!isVisible.value) return 'display: none !important;';
 
-  const isDark = settingsStore.isDarkTheme;
-  const textAlign = direction.value === 'rtl' ? 'right' : 'left';
-  
-  // Design tokens based on current theme
-  const bgColor = isDark ? '#222222' : '#ffffff';
-  const textColor = isDark ? '#ffffff' : '#202124';
-  const borderColor = isDark ? 'rgba(255, 255, 255, 0.2)' : '#dadce0';
-  const shadow = isDark ? '0 4px 15px rgba(0, 0, 0, 0.4)' : '0 2px 10px rgba(0, 0, 0, 0.1)';
-
-  return `
-    position: fixed !important;
-    z-index: 2147483647 !important;
-    top: 0 !important;
-    left: 0 !important;
-    padding: 8px 14px !important;
-    background-color: ${bgColor} !important;
-    color: ${textColor} !important;
-    border: 1px solid ${borderColor} !important;
-    border-radius: 6px !important;
-    box-shadow: ${shadow} !important;
-    font-family: system-ui, -apple-system, sans-serif !important;
-    font-size: 13px !important;
-    line-height: 1.5 !important;
-    max-width: 350px !important;
-    word-wrap: break-word !important;
-    white-space: pre-wrap !important;
-    pointer-events: none !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    display: block !important;
-    text-align: ${textAlign} !important;
-    direction: ${direction.value} !important;
-    transform: translate3d(${position.value.x}px, ${position.value.y}px, 0) !important;
-    will-change: transform !important;
-  `;
+  return {
+    transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0) !important`,
+    direction: direction.value === 'rtl' ? 'rtl !important' : 'ltr !important'
+  };
 });
 
 const showTooltip = async (detail) => {
