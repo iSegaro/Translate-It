@@ -1,0 +1,151 @@
+/* src/components/shared/TranslationInputField.scss */
+@use "@/assets/styles/base/variables" as *;
+
+.ti-textarea-container {
+  position: relative !important;
+  margin: 8px 12px !important;
+  width: calc(100% - 24px) !important; // عرض کامل منهای حاشیه
+  display: block !important;
+  border: 1px solid var(--color-border, #dee2e6) !important;
+  border-radius: 8px !important;
+  background-color: var(--input-bg-color, #ffffff) !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+
+  &:hover .ti-input-toolbar {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+.ti-translation-textarea {
+  width: 100% !important;
+  padding: 42px 10px 10px 10px !important; // فضای بیشتر برای تولبار
+  border-radius: 8px !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  resize: vertical !important;
+  box-sizing: border-box !important;
+  direction: ltr !important;
+  text-align: left !important;
+  background-color: transparent !important;
+  color: var(--text-color, #212529) !important;
+  border: none !important;
+  line-height: 1.6 !important;
+  min-height: 120px !important; // برای سایدپنل که همیشه جا داشته باشد
+  max-width: 100% !important;
+  display: block !important;
+  overflow-x: hidden !important;
+
+  &:focus {
+    border: none !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+  }
+
+  &::placeholder {
+    color: var(--text-secondary, #6c757d) !important;
+    opacity: 0.6 !important;
+  }
+}
+
+/* Enhanced Text Actions Toolbar */
+.ti-input-toolbar {
+  position: absolute !important;
+  top: 8px !important;
+  left: 10px !important;
+  opacity: 0.5 !important;
+  visibility: visible !important;
+  transition: all 0.2s ease !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(4px) !important;
+  border-radius: 6px !important;
+  padding: 4px !important;
+  z-index: 10 !important;
+  display: flex !important;
+  align-items: center !important;
+  pointer-events: auto !important;
+
+  // استایل دکمه‌های داخل تولبار کامپوننت ActionToolbar
+  .ti-base-action-button {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    margin: 0 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    opacity: 0.8 !important;
+
+    &:hover {
+      opacity: 1 !important;
+      background: rgba(0, 0, 0, 0.05) !important;
+      border-radius: 4px !important;
+    }
+
+    img, svg {
+      width: 16px !important;
+      height: 16px !important;
+      display: block !important;
+      opacity: 1 !important;
+      pointer-events: none !important;
+    }
+  }
+}
+
+/* Standalone Paste Button */
+.ti-paste-standalone {
+  position: absolute !important;
+  top: 8px !important;
+  right: 12px !important;
+  z-index: 10 !important;
+}
+
+/* Context-specific adjustments for sidepanel */
+.sidepanel-wrapper {
+  .ti-textarea-container {
+    margin: 12px !important;
+    width: calc(100% - 24px) !important;
+  }
+
+  .ti-input-toolbar {
+    top: 8px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .ti-translation-textarea {
+    min-height: 200px !important;
+    max-height: 600px !important;
+    padding: 48px 14px 12px 14px !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+  }
+}
+
+/* RTL adjustments */
+:is([dir="rtl"], html[dir="rtl"]) {
+  .ti-input-toolbar {
+    left: auto !important;
+    right: 10px !important;
+  }
+
+  .ti-paste-standalone {
+    right: auto !important;
+    left: 12px !important;
+  }
+
+  .ti-translation-textarea {
+    text-align: right !important;
+    direction: rtl !important;
+  }
+
+  .sidepanel-wrapper {
+    .ti-input-toolbar {
+      left: auto !important;
+      right: 12px !important;
+    }
+  }
+}
