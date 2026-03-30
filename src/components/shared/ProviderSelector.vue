@@ -43,6 +43,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
       <div
@@ -151,6 +152,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
       <div
@@ -252,6 +254,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
       <div
@@ -415,6 +418,7 @@ const dropdownMenuRef = ref(null)
 const isDropdownOpen = ref(false)
 const isTranslating = ref(false)
 const focusedIndex = ref(-1)
+const dropdownMaxHeight = ref('400px')
 
 import { nextTick } from 'vue'
 
@@ -624,8 +628,17 @@ const toggleDropdown = () => {
     const currentIndex = items.findIndex(p => p.id === currentProvider.value);
     focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
     
-    // Also ensure the focused item is visible
-    scrollToFocused();
+    // Calculate dynamic max-height based on available space below the button
+    // This is crucial for Extension Popups where space is limited
+    nextTick(() => {
+      if (selectorRef.value) {
+        const rect = selectorRef.value.getBoundingClientRect();
+        const availableHeight = window.innerHeight - rect.bottom - 16; // 16px buffer
+        // Apply a reasonable min/max range
+        dropdownMaxHeight.value = `${Math.min(400, Math.max(150, availableHeight))}px`;
+      }
+      scrollToFocused();
+    });
   }
 
   logger.debug('🔧 Provider selector dropdown toggled!', {

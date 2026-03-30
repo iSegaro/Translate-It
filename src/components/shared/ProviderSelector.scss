@@ -280,7 +280,7 @@
 
 .ti-provider-dropdown-list {
   overflow-y: auto !important;
-  max-height: 300px !important; // Original max-height for items only
+  max-height: 300px; // Allowed to shrink when parent is smaller
   flex: 1 1 auto !important;
   width: 100% !important;
 
