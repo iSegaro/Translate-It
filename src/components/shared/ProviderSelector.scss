@@ -269,11 +269,31 @@
   border: 1px solid var(--header-border-color, #dee2e6) !important;
   border-radius: 4px !important;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
-  z-index: 10 !important; // مقدار کم کافیست چون والد خودش 1000 است
+  z-index: 10 !important;
   min-width: 180px !important;
-  max-height: 300px !important;
-  overflow-y: auto !important;
+  max-height: 400px !important; // Increased to accommodate list + footer
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   filter: none !important;
+}
+
+.ti-provider-dropdown-list {
+  overflow-y: auto !important;
+  max-height: 300px !important; // Original max-height for items only
+  flex: 1 1 auto !important;
+  width: 100% !important;
+
+  &::-webkit-scrollbar {
+    width: 6px !important;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 3px !important;
+  }
 }
 
 .ti-dropdown-item {
@@ -325,8 +345,8 @@
 
 /* Ephemeral Sync Footer Styles */
 .ti-provider-dropdown-footer {
-  position: sticky !important;
-  bottom: 0 !important;
+  position: relative !important; // Changed from sticky to relative
+  bottom: auto !important;
   background-color: var(--color-surface, #ffffff) !important;
   border-top: 1px solid var(--color-border, #e5e7eb) !important;
   padding: 6px !important;
@@ -335,6 +355,7 @@
   gap: 6px !important;
   z-index: 10 !important;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05) !important;
+  flex: 0 0 auto !important;
 }
 
 .ti-sync-row {

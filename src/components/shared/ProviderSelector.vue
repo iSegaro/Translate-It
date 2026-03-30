@@ -28,6 +28,7 @@
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
         @click.stop="toggleDropdown"
+        @keydown="handleKeydown"
       >
         <IconButton
           icon="dropdown-arrow.svg"
@@ -45,18 +46,27 @@
       @click.stop
     >
       <div
-        v-for="provider in availableProviders"
-        :key="provider.id"
-        class="ti-dropdown-item"
-        :class="{ 'ti-active': currentProvider === provider.id }"
-        @click="selectProvider(provider)"
+        ref="dropdownMenuRef"
+        class="ti-provider-dropdown-list"
       >
-        <img
-          :src="getProviderIcon(provider.icon)"
-          :alt="provider.name"
-          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+        <div
+          v-for="(provider, index) in availableProviders"
+          :key="provider.id"
+          class="ti-dropdown-item"
+          :class="{ 
+            'ti-active': currentProvider === provider.id,
+            'is-focused': focusedIndex === index 
+          }"
+          @click="selectProvider(provider)"
+          @mouseenter="focusedIndex = index"
         >
-        <span>{{ provider.name }}</span>
+          <img
+            :src="getProviderIcon(provider.icon)"
+            :alt="provider.name"
+            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+          >
+          <span>{{ provider.name }}</span>
+        </div>
       </div>
 
       <!-- Ephemeral Sync Footer -->
@@ -140,27 +150,31 @@
     <!-- Provider Dropdown -->
     <div 
       v-if="isDropdownOpen"
-      ref="dropdownMenuRef"
       class="ti-provider-dropdown-menu"
       @click.stop
     >
       <div
-        v-for="(provider, index) in availableProviders"
-        :key="provider.id"
-        class="ti-dropdown-item"
-        :class="{ 
-          'ti-active': currentProvider === provider.id,
-          'is-focused': focusedIndex === index 
-        }"
-        @click="selectProvider(provider)"
-        @mouseenter="focusedIndex = index"
+        ref="dropdownMenuRef"
+        class="ti-provider-dropdown-list"
       >
-        <img
-          :src="getProviderIcon(provider.icon)"
-          :alt="provider.name"
-          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+        <div
+          v-for="(provider, index) in availableProviders"
+          :key="provider.id"
+          class="ti-dropdown-item"
+          :class="{ 
+            'ti-active': currentProvider === provider.id,
+            'is-focused': focusedIndex === index 
+          }"
+          @click="selectProvider(provider)"
+          @mouseenter="focusedIndex = index"
         >
-        <span>{{ provider.name }}</span>
+          <img
+            :src="getProviderIcon(provider.icon)"
+            :alt="provider.name"
+            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+          >
+          <span>{{ provider.name }}</span>
+        </div>
       </div>
 
       <!-- Ephemeral Sync Footer -->
@@ -224,6 +238,7 @@
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
       @click="toggleDropdown"
+      @keydown="handleKeydown"
     >
       <img
         :src="currentProviderIcon"
@@ -240,18 +255,27 @@
       @click.stop
     >
       <div
-        v-for="provider in availableProviders"
-        :key="provider.id"
-        class="ti-dropdown-item"
-        :class="{ 'ti-active': currentProvider === provider.id }"
-        @click="selectProvider(provider)"
+        ref="dropdownMenuRef"
+        class="ti-provider-dropdown-list"
       >
-        <img
-          :src="getProviderIcon(provider.icon)"
-          :alt="provider.name"
-          :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+        <div
+          v-for="(provider, index) in availableProviders"
+          :key="provider.id"
+          class="ti-dropdown-item"
+          :class="{ 
+            'ti-active': currentProvider === provider.id,
+            'is-focused': focusedIndex === index 
+          }"
+          @click="selectProvider(provider)"
+          @mouseenter="focusedIndex = index"
         >
-        <span>{{ provider.name }}</span>
+          <img
+            :src="getProviderIcon(provider.icon)"
+            :alt="provider.name"
+            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+          >
+          <span>{{ provider.name }}</span>
+        </div>
       </div>
 
       <!-- Ephemeral Sync Footer -->
