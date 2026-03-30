@@ -120,8 +120,20 @@
     transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
 
     // Status Colors
-    &.is-translating { background: #4a90e2 !important; .status-pulse-glow { background: #4a90e2 !important; } }
-    &.is-auto { background: #9c27b0 !important; .status-pulse-glow { background: #9c27b0 !important; } }
+    &.is-translating { 
+      background: #4a90e2 !important; 
+      .status-pulse-glow { 
+        background: #4a90e2 !important; 
+        animation: pulse-glow 1.5s infinite ease-in-out !important;
+      } 
+    }
+    &.is-auto { 
+      background: #9c27b0 !important; 
+      .status-pulse-glow { 
+        background: #9c27b0 !important; 
+        animation: pulse-glow 1.5s infinite ease-in-out !important;
+      } 
+    }
     &.completed { background: #4caf50 !important; }
 
     .status-inner-dot {
@@ -139,7 +151,6 @@
       right: 0 !important;
       bottom: 0 !important;
       border-radius: 50% !important;
-      animation: pulse-glow 1.5s infinite ease-in-out !important;
       z-index: 0 !important;
       opacity: 0.6 !important;
     }
