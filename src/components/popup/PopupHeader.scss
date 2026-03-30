@@ -13,7 +13,7 @@
   width: 100% !important;
   box-sizing: border-box !important;
   min-height: clamp(50px, 10vh, 64px) !important;
-  gap: 8px !important;
+  gap: 12px !important;
   
   // Force LTR and Row direction
   direction: ltr !important;
@@ -76,8 +76,8 @@
 .ti-switch {
   position: relative !important;
   display: inline-block !important;
-  width: clamp(44px, 12vw, 56px) !important;
-  height: clamp(24px, 6vw, 30px) !important;
+  width: clamp(36px, 10vw, 44px) !important;
+  height: clamp(20px, 5vw, 24px) !important;
   vertical-align: middle !important;
   flex-shrink: 0 !important;
   margin-right: 4px !important;
@@ -91,7 +91,7 @@
       background-color: #4caf50 !important;
       
       &:before {
-        transform: translateX(calc(clamp(44px, 12vw, 56px) - clamp(18px, 5vw, 24px) - 6px)) !important;
+        transform: translateX(calc(clamp(36px, 10vw, 44px) - clamp(14px, 4vw, 18px) - 6px)) !important;
       }
     }
   }
@@ -107,8 +107,8 @@
     &:before {
       position: absolute !important;
       content: "" !important;
-      height: clamp(18px, 5vw, 24px) !important;
-      width: clamp(18px, 5vw, 24px) !important;
+      height: clamp(14px, 4vw, 18px) !important;
+      width: clamp(14px, 4vw, 18px) !important;
       left: 3px !important;
       bottom: 3px !important;
       background-color: white !important;
@@ -121,12 +121,12 @@
 
 /* Overrides for IconButton */
 .ti-toolbar-button {
-  width: clamp(38px, 9vw, 52px) !important;
-  height: clamp(38px, 9vw, 52px) !important;
+  width: clamp(32px, 8vw, 44px) !important;
+  height: clamp(32px, 8vw, 44px) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   flex-shrink: 0 !important;
   background-color: transparent !important;
@@ -140,18 +140,18 @@
 }
 
 .ti-toolbar-icon {
-  width: clamp(22px, 6vw, 30px) !important;
-  height: clamp(22px, 6vw, 30px) !important;
+  width: clamp(18px, 5vw, 24px) !important;
+  height: clamp(18px, 5vw, 24px) !important;
   filter: var(--icon-filter, none) !important;
   opacity: var(--icon-opacity, 0.8) !important;
 }
 
 // PageTranslationButton link
 .ti-header-toolbar .toolbar-link {
-  font-size: clamp(14px, 4.5vw, 16px) !important;
+  font-size: clamp(12px, 4vw, 14px) !important;
   font-weight: 600 !important;
-  padding: 8px 16px !important;
-  border-radius: 20px !important;
+  padding: 6px 12px !important;
+  border-radius: 16px !important;
   white-space: nowrap !important;
   background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
   color: var(--toolbar-link-color, #007bff) !important;
