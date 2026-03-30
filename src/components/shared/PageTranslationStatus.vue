@@ -68,3 +68,7 @@ const status = computed(() => {
     <div class="status-inner-dot"></div>
   </div>
 </template>
+
+<style lang="scss">
+@import "./PageTranslationStatus.scss";
+</style>
