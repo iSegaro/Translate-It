@@ -79,6 +79,14 @@
           class="toolbar-icon"
           alt="Stop"
         >
+
+        <!-- Shared Status Indicator for Popup/Sidepanel -->
+        <PageTranslationStatus 
+          v-if="isTranslating || isAutoTranslating"
+          :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
+          mode="compact"
+        />
+
         <Icon
           v-else-if="!compact && !isTranslating && !isAutoTranslating"
           icon="fa6-solid:language"
@@ -132,6 +140,7 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
 import { Icon } from '@iconify/vue';
 import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import browser from 'webextension-polyfill';
 
 const props = defineProps({
