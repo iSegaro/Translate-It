@@ -83,20 +83,23 @@
 .ti-m-icon-tts { background: #e7f5ff !important; }
 
 /* Dark Mode Overrides */
-:host-context(.theme-dark) {
-  .ti-m-icon-translate-page { background: rgba(24, 100, 171, 0.25) !important; }
-  .ti-m-icon-select-element { background: rgba(151, 119, 250, 0.4) !important; }
-  .ti-m-icon-manual-input { background: rgba(43, 138, 62, 0.4) !important; }
-  .ti-m-icon-history { background: rgba(252, 196, 25, 0.4) !important; }
-  .ti-m-icon-settings { background: rgba(255, 146, 43, 0.4) !important; }
-  .ti-m-icon-revert { background: rgba(255, 107, 107, 0.4) !important; }
-  .ti-m-icon-tts { background: rgba(24, 100, 171, 0.25) !important; }
-  
-  .ti-toolbar-icon {
-    filter: var(--ti-mobile-icon-filter) !important;
+.ti-m-dashboard-view.is-dark {
+  .ti-m-icon-translate-page { background: rgba(51, 154, 240, 0.15) !important; }
+  .ti-m-icon-select-element { background: rgba(132, 94, 247, 0.15) !important; }
+  .ti-m-icon-manual-input { background: rgba(64, 192, 87, 0.15) !important; }
+  .ti-m-icon-history { background: rgba(250, 176, 5, 0.15) !important; }
+  .ti-m-icon-settings { background: rgba(253, 126, 20, 0.15) !important; }
+  .ti-m-icon-revert { background: rgba(250, 82, 82, 0.15) !important; }
+  .ti-m-icon-tts { background: rgba(51, 154, 240, 0.15) !important; }
+
+  .ti-m-icon-select-element,
+  .ti-m-icon-history,
+  .ti-m-icon-settings {
+    .ti-toolbar-icon {
+      filter: brightness(0) invert(1) !important;
+    }
   }
 }
-
 @keyframes ti-m-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

@@ -119,8 +119,7 @@
 }
 
 /* Global Icon Filtering via host-context */
-:host-context(.theme-dark) .ti-m-icon-img, 
-:host-context(.theme-dark) .ti-toolbar-icon {
+:host-context(.theme-dark) .ti-m-icon-img {
   filter: var(--ti-mobile-icon-filter) !important;
 }
 
