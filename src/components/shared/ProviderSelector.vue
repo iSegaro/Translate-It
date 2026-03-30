@@ -400,6 +400,10 @@ const props = defineProps({
   showSync: {
     type: Boolean,
     default: false
+  },
+  allowDefault: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -530,8 +534,15 @@ const currentProviderName = computed(() => {
 
 // Helper to determine if a provider icon should be inverted in dark mode
 const isProviderInverted = (providerId) => {
+  let effectiveId = providerId
+  
+  // If it's 'default', resolve to the actual global provider ID
+  if (providerId === 'default') {
+    effectiveId = settingsStore.settings?.TRANSLATION_API || 'googlev2'
+  }
+  
   const blackIcons = ['deepl', 'openai', 'openrouter']
-  return blackIcons.includes(providerId)
+  return blackIcons.includes(effectiveId)
 }
 
 // Helper to get effective provider ID for sync icons
@@ -703,11 +714,27 @@ const handleStorageChange = (changes, areaName) => {
 onMounted(() => {
   // Use provider registry for consistent provider information
   const providersFromRegistry = getProvidersForDropdown()
-  availableProviders.value = providersFromRegistry.map(provider => ({
+  const mappedProviders = providersFromRegistry.map(provider => ({
     id: provider.id,
     name: provider.name,
     icon: provider.icon
   }))
+
+  if (props.allowDefault) {
+    const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
+    const defaultProvider = getProviderById(defaultProviderId);
+    
+    availableProviders.value = [
+      { 
+        id: 'default', 
+        name: t('provider_default') || 'Default', 
+        icon: defaultProvider?.icon || 'providers/google.svg' 
+      },
+      ...mappedProviders
+    ]
+  } else {
+    availableProviders.value = mappedProviders
+  }
   
   // Add click listener to close dropdown using ResourceTracker
   tracker.addEventListener(document, 'click', closeDropdown)

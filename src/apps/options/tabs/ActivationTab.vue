@@ -88,8 +88,9 @@
             <ProviderSelector
               v-model="fieldProvider"
               allow-default
+              mode="button"
+              :is-global="false"
               :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
-              variant="activation"
             />
           </div>
         </div>
@@ -170,8 +171,9 @@
             <ProviderSelector
               v-model="selectElementProvider"
               allow-default
+              mode="button"
+              :is-global="false"
               :disabled="!extensionEnabled || !translateWithSelectElement"
-              variant="activation"
             />
           </div>
         </div>
@@ -195,8 +197,9 @@
             <ProviderSelector
               v-model="selectionProvider"
               allow-default
+              mode="button"
+              :is-global="false"
               :disabled="!extensionEnabled || !translateOnTextSelection"
-              variant="activation"
             />
           </div>
         </div>
@@ -283,8 +286,9 @@
             <ProviderSelector
               v-model="dictionaryProvider"
               allow-default
+              mode="button"
+              :is-global="false"
               :disabled="!extensionEnabled || !enableDictionary"
-              variant="activation"
             />
           </div>
         </div>
@@ -311,8 +315,9 @@
             <ProviderSelector
               v-model="pageProvider"
               allow-default
+              mode="button"
+              :is-global="false"
               :disabled="!extensionEnabled || !wholePageEnabled"
-              variant="activation"
             />
           </div>
         </div>
@@ -370,7 +375,7 @@ import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
-import ProviderSelector from '@/components/feature/ProviderSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -568,7 +573,7 @@ const dictionaryProvider = computed({
     display: flex;
     align-items: center;
     gap: $spacing-sm;
-    width: 180px;
+    width: 250px; // Increased from 180px to match other dropdowns
 
     .mode-provider-label {
       font-size: $font-size-xs;
@@ -578,6 +583,16 @@ const dictionaryProvider = computed({
 
       &.is-disabled {
         opacity: 0.6;
+      }
+    }
+
+    :deep(.ti-provider-button-container) {
+      flex: 1;
+      min-width: 0;
+
+      .ti-provider-button {
+        width: 100% !important;
+        padding: 6px 10px !important; // Slightly more compact padding for these rows
       }
     }
   }

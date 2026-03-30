@@ -78,7 +78,7 @@
   object-fit: contain !important;
 
   &.ti-invert-dark {
-    :is(.theme-dark, .is-dark) & {
+    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
       filter: invert(1) brightness(1.8) !important;
     }
   }
@@ -209,7 +209,7 @@
   transition: opacity 0.2s ease-in-out !important;
 
   &.ti-invert-dark {
-    :is(.theme-dark, .is-dark) & {
+    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
       filter: invert(1) brightness(1.8) !important;
     }
   }
@@ -415,7 +415,7 @@
   flex-shrink: 0 !important;
 
   &.ti-invert-dark {
-    :is(.theme-dark, .is-dark) & {
+    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
       filter: invert(1) brightness(1.8) !important;
     }
   }
