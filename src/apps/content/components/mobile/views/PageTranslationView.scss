@@ -13,18 +13,28 @@
 .ti-m-view-header {
   display: flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
   padding: 10px 0 !important;
   border-bottom: 1px solid var(--ti-mobile-header-border) !important;
   margin: 0 -15px 15px !important;
   padding-left: 10px !important;
   padding-right: 15px !important;
+  position: relative !important;
+}
+
+.ti-m-header-left-section {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  max-width: 35% !important;
 }
 
 .ti-m-back-btn {
   background: none !important;
   border: none !important;
-  width: 40px !important;
-  height: 40px !important;
+  width: 36px !important;
+  height: 36px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -33,7 +43,6 @@
   color: var(--ti-mobile-text) !important;
   -webkit-tap-highlight-color: transparent !important;
   transition: background-color 0.2s ease !important;
-  margin-right: 5px !important;
 
   &:active {
     background-color: var(--ti-mobile-header-border) !important;
@@ -41,8 +50,8 @@
 
   svg {
     display: block !important;
-    width: 20px !important;
-    height: 20px !important;
+    width: 18px !important;
+    height: 18px !important;
     flex-shrink: 0 !important;
     transform: rotate(90deg) !important;
     stroke: currentColor !important;
@@ -50,31 +59,30 @@
   }
 }
 
-.ti-m-header-title-container {
+.ti-m-header-status-row {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;
-  flex: 1 !important;
+  gap: 4px !important;
   cursor: pointer !important;
+  overflow: hidden !important;
 }
 
 .ti-m-status-dot {
-  width: 10px !important;
-  height: 10px !important;
+  width: 7px !important;
+  height: 7px !important;
   border-radius: 50% !important;
-  display: block !important;
   background: var(--ti-mobile-text-muted) !important;
   flex-shrink: 0 !important;
 
   &.translating { 
     background: var(--ti-mobile-accent) !important; 
-    box-shadow: 0 0 0 3px var(--ti-mobile-accent-bg) !important; 
+    box-shadow: 0 0 0 2px var(--ti-mobile-accent-bg) !important; 
     animation: pulse-mobile 1.5s infinite !important; 
   }
   
   &.completed { 
     background: var(--ti-mobile-success) !important; 
-    box-shadow: 0 0 0 3px rgba(81, 207, 102, 0.2) !important; 
+    box-shadow: 0 0 0 2px rgba(81, 207, 102, 0.2) !important; 
   }
   
   &.error { 
@@ -84,15 +92,67 @@
 
 .ti-m-header-title {
   font-weight: 700 !important;
-  font-size: 17px !important;
-  color: var(--ti-mobile-text) !important;
+  font-size: 10px !important;
+  color: var(--ti-mobile-text-muted) !important;
   white-space: nowrap !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.2px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.ti-m-header-primary-btn {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  height: 34px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  padding: 0 10px !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  width: 45% !important; /* اختصاص ۳۵ درصد از عرض هدر به دکمه */
+  min-width: 110px !important; /* حداقل عرض برای جا شدن متن در گوشی‌های کوچک */
+  max-width: 150px !important; /* حداکثر عرض برای جلوگیری از کشیده شدن در گوشی‌های بزرگ */
+  flex-shrink: 0 !important;
+  border: none !important;
+  z-index: 2 !important;
+
+  span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    flex: 1 !important;
+    text-align: center !important;
+  }
+
+  img {
+    width: 10px !important;
+    height: 10px !important;
+    object-fit: contain !important;
+  }
+
+  &:active {
+    transform: translate(-50%, -50%) scale(0.96) !important; /* حفظ مرکزیت در هنگام انیمیشن */
+    opacity: 0.9 !important;
+  }
 }
 
 .ti-m-header-actions {
   display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
+  gap: 8px !important; /* فاصله کمتر */
 }
 
 .ti-m-auto-close-btn {
@@ -241,38 +301,6 @@
   &.indeterminate { 
     animation: indeterminate-mobile 2s infinite linear !important; 
     transform-origin: 0% 50% !important; 
-  }
-}
-
-.ti-m-action-column {
-  margin-top: auto !important;
-  padding-top: 10px !important;
-  padding-bottom: 10px !important;
-}
-
-.ti-m-primary-action-btn {
-  width: 100% !important;
-  padding: 14px !important;
-  border-radius: 14px !important;
-  font-weight: 700 !important;
-  font-size: 15px !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 10px !important;
-  transition: all 0.2s ease !important;
-  border: none !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-
-  img {
-    width: 20px !important;
-    height: 20px !important;
-  }
-
-  &:active { 
-    transform: scale(0.98) !important; 
-    opacity: 0.9 !important; 
   }
 }
 

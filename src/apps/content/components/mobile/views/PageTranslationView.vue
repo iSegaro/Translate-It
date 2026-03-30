@@ -5,34 +5,54 @@
   >
     <!-- Header -->
     <div class="ti-m-view-header">
-      <button
-        class="ti-m-back-btn"
-        @click="goToDashboard"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 6 4"
-          fill="none"
+      <div class="ti-m-header-left-section">
+        <button
+          class="ti-m-back-btn"
+          @click="goToDashboard"
         >
-          <path
-            d="M1 1L3 3L5 1"
-            stroke="currentColor"
-            stroke-width="0.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 6 4"
+            fill="none"
+          >
+            <path
+              d="M1 1L3 3L5 1"
+              stroke="currentColor"
+              stroke-width="0.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        
+        <!-- Status Info (Now on the Left) -->
+        <div class="ti-m-header-status-row" @click="goToDashboard">
+          <span
+            class="ti-m-status-dot"
+            :class="pageTranslationData.status"
           />
-        </svg>
-      </button>
-      
-      <div class="ti-m-header-title-container" @click="goToDashboard">
-        <span
-          class="ti-m-status-dot"
-          :class="pageTranslationData.status"
-        />
-        <span class="ti-m-header-title">{{ statusMessage }}</span>
+          <span class="ti-m-header-title">{{ statusMessage }}</span>
+        </div>
       </div>
+      
+      <!-- Primary Action Pill (Centered) -->
+      <button 
+        class="ti-m-header-primary-btn"
+        :style="{
+          background: primaryAction.bgColor,
+          border: primaryAction.border + ' !important',
+          color: primaryAction.textColor + ' !important'
+        }"
+        @click.stop="primaryAction.handler"
+      >
+        <img 
+          :src="primaryAction.icon" 
+          :style="{ filter: primaryAction.iconFilter }"
+        >
+        {{ primaryAction.label }}
+      </button>
 
       <div class="ti-m-header-actions">
         <!-- Auto Close Toggle Button -->
@@ -95,26 +115,6 @@
           :style="{ width: pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
         />
       </div>
-    </div>
-
-    <!-- Unified Action Area -->
-    <div class="ti-m-action-column">
-      <!-- Single Multi-state Button -->
-      <button 
-        class="ti-m-primary-action-btn"
-        :style="{
-          background: primaryAction.bgColor,
-          border: primaryAction.border + ' !important',
-          color: primaryAction.textColor + ' !important'
-        }"
-        @click.stop="primaryAction.handler"
-      >
-        <img 
-          :src="primaryAction.icon" 
-          :style="{ filter: primaryAction.iconFilter }"
-        >
-        {{ primaryAction.label }}
-      </button>
     </div>
   </div>
 </template>
