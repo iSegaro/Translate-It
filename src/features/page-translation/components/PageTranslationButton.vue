@@ -17,7 +17,7 @@
       <span class="progress-text">{{ progressText }}</span>
     </div>
 
-    <!-- State: Not Translated -->
+    <!-- State: Not Translated (Show Red dot here if there was a previous error) -->
     <template v-if="!isTranslated && !isTranslating && !isAutoTranslating">
       <a
         v-if="textOnly"
@@ -26,6 +26,12 @@
         :class="{ disabled: !canTranslate }"
         @click.prevent="handleTranslate"
       >
+        <PageTranslationStatus 
+          v-if="hasError"
+          :status-data="{ hasError: true }"
+          mode="compact"
+          class="ti-text-status-badge"
+        />
         {{ t('page_translation_btn_translate') || 'Translate Page' }}
       </a>
       <BaseButton
@@ -36,16 +42,24 @@
         :class="{ 'is-compact-icon': compact }"
         @click="handleTranslate"
       >
-        <img
-          v-if="compact"
-          :src="browser.runtime.getURL('icons/ui/whole-page.png')"
-          class="toolbar-icon"
-          alt="Translate"
-        >
-        <Icon
-          v-else
-          icon="fa6-solid:language"
-        />
+        <div class="ti-btn-status-container">
+          <PageTranslationStatus 
+            v-if="hasError"
+            :status-data="{ hasError: true }"
+            mode="compact"
+            class="ti-btn-status-badge"
+          />
+          <img
+            v-if="compact"
+            :src="browser.runtime.getURL('icons/ui/whole-page.png')"
+            class="toolbar-icon"
+            alt="Translate"
+          >
+          <Icon
+            v-else
+            icon="fa6-solid:language"
+          />
+        </div>
         <span v-if="!compact">{{ translateButtonText }}</span>
       </BaseButton>
     </template>
@@ -104,15 +118,21 @@
 
     <!-- State: Translated -->
     <template v-if="isTranslated && !isTranslating && !isAutoTranslating">
-      <a
-        v-if="textOnly"
-        href="#"
-        class="toolbar-link"
-        :class="{ disabled: !canRestore }"
-        @click.prevent="handleRestore"
-      >
-        {{ t('page_translation_btn_restore') || 'Restore Original' }}
-      </a>
+      <div v-if="textOnly" class="ti-text-status-wrapper">
+        <a
+          href="#"
+          class="toolbar-link"
+          :class="{ disabled: !canRestore }"
+          @click.prevent="handleRestore"
+        >
+          <PageTranslationStatus 
+            :status-data="{ isTranslated: true, isTranslating: false, isAutoTranslating: false }"
+            mode="compact"
+            class="ti-text-status-badge"
+          />
+          {{ t('page_translation_btn_restore') || 'Restore Original' }}
+        </a>
+      </div>
       <BaseButton
         v-else
         :variant="compact ? 'ghost' : 'secondary'"
@@ -121,16 +141,23 @@
         :class="{ 'is-compact-icon': compact }"
         @click="handleRestore"
       >
-        <img
-          :src="browser.runtime.getURL('icons/ui/restore.svg')"
-          :class="compact ? 'toolbar-icon' : 'ti-btn__icon'"
-          alt="Restore"
-        >
+        <div class="ti-btn-status-container">
+          <PageTranslationStatus 
+            :status-data="{ isTranslated: true, isTranslating: false, isAutoTranslating: false }"
+            mode="compact"
+            class="ti-btn-status-badge"
+          />
+          <img
+            :src="browser.runtime.getURL('icons/ui/restore.svg')"
+            :class="compact ? 'toolbar-icon' : 'ti-btn__icon'"
+            alt="Restore"
+          >
+        </div>
         <span v-if="!compact">{{ restoreButtonText }}</span>
       </BaseButton>
     </template>
 
-    <!-- Error State -->
+    <!-- Error State Message -->
     <div
       v-if="hasError && !compact && !textOnly"
       class="error-message"
@@ -400,7 +427,6 @@ export default {
 
 .ti-btn.is-active .toolbar-icon {
   opacity: 1;
-  /* Remove the white filter for a more minimal look */
 }
 
 /* Compact Icon Style (Unification) */
