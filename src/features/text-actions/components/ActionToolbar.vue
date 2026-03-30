@@ -366,14 +366,16 @@ const handleTTSStateChanged = (data) => {
 .ti-mode-floating {
   background: var(--color-background, rgba(255, 255, 255, 0.95));
   border-radius: 4px;
-  padding: 2px;
+  padding: 0px 2px; /* Reduced vertical padding from 2px to 0px */
   border: 1px solid var(--color-border, transparent);
+  min-height: unset; /* Ensure no minimum height is enforced */
+  line-height: 1;
 }
 
 .ti-mode-inline,
 .ti-mode-sidepanel {
   background: transparent;
-  padding: 2px;
+  padding: 0px 2px; /* Reduced vertical padding */
 }
 
 /* Content-based visibility - Removed to always show toolbar with full opacity
