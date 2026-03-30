@@ -54,7 +54,7 @@
       text-align: center !important;
       border: none !important;
       background-color: transparent !important;
-      height: 44px !important;
+      height: 30px !important;
       font-size: 15px !important;
       padding: 0 10px !important;
       color: var(--ti-mobile-text-secondary, #1c7ed6) !important;
@@ -196,7 +196,7 @@
 // Sidepanel Mode
 .sidepanel-wrapper {
   .ti-language-controls {
-    height: 40px !important;
+    height: 30px !important;
     padding: 4px 0 !important;
     margin: 0 !important;
     background: transparent !important;
@@ -250,7 +250,7 @@
     flex-direction: row !important;
     
     .ti-language-select {
-      height: 44px !important;
+      height: 30px !important;
       font-size: 16px !important;
       max-width: none !important;
       flex: 1 !important;
@@ -258,7 +258,7 @@
 
     .ti-swap-button {
       width: 44px !important;
-      height: 44px !important;
+      height: 30px !important;
       
       img {
         width: 24px !important;
