@@ -79,6 +79,19 @@ const handleChange = (event) => {
   cursor: pointer;
   transition: all 0.2s ease;
 
+  // Dark Mode support - explicit override for select element
+  :root.theme-dark &,
+  .theme-dark & {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+    
+    option {
+      background-color: #2d2d2d !important;
+      color: #e0e0e0 !important;
+    }
+  }
+
   &:focus {
     outline: none;
     border-color: var(--color-primary);
