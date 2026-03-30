@@ -136,6 +136,15 @@
     height: 22px !important;
     opacity: 0.4 !important;
     filter: var(--ti-mobile-icon-filter) !important;
+    transition: opacity 0.2s ease !important;
+  }
+}
+
+/* Dark Mode Overrides */
+.ti-m-page-translation-view.is-dark {
+  .ti-m-icon-img-close {
+    filter: invert(1) !important;
+    opacity: 0.8 !important;
   }
 }
 
