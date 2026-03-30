@@ -45,7 +45,11 @@
 
       <div class="setting-group">
         <label>{{ t('translation_api_label') || 'API Choice' }}</label>
-        <ProviderSelector v-model="selectedProvider" />
+        <ProviderSelector 
+          v-model="selectedProvider" 
+          mode="button"
+          :is-global="false"
+        />
       </div>
 
       <div class="provider-settings">
@@ -71,7 +75,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
-import ProviderSelector from '@/components/feature/ProviderSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { useI18n } from 'vue-i18n'
@@ -489,9 +493,15 @@ defineExpose({
     white-space: nowrap;
   }
   
-  .language-dropdown {
-    flex: 0 0 250px;
+  .language-dropdown,
+  :deep(.ti-provider-button-container) {
+    flex: 0 0 250px !important;
+    width: 250px !important;
     height: auto;
+
+    .ti-provider-button {
+      width: 100% !important;
+    }
   }
 }
 
@@ -522,7 +532,8 @@ defineExpose({
       margin-bottom: $spacing-xs !important;
     }
     
-    .language-dropdown {
+    .language-dropdown,
+    :deep(.ti-provider-button-container) {
       min-width: auto !important;
       width: 100% !important;
       flex: none !important;

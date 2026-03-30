@@ -115,9 +115,17 @@
 .ti-provider-button-container {
   position: relative !important;
   overflow: visible !important;
+  width: auto !important; // Removed 100% to allow natural width
 
   &.ti-dropdown-open {
     z-index: 1000 !important;
+  }
+
+  .ti-provider-dropdown-menu {
+    left: auto !important;
+    right: 0 !important;
+    width: 100% !important;
+    min-width: 200px !important;
   }
 }
 
@@ -133,6 +141,7 @@
   transition: background-color 0.2s ease !important;
   font-size: 14px !important;
   color: var(--text-color, #212529) !important;
+  width: 100% !important;
 
   &:hover {
     background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
@@ -140,6 +149,14 @@
 
   &.ti-active {
     background-color: var(--language-controls-bg-color, rgba(0, 123, 255, 0.1)) !important;
+  }
+
+  span {
+    flex: 1 !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .dropdown-arrow.rotated {
