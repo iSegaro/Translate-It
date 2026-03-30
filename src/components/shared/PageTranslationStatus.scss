@@ -56,10 +56,6 @@
 
   &.completed {
     background: #4caf50 !important; // Green
-    &.mode-mobile-header { 
-      background: #845ef7 !important; // برای موبایل بنفش می‌گذاریم چون در موبایل سبز برای چیز دیگری است
-      box-shadow: 0 0 0 2px rgba(132, 94, 247, 0.2) !important; 
-    }
   }
 
   &.error {
