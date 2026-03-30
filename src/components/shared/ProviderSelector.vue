@@ -119,6 +119,7 @@
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
       @click="toggleDropdown"
+      @keydown="handleKeydown"
     >
       <img
         :src="currentProviderIcon"
@@ -139,15 +140,20 @@
     <!-- Provider Dropdown -->
     <div 
       v-if="isDropdownOpen"
+      ref="dropdownMenuRef"
       class="ti-provider-dropdown-menu"
       @click.stop
     >
       <div
-        v-for="provider in availableProviders"
+        v-for="(provider, index) in availableProviders"
         :key="provider.id"
         class="ti-dropdown-item"
-        :class="{ 'ti-active': currentProvider === provider.id }"
+        :class="{ 
+          'ti-active': currentProvider === provider.id,
+          'is-focused': focusedIndex === index 
+        }"
         @click="selectProvider(provider)"
+        @mouseenter="focusedIndex = index"
       >
         <img
           :src="getProviderIcon(provider.icon)"
@@ -381,8 +387,82 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 
 // State
 const selectorRef = ref(null)
+const dropdownMenuRef = ref(null)
 const isDropdownOpen = ref(false)
 const isTranslating = ref(false)
+const focusedIndex = ref(-1)
+
+import { nextTick } from 'vue'
+
+// Handle keyboard navigation
+const handleKeydown = (event) => {
+  if (props.disabled) return
+
+  const { key } = event
+  const items = availableProviders.value
+  const currentIndex = items.findIndex(p => p.id === currentProvider.value)
+
+  // If dropdown is closed, Arrow keys change selection directly (Native behavior - No looping)
+  if (!isDropdownOpen.value) {
+    if (key === 'ArrowDown') {
+      event.preventDefault()
+      if (currentIndex < items.length - 1) {
+        selectProvider(items[currentIndex + 1])
+      }
+      return
+    }
+    if (key === 'ArrowUp') {
+      event.preventDefault()
+      if (currentIndex > 0) {
+        selectProvider(items[currentIndex - 1])
+      }
+      return
+    }
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault()
+      toggleDropdown()
+      focusedIndex.value = currentIndex !== -1 ? currentIndex : 0
+      return
+    }
+    return
+  }
+
+  // If dropdown is open, handle navigation within the list
+  switch (key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      focusedIndex.value = (focusedIndex.value + 1) % items.length
+      scrollToFocused()
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      focusedIndex.value = (focusedIndex.value - 1 + items.length) % items.length
+      scrollToFocused()
+      break
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      if (focusedIndex.value >= 0 && focusedIndex.value < items.length) {
+        selectProvider(items[focusedIndex.value])
+      }
+      break
+    case 'Escape':
+    case 'Tab':
+      isDropdownOpen.value = false
+      break
+  }
+}
+
+const scrollToFocused = () => {
+  nextTick(() => {
+    if (dropdownMenuRef.value) {
+      const focusedEl = dropdownMenuRef.value.children[focusedIndex.value]
+      if (focusedEl) {
+        focusedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  })
+}
 
 // Handle click outside to close dropdown
 const handleClickOutside = (event) => {
@@ -512,13 +592,25 @@ const toggleDropdown = () => {
     deactivateSelectMode();
   }
 
+  const newState = !isDropdownOpen.value;
+
+  // Sync focusedIndex with current selection when opening
+  if (newState) {
+    const items = availableProviders.value;
+    const currentIndex = items.findIndex(p => p.id === currentProvider.value);
+    focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
+    
+    // Also ensure the focused item is visible
+    scrollToFocused();
+  }
+
   logger.debug('🔧 Provider selector dropdown toggled!', {
     currentState: isDropdownOpen.value,
-    newState: !isDropdownOpen.value,
+    newState: newState,
     mode: props.mode
   })
   
-  isDropdownOpen.value = !isDropdownOpen.value
+  isDropdownOpen.value = newState;
 }
 
 const selectProvider = async (provider) => {

@@ -159,6 +159,12 @@
     text-overflow: ellipsis !important;
   }
 
+  &:focus {
+    outline: none !important;
+    border-color: var(--color-primary, #007bff) !important;
+    box-shadow: 0 0 0 3px var(--language-controls-bg-color, rgba(0, 123, 255, 0.15)) !important;
+  }
+
   .dropdown-arrow.rotated {
     transform: rotate(180deg) !important;
   }
@@ -283,7 +289,8 @@
     border-bottom: none !important;
   }
 
-  &:hover {
+  &:hover,
+  &.is-focused {
     background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
     opacity: 1 !important;
   }
