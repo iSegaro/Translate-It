@@ -29,9 +29,8 @@
         
         <!-- Status Info (Now on the Left) -->
         <div class="ti-m-header-status-row" @click="goToDashboard">
-          <span
-            class="ti-m-status-dot"
-            :class="pageTranslationData.isAutoTranslating ? ['completed', 'is-auto'] : [pageTranslationData.status]"
+          <PageTranslationStatus 
+            mode="mobile-header"
           />
           <span class="ti-m-header-title">{{ statusMessage }}</span>
         </div>
@@ -128,6 +127,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import closeIcon from '@/icons/ui/close.png';

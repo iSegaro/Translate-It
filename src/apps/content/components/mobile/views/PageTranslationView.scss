@@ -67,34 +67,6 @@
   overflow: hidden !important;
 }
 
-.ti-m-status-dot {
-  width: 7px !important;
-  height: 7px !important;
-  border-radius: 50% !important;
-  background: var(--ti-mobile-text-muted) !important;
-  flex-shrink: 0 !important;
-
-  &.translating { 
-    background: var(--ti-mobile-accent) !important; 
-    box-shadow: 0 0 0 2px var(--ti-mobile-accent-bg) !important; 
-    animation: pulse-mobile 1.5s infinite !important; 
-  }
-  
-  &.completed { 
-    background: #845ef7 !important; /* بنفش برای ترجمه عادی تمام شده (متمایز از آبی و سبز) */
-    box-shadow: 0 0 0 2px rgba(132, 94, 247, 0.2) !important; 
-    
-    &.is-auto {
-      background: var(--ti-mobile-success) !important; /* سبز برای ترجمه خودکار فعال */
-      box-shadow: 0 0 0 2px rgba(81, 207, 102, 0.2) !important; 
-    }
-  }
-  
-  &.error { 
-    background: var(--ti-mobile-error) !important; 
-  }
-}
-
 .ti-m-header-title {
   font-weight: 700 !important;
   font-size: 10px !important;
