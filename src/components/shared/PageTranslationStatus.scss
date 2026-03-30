@@ -1,0 +1,92 @@
+/* src/components/shared/PageTranslationStatus.scss */
+
+.ti-page-status-indicator {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+
+  // Sizes & Base Modes
+  &.mode-desktop-fab {
+    position: absolute !important;
+    bottom: 2px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 12px !important;
+    height: 12px !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    z-index: 2147483647 !important;
+  }
+
+  &.mode-mobile-header {
+    width: 8px !important;
+    height: 8px !important;
+    background: var(--ti-mobile-text-muted, #ccc) !important;
+    margin-right: 2px !important;
+  }
+
+  &.mode-menu-item {
+    width: 6px !important;
+    height: 6px !important;
+  }
+
+  &.mode-compact {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  // Type Colors
+  &.translating {
+    background: #4a90e2 !important; // Blue
+    &.mode-mobile-header { background: var(--ti-mobile-accent, #4a90e2) !important; }
+    .status-pulse-glow { background: #4a90e2 !important; }
+  }
+
+  &.auto {
+    background: #9c27b0 !important; // Purple
+    .status-pulse-glow { background: #9c27b0 !important; }
+  }
+
+  &.completed {
+    background: #4caf50 !important; // Green
+    &.mode-mobile-header { 
+      background: #845ef7 !important; // برای موبایل بنفش می‌گذاریم چون در موبایل سبز برای چیز دیگری است
+      box-shadow: 0 0 0 2px rgba(132, 94, 247, 0.2) !important; 
+    }
+  }
+
+  &.error {
+    background: #f44336 !important; // Red
+    &.mode-mobile-header { background: var(--ti-mobile-error, #f44336) !important; }
+  }
+
+  // Internal Elements
+  .status-inner-dot {
+    width: 40% !important;
+    height: 40% !important;
+    background-color: white !important;
+    border-radius: 50% !important;
+    z-index: 2 !important;
+  }
+
+  .status-pulse-glow {
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 50% !important;
+    z-index: 1 !important;
+    opacity: 0.6 !important;
+    animation: ti-status-pulse 1.5s infinite ease-in-out !important;
+  }
+}
+
+@keyframes ti-status-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
