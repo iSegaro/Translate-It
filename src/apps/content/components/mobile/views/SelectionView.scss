@@ -185,6 +185,20 @@
   height: 22px !important;
   opacity: 0.5 !important;
   filter: var(--ti-mobile-icon-filter) !important;
+  transition: opacity 0.2s ease !important;
+}
+
+/* Dark Mode Overrides */
+.ti-m-selection-view.is-dark {
+  .ti-m-close-icon {
+    filter: invert(1) !important; /* روشن کردن ضربدر بدون سفید کردن پس‌زمینه */
+    opacity: 0.8 !important;      /* کمی روشن‌تر برای خوانایی بهتر */
+  }
+
+  .ti-m-swap-icon {
+    filter: invert(1) !important;
+    opacity: 0.6 !important;
+  }
 }
 
 @keyframes spin-mobile { 
