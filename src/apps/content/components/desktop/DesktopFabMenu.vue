@@ -74,12 +74,6 @@
                 class="fab-menu-icon"
                 :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
               >
-
-              <!-- Status Dot for Active Translation in Menu -->
-              <PageTranslationStatus 
-                v-if="item.id === 'page_translating'" 
-                mode="menu-item"
-              />
             </div>
             <span 
               class="fab-menu-item-text"
