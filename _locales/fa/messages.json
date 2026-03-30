@@ -545,6 +545,9 @@
   "desktop_fab_translate_selection_label": {
     "message": "ترجمه متن انتخاب شده"
   },
+  "desktop_fab_translating_label": {
+    "message": "در حال ترجمه..."
+  },
   "desktop_fab_stop_auto_translating_label": {
     "message": "توقف ترجمه خودکار"
   },

@@ -46,12 +46,28 @@
           >
             <div 
               class="menu-icon-wrapper"
+              :class="item.statusClass"
               :style="{ 
                 marginRight: side === 'right' ? '10px !important' : '0 !important', 
                 marginLeft: side === 'left' ? '10px !important' : '0 !important', 
                 order: side === 'left' ? 2 : 0
               }" 
             >
+              <!-- Circle Progress for Page Translation -->
+              <svg v-if="item.showProgress" class="fab-circle-progress" viewBox="0 0 32 32">
+                <circle class="progress-bg" cx="16" cy="16" r="14" fill="none" stroke-width="3" />
+                <circle 
+                  class="progress-fill" 
+                  cx="16" 
+                  cy="16" 
+                  r="14" 
+                  fill="none" 
+                  stroke-width="3" 
+                  stroke-dasharray="88" 
+                  :stroke-dashoffset="88 - (88 * item.percent) / 100" 
+                />
+              </svg>
+
               <img 
                 v-if="item.icon" 
                 :src="item.icon" 
@@ -74,7 +90,11 @@
     <!-- Main Button -->
     <div
       class="desktop-fab-button"
-      :class="{ 'is-open': isMenuOpen, 'is-dragging': isDragging }"
+      :class="{ 
+        'is-open': isMenuOpen, 
+        'is-dragging': isDragging,
+        'has-status': pageTranslationStatus.isActive
+      }"
       :title="t('desktop_fab_tooltip')"
       :style="mainButtonStyle"
       @mousedown="startDrag"
@@ -82,7 +102,19 @@
     >
       <img :src="IconExtension" :alt="t('desktop_fab_alt')">
 
-      <!-- Pending Selection Badge -->
+      <!-- Page Translation Status Badge (Bottom) -->
+      <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+        <div 
+          v-if="pageTranslationStatus.isActive"
+          class="fab-page-status-badge"
+          :class="pageTranslationStatus.classes"
+        >
+          <div class="status-pulse-glow"></div>
+          <div class="status-inner-dot"></div>
+        </div>
+      </Transition>
+
+      <!-- Pending Selection Badge (Top) -->
       <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
         <div 
           v-if="pendingSelection.hasSelection && (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled)"
@@ -161,7 +193,7 @@ import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
 import IconRevert from '@/icons/ui/revert.png';
 import IconRestore from '@/icons/ui/restore.svg';
-import IconClear from '@/icons/ui/clear.png';
+import IconHourglass from '@/icons/ui/hourglass.png';
 import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
 import IconTTS from '@/icons/ui/speaker.png';
@@ -261,28 +293,20 @@ const menuItems = computed(() => {
     }
   });
 
-  const pageData = mobileStore.pageTranslationData;
-  const isCurrentlyBusy = pageData.status === TRANSLATION_STATUS.TRANSLATING;
-  const isDone = pageData.totalCount > 0 && pageData.translatedCount >= pageData.totalCount;
+  const status = pageTranslationStatus.value;
 
-  if (isCurrentlyBusy) {
-    const percent = pageData.totalCount > 0 ? Math.round((pageData.translatedCount / pageData.totalCount) * 100) : 0;
+  if (status.isTranslating || status.isAuto) {
     items.push({
       id: 'page_translating',
-      label: `${percent}% - ${t('desktop_fab_stop_auto_translating_label')}`,
-      icon: IconClear,
+      label: status.isTranslating ? t('desktop_fab_translating_label') : t('desktop_fab_stop_auto_translating_label'),
+      icon: IconHourglass,
+      showProgress: true,
+      percent: status.percent,
+      statusClass: status.classes[0],
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
-  } else if (pageData.isAutoTranslating) {
-    items.push({
-      id: 'stop_auto',
-      label: t('desktop_fab_stop_auto_translating_label'),
-      icon: IconClear,
-      closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
-    });
-  } else if (pageData.isTranslated || isDone) {
+  } else if (status.isCompleted) {
     items.push({
       id: 'restore_page',
       label: t('desktop_fab_restore_original_label'),
@@ -304,6 +328,31 @@ const menuItems = computed(() => {
 });
 
 const isTTSActive = computed(() => pendingSelection.value.hasSelection || tts.isPlaying.value);
+
+// Page Translation Status & Progress Logic
+const pageTranslationStatus = computed(() => {
+  const data = mobileStore.pageTranslationData;
+  const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
+  const isAuto = data.isAutoTranslating;
+  const isCompleted = data.totalCount > 0 && data.translatedCount >= data.totalCount;
+  
+  const isActive = isTranslating || isAuto || isCompleted;
+  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
+  
+  let statusClass = '';
+  if (isTranslating) statusClass = 'is-translating';
+  else if (isAuto) statusClass = 'is-auto';
+  else if (isCompleted) statusClass = 'completed';
+
+  return {
+    isActive,
+    isTranslating,
+    isAuto,
+    isCompleted,
+    percent,
+    classes: [statusClass]
+  };
+});
 
 const verticalPos = ref(-1);
 const userPreferredY = ref(null);

@@ -54,6 +54,12 @@
       background-color: #357abd !important;
     }
 
+    &.has-status {
+      img {
+        transform: scale(0.85) translateY(-2px) !important;
+      }
+    }
+
     img {
       width: 32px !important;
       height: 32px !important;
@@ -95,6 +101,47 @@
       animation: pulse-glow 1.5s infinite ease-in-out !important;
       z-index: 0 !important;
       pointer-events: none !important;
+    }
+  }
+
+  // Page Translation Status Badge (Bottom)
+  .fab-page-status-badge {
+    position: absolute !important;
+    bottom: 6px !important;
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 2147483647 !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+
+    // Status Colors
+    &.is-translating { background: #4a90e2 !important; .status-pulse-glow { background: #4a90e2 !important; } }
+    &.is-auto { background: #9c27b0 !important; .status-pulse-glow { background: #9c27b0 !important; } }
+    &.completed { background: #4caf50 !important; }
+
+    .status-inner-dot {
+      width: 4px !important;
+      height: 4px !important;
+      background-color: white !important;
+      border-radius: 50% !important;
+      z-index: 1 !important;
+    }
+
+    .status-pulse-glow {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      border-radius: 50% !important;
+      animation: pulse-glow 1.5s infinite ease-in-out !important;
+      z-index: 0 !important;
+      opacity: 0.6 !important;
     }
   }
 
@@ -181,6 +228,29 @@
         flex-shrink: 0 !important;
         border-radius: 7px !important;
         transition: all 0.2s ease !important;
+        position: relative !important;
+
+        .fab-circle-progress {
+          position: absolute !important;
+          top: -2px !important;
+          left: -2px !important;
+          width: 32px !important;
+          height: 32px !important;
+          transform: rotate(-90deg) !important;
+          z-index: 0 !important;
+
+          .progress-bg {
+            stroke: rgba(0, 0, 0, 0.05) !important;
+          }
+
+          .progress-fill {
+            transition: stroke-dashoffset 0.4s ease !important;
+          }
+        }
+
+        &.is-translating .progress-fill { stroke: #4a90e2 !important; }
+        &.is-auto .progress-fill { stroke: #9c27b0 !important; }
+        &.completed .progress-fill { stroke: #4caf50 !important; }
       }
 
       .fab-menu-icon {
