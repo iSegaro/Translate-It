@@ -52,15 +52,21 @@
 
     <!-- State: Translating or Auto-Translating -->
     <template v-if="isTranslating || isAutoTranslating">
-      <a
-        v-if="textOnly"
-        href="#"
-        class="toolbar-link loading"
-        :class="{ 'is-active': isAutoTranslating }"
-        @click.prevent="handleCancelOrStop"
-      >
-        {{ t('page_translation_btn_stop') || 'Stop Translating' }}
-      </a>
+      <div v-if="textOnly" class="ti-text-status-wrapper">
+        <a
+          href="#"
+          class="toolbar-link loading"
+          :class="{ 'is-active': isAutoTranslating }"
+          @click.prevent="handleCancelOrStop"
+        >
+          <PageTranslationStatus 
+            :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
+            mode="compact"
+            class="ti-text-status-badge"
+          />
+          {{ t('page_translation_btn_stop') || 'Stop Translating' }}
+        </a>
+      </div>
       <BaseButton
         v-else
         :variant="compact ? 'ghost' : 'primary'"
@@ -68,25 +74,26 @@
         :class="{ 'is-compact-icon': compact, 'is-active': isAutoTranslating }"
         @click="handleCancelOrStop"
       >
-        <LoadingSpinner
-          v-if="isTranslating || isAutoTranslating"
-          size="sm"
-          variant="neutral"
-        />
+        <!-- Shared Status Indicator for Popup/Sidepanel -->
+        <div class="ti-btn-status-container">
+          <LoadingSpinner
+            v-if="isTranslating || isAutoTranslating"
+            size="sm"
+            variant="neutral"
+          />
+          <PageTranslationStatus 
+            :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
+            mode="compact"
+            class="ti-btn-status-badge"
+          />
+        </div>
+
         <img
           v-if="compact && !isTranslating && !isAutoTranslating"
           :src="browser.runtime.getURL('icons/ui/whole-page.png')"
           class="toolbar-icon"
           alt="Stop"
         >
-
-        <!-- Shared Status Indicator for Popup/Sidepanel -->
-        <PageTranslationStatus 
-          v-if="isTranslating || isAutoTranslating"
-          :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
-          mode="compact"
-        />
-
         <Icon
           v-else-if="!compact && !isTranslating && !isAutoTranslating"
           icon="fa6-solid:language"
@@ -310,8 +317,28 @@ export default {
   border-radius: 4px;
 }
 
+.ti-btn-status-container {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ti-btn-status-badge {
+  position: absolute !important;
+  bottom: -4px !important;
+  right: -4px !important;
+  z-index: 10 !important;
+}
+
+.ti-text-status-wrapper {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
 /* Toolbar link style to match PopupHeader */
 .toolbar-link {
+  position: relative !important; // برای پوزیشن‌دهی نشانگر داخلی
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -325,6 +352,14 @@ export default {
   background-color: transparent;
   font-size: 13px;
   white-space: nowrap;
+
+  // نشانگر وضعیت روی متن
+  .ti-text-status-badge {
+    position: absolute !important;
+    top: 0px !important;
+    left: 2px !important;
+    z-index: 1 !important;
+  }
 }
 
 .toolbar-link:hover {
