@@ -98,6 +98,7 @@ createThemeTransition(() => settingsStore.settings?.THEME, {
   padding: $spacing-sm $spacing-xl $spacing-xl; /* Increased top padding to 10px (spacing-sm) */
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable; // Prevent layout shift when scrollbar appears
   position: relative;
   scroll-behavior: smooth;
   box-sizing: border-box;
