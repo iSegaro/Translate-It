@@ -122,7 +122,13 @@ const onDragEnd = (e) => {
 
 // Watch for isOpen to lock/unlock body scroll
 watch(isOpen, (newValue) => {
-  if (newValue) {
+  // Check if the device has a mouse/fine pointer
+  const hasMouse = window.matchMedia('(pointer: fine)').matches;
+  
+  // Only lock scroll if:
+  // 1. It is open
+  // 2. We are NOT on a device with a mouse (Desktop/Laptop)
+  if (newValue && !hasMouse) {
     document.body.style.overflow = 'hidden'
     document.body.style.touchAction = 'none'
   } else {
