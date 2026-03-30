@@ -320,11 +320,11 @@ const checkBounds = () => {
 
 const containerStyle = computed(() => {
   let opacityValue = ANIMATION_CONFIG.OPACITY_FULL;
-  if (isFaded.value && !isHovered.value && !isMenuOpen.value) {
+  if (isFaded.value && !isHovered.value && !isMenuOpen.value && !isDragging.value) {
     opacityValue = ANIMATION_CONFIG.OPACITY_DIMMED; 
   }
 
-  const isActive = isHovered.value || isMenuOpen.value;
+  const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
   const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
   const easing = ANIMATION_CONFIG.SOFT_EASING;
   
@@ -355,7 +355,7 @@ const containerStyle = computed(() => {
 
 const mainButtonStyle = computed(() => {
   const isRight = side.value === 'right';
-  const isActive = isHovered.value || isMenuOpen.value;
+  const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
   const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
   
   return {
@@ -433,7 +433,8 @@ const onDrag = (e) => {
     const dx = e.clientX - startX;
     if (Math.abs(dy) > 5 || Math.abs(dx) > 10) {
       isDragging.value = true;
-      isMenuOpen.value = false;
+      isFaded.value = false; // Stay visible while dragging
+      // Do not force close the menu here
     }
   }
   if (isDragging.value) {
