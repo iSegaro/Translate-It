@@ -1,0 +1,162 @@
+/* src/components/popup/PopupHeader.scss */
+@use "@/assets/styles/base/variables" as *;
+@use "@/assets/styles/base/mixins" as *;
+
+.ti-header-toolbar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding: 8px clamp(8px, 3vw, 16px) !important;
+  background-color: var(--header-bg-color, #f8f9fa) !important;
+  border-bottom: 1px solid var(--header-border-color, #dee2e6) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: clamp(50px, 10vh, 64px) !important;
+  gap: 8px !important;
+  
+  // Force LTR and Row direction
+  direction: ltr !important;
+  flex-direction: row !important;
+
+  /* Explicit Ordering to guarantee placement */
+  
+  .ti-page-translate-btn {
+    order: 1 !important; // اول از چپ
+  }
+
+  .ti-header-spacer {
+    order: 2 !important;
+    flex: 1 1 auto !important;
+  }
+
+  .ti-switch {
+    order: 3 !important;
+  }
+
+  .ti-btn-settings {
+    order: 4 !important;
+  }
+
+  .ti-btn-revert {
+    order: 5 !important;
+  }
+
+  .ti-btn-clear {
+    order: 6 !important;
+  }
+
+  .ti-btn-select {
+    order: 7 !important;
+  }
+
+  .ti-btn-sidepanel {
+    order: 8 !important; // آخر از سمت راست
+  }
+
+  /* Responsive Wrap for very small screens */
+  @media (max-width: 380px) {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 12px !important;
+
+    .ti-header-spacer {
+      display: none !important;
+    }
+    
+    .ti-page-translate-btn {
+      width: 100% !important;
+      display: flex !important;
+      justify-content: center !important;
+    }
+  }
+}
+
+/* Toggle Switch Styles */
+.ti-switch {
+  position: relative !important;
+  display: inline-block !important;
+  width: clamp(44px, 12vw, 56px) !important;
+  height: clamp(24px, 6vw, 30px) !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  margin-right: 4px !important;
+
+  input {
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+
+    &:checked + .ti-slider {
+      background-color: #4caf50 !important;
+      
+      &:before {
+        transform: translateX(calc(clamp(44px, 12vw, 56px) - clamp(18px, 5vw, 24px) - 6px)) !important;
+      }
+    }
+  }
+
+  .ti-slider {
+    position: absolute !important;
+    cursor: pointer !important;
+    inset: 0 !important;
+    background-color: #ccc !important;
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border-radius: 30px !important;
+
+    &:before {
+      position: absolute !important;
+      content: "" !important;
+      height: clamp(18px, 5vw, 24px) !important;
+      width: clamp(18px, 5vw, 24px) !important;
+      left: 3px !important;
+      bottom: 3px !important;
+      background-color: white !important;
+      transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      border-radius: 50% !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+  }
+}
+
+/* Overrides for IconButton */
+.ti-toolbar-button {
+  width: clamp(38px, 9vw, 52px) !important;
+  height: clamp(38px, 9vw, 52px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  flex-shrink: 0 !important;
+  background-color: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+
+  &:hover {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
+    transform: scale(1.05) !important;
+  }
+}
+
+.ti-toolbar-icon {
+  width: clamp(22px, 6vw, 30px) !important;
+  height: clamp(22px, 6vw, 30px) !important;
+  filter: var(--icon-filter, none) !important;
+  opacity: var(--icon-opacity, 0.8) !important;
+}
+
+// PageTranslationButton link
+.ti-header-toolbar .toolbar-link {
+  font-size: clamp(14px, 4.5vw, 16px) !important;
+  font-weight: 600 !important;
+  padding: 8px 16px !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
+  color: var(--toolbar-link-color, #007bff) !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
