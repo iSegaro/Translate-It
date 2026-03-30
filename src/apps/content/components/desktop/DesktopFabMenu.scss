@@ -290,7 +290,8 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
     }
 
-    .fab-settings-badge img {
+    .fab-settings-badge img,
+    .fab-tts-badge img {
       filter: brightness(0) invert(1) !important;
     }
   }

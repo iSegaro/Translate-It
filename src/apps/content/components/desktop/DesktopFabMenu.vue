@@ -132,7 +132,7 @@
           v-else
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
-          :style="{ filter: (tts.isPlaying.value || settingsStore.isDarkTheme) ? 'brightness(0) invert(1) !important' : 'none !important' }"
+          :style="{ filter: tts.isPlaying.value ? 'brightness(0) invert(1) !important' : '' }"
         >
       </div>
     </Transition>
