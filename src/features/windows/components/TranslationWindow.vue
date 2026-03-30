@@ -14,7 +14,7 @@
     <LoadingSpinner
       :type="'animated'"
       size="lg"
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+      class="ti-loading-spinner-wrapper"
     />
   </div>
 
@@ -30,25 +30,20 @@
     @mousedown.stop
     @click.stop
   >
-    <!-- Provider Selector positioned absolutely to avoid header overflow clipping -->
-    <ProviderSelector
-      v-if="props.provider"
-      :model-value="props.provider"
-      mode="icon-only"
-      :is-global="false"
-      class="ti-window-provider-selector"
-      @update:model-value="handleProviderChange"
-      @mousedown.stop
-    />
     <div
       class="ti-window-header"
       @mousedown="handleStartDrag"
       @touchstart="handleStartDrag"
     >
       <div class="ti-header-actions">
-        <div
-          class="ti-provider-placeholder"
-          style="width: 28px; height: 28px; flex: 0 0 28px;"
+        <ProviderSelector
+          v-if="props.provider"
+          :model-value="props.provider"
+          mode="icon-only"
+          :is-global="false"
+          class="ti-window-provider-selector"
+          @update:model-value="handleProviderChange"
+          @mousedown.stop
         />
         <button
           class="ti-action-btn"
@@ -182,6 +177,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+
+// Import adjacent SCSS
+import './TranslationWindow.scss';
 
 // i18n
 const { t } = useUnifiedI18n();
@@ -351,33 +349,3 @@ const handleStartDrag = (event) => {
   tracker.addEventListener(document, 'touchend', customStopDrag, { once: true });
 };
 </script>
-
-<style lang="scss" scoped>
-.ti-window { 
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important; 
-  overflow: hidden !important; 
-  display: flex !important; 
-  flex-direction: column !important; 
-  z-index: 2147483647 !important;
-}
-.ti-window.light { background-color: #ffffff !important; color: #2c3e50 !important; border: 1px solid #e8e8e8 !important; }
-.ti-window.dark { background-color: #2d2d2d !important; color: #e0e0e0 !important; border: 1px solid #424242 !important; }
-.ti-window-header { display: flex !important; align-items: center !important; justify-content: space-between !important; padding: 8px 12px !important; cursor: move !important; user-select: none !important; }
-.ti-window.light .ti-window-header { background-color: #f7f7f7 !important; border-bottom: 1px solid #e8e8e8 !important; }
-.ti-window.light .ti-action-btn { background-color: #f0f0f0 !important; color: #555 !important; }
-.ti-window.dark .ti-window-header { background-color: #333333 !important; border-bottom: 1px solid #424242 !important; }
-.ti-window.dark .ti-action-btn { background-color: #424242 !important; color: #e0e0e0 !important; }
-.ti-header-actions { display: flex; align-items: center; gap: 8px; }
-.ti-header-close { display: flex; align-items: center; }
-.ti-action-btn { display: flex !important; align-items: center !important; justify-content: center !important; width: 28px !important; height: 28px !important; border: none !important; border-radius: 6px !important; cursor: pointer !important; transition: background-color 0.2s ease !important; }
-.ti-action-btn:hover { background: rgba(255, 255, 255, 0.1); }
-.ti-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.ti-action-btn.ti-original-visible { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; color: #1e40af !important; }
-.ti-smart-tts-btn { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important; position: relative; }
-.ti-smart-tts-btn.ti-original-mode { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
-.ti-smart-tts-btn:not(.ti-original-mode) { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important; }
-.ti-window-body { padding: 16px !important; min-height: 100px !important; display: flex !important; flex-direction: column !important; }
-.ti-window-translation-display { flex: 1; min-height: 80px; position: relative; contain: layout style; overflow: clip; min-width: 0; width: 100%; }
-.ti-window.loading-window { width: 60px !important; height: 40px !important; border-radius: 20px !important; display: flex !important; align-items: center !important; justify-content: center !important; background: #fff !important; border: 1px solid rgba(0, 0, 0, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important; }
-.ti-window.dark.loading-window { background: #333 !important; border-color: #444 !important; }
-</style>

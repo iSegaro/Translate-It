@@ -118,11 +118,9 @@
     flex-direction: column; // Ensure proper layout for scrollable content
   }
 
-  // Absolute position for provider selector to escape header clipping
+  // Relative position for provider selector to follow flex flow in header actions
   .ti-window-provider-selector {
-    position: absolute !important;
-    top: 8px !important;
-    left: 12px !important;
+    position: relative !important;
     z-index: 10001 !important;
     width: 28px !important;
     height: 28px !important;
