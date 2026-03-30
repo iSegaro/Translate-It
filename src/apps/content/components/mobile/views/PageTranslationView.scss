@@ -81,8 +81,13 @@
   }
   
   &.completed { 
-    background: var(--ti-mobile-success) !important; 
-    box-shadow: 0 0 0 2px rgba(81, 207, 102, 0.2) !important; 
+    background: #845ef7 !important; /* بنفش برای ترجمه عادی تمام شده (متمایز از آبی و سبز) */
+    box-shadow: 0 0 0 2px rgba(132, 94, 247, 0.2) !important; 
+    
+    &.is-auto {
+      background: var(--ti-mobile-success) !important; /* سبز برای ترجمه خودکار فعال */
+      box-shadow: 0 0 0 2px rgba(81, 207, 102, 0.2) !important; 
+    }
   }
   
   &.error { 

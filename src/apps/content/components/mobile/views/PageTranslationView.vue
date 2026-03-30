@@ -31,7 +31,7 @@
         <div class="ti-m-header-status-row" @click="goToDashboard">
           <span
             class="ti-m-status-dot"
-            :class="pageTranslationData.status"
+            :class="pageTranslationData.isAutoTranslating ? ['completed', 'is-auto'] : [pageTranslationData.status]"
           />
           <span class="ti-m-header-title">{{ statusMessage }}</span>
         </div>
