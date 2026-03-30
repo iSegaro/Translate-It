@@ -173,6 +173,7 @@ onUnmounted(() => {
 
 .interface-locale-selector {
   width: 100%;
+  position: relative;
 }
 
 /* Common Styles */
@@ -345,40 +346,55 @@ onUnmounted(() => {
 
 /* Tablet responsive: make it fit in the header when in dropdown mode */
 @media (max-width: 1024px) {
+  .interface-locale-selector {
+    width: fit-content !important;
+    margin-inline-start: auto; /* Push to end in flex containers if needed */
+  }
+
   .dropdown {
+    /* In mobile header, we keep layout consistent regardless of RTL */
     .dropdown-toggle-btn {
       padding: var(--spacing-xs) var(--spacing-sm);
-      min-width: 130px;
+      min-width: 110px; // Reduced from 130px for a more compact look
+      width: auto !important; // Allow content-based width
       height: 36px;
       border: none;
       background: transparent;
-      justify-content: flex-start;
-      gap: var(--spacing-base);
+      display: flex !important;
+      justify-content: space-between !important;
+      flex-direction: row !important; /* Force LTR direction for button layout */
 
       &:hover {
         background: rgba(var(--color-primary-rgb), 0.1);
       }
     }
 
-    /* In mobile header, we keep layout consistent regardless of RTL */
-    .dropdown-toggle-btn {
-      justify-content: flex-start;
-      flex-direction: row !important; /* Force LTR direction for button layout */
-    }
-
     .current-locale-content {
       flex-direction: row !important;
     }
-    
+
     .selected-locale-name {
       font-size: var(--font-size-sm);
     }
 
     .dropdown-menu {
-      position: absolute;
-      width: 160px;
-      right: 0;
-      left: auto !important; /* Always align to right edge of button in header */
+      // In mobile header, it will match the button width via left:0, right:0
+      min-width: 100% !important;
+      width: 100% !important;
+      left: 0 !important;
+      right: 0 !important;
+      overflow-x: hidden !important;
+    }
+
+    .dropdown-item {
+      max-width: 100% !important;
+      overflow: hidden !important;
+      
+      .locale-name {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
     }
   }
 }
