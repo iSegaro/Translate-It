@@ -46,7 +46,6 @@
           >
             <div 
               class="menu-icon-wrapper"
-              :class="item.statusClass"
               :style="{ 
                 marginRight: side === 'right' ? '10px !important' : '0 !important', 
                 marginLeft: side === 'left' ? '10px !important' : '0 !important', 
@@ -75,6 +74,12 @@
                 class="fab-menu-icon"
                 :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
               >
+
+              <!-- Status Dot for Active Translation in Menu -->
+              <PageTranslationStatus 
+                v-if="item.id === 'page_translating'" 
+                mode="menu-item"
+              />
             </div>
             <span 
               class="fab-menu-item-text"
@@ -104,14 +109,10 @@
 
       <!-- Page Translation Status Badge (Bottom) -->
       <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
-        <div 
-          v-if="pageTranslationStatus.isActive"
-          class="fab-page-status-badge"
-          :class="pageTranslationStatus.classes"
-        >
-          <div class="status-pulse-glow"></div>
-          <div class="status-inner-dot"></div>
-        </div>
+        <PageTranslationStatus 
+          v-if="pageTranslationStatus.isActive" 
+          mode="desktop-fab" 
+        />
       </Transition>
 
       <!-- Pending Selection Badge (Top) -->
@@ -187,6 +188,7 @@ import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/c
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import useFabSelection from '@/apps/content/composables/useFabSelection.js';
+import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
@@ -302,7 +304,6 @@ const menuItems = computed(() => {
       icon: IconHourglass,
       showProgress: true,
       percent: status.percent,
-      statusClass: status.classes[0],
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
     });
@@ -339,18 +340,12 @@ const pageTranslationStatus = computed(() => {
   const isActive = isTranslating || isAuto || isCompleted;
   const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
   
-  let statusClass = '';
-  if (isTranslating) statusClass = 'is-translating';
-  else if (isAuto) statusClass = 'is-auto';
-  else if (isCompleted) statusClass = 'completed';
-
   return {
     isActive,
     isTranslating,
     isAuto,
     isCompleted,
-    percent,
-    classes: [statusClass]
+    percent
   };
 });
 
