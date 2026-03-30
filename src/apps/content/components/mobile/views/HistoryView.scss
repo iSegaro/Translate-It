@@ -93,6 +93,25 @@
   height: 100% !important;
   cursor: pointer !important;
   -webkit-appearance: none !important;
+  background-color: var(--ti-mobile-bg) !important;
+  color: var(--ti-mobile-text) !important;
+
+  option {
+    background-color: var(--ti-mobile-bg) !important;
+    color: var(--ti-mobile-text) !important;
+  }
+}
+
+/* Dark Mode Specific Overrides for Native Select */
+.ti-m-history-view.is-dark {
+  .ti-m-native-select {
+    color-scheme: dark !important; /* به مرورگر می‌گوید که از تم تیره برای منوهای بومی استفاده کند */
+    
+    option {
+      background-color: #2d2d2d !important;
+      color: #ffffff !important;
+    }
+  }
 }
 
 .ti-m-clear-all-btn {
