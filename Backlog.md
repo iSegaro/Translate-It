@@ -5,7 +5,6 @@ List of features, enhancements, and ideas planned for future development.
 ## Features and Enhancements
 
 - **PDF Support**: Enable direct translation of text within PDF files.
-- در Page Translation وقتی Tooltip برای نمایش متن اصلی نمایش داده می شود، خط‌های خالی بین متون قرار داره
 - اختیاری کردن ESC Key برای Select Element
 
 ---
