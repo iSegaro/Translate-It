@@ -9,7 +9,7 @@
   z-index: 2147483647 !important;
   max-height: min(450px, 85vh) !important;
   max-width: min(400px, 90vw) !important;
-  overflow: hidden !important; // Critical to contain the body scroll
+  overflow: visible !important; // Changed from hidden to allow dropdowns to pop out
 
   // Theme: Light
   &.light {
