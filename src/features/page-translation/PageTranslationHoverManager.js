@@ -90,31 +90,49 @@ export class PageTranslationHoverManager extends ResourceTracker {
   _getOriginalText(element) {
     const textParts = [];
 
-    // 1. Gather all text nodes within the element
-    // We traverse all text nodes to reconstruct the full original text.
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    // 1. Gather text nodes and handle BR tags for line breaks
+    // We use a custom filter to catch both Text nodes and BR elements.
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode(node) {
+          if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+          if (node.nodeName === 'BR') return NodeFilter.FILTER_ACCEPT;
+          return NodeFilter.FILTER_SKIP;
+        }
+      },
+      false
+    );
+
     let node;
     while ((node = walker.nextNode())) {
-      const original = pageTranslationLookup.get(node);
-      // Use original text if translated, otherwise use current text to keep continuity
-      const content = original !== undefined ? original : node.textContent;
-      if (content) {
-        textParts.push(content);
+      if (node.nodeType === Node.TEXT_NODE) {
+        const original = pageTranslationLookup.get(node);
+        // Use original text if translated, otherwise use current text to keep continuity
+        const content = original !== undefined ? original : node.textContent;
+        if (content) {
+          // Normalize internal whitespace of each node to avoid HTML formatting noise
+          textParts.push(content.replace(/\s+/g, ' '));
+        }
+      } else if (node.nodeName === 'BR') {
+        // Explicitly handle line breaks from the original page
+        textParts.push('\n');
       }
     }
 
-    // Join text parts and normalize whitespace (collapse multiple spaces/newlines into one)
+    // 2. Join parts and perform final cleanup
+    // Collapse multiple spaces but preserve the newlines we explicitly added for BRs
     const mainText = textParts.join('')
-      .replace(/\s+/g, ' ')
+      .replace(/ +/g, ' ')
       .trim();
     
     const finalLines = [];
-    
     if (mainText) {
       finalLines.push(mainText);
     }
 
-    // 2. Check attributes (e.g., title, alt) - these should remain on separate lines
+    // 3. Check attributes (e.g., title, alt) - these should remain on separate lines
     if (element.attributes) {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
