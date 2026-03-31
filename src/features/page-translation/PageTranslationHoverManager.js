@@ -88,30 +88,44 @@ export class PageTranslationHoverManager extends ResourceTracker {
   }
 
   _getOriginalText(element) {
-    let texts = [];
+    const textParts = [];
 
-    // 1. Check child text nodes
+    // 1. Gather all text nodes within the element
+    // We traverse all text nodes to reconstruct the full original text.
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
       const original = pageTranslationLookup.get(node);
-      if (original) {
-        texts.push(original);
+      // Use original text if translated, otherwise use current text to keep continuity
+      const content = original !== undefined ? original : node.textContent;
+      if (content) {
+        textParts.push(content);
       }
     }
 
-    // 2. Check attributes
+    // Join text parts and normalize whitespace (collapse multiple spaces/newlines into one)
+    const mainText = textParts.join('')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    const finalLines = [];
+    
+    if (mainText) {
+      finalLines.push(mainText);
+    }
+
+    // 2. Check attributes (e.g., title, alt) - these should remain on separate lines
     if (element.attributes) {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
         const original = pageTranslationLookup.get(attr);
         if (original) {
-          texts.push(`[${attr.name}]: ${original}`);
+          finalLines.push(`[${attr.name}]: ${original}`);
         }
       }
     }
 
-    return texts.filter(t => t.trim()).join('\n');
+    return finalLines.join('\n');
   }
 }
 
