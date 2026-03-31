@@ -22,11 +22,20 @@ import contentAppStyles from '@/assets/styles/content-app-global.scss?inline';
 
 /**
  * AUTOMATED CSS GLOB IMPORT SYSTEM
- * This eagerly imports standalone SCSS files from the components and apps folders.
+ * Eagerly imports standalone SCSS files for components rendered in the Shadow DOM.
+ * We use a strict whitelist to prevent bloating the host page with unnecessary styles.
  */
 const standaloneStyles = import.meta.glob([
-  '@/apps/content/**/*.scss',
-  '@/components/**/*.scss',
+  // 1. Core UI components injected into the content script (FAB, Tooltip, etc.)
+  '@/apps/content/components/**/*.scss',
+  
+  // 2. Shared UI components (Status indicators, etc.) used in both Shadow DOM and Extension pages
+  '@/components/shared/**/*.scss',
+  
+  // 3. Feature-specific UI components (Translation results, Result windows, etc.)
+  '@/features/**/components/**/*.scss',
+  
+  // EXCLUSION: Skip Sass partials (files starting with _) as they are only for @use
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
