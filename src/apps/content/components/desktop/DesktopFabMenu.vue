@@ -341,9 +341,18 @@ const pageTranslationStatus = computed(() => {
   const data = mobileStore.pageTranslationData;
   const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
   const isAuto = data.isAutoTranslating;
-  const isCompleted = data.totalCount > 0 && data.translatedCount >= data.totalCount;
   
-  const isActive = isTranslating || isAuto || isCompleted;
+  // A page is considered "Completed" (for UI purposes) if it's fully translated, 
+  // marked as completed, OR has some partial translations that can be restored.
+  const isCompleted = !isTranslating && !isAuto && (
+    data.isTranslated || 
+    data.status === TRANSLATION_STATUS.COMPLETED || 
+    (data.totalCount > 0 && data.translatedCount >= data.totalCount)
+  );
+  
+  const isError = data.status === TRANSLATION_STATUS.ERROR;
+  
+  const isActive = isTranslating || isAuto || isCompleted || isError;
   const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
   
   return {
@@ -351,6 +360,7 @@ const pageTranslationStatus = computed(() => {
     isTranslating,
     isAuto,
     isCompleted,
+    isError,
     percent
   };
 });

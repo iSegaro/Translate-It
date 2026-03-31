@@ -250,8 +250,17 @@ export function usePageTranslation() {
   /**
    * Handle auto-restore complete (just stopped auto-translation)
    */
-  function handleAutoRestoreComplete() {
+  function handleAutoRestoreComplete(data) {
     isAutoTranslating.value = false;
+    isTranslating.value = false;
+    
+    // Determine if the page remains translated
+    if (data && data.isTranslated !== undefined) {
+      isTranslated.value = !!data.isTranslated;
+    } else if (data && data.translatedCount !== undefined) {
+      isTranslated.value = data.translatedCount > 0;
+    }
+    
     message.value = 'Auto-translation stopped';
   }
 
@@ -261,6 +270,7 @@ export function usePageTranslation() {
   function handleCancelled() {
     isTranslating.value = false;
     isAutoTranslating.value = false;
+    isTranslated.value = false; // Cancel usually implies restore
     message.value = 'Translation cancelled';
   }
 
@@ -304,7 +314,7 @@ export function usePageTranslation() {
         handleRestoreComplete(message.data || {});
         break;
       case MessageActions.PAGE_AUTO_RESTORE_COMPLETE:
-        handleAutoRestoreComplete();
+        handleAutoRestoreComplete(message.data || {});
         break;
       case MessageActions.PAGE_TRANSLATE_CANCELLED:
         handleCancelled();
@@ -345,7 +355,7 @@ export function usePageTranslation() {
     pageEventBus.on('page-restore-complete', restoreCompleteListener);
 
     // Auto restore complete
-    autoRestoreCompleteListener = () => handleAutoRestoreComplete();
+    autoRestoreCompleteListener = (data) => handleAutoRestoreComplete(data);
     pageEventBus.on(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, autoRestoreCompleteListener);
 
     // Translation cancelled
