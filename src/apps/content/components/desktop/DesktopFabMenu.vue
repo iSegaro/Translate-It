@@ -145,10 +145,12 @@
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
+        :class="{ 'is-playing': isThisTTSActive && tts.isPlaying.value }"
         :title="(isThisTTSActive && tts.isPlaying.value) ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
         :style="{ 
           'bottom': '-42px !important', 
-          'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
+          'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered),
+          'background-color': (isThisTTSActive && tts.isPlaying.value) ? '#fa5252 !important' : ''
         }"
         @click.stop="handleTTS"
         @mouseenter="isTTSHovered = true"
@@ -226,10 +228,11 @@ const hoveredItemIndex = ref(-1);
 
 // Track the specific TTS request started by this component instance
 const localTTSId = ref(null);
+const isLocalLoading = ref(false);
 
 // Check if this specific instance is currently responsible for the active TTS
 const isThisTTSActive = computed(() => {
-  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value);
+  return isLocalLoading.value || (!!(localTTSId.value && tts.currentTTSId.value === localTTSId.value));
 });
 
 const isFullscreen = computed(() => mobileStore.isFullscreen);
@@ -454,12 +457,17 @@ const handleRevert = async () => {
 };
 
 const handleTTS = async () => {
-  if (isThisTTSActive.value && tts.isPlaying.value) {
+  if (isThisTTSActive.value && (tts.isPlaying.value || tts.isLoading.value)) {
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
-    const result = await tts.speak(pendingSelection.value.text);
-    if (result) {
-      localTTSId.value = tts.currentTTSId.value;
+    isLocalLoading.value = true;
+    try {
+      const result = await tts.speak(pendingSelection.value.text);
+      if (result) {
+        localTTSId.value = tts.currentTTSId.value;
+      }
+    } finally {
+      isLocalLoading.value = false;
     }
   }
 };
