@@ -412,17 +412,13 @@ const playGoogleTTSAudio = (ttsUrl) => {
       audio.onended = () => {
         clearTimeout(timeout);
         currentFirefoxAudio = null; // Clear reference when ended
-        currentTTSId = null; // Clear TTS ID when audio actually ends
-        logger.debug('Background Google TTS audio completed');
+        logger.debug('Background Google TTS audio completed (Firefox)');
 
         // Send completion event for event-driven system (Firefox)
-        // Note: Firefox completion is handled here, Chrome uses offscreen document
-        initializebrowserAPI().then(browserAPI => {
-          browserAPI.runtime.sendMessage({ action: MessageActions.GOOGLE_TTS_ENDED }).catch(() => {
-            logger.debug('Failed to send TTS ended notification (Firefox)');
-          });
-        }).catch(error => {
-          logger.debug('Could not send TTS ended event:', error.message);
+        // Note: In Firefox, we call handleGoogleTTSEnded directly because 
+        // runtime.sendMessage from background won't be caught by its own listener.
+        handleGoogleTTSEnded().catch(error => {
+          logger.error('Failed to handle TTS ended event (Firefox):', error);
         });
 
         resolve();
