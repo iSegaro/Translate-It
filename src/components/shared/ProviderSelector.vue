@@ -643,8 +643,11 @@ const toggleDropdown = () => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
         const availableHeight = window.innerHeight - rect.bottom - 16; // 16px buffer
-        // Apply a reasonable min/max range
-        dropdownMaxHeight.value = `${Math.min(400, Math.max(150, availableHeight))}px`;
+        
+        // Use a taller max-height for in-page windows (Shadow DOM) vs Popup
+        const maxLimit = props.isGlobal ? 400 : 600;
+        
+        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(150, availableHeight))}px`;
       }
       scrollToFocused();
     });
