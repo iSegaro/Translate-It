@@ -276,7 +276,8 @@ export class PageTranslationManager extends ResourceTracker {
       // We are now officially translating. 
       // We do NOT set isTranslating = false or broadcast COMPLETE here anymore, 
       // because domtranslator discovery/scheduler is asynchronous and just started.
-      this.isTranslated = true;
+      // Note: we don't set isTranslated = true yet, as no content has been processed.
+      this.isTranslated = false;
       this.isTranslating = true;
       this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
 

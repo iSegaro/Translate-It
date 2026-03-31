@@ -557,11 +557,12 @@ onMounted(async () => {
   });
 
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
+    const hasTranslations = detail.translatedCount > 0;
     mobileStore.setPageTranslation({ 
       isTranslating: false,
       isAutoTranslating: false,
-      isTranslated: detail.translatedCount > 0,
-      status: TRANSLATION_STATUS.COMPLETED
+      isTranslated: hasTranslations,
+      status: hasTranslations ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.IDLE
     });
   });
 
