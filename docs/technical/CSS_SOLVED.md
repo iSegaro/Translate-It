@@ -17,6 +17,7 @@ In `src/core/content-scripts/chunks/lazy-vue-app.js`, we use Vite's `import.meta
 const standaloneStyles = import.meta.glob([
   '@/apps/content/**/*.scss',
   '@/components/**/*.scss',
+  '@/features/**/*.scss',
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 ```

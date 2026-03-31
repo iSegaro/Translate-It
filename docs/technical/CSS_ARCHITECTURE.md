@@ -40,12 +40,12 @@ The extension operates in two distinct environments. Your choice of styling meth
 
 ### Summary Comparison
 
-| Environment | UI Type | Recommended Style Method | `!important` Required? |
-| :--- | :--- | :--- | :--- |
-| **Content Script** | Shadow DOM | **Component-Adjacent SCSS** | **Yes (Mandatory)** |
-| **Popup** | Standard Page | Standard Vue `<style scoped>` | No |
-| **Sidepanel** | Standard Page | Standard Vue `<style scoped>` | No |
-| **Options** | Standard Page | Standard Vue `<style scoped>` | No |
+| Environment | UI Type | How Styles are Loaded | `main.scss` Import Required? | `!important` Required? |
+| :--- | :--- | :--- | :--- | :--- |
+| **Content Script** | Shadow DOM | **Automated Glob Injection** | **No** (Automatic) | **Yes (Mandatory)** |
+| **Popup** | Standard Page | **Standard Bundle** | **Yes** (Manual) | No |
+| **Sidepanel** | Standard Page | **Standard Bundle** | **Yes** (Manual) | No |
+| **Options** | Standard Page | **Standard Bundle** | **Yes** (Manual) | No |
 
 ---
 
@@ -58,8 +58,11 @@ The Translate-It extension renders all UI components in a Shadow DOM. We use a *
 For every Vue component (e.g., `MyComponent.vue`), a matching SCSS file (e.g., `MyComponent.scss`) must be created in the same directory.
 
 - **Why?** Internal `<style scoped>` blocks in `.vue` files are NOT supported for Shadow DOM components because Vite's string-injection mechanism is fragile with SFC styles.
-- **Mechanism:** `src/core/content-scripts/chunks/lazy-vue-app.js` uses Vite's `import.meta.glob` to automatically discover and inject all these SCSS files into the Shadow Root at runtime.
-- **Benefit:** 100% build stability, zero manual registration, and perfect isolation.
+- **Mechanism:** `src/core/content-scripts/chunks/lazy-vue-app.js` uses a **Whitelist-based** `import.meta.glob` to automatically discover and inject SCSS files from the following performance-safe directories:
+  - `@/apps/content/components/**/*.scss` (Core content UI)
+  - `@/components/shared/**/*.scss` (Shared reusable components)
+  - `@/features/**/components/**/*.scss` (Feature-specific UI)
+- **Benefit:** 100% build stability, zero manual registration for content scripts, and prevents bloating the host page with unrelated extension styles.
 
 #### 2. Strategic !important Usage
 Inside the Shadow DOM, `!important` is **mandatory** for all visual properties. This prevents host website styles from leaking into the extension or breaking the UI via global resets (like `all: initial`).
@@ -78,6 +81,27 @@ Inside the Shadow DOM, `!important` is **mandatory** for all visual properties. 
 - **Avoid <style scoped>**: Do not write styles inside `.vue` files for content components; they will not be injected into the Shadow DOM.
 - **Avoid Inline Styles**: Minimize the use of `:style` for static visual properties.
 - **Manual Registration**: You no longer need to `@use` every component's SCSS in a global file; the system finds them automatically.
+
+---
+
+## Developer Workflow
+
+### Step 1: Create your component
+If you create `NewFeature.vue`, also create `NewFeature.scss` in the same folder.
+
+### Step 2: Write your styles
+In `NewFeature.scss`, write your styles. 
+- **CRITICAL:** Use `!important` for all visual properties if the component will be used in **Shadow DOM**.
+
+### Step 3: Registration (The "Where does it show up?" Rule)
+- **If used ONLY in Shadow DOM**:
+  - Ensure the component is within a **Whitelisted Directory** (see the *Shadow DOM Isolation* section above).
+  - The system will find it automatically. No manual registration required.
+- **If used in Popup / Sidepanel / Options**: 
+  - You **MUST** manually add `@use "../../path/to/NewFeature";` to `src/assets/styles/main.scss`.
+- **Note**: If you create a NEW root directory for UI components that must work in Shadow DOM, you must add it to the whitelist in `lazy-vue-app.js`.
+
+---
 
 ## Architecture Components
 
@@ -150,6 +174,25 @@ Inside the Shadow DOM, `!important` is **mandatory** for all visual properties. 
 ```
 
 ## File Structure
+
+### Special Entry Points (Content Scripts)
+
+The extension uses specific entry points to manage the boundary between the extension UI and the host website.
+
+#### 1. `content-app-global.scss` (Shadow DOM Root)
+- **Role**: Base styles for the extension's UI inside the Shadow DOM.
+- **Content**: Shadow Root resets (`:host`), CSS variables, and global utility classes for the extension's components.
+- **Injection**: Loaded via `lazy-vue-app.js` and injected directly into the `shadowRoot`.
+- **Constraint**: Should NOT contain styles for the host page.
+
+#### 2. `content-main-dom.scss` / `.css` (Host Page Root)
+- **Role**: Critical styles that MUST exist in the host page's Main DOM to work.
+- **Content**: 
+  - Cursor changes (`cursor: crosshair`) when in "Select Element" mode.
+  - Element highlighting (Outlines) during selection.
+  - Translation direction support for translated text injected into the page.
+- **Injection**: Injected into the host page's `<head>` via a `<style>` or `<link>` tag.
+- **Constraint**: Keep it minimal to avoid interfering with the host website's layout.
 
 ### Core SCSS Files
 
