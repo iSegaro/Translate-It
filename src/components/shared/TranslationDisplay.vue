@@ -13,6 +13,7 @@
         'sidepanel-mode': mode === 'sidepanel',
         'selection-mode': mode === 'selection',
         'mobile-mode': mode === 'mobile',
+        'no-toolbar': !showToolbar,
         'theme-dark': settingsStore.isDarkTheme,
       },
       containerClass,

@@ -123,8 +123,8 @@
 
   // Window Body
   .ti-window-body {
-    padding: 16px !important;
-    min-height: 100px !important;
+    padding: 12px !important;
+    min-height: 80px !important;
     display: flex !important;
     flex-direction: column !important;
     border-radius: 0 0 12px 12px !important;
@@ -133,12 +133,15 @@
 
   .ti-window-translation-display {
     flex: 1 !important;
-    min-height: 80px !important;
+    min-height: 60px !important;
     position: relative !important;
     contain: layout style !important;
     overflow: clip !important;
     min-width: 0 !important;
     width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
   }
 
   // Special Sections

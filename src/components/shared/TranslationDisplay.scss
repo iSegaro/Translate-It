@@ -83,7 +83,20 @@
   }
 
   &.compact-mode {
-    padding: 8px !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+
+    .ti-translation-content {
+      padding: 0 !important;
+      min-height: auto !important;
+    }
+  }
+
+  &.no-toolbar {
+    .ti-translation-content {
+      padding-top: 4px !important;
+    }
   }
 
   // Mobile Mode
@@ -252,7 +265,10 @@
     h2 { font-size: 16px !important; }
     h3 { font-size: 15px !important; }
 
-    p { margin-bottom: 8px !important; }
+    p { 
+      margin-bottom: 8px !important; 
+      &:last-child { margin-bottom: 0 !important; }
+    }
 
     code {
       background: var(--bg-secondary, #f8f9fa) !important;
