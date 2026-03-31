@@ -87,10 +87,9 @@
         <div class="ti-m-provider-wrapper">
           <ProviderSelector
             v-model="currentProvider"
-            mode="compact"
+            mode="mobile"
             :is-global="false"
             :show-sync="false"
-            class="mobile-native-provider"
           />
         </div>
         
