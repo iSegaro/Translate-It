@@ -51,14 +51,6 @@ Always use project variables where possible: `var(--ti-mobile-bg, #ffffff)`.
 - Simplify the `:style` binding to only handle truly dynamic coordinates.
 - Remove unnecessary reactive variables used only for styling.
 
----
-
-## High-Priority Refactoring List
-
-1.  **`TranslationWindow.vue`**: Still has some internal styles. Move them to `TranslationWindow.scss`.
-2.  **`DesktopFabMenu.vue`**: Has massive inline `:style` bindings. Move them to `DesktopFabMenu.scss`.
-3.  **`MobileSheet/views/`**: All sub-views should have adjacent `.scss` files instead of nested styles.
-4.  **`LoadingSpinner.vue`**: Move its styles to an adjacent `.scss`.
 
 ---
 
