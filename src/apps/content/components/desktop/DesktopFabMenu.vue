@@ -223,6 +223,15 @@ const isRevertHovered = ref(false);
 const isSettingsHovered = ref(false);
 const isTTSHovered = ref(false);
 const hoveredItemIndex = ref(-1);
+
+// Track the specific TTS request started by this component instance
+const localTTSId = ref(null);
+
+// Check if this specific instance is currently responsible for the active TTS
+const isThisTTSActive = computed(() => {
+  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value);
+});
+
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
 
@@ -322,7 +331,7 @@ const menuItems = computed(() => {
   return items;
 });
 
-const isTTSActive = computed(() => pendingSelection.value.hasSelection || tts.isPlaying.value);
+const isTTSActive = computed(() => pendingSelection.value.hasSelection || (isThisTTSActive.value && tts.isPlaying.value));
 
 // Page Translation Status & Progress Logic
 const pageTranslationStatus = computed(() => {
@@ -445,10 +454,13 @@ const handleRevert = async () => {
 };
 
 const handleTTS = async () => {
-  if (tts.isPlaying.value) {
+  if (isThisTTSActive.value && tts.isPlaying.value) {
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
-    await tts.speak(pendingSelection.value.text);
+    const result = await tts.speak(pendingSelection.value.text);
+    if (result) {
+      localTTSId.value = tts.currentTTSId.value;
+    }
   }
 };
 

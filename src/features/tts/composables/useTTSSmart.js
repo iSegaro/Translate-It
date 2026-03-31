@@ -145,7 +145,7 @@ export function useTTSSmart() {
       // Simple error handling without automatic retry
       ttsState.value = 'error';
       errorMessage.value = error.message || 'TTS failed';
-      currentTTSId.value = null;
+      // Keep currentTTSId so the originating component can show the error state
       progress.value = 0;
       
       return false;
@@ -364,6 +364,7 @@ export function useTTSSmart() {
       errorType.value = '';
       lastText.value = '';
       lastLanguage.value = 'auto';
+      currentTTSId.value = null;
       // Error state manually cleared - logged at TRACE level for detailed debugging
       // logger.debug("[useTTSSmart] Error state manually cleared");
       return true;

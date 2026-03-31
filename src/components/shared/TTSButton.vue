@@ -14,7 +14,7 @@
       <div class="ti-icon-container">
         <!-- Idle State Icon -->
         <svg
-          v-if="tts.ttsState.value === 'idle'"
+          v-if="effectiveState === 'idle'"
           class="ti-tts-icon"
           viewBox="0 0 24 24"
           width="16"
@@ -28,7 +28,7 @@
 
         <!-- Loading State Icon with Animation -->
         <svg
-          v-else-if="tts.ttsState.value === 'loading'"
+          v-else-if="effectiveState === 'loading'"
           class="ti-tts-icon ti-loading-spin"
           viewBox="0 0 24 24"
           width="16"
@@ -47,7 +47,7 @@
 
         <!-- Playing State Icon (Stop) -->
         <svg
-          v-else-if="tts.ttsState.value === 'playing'"
+          v-else-if="effectiveState === 'playing'"
           class="ti-tts-icon"
           viewBox="0 0 24 24"
           width="16"
@@ -61,7 +61,7 @@
 
         <!-- Error State Icon -->
         <svg
-          v-else-if="tts.ttsState.value === 'error'"
+          v-else-if="effectiveState === 'error'"
           class="ti-tts-icon ti-error-icon"
           viewBox="0 0 24 24"
           width="16"
@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseActionButton from '@/features/text-actions/components/BaseActionButton.vue'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
@@ -138,17 +138,35 @@ const emit = defineEmits([
 // TTS Composable
 const tts = useTTSSmart()
 
+// Track the specific TTS request started by this button instance
+const localTTSId = ref(null)
+
+// Check if this specific button instance is currently responsible for the active TTS
+const isThisButtonActive = computed(() => {
+  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value)
+})
+
+// The visual state for this specific button instance
+const effectiveState = computed(() => {
+  // If this button is active, show the global TTS state
+  if (isThisButtonActive.value) {
+    return tts.ttsState.value
+  }
+  // Otherwise, always show as idle
+  return 'idle'
+})
+
 // Computed Properties
 const ttsButtonClasses = computed(() => [
   'ti-tts-button',
-  `ti-tts-button--${tts.ttsState.value}`,
+  `ti-tts-button--${effectiveState.value}`,
   {
     'ti-tts-button--has-label': props.showLabel
   }
 ])
 
 const buttonTitle = computed(() => {
-  switch (tts.ttsState.value) {
+  switch (effectiveState.value) {
     case 'idle':
       return t('action_speak_text')
     case 'loading':
@@ -163,7 +181,7 @@ const buttonTitle = computed(() => {
 })
 
 const buttonLabel = computed(() => {
-  switch (tts.ttsState.value) {
+  switch (effectiveState.value) {
     case 'idle':
       return 'Speak'
     case 'loading':
@@ -188,27 +206,32 @@ const handleClick = async () => {
     return
   }
 
-  // Button clicked - logged at TRACE level for detailed debugging
-  // logger.debug('[TTSButton] Button clicked, current state:', tts.ttsState.value)
-
   try {
     let result = false
 
-    switch (tts.ttsState.value) {
+    // Use effectiveState to determine the action for this button
+    switch (effectiveState.value) {
       case 'idle':
+        // Start new TTS and capture its ID
         result = await tts.speak(props.text, props.language)
-        if (result) emit('tts-started', { text: props.text, language: props.language })
+        if (result) {
+          localTTSId.value = tts.currentTTSId.value
+          emit('tts-started', { text: props.text, language: props.language })
+        }
         break
 
       case 'loading':
       case 'playing':
+        // Stop current TTS
         result = await tts.stop()
         if (result) emit('tts-stopped')
         break
 
       case 'error':
+        // Retry failed TTS and update ID
         result = await tts.retry()
         if (result) {
+          localTTSId.value = tts.currentTTSId.value
           emit('tts-started', { text: props.text, language: props.language })
         } else {
           emit('tts-error', new Error(tts.errorMessage.value || 'TTS retry failed'))
@@ -216,13 +239,10 @@ const handleClick = async () => {
         break
 
       default:
-        logger.warn('[TTSButton] Unknown TTS state:', tts.ttsState.value)
+        logger.warn('[TTSButton] Unknown effective state:', effectiveState.value)
         result = await tts.stop()
         if (result) emit('tts-stopped')
     }
-
-    // Action completed - logged at TRACE level for detailed debugging
-    // logger.debug('[TTSButton] Action completed:', result)
   } catch (error) {
     logger.error('[TTSButton] Action failed:', error)
     emit('tts-error', error instanceof Error ? error : new Error(error?.message || 'TTS action failed'))

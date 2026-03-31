@@ -221,7 +221,16 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
-const isSpeaking = computed(() => tts.ttsState.value === 'playing');
+
+// Track the specific TTS request started by this window instance
+const localTTSId = ref(null);
+
+// Check if this specific window instance is currently responsible for the active TTS
+const isThisWindowActive = computed(() => {
+  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value);
+});
+
+const isSpeaking = computed(() => isThisWindowActive.value && tts.ttsState.value === 'playing');
 
 const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
 const hasTTSContent = computed(() => {
@@ -234,7 +243,7 @@ const currentTTSText = computed(() => ttsMode.value === 'original' ? originalTex
 
 const getEnhancedTTSButtonTitle = computed(() => {
   if (!hasTTSContent.value) return t('window_tts_no_text');
-  if (tts.ttsState.value === 'playing') return t('window_tts_stop');
+  if (isSpeaking.value) return t('window_tts_stop');
   return ttsMode.value === 'original' ? t('window_tts_speak_original') : t('window_tts_speak_translation');
 });
 
@@ -322,10 +331,13 @@ const handleCopy = async () => {
 const handleSmartTTS = async () => {
   if (!hasTTSContent.value) return;
   try {
-    if (tts.ttsState.value === 'playing') {
+    if (isSpeaking.value) {
       await tts.stop();
     } else {
-      await tts.speak(currentTTSText.value, 'auto');
+      const result = await tts.speak(currentTTSText.value, 'auto');
+      if (result) {
+        localTTSId.value = tts.currentTTSId.value;
+      }
     }
   } catch (error) {
     logger.error(`Smart TTS failed:`, error);
