@@ -111,25 +111,54 @@
   .ti-smart-tts-btn {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
     position: relative !important;
-
-    &.ti-original-mode {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    }
-
-    &:not(.ti-original-mode) {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-    }
   }
 
   // Window Body
   .ti-window-body {
     padding: 12px !important;
-    min-height: 80px !important;
     display: flex !important;
     flex-direction: column !important;
     border-radius: 0 0 12px 12px !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    min-height: 0 !important;
+  }
+
+  // Accordion Wrapper for Original Text
+  .ti-original-text-wrapper {
+    display: grid !important;
+    grid-template-rows: 0fr !important;
+    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-bottom 0.3s ease,
+                opacity 0.2s ease !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+    margin-bottom: 0 !important;
+
+    &.is-expanded {
+      grid-template-rows: 1fr !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      margin-bottom: 12px !important;
+    }
+
+    > .ti-original-text-section {
+      min-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+
+  // Inner Container (Actual Styles)
+  .ti-original-text {
+    padding-bottom: 12px !important;
+    border-bottom: 1px dashed var(--color-border, #e8e8e8) !important;
+    font-size: 0.9em !important;
+    opacity: 0.8 !important;
+    max-height: 150px !important;
+    overflow-y: auto !important;
   }
 
   .ti-window-translation-display {
@@ -143,17 +172,6 @@
     border: none !important;
     padding: 0 !important;
     background: transparent !important;
-  }
-
-  // Special Sections
-  .ti-original-text-section {
-    margin-bottom: 12px !important;
-    padding-bottom: 12px !important;
-    border-bottom: 1px dashed var(--color-border, #e8e8e8) !important;
-    font-size: 0.9em !important;
-    opacity: 0.8 !important;
-    max-height: 150px !important;
-    overflow-y: auto !important;
   }
 
   // Loading State

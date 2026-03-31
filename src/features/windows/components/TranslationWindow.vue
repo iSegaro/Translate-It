@@ -126,19 +126,16 @@
     </div>
 
     <div class="ti-window-body">
-      <Transition
-        name="ti-original-text"
-        appear
+      <div
+        class="ti-original-text-wrapper"
+        :class="{ 'is-expanded': showOriginal && !isLoading }"
       >
-        <div
-          v-if="showOriginal && !isLoading"
-          class="ti-original-text-section"
-        >
+        <div class="ti-original-text-section">
           <div class="ti-original-text">
             {{ originalText }}
           </div>
         </div>
-      </Transition>
+      </div>
       <TranslationDisplay
         :content="translatedText"
         :is-loading="isLoading"
