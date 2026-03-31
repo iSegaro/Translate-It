@@ -64,7 +64,7 @@
         <button
           class="ti-action-btn ti-smart-tts-btn"
           :class="{ 'ti-original-mode': ttsMode === 'original' }"
-          :disabled="!hasTTSContent"
+          :disabled="!hasTTSContent || isTTSLoading"
           :title="getEnhancedTTSButtonTitle"
           @click.stop="handleSmartTTS"
         >
@@ -231,6 +231,7 @@ const isThisWindowActive = computed(() => {
 });
 
 const isSpeaking = computed(() => isThisWindowActive.value && tts.ttsState.value === 'playing');
+const isTTSLoading = computed(() => isThisWindowActive.value && tts.ttsState.value === 'loading');
 
 const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
 const hasTTSContent = computed(() => {

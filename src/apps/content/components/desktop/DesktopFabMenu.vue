@@ -145,7 +145,7 @@
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
-        :title="tts.isPlaying.value ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
+        :title="(isThisTTSActive && tts.isPlaying.value) ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
         :style="{ 
           'bottom': '-42px !important', 
           'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
@@ -154,12 +154,12 @@
         @mouseenter="isTTSHovered = true"
         @mouseleave="isTTSHovered = false"
       >
-        <div v-if="tts.isLoading.value" class="fab-tts-loader"></div>
+        <div v-if="isThisTTSActive && tts.isLoading.value" class="fab-tts-loader"></div>
         <img
           v-else
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
-          :style="{ filter: tts.isPlaying.value ? 'brightness(0) invert(1) !important' : '' }"
+          :style="{ filter: (isThisTTSActive && tts.isPlaying.value) ? 'brightness(0) invert(1) !important' : '' }"
         >
       </div>
     </Transition>

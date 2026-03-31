@@ -2,7 +2,7 @@
   <BaseActionButton
     :size="size"
     :variant="variant"
-    :disabled="disabled || tts.ttsState.value === 'loading' || !text || !text.trim()"
+    :disabled="disabled || (effectiveState === 'loading') || !text || !text.trim()"
     :title="buttonTitle"
     :label="buttonLabel"
     :show-label="showLabel"
