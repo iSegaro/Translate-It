@@ -254,6 +254,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :class="{ 'ti-open-upward': isUpward }"
       :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
@@ -328,6 +329,70 @@
       </div>
     </div>
   </div>
+
+  <!-- Mobile Mode for Manual Input / Bottom Sheets -->
+  <div
+    v-else-if="mode === 'mobile'"
+    ref="selectorRef"
+    class="ti-provider-mobile-container"
+    :class="{ 'ti-dropdown-open': isDropdownOpen }"
+    v-bind="$attrs"
+  >
+    <button
+      class="ti-provider-mobile-button"
+      :class="{ 'ti-active': isDropdownOpen }"
+      @click="toggleDropdown"
+      @keydown="handleKeydown"
+    >
+      <img
+        :src="currentProviderIcon"
+        alt="API Provider"
+        class="ti-api-provider-icon"
+        :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
+      >
+      <span>{{ currentProviderName }}</span>
+      <IconButton
+        icon="dropdown-arrow.svg"
+        alt="Dropdown"
+        type="inline"
+        class="dropdown-arrow"
+        :class="{ rotated: isDropdownOpen }"
+      />
+    </button>
+    
+    <!-- Provider Dropdown -->
+    <div 
+      v-if="isDropdownOpen"
+      class="ti-provider-dropdown-menu"
+      :class="{ 'ti-open-upward': isUpward }"
+      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
+      @click.stop
+    >
+      <div
+        ref="dropdownMenuRef"
+        class="ti-provider-dropdown-list"
+      >
+        <div
+          v-for="(provider, index) in availableProviders"
+          :key="provider.id"
+          class="ti-dropdown-item"
+          :class="{ 
+            'ti-active': currentProvider === provider.id,
+            'is-focused': focusedIndex === index 
+          }"
+          @click="selectProvider(provider)"
+          @mouseenter="focusedIndex = index"
+        >
+          <img
+            :src="getProviderIcon(provider.icon)"
+            :alt="provider.name"
+            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+          >
+          <span>{{ provider.name }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
   
   <!-- Compact Mode -->
   <div
@@ -382,8 +447,8 @@ const { t } = useUnifiedI18n()
 const props = defineProps({
   mode: {
     type: String,
-    default: 'split', // split, button, icon-only, compact
-    validator: (value) => ['split', 'button', 'icon-only', 'compact'].includes(value)
+    default: 'split', // split, button, icon-only, compact, mobile
+    validator: (value) => ['split', 'button', 'icon-only', 'compact', 'mobile'].includes(value)
   },
   modelValue: {
     type: String,
@@ -420,6 +485,7 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 const selectorRef = ref(null)
 const dropdownMenuRef = ref(null)
 const isDropdownOpen = ref(false)
+const isUpward = ref(false)
 const isTranslating = ref(false)
 const focusedIndex = ref(-1)
 const dropdownMaxHeight = ref('400px')
@@ -637,11 +703,24 @@ const toggleDropdown = () => {
     const currentIndex = items.findIndex(p => p.id === currentProvider.value);
     focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
     
-    // Calculate dynamic max-height based on available space below the button
+    // Calculate dynamic max-height and direction based on available space
     nextTick(() => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
-        const availableHeight = window.innerHeight - rect.bottom - 16;
+        
+        // Find the nearest scrollable container or sheet content that might clip us
+        const container = selectorRef.value.closest('.ti-m-sheet-content, .ti-window-body');
+        const containerRect = container ? container.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+        
+        const spaceBelow = containerRect.bottom - rect.bottom;
+        const spaceAbove = rect.top - containerRect.top;
+        
+        // If space below is less than 250px and there's more space above, open upwards
+        isUpward.value = spaceBelow < 250 && spaceAbove > spaceBelow;
+
+        const availableHeight = isUpward.value 
+          ? spaceAbove - 16 // Space above within container
+          : spaceBelow - 16; // Space below within container
         
         // Detect if we are in an Extension Popup or Sidepanel
         const isPopupOrSidepanel = props.isGlobal || window.innerWidth < 600;
@@ -649,7 +728,7 @@ const toggleDropdown = () => {
         // Use a smarter limit:
         // In Popup: max 400px
         // In Shadow DOM: max 600px (ideal for standard desktop viewports)
-        // BUT always constrained by the actual available space to the bottom of the viewport
+        // BUT always constrained by the actual available space
         const maxLimit = isPopupOrSidepanel ? 400 : 600;
         
         dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(150, availableHeight))}px`;
@@ -661,7 +740,7 @@ const toggleDropdown = () => {
   logger.debug('🔧 Provider selector dropdown toggled!', {
     currentState: isDropdownOpen.value,
     newState: newState,
-    mode: props.mode
+    direction: isUpward.value ? 'up' : 'down'
   })
   
   isDropdownOpen.value = newState;
