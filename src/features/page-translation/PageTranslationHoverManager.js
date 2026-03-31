@@ -89,6 +89,11 @@ export class PageTranslationHoverManager extends ResourceTracker {
 
   _getOriginalText(element) {
     const textParts = [];
+    // Standard block-level elements that should trigger a line break in the tooltip
+    const BLOCK_TAGS = new Set([
+      'P', 'DIV', 'LI', 'TR', 'SECTION', 'ARTICLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
+      'HEADER', 'FOOTER', 'DT', 'DD', 'BLOCKQUOTE', 'FIGURE', 'TABLE', 'MAIN'
+    ]);
 
     // 1. Gather text nodes and handle BR tags for line breaks
     // We use a custom filter to catch both Text nodes and BR elements.
@@ -98,7 +103,8 @@ export class PageTranslationHoverManager extends ResourceTracker {
       {
         acceptNode(node) {
           if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
-          if (node.nodeName === 'BR') return NodeFilter.FILTER_ACCEPT;
+          // Accept BR and all block-level tags to handle layout breaks
+          if (node.nodeName === 'BR' || BLOCK_TAGS.has(node.nodeName)) return NodeFilter.FILTER_ACCEPT;
           return NodeFilter.FILTER_SKIP;
         }
       },
@@ -106,33 +112,42 @@ export class PageTranslationHoverManager extends ResourceTracker {
     );
 
     let node;
+    let hasText = false;
+
     while ((node = walker.nextNode())) {
       if (node.nodeType === Node.TEXT_NODE) {
         const original = pageTranslationLookup.get(node);
         // Use original text if translated, otherwise use current text to keep continuity
         const content = original !== undefined ? original : node.textContent;
         if (content) {
-          // Normalize internal whitespace of each node to avoid HTML formatting noise
-          textParts.push(content.replace(/\s+/g, ' '));
+          // Normalize internal whitespace to avoid HTML formatting noise
+          const normalized = content.replace(/\s+/g, ' ');
+          if (normalized.trim() || normalized === ' ') {
+            textParts.push(normalized);
+            hasText = true;
+          }
         }
-      } else if (node.nodeName === 'BR') {
-        // Explicitly handle line breaks from the original page
-        textParts.push('\n');
+      } else {
+        // It's a BR or a BLOCK_TAG. Add a newline if we already have content to separate.
+        if (hasText && textParts[textParts.length - 1] !== '\n') {
+          textParts.push('\n');
+        }
       }
     }
 
-    // 2. Join parts and perform final cleanup
-    // Collapse multiple spaces but preserve the newlines we explicitly added for BRs
+    // Join and perform final cleanup: trim lines and remove redundant empty lines
     const mainText = textParts.join('')
-      .replace(/ +/g, ' ')
-      .trim();
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join('\n');
     
     const finalLines = [];
     if (mainText) {
       finalLines.push(mainText);
     }
 
-    // 3. Check attributes (e.g., title, alt) - these should remain on separate lines
+    // 2. Check attributes (e.g., title, alt) - these always remain on separate lines
     if (element.attributes) {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
