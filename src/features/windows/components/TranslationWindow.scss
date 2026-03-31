@@ -4,11 +4,12 @@
 
 .ti-window {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
-  overflow: visible !important;
   display: flex !important;
   flex-direction: column !important;
   z-index: 2147483647 !important;
-  contain: layout style !important;
+  max-height: min(450px, 85vh) !important;
+  max-width: min(400px, 90vw) !important;
+  overflow: hidden !important; // Critical to contain the body scroll
 
   // Theme: Light
   &.light {
@@ -52,6 +53,7 @@
     padding: 8px 12px !important;
     cursor: move !important;
     user-select: none !important;
+    flex-shrink: 0 !important; // Don't allow header to shrink
   }
 
   .ti-header-actions {
@@ -119,9 +121,10 @@
     display: flex !important;
     flex-direction: column !important;
     border-radius: 0 0 12px 12px !important;
-    overflow-y: auto !important;
+    overflow-y: auto !important; // Enable vertical scroll
     overflow-x: hidden !important;
-    min-height: 0 !important;
+    flex: 1 !important; // Fill remaining height
+    min-height: 0 !important; // Allow shrinking to enable scroll
   }
 
   // Accordion Wrapper for Original Text
@@ -165,8 +168,7 @@
     flex: 1 !important;
     min-height: 60px !important;
     position: relative !important;
-    contain: layout style !important;
-    overflow: clip !important;
+    overflow: visible !important; // Let the parent body handle scrolling
     min-width: 0 !important;
     width: 100% !important;
     border: none !important;
