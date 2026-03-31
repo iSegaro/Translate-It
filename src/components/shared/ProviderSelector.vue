@@ -638,14 +638,19 @@ const toggleDropdown = () => {
     focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
     
     // Calculate dynamic max-height based on available space below the button
-    // This is crucial for Extension Popups where space is limited
     nextTick(() => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
-        const availableHeight = window.innerHeight - rect.bottom - 16; // 16px buffer
+        const availableHeight = window.innerHeight - rect.bottom - 16;
         
-        // Use a taller max-height for in-page windows (Shadow DOM) vs Popup
-        const maxLimit = props.isGlobal ? 400 : 600;
+        // Detect if we are in an Extension Popup or Sidepanel
+        const isPopupOrSidepanel = props.isGlobal || window.innerWidth < 600;
+        
+        // Use a smarter limit:
+        // In Popup: max 400px
+        // In Shadow DOM: max 600px (ideal for standard desktop viewports)
+        // BUT always constrained by the actual available space to the bottom of the viewport
+        const maxLimit = isPopupOrSidepanel ? 400 : 600;
         
         dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(150, availableHeight))}px`;
       }

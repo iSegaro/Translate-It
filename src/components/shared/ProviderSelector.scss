@@ -271,7 +271,6 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
   z-index: 10 !important;
   min-width: 180px !important;
-  max-height: 400px !important; // Increased to accommodate list + footer
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -280,9 +279,9 @@
 
 .ti-provider-dropdown-list {
   overflow-y: auto !important;
-  max-height: 300px; // Allowed to shrink when parent is smaller
-  flex: 1 1 auto !important;
+  flex: 1 1 auto !important; // Allows the list to grow and shrink properly
   width: 100% !important;
+  min-height: 0 !important; // CRITICAL for flex-shrink to work in Firefox/Chrome
 
   &::-webkit-scrollbar {
     width: 6px !important;
