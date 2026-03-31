@@ -1,0 +1,163 @@
+@use "@/assets/styles/base/mixins" as *;
+
+.page-translation-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+
+  &.compact-wrapper {
+    width: auto !important;
+    gap: 0 !important;
+  }
+
+  &.text-only {
+    width: auto !important;
+  }
+}
+
+.progress-bar {
+  position: relative !important;
+  flex: 1 !important;
+  min-width: 100px !important;
+  height: 24px !important;
+  background: var(--color-bg-subtle, #f0f0f0) !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+
+  &.compact {
+    max-width: 200px !important;
+    height: 20px !important;
+  }
+}
+
+.progress-fill {
+  height: 100% !important;
+  background: var(--color-primary, #4a90d9) !important;
+  transition: width 0.3s ease !important;
+}
+
+.progress-text {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--color-text-inverted, #ffffff) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.error-message {
+  color: var(--color-error, #e74c3c) !important;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  background: var(--color-error-bg, #fee) !important;
+  border-radius: 4px !important;
+}
+
+.ti-btn-status-container {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ti-btn-status-badge {
+  position: absolute !important;
+  bottom: -4px !important;
+  right: -4px !important;
+  z-index: 10 !important;
+}
+
+.ti-text-status-wrapper {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Toolbar link style to match PopupHeader */
+.toolbar-link {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--toolbar-link-color) !important;
+  text-decoration: none !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  opacity: var(--icon-opacity) !important;
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out !important;
+  background-color: transparent !important;
+  font-size: 13px !important;
+  white-space: nowrap !important;
+
+  &:hover {
+    opacity: var(--icon-hover-opacity) !important;
+    background-color: var(--toolbar-link-hover-bg-color) !important;
+  }
+
+  &.disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+  }
+
+  &.loading {
+    color: var(--color-warning, #f39c12) !important;
+  }
+
+  &.is-active {
+    color: var(--color-primary) !important;
+    background-color: var(--toolbar-link-hover-bg-color) !important;
+    font-weight: 600 !important;
+  }
+
+  .ti-text-status-badge {
+    position: absolute !important;
+    top: 0px !important;
+    left: 2px !important;
+    z-index: 1 !important;
+  }
+}
+
+.toolbar-icon {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  margin: 0 auto !important;
+  object-fit: contain !important;
+  opacity: var(--icon-opacity, 0.6) !important;
+  filter: var(--icon-filter) !important;
+  transition: opacity 0.2s ease-in-out !important;
+}
+
+.ti-btn:hover .toolbar-icon {
+  opacity: var(--icon-hover-opacity, 1) !important;
+}
+
+.ti-btn.is-active .toolbar-icon {
+  opacity: 1 !important;
+}
+
+/* Compact Icon Style (Unification) */
+.is-compact-icon {
+  @include toolbar-button-minimal;
+
+  /* Force internal BaseButton content to center */
+  .ti-btn__text {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  &:disabled {
+    opacity: 0.5 !important;
+    background: none !important;
+  }
+}

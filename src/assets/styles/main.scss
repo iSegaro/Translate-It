@@ -17,6 +17,7 @@
 @use "./components/markdown";
 @use "./components/options-tabs";
 @use "../../components/shared/PageTranslationStatus";
+@use "../../features/page-translation/components/PageTranslationButton";
 
 // Utility styles - Helpers and utilities
 @use "./utilities/utilities";
