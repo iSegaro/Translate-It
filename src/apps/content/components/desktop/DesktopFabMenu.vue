@@ -188,7 +188,7 @@ import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
 import IconRevert from '@/icons/ui/revert.png';
-import IconRestore from '@/icons/ui/restore.svg';
+import IconRestore from '@/icons/ui/restore.png';
 import IconHourglass from '@/icons/ui/hourglass.png';
 import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';

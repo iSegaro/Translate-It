@@ -132,7 +132,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import closeIcon from '@/icons/ui/close.png';
 import eyeHideIcon from '@/icons/ui/eye-hide.svg';
-import restoreIcon from '@/icons/ui/restore.svg';
+import restoreIcon from '@/icons/ui/restore.png';
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()

@@ -148,7 +148,7 @@
             class="ti-btn-status-badge"
           />
           <img
-            :src="browser.runtime.getURL('icons/ui/restore.svg')"
+            :src="browser.runtime.getURL('icons/ui/restore.png')"
             :class="compact ? 'toolbar-icon' : 'ti-btn__icon'"
             alt="Restore"
           >
