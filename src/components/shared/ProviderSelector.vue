@@ -496,20 +496,18 @@ const scrollToFocused = () => {
   })
 }
 
-// Handle click outside to close dropdown
+// Handle click outside to close dropdown (Shadow DOM compatible)
 const handleClickOutside = (event) => {
-  if (isDropdownOpen.value && selectorRef.value && !selectorRef.value.contains(event.target)) {
+  if (!isDropdownOpen.value || !selectorRef.value) return
+
+  // Use composedPath to support Shadow DOM and handle retargeting
+  const path = event.composedPath()
+  
+  // If the component container is NOT in the event path, the click was outside
+  if (!path.includes(selectorRef.value)) {
     isDropdownOpen.value = false
   }
 }
-
-onMounted(() => {
-  window.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutside)
-})
 
 const availableProviders = ref([])
 
@@ -694,12 +692,6 @@ const handleProviderChange = (event) => {
   selectProvider({ id: event.target.value })
 }
 
-const closeDropdown = (event) => {
-  if (!event.target.closest('.ti-split-translate-button-container, .ti-provider-button-container, .ti-provider-icon-only-container')) {
-    isDropdownOpen.value = false
-  }
-}
-
 // Storage change handler for cross-context updates
 const handleStorageChange = (changes, areaName) => {
   if (areaName === 'sync' || areaName === 'local') {
@@ -736,8 +728,13 @@ onMounted(() => {
     availableProviders.value = mappedProviders
   }
   
-  // Add click listener to close dropdown using ResourceTracker
-  tracker.addEventListener(document, 'click', closeDropdown)
+  /**
+   * USE CAPTURE PHASE FOR CLICK-OUTSIDE
+   * Why? Content script UI often uses @click.stop to prevent events from reaching the host page.
+   * By using 'capture: true', we intercept the click before it's stopped by any parent container
+   * (like TranslationWindow.vue). This ensures the dropdown closes correctly in Shadow DOM.
+   */
+  tracker.addEventListener(document, 'click', handleClickOutside, { capture: true })
   
   // Add storage listener for cross-context updates using ResourceTracker
   if (typeof browser !== 'undefined' && browser.storage) {
