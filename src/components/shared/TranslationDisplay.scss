@@ -86,10 +86,12 @@
     padding: 0 !important;
     border: none !important;
     background: transparent !important;
+    overflow: visible !important;
 
     .ti-translation-content {
       padding: 0 !important;
       min-height: auto !important;
+      overflow: visible !important;
     }
   }
 

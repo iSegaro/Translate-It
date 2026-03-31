@@ -128,7 +128,8 @@
     display: flex !important;
     flex-direction: column !important;
     border-radius: 0 0 12px 12px !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
   }
 
   .ti-window-translation-display {
