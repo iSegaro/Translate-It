@@ -8,7 +8,8 @@
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     data-translate-ui="true"
-    @mousedown.stop
+    @mousedown="handleStartDrag"
+    @touchstart="handleStartDrag"
     @click.stop
   >
     <LoadingSpinner
@@ -44,11 +45,14 @@
           class="ti-window-provider-selector"
           @update:model-value="handleProviderChange"
           @mousedown.stop
+          @touchstart.stop
         />
         <button
           class="ti-action-btn"
           :title="t('window_copy_translation')"
           @click.stop="handleCopy"
+          @mousedown.stop
+          @touchstart.stop
         >
           <svg
             width="16"
@@ -67,6 +71,8 @@
           :disabled="!hasTTSContent || isTTSLoading"
           :title="getEnhancedTTSButtonTitle"
           @click.stop="handleSmartTTS"
+          @mousedown.stop
+          @touchstart.stop
         >
           <svg
             width="16"
@@ -92,6 +98,8 @@
           :class="{ 'ti-original-visible': showOriginal }"
           :title="getOriginalButtonTitle"
           @click.stop="toggleShowOriginal"
+          @mousedown.stop
+          @touchstart.stop
         >
           <svg
             width="16"
@@ -110,6 +118,8 @@
           class="ti-action-btn"
           :title="t('window_close')"
           @click.stop="handleClose"
+          @mousedown.stop
+          @touchstart.stop
         >
           <svg
             width="16"

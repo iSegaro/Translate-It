@@ -127,6 +127,13 @@ export function usePositioning(initialPosition, options = {}) {
   const onDrag = (event) => {
     if (!isDragging.value) return;
     
+    // For touch events, we must prevent default to stop page scrolling
+    if (event.type === 'touchmove' || event.touches) {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    }
+    
     const coords = getCoordinates(event);
     const newX = coords.x - dragStartOffset.value.x;
     const newY = coords.y - dragStartOffset.value.y;
@@ -134,7 +141,7 @@ export function usePositioning(initialPosition, options = {}) {
     currentPosition.value = clampToViewport({ x: newX, y: newY });
   };
 
-  const stopDrag = () => {
+  const stopDrag = (event) => {
     isDragging.value = false;
     document.removeEventListener('mousemove', onDrag);
     document.removeEventListener('mouseup', stopDrag);
@@ -147,6 +154,12 @@ export function usePositioning(initialPosition, options = {}) {
 
   const startDrag = (event) => {
     isDragging.value = true;
+    
+    // Prevent default on touchstart to avoid scrolling/gestures
+    if (event.type === 'touchstart' && event.cancelable) {
+      event.preventDefault();
+    }
+
     const coords = getCoordinates(event);
     dragStartOffset.value.x = coords.x - currentPosition.value.x;
     dragStartOffset.value.y = coords.y - currentPosition.value.y;

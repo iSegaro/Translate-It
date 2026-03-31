@@ -54,6 +54,7 @@
     cursor: move !important;
     user-select: none !important;
     flex-shrink: 0 !important; // Don't allow header to shrink
+    touch-action: none !important; // Prevent scrolling/gestures on header
   }
 
   .ti-header-actions {
@@ -187,6 +188,8 @@
     background: #fff !important;
     border: 1px solid rgba(0, 0, 0, 0.1) !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    cursor: move !important;
+    touch-action: none !important;
 
     &.dark {
       background: #333 !important;
