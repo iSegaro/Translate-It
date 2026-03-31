@@ -1,3 +1,12 @@
+#### v1.10.0 – Released on April XX, 2026
+
+##### Added
+
+- Added a persistent, vertically draggable **Desktop FAB (Floating Action Button)** for quick access to `Select Element` and `Page Translation` with smart-fading and real-time status tracking
+- Added comprehensive **Mobile & Touchscreen Support** featuring a native-like **In-Page Bottom Sheet** architecture with smooth gesture controls (swipe-to-expand/dismiss) for mobile browsers (Firefox Android, Kiwi, Lemur)
+
+---
+
 #### v1.9.0 – Released on March 20, 2026
 
 ##### Added
