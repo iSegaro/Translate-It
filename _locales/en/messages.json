@@ -554,6 +554,15 @@
   "desktop_fab_translate_page_label": {
     "message": "Translate Page"
   },
+  "desktop_fab_tts_tooltip": {
+    "message": "Text to Speech"
+  },
+  "desktop_fab_tts_play_tooltip": {
+    "message": "Speak"
+  },
+  "desktop_fab_tts_stop_tooltip": {
+    "message": "Stop"
+  },
   "mobile_ui_mode_auto": {
     "message": "Follow system (OS)"
   },

@@ -554,6 +554,15 @@
   "desktop_fab_translate_page_label": {
     "message": "ページを翻訳"
   },
+  "desktop_fab_tts_tooltip": {
+    "message": "テキスト読み上げ"
+  },
+  "desktop_fab_tts_play_tooltip": {
+    "message": "再生"
+  },
+  "desktop_fab_tts_stop_tooltip": {
+    "message": "停止"
+  },
   "mobile_ui_mode_auto": {
     "message": "システムに従う"
   },

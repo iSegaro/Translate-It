@@ -557,6 +557,15 @@
   "desktop_fab_translate_page_label": {
     "message": "ترجمه صفحه"
   },
+  "desktop_fab_tts_tooltip": {
+    "message": "تبدیل متن به گفتار"
+  },
+  "desktop_fab_tts_play_tooltip": {
+    "message": "پخش"
+  },
+  "desktop_fab_tts_stop_tooltip": {
+    "message": "توقف"
+  },
   "mobile_ui_mode_auto": {
     "message": "پیروی از سیستم"
   },
