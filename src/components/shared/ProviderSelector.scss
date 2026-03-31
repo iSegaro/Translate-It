@@ -270,7 +270,8 @@
   border-radius: 4px !important;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
   z-index: 10 !important;
-  min-width: 180px !important;
+  min-width: 12rem !important; // Responsive width based on font size
+  max-width: 85vw !important; // Prevent horizontal overflow on small screens
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
