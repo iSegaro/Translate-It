@@ -12,7 +12,6 @@
       :src="loadingGifUrl"
       class="loading-gif"
       alt="Loading..."
-      :style="{ width: spinnerSize + 'px', height: spinnerSize + 'px' }"
     >
     <div 
       v-else
@@ -24,6 +23,9 @@
 <script setup>
 import { computed } from 'vue'
 import browser from 'webextension-polyfill'
+
+// Import adjacent SCSS
+import './LoadingSpinner.scss'
 
 const props = defineProps({
   size: {
@@ -51,58 +53,4 @@ const loadingGifUrl = computed(() => {
     return ''
   }
 })
-
-const spinnerSize = computed(() => {
-  switch (props.size) {
-    case 'xs': return 12
-    case 'sm': return 16
-    case 'md': return 20
-    case 'lg': return 24
-    case 'xl': return 32
-    default: return 20
-  }
-})
 </script>
-
-<style scoped>
-.loading-spinner {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spinner {
-  border-radius: 50%;
-  border: 2px solid var(--color-border, #dee2e6);
-  border-top-color: var(--color-primary, #1967d2);
-  animation: spin 1s linear infinite;
-  width: 100%;
-  height: 100%;
-}
-
-.loading-gif {
-  object-fit: contain;
-  display: block;
-}
-
-/* Sizes (for traditional spinner) */
-.size-xs .spinner { width: 12px; height: 12px; border-width: 1px; }
-.size-sm .spinner { width: 16px; height: 16px; border-width: 2px; }
-.size-md .spinner { width: 20px; height: 20px; border-width: 2px; }
-.size-lg .spinner { width: 24px; height: 24px; border-width: 3px; }
-.size-xl .spinner { width: 32px; height: 32px; border-width: 3px; }
-
-/* Variants */
-.variant-primary .spinner { border-top-color: var(--color-primary, #1967d2); }
-.variant-secondary .spinner { border-top-color: var(--color-secondary, #6c757d); }
-.variant-neutral .spinner {
-  border-top-color: currentColor;
-  border-left-color: rgba(255, 255, 255, 0.1);
-  border-right-color: rgba(255, 255, 255, 0.1);
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-</style>

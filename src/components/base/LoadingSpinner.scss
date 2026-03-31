@@ -1,0 +1,71 @@
+@use "@/assets/styles/base/variables" as *;
+
+.loading-spinner {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  .spinner {
+    border-radius: 50% !important;
+    border: 2px solid var(--color-border, #dee2e6) !important;
+    border-top-color: var(--color-primary, #1967d2) !important;
+    animation: ti-spin 1s linear infinite !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .loading-gif {
+    object-fit: contain !important;
+    display: block !important;
+  }
+
+  // Sizes
+  &.size-xs {
+    width: 12px !important;
+    height: 12px !important;
+    .spinner { border-width: 1px !important; }
+    .loading-gif { width: 12px !important; height: 12px !important; }
+  }
+
+  &.size-sm {
+    width: 16px !important;
+    height: 16px !important;
+    .spinner { border-width: 2px !important; }
+    .loading-gif { width: 16px !important; height: 16px !important; }
+  }
+
+  &.size-md {
+    width: 20px !important;
+    height: 20px !important;
+    .spinner { border-width: 2px !important; }
+    .loading-gif { width: 20px !important; height: 20px !important; }
+  }
+
+  &.size-lg {
+    width: 24px !important;
+    height: 24px !important;
+    .spinner { border-width: 3px !important; }
+    .loading-gif { width: 24px !important; height: 24px !important; }
+  }
+
+  &.size-xl {
+    width: 32px !important;
+    height: 32px !important;
+    .spinner { border-width: 3px !important; }
+    .loading-gif { width: 32px !important; height: 32px !important; }
+  }
+
+  // Variants
+  &.variant-primary .spinner { border-top-color: var(--color-primary, #1967d2) !important; }
+  &.variant-secondary .spinner { border-top-color: var(--color-secondary, #6c757d) !important; }
+  &.variant-neutral .spinner {
+    border-top-color: currentColor !important;
+    border-left-color: rgba(255, 255, 255, 0.1) !important;
+    border-right-color: rgba(255, 255, 255, 0.1) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  }
+}
+
+@keyframes ti-spin {
+  to { transform: rotate(360deg); }
+}

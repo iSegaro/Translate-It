@@ -31,6 +31,7 @@ const standaloneStyles = import.meta.glob([
   
   // 2. Shared UI components (Status indicators, etc.) used in both Shadow DOM and Extension pages
   '@/components/shared/**/*.scss',
+  '@/components/base/**/*.scss',
   
   // 3. Feature-specific UI components (Translation results, Result windows, etc.)
   '@/features/**/components/**/*.scss',
