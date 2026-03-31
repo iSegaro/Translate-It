@@ -86,6 +86,7 @@
 <script setup>
 import { computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import './TTSButton.scss'
 import BaseActionButton from '@/features/text-actions/components/BaseActionButton.vue'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -264,73 +265,3 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   }
 })
 </script>
-
-<style scoped>
-/* TTS Button specific styles */
-.ti-tts-button {
-  /* No additional styling needed - BaseActionButton handles it */
-}
-
-/* State-specific Styles */
-.ti-tts-button--loading {
-  pointer-events: none;
-}
-
-.ti-tts-button--playing {
-  border-color: var(--color-error, #dc3545);
-}
-
-.ti-tts-button--error {
-  border-color: var(--color-error, #dc3545);
-}
-
-/* Icon Container */
-.ti-icon-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* TTS Icon */
-.ti-tts-icon {
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  color: inherit;
-  opacity: var(--icon-opacity, 0.8);
-}
-
-.ti-tts-button:hover .ti-tts-icon {
-  opacity: var(--icon-hover-opacity, 1);
-}
-
-/* Ensure SVG paths inherit proper color */
-.ti-tts-icon path {
-  fill: currentColor;
-  stroke: none;
-}
-
-.ti-loading-spin {
-  animation: ti-spin 1s linear infinite;
-}
-
-@keyframes ti-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.ti-error-icon {
-  color: currentColor;
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .ti-tts-icon {
-    transition: none;
-  }
-
-  .ti-loading-spin {
-    animation: none;
-  }
-}
-
-</style>

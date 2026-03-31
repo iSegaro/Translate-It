@@ -1,0 +1,66 @@
+/* TTS Button specific styles (extracted from TTSButton.vue) */
+.ti-tts-button {
+  /* No additional styling needed - BaseActionButton handles it */
+}
+
+/* State-specific Styles */
+.ti-tts-button--loading {
+  pointer-events: none !important;
+}
+
+.ti-tts-button--playing {
+  border-color: var(--color-error, #dc3545) !important;
+}
+
+.ti-tts-button--error {
+  border-color: var(--color-error, #dc3545) !important;
+}
+
+/* Icon Container */
+.ti-icon-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* TTS Icon */
+.ti-tts-icon {
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  color: inherit !important;
+  opacity: var(--icon-opacity, 0.8) !important;
+}
+
+.ti-tts-button:hover .ti-tts-icon {
+  opacity: var(--icon-hover-opacity, 1) !important;
+}
+
+/* Ensure SVG paths inherit proper color */
+.ti-tts-icon path {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+
+.ti-loading-spin {
+  animation: ti-spin 1s linear infinite !important;
+}
+
+@keyframes ti-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ti-error-icon {
+  color: currentColor !important;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .ti-tts-icon {
+    transition: none !important;
+  }
+
+  .ti-loading-spin {
+    animation: none !important;
+  }
+}
