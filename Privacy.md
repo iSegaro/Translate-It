@@ -1,23 +1,40 @@
 # Privacy Policy
 
-_Effective Date: April 30, 2025_
+**Effective Date:** April 30, 2025  
+**Last Updated:** March 31, 2026
 
-I respect and value your privacy. This Privacy Policy describes how I handle and protect your personal information in relation to your use of my web extension(s).
+I respect your privacy and am committed to protecting your personal information. This Privacy Policy explains how **Translate-It** handles data across all supported platforms (Chrome, Firefox, Edge, etc.).
 
-## Information Collection
+## 1. Information Collection and Storage
 
-My Web Extension do not collect any personal information from users. I do not gather, store, or transmit any data that can be used to personally identify you, such as your name, email address, or location. Since no data is collected, none of your data is sold to third parties.
+**Translate-It** is a client-side extension. I do not operate any central servers, and I do not collect, store, or monitor your personal data or translation history.
 
-## Links to Other Websites
+* **API Keys & Settings:** If you provide personal API keys (e.g., OpenAI, DeepSeek, DeepL, Gemini), these keys and your configuration preferences are stored locally within your browser's secure storage using standardized browser storage APIs. They are never transmitted to me or any third party, except for the specific translation provider you have selected.
+* **Local Storage:** All settings stay on your device and are deleted if you uninstall the extension.
 
-My Web Extension may contain links to other websites not operated by me. This Privacy Policy does not cover how that website processes personal information. I encourage you to review the Privacy Policy of every website that you visit.
+## 2. Third-Party Translation Providers
 
-## Changes to this Privacy Policy
+This website/extension acts as a bridge between your browser and various third-party translation services. When you request a translation, the selected text is sent directly from your browser to the provider you have chosen (e.g., Google, Microsoft, Yandex, OpenAI, etc.).
 
-I reserve the right to amend this Privacy Policy at any time. Any changes will be effective immediately upon posting the revised Privacy Policy, and the "Effective Date" above will be updated. You are advised to review this Privacy Policy periodically for any changes.
+* **Data Handling:** Each provider has its own Privacy Policy. By choosing a specific provider, you are subject to their respective terms and data processing practices.
+* **Direct Interaction:** The extension communicates directly with the provider's API. There is no intermediate "middleman" server intercepting your data.
+* **Service Terms:** For providers requiring an API key, data usage depends on your specific agreement/tier with that provider.
 
-By using my Web Extension, you signify your consent and agreement to the terms of this Privacy Policy. If you do not agree with this Privacy Policy, please refrain from using my Web Extension.
+## 3. Security
 
-## Feedback
+The security of your API keys depends on the security of your device and browser storage. Since keys are stored locally, I recommend maintaining good device security and not sharing your API keys with others.
 
-If you have questions or concerns about this Privacy Policy, you can contact me by email.
+## 4. Children's Privacy
+
+This extension does not knowingly collect or solicit any information from children under the age of 13.
+
+## 5. Changes to this Policy
+
+I reserve the right to update this policy to reflect changes in browser requirements or the addition of new providers. Please review this page periodically for updates.
+
+## 6. Contact
+
+If you have questions about this Privacy Policy or the security of your data, you can reach out via:
+
+* **Email:** m.khani2810@gmail.com
+* **GitHub Issues:** [https://github.com/iSegaro/Translate-It/issues](https://github.com/iSegaro/Translate-It/issues)
