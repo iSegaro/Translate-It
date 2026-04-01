@@ -16,7 +16,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 let logger = null;
 const getLogger = () => {
   if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'i18n');
+    logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n');
   }
   return logger;
 };

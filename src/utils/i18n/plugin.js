@@ -42,7 +42,7 @@ export async function loadLocaleMessages(locale) {
       return messages[locale];
     }
   } catch (error) {
-    const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'i18n-plugin');
+    const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n-plugin');
     logger.warn(`Failed to load locale ${locale}:`, error);
   }
   

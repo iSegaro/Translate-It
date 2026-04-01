@@ -5,7 +5,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'langUtils');
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'langUtils');
 
 
 /**

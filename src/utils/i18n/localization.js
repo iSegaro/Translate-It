@@ -8,7 +8,7 @@ import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'localization');
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'localization');
 
 
 /**
