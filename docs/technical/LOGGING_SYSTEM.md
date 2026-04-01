@@ -102,12 +102,21 @@ Use immediate initialization when:
 
 ## Log Levels
 
-| Level | Value | Purpose | When to Use |
+| Level | Value | Purpose | When to Use (Strategy) |
 |-------|-------|---------|------------|
-| `ERROR` | 0 | Critical errors | Exceptions, failures, breaking issues |
-| `WARN` | 1 | Warnings | Deprecations, recoverable issues |
-| `INFO` | 2 | General information | Important status updates, initialization |
-| `DEBUG` | 3 | Detailed debugging | Development details, verbose information |
+| `ERROR` | 0 | Critical errors | Exceptions, failures, breaking issues (Visible in Production) |
+| `WARN` | 1 | Warnings | Deprecations, recoverable issues, unexpected states (Visible in Production) |
+| `INFO` | 2 | **User Journey** | Major user actions, process starts, and state changes (Visible in Production) |
+| `DEBUG` | 3 | **Technical Flow** | High-frequency events, internal transitions, and granular details (Dev only) |
+
+## Logging Strategy & Verbosity
+
+To keep the browser console clean and useful, follow these principles:
+
+1. **Action-Driven INFO**: Use `INFO` only for significant events that mark a milestone in the user's path (e.g., "Page translation started", "Panel opened").
+2. **Granular DEBUG**: Use `DEBUG` for repetitive or low-level logic (e.g., "Drag coordinates updated", "Selection detected").
+3. **Linear & Concise**: Keep log messages short and linear. Avoid multi-line objects unless absolutely necessary for debugging.
+4. **Production Awareness**: Remember that `ERROR`, `WARN`, and `INFO` logs are visible to end-users in production. Ensure they provide value without exposing sensitive data or technical clutter.
 
 ## Components
 
