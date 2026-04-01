@@ -37,8 +37,11 @@ export const LOG_COMPONENTS = {
   SETTINGS: 'Settings',           // src/features/settings/
   WINDOWS: 'Windows',             // src/features/windows/
 
+  // Mobile
+  MOBILE: 'Mobile',               // src/features/mobile/
+
   // Content Applications
-  CONTENT_APP: 'ContentApp',       // src/apps/content/
+  CONTENT_APP: 'ContentApp',      // src/apps/content/
   
   // سیستم‌های مشترک
   PROXY: 'Proxy',                 // src/shared/proxy/

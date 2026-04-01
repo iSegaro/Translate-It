@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 export const useMobileStore = defineStore('mobile', () => {
+  const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'Store');
+  
   // State
   const isOpen = ref(false)
   const activeView = ref(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
@@ -41,6 +45,7 @@ export const useMobileStore = defineStore('mobile', () => {
   
   // Actions
   const navigate = (view, state = null) => {
+    logger.debug('Navigating mobile view', { view, state });
     // 1. Set the active view
     activeView.value = view;
 
@@ -61,11 +66,13 @@ export const useMobileStore = defineStore('mobile', () => {
   }
 
   const openSheet = (view = MOBILE_CONSTANTS.VIEWS.DASHBOARD, state = null) => {
+    logger.info('Opening mobile sheet', { view, state });
     navigate(view, state);
     isOpen.value = true;
   }
 
   const closeSheet = () => {
+    logger.info('Closing mobile sheet');
     isOpen.value = false;
     sheetState.value = MOBILE_CONSTANTS.SHEET_STATE.CLOSED;
   }
@@ -79,14 +86,17 @@ export const useMobileStore = defineStore('mobile', () => {
   }
 
   const setView = (view) => {
+    logger.debug('Setting mobile view', view);
     activeView.value = view
   }
 
   const setSheetState = (state) => {
+    logger.debug('Setting mobile sheet state', state);
     sheetState.value = state
   }
 
   const setKeyboardVisibility = (visible) => {
+    logger.debug('Keyboard visibility changed', visible);
     isKeyboardVisible.value = visible
     // Automatically expand to full when keyboard is visible
     if (visible && isOpen.value) {
@@ -95,10 +105,12 @@ export const useMobileStore = defineStore('mobile', () => {
   }
 
   const updateSelectionData = (data) => {
+    logger.debug('Updating selection data', data);
     selectionData.value = { ...selectionData.value, ...data }
   }
 
   const resetSelectionData = () => {
+    logger.debug('Resetting selection data');
     selectionData.value = {
       text: '',
       translation: '',
@@ -110,10 +122,12 @@ export const useMobileStore = defineStore('mobile', () => {
   }
 
   const setPageTranslation = (data) => {
+    logger.debug('Updating page translation data', data);
     pageTranslationData.value = { ...pageTranslationData.value, ...data }
   }
 
   const resetPageTranslation = () => {
+    logger.debug('Resetting page translation data');
     pageTranslationData.value = {
       isTranslating: false,
       isTranslated: false,

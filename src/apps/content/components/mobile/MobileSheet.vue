@@ -48,6 +48,8 @@ import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
@@ -58,6 +60,7 @@ import HistoryView from './views/HistoryView.vue'
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileSheet')
 
 // MEMORY MANAGEMENT
 const tracker = useResourceTracker('mobile-sheet')
@@ -101,18 +104,22 @@ const onDragEnd = (e) => {
   if (isFullState) {
     if (dragDistance > 250) {
       // Very large drag down from FULL -> Close
+      logger.debug('Mobile sheet closed via large drag from FULL');
       mobileStore.closeSheet()
     } else if (dragDistance > 70) {
       // Moderate drag down from FULL -> Go to PEEK
+      logger.debug('Mobile sheet state changed: FULL -> PEEK');
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
     }
   } else {
     // We are in PEEK state
     if (dragDistance > 100) {
       // Drag down from PEEK -> Close
+      logger.debug('Mobile sheet closed via drag from PEEK');
       mobileStore.closeSheet()
     } else if (dragDistance < -70) {
       // Drag up from PEEK -> Go to FULL
+      logger.info('Mobile sheet expanded: PEEK -> FULL');
       mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
     }
   }
@@ -122,6 +129,7 @@ const onDragEnd = (e) => {
 
 // Watch for isOpen to lock/unlock body scroll
 watch(isOpen, (newValue) => {
+  logger.info(newValue ? 'Mobile sheet opened' : 'Mobile sheet closed', { view: activeView.value });
   // Check if the device has a mouse/fine pointer
   const hasMouse = window.matchMedia('(pointer: fine)').matches;
   

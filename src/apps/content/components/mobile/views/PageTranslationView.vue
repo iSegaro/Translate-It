@@ -127,6 +127,8 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
@@ -138,6 +140,7 @@ const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useI18n()
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
 
 const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'completed') return 100;
@@ -189,7 +192,7 @@ const toggleAutoClose = async () => {
   try {
     await settingsStore.updateSettingAndPersist('MOBILE_PAGE_TRANSLATION_AUTO_CLOSE', !currentValue)
   } catch (err) {
-    console.error('Failed to save auto-close setting:', err)
+    logger.error('Failed to save auto-close setting:', err)
   }
 }
 

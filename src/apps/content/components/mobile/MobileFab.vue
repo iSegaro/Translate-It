@@ -39,7 +39,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'MobileFab');
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
 const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
 

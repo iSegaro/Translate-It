@@ -1,7 +1,11 @@
 import { ref, computed } from 'vue'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 export function useMobileGestures(options = {}) {
+  const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'Gestures');
+  
   const {
     onClose = () => {},
     onExpand = () => {},
@@ -42,6 +46,7 @@ export function useMobileGestures(options = {}) {
 
   const onDragEnd = () => {
     if (!isDragging.value) return
+    logger.debug('Mobile gesture ended', { dragY: dragY.value });
     isDragging.value = false;
 
     const threshold = 60; // Pixel threshold to trigger state change (reduced from 100)

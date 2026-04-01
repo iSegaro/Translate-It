@@ -138,11 +138,14 @@ import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const languages = useLanguages()
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'HistoryView')
 const { 
   historyItems, 
   isLoading, 
@@ -199,6 +202,7 @@ const exportIconStyle = computed(() => {
 const handleNativeExport = (event) => {
   const format = event.target.value
   if (format) {
+    logger.info('Exporting translation history', { format });
     exportHistory(format)
     event.target.value = ""
   }
@@ -213,14 +217,17 @@ const removeItem = async (index, event) => {
     event.preventDefault();
     event.stopPropagation();
   }
+  logger.debug('Deleting history item');
   await deleteHistoryItem(index)
 }
 
 const clearAll = async () => {
+  logger.info('Clearing all translation history');
   await clearAllHistory()
 }
 
 const selectItem = (item) => {
+  logger.info('History item selected for manual translation');
   mobileStore.updateSelectionData({
     text: item.sourceText,
     translation: item.translatedText,

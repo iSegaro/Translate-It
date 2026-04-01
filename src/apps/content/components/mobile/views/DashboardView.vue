@@ -89,7 +89,7 @@ import revertIcon from '@/icons/ui/revert.png';
 import historyIcon from '@/icons/ui/history.svg';
 import ttsIcon from '@/icons/ui/speaker.png';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DashboardView');
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'DashboardView');
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
@@ -106,6 +106,7 @@ const isTTSVisible = computed(() => pendingSelection.value.hasSelection || tts.i
 
 const translatePage = (event) => {
   if (event) { event.preventDefault(); event.stopPropagation(); }
+  logger.info('Page translation requested from Mobile Dashboard');
   const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
   if (isCurrentlyTranslating) mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
   else { 
@@ -119,11 +120,28 @@ const translatePage = (event) => {
   }
 }
 
-const activateSelectElement = () => { mobileStore.closeSheet(); pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) }
-const goToInputView = () => { mobileStore.resetSelectionData(); mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT) }
-const goToHistoryView = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
-const openSettings = () => { pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS) }
-const revertTranslations = () => { pageEventBus.emit('revert-translations') }
+const activateSelectElement = () => { 
+  logger.info('Select Element mode requested from Mobile Dashboard');
+  mobileStore.closeSheet(); 
+  pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) 
+}
+const goToInputView = () => { 
+  logger.debug('Navigating to Input View');
+  mobileStore.resetSelectionData(); 
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT) 
+}
+const goToHistoryView = () => { 
+  logger.debug('Navigating to History View');
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) 
+}
+const openSettings = () => { 
+  logger.debug('Opening Settings from Mobile Dashboard');
+  pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS) 
+}
+const revertTranslations = () => { 
+  logger.info('Reverting page translations from Mobile Dashboard');
+  pageEventBus.emit('revert-translations') 
+}
 
 const handleTTS = async () => {
   if (tts.isPlaying.value) {

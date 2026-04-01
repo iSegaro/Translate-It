@@ -51,6 +51,7 @@ const globalState = {
     ScreenCapture: 2,
     Subtitle: 2,
     TTS: 2,
+    Mobile: 2,
 
     // Services/Utilities
     Browser: 2,

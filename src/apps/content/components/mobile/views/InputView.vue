@@ -141,9 +141,9 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
-import LanguageSelector from '@/components/shared/LanguageSelector.vue'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
@@ -151,6 +151,7 @@ const { t } = useI18n()
 const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
 const { getErrorForDisplay } = useErrorHandler()
 const tts = useTTSSmart()
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'InputView')
 
 const mobileIconStyle = computed(() => {
   const filter = settingsStore.isDarkTheme ? 'invert(1) brightness(2)' : 'none';
@@ -205,22 +206,36 @@ const handleTranslate = async () => {
   isLoading.value = true
   isError.value = false
   
+  logger.info('Manual translation requested', { 
+    sourceLang: sourceLang.value, 
+    targetLang: targetLang.value,
+    provider: currentProvider.value,
+    textLength: inputText.value.length 
+  });
+
   try {
     const payload = { text: inputText.value, sourceLanguage: sourceLang.value, targetLanguage: targetLang.value, provider: currentProvider.value, mode: TranslationMode.Mobile_Translate };
     const message = createMessage(MessageActions.TRANSLATE, payload);
     const response = await sendMessage(message);
     if (response && response.success) {
       const translated = response.translatedText || (response.data && response.data.translatedText) || (response.result && response.result.translatedText);
-      if (translated) resultText.value = translated;
-      else resultText.value = t('mobile_input_no_result_error') || "No translation found.";
+      if (translated) {
+        logger.debug('Manual translation successful');
+        resultText.value = translated;
+      } else {
+        logger.info('Manual translation returned empty result');
+        resultText.value = t('mobile_input_no_result_error') || "No translation found.";
+      }
     } else {
       isError.value = true;
       const errorInfo = await getErrorForDisplay(response?.error || "Translation failed.", 'mobile-input');
+      logger.error('Manual translation failed', { error: errorInfo.message });
       resultText.value = errorInfo.message;
     }
   } catch (error) {
     isError.value = true;
     const errorInfo = await getErrorForDisplay(error, 'mobile-input');
+    logger.error('Manual translation exception', { error: errorInfo.message });
     resultText.value = errorInfo.message;
   } finally { isLoading.value = false; }
 }
