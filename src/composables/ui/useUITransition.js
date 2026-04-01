@@ -23,36 +23,11 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUITransition');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUITransition');
 
+/**
+ * useUITransition - Universal Composable for UI State Transitions
+ */
 export function useUITransition(options = {}) {
   const {
     watchSource,
@@ -76,7 +51,7 @@ export function useUITransition(options = {}) {
     try {
       displayValue.value = watchSource()
     } catch (error) {
-      getLogger().warn('Failed to initialize display value:', error.message)
+      logger.warn('Failed to initialize display value:', error.message)
     }
   }
 
@@ -85,7 +60,7 @@ export function useUITransition(options = {}) {
     if (containerSelector) {
       const element = document.querySelector(containerSelector)
       if (!element) {
-        getLogger().warn(`Container not found: ${containerSelector}`)
+        logger.warn(`Container not found: ${containerSelector}`)
       }
       return element
     }
@@ -131,7 +106,7 @@ export function useUITransition(options = {}) {
   const startTransition = async (newValue = null) => {
     // Stop any existing transition first
     if (isTransitioning.value) {
-      getLogger().debug('Stopping existing transition before starting new one')
+      logger.debug('Stopping existing transition before starting new one')
       stopTransition()
       await nextTick() // Wait for cleanup
     }
@@ -140,7 +115,7 @@ export function useUITransition(options = {}) {
     const container = getContainer()
     
     try {
-      getLogger().debug(`Starting ${transitionType} transition`, { newValue, duration })
+      logger.debug(`Starting ${transitionType} transition`, { newValue, duration })
       
       // Set transition state
       isTransitioning.value = true
@@ -158,13 +133,13 @@ export function useUITransition(options = {}) {
         try {
           if (transitionId.value !== currentId) return // Prevent race conditions
 
-          getLogger().debug(`Mid-transition: applying value change for ${transitionType}`)
+          logger.debug(`Mid-transition: applying value change for ${transitionType}`)
           displayValue.value = pendingValue.value
 
           await nextTick()
           onTransitionMid(pendingValue.value)
         } catch (error) {
-          getLogger().error(`Error in mid-transition for ${transitionType}:`, error)
+          logger.error(`Error in mid-transition for ${transitionType}:`, error)
         }
       }, duration / 2)
 
@@ -173,7 +148,7 @@ export function useUITransition(options = {}) {
         try {
           if (transitionId.value !== currentId) return // Prevent race conditions
 
-          getLogger().debug(`Completed ${transitionType} transition`)
+          logger.debug(`Completed ${transitionType} transition`)
 
           // Reset state
           isTransitioning.value = false
@@ -191,7 +166,7 @@ export function useUITransition(options = {}) {
           await nextTick()
           onTransitionEnd(displayValue.value)
         } catch (error) {
-          getLogger().error(`Error in end transition for ${transitionType}:`, error)
+          logger.error(`Error in end transition for ${transitionType}:`, error)
           // Ensure state is reset even on error
           isTransitioning.value = false
           pendingValue.value = null
@@ -199,7 +174,7 @@ export function useUITransition(options = {}) {
       }, duration)
       
     } catch (error) {
-      getLogger().error(`Failed to start ${transitionType} transition:`, error)
+      logger.error(`Failed to start ${transitionType} transition:`, error)
       
       // Reset state on error
       isTransitioning.value = false
@@ -221,7 +196,7 @@ export function useUITransition(options = {}) {
   const stopTransition = () => {
     if (!isTransitioning.value) return
     
-    getLogger().debug(`Stopping ${transitionType} transition`)
+    logger.debug(`Stopping ${transitionType} transition`)
     
     const container = getContainer()
     
@@ -252,7 +227,7 @@ export function useUITransition(options = {}) {
       try {
         displayValue.value = watchSource()
       } catch (error) {
-        getLogger().warn('Failed to reset display value:', error.message)
+        logger.warn('Failed to reset display value:', error.message)
       }
     }
     

@@ -99,6 +99,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
@@ -215,12 +216,7 @@ const initialize = async () => {
       errorMessage.value = error.message || 'Unknown error occurred'
       
       // Attempt to identify error type for better UI feedback
-      try {
-        const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
-        errorType.value = matchErrorToType(error)
-      } catch {
-        logger.warn('Failed to load ErrorMatcher during initialization failure');
-      }
+      errorType.value = matchErrorToType(error)
     }
   } finally {
     isLoading.value = false

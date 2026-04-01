@@ -3,7 +3,7 @@ import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-// ErrorHandler will be imported lazily when needed
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'FeatureManager');
@@ -91,18 +91,11 @@ export class FeatureManager extends ResourceTracker {
       });
 
     } catch (error) {
-      // Try to get ErrorHandler for better error handling
-      try {
-        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-        const handler = ErrorHandler.getInstance();
-        handler.handle(error, {
-          type: ErrorTypes.SERVICE,
-          context: 'FeatureManager-initialize',
-          showToast: false
-        });
-      } catch {
-        logger.error('Error initializing FeatureManager:', error);
-      }
+      ErrorHandler.getInstance().handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: 'FeatureManager-initialize',
+        showToast: false
+      });
       throw error;
     }
   }
@@ -243,18 +236,11 @@ export class FeatureManager extends ResourceTracker {
       
     } catch (error) {
       logger.error(`Failed to activate feature ${featureName}:`, error);
-      // Try to get ErrorHandler for better error handling
-      try {
-        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-        const handler = ErrorHandler.getInstance();
-        handler.handle(error, {
-          type: ErrorTypes.SERVICE,
-          context: `FeatureManager-activateFeature-${featureName}`,
-          showToast: false
-        });
-      } catch {
-        // Fallback - error already logged
-      }
+      ErrorHandler.getInstance().handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: `FeatureManager-activateFeature-${featureName}`,
+        showToast: false
+      });
     }
   }
 
@@ -306,18 +292,11 @@ export class FeatureManager extends ResourceTracker {
 
     } catch (error) {
       logger.error(`Failed to deactivate feature ${featureName}:`, error);
-      // Try to get ErrorHandler for better error handling
-      try {
-        const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-        const handler = ErrorHandler.getInstance();
-        handler.handle(error, {
-          type: ErrorTypes.SERVICE,
-          context: `FeatureManager-deactivateFeature-${featureName}`,
-          showToast: false
-        });
-      } catch {
-        // Fallback - error already logged
-      }
+      ErrorHandler.getInstance().handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: `FeatureManager-deactivateFeature-${featureName}`,
+        showToast: false
+      });
     }
   }
 

@@ -3,39 +3,13 @@ import { ref, nextTick } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePopupResize');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePopupResize');
 
+/**
+ * usePopupResize - Intelligent popup dimension management
+ */
 export function usePopupResize() {
   const isResizing = ref(false)
-  
   // Popup size constraints
   // در استایل popup.scss حداکثر ارتفاع 600px تنظیم شده است
   // در استایل popup.scss حداقل ارتفاع 350px تنظیم شده است
@@ -71,7 +45,7 @@ export function usePopupResize() {
     // Calculate new popup height
     const newPopupHeight = Math.min(MIN_HEIGHT + additionalHeight, MAX_HEIGHT)
     
-    getLogger().debug('[usePopupResize] Height calculation:', {
+    logger.debug('[usePopupResize] Height calculation:', {
       contentHeight,
       currentHeight,
       additionalHeight,
@@ -88,14 +62,14 @@ export function usePopupResize() {
    */
   const adjustContentLayout = async (outputElement, contentHeight) => {
     if (isResizing.value || !outputElement) {
-      getLogger().warn('[usePopupResize] Skipping layout adjustment:', { isResizing: isResizing.value, hasElement: !!outputElement })
+      logger.warn('[usePopupResize] Skipping layout adjustment:', { isResizing: isResizing.value, hasElement: !!outputElement })
       return
     }
     
     isResizing.value = true
     
     try {
-      getLogger().debug('[usePopupResize] Element info:', {
+      logger.debug('[usePopupResize] Element info:', {
         element: outputElement.tagName,
         classList: outputElement.classList.toString(),
         scrollHeight: outputElement.scrollHeight,
@@ -109,7 +83,7 @@ export function usePopupResize() {
       const headerElement = document.querySelector('.sticky-header')
       const actualHeaderHeight = headerElement ? headerElement.offsetHeight : 88
       
-      getLogger().debug('[usePopupResize] Flexbox measurements:', {
+      logger.debug('[usePopupResize] Flexbox measurements:', {
         actualHeaderHeight,
         contentHeight,
         currentWindowHeight: window.innerHeight,
@@ -143,7 +117,7 @@ export function usePopupResize() {
           outputElement.style.setProperty('height', 'auto', 'important')
           outputElement.style.setProperty('overflow-y', 'visible', 'important')
           
-          getLogger().debug('[usePopupResize] ✅ Maximum height reached - enabled scrolling:', {
+          logger.debug('[usePopupResize] ✅ Maximum height reached - enabled scrolling:', {
             popupHeight: MAX_HEIGHT,
             contentHeight,
             scrollEnabled: true
@@ -166,7 +140,7 @@ export function usePopupResize() {
           outputElement.style.setProperty('height', 'auto', 'important')
           outputElement.style.setProperty('overflow-y', 'visible', 'important')
           
-          getLogger().debug('[usePopupResize] ✅ Flexbox resize to exact fit:', {
+          logger.debug('[usePopupResize] ✅ Flexbox resize to exact fit:', {
             fromHeight: window.innerHeight,
             toHeight: requiredPopupHeight,
             headerHeight: actualHeaderHeight,
@@ -185,7 +159,7 @@ export function usePopupResize() {
         outputElement.style.setProperty('height', 'auto', 'important')
         outputElement.style.setProperty('overflow-y', 'visible', 'important')
         
-        getLogger().debug('[usePopupResize] ✅ Using minimum height for flexbox layout')
+        logger.debug('[usePopupResize] ✅ Using minimum height for flexbox layout')
       }
       
       // Force reflow to ensure styles are applied
@@ -196,7 +170,7 @@ export function usePopupResize() {
       }, 100)
       
     } catch (error) {
-      getLogger().error('[usePopupResize] Failed to adjust popup layout:', error)
+      logger.error('[usePopupResize] Failed to adjust popup layout:', error)
       isResizing.value = false
     }
   }
@@ -220,7 +194,7 @@ export function usePopupResize() {
     outputElement.style.setProperty('height', 'auto', 'important')
     outputElement.style.setProperty('overflow-y', 'visible', 'important')
     
-    getLogger().debug('[usePopupResize] Reset flexbox layout to default:', {
+    logger.debug('[usePopupResize] Reset flexbox layout to default:', {
       popupHeight: `${MIN_HEIGHT}px`,
       fieldMaxHeight: 'auto'
     })
@@ -236,7 +210,7 @@ export function usePopupResize() {
       popupWrapper.style.height = `${MIN_HEIGHT}px`
     }
     document.body.style.height = `${MIN_HEIGHT}px`
-    getLogger().debug('[usePopupResize] Reset flexbox layout - popup height to:', `${MIN_HEIGHT}px`)
+    logger.debug('[usePopupResize] Reset flexbox layout - popup height to:', `${MIN_HEIGHT}px`)
   }
   
   /**
@@ -253,7 +227,7 @@ export function usePopupResize() {
     const contentHeight = outputElement.scrollHeight
     await adjustContentLayout(outputElement, contentHeight)
     
-    getLogger().debug('[usePopupResize] Unified animation started - fade-in + resize together')
+    logger.debug('[usePopupResize] Unified animation started - fade-in + resize together')
   }
   
   return {

@@ -12,15 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
-// Lazy initialization to avoid TDZ issues
-let logger = null;
-const getLogger = () => {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n');
-  }
-  return logger;
-};
-
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n');
 
 export function parseBoolean(value) {
   return String(value).trim().toLowerCase() === "true";
@@ -35,7 +27,7 @@ const translationsCache = new Map();
  */
 export function clearTranslationsCache() {
   translationsCache.clear();
-  getLogger().debug('Translations cache cleared');
+  logger.debug('Translations cache cleared');
 }
 
 // Export with backward compatibility name
@@ -57,7 +49,7 @@ async function loadTranslationsForLanguageCached(lang) {
     const url = browser.runtime.getURL(`_locales/${lang}/messages.json`);
     const response = await fetch(url);
     if (!response.ok) {
-      getLogger().warn(`Translation not found for language "${lang}"`);
+      logger.warn(`Translation not found for language "${lang}"`);
       return null;
     }
     const translations = await response.json();
@@ -71,9 +63,9 @@ async function loadTranslationsForLanguageCached(lang) {
     } else {
       // Log as debug instead of error if it's a fetch error during early initialization
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        getLogger().debug(`Translation loading failed during early initialization for "${lang}":`, error.message);
+        logger.debug(`Translation loading failed during early initialization for "${lang}":`, error.message);
       } else {
-        getLogger().error(`Error loading translations for "${lang}":`, error);
+        logger.error(`Error loading translations for "${lang}":`, error);
       }
     }
     return null;
@@ -116,11 +108,11 @@ export async function getTranslationString(key, lang) {
   try {
     const nativeTranslation = browser.i18n.getMessage(key);
     if (nativeTranslation) {
-      getLogger().debug(`Using native browser i18n for key "${key}"`);
+      logger.debug(`Using native browser i18n for key "${key}"`);
       return nativeTranslation;
     }
   } catch (error) {
-    getLogger().debug(`Native i18n also failed for key "${key}":`, error);
+    logger.debug(`Native i18n also failed for key "${key}":`, error);
   }
 
   return null;

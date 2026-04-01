@@ -6,35 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'useCopyAction');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_ACTIONS, 'useCopyAction');
 
 export function useCopyAction() {
   // Use ResourceTracker for automatic cleanup
@@ -52,12 +24,12 @@ export function useCopyAction() {
    */
   const copyText = async (text) => {
     if (!text || typeof text !== 'string') {
-      getLogger().warn('[useCopyAction] Invalid text provided for copy')
+      logger.warn('[useCopyAction] Invalid text provided for copy')
       return false
     }
 
     if (isCopying.value) {
-      getLogger().warn('[useCopyAction] Copy operation already in progress')
+      logger.warn('[useCopyAction] Copy operation already in progress')
       return false
     }
 
@@ -68,28 +40,28 @@ export function useCopyAction() {
       // Primary method: Clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text)
-        getLogger().debug('[useCopyAction] Text copied via Clipboard API')
+        logger.debug('[useCopyAction] Text copied via Clipboard API')
       } else {
         // Fallback method: document.execCommand
         await copyTextFallback(text)
-        getLogger().debug('[useCopyAction] Text copied via fallback method')
+        logger.debug('[useCopyAction] Text copied via fallback method')
       }
 
       lastCopiedText.value = text
       return true
 
     } catch (error) {
-      getLogger().error('[useCopyAction] Copy failed:', error)
+      logger.error('[useCopyAction] Copy failed:', error)
       copyError.value = error
       
       // Try fallback if primary method failed
       try {
         await copyTextFallback(text)
-        getLogger().debug('[useCopyAction] Text copied via fallback after primary failure')
+        logger.debug('[useCopyAction] Text copied via fallback after primary failure')
         lastCopiedText.value = text
         return true
       } catch (fallbackError) {
-        getLogger().error('[useCopyAction] Fallback copy also failed:', fallbackError)
+        logger.error('[useCopyAction] Fallback copy also failed:', fallbackError)
         copyError.value = fallbackError
         return false
       }

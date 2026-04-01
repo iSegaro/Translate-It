@@ -11,14 +11,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
 
 export class StreamingTimeoutManager {
   constructor() {
@@ -45,7 +38,7 @@ export class StreamingTimeoutManager {
       gracePeriod = 30000 // Grace period after initial timeout
     } = options;
 
-    getLogger().debug(`Registering streaming operation: ${messageId}`, {
+    logger.debug(`Registering streaming operation: ${messageId}`, {
       initialTimeout,
       maxProgressTimeout,
       gracePeriod
@@ -100,7 +93,7 @@ export class StreamingTimeoutManager {
     streamState.progressCount++;
     this.progressTrackers.set(messageId, now);
 
-    getLogger().debug(`Progress reported for ${messageId}:`, {
+    logger.debug(`Progress reported for ${messageId}:`, {
       progressCount: streamState.progressCount,
       timeSinceStart: now - streamState.startTime,
       progressData
@@ -110,7 +103,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onProgress(progressData);
     } catch (error) {
-      getLogger().warn(`Error in progress callback for ${messageId}:`, error);
+      logger.warn(`Error in progress callback for ${messageId}:`, error);
     }
 
     // Reset timeout since we got progress
@@ -128,7 +121,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    getLogger().debug(`Streaming completed for ${messageId}:`, {
+    logger.debug(`Streaming completed for ${messageId}:`, {
       duration: Date.now() - streamState.startTime,
       progressCount: streamState.progressCount
     });
@@ -143,7 +136,7 @@ export class StreamingTimeoutManager {
       streamState.onComplete(result);
       streamState.resolve(result);
     } catch (error) {
-      getLogger().warn(`Error in completion callback for ${messageId}:`, error);
+      logger.warn(`Error in completion callback for ${messageId}:`, error);
     }
 
     // Cleanup
@@ -166,9 +159,9 @@ export class StreamingTimeoutManager {
 
     // Handle both Error objects and cancellation info objects
     if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
-      getLogger().debug(`Streaming cancelled for ${messageId}:`, error.message || error);
+      logger.debug(`Streaming cancelled for ${messageId}:`, error.message || error);
     } else {
-      getLogger().debug(`Streaming error for ${messageId}:`, error);
+      logger.debug(`Streaming error for ${messageId}:`, error);
     }
 
     streamState.isCompleted = true;
@@ -196,7 +189,7 @@ export class StreamingTimeoutManager {
           messageId: messageId,
           showToast: false // Streaming errors are handled by the streaming system
         }).catch(handlerError => {
-          getLogger().warn(`ErrorHandler failed to handle streaming timeout error:`, handlerError);
+          logger.warn(`ErrorHandler failed to handle streaming timeout error:`, handlerError);
         });
 
         // Resolve with error result instead of rejecting to prevent uncaught promise errors
@@ -208,7 +201,7 @@ export class StreamingTimeoutManager {
         });
       }
     } catch (callbackError) {
-      getLogger().warn(`Error in error callback for ${messageId}:`, callbackError);
+      logger.warn(`Error in error callback for ${messageId}:`, callbackError);
     }
 
     // Cleanup
@@ -226,7 +219,7 @@ export class StreamingTimeoutManager {
       return;
     }
 
-    getLogger().debug(`Cancelling streaming for ${messageId}: ${reason}`);
+    logger.debug(`Cancelling streaming for ${messageId}: ${reason}`);
 
     // Mark as cancelled for timeout detection
     streamState.isCancelled = true;
@@ -249,7 +242,7 @@ export class StreamingTimeoutManager {
       this.errorStreaming(messageId, cancellationInfo);
     } catch (error) {
       // Log any secondary errors but don't throw them to avoid uncaught promise rejections
-      getLogger().warn(`Secondary error during cancellation of ${messageId}:`, error);
+      logger.warn(`Secondary error during cancellation of ${messageId}:`, error);
     }
   }
 
@@ -316,14 +309,14 @@ export class StreamingTimeoutManager {
 
     // Check if this was cancelled by user
     if (streamState.isCancelled) {
-      getLogger().debug(`Initial timeout ignored for cancelled streaming operation ${messageId}`);
+      logger.debug(`Initial timeout ignored for cancelled streaming operation ${messageId}`);
       return;
     }
 
     // Check if this is a user cancellation scenario using proper error management
     const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
     if (errorType === ErrorTypes.USER_CANCELLED) {
-      getLogger().debug(`Initial timeout ignored for user-cancelled streaming operation ${messageId}`);
+      logger.debug(`Initial timeout ignored for user-cancelled streaming operation ${messageId}`);
       return;
     }
 
@@ -332,7 +325,7 @@ export class StreamingTimeoutManager {
 
     if (timeSinceProgress < 30000 && streamState.progressCount > 0) {
       // We have recent progress, extend timeout with grace period
-      getLogger().debug(`Initial timeout reached for ${messageId}, but streaming is active. Extending with grace period.`);
+      logger.debug(`Initial timeout reached for ${messageId}, but streaming is active. Extending with grace period.`);
 
       const graceTimeoutHandle = setTimeout(() => {
         this._handleFinalTimeout(messageId);
@@ -360,18 +353,18 @@ export class StreamingTimeoutManager {
 
     // Check if this was cancelled by user
     if (streamState.isCancelled) {
-      getLogger().debug(`Progress timeout ignored for cancelled streaming operation ${messageId}`);
+      logger.debug(`Progress timeout ignored for cancelled streaming operation ${messageId}`);
       return;
     }
 
     // Check if this is a user cancellation scenario using proper error management
     const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
     if (errorType === ErrorTypes.USER_CANCELLED) {
-      getLogger().debug(`Progress timeout ignored for user-cancelled streaming operation ${messageId}`);
+      logger.debug(`Progress timeout ignored for user-cancelled streaming operation ${messageId}`);
       return;
     }
 
-    getLogger().warn(`Progress timeout for streaming operation ${messageId}`);
+    logger.warn(`Progress timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out - no progress for too long`);
     timeoutError.type = 'PROGRESS_TIMEOUT';
@@ -381,7 +374,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onTimeout();
     } catch (error) {
-      getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
+      logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
     // Use centralized error handling for progress timeout errors
@@ -390,7 +383,7 @@ export class StreamingTimeoutManager {
       messageId: messageId,
       showToast: false // Timeout errors are handled by the streaming system
     }).catch(handlerError => {
-      getLogger().warn(`ErrorHandler failed to handle progress timeout:`, handlerError);
+      logger.warn(`ErrorHandler failed to handle progress timeout:`, handlerError);
     });
 
     this.errorStreaming(messageId, timeoutError);
@@ -408,18 +401,18 @@ export class StreamingTimeoutManager {
 
     // Check if this was actually cancelled by user before timing out
     if (streamState.isCancelled) {
-      getLogger().debug(`Final timeout ignored for cancelled streaming operation ${messageId}`);
+      logger.debug(`Final timeout ignored for cancelled streaming operation ${messageId}`);
       return;
     }
 
     // Check if this is a user cancellation scenario using proper error management
     const errorType = streamState.lastError ? matchErrorToType(streamState.lastError) : null;
     if (errorType === ErrorTypes.USER_CANCELLED) {
-      getLogger().debug(`Final timeout ignored for user-cancelled streaming operation ${messageId}`);
+      logger.debug(`Final timeout ignored for user-cancelled streaming operation ${messageId}`);
       return;
     }
 
-    getLogger().warn(`Final timeout for streaming operation ${messageId}`);
+    logger.warn(`Final timeout for streaming operation ${messageId}`);
 
     const timeoutError = new Error(`Streaming operation timed out completely`);
     timeoutError.type = 'FINAL_TIMEOUT';
@@ -429,7 +422,7 @@ export class StreamingTimeoutManager {
     try {
       streamState.onTimeout();
     } catch (error) {
-      getLogger().warn(`Error in timeout callback for ${messageId}:`, error);
+      logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
     // Use centralized error handling for timeout errors
@@ -438,7 +431,7 @@ export class StreamingTimeoutManager {
       messageId: messageId,
       showToast: false // Timeout errors are handled by the streaming system
     }).catch(handlerError => {
-      getLogger().warn(`ErrorHandler failed to handle final timeout:`, handlerError);
+      logger.warn(`ErrorHandler failed to handle final timeout:`, handlerError);
     });
 
     this.errorStreaming(messageId, timeoutError);
@@ -510,7 +503,7 @@ export class StreamingTimeoutManager {
    * Cleanup all operations (for shutdown)
    */
   cleanup() {
-    getLogger().debug('Cleaning up StreamingTimeoutManager');
+    logger.debug('Cleaning up StreamingTimeoutManager');
 
     // Cancel all active operations
     for (const messageId of this.activeStreams.keys()) {

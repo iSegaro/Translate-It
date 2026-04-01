@@ -46,6 +46,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { loadSettingsModules } from '@/features/settings/utils/settings-modules.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsApp');
 
@@ -116,12 +117,7 @@ const initialize = async () => {
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
     // Extract error type for reactive translation
-    try {
-      const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
-      errorType.value = matchErrorToType(error)
-    } catch {
-      logger.warn('Failed to load ErrorMatcher during initialization failure');
-    }
+    errorType.value = matchErrorToType(error)
   } finally {
   logger.debug('✅ OptionsApp initialization complete')
     isLoading.value = false

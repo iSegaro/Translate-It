@@ -5,11 +5,10 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
-// ErrorHandler will be imported dynamically when needed
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-// createMessageHandler will be imported dynamically when needed
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -31,31 +30,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
-
-    // Initialize error handler lazily when needed
-    this._errorHandler = null;
-
-    // Add getter for errorHandler
-    Object.defineProperty(this, 'errorHandler', {
-      get: async function() {
-        if (!this._errorHandler) {
-          try {
-            const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-            this._errorHandler = ErrorHandler.getInstance();
-          } catch {
-            // Fallback: create a simple error handler
-            this._errorHandler = {
-              handle: (err, context) => {
-                console.error('Error:', err, context);
-                return err;
-              }
-            };
-          }
-        }
-        return this._errorHandler;
-      },
-      configurable: true
-    });
+    this.errorHandler = ErrorHandler.getInstance();
 
     // Track processed message IDs to prevent duplicates
     this.processedMessageIds = new Set();
@@ -326,27 +301,8 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
       
-      // Use centralized error handling for better error classification
-      const errorHandler = await this.errorHandler;
-      
-      // Determine error type and provide meaningful response
-      let errorType = ErrorTypes.UNKNOWN;
-      let userMessage = "Failed to activate Select Element mode";
-      
-      // Check for specific error conditions
-      if (error.message.includes('Extension context')) {
-        errorType = ErrorTypes.CONTEXT;
-        userMessage = "Extension context invalidated. Please refresh the page.";
-      } else if (error.message.includes('permission') || error.message.includes('restricted')) {
-        errorType = ErrorTypes.PERMISSION;
-        userMessage = "Feature not available on this page";
-      } else if (error.message.includes('initialization') || error.message.includes('initialize')) {
-        errorType = ErrorTypes.INTEGRATION;
-        userMessage = "Feature initialization failed. Please refresh the page.";
-      }
-      
       // Log the error with proper context
-      await errorHandler.handle(error, {
+      await this.errorHandler.handle(error, {
         type: errorType,
         context: "ContentMessageHandler-activateSelectElement",
         showToast: false // Don't show toast for background-triggered actions
@@ -480,8 +436,7 @@ export class ContentMessageHandler extends ResourceTracker {
           translationError.originalError = error;
           
           // Use centralized error handling
-          const errorHandler = await this.errorHandler;
-          await errorHandler.handle(translationError, {
+          await this.errorHandler.handle(translationError, {
             context: 'text-field-translation',
             type: ErrorTypes.TRANSLATION_FAILED,
             showToast: true
@@ -505,8 +460,7 @@ export class ContentMessageHandler extends ResourceTracker {
           this.logger.error('Field translation failed during application:', error);
           
           // Use centralized error handling
-          const errorHandler = await this.errorHandler;
-          await errorHandler.handle(error, {
+          await this.errorHandler.handle(error, {
             context: 'text-field-application',
             type: ErrorTypes.TRANSLATION_FAILED,
             showToast: true
@@ -682,8 +636,7 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error('Page translation failed:', error);
 
       // Use centralized error handling
-      const errorHandler = await this.errorHandler;
-      await errorHandler.handle(error, {
+      await this.errorHandler.handle(error, {
         type: ErrorTypes.TRANSLATION_FAILED,
         context: 'page-translation',
         showToast: true
@@ -713,8 +666,7 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error('Page restore failed:', error);
 
       // Use centralized error handling
-      const errorHandler = await this.errorHandler;
-      await errorHandler.handle(error, {
+      await this.errorHandler.handle(error, {
         type: ErrorTypes.TRANSLATION_FAILED,
         context: 'page-restore',
         showToast: true

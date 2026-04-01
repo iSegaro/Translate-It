@@ -4,36 +4,11 @@ import { ref, nextTick } from "vue";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
 
+/**
+ * useUI - Centralized UI state management for Sidepanel and other Vue contexts
+ */
 export function useUI() {
   // State
   const isHistoryPanelOpen = ref(false);
@@ -170,7 +145,7 @@ export function useUI() {
       element.focus();
       return true;
     } catch (error) {
-      getLogger().warn("Could not focus element:", error);
+      logger.warn("Could not focus element:", error);
       return false;
     }
   };
@@ -183,7 +158,7 @@ export function useUI() {
       element.scrollIntoView({ behavior, block: "nearest" });
       return true;
     } catch (error) {
-      getLogger().warn("Could not scroll to element:", error);
+      logger.warn("Could not scroll to element:", error);
       return false;
     }
   };

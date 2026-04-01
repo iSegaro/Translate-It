@@ -7,14 +7,7 @@ import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
 
 // Shared state for cache optimization
 let sharedState = {
@@ -66,9 +59,9 @@ export function useLanguages() {
         languages.value = languageList;
         isLoaded.value = true;
 
-        getLogger().init('Languages loaded successfully:', languages.value.length);
+        logger.init('Languages loaded successfully:', languages.value.length);
       } catch (error) {
-        getLogger().error('Failed to load languages:', error);
+        logger.error('Failed to load languages:', error);
         // In case of error, use an empty list but mark as loaded
         languages.value = [];
         isLoaded.value = true;

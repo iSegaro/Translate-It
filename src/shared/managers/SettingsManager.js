@@ -15,36 +15,11 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { SelectionTranslationMode } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
 
+/**
+ * SettingsManager - Unified settings management system
+ */
 class SettingsManager {
   constructor() {
     if (SettingsManager.instance) {
@@ -107,7 +82,7 @@ class SettingsManager {
 
     // Lazy debug call to avoid TDZ
     setTimeout(() => {
-      getLogger().debug('SettingsManager singleton created')
+      logger.debug('SettingsManager singleton created')
     }, 0)
   }
 
@@ -116,23 +91,23 @@ class SettingsManager {
    */
   async initialize() {
     if (this._initialized) {
-      getLogger().debug('SettingsManager already initialized')
+      logger.debug('SettingsManager already initialized')
       return this
     }
 
     try {
       // Check if Vue is available
       if (typeof window === 'undefined' || !window.Vue) {
-        getLogger().debug('Vue not available, SettingsManager will use storage directly')
+        logger.debug('Vue not available, SettingsManager will use storage directly')
         this._fallbackMode = true
 
         // Load settings directly from storage
         try {
           const settings = await storageManager.get(Object.keys(this._defaults))
           this._settings.value = { ...this._defaults, ...settings }
-          getLogger().debug('Settings loaded from storage in fallback mode')
+          logger.debug('Settings loaded from storage in fallback mode')
         } catch (error) {
-          getLogger().error('Failed to load settings from storage:', error)
+          logger.error('Failed to load settings from storage:', error)
           this._settings.value = { ...this._defaults }
         }
 
@@ -150,7 +125,7 @@ class SettingsManager {
       if (this._store && typeof this._store.loadSettings === 'function') {
         await this._store.loadSettings()
       } else {
-        getLogger().warn('Settings store not available, using storage directly')
+        logger.warn('Settings store not available, using storage directly')
         this._fallbackMode = true
 
         // Load settings directly from storage
@@ -158,7 +133,7 @@ class SettingsManager {
           const settings = await storageManager.get(Object.keys(this._defaults))
           this._settings.value = { ...this._defaults, ...settings }
         } catch (error) {
-          getLogger().error('Failed to load settings from storage:', error)
+          logger.error('Failed to load settings from storage:', error)
           this._settings.value = { ...this._defaults }
         }
 
@@ -178,11 +153,11 @@ class SettingsManager {
       }
 
       this._initialized = true
-      getLogger().debug('SettingsManager initialized successfully')
+      logger.debug('SettingsManager initialized successfully')
 
       return this
     } catch (error) {
-      getLogger().error('Failed to initialize SettingsManager:', error)
+      logger.error('Failed to initialize SettingsManager:', error)
       // Use fallback mode on error
       this._fallbackMode = true
 
@@ -191,7 +166,7 @@ class SettingsManager {
         const settings = await storageManager.get(Object.keys(this._defaults))
         this._settings.value = { ...this._defaults, ...settings }
       } catch (storageError) {
-        getLogger().error('Failed to load settings from storage in fallback:', storageError)
+        logger.error('Failed to load settings from storage in fallback:', storageError)
         this._settings.value = { ...this._defaults }
       }
 
@@ -211,10 +186,10 @@ class SettingsManager {
     try {
       const keys = Object.keys(this._defaults);
       await storageManager.get(keys);
-      getLogger().debug(`Cache warmed up with ${keys.length} keys`);
+      logger.debug(`Cache warmed up with ${keys.length} keys`);
       return this;
     } catch (error) {
-      getLogger().error('Failed to warmup SettingsManager:', error);
+      logger.error('Failed to warmup SettingsManager:', error);
       return this;
     }
   }
@@ -224,7 +199,7 @@ class SettingsManager {
    */
   getSettings() {
     if (!this._initialized) {
-      getLogger().debug('SettingsManager not initialized, returning empty object')
+      logger.debug('SettingsManager not initialized, returning empty object')
       return ref({})
     }
 
@@ -236,7 +211,7 @@ class SettingsManager {
    */
   get(key, defaultValue = undefined) {
     if (!this._initialized) {
-      getLogger().debug(`SettingsManager not initialized, returning default for ${key}`)
+      logger.debug(`SettingsManager not initialized, returning default for ${key}`)
       return defaultValue
     }
 
@@ -244,7 +219,7 @@ class SettingsManager {
     if (this._fallbackMode) {
       const value = this._settings.value[key] !== undefined ? this._settings.value[key] : (this._defaults[key] !== undefined ? this._defaults[key] : defaultValue)
       if (key === 'TRANSLATE_ON_TEXT_SELECTION') {
-        getLogger().debug(`TRANSLATE_ON_TEXT_SELECTION value:`, value, `(fallback mode: ${this._fallbackMode})`)
+        logger.debug(`TRANSLATE_ON_TEXT_SELECTION value:`, value, `(fallback mode: ${this._fallbackMode})`)
       }
       return value
     }
@@ -289,10 +264,10 @@ class SettingsManager {
         // Emit change event
         this._emitChangeEvent(key, value, oldValue)
 
-        getLogger().debug(`Setting updated (fallback mode): ${key} =`, value)
+        logger.debug(`Setting updated (fallback mode): ${key} =`, value)
         return
       } catch (error) {
-        getLogger().error('Failed to update setting in fallback mode:', error)
+        logger.error('Failed to update setting in fallback mode:', error)
         throw error
       }
     }
@@ -303,7 +278,7 @@ class SettingsManager {
     // Emit change event
     this._emitChangeEvent(key, value, oldValue)
 
-    getLogger().debug(`Setting updated: ${key} =`, value)
+    logger.debug(`Setting updated: ${key} =`, value)
   }
 
   /**
@@ -327,7 +302,7 @@ class SettingsManager {
       this._emitChangeEvent(key, updates[key], oldValues[key])
     }
 
-    getLogger().debug('Multiple settings updated:', updates)
+    logger.debug('Multiple settings updated:', updates)
   }
 
   /**
@@ -358,7 +333,7 @@ class SettingsManager {
   onChange(key, callback, context = null) {
     // Validate callback
     if (typeof callback !== 'function') {
-      getLogger().error(`Invalid callback provided for ${key}:`, typeof callback, callback)
+      logger.error(`Invalid callback provided for ${key}:`, typeof callback, callback)
       return () => {} // Return noop function
     }
 
@@ -372,7 +347,7 @@ class SettingsManager {
     Object.freeze(listenerObj) // Prevent modification
     this._eventListeners.get(key).set(listenerId, listenerObj)
 
-    getLogger().debug(`Listener added for setting: ${key}`)
+    logger.debug(`Listener added for setting: ${key}`)
 
     // Return unsubscribe function
     return () => {
@@ -407,7 +382,7 @@ class SettingsManager {
    */
   computed(key, defaultValue = undefined) {
     if (!this._initialized) {
-      getLogger().debug('SettingsManager not initialized for computed property')
+      logger.debug('SettingsManager not initialized for computed property')
       return computed(() => defaultValue)
     }
 
@@ -446,7 +421,7 @@ class SettingsManager {
     }
 
     await this._store.resetSettings()
-    getLogger().info('All settings reset to defaults')
+    logger.info('All settings reset to defaults')
   }
 
   /**
@@ -469,7 +444,7 @@ class SettingsManager {
     }
 
     await this._store.importSettings(settingsData, password)
-    getLogger().info('Settings imported successfully')
+    logger.info('Settings imported successfully')
   }
 
   /**
@@ -518,7 +493,7 @@ class SettingsManager {
   _setupStorageListener() {
     // Only setup listener once
     if (this._storageListenerSetup) {
-      getLogger().debug('Storage listener already setup, skipping')
+      logger.debug('Storage listener already setup, skipping')
       return
     }
 
@@ -526,12 +501,12 @@ class SettingsManager {
     const browserAPI = typeof browser !== "undefined" ? browser : chrome;
 
     if (!browserAPI?.storage || !browserAPI.storage.onChanged) {
-      getLogger().warn('Storage API not available, cannot setup storage listener')
+      logger.warn('Storage API not available, cannot setup storage listener')
       return
     }
 
     browserAPI.storage.onChanged.addListener((changes, areaName) => {
-      getLogger().debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
+      logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
 
       if (areaName !== 'local') return
 
@@ -543,13 +518,13 @@ class SettingsManager {
           // Emit change event
           this._emitChangeEvent(key, change.newValue, change.oldValue)
 
-          getLogger().info(`Setting changed (storage listener): ${key} =`, change.newValue)
+          logger.info(`Setting changed (storage listener): ${key} =`, change.newValue)
         }
       }
     })
 
     this._storageListenerSetup = true
-    getLogger().debug('Storage listener setup complete')
+    logger.debug('Storage listener setup complete')
   }
 
   /**
@@ -569,7 +544,7 @@ class SettingsManager {
           const oldValue = this._settings.value[key]
 
           if (newValue !== oldValue) {
-            getLogger().debug(`Manual refresh detected change: ${key} =`, newValue)
+            logger.debug(`Manual refresh detected change: ${key} =`, newValue)
 
             // Update internal settings
             this._settings.value[key] = newValue
@@ -580,9 +555,9 @@ class SettingsManager {
         }
       }
 
-      getLogger().debug('Settings refreshed manually')
+      logger.debug('Settings refreshed manually')
     } catch (error) {
-      getLogger().error('Error manually refreshing settings:', error)
+      logger.error('Error manually refreshing settings:', error)
     }
   }
 
@@ -602,16 +577,16 @@ class SettingsManager {
     // Notify listeners
     const listeners = this._eventListeners.get(key)
     if (listeners) {
-      getLogger().debug(`Notifying ${listeners.size} listeners for ${key}`)
+      logger.debug(`Notifying ${listeners.size} listeners for ${key}`)
       for (const listener of listeners.values()) {
         try {
           if (typeof listener.callback === 'function') {
             listener.callback(newValue, oldValue, key)
           } else {
-            getLogger().error(`Invalid callback for ${key}:`, typeof listener.callback, listener)
+            logger.error(`Invalid callback for ${key}:`, typeof listener.callback, listener)
           }
         } catch (error) {
-          getLogger().error(`Error in settings listener for ${key}:`, error)
+          logger.error(`Error in settings listener for ${key}:`, error)
         }
       }
     }
@@ -619,7 +594,7 @@ class SettingsManager {
     // Log important changes
     const importantKeys = ['EXTENSION_ENABLED', 'TRANSLATE_API', 'SOURCE_LANGUAGE', 'TARGET_LANGUAGE']
     if (importantKeys.includes(key)) {
-      getLogger().info(`Important setting changed: ${key} =`, newValue)
+      logger.info(`Important setting changed: ${key} =`, newValue)
     }
   }
 
@@ -631,7 +606,7 @@ class SettingsManager {
     this._reactiveCache.clear()
     this._initialized = false
     SettingsManager.instance = null
-    getLogger().debug('SettingsManager destroyed')
+    logger.debug('SettingsManager destroyed')
   }
 }
 
@@ -664,7 +639,7 @@ export function useSettings() {
 if (typeof window !== 'undefined') {
   settingsManager.initialize().catch(error => {
     setTimeout(() => {
-      getLogger().error('Failed to auto-initialize SettingsManager:', error)
+      logger.error('Failed to auto-initialize SettingsManager:', error)
     }, 0)
   })
 }

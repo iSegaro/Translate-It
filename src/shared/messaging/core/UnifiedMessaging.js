@@ -10,14 +10,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
 // Operation timeout mapping remains the same
 const OPERATION_TIMEOUTS = {
@@ -107,7 +100,7 @@ function createTimeout(ms, action) {
           showToast: false, // Caller will handle UI feedback
           metadata: { timeoutMs: ms }
         }).catch(handlerError => {
-          getLogger().warn('ErrorHandler failed to handle timeout:', handlerError);
+          logger.warn('ErrorHandler failed to handle timeout:', handlerError);
         });
       }
 
@@ -130,7 +123,7 @@ export async function sendMessage(message, options = {}) {
 
   // Check if this should be handled as a streaming operation
   if (!forceRegular && isTranslationAction(message.action)) {
-    getLogger().debug('Routing translation message through coordinator:', {
+    logger.debug('Routing translation message through coordinator:', {
       action: message.action,
       messageId: message.messageId,
       context: message.context
@@ -141,12 +134,12 @@ export async function sendMessage(message, options = {}) {
     } catch (error) {
       // Check if this is a user cancellation or non-retryable error - if so, don't attempt fallback
       if (isFatalError(error)) {
-        getLogger().debug('Translation failed with non-retryable error, not attempting fallback:', error);
+        logger.debug('Translation failed with non-retryable error, not attempting fallback:', error);
         throw error; // Re-throw error without fallback
       }
 
       // If coordination fails, fall back to regular messaging
-      getLogger().debug('Translation coordination failed, falling back to regular messaging:', error);
+      logger.debug('Translation coordination failed, falling back to regular messaging:', error);
 
       // Check if this is a streaming timeout and translation might already be complete
       const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');
@@ -162,17 +155,17 @@ export async function sendMessage(message, options = {}) {
           });
 
           if (checkResponse && checkResponse.completed) {
-            getLogger().info('Streaming timeout detected but translation already completed, skipping fallback');
+            logger.info('Streaming timeout detected but translation already completed, skipping fallback');
             return checkResponse.results;
           }
         } catch (checkError) {
-          getLogger().debug('Could not check translation status, proceeding with fallback:', checkError);
+          logger.debug('Could not check translation status, proceeding with fallback:', checkError);
         }
       }
 
       // Check if the original operation was cancelled before attempting fallback
       if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-        getLogger().debug('Original operation was cancelled, skipping fallback message');
+        logger.debug('Original operation was cancelled, skipping fallback message');
         throw new Error('Translation cancelled by user');
       }
 
@@ -180,7 +173,7 @@ export async function sendMessage(message, options = {}) {
       if (error.type === 'OPERATION_TIMEOUT' || (error.message && error.message.includes('timed out'))) {
         // For streaming timeouts, we should not fallback as the user likely cancelled
         if (message.context === 'select-element' || (message.data && message.data.mode === 'select_element')) {
-          getLogger().debug('Streaming timeout detected for select element, not attempting fallback');
+          logger.debug('Streaming timeout detected for select element, not attempting fallback');
           const timeoutError = new Error('Streaming translation timed out - user likely cancelled');
 
           // Handle through ErrorHandler before throwing
@@ -190,14 +183,14 @@ export async function sendMessage(message, options = {}) {
               messageId: message.messageId,
               showToast: false
             }).catch(handlerError => {
-              getLogger().warn('ErrorHandler failed to handle streaming timeout:', handlerError);
+              logger.warn('ErrorHandler failed to handle streaming timeout:', handlerError);
             });
           }
 
           throw timeoutError;
         }
 
-        getLogger().debug('Timeout detected, not attempting fallback as operation is likely cancelled');
+        logger.debug('Timeout detected, not attempting fallback as operation is likely cancelled');
         const timeoutError = new Error('Translation timed out - operation cancelled');
 
         // Handle through ErrorHandler before throwing
@@ -207,7 +200,7 @@ export async function sendMessage(message, options = {}) {
             messageId: message.messageId,
             showToast: false
           }).catch(handlerError => {
-            getLogger().warn('ErrorHandler failed to handle timeout:', handlerError);
+            logger.warn('ErrorHandler failed to handle timeout:', handlerError);
           });
         }
 
@@ -220,7 +213,7 @@ export async function sendMessage(message, options = {}) {
         messageId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
 
-      getLogger().info('Using fallback message with new ID:', {
+      logger.info('Using fallback message with new ID:', {
         originalId: message.messageId,
         fallbackId: fallbackMessage.messageId
       });
@@ -241,7 +234,7 @@ export async function sendRegularMessage(message, options = {}) {
   const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
 
   if (!silent) {
-    getLogger().debug(`Sending ${message.action} to background (${actionTimeout}ms timeout)`);
+    logger.debug(`Sending ${message.action} to background (${actionTimeout}ms timeout)`);
   }
 
   try {
@@ -254,7 +247,7 @@ export async function sendRegularMessage(message, options = {}) {
     // Check if streaming operation was cancelled before sending the message
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
       if (!silent) {
-        getLogger().debug('Streaming operation was cancelled, not sending message');
+        logger.debug('Streaming operation was cancelled, not sending message');
       }
       const cancelError = new Error(ErrorTypes.USER_CANCELLED);
       cancelError.type = ErrorTypes.USER_CANCELLED;
@@ -283,7 +276,7 @@ export async function sendRegularMessage(message, options = {}) {
         if (window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           if (!silent) {
-            getLogger().debug('ESC flag detected, cancelling message immediately');
+            logger.debug('ESC flag detected, cancelling message immediately');
           }
           const cancelError = new Error('Translation cancelled by user ESC');
           cancelError.type = 'USER_CANCELLED';
@@ -316,7 +309,7 @@ export async function sendRegularMessage(message, options = {}) {
     if (response.success === false) {
       // Simplified logging to avoid console noise from large partialResults
       if (!silent) {
-        getLogger().debug(`Response with success=false received for ${message.action}:`, {
+        logger.debug(`Response with success=false received for ${message.action}:`, {
           error: response.error?.message || response.error || 'Unknown error',
           hasPartialResults: !!response.partialResults
         });
@@ -325,7 +318,7 @@ export async function sendRegularMessage(message, options = {}) {
       // Check if this is a restricted page error - if so, return the response instead of throwing
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
         if (!silent) {
-          getLogger().debug('Restricted page detected, returning response without throwing error');
+          logger.debug('Restricted page detected, returning response without throwing error');
         }
         return response;
       }
@@ -349,7 +342,7 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (!silent) {
-      getLogger().debug(`Regular message response received: ${message.action}`);
+      logger.debug(`Regular message response received: ${message.action}`);
     }
 
     return response;
@@ -357,7 +350,7 @@ export async function sendRegularMessage(message, options = {}) {
     const errorType = matchErrorToType(error);
 
     // Simplified debug log
-    getLogger().debug(`Error type detected: ${errorType} for message: ${message.action}`, {
+    logger.debug(`Error type detected: ${errorType} for message: ${message.action}`, {
       errorMessage: error.message
     });
 
@@ -368,17 +361,17 @@ export async function sendRegularMessage(message, options = {}) {
          errorType === ErrorTypes.CONTEXT ||
          errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED)) {
       // TTS stop errors are expected when offscreen document is closed
-      getLogger().debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
+      logger.debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
     } else if (errorType === ErrorTypes.TAB_BROWSER_INTERNAL ||
                errorType === ErrorTypes.TAB_EXTENSION_PAGE ||
                errorType === ErrorTypes.TAB_LOCAL_FILE ||
                errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
                errorType === ErrorTypes.TAB_RESTRICTED) {
       // Tab accessibility errors should be debug level
-      getLogger().debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
+      logger.debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
     } else if (errorType === ErrorTypes.USER_CANCELLED) {
       // User cancellation should be debug level, not error
-      getLogger().debug(`Message cancelled for ${message.action}:`, {
+      logger.debug(`Message cancelled for ${message.action}:`, {
         message: error.message || error,
         errorType: errorType,
         fullError: error

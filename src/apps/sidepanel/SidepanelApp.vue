@@ -47,7 +47,8 @@ import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSGlobalManager } from '@/features/tts/core/TTSGlobalManager.js'
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
@@ -210,7 +211,6 @@ const initialize = async () => {
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
     // Extract error type for reactive translation
-    const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js')
     errorType.value = matchErrorToType(error)
   } finally {
     logger.debug('✅ SidepanelApp initialization complete')

@@ -5,15 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage as sendUnifiedMessage } from '../core/UnifiedMessaging.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
-  }
-  return logger;
-}
-
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 /**
  * Provides a standardized interface for messaging within Vue components.
@@ -47,9 +39,9 @@ export function useMessaging(context) {
     } catch (error) {
       // Handle context errors silently (they're expected when extension reloads)
       if (ExtensionContextManager.isContextError(error)) {
-        getLogger().debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
+        logger.debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
       } else {
-        getLogger().error('sendMessage failed via UnifiedMessaging:', error);
+        logger.error('sendMessage failed via UnifiedMessaging:', error);
       }
       throw error;
     }
@@ -81,9 +73,9 @@ export function useMessaging(context) {
     sendUnifiedMessage(message, options).catch(error => {
       // Handle context errors silently, log other errors
       if (ExtensionContextManager.isContextError(error)) {
-        getLogger().debug(`[useMessaging:${context}] Fire-and-forget failed due to extension context invalidated (expected):`, error.message);
+        logger.debug(`[useMessaging:${context}] Fire-and-forget failed due to extension context invalidated (expected):`, error.message);
       } else {
-        getLogger().debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
+        logger.debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
       }
     });
   };

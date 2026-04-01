@@ -4,35 +4,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-store');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-store');
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -70,7 +42,7 @@ export const useTranslationStore = defineStore('translation', () => {
     // This store is currently not directly handling translation requests.
     // Translation logic is handled by composables (e.g., useSidepanelTranslation, usePopupTranslation)
     // which use UnifiedMessenger directly.
-    getLogger().warn("TranslationStore: translateText is a placeholder. Use composables for translation.");
+    logger.warn("TranslationStore: translateText is a placeholder. Use composables for translation.");
     return Promise.resolve(null);
 
     /* 
@@ -123,7 +95,7 @@ export const useTranslationStore = defineStore('translation', () => {
       return result
     } catch (err) {
       error.value = err.message || 'Translation failed'
-      getLogger().error('Translation error:', err)
+      logger.error('Translation error:', err)
       throw new Error(`Translation failed: ${err.message}`)
     } finally {
       isLoading.value = false
@@ -151,18 +123,18 @@ export const useTranslationStore = defineStore('translation', () => {
   const setProvider = async (provider) => {
     // This store is currently not directly setting providers.
     // Provider selection is handled by useApiProvider composable.
-    getLogger().warn("TranslationStore: setProvider is a placeholder. Use useApiProvider for provider selection.");
+    logger.warn("TranslationStore: setProvider is a placeholder. Use useApiProvider for provider selection.");
     selectedProvider.value = provider; // Still update local state
   }
 
   const resetProviders = async () => {
     // This store is currently not directly resetting providers.
-    getLogger().warn("TranslationStore: resetProviders is a placeholder.");
+    logger.warn("TranslationStore: resetProviders is a placeholder.");
   }
 
   const isProviderSupported = async () => {
     // This store is currently not directly checking provider support.
-    getLogger().warn("TranslationStore: isProviderSupported is a placeholder.");
+    logger.warn("TranslationStore: isProviderSupported is a placeholder.");
     return false;
   }
 

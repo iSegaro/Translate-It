@@ -1,38 +1,9 @@
-
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageFormat } from './MessagingCore.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
 
 class MessageHandler {
   constructor() {
@@ -45,7 +16,7 @@ class MessageHandler {
 
   registerHandler(action, handler) {
     if (this.handlers.has(action)) {
-      getLogger().warn(`Handler for action '${action}' is already registered. Overwriting.`);
+      logger.warn(`Handler for action '${action}' is already registered. Overwriting.`);
     }
     this.handlers.set(action, handler);
 
@@ -57,9 +28,9 @@ class MessageHandler {
       this._registrationTimeout = setTimeout(() => {
         const count = this._pendingRegistrations.length;
         if (count > 1) {
-          getLogger().debug(`🔧 ${count} handlers registered: ${this._pendingRegistrations.join(', ')}`);
+          logger.debug(`🔧 ${count} handlers registered: ${this._pendingRegistrations.join(', ')}`);
         } else {
-          getLogger().debug(`Handler registered for action: ${this._pendingRegistrations[0]}`);
+          logger.debug(`Handler registered for action: ${this._pendingRegistrations[0]}`);
         }
         this._pendingRegistrations = [];
         this._registrationTimeout = null;
@@ -70,7 +41,7 @@ class MessageHandler {
   unregisterHandler(action) {
     if (this.handlers.has(action)) {
       this.handlers.delete(action);
-      getLogger().debug(`Handler for action '${action}' unregistered.`);
+      logger.debug(`Handler for action '${action}' unregistered.`);
     }
   }
 
@@ -86,7 +57,7 @@ class MessageHandler {
   _handleMessage(message, sender, sendResponse) {
     // Allow messages with just action (for backward compatibility)
     if (!message || !message.action) {
-      getLogger().warn('Received message without action.');
+      logger.warn('Received message without action.');
       return false;
     }
 
@@ -107,7 +78,7 @@ class MessageHandler {
             this._sendResponse(messageId, response);
           })
           .catch(error => {
-            getLogger().error(`Error in promise-based handler for ${action}:`, error);
+            logger.error(`Error in promise-based handler for ${action}:`, error);
             const errorResponse = MessageFormat.createErrorResponse(error, messageId);
             this._sendResponse(messageId, errorResponse);
           });
@@ -115,16 +86,16 @@ class MessageHandler {
         return true;
       } else if (result === true) {
         // Handler indicates it will send response asynchronously
-        getLogger().debug(`Async response handler for ${action}`);
+        logger.debug(`Async response handler for ${action}`);
         return true;
       } else {
-        getLogger().debug(`Synchronous handler for ${action}. Sending response immediately.`);
+        logger.debug(`Synchronous handler for ${action}. Sending response immediately.`);
         try {
           if (sendResponse && result !== undefined) {
             sendResponse(result);
           }
         } catch (error) {
-          getLogger().warn(`Failed to send synchronous response for ${action}:`, error);
+          logger.warn(`Failed to send synchronous response for ${action}:`, error);
         }
         return false;
       }
@@ -133,7 +104,7 @@ class MessageHandler {
       // Don't log for these to reduce verbosity
       const streamingActions = ['TRANSLATION_STREAM_UPDATE', 'TRANSLATION_STREAM_END', 'TRANSLATION_RESULT_UPDATE'];
       if (!streamingActions.includes(action)) {
-        getLogger().debug(`No handler for: ${action}`);
+        logger.debug(`No handler for: ${action}`);
       }
       // No handler, so we don't need to keep the message channel open
       // Return false to allow other listeners to handle the message
@@ -158,22 +129,22 @@ class MessageHandler {
 
   _sendResponse(messageId, response) {
     const sendResponse = this.pendingResponses.get(messageId);
-    getLogger().debug(`Sending response for messageId ${messageId}:`, response);
+    logger.debug(`Sending response for messageId ${messageId}:`, response);
     if (sendResponse) {
       try {
         sendResponse(response);
       } catch (error) {
-        getLogger().warn(`Failed to send response for messageId ${messageId}:`, error.message);
+        logger.warn(`Failed to send response for messageId ${messageId}:`, error.message);
       }
       this.pendingResponses.delete(messageId);
     } else {
-      getLogger().debug(`No pending response found for messageId: ${messageId}`);
+      logger.debug(`No pending response found for messageId: ${messageId}`);
     }
   }
 
   listen() {
     if (this.isListenerActive) {
-      getLogger().warn('Message listener is already active.');
+      logger.warn('Message listener is already active.');
       return;
     }
     
@@ -181,7 +152,7 @@ class MessageHandler {
     this._boundHandleMessage = this._handleMessage.bind(this);
     browser.runtime.onMessage.addListener(this._boundHandleMessage);
     this.isListenerActive = true;
-    getLogger().debug('Message listener activated.');
+    logger.debug('Message listener activated.');
   }
 
   /**
@@ -198,7 +169,7 @@ class MessageHandler {
     }
     
     this.isListenerActive = false;
-    getLogger().debug('Message listener deactivated.');
+    logger.debug('Message listener deactivated.');
   }
 }
 

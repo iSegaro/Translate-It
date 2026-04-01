@@ -12,38 +12,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js'
 import { isRTLLanguage } from '@/features/element-selection/utils/textDirection.js'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont');
-      // Ensure logger is not null
-      if (!logger) {
-        logger = {
-          debug: () => {},
-          warn: () => {},
-          error: () => {},
-          info: () => {},
-          init: () => {}
-        };
-      }
-    } catch {
-      // Fallback to noop logger
-      logger = {
-        debug: () => {},
-        warn: () => {},
-        error: () => {},
-        info: () => {},
-        init: () => {}
-      };
-    }
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont');
 
-// Font CSS mapping with fallbacks
-const FONT_CSS_MAP = {
+/**
+ * useFont.js - Font management composable
   'auto': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
   'system': 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto',
   'vazirmatn': '"Vazirmatn", "Vazir", Tahoma, Arial, sans-serif',
@@ -137,7 +109,7 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
     try {
       return systemFontDetector.getFontCSSFamily(fontValue)
     } catch (error) {
-      getLogger().warn('Failed to get font CSS from SystemFontDetector, using fallback:', error)
+      logger.warn('Failed to get font CSS from SystemFontDetector, using fallback:', error)
       return FONT_CSS_MAP[fontValue] || FONT_CSS_MAP[fallbackFont]
     }
   })
@@ -188,9 +160,9 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
         root.style.setProperty(property, value)
       })
       appliedVariables.value = true
-      getLogger().debug('Applied global CSS variables for fonts', cssVariables.value)
+      logger.debug('Applied global CSS variables for fonts', cssVariables.value)
     } catch (error) {
-      getLogger().warn('Failed to apply global CSS variables:', error)
+      logger.warn('Failed to apply global CSS variables:', error)
     }
   }
   
@@ -204,9 +176,9 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
         root.style.removeProperty(property)
       })
       appliedVariables.value = false
-      getLogger().debug('Removed global CSS variables for fonts')
+      logger.debug('Removed global CSS variables for fonts')
     } catch (error) {
-      getLogger().warn('Failed to remove global CSS variables:', error)
+      logger.warn('Failed to remove global CSS variables:', error)
     }
   }
   
@@ -257,7 +229,7 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
       const fonts = await systemFontDetector.getAvailableFonts()
       availableFonts.value = fonts
     } catch (error) {
-      getLogger().warn('Failed to load available fonts:', error)
+      logger.warn('Failed to load available fonts:', error)
       availableFonts.value = []
     }
   }
@@ -274,7 +246,7 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
       isFontLoaded.value = true
       return true
     } catch (error) {
-      getLogger().warn('Font loading check failed:', error)
+      logger.warn('Font loading check failed:', error)
       isFontLoaded.value = false
       return false
     }
