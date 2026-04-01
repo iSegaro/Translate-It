@@ -4,6 +4,7 @@ import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { PageTranslationEvents } from '@/core/PageEventBus.js';
+import { stripBiDiMarks } from '@/utils/dom/DomDirectionManager.js';
 
 /**
  * PageTranslationHoverManager - Lightweight tooltip to show original text on hover.
@@ -152,7 +153,11 @@ export class PageTranslationHoverManager extends ResourceTracker {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
         const original = pageTranslationLookup.get(attr);
-        if (original) {
+        
+        // FIX: Only show original text for attributes if it was actually translated.
+        // We strip BiDi marks (RLM/LRM) from the current value before comparison to detect if
+        // the core content has changed.
+        if (original && original !== stripBiDiMarks(attr.value)) {
           finalLines.push(`[${attr.name}]: ${original}`);
         }
       }

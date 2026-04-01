@@ -24,6 +24,16 @@ export const BIDI_MARKS = {
 };
 
 /**
+ * Removes BiDi control marks (RLM, LRM) from a string.
+ * @param {string} text 
+ * @returns {string}
+ */
+export function stripBiDiMarks(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(/[\u200E\u200F]/g, '');
+}
+
+/**
  * Detect text direction from actual text content (more accurate for mixed content)
  * Uses strong directional character detection following Unicode Bidirectional Algorithm principles
  * @param {string} text - Text to analyze
@@ -234,6 +244,7 @@ export function restoreElementDirection(element) {
       el.removeAttribute('data-dir-original-saved');
       el.removeAttribute('data-translate-dir');
       el.removeAttribute('data-page-translated');
+      el.removeAttribute('data-has-original');
     }
   };
 
