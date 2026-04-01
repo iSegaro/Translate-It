@@ -18,10 +18,9 @@ export const ProviderCategories = {
 
 /**
  * The Central Manifest
- * Each entry defines everything the system needs to know about a provider.
- * Sorted by category to ensure proper grouping in UI (Context Menus, Dropdowns)
+ * Wrapped in a function to enable lazy initialization and avoid TDZ issues
  */
-const RAW_MANIFEST = [
+const getRawManifest = () => [
   // --- Group: FREE ---
   {
     id: ProviderRegistryIds.GOOGLE_V2,
@@ -197,26 +196,38 @@ const RAW_MANIFEST = [
   },
 ];
 
+let cachedManifest = null;
+
 /**
  * Process manifest to add dynamic i18n keys
  */
-export const PROVIDER_MANIFEST = RAW_MANIFEST.map(provider => ({
-  ...provider,
-  titleKey: `provider_${provider.id}_title`,
-  descriptionKey: `provider_${provider.id}_description`
-}));
+export const getProviderManifest = () => {
+  if (cachedManifest) return cachedManifest;
+  
+  cachedManifest = getRawManifest().map(provider => ({
+    ...provider,
+    titleKey: `provider_${provider.id}_title`,
+    descriptionKey: `provider_${provider.id}_description`
+  }));
+  
+  return cachedManifest;
+};
+
+// Backward compatibility for existing imports
+export const PROVIDER_MANIFEST = getProviderManifest();
 
 /**
  * Helper: Find provider by Registry ID
  */
-export const findProviderById = (id) => PROVIDER_MANIFEST.find(p => p.id === id);
+export const findProviderById = (id) => getProviderManifest().find(p => p.id === id);
 
 /**
  * Helper: Find provider by Provider Name
  */
-export const findProviderByName = (name) => PROVIDER_MANIFEST.find(p => p.name === name);
+export const findProviderByName = (name) => getProviderManifest().find(p => p.name === name);
 
 /**
  * Helper: Get all active/supported providers
  */
-export const getActiveProviders = () => PROVIDER_MANIFEST.filter(p => p.supported);
+export const getActiveProviders = () => getProviderManifest().filter(p => p.supported);
+
