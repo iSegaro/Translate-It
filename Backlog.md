@@ -7,6 +7,7 @@ List of features, enhancements, and ideas planned for future development.
 - **PDF Support**: Enable direct translation of text within PDF files.
 - **ESC Key Flexibility**: Add option to revert and cancel `Select Element` via `ESC`.
 - **Translation Speed Control**: Allow users to prioritize between **Performance (Speed)** and **Cost-Efficiency** based on the translation provider.
+- **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Dependency Management**: Update `npm packages` to latest versions.
 
 ---
