@@ -1,10 +1,9 @@
 // src/config.js
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS } from './constants.js';
 
@@ -487,8 +486,7 @@ export const getSettingsAsync = async () => {
     // Combine fetched items with defaults to ensure all keys exist
     return { ...CONFIG, ...items };
   } catch (error) {
-    const handler = ErrorHandler.getInstance();
-    handler.handle(error, { type: ErrorTypes.SERVICE, context: 'config-getSettingsAsync' });
+    logger.error('config-getSettingsAsync error:', error);
     return { ...CONFIG }; // Use defaults on error
   }
 };
@@ -535,21 +533,13 @@ const getSettingValueAsync = async (key, defaultValue) => {
     // logger.debug(`[config] Retrieved value for ${key}:`, result[key] ? 'present' : 'not present');
     return result[key];
   } catch (error) {
-    const handler = ErrorHandler.getInstance();
-    handler.handle(error, { type: ErrorTypes.SERVICE, context: `config-getSettingValueAsync-${key}` });
+    logger.error(`config-getSettingValueAsync-${key} error:`, error);
     return defaultValue;
   }
 };
 
 export const getDebugModeAsync = async () => {
   const debugMode = await getSettingValueAsync("DEBUG_MODE", CONFIG.DEBUG_MODE);
-  // Update ErrorHandler with current debug mode
-  try {
-    const errorHandler = ErrorHandler.getInstance();
-    errorHandler.setDebugMode(debugMode);
-  } catch {
-    // Ignore errors during ErrorHandler setup
-  }
   return debugMode;
 };
 

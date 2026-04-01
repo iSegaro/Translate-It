@@ -7,12 +7,11 @@
  */
 
 // Early debug to trace module evaluation order
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import SmartCache from '@/core/memory/SmartCache.js';
 import { MEMORY_TIMING } from '@/core/memory/constants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -249,8 +248,9 @@ class StorageCore extends ResourceTracker {
       return { ...defaultValues, ...result };
 
     } catch (error) {
-      const handler = ErrorHandler.getInstance();
-      handler.handle(error, { type: ErrorTypes.SERVICE, context: 'StorageCore-get' });
+      // StorageCore should not handle its own errors via ErrorHandler
+      // to avoid circular dependencies. We just throw and let the caller handle it.
+      logger.error('StorageCore-get error:', error);
       throw error;
     }
   }
