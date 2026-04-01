@@ -196,7 +196,7 @@ import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
 import IconTTS from '@/icons/ui/speaker.png';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'DesktopFabMenu');
+const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
 const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
@@ -436,20 +436,24 @@ const toggleMenu = () => {
   const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK;
   
   if (isOnFabClickMode) {
+    logger.info('Translation triggered via Desktop FAB click');
     triggerTranslation();
     isMenuOpen.value = false;
   } else {
     isMenuOpen.value = !isMenuOpen.value;
+    logger.debug(isMenuOpen.value ? 'Desktop FAB menu opened' : 'Desktop FAB menu closed');
   }
 };
 
 const handleMenuItemClick = async (item) => {
+  logger.info('Desktop FAB menu item clicked', { id: item.id });
   if (item.closeMenu) isMenuOpen.value = false;
   if (typeof item.action === 'function') await item.action();
 };
 
 const handleOpenSettings = async () => {
   try {
+    logger.info('Opening settings from Desktop FAB');
     await sendMessage({ action: MessageActions.OPEN_OPTIONS_PAGE });
     isMenuOpen.value = false;
   } catch (err) {
@@ -459,6 +463,7 @@ const handleOpenSettings = async () => {
 
 const handleRevert = async () => {
   try {
+    logger.info('Reverting translations from Desktop FAB');
     mobileStore.setHasElementTranslations(false);
     await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
   } catch (err) {
@@ -468,8 +473,10 @@ const handleRevert = async () => {
 
 const handleTTS = async () => {
   if (isThisTTSActive.value && (tts.isPlaying.value || tts.isLoading.value)) {
+    logger.info('Stopping TTS from Desktop FAB');
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
+    logger.info('Starting TTS from Desktop FAB');
     isLocalLoading.value = true;
     try {
       const result = await tts.speak(pendingSelection.value.text);
@@ -524,6 +531,10 @@ const stopDrag = () => {
   tracker.removeEventListener(window, 'mousemove', onDrag);
   tracker.removeEventListener(window, 'mouseup', stopDrag);
   
+  if (isDragging.value) {
+    logger.debug('Desktop FAB drag ended', { side: side.value, y: verticalPos.value });
+  }
+
   setTimeout(async () => { 
     isDragging.value = false; 
     try {

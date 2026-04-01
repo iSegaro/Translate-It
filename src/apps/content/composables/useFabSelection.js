@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'useFabSelection');
+const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'useFabSelection');
 
 /**
  * Composable for managing FAB-specific selection state and logic.

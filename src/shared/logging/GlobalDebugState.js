@@ -52,6 +52,7 @@ const globalState = {
     Subtitle: 2,
     TTS: 2,
     Mobile: 2,
+    DesktopFab: 2,
 
     // Services/Utilities
     Browser: 2,

@@ -39,6 +39,7 @@ export const LOG_COMPONENTS = {
 
   // Mobile
   MOBILE: 'Mobile',               // src/features/mobile/
+  DESKTOP_FAB: 'DesktopFab',      // src/apps/content/components/desktop/
 
   // Content Applications
   CONTENT_APP: 'ContentApp',      // src/apps/content/
