@@ -144,7 +144,7 @@ const isTopFrame = window === window.top;
 const canAccessTop = (() => {
   try {
     return !!(window.top && window.top.location && window.top.location.href);
-  } catch (e) {
+  } catch {
     return false;
   }
 })();

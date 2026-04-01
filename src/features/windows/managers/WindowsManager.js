@@ -284,7 +284,7 @@ export class WindowsManager extends ResourceTracker {
     return deviceDetector.shouldEnableMobileUI();
   }
 
-  async show(selectedText, position, options = {}) {
+  async show(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, aborting show()');
       return;

@@ -5,61 +5,116 @@
   >
     <div class="ti-m-dashboard-scroll-container">
       <!-- Translate Page Button -->
-      <button class="ti-m-action-btn" @click="translatePage">
+      <button
+        class="ti-m-action-btn"
+        @click="translatePage"
+      >
         <div class="ti-m-icon-container ti-m-icon-translate-page">
-          <img :src="wholePageIcon" :alt="t('mobile_dashboard_page_label')" class="ti-toolbar-icon">
+          <img
+            :src="wholePageIcon"
+            :alt="t('mobile_dashboard_page_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
       </button>
 
       <!-- Select Element Button -->
-      <button class="ti-m-action-btn" @click="activateSelectElement">
+      <button
+        class="ti-m-action-btn"
+        @click="activateSelectElement"
+      >
         <div class="ti-m-icon-container ti-m-icon-select-element">
-          <img :src="selectIcon" :alt="t('mobile_dashboard_select_label')" class="ti-toolbar-icon">
+          <img
+            :src="selectIcon"
+            :alt="t('mobile_dashboard_select_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
       </button>
 
       <!-- Manual Translation Button -->
-      <button class="ti-m-action-btn" @click="goToInputView">
+      <button
+        class="ti-m-action-btn"
+        @click="goToInputView"
+      >
         <div class="ti-m-icon-container ti-m-icon-manual-input">
-          <img :src="inputIcon" :alt="t('mobile_dashboard_input_label')" class="ti-toolbar-icon">
+          <img
+            :src="inputIcon"
+            :alt="t('mobile_dashboard_input_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
       </button>
 
       <!-- History Button -->
-      <button class="ti-m-action-btn" @click="goToHistoryView">
+      <button
+        class="ti-m-action-btn"
+        @click="goToHistoryView"
+      >
         <div class="ti-m-icon-container ti-m-icon-history">
-          <img :src="historyIcon" :alt="t('mobile_dashboard_history_label')" class="ti-toolbar-icon">
+          <img
+            :src="historyIcon"
+            :alt="t('mobile_dashboard_history_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_history_label') || 'History' }}</span>
       </button>
 
       <!-- TTS Button (Dynamic) -->
-      <button v-if="isTTSVisible" class="ti-m-action-btn" @click="handleTTS">
+      <button
+        v-if="isTTSVisible"
+        class="ti-m-action-btn"
+        @click="handleTTS"
+      >
         <div
           class="ti-m-icon-container ti-m-icon-tts"
           :class="{ 'is-playing': tts.isPlaying.value }"
         >
-          <div v-if="tts.isLoading.value" class="ti-m-tts-loader"></div>
-          <img v-else :src="ttsIcon" :alt="t('mobile_selection_speak_tooltip')" class="ti-toolbar-icon">
+          <div
+            v-if="tts.isLoading.value"
+            class="ti-m-tts-loader"
+          />
+          <img
+            v-else
+            :src="ttsIcon"
+            :alt="t('mobile_selection_speak_tooltip')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ tts.isPlaying.value ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}</span>
       </button>
 
       <!-- Revert Element Translations (Dynamic) -->
-      <button v-if="hasElementTranslations" class="ti-m-action-btn" @click="revertTranslations">
+      <button
+        v-if="hasElementTranslations"
+        class="ti-m-action-btn"
+        @click="revertTranslations"
+      >
         <div class="ti-m-icon-container ti-m-icon-revert">
-          <img :src="revertIcon" :alt="t('mobile_dashboard_revert_label')" class="ti-toolbar-icon">
+          <img
+            :src="revertIcon"
+            :alt="t('mobile_dashboard_revert_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
       </button>
 
       <!-- Settings Button -->
-      <button class="ti-m-action-btn" @click="openSettings">
+      <button
+        class="ti-m-action-btn"
+        @click="openSettings"
+      >
         <div class="ti-m-icon-container ti-m-icon-settings">
-          <img :src="settingsIcon" :alt="t('mobile_dashboard_settings_label')" class="ti-toolbar-icon">
+          <img
+            :src="settingsIcon"
+            :alt="t('mobile_dashboard_settings_label')"
+            class="ti-toolbar-icon"
+          >
         </div>
         <span class="ti-m-action-label">{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
       </button>

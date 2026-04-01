@@ -28,7 +28,10 @@
         </button>
         
         <!-- Status Info (Now on the Left) -->
-        <div class="ti-m-header-status-row" @click="goToDashboard">
+        <div
+          class="ti-m-header-status-row"
+          @click="goToDashboard"
+        >
           <PageTranslationStatus 
             mode="mobile-header"
           />

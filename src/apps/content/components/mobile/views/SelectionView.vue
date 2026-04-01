@@ -26,7 +26,10 @@
             />
           </svg>
         </button>
-        <div class="ti-m-lang-pair" @click="goBack">
+        <div
+          class="ti-m-lang-pair"
+          @click="goBack"
+        >
           <span class="ti-m-lang-target">{{ selectionData.targetLang }}</span>
           <img
             src="@/icons/ui/swap.png"
@@ -120,8 +123,6 @@ import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
@@ -129,7 +130,6 @@ const settingsStore = useSettingsStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useI18n()
 const tts = useTTSSmart()
-const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'SelectionView')
 
 watch(() => selectionData.value.translation, (newTranslation) => {
   if (newTranslation && newTranslation.length > 200 && sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {

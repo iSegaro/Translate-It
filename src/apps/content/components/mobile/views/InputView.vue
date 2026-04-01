@@ -25,7 +25,10 @@
           />
         </svg>
       </button>
-      <span class="ti-m-header-title" @click="goBack">{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+      <span
+        class="ti-m-header-title"
+        @click="goBack"
+      >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
     </div>
 
     <!-- Input Card -->

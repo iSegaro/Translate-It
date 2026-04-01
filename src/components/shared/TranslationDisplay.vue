@@ -21,8 +21,14 @@
     :style="cssVariables"
   >
     <!-- Simplified Loading State -->
-    <div v-if="isLoading" class="ti-loading-overlay">
-      <LoadingSpinner type="animated" size="lg" />
+    <div
+      v-if="isLoading"
+      class="ti-loading-overlay"
+    >
+      <LoadingSpinner
+        type="animated"
+        size="lg"
+      />
     </div>
 
     <!-- Main Content State -->
@@ -58,50 +64,107 @@
         :style="mode === 'mobile' ? { ...fontStyles, ...cssVariables } : { ...(fontStyles || {}), ...(cssVariables || {}) }"
         @click="handleContentClick"
       >
-        <div v-if="hasError" class="error-message">
-          <div class="error-text">⚠️ {{ displayErrorMessage }}</div>
-          <div v-if="canRetry || canOpenSettings" class="error-actions">
-            <button v-if="canRetry" class="error-action retry-btn" @click="handleRetry">
+        <div
+          v-if="hasError"
+          class="error-message"
+        >
+          <div class="error-text">
+            ⚠️ {{ displayErrorMessage }}
+          </div>
+          <div
+            v-if="canRetry || canOpenSettings"
+            class="error-actions"
+          >
+            <button
+              v-if="canRetry"
+              class="error-action retry-btn"
+              @click="handleRetry"
+            >
               🔄 {{ t('action_retry') }}
             </button>
-            <button v-if="canOpenSettings" class="error-action settings-btn" @click="handleSettings">
+            <button
+              v-if="canOpenSettings"
+              class="error-action settings-btn"
+              @click="handleSettings"
+            >
               ⚙️ {{ t('action_settings') }}
             </button>
           </div>
         </div>
 
         <!-- Placeholder State -->
-        <div v-else-if="!content" class="placeholder-message">
+        <div
+          v-else-if="!content"
+          class="placeholder-message"
+        >
           {{ placeholder }}
         </div>
 
         <!-- Normal Content with Markdown Support -->
-        <div v-else v-html="sanitizedContent" />
+        <div
+          v-else
+          v-html="sanitizedContent"
+        />
       </div>
 
       <!-- Mobile Actions Row -->
-      <div v-if="mode === 'mobile' && hasContent" class="ti-mobile-actions" @click.stop>
+      <div
+        v-if="mode === 'mobile' && hasContent"
+        class="ti-mobile-actions"
+        @click.stop
+      >
         <button 
           class="mobile-action-btn secondary-action" 
           :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle" 
           @click="handleMobileSpeak"
         >
-          <svg v-if="ttsStatus === 'playing'" viewBox="0 0 24 24" class="mobile-action-icon">
-            <rect x="6" y="6" width="12" height="12" rx="1.5" />
+          <svg
+            v-if="ttsStatus === 'playing'"
+            viewBox="0 0 24 24"
+            class="mobile-action-icon"
+          >
+            <rect
+              x="6"
+              y="6"
+              width="12"
+              height="12"
+              rx="1.5"
+            />
           </svg>
-          <img v-else src="@/icons/ui/speaker.png" :alt="ttsAlt" class="mobile-action-icon">
+          <img
+            v-else
+            src="@/icons/ui/speaker.png"
+            :alt="ttsAlt"
+            class="mobile-action-icon"
+          >
           <span class="mobile-action-label">
             {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
           </span>
         </button>
         
-        <button class="mobile-action-btn secondary-action" :title="copyTitle" @click="handleMobileCopy">
-          <img src="@/icons/ui/copy.png" :alt="copyAlt" class="mobile-action-icon">
+        <button
+          class="mobile-action-btn secondary-action"
+          :title="copyTitle"
+          @click="handleMobileCopy"
+        >
+          <img
+            src="@/icons/ui/copy.png"
+            :alt="copyAlt"
+            class="mobile-action-icon"
+          >
           <span class="mobile-action-label">{{ t('mobile_selection_copy_tooltip') }}</span>
         </button>
         
-        <button class="mobile-action-btn icon-only-action" :title="t('mobile_selection_history_tooltip')" @click="handleMobileHistory">
-          <img src="@/icons/ui/history.svg" :alt="t('mobile_history_button_alt')" class="mobile-action-icon">
+        <button
+          class="mobile-action-btn icon-only-action"
+          :title="t('mobile_selection_history_tooltip')"
+          @click="handleMobileHistory"
+        >
+          <img
+            src="@/icons/ui/history.svg"
+            :alt="t('mobile_history_button_alt')"
+            class="mobile-action-icon"
+          >
         </button>
       </div>
     </template>

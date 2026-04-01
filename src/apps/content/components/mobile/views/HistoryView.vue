@@ -25,7 +25,10 @@
           />
         </svg>
       </button>
-      <span class="ti-m-header-title" @click="goBack">{{ t('history_title') || 'Translation History' }}</span>
+      <span
+        class="ti-m-header-title"
+        @click="goBack"
+      >{{ t('history_title') || 'Translation History' }}</span>
       
       <div
         v-if="hasHistory"
@@ -46,11 +49,25 @@
             class="ti-m-native-select"
             @change="handleNativeExport"
           >
-            <option value="" disabled selected>{{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}</option>
-            <option value="json_clean">{{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'JSON (Clean)' }}</option>
-            <option value="json_raw">{{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'JSON (Raw)' }}</option>
-            <option value="csv">{{ t('SIDEPANEL_EXPORT_CSV') || 'CSV' }}</option>
-            <option value="anki">{{ t('SIDEPANEL_EXPORT_ANKI') || 'Anki' }}</option>
+            <option
+              value=""
+              disabled
+              selected
+            >
+              {{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}
+            </option>
+            <option value="json_clean">
+              {{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'JSON (Clean)' }}
+            </option>
+            <option value="json_raw">
+              {{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'JSON (Raw)' }}
+            </option>
+            <option value="csv">
+              {{ t('SIDEPANEL_EXPORT_CSV') || 'CSV' }}
+            </option>
+            <option value="anki">
+              {{ t('SIDEPANEL_EXPORT_ANKI') || 'Anki' }}
+            </option>
           </select>
         </div>
 

@@ -141,7 +141,7 @@ export function usePositioning(initialPosition, options = {}) {
     currentPosition.value = clampToViewport({ x: newX, y: newY });
   };
 
-  const stopDrag = (event) => {
+  const stopDrag = () => {
     isDragging.value = false;
     document.removeEventListener('mousemove', onDrag);
     document.removeEventListener('mouseup', stopDrag);

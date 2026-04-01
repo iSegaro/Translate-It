@@ -64,7 +64,10 @@ const status = computed(() => {
       { 'has-pulse': status.isPulse }
     ]"
   >
-    <div v-if="status.isPulse" class="status-pulse-glow"></div>
-    <div class="status-inner-dot"></div>
+    <div
+      v-if="status.isPulse"
+      class="status-pulse-glow"
+    />
+    <div class="status-inner-dot" />
   </div>
 </template>

@@ -141,7 +141,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       finalText.includes('**') || // Markdown bold (often headers)
       finalText.includes('###') || // Markdown headers
       lines[0].includes(':') ||    // Definition style
-      /^[•\-\*\d\.]/.test(lines[0]) // Starts with bullet or number
+      /^[•\-*\d.]/.test(lines[0]) // Starts with bullet or number
     );
 
     if (isComplexContent) {
@@ -163,7 +163,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
       .replace(/__(.*?)__/g, '$1')     // Remove __underline__
       .replace(/_([^_]+)_/g, '$1')     // Remove _emphasis_
       // Remove common list/bullet prefixes
-      .replace(/^[•\-\*\d\.]+\s+/, '')
+      .replace(/^[•\-*\d.]+\s+/, '')
       // Remove definition patterns (noun:, verb:, adj:, etc.)
       .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
       .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
@@ -835,4 +835,4 @@ const getGoogleTTSAudioStatus = async () => {
   }
   
   return 'playing';
-};
+};;

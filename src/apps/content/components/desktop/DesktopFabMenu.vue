@@ -13,7 +13,10 @@
     @mouseleave="handleMouseLeave"
   >
     <!-- Revert Action (Small Badge Button) -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+    <Transition
+      name="fade-scale"
+      :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+    >
       <div 
         v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
         class="fab-revert-badge"
@@ -23,16 +26,31 @@
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
       >
-        <img :src="IconRevert" :alt="t('desktop_fab_revert_tooltip')">
+        <img
+          :src="IconRevert"
+          :alt="t('desktop_fab_revert_tooltip')"
+        >
       </div>
     </Transition>
 
     <!-- Menu -->
-    <Transition name="fab-menu" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
-      <div v-if="isMenuOpen" class="desktop-fab-menu">
-        <template v-for="(item, index) in menuItems" :key="item.id">
+    <Transition
+      name="fab-menu"
+      :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+    >
+      <div
+        v-if="isMenuOpen"
+        class="desktop-fab-menu"
+      >
+        <template
+          v-for="(item, index) in menuItems"
+          :key="item.id"
+        >
           <!-- Divider -->
-          <div v-if="index > 0" class="fab-menu-divider"></div>
+          <div
+            v-if="index > 0"
+            class="fab-menu-divider"
+          />
 
           <div 
             class="fab-menu-item"
@@ -53,8 +71,19 @@
               }" 
             >
               <!-- Circle Progress for Page Translation -->
-              <svg v-if="item.showProgress" class="fab-circle-progress" viewBox="0 0 32 32">
-                <circle class="progress-bg" cx="16" cy="16" r="14" fill="none" stroke-width="3" />
+              <svg
+                v-if="item.showProgress"
+                class="fab-circle-progress"
+                viewBox="0 0 32 32"
+              >
+                <circle
+                  class="progress-bg"
+                  cx="16"
+                  cy="16"
+                  r="14"
+                  fill="none"
+                  stroke-width="3"
+                />
                 <circle 
                   class="progress-fill" 
                   cx="16" 
@@ -99,10 +128,16 @@
       @mousedown="startDrag"
       @click.stop="toggleMenu"
     >
-      <img :src="IconExtension" :alt="t('desktop_fab_alt')">
+      <img
+        :src="IconExtension"
+        :alt="t('desktop_fab_alt')"
+      >
 
       <!-- Page Translation Status Badge (Bottom) -->
-      <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+      <Transition
+        name="fade-scale"
+        :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+      >
         <PageTranslationStatus 
           v-if="pageTranslationStatus.isActive" 
           mode="desktop-fab" 
@@ -110,20 +145,26 @@
       </Transition>
 
       <!-- Pending Selection Badge (Top) -->
-      <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+      <Transition
+        name="fade-scale"
+        :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+      >
         <div 
           v-if="pendingSelection.hasSelection && (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled)"
           class="fab-translate-badge"
           @click.stop="triggerTranslation"
         >
-          <div class="fab-badge-pulse-glow"></div>
-          <div style="width: 4px !important; height: 4px !important; background-color: white !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(255, 255, 255, 0.8) !important; z-index: 1;"></div>
+          <div class="fab-badge-pulse-glow" />
+          <div style="width: 4px !important; height: 4px !important; background-color: white !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(255, 255, 255, 0.8) !important; z-index: 1;" />
         </div>
       </Transition>
     </div>
 
     <!-- Settings Button -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+    <Transition
+      name="fade-scale"
+      :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+    >
       <div 
         v-if="isMenuOpen" 
         class="fab-settings-badge"
@@ -136,12 +177,18 @@
         @mouseenter="isSettingsHovered = true"
         @mouseleave="isSettingsHovered = false"
       >
-        <img :src="IconSettings" :alt="t('desktop_fab_settings_tooltip')">
+        <img
+          :src="IconSettings"
+          :alt="t('desktop_fab_settings_tooltip')"
+        >
       </div>
     </Transition>
 
     <!-- TTS Button -->
-    <Transition name="fade-scale" :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }">
+    <Transition
+      name="fade-scale"
+      :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
+    >
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
@@ -156,7 +203,10 @@
         @mouseenter="isTTSHovered = true"
         @mouseleave="isTTSHovered = false"
       >
-        <div v-if="isThisTTSActive && tts.isLoading.value" class="fab-tts-loader"></div>
+        <div
+          v-if="isThisTTSActive && tts.isLoading.value"
+          class="fab-tts-loader"
+        />
         <img
           v-else
           :src="IconTTS"

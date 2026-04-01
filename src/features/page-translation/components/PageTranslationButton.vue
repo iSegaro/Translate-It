@@ -66,7 +66,10 @@
 
     <!-- State: Translating or Auto-Translating -->
     <template v-if="isTranslating || isAutoTranslating">
-      <div v-if="textOnly" class="ti-text-status-wrapper">
+      <div
+        v-if="textOnly"
+        class="ti-text-status-wrapper"
+      >
         <a
           href="#"
           class="toolbar-link loading"
@@ -118,7 +121,10 @@
 
     <!-- State: Translated -->
     <template v-if="isTranslated && !isTranslating && !isAutoTranslating">
-      <div v-if="textOnly" class="ti-text-status-wrapper">
+      <div
+        v-if="textOnly"
+        class="ti-text-status-wrapper"
+      >
         <a
           href="#"
           class="toolbar-link"

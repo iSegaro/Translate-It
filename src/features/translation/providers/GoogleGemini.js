@@ -157,7 +157,7 @@ export class GeminiProvider extends BaseAIProvider {
   }
 
   async translateImage(base64Image, _sourceLang, targetLang) {
-    const [apiKeys, model, rawApiUrl, promptBase] = await Promise.all([
+    const [apiKeys, , rawApiUrl, promptBase] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
       getGeminiApiUrlAsync(),

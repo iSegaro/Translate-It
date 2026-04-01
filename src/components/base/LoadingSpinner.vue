@@ -27,7 +27,7 @@ import browser from 'webextension-polyfill'
 // Import adjacent SCSS
 import './LoadingSpinner.scss'
 
-const props = defineProps({
+defineProps({
   size: {
     type: String,
     default: 'md',
