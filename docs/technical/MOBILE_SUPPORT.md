@@ -1,38 +1,47 @@
-# Mobile Support Architecture (2025)
+# Touch & Mobile Support Architecture
 
 ## Overview
 
-The **Mobile Support** system provides a native-like, touch-friendly translation experience for mobile browsers (Firefox Android, Kiwi, Lemur). It replaces the desktop-centric floating windows and sidepanels with a centralized **In-Page Bottom Sheet** architecture, ensuring high performance and non-intrusive interactions on small screens.
+The **Touch & Mobile Support** system provides a "Touch-First", ergonomic translation experience designed for small screens and touch-enabled interfaces. It automatically replaces desktop-centric floating windows with a centralized **In-Page Bottom Sheet** architecture on mobile browsers (Firefox Android, Kiwi, Lemur) and touch-capable desktop devices, ensuring high performance and intuitive interaction.
 
-**Architecture Status:** Complete & Integrated
-**Performance:** Hardware-accelerated (GPU) animations, 60fps gestures
-**UX Strategy:** Thumb-friendly "Bottom Sheet" with Multi-view support
+**Architecture Status**: Production Ready (Optimized)
+**Key Metrics**: Hardware-accelerated gestures, 60fps animations, Touch-responsive layout.
+
+---
+
+## Device Compatibility & Detection
+
+The system employs a **Feature Detection** strategy rather than relying solely on UserAgent strings:
+- **Touch Detection**: Validates `navigator.maxTouchPoints > 0` and the presence of `ontouchstart`.
+- **Hybrid Support**: On touch-enabled laptops or tablets running desktop browsers, the system can switch to the Bottom Sheet UI for better thumb-driven ergonomics.
+- **Independence**: The detection logic is encapsulated in `compatibility.js`, allowing other modules to query `shouldEnableMobileUI()`.
 
 ---
 
 ## Architecture
 
-The mobile system is built as a modular extension of the existing **UI Host (Shadow DOM)**. It follows a decoupled, event-driven pattern where presenters (MobileFab, MobileSheet) subscribe to global selection events via the **Selection Coordinator**.
+The system operates as an autonomous module within the **UI Host (Shadow DOM)**. It follows a decoupled, event-driven pattern coordinated by the **Mobile Store** and **PageEventBus**.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  MOBILE SYSTEM ARCHITECTURE                 │
+│              TOUCH & MOBILE SYSTEM ARCHITECTURE             │
 ├─────────────────────────────────────────────────────────────┤
-│  Infrastructure Layer: compatibility.js (isMobile detection)│
+│   Infrastructure Layer: Shadow DOM & Touch Feature Check    │
 └──────────────┬──────────────────────────────┬───────────────┘
                │                              │
 ┌──────────────▼──────────────┐      ┌────────▼──────────────┐
 │      Logic & State Layer    │      │      UI Host Layer    │
-│  - GLOBAL_SELECTION events  │◀────▶│  - MobileSheet.vue    │
-│  - mobile.js (Pinia Store)  │      │  - MobileFab.vue      │
-│  - useMobileGestures.js     │      │  - DashboardView.vue  │
-└──────────────┬──────────────┘      └───────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────────────────┐
+│  - Mobile Store (Pinia)     │◀────▶│  - MobileSheet.vue    │
+│  - useMobileGestures.js     │      │  - MobileFab.vue      │
+│  - Selection Coordinator    │      │  - Multi-View System  │
+└──────────────┬──────────────┘      └────────┬──────────────┘
+               │                              │
+┌──────────────▼──────────────────────────────▼───────────────┐
 │                    INTEGRATION POINTS                       │
-│  - Selection Coordinator: Unified event-driven selection    │
-│  - WindowsManager: Subscription-based UI display            │
-│  - Independence: Works even if WindowsManager is disabled   │
+│  - Selection Coordinator: GLOBAL_SELECTION_CHANGE events    │
+│  - Page Translation: Real-time progress & control           │
+│  - StorageManager: Persistent positioning                   │
+│  - Visual Viewport: Keyboard awareness (Touch devices)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,74 +49,54 @@ The mobile system is built as a modular extension of the existing **UI Host (Sha
 
 ## Core Components
 
-### 1. Device Detection (`compatibility.js`)
-A robust utility that identifies mobile environments using a combination of UserAgent analysis, touch point detection (`maxTouchPoints`), and viewport width.
-- **`isMobile()`**: General detection for Android/iOS.
-- **`shouldEnableMobileUI()`**: Decision logic to switch from Windows to Sheet.
+### 1. Mobile Store (`src/store/modules/mobile.js`)
+The central state manager for the touch-optimized UI. It manages:
+- **Visibility**: `isOpen`, `isFullscreen`.
+- **Navigation**: `activeView` (Dashboard, Selection, Input, etc.).
+- **Visual State**: `sheetState` (Closed, Peek, Full).
+- **Selection Data**: Synchronized with global selection events across touch interactions.
 
-### 2. Mobile Store (`mobile.js`)
-A centralized Pinia store that manages the global state of the mobile UI.
-- **Visibility**: `isOpen`
-- **View Management**: `activeView` (dashboard, selection, input, page_translation)
-- **Visual State**: `sheetState` (peek: 35vh, full: 90vh)
-- **Data Persistence**: Stores selection results and page translation progress.
+### 2. Gesture Engine (`useMobileGestures.js`)
+A high-performance gesture handler optimized for low-latency touch response:
+- **Smart Snapping**: Automatically snaps to **Peek** (35vh) or **Full** (90vh) positions.
+- **Swipe-to-Dismiss**: Natural downward drag to close the interface.
+- **Resistance**: Applies physical-like friction when dragging beyond boundaries.
 
-### 3. Gesture Engine (`useMobileGestures.js`)
-A high-performance composable that handles complex touch interactions.
-- **Swipe-to-Dismiss**: Closing the sheet by dragging it down.
-- **Swipe-to-Expand**: Moving from "Peek" to "Full" mode for better visibility.
-- **Momentum & Snapping**: Smoothly snapping to predefined vertical positions using CSS transforms.
-
-### 4. UI Host Integration (`MobileSheet.vue` & `MobileFab.vue`)
-The mobile UI is divided into two primary entry points:
-- **`MobileSheet.vue`**: The master container for the Bottom Sheet (Dashboard, Selection, etc.).
-- **`MobileFab.vue`**: A dedicated, draggable floating button that provides quick access to translation.
-    - **Independence**: Subscribes directly to `GLOBAL_SELECTION_CHANGE` to store pending text locally, removing dependency on `WindowsManager` state.
-    - **Vertical Drag**: Supports NS-resize dragging to avoid overlapping with site content.
-    - **Persistence**: Remembers its last vertical position across page reloads using `storageManager`.
-    - **Idle State**: Becomes semi-transparent after 1.5s of inactivity.
+### 3. Draggable FAB (`MobileFab.vue`)
+A persistent, touch-friendly entry point:
+- **NS-Dragging**: Supports vertical repositioning to avoid blocking page content.
+- **Persistence**: Remembers position and side (Left/Right) via `storageManager`.
+- **Idle Fading**: Dims when not in use to maintain a clean reading environment.
 
 ---
 
-## Feature Adaptations
+## Multi-View System
 
-### Text Selection Translation
-- **Desktop**: Shows a floating icon or FAB badge near selection.
-- **Mobile**:
-    - **Immediate**: Automatically triggers the **Mobile Sheet** in `SelectionView` (Peek mode).
-    - **On FAB Click**: Remains silent and waits for manual FAB interaction (Native menu friendly).
-    - **On Click**: Shows a floating translation icon (Desktop-parity mode).
+The interface dynamically adapts its view based on the current touch context:
 
-### Select Element Mode
-- **Hover to Tap**: Since mobile lacks hover, the `SelectElementManager` is adapted to use `touchstart` and `touchend`.
-- **Navigation Prevention**: Aggressively applies `preventDefault()` and `stopPropagation()` during the active mode to prevent accidental link clicks.
-- **Unified Controls**: Instead of a dedicated exit button, the system leverages the **Circuit Breaker Toast** which provides "Cancel" and "Revert" actions, keeping the UI clean and consistent.
-
-### Whole Page Translation
-- **Dashboard Hub**: Translation is triggered from within the sheet, keeping the user in context.
-- **Progress View**: Switches to `PageTranslationView`, showing a live progress bar and element counts.
-- **Unified Controls**: Provides "Restore" and "Back to Dashboard" options directly in the mobile UI.
+| View | Purpose | Trigger |
+|------|---------|---------|
+| **Dashboard** | Feature Hub | Manual interaction or navigation |
+| **Selection** | Instant Result | Native touch selection on page |
+| **Input** | Manual Entry | Dashboard click or keyboard focus |
+| **History** | Audit Log | Dashboard click or interaction |
+| **Page Translation** | Full Page Hub | "Translate Page" action |
 
 ---
 
 ## Technical Implementation Details
 
-### CSS Strategy (Shadow DOM Compatibility)
-To overcome Shadow DOM style isolation, the mobile system uses:
-1.  **Explicit Styles**: Using `!important` for positioning and z-index.
-2.  **Inline Logic**: Computing heights and transforms dynamically in JavaScript to ensure priority.
-3.  **Logical Properties**: Using `env(safe-area-inset-bottom)` to handle modern device notches and navigation bars.
+### Viewport & Keyboard Awareness
+Using the **Visual Viewport API**, the system identifies when a virtual keyboard is active. In **InputView**, the sheet automatically snaps to **Full** mode to ensure the text area remains visible and accessible above the keyboard.
 
-### Keyboard Awareness
-Using the **Visual Viewport API**, the system detects when the virtual keyboard is active. During manual input (`InputView`), the sheet automatically snaps to **Full-screen** mode to remain visible above the keyboard.
+### CSS & Shadow DOM Isolation
+1. **Reset Styles**: Strict use of `!important` to prevent host page CSS leakage.
+2. **Safe Areas**: Utilizes `env(safe-area-inset-bottom)` to respect hardware notches and navigation bars on modern devices.
+3. **Hardware Acceleration**: Only `transform` and `opacity` are animated to ensure 60fps performance on mobile CPUs.
 
-### Event Bus Communication
-The mobile system communicates with core managers and other modules via the `PageEventBus`:
-- `GLOBAL_SELECTION_CHANGE`: Listened to by `MobileFab` and `DashboardView` to sync selection state.
-- `GLOBAL_SELECTION_CLEAR`: Unified signal to reset selection-aware UI.
-- `SHOW_MOBILE_SHEET`: Directly requested when a translation result is ready.
-- `PAGE_TRANSLATE_PROGRESS`: Listened to by `PageTranslationView`.
-- `ACTIVATE_SELECT_ELEMENT_MODE`: Emitted by `DashboardView`.
+### Event Communication
+- **Global Selection**: Listens for unified events from the Selection Coordinator.
+- **Cross-World Communication**: Uses `sendMessage` for background operations and `PageEventBus` for local DOM changes.
 
 ---
 
@@ -115,14 +104,14 @@ The mobile system communicates with core managers and other modules via the `Pag
 
 ### Adding a New View
 1. Create the component in `src/apps/content/components/mobile/views/`.
-2. Register the view name in `MobileStore`.
-3. Add the view to the conditional rendering block in `MobileSheet.vue`.
+2. Add the view name to `MOBILE_CONSTANTS.VIEWS`.
+3. Register the component in `MobileSheet.vue`.
 
 ### Best Practices
-- **Touch Targets**: Ensure all buttons are at least **44x44px**.
-- **Animation**: Only animate `transform` and `opacity` for 60fps performance.
-- **Isolation**: Always use the `.notranslate` class on mobile UI containers.
+- **Touch Targets**: All interactive elements (buttons, inputs) MUST be at least **44x44px**.
+- **Gesture Conflict**: Use `touch-action: none` on drag handles to prevent browser-native scrolling.
+- **Locking**: Body scroll is locked on touch devices when the sheet is open to prevent background shifting.
 
 ---
 
-**Last Updated**: March 2026
+**Last Updated**: April 2026
