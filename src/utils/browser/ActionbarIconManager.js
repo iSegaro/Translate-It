@@ -2,37 +2,16 @@ import browser from 'webextension-polyfill';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy logger initialization to avoid TDZ
-let logger = null;
-let loggerPromise = null;
-const getLogger = () => {
-  if (!logger) {
-    if (!loggerPromise) {
-      loggerPromise = Promise.all([
-        import('@/shared/logging/logger.js'),
-        import('@/shared/logging/logConstants.js')
-      ]).then(([loggerModule, logConstantsModule]) => {
-        logger = loggerModule.getScopedLogger(logConstantsModule.LOG_COMPONENTS.CORE, 'ActionbarIconManager');
-        return logger;
-      });
-    }
-    // Return a temporary logger that buffers calls until the real logger is loaded
-    return {
-      debug: (...args) => loggerPromise.then(l => l.debug(...args)),
-      info: (...args) => loggerPromise.then(l => l.info(...args)),
-      warn: (...args) => loggerPromise.then(l => l.warn(...args)),
-      error: (...args) => loggerPromise.then(l => l.error(...args))
-    };
-  }
-  return logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
 
 /**
  * Actionbar Icon Manager - Minimal, fast, reliable
  * Manages browser action bar icons with dynamic provider overlays
  */
-class ActionbarIconManager {
+export class ActionbarIconManager {
   constructor() {
     this.resourceTracker = null;
     this.currentProvider = null;
@@ -44,8 +23,6 @@ class ActionbarIconManager {
 
     const { default: ResourceTracker } = await import('@/core/memory/ResourceTracker.js');
     this.resourceTracker = new ResourceTracker('actionbar-icon-manager');
-
-    const logger = getLogger();
 
     try {
       // Get current provider
@@ -87,7 +64,6 @@ class ActionbarIconManager {
    * Update icon for provider
    */
   async updateIcon(provider) {
-    const logger = getLogger();
     try {
       logger.debug(`Updating icon for: ${provider}`);
 
@@ -130,7 +106,6 @@ class ActionbarIconManager {
    * Load image and convert to imageData using fetch and OffscreenCanvas
    */
   async loadImageData(iconPath) {
-    const logger = getLogger();
     try {
       // Get full URL for the icon
       const fullUrl = browser.runtime.getURL(iconPath);
@@ -170,7 +145,6 @@ class ActionbarIconManager {
    * Create composite icon with provider overlay
    */
   async createCompositeIcon(provider) {
-    const logger = getLogger();
     try {
       // Load main extension icon
       const mainIconBitmap = await this.loadImageBitmap('icons/extension/extension_icon_128.png');
@@ -222,7 +196,6 @@ class ActionbarIconManager {
 
       return compositeImageData;
     } catch (error) {
-      const logger = getLogger();
       logger.error('Error creating composite icon:', error);
       return null;
     }
@@ -239,7 +212,6 @@ class ActionbarIconManager {
       // Simple fetch with basic error handling
       const response = await fetch(fullUrl);
       if (!response.ok) {
-        const logger = getLogger();
         logger.warn(`Failed to fetch image: ${fullUrl} - Status: ${response.status}`);
         return null;
       }
@@ -247,7 +219,6 @@ class ActionbarIconManager {
       // Create bitmap from image
       return await createImageBitmap(await response.blob());
     } catch (error) {
-      const logger = getLogger();
       logger.warn(`Error in loadImageBitmap for ${iconPath}:`, error.message);
       return null;
     }
@@ -264,7 +235,6 @@ class ActionbarIconManager {
         await browser.browserAction.setIcon({ imageData: imageData });
       }
     } catch (error) {
-      const logger = getLogger();
       logger.error('Failed to set browser icon with imageData:', error);
       throw error;
     }
@@ -275,7 +245,6 @@ class ActionbarIconManager {
    */
   clearCache() {
     // Cache is no longer used with path-based approach
-    const logger = getLogger();
     logger.debug('🧹 Icon cache cleared (no-op)');
   }
 
