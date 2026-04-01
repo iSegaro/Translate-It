@@ -103,10 +103,13 @@ export class PageTranslationBridge extends ResourceTracker {
 
             if (processedNode.nodeType === Node.TEXT_NODE) {
               try {
-                if (hasMark && isTargetRTL) {
-                  // Apply directional logic (Unicode marks + container alignment)
-                  applyNodeDirection(processedNode, settings.targetLanguage);
+                if (hasMark) {
+                  // 1. Apply directional logic (Unicode marks + container alignment) only for RTL targets
+                  if (isTargetRTL) {
+                    applyNodeDirection(processedNode, settings.targetLanguage);
+                  }
                   
+                  // 2. Mark the parent for tooltip display regardless of target direction
                   const parent = processedNode.parentElement;
                   if (parent) {
                     parent.setAttribute(TRANSLATED_MARKER, 'true');
@@ -116,7 +119,7 @@ export class PageTranslationBridge extends ResourceTracker {
                   }
                 }
               } catch (e) {
-                bridge.logger.warn('Failed to apply direction to node', e);
+                bridge.logger.warn('Failed to apply direction/marking to node', e);
               }
             } else if (processedNode.nodeType === Node.ATTRIBUTE_NODE) {
               // For attributes, we mark the owner element only if translated
