@@ -5,7 +5,9 @@ List of features, enhancements, and ideas planned for future development.
 ## Features and Enhancements
 
 - **PDF Support**: Enable direct translation of text within PDF files.
-- اختیاری کردن ESC Key برای Select Element
+- **ESC Key Flexibility**: Add option to revert and cancel `Select Element` via `ESC`.
+- **Translation Speed Control**: Allow users to prioritize between **Performance (Speed)** and **Cost-Efficiency** based on the translation provider.
+- **Dependency Management**: Update `npm packages` to latest versions.
 
 ---
 
