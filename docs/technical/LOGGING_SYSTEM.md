@@ -140,6 +140,8 @@ LOG_COMPONENTS.CONTENT_APP // Content application (src/apps/content/)
 ```javascript
 LOG_COMPONENTS.TRANSLATION          // Translation engine and services
 LOG_COMPONENTS.PAGE_TRANSLATION     // Whole-page translation system
+LOG_COMPONENTS.MOBILE               // Mobile support system (src/features/mobile/)
+LOG_COMPONENTS.DESKTOP_FAB          // Desktop floating button (src/apps/content/components/desktop/)
 LOG_COMPONENTS.TTS                  // Text-to-Speech system
 LOG_COMPONENTS.SCREEN_CAPTURE        // Screen capture and OCR
 LOG_COMPONENTS.ELEMENT_SELECTION     // Element selection functionality
@@ -171,6 +173,7 @@ LOG_COMPONENTS.MEMORY     // Memory management and garbage collection
 LOG_COMPONENTS.UTILS      // General utilities
 LOG_COMPONENTS.BROWSER    // Browser compatibility utilities
 LOG_COMPONENTS.TEXT       // Text processing utilities
+LOG_COMPONENTS.I18N       // Internationalization utilities (src/utils/i18n/)
 LOG_COMPONENTS.FRAMEWORK  // Framework compatibility
 LOG_COMPONENTS.LEGACY     // Legacy compatibility code
 ```
