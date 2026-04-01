@@ -4,26 +4,8 @@
  */
 import { getMemoryManager } from './MemoryManager.js';
 import { isDevelopmentMode } from '../../shared/utils/environment.js';
-
-// Lazy logger initialization to avoid TDZ
-let loggerPromise = null;
-const getLogger = (groupId) => {
-  if (!loggerPromise) {
-    loggerPromise = Promise.all([
-      import('../../shared/logging/logger.js'),
-      import('../../shared/logging/logConstants.js')
-    ]).then(([loggerModule, logConstantsModule]) => {
-      return loggerModule.getScopedLogger(logConstantsModule.LOG_COMPONENTS.MEMORY, `ResourceTracker:${groupId}`);
-    });
-  }
-  // Return a temporary logger that buffers calls until the real logger is loaded
-  return {
-    debug: (...args) => loggerPromise.then(l => l.debug(...args)),
-    info: (...args) => loggerPromise.then(l => l.info(...args)),
-    warn: (...args) => loggerPromise.then(l => l.warn(...args)),
-    error: (...args) => loggerPromise.then(l => l.error(...args))
-  };
-};
+import { getScopedLogger } from '../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 
 const isDevelopment = isDevelopmentMode();
 
@@ -49,7 +31,7 @@ class ResourceTracker {
 
   get logger() {
     if (!this._logger) {
-      this._logger = getLogger(this.groupId);
+      this._logger = getScopedLogger(LOG_COMPONENTS.MEMORY, `ResourceTracker:${this.groupId}`);
     }
     return this._logger;
   }

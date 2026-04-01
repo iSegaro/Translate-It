@@ -4,6 +4,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ActionbarIconManager');
 
@@ -21,7 +22,6 @@ export class ActionbarIconManager {
   async initialize() {
     if (this.isInitialized) return;
 
-    const { default: ResourceTracker } = await import('@/core/memory/ResourceTracker.js');
     this.resourceTracker = new ResourceTracker('actionbar-icon-manager');
 
     try {

@@ -2,6 +2,7 @@
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType, isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -318,7 +319,6 @@ export class BaseProvider {
         }
 
         // 6. Final error handling via ErrorHandler (if no more keys or not a failover error)
-        const { ErrorHandler } = await import("@/shared/error-management/ErrorHandler.js");
         const errorHandler = ErrorHandler.getInstance();
         
         if (!error.type) error.type = errorType;
