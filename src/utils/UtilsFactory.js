@@ -1,21 +1,24 @@
 // src/utils/UtilsFactory.js
-// Factory for lazy loading utils modules to enable better code splitting
+// Factory for loading utils modules with optimized splitting
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Lazy initialization to avoid TDZ issues
-let logger = null;
-const getLogger = () => {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'UtilsFactory');
-  }
-  return logger;
-};
+// Static imports for core utilities (lightweight and frequently used)
+import * as eventsUtils from './browser/events.js';
+import * as compatibilityUtils from './browser/compatibility.js';
+import getActionbarIconManager, { ActionbarIconManager } from './browser/ActionbarIconManager.js';
+import * as themeUtils from './ui/theme.js';
+import * as exclusionUtils from './ui/exclusion.js';
+import * as htmlSanitizerUtils from './ui/html-sanitizer.js';
+import * as secureStorageModule from './secureStorage.js';
+import * as messageIdModule from './messaging/messageId.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'UtilsFactory');
 
 /**
- * Factory class for lazy loading utils modules
- * This enables Vite to split utils into separate chunks
+ * Factory class for utils modules
+ * Uses static imports for core utils and dynamic imports for heavy modules (i18n)
  */
 class UtilsFactory {
   constructor() {
@@ -23,54 +26,63 @@ class UtilsFactory {
     this.loadedModules = new Map();
     // Loading promises to prevent duplicate loads
     this.loadingPromises = new Map();
-    // Modules that need TDZ-safe loading
-    this.tzdSafeModules = new Set(['i18n', 'languages', 'text', 'ui', 'browser']);
+    
+    // Initialize static modules in cache
+    this._initializeStaticModules();
+  }
+
+  _initializeStaticModules() {
+    // Browser Utils
+    const legacyCompatibility = {
+      ...compatibilityUtils,
+      detectPlatform: compatibilityUtils.detectOS,
+      Platform: compatibilityUtils.OS_PLATFORMS
+    };
+    
+    this.loadedModules.set('browser', {
+      ...eventsUtils,
+      ...legacyCompatibility,
+      ActionbarIconManager,
+      getActionbarIconManager
+    });
+
+    // UI Utils
+    this.loadedModules.set('ui', {
+      ...themeUtils,
+      ...exclusionUtils,
+      ...htmlSanitizerUtils
+    });
+
+    // Security Utils
+    this.loadedModules.set('security', {
+      ...secureStorageModule
+    });
+
+    // Core Utils
+    this.loadedModules.set('core', {
+      ...messageIdModule
+    });
   }
 
   /**
-   * TDZ-Safe module loader for problematic modules
+   * Sync getter for core modules (since they are now static)
+   */
+  getModuleSync(moduleName) {
+    return this.loadedModules.get(moduleName);
+  }
+
+  /**
+   * Async module loader for compatibility
    */
   async getModuleSafe(moduleName) {
-    if (this.tzdSafeModules.has(moduleName)) {
-      return await this._loadTzdSafeModule(moduleName);
+    if (moduleName === 'i18n' || moduleName === 'languages') {
+      return await this.getI18nUtils();
     }
-    // Fallback to regular loading
-    switch (moduleName) {
-      case 'i18n':
-        return await this.getI18nUtils();
-      case 'browser':
-        return await this.getBrowserUtils();
-      case 'text':
-        return await this.getTextUtils();
-      case 'ui':
-        return await this.getUIUtils();
-      default:
-        throw new Error(`Unknown module: ${moduleName}`);
-    }
-  }
-
-  async _loadTzdSafeModule(moduleName) {
-    getLogger().debug(`Loading ${moduleName} utils with TDZ-safe mode`);
-
-    try {
-      // Use dynamic import to avoid TDZ during module evaluation
-      switch (moduleName) {
-        case 'i18n':
-          return await this._loadI18nUtilsTzdSafe();
-        case 'languages':
-          return await this._loadLanguagesUtilsTzdSafe();
-        default:
-          return await this.getModule(moduleName);
-      }
-    } catch (error) {
-      getLogger().error(`Failed to load ${moduleName} in TDZ-safe mode:`, error);
-      // Fallback to regular loading
-      return await this.getModule(moduleName);
-    }
+    return this.loadedModules.get(moduleName);
   }
 
   /**
-   * Load i18n utilities lazily
+   * Load i18n utilities lazily (remain dynamic due to size)
    */
   async getI18nUtils() {
     if (this.loadedModules.has('i18n')) {
@@ -92,183 +104,78 @@ class UtilsFactory {
   }
 
   async _loadI18nUtils() {
-    getLogger().debug('Loading i18n utils lazily');
+    logger.debug('Loading i18n utils lazily');
 
-    const [
-      i18nUtils,
-      languagesUtils,
-      pluginModule,
-      languagePackLoader,
-      lazyLoader,
-      languageDetector
-    ] = await Promise.all([
-      import('./i18n/i18n.js'),
-      import('./i18n/languages.js'),
-      import('./i18n/plugin.js'),
-      import('./i18n/LanguagePackLoader.js'),
-      import('./i18n/LazyLanguageLoader.js'),
-      import('./i18n/LanguageDetector.js')
-    ]);
+    try {
+      const [
+        i18nUtils,
+        languagesUtils,
+        pluginModule,
+        languagePackLoader,
+        lazyLoader,
+        languageDetector
+      ] = await Promise.all([
+        import('./i18n/i18n.js'),
+        import('./i18n/languages.js'),
+        import('./i18n/plugin.js'),
+        import('./i18n/LanguagePackLoader.js'),
+        import('./i18n/LazyLanguageLoader.js'),
+        import('./i18n/LanguageDetector.js')
+      ]);
 
-    // Preload core languages in background
-    languagePackLoader.preloadCoreLanguagePacks().catch(err => {
-      getLogger().debug('Failed to preload core languages:', err);
-    });
+      // Preload core languages in background
+      languagePackLoader.preloadCoreLanguagePacks().catch(err => {
+        logger.debug('Failed to preload core languages:', err);
+      });
 
-    // Preload user languages based on preferences
-    lazyLoader.preloadUserLanguages().catch(err => {
-      getLogger().debug('Failed to preload user languages:', err);
-    });
+      // Preload user languages based on preferences
+      lazyLoader.preloadUserLanguages().catch(err => {
+        logger.debug('Failed to preload user languages:', err);
+      });
 
-    return {
-      ...i18nUtils,
-      ...languagesUtils,
-      i18nPlugin: pluginModule.default,
-      setI18nLocale: pluginModule.setI18nLocale,
-      languagePackLoader: {
-        preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
-        loadLanguagePack: languagePackLoader.loadLanguagePack,
-        loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
-        isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
-        isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
-        getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
-      },
-      lazyLanguageLoader: {
-        lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
-        lazyLoadInterfaceLanguage: lazyLoader.lazyLoadInterfaceLanguage,
-        lazyLoadTtsLanguage: lazyLoader.lazyLoadTtsLanguage,
-        preloadUserLanguages: lazyLoader.preloadUserLanguages,
-        getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
-        detectLanguageLazy: lazyLoader.detectLanguageLazy,
-        clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
-        getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
-      },
-      languageDetector: {
-        detectBrowserLanguage: languageDetector.detectBrowserLanguage,
-        detectLanguageFromText: languageDetector.detectLanguageFromText,
-        clearDetectionCache: languageDetector.clearDetectionCache,
-        getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
-        configureDetection: languageDetector.configureDetection,
-        getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
-      }
-    };
-  }
-
-  async _loadI18nUtilsTzdSafe() {
-    getLogger().debug('Loading i18n utils with TDZ-safe mode');
-
-    // Load modules one by one to avoid TDZ
-    const i18nModule = await import('./i18n/i18n.js');
-    const languagesModule = await import('./i18n/languages.js');
-    const pluginModule = await import('./i18n/plugin.js');
-    const languagePackLoader = await import('./i18n/LanguagePackLoader.js');
-    const lazyLoader = await import('./i18n/LazyLanguageLoader.js');
-    const languageDetector = await import('./i18n/LanguageDetector.js');
-
-    // Preload core languages in background
-    languagePackLoader.preloadCoreLanguagePacks().catch(err => {
-      getLogger().debug('Failed to preload core languages:', err);
-    });
-
-    // Preload user languages based on preferences
-    lazyLoader.preloadUserLanguages().catch(err => {
-      getLogger().debug('Failed to preload user languages:', err);
-    });
-
-    return {
-      ...i18nModule,
-      ...languagesModule,
-      i18nPlugin: pluginModule.default,
-      setI18nLocale: pluginModule.setI18nLocale,
-      languagePackLoader: {
-        preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
-        loadLanguagePack: languagePackLoader.loadLanguagePack,
-        loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
-        isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
-        isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
-        getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
-      },
-      lazyLanguageLoader: {
-        lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
-        lazyLoadInterfaceLanguage: lazyLoader.lazyLoadInterfaceLanguage,
-        lazyLoadTtsLanguage: lazyLoader.lazyLoadTtsLanguage,
-        preloadUserLanguages: lazyLoader.preloadUserLanguages,
-        getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
-        detectLanguageLazy: lazyLoader.detectLanguageLazy,
-        clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
-        getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
-      },
-      languageDetector: {
-        detectBrowserLanguage: languageDetector.detectBrowserLanguage,
-        detectLanguageFromText: languageDetector.detectLanguageFromText,
-        clearDetectionCache: languageDetector.clearDetectionCache,
-        getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
-        configureDetection: languageDetector.configureDetection,
-        getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
-      }
-    };
-  }
-
-  async _loadLanguagesUtilsTzdSafe() {
-    getLogger().debug('Loading languages utils with TDZ-safe mode');
-
-    const languagesModule = await import('./i18n/languages.js');
-
-    return {
-      getLanguageCodeForTTS: languagesModule.getLanguageCodeForTTS,
-      normalizeLanguageCode: languagesModule.normalizeLanguageCode,
-      languageList: languagesModule.languageList
-    };
+      return {
+        ...i18nUtils,
+        ...languagesUtils,
+        i18nPlugin: pluginModule.default,
+        setI18nLocale: pluginModule.setI18nLocale,
+        languagePackLoader: {
+          preloadCoreLanguagePacks: languagePackLoader.preloadCoreLanguagePacks,
+          loadLanguagePack: languagePackLoader.loadLanguagePack,
+          loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
+          isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
+          isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
+          getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
+        },
+        lazyLanguageLoader: {
+          lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
+          lazyLoadInterfaceLanguage: lazyLoader.lazyLoadInterfaceLanguage,
+          lazyLoadTtsLanguage: lazyLoader.lazyLoadTtsLanguage,
+          preloadUserLanguages: lazyLoader.preloadUserLanguages,
+          getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
+          detectLanguageLazy: lazyLoader.detectLanguageLazy,
+          clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
+          getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
+        },
+        languageDetector: {
+          detectBrowserLanguage: languageDetector.detectBrowserLanguage,
+          detectLanguageFromText: languageDetector.detectLanguageFromText,
+          clearDetectionCache: languageDetector.clearDetectionCache,
+          getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
+          configureDetection: languageDetector.configureDetection,
+          getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to load i18n utils:', error);
+      throw error;
+    }
   }
 
   /**
-   * Load browser utilities lazily
+   * Load browser utilities (now returns sync but kept async for API compatibility)
    */
   async getBrowserUtils() {
-    if (this.loadedModules.has('browser')) {
-      return this.loadedModules.get('browser');
-    }
-
-    if (this.loadingPromises.has('browser')) {
-      return await this.loadingPromises.get('browser');
-    }
-
-    const loadingPromise = this._loadBrowserUtils();
-    this.loadingPromises.set('browser', loadingPromise);
-
-    const utils = await loadingPromise;
-    this.loadedModules.set('browser', utils);
-    this.loadingPromises.delete('browser');
-
-    return utils;
-  }
-
-  async _loadBrowserUtils() {
-    getLogger().debug('Loading browser utils lazily');
-
-    const [
-      eventsUtils,
-      compatibilityUtils,
-      iconManagerModule
-    ] = await Promise.all([
-      import('./browser/events.js'),
-      import('./browser/compatibility.js'),
-      import('./browser/ActionbarIconManager.js')
-    ]);
-
-    // Map new names to old names for backward compatibility within the factory's returned object
-    const legacyCompatibility = {
-      ...compatibilityUtils,
-      detectPlatform: compatibilityUtils.detectOS,
-      Platform: compatibilityUtils.OS_PLATFORMS
-    };
-
-    return {
-      ...eventsUtils,
-      ...legacyCompatibility,
-      ActionbarIconManager: iconManagerModule.default || iconManagerModule.ActionbarIconManager,
-      getActionbarIconManager: iconManagerModule.getActionbarIconManager
-    };
+    return this.loadedModules.get('browser');
   }
 
   /**
@@ -279,155 +186,51 @@ class UtilsFactory {
       return this.loadedModules.get('text');
     }
 
-    if (this.loadingPromises.has('text')) {
-      return await this.loadingPromises.get('text');
-    }
-
-    const loadingPromise = this._loadTextUtils();
-    this.loadingPromises.set('text', loadingPromise);
-
-    const utils = await loadingPromise;
+    const { TranslationRenderer } = await import('./rendering/TranslationRenderer.js');
+    const utils = { TranslationRenderer };
     this.loadedModules.set('text', utils);
-    this.loadingPromises.delete('text');
-
     return utils;
   }
 
-  async _loadTextUtils() {
-    getLogger().debug('Loading text utils lazily');
-
-    const [
-      rendererModule
-    ] = await Promise.all([
-      import('./rendering/TranslationRenderer.js')
-    ]);
-
-    return {
-      TranslationRenderer: rendererModule.TranslationRenderer
-    };
-  }
-
   /**
-   * Load UI utilities lazily
+   * Load UI utilities
    */
   async getUIUtils() {
-    if (this.loadedModules.has('ui')) {
-      return this.loadedModules.get('ui');
-    }
-
-    if (this.loadingPromises.has('ui')) {
-      return await this.loadingPromises.get('ui');
-    }
-
-    const loadingPromise = this._loadUIUtils();
-    this.loadingPromises.set('ui', loadingPromise);
-
-    const utils = await loadingPromise;
-    this.loadedModules.set('ui', utils);
-    this.loadingPromises.delete('ui');
-
-    return utils;
-  }
-
-  async _loadUIUtils() {
-    getLogger().debug('Loading UI utils lazily');
-
-    const [
-      themeUtils,
-      exclusionUtils,
-      htmlSanitizerUtils
-    ] = await Promise.all([
-      import('./ui/theme.js'),
-      import('./ui/exclusion.js'),
-      import('./ui/html-sanitizer.js')
-    ]);
-
-    return {
-      ...themeUtils,
-      ...exclusionUtils,
-      ...htmlSanitizerUtils
-    };
+    return this.loadedModules.get('ui');
   }
 
   /**
-   * Load security utilities lazily
+   * Load security utilities
    */
   async getSecurityUtils() {
-    if (this.loadedModules.has('security')) {
-      return this.loadedModules.get('security');
-    }
-
-    if (this.loadingPromises.has('security')) {
-      return await this.loadingPromises.get('security');
-    }
-
-    const loadingPromise = this._loadSecurityUtils();
-    this.loadingPromises.set('security', loadingPromise);
-
-    const utils = await loadingPromise;
-    this.loadedModules.set('security', utils);
-    this.loadingPromises.delete('security');
-
-    return utils;
-  }
-
-  async _loadSecurityUtils() {
-    getLogger().debug('Loading security utils lazily');
-
-    const [
-      secureStorageModule
-    ] = await Promise.all([
-      import('./secureStorage.js')
-    ]);
-
-    return {
-      ...secureStorageModule
-    };
+    return this.loadedModules.get('security');
   }
 
   /**
-   * Load core utilities (small, frequently used)
+   * Load core utilities
    */
   async getCoreUtils() {
-    if (this.loadedModules.has('core')) {
-      return this.loadedModules.get('core');
-    }
-
-    if (this.loadingPromises.has('core')) {
-      return await this.loadingPromises.get('core');
-    }
-
-    const loadingPromise = this._loadCoreUtils();
-    this.loadingPromises.set('core', loadingPromise);
-
-    const utils = await loadingPromise;
-    this.loadedModules.set('core', utils);
-    this.loadingPromises.delete('core');
-
-    return utils;
-  }
-
-  async _loadCoreUtils() {
-    getLogger().debug('Loading core utils lazily');
-
-    const [
-      messageIdModule
-    ] = await Promise.all([
-      import('./messaging/messageId.js')
-    ]);
-
-    return {
-      ...messageIdModule
-    };
+    return this.loadedModules.get('core');
   }
 
   /**
-   * Clear all cached modules (useful for testing/development)
+   * Clear all cached modules (only clears dynamic ones)
    */
   clearCache() {
-    getLogger().debug('Clearing utils factory cache');
+    logger.debug('Clearing utils factory dynamic cache');
+    const browser = this.loadedModules.get('browser');
+    const ui = this.loadedModules.get('ui');
+    const security = this.loadedModules.get('security');
+    const core = this.loadedModules.get('core');
+    
     this.loadedModules.clear();
     this.loadingPromises.clear();
+    
+    // Restore static ones
+    this.loadedModules.set('browser', browser);
+    this.loadedModules.set('ui', ui);
+    this.loadedModules.set('security', security);
+    this.loadedModules.set('core', core);
   }
 
   /**
