@@ -4,6 +4,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 // Logger will be initialized inside the function to avoid TDZ
@@ -258,10 +260,6 @@ export function useTTSSmart() {
       
       return true;
     } catch (error) {
-      // Use proper error management system
-      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
-      
       // Handle TTS stop errors gracefully - these are usually expected
       await ErrorHandler.getInstance().handle(error, {
         type: ErrorTypes.TTS,
@@ -310,10 +308,6 @@ export function useTTSSmart() {
       // logger.debug("[useTTSSmart] All TTS instances stopped");
       return true;
     } catch (error) {
-      // Use proper error management system
-      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
-      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
-      
       // Handle TTS stop errors gracefully - these are usually expected
       await ErrorHandler.getInstance().handle(error, {
         type: ErrorTypes.TTS,

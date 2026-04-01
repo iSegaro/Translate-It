@@ -5,9 +5,10 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { isRestrictedUrl } from '@/core/tabPermissions.js';
 
 // Lazy logger initialization to avoid TDZ issues
 let logger = null;
@@ -321,9 +322,6 @@ export async function sendRegularMessage(message, options = {}) {
         });
       }
 
-      // Import tabPermissions utilities to check for restricted pages
-      const { isRestrictedUrl } = await import('@/core/tabPermissions.js');
-
       // Check if this is a restricted page error - if so, return the response instead of throwing
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
         if (!silent) {
@@ -356,10 +354,6 @@ export async function sendRegularMessage(message, options = {}) {
 
     return response;
   } catch (error) {
-    // Import ErrorMatcher to detect error types
-    const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
-    const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
-    
     const errorType = matchErrorToType(error);
 
     // Simplified debug log
