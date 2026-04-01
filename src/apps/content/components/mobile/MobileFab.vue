@@ -250,6 +250,7 @@ const onFabDragEnd = async (e) => {
 };
 
 const onMobileFabClick = () => {
+  logger.info('Mobile FAB clicked');
   const selection = window.getSelection()?.toString().trim() || '';
   const effectiveSelection = pendingText.value || selection;
   const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);

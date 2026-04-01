@@ -197,12 +197,19 @@ const toggleAutoClose = async () => {
 }
 
 const startTranslation = () => { 
+  logger.info('Starting page translation from Mobile View');
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
   if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
     mobileStore.closeSheet() 
   }
 }
 
-const stopAutoTranslation = () => { pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO) }
-const restorePage = () => { pageEventBus.emit(MessageActions.PAGE_RESTORE) }
+const stopAutoTranslation = () => { 
+  logger.info('Stopping auto-translation from Mobile View');
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO) 
+}
+const restorePage = () => { 
+  logger.info('Restoring original page from Mobile View');
+  pageEventBus.emit(MessageActions.PAGE_RESTORE) 
+}
 </script>
