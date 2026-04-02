@@ -171,6 +171,7 @@ class LifecycleManager {
       [MessageActions.PAGE_TRANSLATE_PROGRESS]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_COMPLETE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_ERROR]: Handlers.handlePageTranslation,
+      [MessageActions.PAGE_TRANSLATE_RESET_ERROR]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_RESTORE_COMPLETE]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_AUTO_RESTORE_COMPLETE]: Handlers.handlePageTranslation, // NEW
       [MessageActions.PAGE_RESTORE_ERROR]: Handlers.handlePageTranslation,

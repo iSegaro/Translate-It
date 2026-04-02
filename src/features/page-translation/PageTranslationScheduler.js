@@ -4,7 +4,6 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
@@ -29,7 +28,6 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.isTranslated = false;
     this.translationSessionId = null;
     this.sessionContext = null;
-    this.errorHandler = ErrorHandler.getInstance();
     
     this.settings = { 
       ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
@@ -193,88 +191,95 @@ export class PageTranslationScheduler extends ResourceTracker {
     let currentBatch = [];
 
     try {
-      if (!this.isTranslated) return;
-
-      const config = await this._getBatchConfig();
-      
-      // 1. Sort queue by score (DESC) to ensure high priority items are picked first
-      this.queue.sort((a, b) => b.score - a.score);
-
-      // 2. Select items for this batch
-      let itemsToProcess = 0;
-      let currentChars = 0;
-      for (const item of this.queue) {
-        if (item.context && item.context !== flushContext) break;
-        const itemLen = item.text.length;
+      // Process batches in a loop as long as there are items and we are still translating
+      while (this.queue.length > 0 && this.isTranslated && flushContext === this.sessionContext) {
+        const config = await this._getBatchConfig();
         
-        // Respect chunk size and character limits
-        if (itemsToProcess >= config.chunkSize) break;
-        if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
+        // 1. Sort queue by score (DESC) to ensure high priority items are picked first
+        this.queue.sort((a, b) => b.score - a.score);
+
+        // 2. Select items for this batch
+        let itemsToProcess = 0;
+        let currentChars = 0;
+        for (const item of this.queue) {
+          if (item.context && item.context !== flushContext) break;
+          const itemLen = item.text.length;
+          
+          // Respect chunk size and character limits
+          if (itemsToProcess >= config.chunkSize) break;
+          if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
+          
+          currentChars += itemLen;
+          itemsToProcess++;
+        }
         
-        currentChars += itemLen;
-        itemsToProcess++;
-      }
-      
-      currentBatch = this.queue.splice(0, itemsToProcess);
+        currentBatch = this.queue.splice(0, itemsToProcess);
 
-      if (currentBatch.length === 0 || !this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
-        return;
-      }
+        if (currentBatch.length === 0) {
+          // If we couldn't pick any items (e.g. context mismatch), break to avoid infinite loop
+          break;
+        }
 
-      this.isFirstBatch = false;
-      const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
-      
-      const batchMessage = MessageFormat.create(
-        MessageActions.PAGE_TRANSLATE_BATCH,
-        {
-          text: JSON.stringify(textsToTranslate),
-          provider: config.providerRegistryId,
-          sourceLanguage: AUTO_DETECT_VALUE, 
-          targetLanguage: config.targetLanguage,
-          mode: TranslationMode.Page,
-          options: { rawJsonPayload: true },
-          sessionId: this.translationSessionId
-        },
-        MessageContexts.CONTENT
-      );
+        this.isFirstBatch = false;
+        const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
+        
+        const batchMessage = MessageFormat.create(
+          MessageActions.PAGE_TRANSLATE_BATCH,
+          {
+            text: JSON.stringify(textsToTranslate),
+            provider: config.providerRegistryId,
+            sourceLanguage: AUTO_DETECT_VALUE, 
+            targetLanguage: config.targetLanguage,
+            mode: TranslationMode.Page,
+            options: { rawJsonPayload: true },
+            sessionId: this.translationSessionId
+          },
+          MessageContexts.CONTENT
+        );
 
-      if (!this.isTranslated) throw new Error('Session stopped');
+        if (!this.isTranslated) throw new Error('Session stopped');
 
-      const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
+        const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
 
-      if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
-        throw new Error('Session changed or stopped');
-      }
+        if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
+          // Resolve items with original text if session stopped/changed
+          currentBatch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
+          break;
+        }
 
-      if (!result?.success) throw new Error(result?.error || 'Batch translation failed');
+        if (!result?.success) {
+          await this._handleBatchError(new Error(result?.error || 'Batch translation failed'), currentBatch);
+          // Stop processing more batches after an error to prevent error cascading
+          break;
+        }
 
-      const translatedTexts = JSON.parse(result.translatedText);
-      
-      currentBatch.forEach((item, index) => {
-        item.resolve(translatedTexts[index]?.text || translatedTexts[index] || item.text);
-        this.translatedCount++;
-      });
+        const translatedTexts = JSON.parse(result.translatedText);
+        
+        currentBatch.forEach((item, index) => {
+          item.resolve(translatedTexts[index]?.text || translatedTexts[index] || item.text);
+          this.translatedCount++;
+        });
 
-      this._reportProgress();
+        this._reportProgress();
 
-      // Check if we are done with all current tasks
-      if (this.queue.length === 0 && this.activeFlushes === 1) {
-        this._checkCompletion();
+        // Check if we are done with all current tasks
+        if (this.queue.length === 0 && this.activeFlushes === 1) {
+          this._checkCompletion();
+        }
+
+        // Yield to event loop between batches if there are many items
+        if (this.queue.length > 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
     } catch (error) {
-      const msg = error.message;
-      if (msg !== 'Session changed or stopped' && msg !== 'Session stopped') {
-        await this._handleBatchError(error, currentBatch);
-      } else {
-        currentBatch.forEach(item => { try { item.resolve(item.text); } catch {
-          // Ignore resolution errors
-        } });
-      }
+      this.logger.debug('Critical error in scheduler flush loop:', error);
+      // Ensure the error is reported to the Manager so UI can update
+      // currentBatch might be empty here if the error happened before splicing, 
+      // but _handleBatchError handles it safely.
+      await this._handleBatchError(error, typeof currentBatch !== 'undefined' ? currentBatch : []);
     } finally {
       this.activeFlushes--;
-      if (this.queue.length > 0 && this.isTranslated) {
-        this.flush(); // Immediate subsequent flush for remaining items
-      }
     }
   }
 
@@ -307,7 +312,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   async _handleBatchError(error, batch) {
     if (this.fatalErrorOccurred) return;
 
-    // Fast-check for fatal error before any awaits to prevent race conditions
+    // Preserve original error identity as per guidelines
     const errorType = matchErrorToType(error);
     const isFatal = isFatalError(errorType);
 
@@ -315,32 +320,27 @@ export class PageTranslationScheduler extends ResourceTracker {
       this.fatalErrorOccurred = true;
     }
 
-    // Now safe to do async operations
-    const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation-batch');
-
-    // Handle error via centralized handler
-    await this.errorHandler.handle(error, {
-      context: 'page-translation-batch',
-      showToast: !isFatal,
-      silent: false
+    // Resolve current batch items with original text to unblock domtranslator
+    batch.forEach(item => { 
+      try { item.resolve(item.text); } catch { /* ignore */ } 
     });
 
+    // Emit internal event for the Manager to handle feedback and broadcasting
+    // We pass the raw error to preserve identity for the centralized handler
+    pageEventBus.emit('page-translation-internal-error', { 
+      error, 
+      errorType, 
+      isFatal: isFatal,
+      context: 'page-translation-batch'
+    });
+
+    // Also emit specific fatal event for the Manager's circuit breaker
     if (isFatal) {
       pageEventBus.emit('page-translation-fatal-error', { 
         error, 
-        errorType, 
-        localizedMessage: errorInfo.message 
+        errorType
       });
     }
-
-    batch.forEach(item => { try { item.resolve(item.text); } catch {
-          // Ignore resolution errors
-        } });
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { 
-      error: errorInfo.message, 
-      errorType, 
-      isFatal: isFatal 
-    });
   }
 
   _reportProgress(force = false) {

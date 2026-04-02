@@ -173,9 +173,35 @@ export class PageTranslationManager extends ResourceTracker {
       this.stopAutoTranslation().catch(() => {});
     });
 
-    bus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+    bus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, (data) => {
+      // Prevent infinite loop: ignore events that we broadcasted ourselves
+      if (data?.isInternal) return;
+
       this.logger.info('Page translation error reset requested via PageEventBus');
       this.resetError();
+    });
+
+    // Listen for internal errors from scheduler to handle broadcasting and UI feedback
+    bus.on('page-translation-internal-error', (data) => {
+      if (data.isFatal) {
+        // Fatal errors are already handled via 'page-translation-fatal-error' listener
+        return;
+      }
+
+      this.logger.debug('Non-fatal page translation error received', data.error);
+
+      // Handle UI feedback for non-fatal errors
+      ErrorHandler.getInstance().handle(data.error, {
+        context: data.context || 'page-translation',
+        showToast: true
+      }).catch(err => this.logger.warn('ErrorHandler failed for non-fatal error:', err));
+
+      // Broadcast to update UI (red dot) and other extension parts
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
+        error: data.error?.message || String(data.error),
+        errorType: data.errorType,
+        isFatal: false
+      });
     });
 
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
@@ -360,7 +386,7 @@ export class PageTranslationManager extends ResourceTracker {
 
   resetError() {
     this.isFatalErrorHandling = false;
-    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_RESET_ERROR, { isInternal: true });
   }
 
   resetLocalState() {
@@ -516,7 +542,7 @@ export class PageTranslationManager extends ResourceTracker {
   async _broadcastEvent(action, data = {}) {
     try {
       pageEventBus.emit(action, data);
-      sendRegularMessage({ action, data, context: 'page-translation-broadcast' }).catch(() => {});
+      sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
     } catch {
       // Silent error
     }
