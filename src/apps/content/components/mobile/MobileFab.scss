@@ -1,12 +1,30 @@
 /* src/apps/content/components/mobile/MobileFab.scss */
 
 .mobile-fab {
+  /* Responsive Sizing Variables */
+  --fab-size: 54px;
+  --fab-icon-size: 28px;
+  --fab-visible-width: 18px; /* How much of the FAB is visible at the screen edge */
+  
+  /* Media Queries for Responsive Scaling */
+  @media (min-width: 576px) { // Tablet
+    --fab-size: 64px;
+    --fab-icon-size: 34px;
+    --fab-visible-width: 22px;
+  }
+
+  @media (min-width: 992px) { // Desktop / Large Screen
+    --fab-size: 72px;
+    --fab-icon-size: 40px;
+    --fab-visible-width: 26px;
+  }
+
   /* Default values for CSS Variables */
   --fab-y: 100px;
   --fab-opacity: 1;
   --fab-pointer-events: auto;
   --fab-left: 100%;
-  --fab-margin-left: -15px;
+  --fab-margin-left: calc(-1 * var(--fab-visible-width));
   --fab-justify-content: flex-start;
   --fab-transition: opacity 0.2s ease, bottom 0.1s ease-out, left 0.3s ease-out, margin 0.3s ease-out;
 
@@ -15,8 +33,8 @@
   left: var(--fab-left) !important;
   margin-left: var(--fab-margin-left) !important;
   
-  width: 50px !important;
-  height: 50px !important;
+  width: var(--fab-size) !important;
+  height: var(--fab-size) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: var(--fab-justify-content) !important;
@@ -45,12 +63,13 @@
 
   &.is-dragging {
     --fab-justify-content: center !important;
-    --fab-margin-left: -20px !important; /* جبران پهنای آیکون در زمان درگ */
+    /* Centering with slight offset (40% of size) to keep it visible under finger */
+    --fab-margin-left: calc(var(--fab-size) * -0.4) !important;
   }
 
   &.is-left {
     --fab-left: 0 !important;
-    --fab-margin-left: -35px !important;
+    --fab-margin-left: calc(var(--fab-visible-width) - var(--fab-size)) !important;
     --fab-justify-content: flex-end !important;
 
     img {
@@ -60,7 +79,7 @@
 
   &.is-right {
     --fab-left: 100% !important;
-    --fab-margin-left: -15px !important;
+    --fab-margin-left: calc(-1 * var(--fab-visible-width)) !important;
     --fab-justify-content: flex-start !important;
 
     img {
@@ -69,8 +88,8 @@
   }
 
   img {
-    width: 26px !important; 
-    height: 26px !important;
+    width: var(--fab-icon-size) !important; 
+    height: var(--fab-icon-size) !important;
     display: block !important;
     object-fit: contain !important;
     transition: transform 0.3s ease !important;
