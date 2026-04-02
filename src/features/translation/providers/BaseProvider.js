@@ -388,7 +388,7 @@ export class BaseProvider {
           // Fallback if URL parsing fails
         }
 
-        logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
+        logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error (${response.status})`, {
           status: response.status,
           message: msg,
           url: sanitizedUrl,
