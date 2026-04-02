@@ -6,7 +6,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
@@ -301,34 +300,21 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
       
-      // Determine error type and provide meaningful response
-      let errorType = ErrorTypes.UNKNOWN;
-      let userMessage = "Failed to activate Select Element mode";
-      
-      // Check for specific error conditions
-      if (error.message.includes('Extension context')) {
-        errorType = ErrorTypes.CONTEXT;
-        userMessage = "Extension context invalidated. Please refresh the page.";
-      } else if (error.message.includes('permission') || error.message.includes('restricted')) {
-        errorType = ErrorTypes.PERMISSION;
-        userMessage = "Feature not available on this page";
-      } else if (error.message.includes('initialization') || error.message.includes('initialize')) {
-        errorType = ErrorTypes.INTEGRATION;
-        userMessage = "Feature initialization failed. Please refresh the page.";
-      }
+      // Use centralized error management to get classified error type and localized message
+      const errorInfo = await this.errorHandler.getErrorForUI(error, "ContentMessageHandler-activateSelectElement");
 
       // Log the error with proper context
       await this.errorHandler.handle(error, {
-        type: errorType,
+        type: errorInfo.type,
         context: "ContentMessageHandler-activateSelectElement",
         showToast: false // Don't show toast for background-triggered actions
       });
       
       return { 
         success: false, 
-        error: userMessage, 
+        error: errorInfo.message, 
         activated: false,
-        errorType: errorType,
+        errorType: errorInfo.type,
         isCompatibilityIssue: true // Explicitly mark as compatibility issue, not restriction
       };
     }
@@ -431,33 +417,18 @@ export class ContentMessageHandler extends ResourceTracker {
             window.pendingTranslationToastId = null;
           }
           
-          // Extract error message safely
-          let errorMessage;
-          if (typeof error === 'string' && error.length > 0) {
-            errorMessage = error;
-          } else if (error && typeof error === 'object' && error.message) {
-            errorMessage = error.message;
-          } else if (error) {
-            try {
-              errorMessage = JSON.stringify(error);
-                        } catch {
-              errorMessage = 'Translation failed';
-            }
-          } else {
-            errorMessage = 'Translation failed';
-          }
+          // Use centralized error handling system to get localized message and correct type
+          const errorInfo = await this.errorHandler.getErrorForUI(error, 'text-field-translation');
           
-          // Create error object with original error message
-          const translationError = new Error(errorMessage);
-          translationError.originalError = error;
-          
-          // Use centralized error handling
-          await this.errorHandler.handle(translationError, {
+          // Log the error with proper context
+          await this.errorHandler.handle(error, {
             context: 'text-field-translation',
-            type: ErrorTypes.TRANSLATION_FAILED,
+            type: errorInfo.type,
             showToast: true
           });
           
+          const translationError = new Error(errorInfo.message);
+          translationError.type = errorInfo.type;
           translationError.alreadyHandled = true;
           throw translationError;
         }
@@ -475,10 +446,12 @@ export class ContentMessageHandler extends ResourceTracker {
           // Only log if error is not already handled
           this.logger.error('Field translation failed during application:', error);
           
-          // Use centralized error handling
+          // Use centralized error handling system
+          const errorInfo = await this.errorHandler.getErrorForUI(error, 'text-field-application');
+          
           await this.errorHandler.handle(error, {
             context: 'text-field-application',
-            type: ErrorTypes.TRANSLATION_FAILED,
+            type: errorInfo.type,
             showToast: true
           });
           
@@ -651,14 +624,16 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.error('Page translation failed:', error);
 
-      // Use centralized error handling
+      // Use centralized error handling system
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation');
+
       await this.errorHandler.handle(error, {
-        type: ErrorTypes.TRANSLATION_FAILED,
+        type: errorInfo.type,
         context: 'page-translation',
         showToast: true
       });
 
-      return { success: false, error: error.message };
+      return { success: false, error: errorInfo.message, errorType: errorInfo.type };
     }
   }
 
@@ -681,14 +656,16 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.error('Page restore failed:', error);
 
-      // Use centralized error handling
+      // Use centralized error handling system
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-restore');
+
       await this.errorHandler.handle(error, {
-        type: ErrorTypes.TRANSLATION_FAILED,
+        type: errorInfo.type,
         context: 'page-restore',
         showToast: true
       });
 
-      return { success: false, error: error.message };
+      return { success: false, error: errorInfo.message, errorType: errorInfo.type };
     }
   }
 
