@@ -8,10 +8,11 @@
 
 // Early debug to trace module evaluation order
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'StorageCore');
 import SmartCache from '@/core/memory/SmartCache.js';
 import { MEMORY_TIMING } from '@/core/memory/constants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
