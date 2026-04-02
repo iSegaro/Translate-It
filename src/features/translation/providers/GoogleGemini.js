@@ -89,7 +89,26 @@ export class GeminiProvider extends BaseAIProvider {
       };
     }
 
-    let url = rawApiUrl || CONFIG.GEMINI_API_URL;
+    // CRITICAL FIX: Determine the correct API URL based on the selected model
+    let apiUrl = rawApiUrl;
+    
+    // Only auto-correct the URL if it's a standard Google endpoint or empty.
+    // This allows users to use custom proxy URLs by changing the API URL field.
+    const isStandardGoogleUrl = !rawApiUrl || 
+                                rawApiUrl.includes('generativelanguage.googleapis.com') || 
+                                rawApiUrl === CONFIG.GEMINI_API_URL;
+
+    if (isStandardGoogleUrl && model && CONFIG.GEMINI_MODELS) {
+      const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
+      if (modelConfig?.url) {
+        apiUrl = modelConfig.url;
+        logger.debug(`[Gemini] Using specific Google endpoint for model ${model}`);
+      }
+    } else if (!isStandardGoogleUrl) {
+      logger.debug(`[Gemini] Using custom/proxy endpoint: ${rawApiUrl}`);
+    }
+
+    let url = apiUrl || CONFIG.GEMINI_API_URL;
     if (!url.includes(':generateContent')) {
       url = `${url}:generateContent`;
     }
@@ -167,6 +186,19 @@ export class GeminiProvider extends BaseAIProvider {
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
     const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
 
+    // CRITICAL FIX: Determine the correct API URL based on the selected model
+    let apiUrl = rawApiUrl;
+    const isStandardGoogleUrl = !rawApiUrl || 
+                                rawApiUrl.includes('generativelanguage.googleapis.com') || 
+                                rawApiUrl === CONFIG.GEMINI_API_URL;
+
+    if (isStandardGoogleUrl && model && CONFIG.GEMINI_MODELS) {
+      const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
+      if (modelConfig?.url) {
+        apiUrl = modelConfig.url;
+      }
+    }
+
     const requestBody = {
       contents: [{
         parts: [
@@ -185,7 +217,7 @@ export class GeminiProvider extends BaseAIProvider {
       }
     };
 
-    let url = rawApiUrl || CONFIG.GEMINI_API_URL;
+    let url = apiUrl || CONFIG.GEMINI_API_URL;
     if (!url.includes(':generateContent')) {
       url = `${url}:generateContent`;
     }
