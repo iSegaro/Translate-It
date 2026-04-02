@@ -145,7 +145,7 @@ export async function loadVueApp(contentCore) {
 
     app.use(pinia);
 
-    // Load i18n plugin asynchronously to prevent TDZ
+    // Load i18n plugin asynchronously for optimal performance
     try {
       const { i18nPlugin } = await utilsFactory.getI18nUtils();
       app.use(i18nPlugin);

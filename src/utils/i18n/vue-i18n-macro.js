@@ -4,8 +4,7 @@
 import { loadI18nPlugin } from './plugin-async-loader.js';
 
 /**
- * Create Vue app with async i18n plugin loading
- * This prevents TDZ errors in main app files
+ * Create Vue app with async i18n plugin loading for optimal performance
  */
 export async function createAppWithI18n(rootComponent) {
   const { createApp } = await import('vue');

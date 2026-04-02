@@ -18,7 +18,7 @@ export const ProviderCategories = {
 
 /**
  * The Central Manifest
- * Wrapped in a function to enable lazy initialization and avoid TDZ issues
+ * Wrapped in a function to enable lazy initialization for better stability
  */
 const getRawManifest = () => [
   // --- Group: FREE ---
