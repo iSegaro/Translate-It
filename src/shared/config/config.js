@@ -1,6 +1,5 @@
 // src/config.js
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
