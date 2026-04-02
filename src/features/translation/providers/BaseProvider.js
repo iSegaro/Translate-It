@@ -377,10 +377,21 @@ export class BaseProvider {
         // For server errors (502, 503, 524), use warn level instead of error - these are temporary server issues
         const isServerError = response.status >= 500 && response.status < 600;
         const logLevel = isDeepL400 || isServerError ? 'warn' : 'error';
+        // Sanitize URL for logging: remove API keys from query parameters
+        let sanitizedUrl = url;
+        try {
+          const urlObj = new URL(url);
+          if (urlObj.searchParams.has('key')) urlObj.searchParams.set('key', '***');
+          if (urlObj.searchParams.has('api_key')) urlObj.searchParams.set('api_key', '***');
+          sanitizedUrl = urlObj.toString();
+        } catch {
+          // Fallback if URL parsing fails
+        }
+
         logger[logLevel](`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           message: msg,
-          url: url,
+          url: sanitizedUrl,
           // Log full error body for DeepL 400 errors to diagnose the issue
           ...(isDeepL400 && { errorBody: body })
         });

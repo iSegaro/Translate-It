@@ -73,6 +73,17 @@ export class ErrorHandler {
         raw = 'Error processing failed';
       }
 
+      // CRITICAL SECURITY FIX: Redact API keys from the raw error message before logging
+      // This prevents leaks when providers (like Gemini) include the URL with key in the error message.
+      const redactKeys = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        return text
+          .replace(/(key|api_key)=([a-zA-Z0-9_\-]+)/gi, '$1=***') // Mask URL params
+          .replace(/(AIzaSy)[a-zA-Z0-9_\-]{35}/g, '$1***'); // Mask standard Gemini key pattern
+      };
+      
+      const sanitizedRaw = redactKeys(raw);
+
       // Handle extension context errors silently
       if (ExtensionContextManager.isContextError(err)) {
         ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
@@ -89,14 +100,14 @@ export class ErrorHandler {
         // Decide whether to use raw message or localized generic message
         const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
         
-        if (!shouldUseGeneric && raw && raw.length > 5 && 
-            !raw.includes('[object Object]') && !raw.startsWith('Error:')) {
-          msg = raw;
+        if (!shouldUseGeneric && sanitizedRaw && sanitizedRaw.length > 5 && 
+            !sanitizedRaw.includes('[object Object]') && !sanitizedRaw.startsWith('Error:')) {
+          msg = sanitizedRaw;
         } else {
           msg = genericMsg;
         }
       } catch {
-        msg = raw || 'An error occurred';
+        msg = sanitizedRaw || 'An error occurred';
       }
       
       const displayStrategy = getErrorDisplayStrategy(meta.context || 'unknown', type);
@@ -115,7 +126,7 @@ export class ErrorHandler {
       // Logging
       if (this.debugMode && !shouldSuppressConsole(type)) {
         const logLevel = enhancedMeta.showToast ? 'error' : 'debug';
-        logger[logLevel](`[${type}] ${raw}`, err.stack);
+        logger[logLevel](`[${type}] ${sanitizedRaw}`, err.stack);
       }
 
       if (isSilentError(type)) return err;

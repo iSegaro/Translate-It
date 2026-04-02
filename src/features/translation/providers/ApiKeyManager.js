@@ -95,9 +95,13 @@ class ApiKeyManager {
       const result = await storageManager.get({ [providerSettingKey]: '' });
       const keyString = result[providerSettingKey] || '';
 
-      // Debug logging to see what's actually in storage
+      // Debug logging to see what's actually in storage (masked for security)
+      const maskedValue = keyString.length > 10 
+        ? `${keyString.substring(0, 4)}...${keyString.substring(keyString.length - 4)}`
+        : '***';
+
       logger.info(`[ApiKeyManager] Raw storage value for ${providerSettingKey}:`, {
-        value: keyString,
+        value: maskedValue,
         length: keyString.length,
         hasNewlines: keyString.includes('\n'),
         lineCount: keyString.split('\n').length
