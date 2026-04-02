@@ -71,6 +71,9 @@ export class CustomProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model, // مدل باید توسط کاربر مشخص شود
         messages: messages,
+        max_tokens: 4096, // Safe limit for most compatible APIs
+        // Enable JSON mode if requested for batch
+        ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -92,7 +95,10 @@ export class CustomProvider extends BaseAIProvider {
     }
 
     logger.info(`[Custom] Translation completed successfully`);
-    return this._cleanAIResponse(result);
+    
+    // Batch translations should return raw text to let the specialized parser handle it.
+    // Individual translations use _cleanAIResponse to remove markdown blocks.
+    return isBatch ? result : this._cleanAIResponse(result);
   }
 
   /**

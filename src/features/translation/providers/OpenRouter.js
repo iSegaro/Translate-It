@@ -73,6 +73,9 @@ export class OpenRouterProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "openai/gpt-3.5-turbo",
         messages: messages,
+        max_tokens: 4096, // Ensure enough tokens for batch responses
+        // Enable JSON mode for batch translations
+        ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -94,7 +97,10 @@ export class OpenRouterProvider extends BaseAIProvider {
     }
 
     logger.info(`[OpenRouter] Translation completed successfully`);
-    return this._cleanAIResponse(result);
+    
+    // Batch translations should return raw text to let the specialized parser handle it.
+    // Individual translations use _cleanAIResponse to remove markdown blocks.
+    return isBatch ? result : this._cleanAIResponse(result);
   }
 
   /**

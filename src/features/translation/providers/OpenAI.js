@@ -72,6 +72,9 @@ export class OpenAIProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "gpt-3.5-turbo",
         messages: messages,
+        max_tokens: 4096, // Prevent truncation
+        // Enable JSON mode for batch translations
+        ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -93,7 +96,10 @@ export class OpenAIProvider extends BaseAIProvider {
     }
 
     logger.info(`[OpenAI] Translation completed successfully`);
-    return this._cleanAIResponse(result);
+    
+    // Batch translations should return raw text to let the specialized parser handle it.
+    // Individual translations use _cleanAIResponse to remove markdown blocks.
+    return isBatch ? result : this._cleanAIResponse(result);
   }
 
   /**

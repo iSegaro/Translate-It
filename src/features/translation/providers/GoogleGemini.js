@@ -66,7 +66,9 @@ export class GeminiProvider extends BaseAIProvider {
       },
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 2048
+        maxOutputTokens: 8192, // Increased from 2048 to prevent truncation on large batches
+        // Force JSON response for batch translations to prevent parsing errors
+        ...(isBatch && { response_mime_type: "application/json" })
       }
     };
 
@@ -142,7 +144,10 @@ export class GeminiProvider extends BaseAIProvider {
       }
 
       logger.info(`[Gemini] Translation completed successfully`);
-      return this._cleanAIResponse(result);
+      
+      // Batch translations should return raw text to let the specialized parser handle it.
+      // Individual translations use _cleanAIResponse to remove markdown blocks.
+      return isBatch ? result : this._cleanAIResponse(result);
     } catch (error) {
       if (
         thinkingEnabled &&

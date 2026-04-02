@@ -33,7 +33,7 @@ export class WebAIProvider extends BaseAIProvider {
   }
 
   
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
@@ -64,7 +64,10 @@ export class WebAIProvider extends BaseAIProvider {
         message: prompt,
         model: apiModel,
         images: [],
+        max_tokens: 4096, // Ensure enough tokens for batch responses
         reset_session: this.shouldResetSession(),
+        // Enable JSON mode for batch translations
+        ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -80,6 +83,8 @@ export class WebAIProvider extends BaseAIProvider {
 
     logger.info(`[WebAI] Translation completed successfully`);
     this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
-    return this._cleanAIResponse(result);
+    
+    // Batch translations should return raw text to let the specialized parser handle it.
+    return isBatch ? result : this._cleanAIResponse(result);
   }
 }
