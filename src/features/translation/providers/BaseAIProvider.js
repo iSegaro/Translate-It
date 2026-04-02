@@ -811,51 +811,89 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {string[]} - Parsed results
    */
   _parseBatchResult(result, expectedCount, originalBatch) {
+    if (!result || typeof result !== 'string') {
+      return originalBatch;
+    }
+
     try {
-      // Find the JSON array in the response, allowing for markdown code blocks
-      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```|(\[[\s\S]*\])/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in the response.');
+      let jsonString = result.trim();
+      let parsed = null;
+
+      // 1. Try parsing the whole string first (fast path)
+      try {
+        parsed = JSON.parse(jsonString);
+      } catch {
+        // 2. Try extracting from markdown code blocks
+        const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          try {
+            parsed = JSON.parse(codeBlockMatch[1]);
+          } catch { /* continue */ }
+        }
+
+        // 3. Last resort: Find the first '[' and last ']'
+        if (!parsed) {
+          const firstBracket = jsonString.indexOf('[');
+          const lastBracket = jsonString.lastIndexOf(']');
+          if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+            try {
+              parsed = JSON.parse(jsonString.substring(firstBracket, lastBracket + 1));
+            } catch { /* continue */ }
+          }
+        }
       }
-      
-      // Use the first captured group that is not undefined
-      const jsonString = jsonMatch[1] || jsonMatch[2];
-      const parsed = JSON.parse(jsonString);
+
+      if (!parsed) {
+        throw new Error('No valid JSON array or object found in the response.');
+      }
+
+      // If we got an object instead of an array, try to find the array inside it
+      // Some models wrap the output even when asked for an array
+      if (!Array.isArray(parsed) && typeof parsed === 'object') {
+        const potentialArray = Object.values(parsed).find(Array.isArray);
+        if (potentialArray) {
+          parsed = potentialArray;
+        }
+      }
       
       if (Array.isArray(parsed)) {
-        // Check if this is a simple string array (the main issue we're fixing)
-        if (parsed.length === 1 && typeof parsed[0] === 'string') {
-          logger.debug(`[${this.providerName}] Single segment array detected, extracting text properly`);
-          return [parsed[0]];
+        // Handle simple string array format (fallback for some models)
+        if (parsed.length > 0 && typeof parsed[0] === 'string') {
+          if (parsed.length === expectedCount) {
+            return parsed;
+          }
+          // If count mismatch, pad or truncate
+          logger.warn(`[${this.providerName}] String array length mismatch: got ${parsed.length}, expected ${expectedCount}`);
+          return parsed.slice(0, expectedCount).concat(originalBatch.slice(parsed.length));
         }
 
-        // Handle object array format (multi-segment case)
-        if (parsed.length === expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
-          // Ensure the order is correct based on id
-          const sortedResults = parsed.sort((a, b) => a.id - b.id);
-          return sortedResults.map(item => item.text);
-        } else if (parsed.length > expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
-          // Sometimes AI returns extra items - take first N items
-          logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Taking first ${expectedCount} items.`);
-          const firstItems = parsed.slice(0, expectedCount);
-          const sortedResults = firstItems.sort((a, b) => a.id - b.id);
-          return sortedResults.map(item => item.text);
-        } else if (parsed.length < expectedCount && typeof parsed[0] === 'object' && parsed[0] !== null) {
-          // Sometimes AI returns fewer items - pad with original texts
-          logger.warn(`[${this.providerName}] AI provider returned ${parsed.length} items, expected ${expectedCount}. Padding with original texts.`);
-          const sortedResults = parsed.sort((a, b) => a.id - b.id);
-          const translatedTexts = sortedResults.map(item => item.text);
+        // Handle standard object array format: [{id: 0, text: "..."}, ...]
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
+          // Sort by ID to ensure consistency
+          const sortedResults = [...parsed].sort((a, b) => (a.id || 0) - (b.id || 0));
+          const translatedTexts = sortedResults.map(item => item.text || '');
 
-          // Pad with original texts if needed
-          while (translatedTexts.length < expectedCount) {
-            translatedTexts.push(originalBatch[translatedTexts.length] || '');
+          if (translatedTexts.length === expectedCount) {
+            return translatedTexts;
           }
 
-          return translatedTexts;
+          // Handle count mismatch for object arrays
+          logger.warn(`[${this.providerName}] Object array length mismatch: got ${translatedTexts.length}, expected ${expectedCount}`);
+          
+          if (translatedTexts.length > expectedCount) {
+            return translatedTexts.slice(0, expectedCount);
+          } else {
+            // Pad with original texts
+            const padded = [...translatedTexts];
+            for (let i = padded.length; i < expectedCount; i++) {
+              padded.push(originalBatch[i] || '');
+            }
+            return padded;
+          }
         }
       }
 
-      throw new Error(`Invalid batch result format. Expected ${expectedCount} items, got ${parsed.length}.`);
+      throw new Error(`Invalid batch result structure or empty array.`);
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to parse batch result: ${error.message}. Falling back to splitting by lines.`);
       return this._fallbackParsing(result, expectedCount, originalBatch);
