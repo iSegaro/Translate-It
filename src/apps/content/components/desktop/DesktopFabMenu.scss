@@ -2,6 +2,45 @@
 @use "@/assets/styles/base/variables" as *;
 
 .desktop-fab-container {
+  /* Responsive Sizing Variables */
+  --fab-size: 54px;
+  --fab-icon-size: 32px;
+  --fab-edge-offset: 25px; /* Amount hidden off-screen */
+  --fab-active-translate: 18px; /* Amount it moves inward when active */
+  --badge-size: 32px;
+  --badge-icon-size: 18px;
+  --badge-offset: 42px; /* Vertical spacing between badges */
+  --translate-badge-size: 20px;
+  --menu-min-width: 190px;
+  --menu-font-size: 13px;
+
+  /* Media Queries for Responsive Scaling */
+  @media (max-width: 576px) { // Small screens (Mobile)
+    --fab-size: 48px;
+    --fab-icon-size: 28px;
+    --fab-edge-offset: 22px;
+    --fab-active-translate: 15px;
+    --badge-size: 28px;
+    --badge-icon-size: 16px;
+    --badge-offset: 36px;
+    --translate-badge-size: 18px;
+    --menu-min-width: 170px;
+    --menu-font-size: 12px;
+  }
+
+  @media (min-width: 1200px) { // Extra Large screens
+    --fab-size: 64px;
+    --fab-icon-size: 38px;
+    --fab-edge-offset: 30px;
+    --fab-active-translate: 22px;
+    --badge-size: 36px;
+    --badge-icon-size: 20px;
+    --badge-offset: 48px;
+    --translate-badge-size: 24px;
+    --menu-min-width: 210px;
+    --menu-font-size: 14px;
+  }
+
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-end !important;
@@ -14,9 +53,9 @@
   // Revert Badge
   .fab-revert-badge {
     position: absolute !important;
-    bottom: 42px !important;
-    width: 32px !important;
-    height: 32px !important;
+    bottom: var(--badge-offset) !important;
+    width: var(--badge-size) !important;
+    height: var(--badge-size) !important;
     border-radius: 50% !important;
     background-color: #fa5252 !important;
     display: flex !important;
@@ -27,22 +66,23 @@
     pointer-events: auto !important;
 
     img {
-      width: 16px !important;
-      height: 16px !important;
+      width: var(--badge-icon-size) !important;
+      height: var(--badge-icon-size) !important;
       filter: brightness(0) invert(1) !important;
     }
   }
 
   // Desktop Fab Button
   .desktop-fab-button {
-    width: 54px !important;
-    height: 54px !important;
+    width: var(--fab-size) !important;
+    height: var(--fab-size) !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
     cursor: pointer !important;
     pointer-events: auto !important;
     user-select: none !important;
+    touch-action: none !important;
     position: relative !important;
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2) !important;
     transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease !important;
@@ -62,8 +102,8 @@
     }
 
     img {
-      width: 32px !important;
-      height: 32px !important;
+      width: var(--fab-icon-size) !important;
+      height: var(--fab-icon-size) !important;
       display: block !important;
       pointer-events: none !important;
       object-fit: contain !important;
@@ -77,9 +117,9 @@
   // Translate Badge (Selection)
   .fab-translate-badge {
     position: absolute !important;
-    top: -6px !important;
-    width: 20px !important;
-    height: 20px !important;
+    top: calc(var(--translate-badge-size) * -0.3) !important;
+    width: var(--translate-badge-size) !important;
+    height: var(--translate-badge-size) !important;
     border-radius: 50% !important;
     display: flex !important;
     justify-content: center !important;
@@ -106,8 +146,8 @@
   .fab-settings-badge,
   .fab-tts-badge {
     position: absolute !important;
-    width: 32px !important;
-    height: 32px !important;
+    width: var(--badge-size) !important;
+    height: var(--badge-size) !important;
     border-radius: 50% !important;
     display: flex !important;
     justify-content: center !important;
@@ -119,8 +159,8 @@
     backdrop-filter: blur(12px) !important;
 
     img {
-      width: 18px !important;
-      height: 18px !important;
+      width: var(--badge-icon-size) !important;
+      height: var(--badge-icon-size) !important;
       display: block !important;
       object-fit: contain !important;
       transition: transform 0.3s ease !important;
@@ -128,8 +168,8 @@
   }
 
   .fab-tts-loader {
-    width: 16px !important;
-    height: 16px !important;
+    width: calc(var(--badge-icon-size) * 0.9) !important;
+    height: calc(var(--badge-icon-size) * 0.9) !important;
     border: 2px solid rgba(74, 144, 226, 0.3) !important;
     border-top-color: #4a90e2 !important;
     border-radius: 50% !important;
@@ -142,7 +182,7 @@
     bottom: 0px !important;
     border-radius: 14px !important;
     padding: 5px !important;
-    min-width: 190px !important;
+    min-width: var(--menu-min-width) !important;
     width: max-content !important;
     display: flex !important;
     flex-direction: column !important;
@@ -180,8 +220,8 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 28px !important;
-        height: 28px !important;
+        width: calc(var(--fab-size) * 0.52) !important;
+        height: calc(var(--fab-size) * 0.52) !important;
         flex-shrink: 0 !important;
         border-radius: 7px !important;
         transition: all 0.2s ease !important;
@@ -190,8 +230,8 @@
         .fab-circle-progress {
           position: absolute !important;
           inset: -2px !important;
-          width: 32px !important;
-          height: 32px !important;
+          width: calc(var(--fab-size) * 0.59) !important;
+          height: calc(var(--fab-size) * 0.59) !important;
           transform: rotate(-90deg) !important;
           z-index: 0 !important;
 
@@ -207,8 +247,8 @@
       }
 
       .fab-menu-icon {
-        width: 20px !important;
-        height: 20px !important;
+        width: calc(var(--fab-size) * 0.37) !important;
+        height: calc(var(--fab-size) * 0.37) !important;
         object-fit: contain !important;
         display: block !important;
         border: none !important;
@@ -218,7 +258,7 @@
       }
 
       .fab-menu-item-text {
-        font-size: 13px !important;
+        font-size: var(--menu-font-size) !important;
         font-weight: 600 !important;
         white-space: nowrap !important;
         font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
@@ -278,25 +318,25 @@
 
   // Sides
   &.is-right {
-    right: -25px !important;
-    .fab-revert-badge, .fab-settings-badge, .fab-tts-badge { right: 15px !important; }
-    .desktop-fab-menu { right: 80px !important; transform-origin: bottom right; }
+    right: calc(-1 * var(--fab-edge-offset)) !important;
+    .fab-revert-badge, .fab-settings-badge, .fab-tts-badge { right: calc(var(--fab-edge-offset) - 10px) !important; }
+    .desktop-fab-menu { right: calc(var(--fab-size) + 26px) !important; transform-origin: bottom right; }
     .desktop-fab-button {
       border-radius: 50% 0 0 50% !important;
-      img { margin-right: 15px !important; transform: scaleX(1); }
+      img { margin-right: calc(var(--fab-edge-offset) - 10px) !important; transform: scaleX(1); }
     }
-    .fab-translate-badge { left: -6px !important; }
+    .fab-translate-badge { left: calc(var(--translate-badge-size) * -0.3) !important; }
   }
 
   &.is-left {
-    left: -25px !important;
-    .fab-revert-badge, .fab-settings-badge, .fab-tts-badge { left: 15px !important; }
-    .desktop-fab-menu { left: 80px !important; transform-origin: bottom left; }
+    left: calc(-1 * var(--fab-edge-offset)) !important;
+    .fab-revert-badge, .fab-settings-badge, .fab-tts-badge { left: calc(var(--fab-edge-offset) - 10px) !important; }
+    .desktop-fab-menu { left: calc(var(--fab-size) + 26px) !important; transform-origin: bottom left; }
     .desktop-fab-button {
       border-radius: 0 50% 50% 0 !important;
-      img { margin-left: 15px !important; transform: scaleX(-1); }
+      img { margin-left: calc(var(--fab-edge-offset) - 10px) !important; transform: scaleX(-1); }
     }
-    .fab-translate-badge { right: -6px !important; }
+    .fab-translate-badge { right: calc(var(--translate-badge-size) * -0.3) !important; }
   }
 }
 
