@@ -115,39 +115,59 @@ export const CONFIG = {
   WEBAI_API_MODEL: "gemini-2.5-flash",
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
-  OPENAI_API_MODEL: "gpt-4o",
+  OPENAI_API_MODEL: "gpt-4o-mini",
   OPENAI_MODELS: [
-    { value: "gpt-4.1", name: "GPT-4.1" },
-    { value: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
-    { value: "gpt-4.1-nano", name: "GPT-4.1 Nano" },
-    { value: "gpt-4o", name: "GPT-4o" },
-    { value: "gpt-4o-mini", name: "GPT-4o Mini" },
+    // --- OpenAI Reasoning Models (برای حل مسائل پیچیده، ریاضیات و کدنویسی) ---
+    { value: "o1", name: "o1" },
+    { value: "o1-mini", name: "o1-mini" },
+    { value: "o3-mini", name: "o3-mini" },
+
+    // --- OpenAI Omni Series (مدل‌های سریع، ارزان و چندمنظوره) ---
     { value: "gpt-4.5-preview", name: "GPT-4.5 Preview" },
-    { value: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+    { value: "gpt-4o", name: "GPT-4o" },
+    { value: "chatgpt-4o-latest", name: "ChatGPT-4o Latest" },
+    { value: "gpt-4o-mini", name: "GPT-4o Mini" },
     { value: "custom", name: "Custom Model" }
   ],
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-4o",
   OPENROUTER_MODELS: [
+// --- OpenAI ---
+    { value: "openai/o1", name: "OpenAI o1 (Reasoning)" },
+    { value: "openai/o3-mini", name: "OpenAI o3-mini (Reasoning)" },
+    { value: "openai/gpt-4.5-preview", name: "OpenAI GPT-4.5 Preview" },
     { value: "openai/gpt-4o", name: "OpenAI GPT-4o" },
     { value: "openai/gpt-4o-mini", name: "OpenAI GPT-4o Mini" },
-    { value: "openai/gpt-4.1", name: "OpenAI GPT-4.1" },
-    { value: "openai/gpt-4.1-mini", name: "OpenAI GPT-4.1 Mini" },
-    { value: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
+
+    // --- Anthropic ---
+    { value: "anthropic/claude-3.7-sonnet", name: "Claude 3.7 Sonnet" },
     { value: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku" },
+
+    // --- DeepSeek (NEW - Highly Recommended) ---
+    { value: "deepseek/deepseek-r1", name: "DeepSeek R1 (Reasoning)" },
+    { value: "deepseek/deepseek-chat", name: "DeepSeek V3 (Chat)" },
+
+    // --- Google ---
+    { value: "google/gemini-3.1-pro-preview", name: "Google Gemini 3.1 Pro" },
+    { value: "google/gemini-3.1-flash-lite-preview", name: "Google Gemini 3.1 Flash-Lite" },
     { value: "google/gemini-2.5-pro", name: "Google Gemini 2.5 Pro" },
     { value: "google/gemini-2.5-flash", name: "Google Gemini 2.5 Flash" },
+
+    // --- Meta & Mistral ---
     { value: "meta-llama/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
     { value: "mistralai/mistral-large", name: "Mistral Large" },
+    
     { value: "custom", name: "Custom Model" }
   ],
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
   DEEPSEEK_API_MODEL: "deepseek-chat",
   DEEPSEEK_MODELS: [
-    { value: "deepseek-chat", name: "DeepSeek Chat (V3)" },
-    { value: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
+    // --- DeepSeek Official Models ---
+    { value: "deepseek-chat", name: "DeepSeek V3 (Chat & Code)" },
+    { value: "deepseek-reasoner", name: "DeepSeek R1 (Reasoner)" },
+
     { value: "custom", name: "Custom Model" }
   ],
   CUSTOM_API_URL: "",
