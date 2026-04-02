@@ -44,8 +44,9 @@ export class BaseTranslateProvider extends BaseProvider {
     } = typeof options === 'object' && options !== null ? options : { mode: options };
 
     const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
+    const sessionId = options.sessionId || null;
 
-    logger.debug(`[${this.providerName}] Traditional provider translate call - Mode: ${translateMode}`);
+    logger.debug(`[${this.providerName}] Traditional provider translate call - Mode: ${translateMode}, Session: ${sessionId}`);
 
     // 1. Language swapping and normalization
     if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
@@ -89,7 +90,8 @@ export class BaseTranslateProvider extends BaseProvider {
       engine, 
       messageId, 
       abortController,
-      priority
+      priority,
+      sessionId
     );
 
     // 4. Reconstruct output
@@ -169,14 +171,14 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
     // Check if streaming is supported and beneficial
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId);
     }
 
     // Fall back to traditional translation (original implementation)
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId);
   }
 
   /**
@@ -223,7 +225,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - All translated texts
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
     
     // Initialize streaming session if messageId is available
@@ -264,7 +266,7 @@ export class BaseTranslateProvider extends BaseProvider {
         // Translate this chunk using provider's original implementation
         const chunkResults = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length),
+          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, sessionId),
           `streaming-chunk-${chunkIndex + 1}/${chunks.length}`,
           priority
         );
@@ -453,7 +455,7 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
     // Default implementation with chunking and rate limiting
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
@@ -479,7 +481,7 @@ export class BaseTranslateProvider extends BaseProvider {
         // Execute chunk translation with rate limiting
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length),
+          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, sessionId),
           chunkContext,
           priority
         );

@@ -98,16 +98,38 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
   /**
    * Extract contextual metadata to improve DeepL translation quality
-   * Provides domain and semantic information to help disambiguate terms
+   * Provides domain, semantic, and historical information to help disambiguate terms
    * @param {HTMLElement} blockContainer - The block container being translated
-   * @returns {string|null} Context string or null if not available
+   * @param {string} sessionId - Optional session identifier for history context
+   * @returns {Promise<string|null>} Context string or null if not available
    */
-  _extractTranslationContext(blockContainer) {
-    if (!blockContainer) return null;
-
+  async _extractTranslationContext(blockContainer, sessionId = null) {
     const contextParts = [];
 
-    // 1. Extract page title (source domain context)
+    // 1. ADD HISTORY CONTEXT
+    // For DeepL, we only send the previous original source texts (User role)
+    // because DeepL recommends context in the same language as the source text.
+    if (sessionId) {
+      try {
+        const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
+        const session = translationSessionManager.sessions.get(sessionId);
+        if (session && session.history && session.history.length > 0) {
+          // Extract only 'user' messages (original source texts)
+          const sourceHistory = session.history
+            .filter(msg => msg.role === 'user')
+            .map(msg => msg.content)
+            .join(' ');
+          
+          if (sourceHistory) {
+            contextParts.push(`Previous Text: ${sourceHistory}`);
+          }
+        }
+      } catch (e) {
+        logger.debug('[DeepL] Failed to extract history context:', e.message);
+      }
+    }
+
+    // 2. Extract page title (source domain context)
     if (typeof document !== 'undefined' && document.title) {
       const title = document.title.trim();
       if (title) {
@@ -115,52 +137,54 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       }
     }
 
-    // 2. Extract block container type (structural context)
-    const tagName = blockContainer.tagName;
-    if (tagName) {
-      // Map common tag names to semantic descriptions
-      const semanticNames = {
-        'P': 'paragraph',
-        'H1': 'main heading',
-        'H2': 'subheading',
-        'H3': 'section heading',
-        'LI': 'list item',
-        'DIV': 'content section',
-        'ARTICLE': 'article',
-        'SECTION': 'section',
-        'BLOCKQUOTE': 'blockquote',
-        'TD': 'table cell',
-        'TH': 'table header',
-        'CAPTION': 'caption',
-        'FIGCAPTION': 'figure caption'
-      };
+    // 3. Extract block container type (structural context)
+    if (blockContainer) {
+      const tagName = blockContainer.tagName;
+      if (tagName) {
+        // Map common tag names to semantic descriptions
+        const semanticNames = {
+          'P': 'paragraph',
+          'H1': 'main heading',
+          'H2': 'subheading',
+          'H3': 'section heading',
+          'LI': 'list item',
+          'DIV': 'content section',
+          'ARTICLE': 'article',
+          'SECTION': 'section',
+          'BLOCKQUOTE': 'blockquote',
+          'TD': 'table cell',
+          'TH': 'table header',
+          'CAPTION': 'caption',
+          'FIGCAPTION': 'figure caption'
+        };
 
-      const semanticName = semanticNames[tagName] || tagName.toLowerCase();
-      contextParts.push(`Content Area: ${semanticName}`);
-    }
+        const semanticName = semanticNames[tagName] || tagName.toLowerCase();
+        contextParts.push(`Content Area: ${semanticName}`);
+      }
 
-    // 3. Add parent context for better disambiguation
-    const parent = blockContainer.parentElement;
-    if (parent) {
-      const parentTag = parent.tagName;
-      const parentSemantic = {
-        'NAV': 'navigation',
-        'ARTICLE': 'article',
-        'SECTION': 'section',
-        'ASIDE': 'sidebar',
-        'HEADER': 'header',
-        'FOOTER': 'footer',
-        'MAIN': 'main content'
-      }[parentTag];
+      // 4. Add parent context for better disambiguation
+      const parent = blockContainer.parentElement;
+      if (parent) {
+        const parentTag = parent.tagName;
+        const parentSemantic = {
+          'NAV': 'navigation',
+          'ARTICLE': 'article',
+          'SECTION': 'section',
+          'ASIDE': 'sidebar',
+          'HEADER': 'header',
+          'FOOTER': 'footer',
+          'MAIN': 'main content'
+        }[parentTag];
 
-      if (parentSemantic) {
-        contextParts.push(`Location: ${parentSemantic}`);
+        if (parentSemantic) {
+          contextParts.push(`Location: ${parentSemantic}`);
+        }
       }
     }
 
     if (contextParts.length === 0) return null;
 
-    // Combine with separator, limit to 1000 characters
+    // Combine with separator, limit to 2000 characters (DeepL context is generous)
     let context = contextParts.join(' | ');
 
     // Sanitize: Remove any XML tags or @@@ markers
@@ -170,8 +194,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       .replace(/\s+/g, ' ')      // Normalize whitespace
       .trim();
 
-    // Limit length to avoid API overhead
-    const MAX_CONTEXT_LENGTH = 1000;
+    // Limit length to avoid request overhead (though DeepL body limit is 128KB)
+    const MAX_CONTEXT_LENGTH = 2000;
     if (context.length > MAX_CONTEXT_LENGTH) {
       context = context.substring(0, MAX_CONTEXT_LENGTH - 3) + '...';
     }
@@ -284,9 +308,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @param {number} chunkIndex - Current chunk index
    * @param {number} totalChunks - Total number of chunks
    * @param {HTMLElement} blockContainer - Block container for context extraction
+   * @param {string} sessionId - Optional session identifier for history context
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1, blockContainer = null) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1, blockContainer = null, sessionId = null) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
     // Normalize language codes
@@ -464,16 +489,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
     // CRITICAL: Add contextual metadata for better translation quality
     // Extract context from block container if available
-    if (blockContainer) {
-      const translationContext = this._extractTranslationContext(blockContainer);
-      if (translationContext) {
-        requestBody.append('context', translationContext);
+    const translationContext = await this._extractTranslationContext(blockContainer, sessionId);
+    if (translationContext) {
+      requestBody.append('context', translationContext);
 
-        logger.debug('[DeepL] Context parameter added', {
-          contextLength: translationContext.length,
-          contextPreview: translationContext.substring(0, 100) + '...'
-        });
-      }
+      logger.debug('[DeepL] Context parameter added', {
+        contextLength: translationContext.length,
+        contextPreview: translationContext.substring(0, 100) + '...'
+      });
     }
 
     // Additional options
@@ -623,14 +646,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         let firstResult, secondResult;
 
         try {
-          firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
+          firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks, blockContainer, sessionId);
         } catch {
           logger.debug(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
           firstResult = firstHalf;
         }
 
         try {
-          secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks);
+          secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks, blockContainer, sessionId);
         } catch {
           logger.debug(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
           secondResult = secondHalf;

@@ -495,7 +495,19 @@ export class TranslationEngine {
                                 );
                             } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method for SelectElement mode
-                                return providerInstance._translateChunk(batch, effectiveSource, effectiveTarget, mode, abortController);
+                                // Pass all arguments to match new signature: (chunkTexts, sl, tl, mode, abort, retry, chunkIdx, totalChunks, blockContainer, sessionId)
+                                return providerInstance._translateChunk(
+                                    batch, 
+                                    effectiveSource, 
+                                    effectiveTarget, 
+                                    mode, 
+                                    abortController,
+                                    0,              // retryAttempt
+                                    batch.length,   // chunkIndex (actually segment count in some signatures)
+                                    1,              // totalChunks
+                                    null,           // blockContainer (will be extracted inside if needed)
+                                    sessionId       // sessionId for history context
+                                );
                             } else {
                                 // Fallback: gather detailed information about the provider issue
                                 const providerInfo = {

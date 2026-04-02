@@ -243,7 +243,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
 
       return await this._finalizeTranslation({
-        result, element, elementId, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete
+        result, element, elementId, originalTextNodesData, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
       });
 
     } catch (error) {
@@ -288,7 +288,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, originalTextNodesData, targetLanguage, onComplete }) {
+  async _finalizeTranslation({ result, element, elementId, originalTextNodesData, targetLanguage, onComplete, sessionId }) {
     if (!result?.success) {
       if (result.cancelled) {
         return { success: false, cancelled: true, element };
@@ -350,6 +350,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (globalSelectElementState.currentTranslation) {
       globalSelectElementState.currentTranslation.targetLanguage = finalTarget;
       globalSelectElementState.currentTranslation.partial = false;
+      globalSelectElementState.currentTranslation.sessionId = sessionId;
     }
 
     if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
