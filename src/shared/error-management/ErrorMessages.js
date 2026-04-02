@@ -79,6 +79,12 @@ export const errorMessages = {
  * Returns a localized message for a given error type.
  */
 export async function getErrorMessage(type, skipI18n = false) {
+  // Proactive check for context errors to avoid i18n failures
+  if (type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || 
+      ExtensionContextManager.isContextError({ message: type })) {
+    return errorMessages[ErrorTypes.EXTENSION_CONTEXT_INVALIDATED];
+  }
+
   if (skipI18n || ExtensionContextManager.isContextError({ message: type })) {
     return ExtensionContextManager.getContextErrorMessage(type, errorMessages);
   }

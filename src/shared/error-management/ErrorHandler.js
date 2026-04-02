@@ -50,6 +50,12 @@ export class ErrorHandler {
 
   async handle(err, meta = {}) {
     if (this.handling) return err;
+    
+    // SECOND LAYER: If context is already invalidated, exit immediately and silently
+    if (!ExtensionContextManager.isValidSync()) {
+      return err;
+    }
+
     this.handling = true;
     
     try {

@@ -2,6 +2,7 @@
 
 import { ErrorTypes } from "./ErrorTypes.js";
 import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 /**
  * Errors that should be handled silently without showing any UI or toast
@@ -138,6 +139,11 @@ export function isRetryableError(errorOrType) {
  * @returns {boolean}
  */
 export function isSilentError(errorOrType) {
+  // If context is already invalidated, everything should be silent
+  if (!ExtensionContextManager.isValidSync()) {
+    return true;
+  }
+
   const type = typeof errorOrType === 'string' ? errorOrType : matchErrorToType(errorOrType);
   return SILENT_ERRORS.has(type);
 }
@@ -305,7 +311,9 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("failed to fetch") || msg.includes("network failure") || msg.includes("networkerror")) return ErrorTypes.NETWORK_ERROR;
   if (msg.includes("http error") || msg.includes("http status") || msg.includes("the operation was aborted.")) return ErrorTypes.HTTP_ERROR;
 
-  if (msg.includes("extension context invalidated") || (msg.includes("extension context") && msg.includes("invalidated"))) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+  if (msg.includes("extension context invalidated") || 
+      (msg.includes("extension context") && msg.includes("invalidated")) ||
+      msg.includes("extension context invalid before operation")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 
   if (msg.includes("listener indicated an asynchronous response") || msg.includes("message channel closed") || msg.includes("receiving end does not exist")) return ErrorTypes.USER_CANCELLED;
