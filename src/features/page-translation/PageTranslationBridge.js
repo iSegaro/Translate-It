@@ -11,12 +11,14 @@ import {
   PAGE_TRANSLATION_ATTRIBUTES, 
   PAGE_TRANSLATION_SELECTORS
 } from './PageTranslationConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 export class PageTranslationBridge extends ResourceTracker {
-  constructor(logger) {
+  constructor() {
     super('page-translation-bridge');
-    this.logger = logger;
+    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Bridge');
     this.session = null;
     this.showOriginalOnHover = true; // Initial default
   }

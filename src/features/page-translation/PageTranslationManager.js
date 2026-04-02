@@ -42,7 +42,7 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js';
 export class PageTranslationManager extends ResourceTracker {
   constructor() {
     super('page-translation-manager');
-    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'PageTranslationManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Manager');
     
     this.toastIntegration = new ToastIntegration(pageEventBus);
     this.notificationManager = new NotificationManager();
@@ -58,8 +58,8 @@ export class PageTranslationManager extends ResourceTracker {
     this.isFatalErrorHandling = false;
     this._isCancelling = false;
     
-    this.scheduler = new PageTranslationScheduler(this.logger);
-    this.bridge = new PageTranslationBridge(this.logger);
+    this.scheduler = new PageTranslationScheduler();
+    this.bridge = new PageTranslationBridge();
     this.hoverManager = new PageTranslationHoverManager();
 
     this.settings = {};

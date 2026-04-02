@@ -5,6 +5,8 @@ import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
@@ -15,9 +17,9 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
  * Handles batching, prioritization (Viewport first), and fault tolerance.
  */
 export class PageTranslationScheduler extends ResourceTracker {
-  constructor(logger) {
+  constructor() {
     super('page-translation-scheduler');
-    this.logger = logger;
+    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Scheduler');
     this.queue = []; // Tasks: { text, score, resolve, reject, context }
     this.batchTimer = null;
     this.translatedCount = 0;
