@@ -8,7 +8,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
-// Logger will be initialized inside the function to avoid TDZ
+// Logger for TTS features
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
 // Shared state across all instances
 const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
@@ -21,9 +22,6 @@ const lastLanguage = ref('auto');
 const isProcessing = ref(false); // Prevent duplicate requests
 
 export function useTTSSmart() {
-  // Initialize logger to avoid TDZ
-  const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
-
   // Backward compatibility
   const isPlaying = computed(() => ttsState.value === 'playing');
   const isLoading = computed(() => ttsState.value === 'loading');

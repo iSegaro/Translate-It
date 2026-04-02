@@ -3,14 +3,7 @@ import DOMPurify from 'dompurify';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-// Use lazy initialization to prevent TDZ errors
-let logger = null;
-const getLogger = () => {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.UI, 'MarkdownService');
-  }
-  return logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'MarkdownService');
 
 /**
  * Centralized service for markdown rendering across the extension
@@ -56,7 +49,7 @@ export class MarkdownService {
     const config = { ...this.defaultConfig[mode], ...options };
 
     try {
-      getLogger().debug('Rendering markdown', { mode, contentLength: content?.length });
+      logger.debug('Rendering markdown', { mode, contentLength: content?.length });
 
       // For full mode, use enhanced markdown with GFM support
       if (mode === 'full') {
@@ -66,7 +59,7 @@ export class MarkdownService {
       // For basic mode, use SimpleMarkdown
       return this._renderBasicMarkdown(content, config, target, sanitize);
     } catch (error) {
-      getLogger().error('Error rendering markdown:', error);
+      logger.error('Error rendering markdown:', error);
       // Fallback to plain text with line breaks
       return this._fallbackRender(content, target);
     }

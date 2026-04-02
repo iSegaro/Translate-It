@@ -6,14 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.UI, 'SystemFontDetector');
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SystemFontDetector');
 
 class SystemFontDetector {
   constructor() {
@@ -76,12 +69,12 @@ class SystemFontDetector {
    */
   async getAvailableFonts(forceRefresh = false) {
     if (this.cachedFonts && !forceRefresh) {
-      getLogger().debug('Returning cached fonts:', this.cachedFonts.length)
+      logger.debug('Returning cached fonts:', this.cachedFonts.length)
       return this.cachedFonts
     }
 
     if (this.isDetecting) {
-      getLogger().debug('Font detection already in progress, returning existing promise')
+      logger.debug('Font detection already in progress, returning existing promise')
       return await this.detectionPromise
     }
 
@@ -91,10 +84,10 @@ class SystemFontDetector {
     try {
       const fonts = await this.detectionPromise
       this.cachedFonts = fonts
-      getLogger().info('System fonts detected successfully:', fonts.length)
+      logger.info('System fonts detected successfully:', fonts.length)
       return fonts
     } catch (error) {
-      getLogger().error('Font detection failed:', error)
+      logger.error('Font detection failed:', error)
       return this.fallbackFonts
     } finally {
       this.isDetecting = false
@@ -112,7 +105,7 @@ class SystemFontDetector {
     try {
       // Method 1: Use document.fonts API if available
       if (typeof document !== 'undefined' && document.fonts && document.fonts.check) {
-        getLogger().debug('Using document.fonts API for detection')
+        logger.debug('Using document.fonts API for detection')
         const fontPromises = this.testFonts.map(async (fontName) => {
           try {
             const isAvailable = await this._checkFontAvailability(fontName)
@@ -120,7 +113,7 @@ class SystemFontDetector {
               detectedFonts.add(fontName)
             }
           } catch (error) {
-            getLogger().debug(`Font check failed for ${fontName}:`, error)
+            logger.debug(`Font check failed for ${fontName}:`, error)
           }
         })
         
@@ -139,7 +132,7 @@ class SystemFontDetector {
       
       // Method 2: Canvas-based detection as fallback
       if (detectedFonts.size === 0) {
-        getLogger().debug('Falling back to canvas-based detection')
+        logger.debug('Falling back to canvas-based detection')
         this.testFonts.forEach(fontName => {
           if (this._isSystemFontAvailable(fontName)) {
             detectedFonts.add(fontName)
@@ -148,7 +141,7 @@ class SystemFontDetector {
       }
       
     } catch (error) {
-      getLogger().warn('Font detection error:', error)
+      logger.warn('Font detection error:', error)
     }
 
     // Convert to structured format
@@ -174,11 +167,11 @@ class SystemFontDetector {
           isSystemFont: true
         })
       } else {
-        getLogger().debug(`Skipping duplicate font: ${fontName} (value: ${fontValue})`)
+        logger.debug(`Skipping duplicate font: ${fontName} (value: ${fontValue})`)
       }
     })
 
-    getLogger().debug('Final font list prepared:', fonts.length)
+    logger.debug('Final font list prepared:', fonts.length)
     return fonts
   }
 
@@ -359,7 +352,7 @@ class SystemFontDetector {
    */
   clearCache() {
     this.cachedFonts = null
-    getLogger().debug('Font cache cleared')
+    logger.debug('Font cache cleared')
   }
 
   /**

@@ -7,14 +7,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { isContextError } from '@/core/extensionContext.js'
 import browser from 'webextension-polyfill';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSGlobalManager');
-  }
-  return logger;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSGlobalManager');
 
 /**
  * Singleton class to manage TTS instances globally
@@ -36,7 +29,7 @@ class TTSGlobalManager {
   initialize() {
     if (this.isInitialized) return
 
-    getLogger().debug('[TTSGlobalManager] Initializing global TTS manager')
+    logger.debug('[TTSGlobalManager] Initializing global TTS manager')
 
     // Listen for page visibility changes
     this.setupVisibilityChangeHandler()
@@ -48,7 +41,7 @@ class TTSGlobalManager {
     this.setupPeriodicCleanup()
 
     this.isInitialized = true
-    getLogger().info('[TTSGlobalManager] Global TTS manager initialized')
+    logger.info('[TTSGlobalManager] Global TTS manager initialized')
   }
 
   /**
@@ -60,9 +53,6 @@ class TTSGlobalManager {
     this.cleanupInterval = setInterval(() => {
       this.cleanupStaleInstances()
     }, 2 * 60 * 1000)
-    
-    // Periodic cleanup initialized - logged at TRACE level for detailed debugging
-    // getLogger().debug('[TTSGlobalManager] Periodic cleanup initialized')
   }
 
   /**
@@ -72,9 +62,6 @@ class TTSGlobalManager {
    * @param {Object} componentInfo - Information about the component
    */
   registerInstance(instanceId, stopCallback, componentInfo = {}) {
-    // Registering TTS instance - logged at TRACE level for detailed debugging
-    // getLogger().debug('[TTSGlobalManager] Registering TTS instance:', instanceId, componentInfo)
-
     this.activeTTSInstances.set(instanceId, {
       stopCallback,
       componentInfo: {
@@ -85,9 +72,6 @@ class TTSGlobalManager {
       registeredAt: Date.now(),
       lastActivityAt: Date.now()
     })
-
-    // Active instances count - logged at TRACE level for detailed debugging
-    // getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
   }
 
   /**
@@ -97,9 +81,6 @@ class TTSGlobalManager {
   unregisterInstance(instanceId) {
     if (!instanceId) return
 
-    // Unregistering TTS instance - logged at TRACE level for detailed debugging
-    // getLogger().debug('[TTSGlobalManager] Unregistering TTS instance:', instanceId)
-
     const wasActive = this.currentActiveId === instanceId
 
     this.activeTTSInstances.delete(instanceId)
@@ -107,9 +88,6 @@ class TTSGlobalManager {
     if (wasActive) {
       this.currentActiveId = null
     }
-
-    // Active instances count - logged at TRACE level for detailed debugging
-    // getLogger().debug(`[TTSGlobalManager] Active instances count: ${this.activeTTSInstances.size}`)
   }
 
   /**
@@ -118,16 +96,16 @@ class TTSGlobalManager {
    * @param {Object} options - TTS options
    */
   async startTTS(instanceId, options = {}) {
-    getLogger().debug('[TTSGlobalManager] Starting TTS for instance:', instanceId, options)
+    logger.debug('[TTSGlobalManager] Starting TTS for instance:', instanceId, options)
 
     const instance = this.activeTTSInstances.get(instanceId)
     if (!instance) {
-      getLogger().warn('[TTSGlobalManager] Instance not registered:', instanceId)
+      logger.warn('[TTSGlobalManager] Instance not registered:', instanceId)
       return false
     }
 
     // Enforce exclusive playback rule - stop all other instances
-    getLogger().debug('[TTSGlobalManager] Enforcing exclusive playback - stopping all other instances')
+    logger.debug('[TTSGlobalManager] Enforcing exclusive playback - stopping all other instances')
     await this.stopAllExcept(instanceId)
 
     // Mark this instance as active
@@ -136,7 +114,7 @@ class TTSGlobalManager {
     // Update instance timestamp
     instance.lastActivityAt = Date.now()
 
-    getLogger().info(`[TTSGlobalManager] TTS started for ${instance.componentInfo.type || 'instance'}`)
+    logger.info(`[TTSGlobalManager] TTS started for ${instance.componentInfo.type || 'instance'}`)
     return true
   }
 
@@ -144,27 +122,27 @@ class TTSGlobalManager {
    * Stop all TTS instances
    */
   async stopAll() {
-    getLogger().info(`[TTSGlobalManager] Stopped all TTS instances (${this.activeTTSInstances.size} active)`)
+    logger.info(`[TTSGlobalManager] Stopped all TTS instances (${this.activeTTSInstances.size} active)`)
 
     const stopPromises = []
 
     for (const [instanceId, instance] of this.activeTTSInstances.entries()) {
       try {
-        getLogger().debug(`[TTSGlobalManager] Stopping instance: ${instanceId} (${instance.componentInfo.type})`)
+        logger.debug(`[TTSGlobalManager] Stopping instance: ${instanceId} (${instance.componentInfo.type})`)
         
         if (typeof instance.stopCallback === 'function') {
           stopPromises.push(
             Promise.resolve(instance.stopCallback()).catch(error => {
               if (isContextError(error)) {
-                getLogger().debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
+                logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
               } else {
-                getLogger().error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error);
+                logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error);
               }
             })
           )
         }
       } catch (error) {
-        getLogger().error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error)
+        logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error)
       }
     }
 
@@ -174,8 +152,6 @@ class TTSGlobalManager {
     // Clear active instance
     this.currentActiveId = null
 
-    // All TTS instances stopped - logged at TRACE level for detailed debugging
-    // getLogger().debug('[TTSGlobalManager] All TTS instances stopped')
     return true
   }
 
@@ -184,31 +160,31 @@ class TTSGlobalManager {
    * @param {string} exceptInstanceId - Instance ID to keep running
    */
   async stopAllExcept(exceptInstanceId) {
-    getLogger().debug(`[TTSGlobalManager] Stopping all TTS except: ${exceptInstanceId}`)
+    logger.debug(`[TTSGlobalManager] Stopping all TTS except: ${exceptInstanceId}`)
 
     const stopPromises = []
 
     for (const [instanceId, instance] of this.activeTTSInstances.entries()) {
       if (instanceId !== exceptInstanceId) {
         try {
-          getLogger().debug(`[TTSGlobalManager] Stopping instance: ${instanceId}`)
+          logger.debug(`[TTSGlobalManager] Stopping instance: ${instanceId}`)
           
           if (typeof instance.stopCallback === 'function') {
             stopPromises.push(
               Promise.resolve(instance.stopCallback()).catch(error => {
-                getLogger().error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error)
+                logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error)
               })
             )
           }
         } catch (error) {
-          getLogger().error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error)
+          logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error)
         }
       }
     }
 
     await Promise.allSettled(stopPromises)
     
-    getLogger().debug(`[TTSGlobalManager] All instances stopped except: ${exceptInstanceId}`)
+    logger.debug(`[TTSGlobalManager] All instances stopped except: ${exceptInstanceId}`)
   }
 
   /**
@@ -251,19 +227,14 @@ class TTSGlobalManager {
   setupVisibilityChangeHandler() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        getLogger().debug('[TTSGlobalManager] Tab hidden - TTS will continue playing (only WindowsManager dismiss stops TTS)')
-        // Only stop TTS on actual tab/window close, not on focus loss or clicks
-        // TTS should only be stopped when WindowsManager is dismissed explicitly
+        logger.debug('[TTSGlobalManager] Tab hidden - TTS will continue playing (only WindowsManager dismiss stops TTS)')
       } else {
-        getLogger().debug('[TTSGlobalManager] Tab visible again')
-        // Tab is now visible - could potentially resume sidepanel TTS if needed
+        logger.debug('[TTSGlobalManager] Tab visible again')
         this.handleTabVisible()
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    // Store reference for cleanup
     this.visibilityChangeHandler = handleVisibilityChange
   }
 
@@ -272,12 +243,10 @@ class TTSGlobalManager {
    * @private
    */
   handleTabVisible() {
-    // Check if sidepanel has paused TTS that could be resumed
     const sidepanelInstances = this.getInstancesByType()['sidepanel'] || []
     
     if (sidepanelInstances.length > 0) {
-      getLogger().debug('[TTSGlobalManager] Tab visible - sidepanel instances can continue TTS')
-      // Note: Actual resume logic would be handled by individual components
+      logger.debug('[TTSGlobalManager] Tab visible - sidepanel instances can continue TTS')
     }
   }
 
@@ -287,13 +256,11 @@ class TTSGlobalManager {
    */
   setupUnloadHandler() {
     const handleBeforeUnload = () => {
-      getLogger().debug('[TTSGlobalManager] Page unloading - stopping all TTS')
+      logger.debug('[TTSGlobalManager] Page unloading - stopping all TTS')
       this.stopAll()
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
-    
-    // Store reference for cleanup
     this.beforeUnloadHandler = handleBeforeUnload
   }
 
@@ -302,27 +269,31 @@ class TTSGlobalManager {
    * @param {string[]} types - Array of component types to stop
    */
   async stopInstancesByType(types) {
-    getLogger().debug(`[TTSGlobalManager] Stopping instances of types:`, types)
+    logger.debug(`[TTSGlobalManager] Stopping instances of types:`, types)
 
     const stopPromises = []
 
     for (const [instanceId, instance] of this.activeTTSInstances.entries()) {
       if (types.includes(instance.componentInfo.type)) {
         try {
-          getLogger().debug(`[TTSGlobalManager] Stopping ${instance.componentInfo.type} instance: ${instanceId}`)
+          logger.debug(`[TTSGlobalManager] Stopping ${instance.componentInfo.type} instance: ${instanceId}`)
           
           if (typeof instance.stopCallback === 'function') {
             stopPromises.push(
               Promise.resolve(instance.stopCallback()).catch(error => {
-                getLogger().error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error)
+                if (isContextError(error)) {
+                  logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
+                } else {
+                  logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error);
+                }
               })
             )
           }
         } catch (error) {
           if (isContextError(error)) {
-            getLogger().debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
+            logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
           } else {
-            getLogger().error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error);
+            logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error);
           }
         }
       }
@@ -330,22 +301,20 @@ class TTSGlobalManager {
 
     await Promise.allSettled(stopPromises)
     
-    getLogger().debug(`[TTSGlobalManager] Stopped instances of types:`, types)
+    logger.debug(`[TTSGlobalManager] Stopped instances of types:`, types)
   }
 
   /**
    * Enhanced cleanup with performance optimizations
    */
   cleanup() {
-    getLogger().debug('[TTSGlobalManager] Cleaning up global TTS manager')
+    logger.debug('[TTSGlobalManager] Cleaning up global TTS manager')
 
-    // Clear periodic cleanup
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval)
       this.cleanupInterval = null
     }
 
-    // Remove event handlers
     if (this.visibilityChangeHandler) {
       document.removeEventListener('visibilitychange', this.visibilityChangeHandler)
       this.visibilityChangeHandler = null
@@ -356,15 +325,13 @@ class TTSGlobalManager {
       this.beforeUnloadHandler = null
     }
 
-    // Force stop all TTS
     this.forceStopAll()
     
-    // Clear all instances
     this.activeTTSInstances.clear()
     this.currentActiveId = null
     this.isInitialized = false
     
-    getLogger().debug('[TTSGlobalManager] Cleanup completed')
+    logger.debug('[TTSGlobalManager] Cleanup completed')
   }
 
   /**
@@ -407,25 +374,23 @@ class TTSGlobalManager {
    * Force stop all TTS instances immediately (emergency cleanup)
    */
   async forceStopAll() {
-    getLogger().debug('[TTSGlobalManager] Force stopping all TTS instances')
+    logger.debug('[TTSGlobalManager] Force stopping all TTS instances')
     
-    // Send stop message to background directly
     try {
       await browser.runtime.sendMessage({
         action: MessageActions.TTS_STOP,
         data: {}
       })
       
-      getLogger().debug('[TTSGlobalManager] Background TTS stop command sent')
+      logger.debug('[TTSGlobalManager] Background TTS stop command sent')
     } catch (error) {
-      getLogger().error('[TTSGlobalManager] Failed to send background stop command:', error)
+      logger.error('[TTSGlobalManager] Failed to send background stop command:', error)
     }
     
-    // Clear all local state
     this.currentActiveId = null
     this.activeTTSInstances.clear()
     
-    getLogger().debug('[TTSGlobalManager] Force stop completed')
+    logger.debug('[TTSGlobalManager] Force stop completed')
   }
 
   /**
@@ -444,7 +409,7 @@ class TTSGlobalManager {
     }
     
     if (staleInstances.length > 0) {
-      getLogger().debug('[TTSGlobalManager] Cleaning up stale instances:', staleInstances)
+      logger.debug('[TTSGlobalManager] Cleaning up stale instances:', staleInstances)
       
       for (const instanceId of staleInstances) {
         this.unregisterInstance(instanceId)
@@ -480,8 +445,6 @@ function getGlobalTTSManager() {
  */
 export function useTTSGlobal(componentInfo = {}) {
   const manager = getGlobalTTSManager();
-    // useTTSGlobal composable created - logged at TRACE level for detailed debugging
-    // getLogger().debug('[useTTSGlobal] Creating TTS global composable for:', componentInfo)
 
   // Generate unique instance ID
   const instanceId = `${componentInfo.type || 'component'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`

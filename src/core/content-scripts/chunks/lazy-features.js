@@ -4,40 +4,9 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
-// Lazy logger initialization to avoid TDZ issues
-let logger = null;
-function getLogger() {
-  if (!logger) {
-    try {
-      logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
-    } catch {
-      // Fallback logger with proper formatting
-      logger = {
-        debug: (...args) => console.debug('[LazyFeatures]', ...args),
-        warn: (...args) => console.warn('[LazyFeatures]', ...args),
-        error: (...args) => console.error('[LazyFeatures]', ...args),
-        info: (...args) => console.log('[LazyFeatures]', ...args),
-        operation: (...args) => console.log('[LazyFeatures]', ...args)
-      };
-    }
-  }
-  return logger;
-}
-
-// Ensure ErrorHandler is loaded before any feature loading
-let errorHandlerPromise = null;
-async function getErrorHandler() {
-  if (!errorHandlerPromise) {
-    errorHandlerPromise = import('@/shared/error-management/ErrorHandler.js')
-      .then(({ ErrorHandler }) => ErrorHandler.getInstance())
-      .catch(error => {
-        getLogger().warn('Failed to load ErrorHandler:', error);
-        return null;
-      });
-  }
-  return await errorHandlerPromise;
-}
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
 
 // Feature registry
 const loadedFeatures = new Map();
@@ -68,8 +37,6 @@ const ON_DEMAND_FEATURES = new Set([
 ]);
 
 export async function loadFeature(featureName) {
-  const logger = getLogger();
-
   // Check if already loaded
   if (loadedFeatures.has(featureName)) {
     return loadedFeatures.get(featureName);
@@ -135,29 +102,23 @@ export async function loadFeature(featureName) {
     return featureInstance;
 
   } catch (error) {
-    // Try to get ErrorHandler for proper error handling, but don't fail if it's not available
+    // Use centralized ErrorHandler
     try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        const processedError = handler.handle(error, {
-          type: 'FEATURE',
-          context: `loadFeature-${featureName}`
-        });
-        throw processedError;
-      }
+      const handler = ErrorHandler.getInstance();
+      const processedError = handler.handle(error, {
+        type: 'FEATURE',
+        context: `loadFeature-${featureName}`
+      });
+      throw processedError;
     } catch {
-      // Fallback to simple error if ErrorHandler is not available
-      logger.warn('ErrorHandler not available, using simple error handling');
+      logger.error(`Failed to load feature ${featureName}:`, error);
+      loadingPromises.delete(featureName);
+      throw error;
     }
-
-    logger.error(`Failed to load feature ${featureName}:`, error);
-    loadingPromises.delete(featureName);
-    throw error;
   }
 }
 
 async function loadTextSelectionFeature() {
-  const logger = getLogger();
   try {
     // Use FeatureManager to load text selection to ensure proper integration
     if (!featureManager) {
@@ -183,25 +144,15 @@ async function loadTextSelectionFeature() {
     const handler = featureManager.getFeatureHandler('textSelection');
     return handler ? handler.selectionManager : null;
   } catch (error) {
-    // Try to get ErrorHandler for proper error handling
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadTextSelectionFeature'
-        });
-      }
-    } catch {
-      // Fallback
-      logger.error('Failed to load text selection feature:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadTextSelectionFeature'
+    });
   }
 }
 
 async function loadWindowsManagerFeature() {
-  const logger = getLogger();
   try {
     // Use FeatureManager to load WindowsManager to ensure proper integration
     if (!featureManager) {
@@ -224,25 +175,15 @@ async function loadWindowsManagerFeature() {
     const handler = featureManager.getFeatureHandler('windowsManager');
     return handler ? handler.getWindowsManager() : null;
   } catch (error) {
-    // Try to get ErrorHandler for proper error handling
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadWindowsManagerFeature'
-        });
-      }
-    } catch {
-      // Fallback
-      logger.error('Failed to load windows manager feature:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadWindowsManagerFeature'
+    });
   }
 }
 
 async function loadTextFieldIconFeature() {
-  const logger = getLogger();
   try {
     // Use FeatureManager to load TextFieldIcon to ensure proper integration
     if (!featureManager) {
@@ -265,25 +206,15 @@ async function loadTextFieldIconFeature() {
     const handler = featureManager.getFeatureHandler('textFieldIcon');
     return handler ? handler.getManager() : null;
   } catch (error) {
-    // Try to get ErrorHandler for proper error handling
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadTextFieldIconFeature'
-        });
-      }
-    } catch {
-      // Fallback
-      logger.error('Failed to load text field icon feature:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadTextFieldIconFeature'
+    });
   }
 }
 
 async function loadContentMessageHandlerFeature() {
-  const logger = getLogger();
   try {
     // ContentMessageHandler exports a proxy singleton, not the class itself
     const { contentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
@@ -291,23 +222,15 @@ async function loadContentMessageHandlerFeature() {
     await contentMessageHandler.activate();
     return contentMessageHandler;
   } catch (error) {
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadContentMessageHandlerFeature'
-        });
-      }
-    } catch {
-      logger.error('Failed to load ContentMessageHandler:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadContentMessageHandlerFeature'
+    });
   }
 }
 
 async function loadSelectElementFeature() {
-  const logger = getLogger();
   try {
     // Use FeatureManager to load SelectElementManager to ensure proper integration
     if (!featureManager) {
@@ -330,23 +253,15 @@ async function loadSelectElementFeature() {
     const handler = featureManager.getFeatureHandler('selectElement');
     return handler;
   } catch (error) {
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadSelectElementFeature'
-        });
-      }
-    } catch {
-      logger.error('Failed to load SelectElementManager:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadSelectElementFeature'
+    });
   }
 }
 
 async function loadShortcutFeature() {
-  const logger = getLogger();
   try {
     // Use FeatureManager to load ShortcutHandler to ensure proper integration
     if (!featureManager) {
@@ -371,25 +286,15 @@ async function loadShortcutFeature() {
     const handler = featureManager.getFeatureHandler('shortcut');
     return handler;
   } catch (error) {
-    // Try to get ErrorHandler for proper error handling
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadShortcutFeature'
-        });
-      }
-    } catch {
-      // Fallback
-      logger.error('Failed to load shortcut feature:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadShortcutFeature'
+    });
   }
 }
 
 async function loadPageTranslationFeature() {
-  const logger = getLogger();
   try {
     // Import PageTranslationManager
     const { pageTranslationManager } = await import('@/features/page-translation/PageTranslationManager.js');
@@ -402,25 +307,17 @@ async function loadPageTranslationFeature() {
     logger.info('PageTranslationManager loaded and initialized');
     return pageTranslationManager;
   } catch (error) {
-    try {
-      const handler = await getErrorHandler();
-      if (handler) {
-        throw handler.handle(error, {
-          type: 'FEATURE',
-          context: 'loadPageTranslationFeature'
-        });
-      }
-    } catch {
-      logger.error('Failed to load page translation feature:', error);
-    }
-    throw error;
+    const handler = ErrorHandler.getInstance();
+    throw handler.handle(error, {
+      type: 'FEATURE',
+      context: 'loadPageTranslationFeature'
+    });
   }
 }
 
 // Smart feature loading handlers
 function handleTextSelection() {
   // Load text selection feature on demand when user selects text
-  const logger = getLogger();
   logger.debug('Text selection detected, loading textSelection feature...');
   loadFeature('textSelection', 'ESSENTIAL');
 }
@@ -429,7 +326,6 @@ function handleKeyboardInteraction(event) {
   // Load shortcut feature on demand when user presses relevant keys
   // Check for common shortcut combinations
   if (event.ctrlKey || event.metaKey || event.altKey) {
-    const logger = getLogger();
     logger.debug('Shortcut key detected, loading shortcut feature...');
     loadFeature('shortcut', 'ON_DEMAND');
   }
@@ -437,7 +333,6 @@ function handleKeyboardInteraction(event) {
 
 // Load core features immediately
 export async function loadCoreFeatures() {
-  const logger = getLogger();
   logger.debug('Loading core features...');
   logger.debug('Starting loadCoreFeatures()');
 
@@ -457,20 +352,15 @@ export async function loadCoreFeatures() {
   }
 
   try {
-    // Try to get ErrorHandler for better error handling
-    const handler = await getErrorHandler();
+    const handler = ErrorHandler.getInstance();
 
     const loadPromises = Array.from(CORE_FEATURES).map(feature =>
       loadFeature(feature).catch(error => {
-        if (handler) {
-          const handledError = handler.handle(error, {
-            type: 'FEATURE',
-            context: `loadCoreFeatures-${feature}`
-          });
-          logger.warn(`Failed to load core feature ${feature}:`, handledError);
-        } else {
-          logger.warn(`Failed to load core feature ${feature}:`, error);
-        }
+        const handledError = handler.handle(error, {
+          type: 'FEATURE',
+          context: `loadCoreFeatures-${feature}`
+        });
+        logger.warn(`Failed to load core feature ${feature}:`, handledError);
       })
     );
 
@@ -480,9 +370,8 @@ export async function loadCoreFeatures() {
     logger.debug('About to call initializeAndActivateFeatures()');
     await initializeAndActivateFeatures();
     logger.debug('initializeAndActivateFeatures() completed');
-  } catch {
-    // Fallback if ErrorHandler is not available
-    logger.warn('ErrorHandler not available in loadCoreFeatures, using simple error handling');
+  } catch (error) {
+    logger.error('Error in loadCoreFeatures:', error);
 
     const loadPromises = Array.from(CORE_FEATURES).map(feature =>
       loadFeature(feature).catch(error => {
@@ -493,15 +382,12 @@ export async function loadCoreFeatures() {
     await Promise.all(loadPromises);
 
     // Initialize and activate FeatureManager after features are loaded
-    logger.debug('About to call initializeAndActivateFeatures() (fallback path)');
     await initializeAndActivateFeatures();
-    logger.debug('initializeAndActivateFeatures() completed (fallback path)');
   }
 }
 
 // Initialize FeatureManager and activate features
 async function initializeAndActivateFeatures() {
-  const logger = getLogger();
   logger.debug('initializeAndActivateFeatures called');
   try {
     // Initialize FeatureManager if not already initialized
@@ -608,8 +494,6 @@ const FEATURE_MAPPING = {
 
 // Load features on demand with smart mapping
 export async function loadFeatureOnDemand(featureName) {
-  const logger = getLogger();
-
   // Check if feature exists in mapping
   if (!FEATURE_MAPPING[featureName]) {
     logger.warn(`Attempted to load unknown feature: ${featureName}`);
@@ -634,7 +518,6 @@ const FEATURE_CATEGORIES = {
 
 // Load multiple features by category
 export async function loadFeaturesByCategory(category) {
-  const logger = getLogger();
   const features = FEATURE_CATEGORIES[category] || [];
 
   try {
@@ -664,7 +547,6 @@ export function isFeatureLoaded(featureName) {
 
 // Legacy compatibility - load all features
 export async function loadFeatures(contentCore) {
-  const logger = getLogger();
   try {
     logger.debug('Loading all features (legacy mode)...');
 
@@ -699,31 +581,6 @@ export async function loadFeatures(contentCore) {
   }
 }
 
-// async function setupAdditionalSystems() {
-  //   const logger = getLogger();
-//   try {
-//     // Load memory management if needed
-//     if (isDevelopmentMode()) {
-//       const { startMemoryMonitoring } = await import('@/core/memory/MemoryMonitor.js');
-//       startMemoryMonitoring();
-//     }
-
-//     // Load notification system
-//     await import('@/core/managers/core/NotificationManager.js');
-
-//     // Load iframe support
-//     const { IFrameSupportFactory } = await import('@/features/iframe-support/IFrameSupportFactory.js');
-//     void IFrameSupportFactory.getIFrameManager();
-
-//     logger.debug('Additional systems setup complete');
-
-//   } catch (error) {
-//     logger.warn('Failed to setup additional systems:', error);
-//     // Non-critical, continue without these systems
-//   }
-// }
-
-
 // Get feature manager instance
 export function getFeatureManager() {
   return featureManager;
@@ -736,7 +593,6 @@ export function areFeaturesLoaded() {
 
 // Activate a specific feature on demand
 export async function activateFeature(featureName) {
-  const logger = getLogger();
   if (!featureManager) {
     await initializeAndActivateFeatures();
   }
@@ -751,7 +607,6 @@ export async function activateFeature(featureName) {
 
 // Deactivate a specific feature
 export async function deactivateFeature(featureName) {
-  const logger = getLogger();
   if (!featureManager) {
     return;
   }
@@ -769,7 +624,6 @@ export async function deactivateFeature(featureName) {
 
 // Export cleanup function
 export function cleanupFeatures() {
-  const logger = getLogger();
   if (featureManager) {
     logger.debug('Cleaning up features...');
 

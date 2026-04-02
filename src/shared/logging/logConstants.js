@@ -1,4 +1,4 @@
-// Centralized logging constants to avoid circular import / TDZ issues
+// Centralized logging constants for the extension
 
 export const LOG_LEVELS = {
   ERROR: 0,

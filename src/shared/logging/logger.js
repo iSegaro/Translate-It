@@ -95,7 +95,7 @@ function createLazyLogMethod(component, loggerName, level, consoleMethod) {
  * @param {string|null} subComponent Optional sub-scope (e.g. specific strategy or feature)
  */
 export function getScopedLogger(component, subComponent = null) {
-  // Pure implementation: always go through global cache accessor (fully lazy & TDZ-proof)
+  // Pure implementation: always go through global cache accessor
   const cache = __getLoggerCache();
   const key = subComponent ? `${component}::${subComponent}` : component;
   if (!cache.has(key)) cache.set(key, createLogger(component, subComponent));

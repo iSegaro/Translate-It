@@ -66,7 +66,7 @@ export async function mountContentApp(rootElement) {
   const app = configureVueForCSP(createApp(ContentApp));
   app.use(createPinia());
 
-  // Load i18n plugin asynchronously to prevent TDZ
+  // Load i18n plugin asynchronously for optimal performance
   try {
     const { i18nPlugin } = await utilsFactory.getI18nUtils();
     app.use(i18nPlugin);

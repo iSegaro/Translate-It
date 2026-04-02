@@ -80,10 +80,7 @@ class SettingsManager {
       WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false
     }
 
-    // Lazy debug call to avoid TDZ
-    setTimeout(() => {
-      logger.debug('SettingsManager singleton created')
-    }, 0)
+    logger.debug('SettingsManager singleton created')
   }
 
   /**
