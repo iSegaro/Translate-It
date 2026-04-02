@@ -301,6 +301,22 @@ export class ContentMessageHandler extends ResourceTracker {
     } catch (error) {
       this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
       
+      // Determine error type and provide meaningful response
+      let errorType = ErrorTypes.UNKNOWN;
+      let userMessage = "Failed to activate Select Element mode";
+      
+      // Check for specific error conditions
+      if (error.message.includes('Extension context')) {
+        errorType = ErrorTypes.CONTEXT;
+        userMessage = "Extension context invalidated. Please refresh the page.";
+      } else if (error.message.includes('permission') || error.message.includes('restricted')) {
+        errorType = ErrorTypes.PERMISSION;
+        userMessage = "Feature not available on this page";
+      } else if (error.message.includes('initialization') || error.message.includes('initialize')) {
+        errorType = ErrorTypes.INTEGRATION;
+        userMessage = "Feature initialization failed. Please refresh the page.";
+      }
+
       // Log the error with proper context
       await this.errorHandler.handle(error, {
         type: errorType,
