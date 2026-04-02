@@ -126,7 +126,7 @@ export class ErrorHandler {
       // Logging
       if (this.debugMode && !shouldSuppressConsole(type)) {
         const logLevel = enhancedMeta.showToast ? 'error' : 'debug';
-        logger[logLevel](`[${type}] ${sanitizedRaw}`, err.stack);
+        logger[logLevel](`[${type}] ${sanitizedRaw}`, err);
       }
 
       if (isSilentError(type)) return err;
