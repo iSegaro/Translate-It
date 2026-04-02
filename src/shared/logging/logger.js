@@ -106,7 +106,6 @@ export function getScopedLogger(component, subComponent = null) {
 export function listLoggerLevels() {
   const globalState = getGlobalDebugState();
   return {
-    global: getGlobalLogLevel(),
     components: { ...globalState.componentLogLevels }
   };
 }
@@ -123,17 +122,35 @@ function formatMessage(component, level, message, data) {
   });
 
   const prefix = `[${timestamp}] ${component}:`;
+  let enhancedMessage = message;
 
-  // If data is an Error, log it directly to preserve stack trace
-  if (data instanceof Error) {
-    return [prefix, message, data];
+  // Principled Optimization: Only enhance messages for ERROR (0) and WARN (1) levels.
+  // These are the only levels shown in the non-interactive chrome://extensions page.
+  // Skipping this for INFO/DEBUG saves CPU cycles during high-frequency logging.
+  if (level <= 1 && data && typeof data === 'object' && !(data instanceof Error)) {
+    const summary = data.message || data.error || (data.status ? `Status ${data.status}` : '');
+    if (summary) {
+      const summaryStr = String(summary);
+      // Limit summary length in the main string to keep logs readable
+      const MAX_SUMMARY = 300;
+      const displaySummary = summaryStr.length > MAX_SUMMARY 
+        ? summaryStr.substring(0, MAX_SUMMARY) + '...' 
+        : summaryStr;
+        
+      if (!enhancedMessage.includes(displaySummary)) {
+        enhancedMessage = `${enhancedMessage} (${displaySummary})`;
+      }
+    }
   }
 
-  if (data && typeof data === "object") {
-    // If it's a plain object or error, return it as-is for the console to handle
-    return [prefix, message, data];
+  const fullMessage = `${prefix} ${enhancedMessage}`;
+
+  // Return arguments for console. If data is present, keep it as a 2nd arg for DevTools expansion
+  if (data !== undefined) {
+    return [fullMessage, data];
   }
-  return [prefix, message, data].filter(Boolean);
+  
+  return [fullMessage];
 }
 
 /**
@@ -247,12 +264,22 @@ function processLogBatch() {
  * Get safe console method for log level
  */
 function getConsoleMethod(level) {
+  // Support both numeric levels and string names (for batched logs)
   switch (level) {
-    case 0: return safeConsole.error.bind(safeConsole);
-    case 1: return safeConsole.warn.bind(safeConsole);
-    case 2: return safeConsole.info.bind(safeConsole);
-    case 3: return safeConsole.log.bind(safeConsole);
-    default: return safeConsole.log.bind(safeConsole);
+    case 0:
+    case 'error': 
+      return safeConsole.error.bind(safeConsole);
+    case 1:
+    case 'warn':
+      return safeConsole.warn.bind(safeConsole);
+    case 2:
+    case 'info':
+      return safeConsole.info.bind(safeConsole);
+    case 3:
+    case 'debug':
+      return safeConsole.debug.bind(safeConsole);
+    default: 
+      return safeConsole.log.bind(safeConsole);
   }
 }
 

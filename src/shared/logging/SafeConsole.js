@@ -119,21 +119,18 @@ const safeConsole = {
     if (isEnabled) {
       try {
         const consoleRef = getConsoleRef();
-        // Use multiple methods to bypass different minifiers
         const method1 = consoleRef['log'];
         const method2 = originalConsole.log;
 
         if (method1) {
-          method1(...args);
+          method1.apply(consoleRef, args);
         } else if (method2) {
-          method2(...args);
+          method2.apply(globalScope.console, args);
         }
       } catch {
-        // Fallback to original console if available
-        originalConsole.log?.(...args);
+        originalConsole.log?.apply(globalScope.console, args);
       }
     }
-    // No queue when disabled - waste of memory and CPU
   },
 
   info(...args) {
@@ -144,15 +141,14 @@ const safeConsole = {
         const method2 = originalConsole.info;
 
         if (method1) {
-          method1(...args);
+          method1.apply(consoleRef, args);
         } else if (method2) {
-          method2(...args);
+          method2.apply(globalScope.console, args);
         }
       } catch {
-        originalConsole.info?.(...args);
+        originalConsole.info?.apply(globalScope.console, args);
       }
     }
-    // No queue when disabled - waste of memory and CPU
   },
 
   warn(...args) {
@@ -163,15 +159,14 @@ const safeConsole = {
         const method2 = originalConsole.warn;
 
         if (method1) {
-          method1(...args);
+          method1.apply(consoleRef, args);
         } else if (method2) {
-          method2(...args);
+          method2.apply(globalScope.console, args);
         }
       } catch {
-        originalConsole.warn?.(...args);
+        originalConsole.warn?.apply(globalScope.console, args);
       }
     }
-    // No queue when disabled - waste of memory and CPU
   },
 
   error(...args) {
@@ -182,15 +177,14 @@ const safeConsole = {
         const method2 = originalConsole.error;
 
         if (method1) {
-          method1(...args);
+          method1.apply(consoleRef, args);
         } else if (method2) {
-          method2(...args);
+          method2.apply(globalScope.console, args);
         }
       } catch {
-        originalConsole.error?.(...args);
+        originalConsole.error?.apply(globalScope.console, args);
       }
     }
-    // No queue when disabled - waste of memory and CPU
   },
 
   debug(...args) {
@@ -201,15 +195,14 @@ const safeConsole = {
         const method2 = originalConsole.debug;
 
         if (method1) {
-          method1(...args);
+          method1.apply(consoleRef, args);
         } else if (method2) {
-          method2(...args);
+          method2.apply(globalScope.console, args);
         }
       } catch {
-        originalConsole.debug?.(...args);
+        originalConsole.debug?.apply(globalScope.console, args);
       }
     }
-    // No queue when disabled - waste of memory and CPU
   },
 
   // Advanced methods for special cases
