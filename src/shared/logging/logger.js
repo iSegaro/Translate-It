@@ -122,35 +122,27 @@ function formatMessage(component, level, message, data) {
   });
 
   const prefix = `[${timestamp}] ${component}:`;
-  let enhancedMessage = message;
+  let msg = message;
 
-  // Principled Optimization: Only enhance messages for ERROR (0) and WARN (1) levels.
-  // These are the only levels shown in the non-interactive chrome://extensions page.
-  // Skipping this for INFO/DEBUG saves CPU cycles during high-frequency logging.
-  if (level <= 1 && data && typeof data === 'object' && !(data instanceof Error)) {
-    const summary = data.message || data.error || (data.status ? `Status ${data.status}` : '');
-    if (summary) {
-      const summaryStr = String(summary);
-      // Limit summary length in the main string to keep logs readable
-      const MAX_SUMMARY = 300;
-      const displaySummary = summaryStr.length > MAX_SUMMARY 
-        ? summaryStr.substring(0, MAX_SUMMARY) + '...' 
-        : summaryStr;
-        
-      if (!enhancedMessage.includes(displaySummary)) {
-        enhancedMessage = `${enhancedMessage} (${displaySummary})`;
+  // Optimized: Only perform expensive string operations for ERROR (0) and WARN (1)
+  if (level <= 1) {
+    // 1. Smart Summary: Append object info if it's a plain data object
+    if (data && typeof data === 'object' && !(data instanceof Error)) {
+      const summary = data.message || data.error || (data.status ? `Status ${data.status}` : '');
+      if (summary && !String(msg).includes(String(summary))) {
+        msg = `${msg} (${summary})`;
       }
+    }
+
+    // 2. Length Safety: Truncate very long messages for Chrome Extensions UI
+    if (msg.length > 600) {
+      msg = msg.substring(0, 600) + '...';
     }
   }
 
-  const fullMessage = `${prefix} ${enhancedMessage}`;
+  const fullMessage = `${prefix} ${msg}`;
 
-  // Return arguments for console. If data is present, keep it as a 2nd arg for DevTools expansion
-  if (data !== undefined) {
-    return [fullMessage, data];
-  }
-  
-  return [fullMessage];
+  return data !== undefined ? [fullMessage, data] : [fullMessage];
 }
 
 /**
