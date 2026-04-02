@@ -34,6 +34,7 @@ export function usePageTranslation() {
   let restoreCompleteListener = null;
   let autoRestoreCompleteListener = null; // Auto-restore event (NEW)
   let cancelledListener = null;
+  let resetErrorListener = null;
 
   /**
    * Fetch current translation status from the active tab
@@ -274,6 +275,16 @@ export function usePageTranslation() {
     message.value = 'Translation cancelled';
   }
 
+  /**
+   * Handle error reset
+   */
+  function handleResetError() {
+    error.value = null;
+    if (message.value && message.value.includes('Error:')) {
+      message.value = '';
+    }
+  }
+
   // Tab change handlers for Sidepanel sync
   const handleTabChange = () => {
     refreshStatus();
@@ -319,6 +330,9 @@ export function usePageTranslation() {
       case MessageActions.PAGE_TRANSLATE_CANCELLED:
         handleCancelled();
         break;
+      case MessageActions.PAGE_TRANSLATE_RESET_ERROR:
+        handleResetError();
+        break;
     }
   };
 
@@ -361,6 +375,10 @@ export function usePageTranslation() {
     // Translation cancelled
     cancelledListener = () => handleCancelled();
     pageEventBus.on('page-translation-cancelled', cancelledListener);
+
+    // Error reset
+    resetErrorListener = () => handleResetError();
+    pageEventBus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, resetErrorListener);
   });
 
   // Cleanup event listeners
@@ -380,6 +398,7 @@ export function usePageTranslation() {
     pageEventBus.off('page-restore-complete', restoreCompleteListener);
     pageEventBus.off(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, autoRestoreCompleteListener);
     pageEventBus.off('page-translation-cancelled', cancelledListener);
+    pageEventBus.off(MessageActions.PAGE_TRANSLATE_RESET_ERROR, resetErrorListener);
   });
 
   return {

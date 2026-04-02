@@ -49,6 +49,7 @@ export async function handlePageTranslation(message, sender) {
       MessageActions.PAGE_TRANSLATE_PROGRESS,
       MessageActions.PAGE_TRANSLATE_COMPLETE,
       MessageActions.PAGE_TRANSLATE_ERROR,
+      MessageActions.PAGE_TRANSLATE_RESET_ERROR,
       MessageActions.PAGE_RESTORE_COMPLETE,
       MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
       MessageActions.PAGE_RESTORE_ERROR,

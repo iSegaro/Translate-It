@@ -149,6 +149,11 @@ export class PageTranslationManager extends ResourceTracker {
       this.stopAutoTranslation().catch(() => {});
     });
 
+    bus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+      this.logger.info('Page translation error reset requested via PageEventBus');
+      this.resetError();
+    });
+
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
       this.logger.info('Page translation complete event received in Manager');
       this.isTranslating = false;
@@ -327,6 +332,11 @@ export class PageTranslationManager extends ResourceTracker {
       this._broadcastEvent(MessageActions.PAGE_RESTORE_ERROR, { error: error.message });
       throw error;
     }
+  }
+
+  resetError() {
+    this.isFatalErrorHandling = false;
+    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
   }
 
   resetLocalState() {

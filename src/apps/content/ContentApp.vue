@@ -549,6 +549,10 @@ onMounted(async () => {
     });
   });
 
+  tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+    mobileStore.resetPageTranslation();
+  });
+
   tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
     // Keep error state visible so user can see what happened
     if (mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.ERROR) {

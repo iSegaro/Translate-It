@@ -343,6 +343,11 @@ const handleMouseEnter = () => {
   if (fadeTimerId) { tracker.clearTimer(fadeTimerId); fadeTimerId = null; }
   isHovered.value = true;
   isFaded.value = false;
+
+  // Reset error status when interacting with FAB
+  if (pageTranslationStatus.value.isError) {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+  }
 };
 
 const handleMouseLeave = () => {
@@ -552,17 +557,22 @@ const getBadgeTransform = (isHoveredOrOpen, isIndividualHovered) => {
 const toggleMenu = () => {
   if (isDragging.value || wasDragged.value) return;
   const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK;
-  
+
   if (isOnFabClickMode) {
     logger.info('Translation triggered via Desktop FAB click');
     triggerTranslation();
     isMenuOpen.value = false;
   } else {
     isMenuOpen.value = !isMenuOpen.value;
+
+    // Reset error when menu is opened
+    if (isMenuOpen.value && pageTranslationStatus.value.isError) {
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+    }
+
     logger.debug(isMenuOpen.value ? 'Desktop FAB menu opened' : 'Desktop FAB menu closed');
   }
 };
-
 const handleMenuItemClick = async (item) => {
   logger.info('Desktop FAB menu item clicked', { id: item.id });
   if (item.closeMenu) isMenuOpen.value = false;

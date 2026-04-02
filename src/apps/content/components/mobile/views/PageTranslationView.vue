@@ -187,8 +187,19 @@ const primaryAction = computed(() => {
   return { label: t('mobile_page_start_btn') || 'Start Translation', icon: wholePageIcon, bgColor: 'var(--ti-mobile-accent)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: startTranslation }
 })
 
-const goToDashboard = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) }
-const closeView = () => { mobileStore.closeSheet() }
+const goToDashboard = () => { 
+  if (pageTranslationData.value.status === 'error') {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+  }
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) 
+}
+
+const closeView = () => { 
+  if (pageTranslationData.value.status === 'error') {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+  }
+  mobileStore.closeSheet() 
+}
 
 const toggleAutoClose = async () => {
   const currentValue = settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE || false
