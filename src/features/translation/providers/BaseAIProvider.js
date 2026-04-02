@@ -14,7 +14,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getProviderBatching } from '../core/ProviderConfigurations.js';
-import { getPromptBASEAIBatchAsync, getPromptBASEAIFollowupAsync } from '@/shared/config/config.js';
+import { getPromptBASEAIBatchAsync, getPromptBASEAIFollowupAsync, TranslationMode } from '@/shared/config/config.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import browser from 'webextension-polyfill';
@@ -614,6 +614,48 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
+   * Helper to get conversation history as structured turns
+   * @param {string} sessionId - Session identifier
+   * @param {string} translateMode - Translation mode
+   * @returns {Promise<Array>} - Array of turns {user, assistant}
+   * @protected
+   */
+  async _getConversationHistory(sessionId, translateMode = '') {
+    if (!sessionId) return [];
+
+    // ONLY apply history logic for Select Element mode.
+    // Page Translation and other modes should NOT send previous batch history
+    // to prevent token bloat and rate limiting.
+    if (translateMode !== TranslationMode.Select_Element) {
+      return [];
+    }
+
+    try {
+      const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
+      const session = translationSessionManager.sessions.get(sessionId);
+      if (!session || !session.history || session.history.length === 0) return [];
+
+      const turns = [];
+      // Group history messages into turns (user + assistant pairs)
+      for (let i = 0; i < session.history.length; i += 2) {
+        const userMsg = session.history[i];
+        const assistantMsg = session.history[i + 1];
+        
+        if (userMsg && assistantMsg && userMsg.role === 'user' && assistantMsg.role === 'assistant') {
+          turns.push({
+            user: userMsg.content,
+            assistant: assistantMsg.content
+          });
+        }
+      }
+      return turns;
+    } catch (e) {
+      logger.warn('Failed to get conversation history:', e);
+      return [];
+    }
+  }
+
+  /**
    * Helper to prepare system prompt and user text
    * @param {string} text - Input text
    * @param {string} sourceLang - Source language
@@ -689,10 +731,10 @@ export class BaseAIProvider extends BaseProvider {
       { role: 'system', content: session.systemPrompt }
     ];
 
-    // For Page Translation, we MUST NOT send history of previous batches.
-    // Each batch is independent content from the page. Sending history
-    // causes massive token bloat and triggers Rate Limits (especially on Gemini Free).
-    if (translateMode !== 'page') {
+    // ONLY apply history logic for Select Element mode.
+    // Each Page Translation batch is independent content from the page. 
+    // Sending history in other modes causes massive token bloat and triggers Rate Limits.
+    if (translateMode === TranslationMode.Select_Element) {
       const maxHistoryMessages = 10;
       const history = session.history.slice(-maxHistoryMessages);
       messages.push(...history);

@@ -71,7 +71,7 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     if (sessionId) {
-      const history = await this._getConversationHistory(sessionId);
+      const history = await this._getConversationHistory(sessionId, translateMode);
       if (history.length > 0) {
         const contents = [];
         for (const turn of history) {
