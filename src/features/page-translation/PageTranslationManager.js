@@ -2,6 +2,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import browser from 'webextension-polyfill';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
@@ -98,6 +99,29 @@ export class PageTranslationManager extends ResourceTracker {
     };
 
     this._setupPageEventBusListeners();
+    this._setupStorageListeners();
+  }
+
+  _setupStorageListeners() {
+    // 1. Listen for global TRANSLATION_API changes
+    storageManager.on('change:TRANSLATION_API', ({ newValue, oldValue }) => {
+      if (newValue !== oldValue) {
+        this.logger.info('Global TRANSLATION_API changed, resetting error state');
+        this.resetError();
+      }
+    });
+
+    // 2. Listen for MODE_PROVIDERS changes
+    storageManager.on('change:MODE_PROVIDERS', ({ newValue, oldValue }) => {
+      // TranslationMode.Page matches MessageContexts.PAGE_TRANSLATION_BATCH
+      const newPageProvider = newValue?.[TranslationMode.Page];
+      const oldPageProvider = oldValue?.[TranslationMode.Page];
+
+      if (newPageProvider !== oldPageProvider) {
+        this.logger.info('Mode-specific provider for PAGE changed, resetting error state');
+        this.resetError();
+      }
+    });
   }
 
   _setupPageEventBusListeners() {
