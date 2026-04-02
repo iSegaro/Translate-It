@@ -6,6 +6,7 @@
       'is-idle': isFabIdle && !isFabDragging && !isHovering,
       'is-dragging': isFabDragging,
       'is-positioning': isPositioning,
+      'is-unstable': isViewportUnstable && !isFabDragging,
       'is-left': side === 'left',
       'is-right': side === 'right'
     }"
@@ -34,6 +35,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -87,7 +89,12 @@ const checkBounds = () => {
 
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
-  isViewportUnstable.value = true;
+  
+  // Only hide FAB on scroll for actual mobile devices (where toolbars hide/show)
+  if (deviceDetector.isMobile()) {
+    isViewportUnstable.value = true;
+  }
+  
   checkBounds();
   
   if (instabilityTimer) {

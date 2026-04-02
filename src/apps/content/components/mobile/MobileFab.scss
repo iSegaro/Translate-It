@@ -52,8 +52,15 @@
   transition: var(--fab-transition) !important;
   -webkit-tap-highlight-color: transparent !important;
 
+  /* State Overrides */
   &.is-idle:not(.is-dragging):not(:hover) {
     --fab-opacity: 0.2 !important;
+  }
+
+  &.is-unstable {
+    opacity: 0 !important;
+    --fab-opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   &.is-dragging,
