@@ -453,8 +453,9 @@ const containerStyle = computed(() => {
   };
 
   if (verticalPos.value === -1) {
-    style.bottom = '150px !important';
-    style.top = 'auto !important';
+    style.top = '50% !important';
+    style.bottom = 'auto !important';
+    style.transform = 'translateY(-50%) !important';
   } else {
     style.top = `${verticalPos.value}px !important`;
     style.bottom = 'auto !important';
