@@ -367,13 +367,13 @@ const currentUiLang = computed(() => {
 
 // Enhanced text direction computation with content-first detection
 const textDirection = computed(() => {
-  // If we have an error, follow UI language direction strictly
+  // If we have an error, follow UI language direction strictly but center text
   if (hasError.value) {
     const lang = currentUiLang.value;
     const direction = isRTLLanguage(lang) ? 'rtl' : 'ltr';
     return {
       dir: direction,
-      textAlign: direction === 'rtl' ? 'right' : 'left',
+      textAlign: 'center',
     };
   }
 

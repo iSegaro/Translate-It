@@ -134,6 +134,17 @@
     }
   }
 
+  // Error State Handling - High Specificity (0-3-1) to override all modes
+  &.has-error .ti-translation-content.has-error {
+    padding: 10px !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    min-height: auto !important;
+  }
+
   // Dark Theme
   &.theme-dark, &.is-dark {
     background-color: #1a1a1a !important;
@@ -198,10 +209,6 @@
   word-wrap: break-word !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-
-  &.has-error {
-    padding-top: 2px !important;
-  }
 
   .placeholder-message {
     color: #6c757d !important;
@@ -310,22 +317,23 @@
 .error-message {
   color: #dc3545 !important;
   font-style: normal !important;
-  padding: 24px 16px !important;
+  padding: 16px !important;
   border-radius: 12px !important;
   line-height: 1.6 !important;
   background-color: rgba(220, 53, 69, 0.08) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   text-align: center !important;
-  min-height: 140px !important;
-  gap: 20px !important;
+  min-height: auto !important;
+  gap: 16px !important;
   border: 1px solid rgba(220, 53, 69, 0.2) !important;
-  margin: 12px 0 !important;
+  margin: 0 !important;
   width: 100% !important;
   box-sizing: border-box !important;
   position: relative !important;
+  white-space: normal !important;
 
   .error-text {
     margin: 0 !important;
@@ -471,6 +479,10 @@
   .ti-translation-content {
     direction: rtl !important;
     text-align: right !important;
+
+    &.has-error {
+      text-align: center !important;
+    }
 
     .simple-markdown {
       li::before { text-align: right !important; }
