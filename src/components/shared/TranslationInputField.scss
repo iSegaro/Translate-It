@@ -33,8 +33,10 @@
   border: none !important;
   line-height: 1.6 !important;
   min-height: 120px !important; // برای سایدپنل که همیشه جا داشته باشد
+  max-height: 250px !important; // Limit height for all modes
   max-width: 100% !important;
   display: block !important;
+  overflow-y: auto !important;
   overflow-x: hidden !important;
 
   &:focus {
@@ -117,7 +119,7 @@
 
   .ti-translation-textarea {
     min-height: 200px !important;
-    max-height: 600px !important;
+    max-height: 400px !important;
     padding: 48px 14px 12px 14px !important;
     font-size: 15px !important;
     line-height: 1.7 !important;

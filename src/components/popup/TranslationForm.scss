@@ -26,6 +26,7 @@
     max-height: 120px !important;
     font-size: 14px !important;
     padding: 42px 8px 8px 8px !important;
+    overflow-y: auto !important;
     
     @media (min-width: 481px) {
       font-size: 15px !important;
