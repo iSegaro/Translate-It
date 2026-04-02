@@ -16,6 +16,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont');
 
 /**
  * useFont.js - Font management composable
+ */
+const FONT_CSS_MAP = {
   'auto': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
   'system': 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto',
   'vazirmatn': '"Vazirmatn", "Vazir", Tahoma, Arial, sans-serif',
