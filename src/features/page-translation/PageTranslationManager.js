@@ -18,6 +18,8 @@ import {
   TranslationMode
 } from '@/config.js';
 
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -400,25 +402,19 @@ export class PageTranslationManager extends ResourceTracker {
       this.cancelTranslation();
     }
     
-    // Get localized message for "Whole-page translation stopped"
-    const stopMessage = (browser.i18n?.getMessage ? browser.i18n.getMessage('ERRORS_PAGE_TRANSLATION_STOPPED') : null) || '{error}';
-    
-    // Use the provided localized message from scheduler if available, fallback to error message
-    const displayError = localizedMessage || error.message || String(error);
-    const finalMessage = stopMessage.replace('{error}', displayError).replace('$1', displayError);
-
-    // Determine the toast level (error, warning, info) based on error type
-    const toastType = getErrorToastType(errorType);
-
-    this.notificationManager.show(
-      finalMessage,
-      toastType,
-      PAGE_TRANSLATION_TIMING.FATAL_ERROR_DURATION
-    );
+    // Use centralized ErrorHandler to manage notification and logging
+    // It will automatically handle silent errors (like EXTENSION_CONTEXT_INVALIDATED)
+    ErrorHandler.getInstance().handle(error, {
+      type: errorType || ErrorTypes.TRANSLATION_FAILED,
+      context: 'page-translation-fatal',
+      showToast: true // ErrorHandler will still respect SILENT_ERRORS from ErrorMatcher
+    }).catch(err => {
+      this.logger.error('ErrorHandler failed in _handleFatalError:', err);
+    });
 
     this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
-      error: displayError, 
-      errorType,
+      error: localizedMessage || error.message || String(error), 
+      errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
       isFatal: true 
     });
   }

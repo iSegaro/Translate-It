@@ -337,7 +337,7 @@ export class PageTranslationScheduler extends ResourceTracker {
           // Ignore resolution errors
         } });
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_ERROR, { 
-      error: error.message || String(error), 
+      error: errorInfo.message, 
       errorType, 
       isFatal: isFatal 
     });
