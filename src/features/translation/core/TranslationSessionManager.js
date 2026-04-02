@@ -52,7 +52,7 @@ export class TranslationSessionManager {
   }
 
   /**
-   * Add message to session history with rolling window
+   * Add message to session history with rolling window and character limit
    * @param {string} sessionId - Session identifier
    * @param {string} role - Message role ('user' or 'assistant')
    * @param {string} content - Message content
@@ -62,7 +62,17 @@ export class TranslationSessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    session.history.push({ role, content });
+    // Optimization: Truncate very long history messages to save tokens.
+    // 1000 chars is plenty for context (tone/terminology) without wasting budget.
+    const MAX_HISTORY_CONTENT_CHARS = 1000;
+    let processedContent = content;
+    
+    if (content && content.length > MAX_HISTORY_CONTENT_CHARS) {
+      processedContent = content.substring(0, MAX_HISTORY_CONTENT_CHARS) + '... (truncated)';
+      logger.debug(`History message truncated from ${content.length} to ${processedContent.length} chars`);
+    }
+
+    session.history.push({ role, content: processedContent });
     session.lastUsed = Date.now();
 
     // Rolling window: Keep only last N turns (user + assistant = 1 turn)
