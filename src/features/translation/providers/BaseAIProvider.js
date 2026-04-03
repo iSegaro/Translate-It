@@ -811,114 +811,73 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {string[]} - Parsed results
    */
   _parseBatchResult(result, expectedCount, originalBatch) {
-    if (!result || typeof result !== 'string') {
-      return originalBatch;
-    }
+    if (!result || typeof result !== 'string') return originalBatch;
 
     try {
       let jsonString = result.trim();
       let parsed = null;
 
-      // 1. Try parsing the whole string first (fast path)
+      // 1. Multi-stage JSON Extraction
       try {
         parsed = JSON.parse(jsonString);
       } catch {
-        // 2. Try extracting from markdown code blocks
         const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         if (codeBlockMatch) {
-          try {
-            parsed = JSON.parse(codeBlockMatch[1]);
-          } catch { /* continue */ }
+          try { parsed = JSON.parse(codeBlockMatch[1]); } catch { /* next */ }
         }
-
-        // 3. Last resort: Find the first '[' and last ']'
         if (!parsed) {
           const firstBracket = jsonString.indexOf('[');
           const lastBracket = jsonString.lastIndexOf(']');
-          if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-            try {
-              parsed = JSON.parse(jsonString.substring(firstBracket, lastBracket + 1));
-            } catch { /* continue */ }
-          }
-        }
-      }
-
-      if (!parsed) {
-        throw new Error('No valid JSON array or object found in the response.');
-      }
-
-      // 4. Handle Object-based results (ID to Text mapping or nested array)
-      if (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
-        // High Priority: Check for the 'translations' key (requested by prompt)
-        if (Array.isArray(parsed.translations)) {
-          parsed = parsed.translations;
-        } else {
-          // Fallback: Try to find any array property
-          const potentialArray = Object.values(parsed).find(Array.isArray);
-          if (potentialArray) {
-            parsed = potentialArray;
-          } else {
-            // If no array found, check if it's a map of IDs to values
-            const results = [];
-            for (let i = 0; i < expectedCount; i++) {
-              // Check for various possible keys: "0", 0, "text_0", etc.
-              const val = parsed[i] || parsed[String(i)] || parsed[`text_${i}`] || parsed[`id_${i}`];
-              if (val) {
-                results[i] = typeof val === 'object' ? (val.text || JSON.stringify(val)) : val;
-              }
-            }
-            
-            if (results.filter(Boolean).length > 0) {
-              // Fill missing with original
-              for (let i = 0; i < expectedCount; i++) {
-                if (!results[i]) results[i] = originalBatch[i] || '';
-              }
-              return results;
-            }
-          }
-        }
-      }
-      
-      if (Array.isArray(parsed)) {
-        // Handle simple string array format (fallback for some models)
-        if (parsed.length > 0 && typeof parsed[0] === 'string') {
-          if (parsed.length === expectedCount) {
-            return parsed;
-          }
-          // If count mismatch, pad or truncate
-          logger.warn(`[${this.providerName}] String array length mismatch: got ${parsed.length}, expected ${expectedCount}`);
-          return parsed.slice(0, expectedCount).concat(originalBatch.slice(parsed.length));
-        }
-
-        // Handle standard object array format: [{id: 0, text: "..."}, ...]
-        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
-          // Sort by ID to ensure consistency
-          const sortedResults = [...parsed].sort((a, b) => (a.id || 0) - (b.id || 0));
-          const translatedTexts = sortedResults.map(item => item.text || '');
-
-          if (translatedTexts.length === expectedCount) {
-            return translatedTexts;
-          }
-
-          // Handle count mismatch for object arrays
-          logger.warn(`[${this.providerName}] Object array length mismatch: got ${translatedTexts.length}, expected ${expectedCount}`);
+          const firstBrace = jsonString.indexOf('{');
+          const lastBrace = jsonString.lastIndexOf('}');
           
-          if (translatedTexts.length > expectedCount) {
-            return translatedTexts.slice(0, expectedCount);
-          } else {
-            // Pad with original texts
-            const padded = [...translatedTexts];
-            for (let i = padded.length; i < expectedCount; i++) {
-              padded.push(originalBatch[i] || '');
-            }
-            return padded;
+          const start = (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) ? firstBracket : firstBrace;
+          const end = (lastBracket !== -1 && (lastBrace === -1 || lastBracket > lastBrace)) ? lastBracket : lastBrace;
+          
+          if (start !== -1 && end !== -1 && end > start) {
+            try { parsed = JSON.parse(jsonString.substring(start, end + 1)); } catch { /* fail */ }
           }
         }
       }
 
-      throw new Error(`Invalid batch result structure or empty array.`);
+      if (!parsed) throw new Error('No valid JSON found');
+
+      // 2. Normalize parsed data into a flat array
+      let rawItems = [];
+      if (Array.isArray(parsed)) {
+        rawItems = parsed;
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        if (Array.isArray(parsed.translations)) rawItems = parsed.translations;
+        else rawItems = Object.values(parsed);
+      }
+
+      // 3. Map by ID or fill results array
+      const results = new Array(expectedCount).fill(null);
+      const unmappedTexts = [];
+
+      rawItems.forEach((item) => {
+        const text = typeof item === 'object' && item !== null ? (item.text || item.translation || '') : String(item);
+        const id = (typeof item === 'object' && item !== null && item.id !== undefined) ? parseInt(item.id, 10) : null;
+
+        if (id !== null && id >= 0 && id < expectedCount) {
+          results[id] = text;
+        } else {
+          unmappedTexts.push(text);
+        }
+      });
+
+      // 4. Fill gaps
+      let unmappedIdx = 0;
+      for (let i = 0; i < expectedCount; i++) {
+        if (results[i] === null) {
+          results[i] = unmappedTexts[unmappedIdx] || originalBatch[i] || '';
+          unmappedIdx++;
+        }
+      }
+
+      return results;
     } catch (error) {
-      logger.warn(`[${this.providerName}] Failed to parse batch result: ${error.message}. Falling back to splitting by lines.`);
+      logger.warn(`[${this.providerName}] Failed to parse batch result: ${error.message}. Falling back to lines.`);
       logger.debug(`[${this.providerName}] Raw response snippet: ${result.substring(0, 500)}...`);
       return this._fallbackParsing(result, expectedCount, originalBatch);
     }
