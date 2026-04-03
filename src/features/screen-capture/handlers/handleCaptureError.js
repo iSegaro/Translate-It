@@ -46,7 +46,7 @@ export async function handleCaptureError(message, sender, sendResponse) {
       });
     }
     
-    logger.debug(`✅ [captureError] Capture error handled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`[captureError] Capture error handled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

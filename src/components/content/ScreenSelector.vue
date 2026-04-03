@@ -194,50 +194,50 @@ const cursorY = ref(0)
 
 // Methods
 const confirmSelection = async () => {
-  logger.debug('✅ Confirm Selection clicked!')
+  logger.debug('Confirm Selection clicked!')
   if (!hasSelection.value || isCapturing.value) {
-    logger.debug('⚠️ Cannot confirm: no selection or already capturing')
+    logger.debug('Cannot confirm: no selection or already capturing')
     return
   }
 
   try {
     const result = await captureSelection()
-    logger.debug('✅ Selection captured successfully')
+    logger.debug('Selection captured successfully')
     emit('select', result)
     props.onSelect(result)
   } catch (err) {
-    logger.error('❌ Selection capture failed:', err)
+    logger.error('Selection capture failed:', err)
     emit('error', err)
     props.onError(err)
   }
 }
 
 const captureFullScreen = async () => {
-  logger.debug('🖥️ Capture Full Screen clicked!')
+  logger.debug('Capture Full Screen clicked!')
   if (isCapturing.value) {
-    logger.debug('⚠️ Already capturing, ignoring click')
+    logger.debug('Already capturing, ignoring click')
     return
   }
 
   try {
     const result = await captureFullScreenArea()
-    logger.debug('✅ Full screen captured successfully')
+    logger.debug('Full screen captured successfully')
     emit('select', result)
     props.onSelect(result)
   } catch (err) {
-    logger.error('❌ Full screen capture failed:', err)
+    logger.error('Full screen capture failed:', err)
     emit('error', err)
     props.onError(err)
   }
 }
 
 const resetSelection = () => {
-  logger.debug('🔄 Reset Selection clicked!')
+  logger.debug('Reset Selection clicked!')
   resetCaptureSelection()
 }
 
 const cancel = () => {
-  logger.debug('❌ Cancel clicked!')
+  logger.debug('Cancel clicked!')
   cancelSelection()
   emit('cancel')
   props.onCancel()

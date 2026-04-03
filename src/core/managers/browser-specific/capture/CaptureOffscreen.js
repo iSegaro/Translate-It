@@ -35,16 +35,16 @@ export class OffscreenCaptureManager extends ResourceTracker {
         throw new Error("Offscreen API not available");
       }
 
-      logger.debug("📸 Initializing Chrome offscreen capture manager");
+      logger.debug("Initializing Chrome offscreen capture manager");
 
       // Create offscreen document for advanced capture functionality
       await this.createOffscreenDocument();
 
       this.initialized = true;
-      logger.debug("✅ Offscreen capture manager initialized");
+      logger.debug("Offscreen capture manager initialized");
     } catch (error) {
       logger.error(
-        "❌ Failed to initialize offscreen capture manager:",
+        "Failed to initialize offscreen capture manager:",
         error,
       );
       throw error;
@@ -77,10 +77,10 @@ export class OffscreenCaptureManager extends ResourceTracker {
       });
 
       this.offscreenCreated = true;
-      logger.debug("📄 Offscreen document created for screen capture");
+      logger.debug("Offscreen document created for screen capture");
     } catch (error) {
       logger.error(
-        "❌ Failed to create offscreen document for capture:",
+        "Failed to create offscreen document for capture:",
         error,
       );
       throw error;
@@ -127,7 +127,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
 
       return imageData;
     } catch (error) {
-      logger.error("❌ Screen capture failed:", error);
+      logger.error("Screen capture failed:", error);
       throw new Error(`Screen capture failed: ${error.message}`);
     }
   }
@@ -160,10 +160,10 @@ export class OffscreenCaptureManager extends ResourceTracker {
         throw new Error(response?.error || "Failed to crop image in offscreen document");
       }
 
-      logger.debug("📸 Screen area captured and cropped");
+      logger.debug("Screen area captured and cropped");
       return response.croppedData;
     } catch (error) {
-      logger.error("❌ Screen area capture failed:", error);
+      logger.error("Screen area capture failed:", error);
       throw new Error(`Screen area capture failed: ${error.message}`);
     }
   }
@@ -180,7 +180,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
     }
 
     try {
-      logger.debug("🔍 Processing image for OCR in offscreen document");
+      logger.debug("Processing image for OCR in offscreen document");
 
       const message = MessageFormat.create(
         MessageActions.PROCESS_IMAGE_OCR,
@@ -199,10 +199,10 @@ export class OffscreenCaptureManager extends ResourceTracker {
         throw new Error(response?.error || "OCR processing failed");
       }
 
-      logger.debug("✅ OCR processing completed");
+      logger.debug("OCR processing completed");
       return response.extractedText;
     } catch (error) {
-      logger.error("❌ OCR processing failed:", error);
+      logger.error("OCR processing failed:", error);
       throw new Error(`OCR processing failed: ${error.message}`);
     }
   }
@@ -232,7 +232,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
    * Cleanup resources
    */
   async cleanup() {
-    logger.debug("🧹 Cleaning up offscreen capture manager");
+    logger.debug("Cleaning up offscreen capture manager");
 
     try {
       // Close offscreen document if we created it
@@ -241,7 +241,7 @@ export class OffscreenCaptureManager extends ResourceTracker {
         this.offscreenCreated = false;
       }
     } catch (error) {
-      logger.error("❌ Error during capture manager cleanup:", error);
+      logger.error("Error during capture manager cleanup:", error);
     }
 
     this.browser = null;
@@ -250,6 +250,6 @@ export class OffscreenCaptureManager extends ResourceTracker {
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();
     
-    logger.debug("✅ Offscreen capture manager cleanup completed");
+    logger.debug("Offscreen capture manager cleanup completed");
   }
 }

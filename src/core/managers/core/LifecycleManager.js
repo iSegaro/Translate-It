@@ -63,7 +63,7 @@ class LifecycleManager {
       const features = await this.featureLoader.preloadEssentialFeatures();
       logger.info("Essential features preloaded:", Object.keys(features));
     } catch (error) {
-      logger.error("❌ Failed to preload essential features:", error);
+      logger.error("Failed to preload essential features:", error);
       // Continue initialization even if preloading fails
     }
   }
@@ -82,7 +82,7 @@ class LifecycleManager {
       await this.translationEngine.initialize();
       logger.info('[LifecycleManager] TranslationEngine initialized successfully');
     } catch (error) {
-      logger.error('❌ [LifecycleManager] Failed to initialize TranslationEngine:', error);
+      logger.error('[LifecycleManager] Failed to initialize TranslationEngine:', error);
       throw error;
     }
   }
@@ -226,7 +226,7 @@ class LifecycleManager {
       logger.warn('Unmapped handlers detected (consider adding to handlerMappings):',
                    unmappedHandlers.map(h => h.name || 'anonymous'));
     } else {
-      logger.debug('✅ All available handlers are properly mapped');
+      logger.debug('All available handlers are properly mapped');
     }
     
     // Mapping statistics - logged at TRACE level for detailed debugging
@@ -260,11 +260,11 @@ class LifecycleManager {
           
           registeredCount++;
         } catch (error) {
-          logger.error(`❌ Failed to register handler for action: ${actionName}`, error);
+          logger.error(`Failed to register handler for action: ${actionName}`, error);
           failedCount++;
         }
       } else {
-        logger.warn(`⚠️ Handler function not found for action: ${actionName}`);
+        logger.warn(`Handler function not found for action: ${actionName}`);
         failedCount++;
       }
     }
@@ -289,7 +289,7 @@ class LifecycleManager {
 
       logger.info("Error handlers initialization completed");
     } catch (error) {
-      logger.error("❌ Failed to initialize error handlers:", error);
+      logger.error("Failed to initialize error handlers:", error);
     }
   }
 
@@ -318,7 +318,7 @@ class LifecycleManager {
       logger.info("[LifecycleManager] Context menus refreshed successfully");
 
     } catch (error) {
-      logger.error("❌ [LifecycleManager] Failed to refresh context menus:", error);
+      logger.error("[LifecycleManager] Failed to refresh context menus:", error);
       // Try one more direct approach as ultimate fallback if featureLoader failed
       await this.createContextMenuDirectly();
     }
@@ -362,7 +362,7 @@ class LifecycleManager {
       logger.info("[LifecycleManager] Emergency context menu setup completed");
 
     } catch (directError) {
-      logger.error("❌ [LifecycleManager] Emergency context menu creation failed:", directError);
+      logger.error("[LifecycleManager] Emergency context menu creation failed:", directError);
     }
   }
 

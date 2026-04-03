@@ -117,7 +117,7 @@ export function usePopupResize() {
           outputElement.style.setProperty('height', 'auto', 'important')
           outputElement.style.setProperty('overflow-y', 'visible', 'important')
           
-          logger.debug('[usePopupResize] ✅ Maximum height reached - enabled scrolling:', {
+          logger.debug('[usePopupResize] Maximum height reached - enabled scrolling:', {
             popupHeight: MAX_HEIGHT,
             contentHeight,
             scrollEnabled: true
@@ -140,7 +140,7 @@ export function usePopupResize() {
           outputElement.style.setProperty('height', 'auto', 'important')
           outputElement.style.setProperty('overflow-y', 'visible', 'important')
           
-          logger.debug('[usePopupResize] ✅ Flexbox resize to exact fit:', {
+          logger.debug('[usePopupResize] Flexbox resize to exact fit:', {
             fromHeight: window.innerHeight,
             toHeight: requiredPopupHeight,
             headerHeight: actualHeaderHeight,
@@ -159,7 +159,7 @@ export function usePopupResize() {
         outputElement.style.setProperty('height', 'auto', 'important')
         outputElement.style.setProperty('overflow-y', 'visible', 'important')
         
-        logger.debug('[usePopupResize] ✅ Using minimum height for flexbox layout')
+        logger.debug('[usePopupResize] Using minimum height for flexbox layout')
       }
       
       // Force reflow to ensure styles are applied

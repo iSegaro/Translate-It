@@ -40,7 +40,7 @@ export async function handlePreviewConfirmed(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [previewConfirmed] Preview confirmed and processed for tab ${targetTabId}`);
+    logger.debug(`[previewConfirmed] Preview confirmed and processed for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

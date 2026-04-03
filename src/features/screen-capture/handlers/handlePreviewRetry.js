@@ -37,7 +37,7 @@ export async function handlePreviewRetry(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [previewRetry] Preview retry initiated for tab ${targetTabId}`);
+    logger.debug(`[previewRetry] Preview retry initiated for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

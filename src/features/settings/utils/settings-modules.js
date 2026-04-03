@@ -8,7 +8,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings-modules');
 
 export const loadSettingsModules = async () => {
   try {
-    logger.debug("🔧 Loading settings modules...");
+    logger.debug("Loading settings modules...");
 
     const [providers, importExport, backup] = await Promise.all([
       import("@/store/modules/providers.js").catch((e) => {
@@ -21,7 +21,7 @@ export const loadSettingsModules = async () => {
       }),
     ]);
 
-    logger.debug("✅ Settings modules loaded:", {
+    logger.debug("Settings modules loaded:", {
       providers: !!providers,
       importExport: !!importExport,
       backup: !!backup,
@@ -29,7 +29,7 @@ export const loadSettingsModules = async () => {
 
     return { providers, importExport, backup };
   } catch (error) {
-    logger.error("❌ Failed to load settings modules:", error);
+    logger.error("Failed to load settings modules:", error);
     throw error;
   }
 };

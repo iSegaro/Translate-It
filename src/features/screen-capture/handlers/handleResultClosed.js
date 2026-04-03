@@ -36,7 +36,7 @@ export async function handleResultClosed(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [resultClosed] Capture result closed and cleaned up for tab ${targetTabId}`);
+    logger.debug(`[resultClosed] Capture result closed and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

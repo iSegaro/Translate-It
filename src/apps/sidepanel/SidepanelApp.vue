@@ -128,15 +128,15 @@ const handleSystemThemeChange = (event) => {
 };
 
 const initialize = async () => {
-  logger.debug('🗳️ SidepanelApp mounting...')
+  logger.debug('SidepanelApp mounting...')
   try {
     // Step 1: Set loading text
-    logger.debug('📝 Setting loading text...')
+    logger.debug('Setting loading text...')
     loadingText.value = (browser.i18n?.getMessage ? browser.i18n.getMessage('sidepanel_loading') : null) || 'Loading Sidepanel...'
-    logger.debug('✅ Loading text set')
+    logger.debug('Loading text set')
 
     // Step 2: Load settings store and preload essential data
-    logger.debug('⚙️ Loading settings store and preloading data...')
+    logger.debug('Loading settings store and preloading data...')
     await Promise.race([
       Promise.all([
         settingsStore.loadSettings(),
@@ -145,7 +145,7 @@ const initialize = async () => {
       ]),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Settings loading timeout')), 10000))
     ])
-    logger.debug('✅ Settings store loaded and languages preloaded')
+    logger.debug('Settings store loaded and languages preloaded')
 
     // Step 3: Apply theme
     const settings = settingsStore.settings
@@ -213,7 +213,7 @@ const initialize = async () => {
     // Extract error type for reactive translation
     errorType.value = matchErrorToType(error)
   } finally {
-    logger.debug('✅ SidepanelApp initialization complete')
+    logger.debug('SidepanelApp initialization complete')
     isLoading.value = false
   }
 };
@@ -255,7 +255,7 @@ onUnmounted(() => {
 });
 
 const retryLoading = () => {
-  logger.debug('🔄 Retrying sidepanel loading...')
+  logger.debug('Retrying sidepanel loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true

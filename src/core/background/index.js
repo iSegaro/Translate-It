@@ -32,7 +32,7 @@ browser.runtime.onInstalled.addListener(async (details) => {
   try {
     await handleInstallationEvent(details);
   } catch (error) {
-    logger.error('❌ Failed to handle installation event:', error);
+    logger.error('Failed to handle installation event:', error);
   }
 });
 
@@ -91,7 +91,7 @@ backgroundService.initialize().then(async () => {
   }
 
 }).catch((error) => {
-  logger.error("❌ [Background] Background service initialization failed:", error);
+  logger.error("[Background] Background service initialization failed:", error);
 });
 
 export { backgroundService };

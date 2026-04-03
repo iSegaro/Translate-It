@@ -760,16 +760,16 @@ const selectProvider = async (provider) => {
 
     if (props.isGlobal) {
       await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
-      logger.debug('✅ Global provider updated successfully:', provider.id)
+      logger.debug('Global provider updated successfully:', provider.id)
     } else {
-      logger.debug('✅ Local provider selected:', provider.id)
+      logger.debug('Local provider selected:', provider.id)
     }
     
     emit('update:modelValue', provider.id)
     emit('provider-change', provider.id)
     isDropdownOpen.value = false
   } catch (error) {
-    logger.error('❌ Failed to update provider:', error)
+    logger.error('Failed to update provider:', error)
     await handleError(error, 'provider-selector-change')
   }
 }

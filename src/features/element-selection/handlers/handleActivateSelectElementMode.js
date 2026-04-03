@@ -184,7 +184,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     if (!wasSuccessful) {
       // Only treat as communication failure if response is undefined/null or indicates actual failure
-      logger.warn(`⚠️ [activateSelectElementMode] Element selection mode communication FAILED for tab ${targetTabId}`, {
+      logger.warn(`[activateSelectElementMode] Element selection mode communication FAILED for tab ${targetTabId}`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 50) + (access.fullUrl.length > 50 ? '...' : ''),
         response,
@@ -205,7 +205,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     // If successful, update the central state, which will broadcast to all UIs
     setStateForTab(targetTabId, isActivating);
     
-    logger.info(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
+    logger.info(`[activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
     
     return { 
       success: true, 

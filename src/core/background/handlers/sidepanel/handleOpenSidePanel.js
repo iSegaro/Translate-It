@@ -46,7 +46,7 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
       });
     }
     
-    logger.debug(`✅ [OPEN_SIDE_PANEL] Side panel opened successfully`);
+    logger.debug(`[OPEN_SIDE_PANEL] Side panel opened successfully`);
     
     sendResponse({ 
       success: true, 

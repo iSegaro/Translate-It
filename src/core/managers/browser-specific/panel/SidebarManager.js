@@ -28,11 +28,11 @@ export class FirefoxSidebarManager extends ResourceTracker {
     try {
       this.browser = browser;
 
-      logger.debug("📋 Initializing Firefox sidebar manager");
+      logger.debug("Initializing Firefox sidebar manager");
       this.initialized = true;
-      logger.debug("✅ Firefox sidebar manager initialized");
+      logger.debug("Firefox sidebar manager initialized");
     } catch (error) {
-      logger.error("❌ Failed to initialize Firefox sidebar manager:", error);
+      logger.error("Failed to initialize Firefox sidebar manager:", error);
       throw error;
     }
   }
@@ -62,17 +62,17 @@ export class FirefoxSidebarManager extends ResourceTracker {
           left: window.screen.width - 420,
           top: 100,
         });
-        logger.debug("📋 Firefox sidebar opened as popup window");
+        logger.debug("Firefox sidebar opened as popup window");
       } else {
         // Fallback: open in new tab
         await browser.tabs.create({
           url: sidebarUrl,
           active: true,
         });
-        logger.debug("📋 Firefox sidebar opened in new tab");
+        logger.debug("Firefox sidebar opened in new tab");
       }
     } catch (error) {
-      logger.error("❌ Failed to open Firefox sidebar:", error);
+      logger.error("Failed to open Firefox sidebar:", error);
       throw error;
     }
   }
@@ -85,7 +85,7 @@ export class FirefoxSidebarManager extends ResourceTracker {
   async setPanelBehavior() {
     // Firefox sidebar behavior is controlled by manifest
     // This is a no-op but we'll log for consistency
-    logger.debug(`📋 Firefox sidebar behavior is always enabled (no-op)`);
+    logger.debug(`Firefox sidebar behavior is always enabled (no-op)`);
   }
 
   /**

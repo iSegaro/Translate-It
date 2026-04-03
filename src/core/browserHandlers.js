@@ -41,9 +41,9 @@ export const addChromiumSpecificHandlers = () => {
   if (isChromium()) {
     // OFFSCREEN_READY is needed in all Chromium-based browsers (Chrome, Edge, Opera, etc.)
     // Note: Already mapped in LifecycleManager, no need to add again
-    logger.debug('🟢 [Chromium] OFFSCREEN_READY handler already configured for Chromium offscreen documents');
+    logger.debug('[Chromium] OFFSCREEN_READY handler already configured for Chromium offscreen documents');
   } else {
-    logger.debug('🟠 [Firefox/Other] Skipped OFFSCREEN_READY handler (not needed for direct audio)');
+    logger.debug('[Firefox/Other] Skipped OFFSCREEN_READY handler (not needed for direct audio)');
   }
 };
 
@@ -55,7 +55,7 @@ export const addChromiumSpecificHandlers = () => {
 export const addFirefoxSpecificHandlers = () => {
   if (isFirefox()) {
     // Currently no Firefox-specific handlers
-    logger.debug('🦊 [Firefox] No Firefox-specific handlers to add');
+    logger.debug('[Firefox] No Firefox-specific handlers to add');
   }
 };
 
@@ -65,10 +65,10 @@ export const addFirefoxSpecificHandlers = () => {
  * @param {Object} Handlers - Available handlers object
  */
 export const addBrowserSpecificHandlers = () => {
-  logger.debug('🌐 Adding browser-specific handlers...');
+  logger.debug('Adding browser-specific handlers...');
 
   addChromiumSpecificHandlers();
   addFirefoxSpecificHandlers();
 
-  logger.debug('✅ Browser-specific handlers added');
+  logger.debug('Browser-specific handlers added');
 };

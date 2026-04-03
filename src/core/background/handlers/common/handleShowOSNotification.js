@@ -43,7 +43,7 @@ export async function handleShowOSNotification(message, sender, sendResponse) {
     // Create the notification
     const notificationId = await browser.notifications.create(notificationOptions);
     
-    logger.debug(`✅ [show_os_notification] Notification created with ID: ${notificationId}`);
+    logger.debug(`[show_os_notification] Notification created with ID: ${notificationId}`);
     
     sendResponse({ 
       success: true, 

@@ -40,7 +40,7 @@ export async function handleStartAreaCapture(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [startAreaCapture] Area capture started for tab ${targetTabId}`);
+    logger.debug(`[startAreaCapture] Area capture started for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

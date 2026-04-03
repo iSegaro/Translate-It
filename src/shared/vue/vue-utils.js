@@ -4,7 +4,7 @@
  * This module provides essential utilities for Vue.js applications running in browser extensions,
  * with special handling for Content Security Policy (CSP) restrictions, particularly Trusted Types.
  *
- * ## 🎯 Purpose
+ * ## Purpose
  * Browser extensions run in hostile environments where host pages may have strict CSP policies.
  * Vue.js automatically tries to create Trusted Types policies, but these may violate the host page's CSP.
  * This module provides comprehensive protection against such CSP violations.
@@ -15,7 +15,7 @@
  * - **Smart Fallback System**: Multiple layers of fallback for maximum compatibility
  * - **Cross-Browser Support**: Works across different CSP configurations
  *
- * ## 🛡️ Trusted Types Handling Strategy
+ * ## Trusted Types Handling Strategy
  *
  * ### The Problem
  * - Vue.js automatically creates a Trusted Types policy named 'vue'
@@ -34,14 +34,14 @@
  * 2. Try other allowed policies (dompurify, nextjs, script-url#webpack, etc.)
  * 3. Fall back to no-op policy (safe but minimal functionality)
  *
- * ## 📋 Usage
+ * ## Usage
  * ```javascript
  * import { configureVueForCSP } from '@/shared/vue/vue-utils.js';
  *
  * const app = configureVueForCSP(createApp(MyComponent));
  * ```
  *
- * ## 🔍 Debugging
+ * ## Debugging
  * Enable debug logging to see which fallback is being used:
  * ```javascript
  * // Check console for messages like:
@@ -49,7 +49,7 @@
  * // "Creating no-op fallback policy for vue"
  * ```
  *
- * ## ✅ Future Considerations
+ * ## Future Considerations
  * - Monitor CSP changes in major websites
  * - Update fallback policy list as needed
  * - Consider Vue.js updates that might change Trusted Types behavior

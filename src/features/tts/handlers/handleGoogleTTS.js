@@ -35,7 +35,7 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
         reason: reason,
         targetFrameId: sender.frameId // Send to specific frame if available
       });
-      logger.debug(`✅ Notified content script in tab ${sender.tab.id} (${reason})`);
+      logger.debug(`Notified content script in tab ${sender.tab.id} (${reason})`);
     } else {
       // Popup/Sidepanel request - send via runtime.sendMessage (global)
       await browserAPI.runtime.sendMessage({
@@ -44,7 +44,7 @@ const notifyTTSEnded = async (sender, reason = 'completed') => {
         reason: reason,
         targetContext: 'popup-sidepanel' // Identifier for popup/sidepanel
       });
-      logger.debug(`✅ Notified popup/sidepanel via runtime.sendMessage (${reason})`);
+      logger.debug(`Notified popup/sidepanel via runtime.sendMessage (${reason})`);
     }
   } catch (sendError) {
     logger.debug(`Could not notify sender (${reason}):`, sendError.message);
@@ -531,11 +531,11 @@ export const handleGoogleTTSPause = async () => {
       await pauseGoogleTTSAudio();
     }
     
-    logger.debug('✅ Google TTS paused successfully');
+    logger.debug('Google TTS paused successfully');
     return { success: true, action: 'paused' };
     
   } catch (error) {
-    logger.error('❌ Google TTS pause failed:', error);
+    logger.error('Google TTS pause failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS pause failed'
@@ -562,11 +562,11 @@ export const handleGoogleTTSResume = async () => {
       await resumeGoogleTTSAudio();
     }
     
-    logger.debug('✅ Google TTS resumed successfully');
+    logger.debug('Google TTS resumed successfully');
     return { success: true, action: 'resumed' };
     
   } catch (error) {
-    logger.error('❌ Google TTS resume failed:', error);
+    logger.error('Google TTS resume failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS resume failed'
@@ -603,7 +603,7 @@ export const handleGoogleTTSEnded = async () => {
 
     return { success: true, action: 'cleared' };
   } catch (error) {
-    logger.error('❌ Google TTS end handling failed:', error);
+    logger.error('Google TTS end handling failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS end handling failed'
@@ -632,11 +632,11 @@ export const handleGoogleTTSGetStatus = async () => {
       status = await getGoogleTTSAudioStatus();
     }
     
-    logger.debug('✅ Google TTS status retrieved:', status);
+    logger.debug('Google TTS status retrieved:', status);
     return { success: true, status };
     
   } catch (error) {
-    logger.error('❌ Google TTS get status failed:', error);
+    logger.error('Google TTS get status failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS get status failed',

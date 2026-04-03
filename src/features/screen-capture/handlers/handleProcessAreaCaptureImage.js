@@ -42,7 +42,7 @@ export async function handleProcessAreaCaptureImage(message, sender, sendRespons
       sender
     });
     
-    logger.debug(`✅ [processAreaCaptureImage] Image processed successfully for tab ${targetTabId}`);
+    logger.debug(`[processAreaCaptureImage] Image processed successfully for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

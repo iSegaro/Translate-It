@@ -51,7 +51,7 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
     
     const selectedText = response?.selectedText || '';
     
-    logger.debug(`✅ [getSelectedText] Selected text retrieved from tab ${targetTabId}: "${selectedText.substring(0, 50)}..."`);
+    logger.debug(`[getSelectedText] Selected text retrieved from tab ${targetTabId}: "${selectedText.substring(0, 50)}..."`);
     
     sendResponse({ 
       success: true, 

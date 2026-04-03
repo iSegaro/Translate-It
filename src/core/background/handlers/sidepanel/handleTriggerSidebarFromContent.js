@@ -18,11 +18,11 @@ export const handleTriggerSidebarFromContent = async (message, sender, sendRespo
     if (browser.sidebarAction) {
       // Firefox: Open sidebar directly - this should work in background context
       await browser.sidebarAction.open();
-      logger.debug(`✅ [TRIGGER_SIDEBAR_FROM_CONTENT] Firefox sidebar opened successfully`);
+      logger.debug(`[TRIGGER_SIDEBAR_FROM_CONTENT] Firefox sidebar opened successfully`);
     } else if (browser.sidePanel && sender.tab?.id) {
       // Chrome fallback: open side panel for specific tab
       await browser.sidePanel.open({ tabId: sender.tab.id });
-      logger.debug(`✅ [TRIGGER_SIDEBAR_FROM_CONTENT] Chrome sidePanel opened successfully`);
+      logger.debug(`[TRIGGER_SIDEBAR_FROM_CONTENT] Chrome sidePanel opened successfully`);
     } else {
       throw new Error('No suitable sidebar API available');
     }
@@ -33,7 +33,7 @@ export const handleTriggerSidebarFromContent = async (message, sender, sendRespo
     });
     
   } catch (error) {
-    logger.error(`❌ [TRIGGER_SIDEBAR_FROM_CONTENT] Error opening sidebar:`, error);
+    logger.error(`[TRIGGER_SIDEBAR_FROM_CONTENT] Error opening sidebar:`, error);
     
     sendResponse({ 
       success: false, 

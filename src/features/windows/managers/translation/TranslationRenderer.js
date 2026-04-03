@@ -84,7 +84,7 @@ export class TranslationRenderer {
       e.stopPropagation();
       
       // Log close event
-      this.logger.debug('❌ Close button clicked!');
+      this.logger.debug('Close button clicked!');
       
       if (onClose) onClose();
     });

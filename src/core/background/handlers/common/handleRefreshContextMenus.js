@@ -30,7 +30,7 @@ export async function handleRefreshContextMenus(message, sender, sendResponse) {
     const locale = message.locale;
     await backgroundService.refreshContextMenus(locale);
     
-    logger.debug('✅ [REFRESH_CONTEXT_MENUS] Context menus refreshed successfully');
+    logger.debug('[REFRESH_CONTEXT_MENUS] Context menus refreshed successfully');
     
     sendResponse({ 
       success: true, 

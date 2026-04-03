@@ -37,7 +37,7 @@ export async function handleBackgroundReloadExtension(message, sender, sendRespo
         // Reload the extension runtime
         await browser.runtime.reload();
       } catch (reloadError) {
-        logger.error('❌ [BACKGROUND_RELOAD_EXTENSION] Reload failed:', reloadError);
+        logger.error('[BACKGROUND_RELOAD_EXTENSION] Reload failed:', reloadError);
         errorHandler.handle(reloadError, {
           type: ErrorTypes.LIFECYCLE,
           context: "handleBackgroundReloadExtension-reload",

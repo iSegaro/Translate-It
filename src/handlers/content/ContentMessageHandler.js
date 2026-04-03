@@ -128,7 +128,7 @@ export class ContentMessageHandler extends ResourceTracker {
         // Store reference to message handler
         this.messageHandler = messageHandler;
 
-        this.logger.info(`✅ ContentMessageHandler registered ${this.handlers.size} handlers`);
+        this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
         // logger.trace('Handler details:', {
         //   hasRevertHandler: this.handlers.has('revertTranslation'),
         //   usingContentScriptCore: !!contentScriptCore
@@ -140,7 +140,7 @@ export class ContentMessageHandler extends ResourceTracker {
       // Activate the message listener if we created our own
       if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
         this.messageHandler.listen();
-        this.logger.info('✅ ContentMessageHandler message listener activated');
+        this.logger.info('ContentMessageHandler message listener activated');
       }
 
       // If using ContentScriptCore's message handler, it should already be listening

@@ -27,12 +27,12 @@ export class ContentScriptCaptureManager {
     try {
       this.browser = browser;
 
-      logger.debug("📸 Initializing content script capture manager");
+      logger.debug("Initializing content script capture manager");
       this.initialized = true;
-      logger.debug("✅ Content script capture manager initialized");
+      logger.debug("Content script capture manager initialized");
     } catch (error) {
       logger.error(
-        "❌ Failed to initialize content script capture manager:",
+        "Failed to initialize content script capture manager:",
         error,
       );
       throw error;
@@ -55,14 +55,14 @@ export class ContentScriptCaptureManager {
         quality: options.quality || 90,
       };
 
-      logger.debug("📸 Capturing visible tab via content script method");
+      logger.debug("Capturing visible tab via content script method");
 
       // Use basic tab capture API
       const imageData = await browser.tabs.captureVisibleTab(captureOptions);
 
       return imageData;
     } catch (error) {
-      logger.error("❌ Content script screen capture failed:", error);
+      logger.error("Content script screen capture failed:", error);
       throw new Error(`Screen capture failed: ${error.message}`);
     }
   }
@@ -88,7 +88,7 @@ export class ContentScriptCaptureManager {
         throw new Error("No active tab found");
       }
 
-      logger.debug("📸 Starting area capture via content script");
+      logger.debug("Starting area capture via content script");
 
       // Inject capture UI into content script
       await browser.tabs.sendMessage(tab.id, {
@@ -112,7 +112,7 @@ export class ContentScriptCaptureManager {
 
       return fullImage;
     } catch (error) {
-      logger.error("❌ Content script area capture failed:", error);
+      logger.error("Content script area capture failed:", error);
       throw new Error(`Area capture failed: ${error.message}`);
     }
   }
@@ -131,7 +131,7 @@ export class ContentScriptCaptureManager {
       // which is not available in service worker context
       return imageData;
     } catch (error) {
-      logger.error("❌ Basic image crop failed:", error);
+      logger.error("Basic image crop failed:", error);
       return imageData; // Return original on failure
     }
   }
@@ -157,7 +157,7 @@ export class ContentScriptCaptureManager {
         throw new Error("No active tab found for OCR processing");
       }
 
-      logger.debug("🔍 Processing image for OCR via content script");
+      logger.debug("Processing image for OCR via content script");
 
       // Send image to content script for OCR processing
       const response = await browser.tabs.sendMessage(tab.id, {
@@ -178,10 +178,10 @@ export class ContentScriptCaptureManager {
         );
       }
 
-      logger.debug("✅ OCR processing completed via content script");
+      logger.debug("OCR processing completed via content script");
       return response.extractedText;
     } catch (error) {
-      logger.error("❌ Content script OCR processing failed:", error);
+      logger.error("Content script OCR processing failed:", error);
       throw new Error(`OCR processing failed: ${error.message}`);
     }
   }
@@ -211,7 +211,7 @@ export class ContentScriptCaptureManager {
    * Cleanup resources
    */
   async cleanup() {
-    logger.debug("🧹 Cleaning up content script capture manager");
+    logger.debug("Cleaning up content script capture manager");
     this.initialized = false;
   }
 }

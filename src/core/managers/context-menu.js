@@ -259,9 +259,9 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       this.initialized = true;
-      logger.info("✅ Context menu manager initialized");
+      logger.info("Context menu manager initialized");
     } catch (error) {
-      logger.error("❌ Failed to initialize context menu manager:", error);
+      logger.error("Failed to initialize context menu manager:", error);
       throw error;
     }
   }
@@ -371,7 +371,7 @@ export class ContextMenuManager extends ResourceTracker {
 
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
-        logger.debug("🎯 [ContextMenuManager] Creating Action (Browser Action) menus...");
+        logger.debug("[ContextMenuManager] Creating Action (Browser Action) menus...");
 
         // --- Translate Element Menu (First option) ---
         if (isSelectElementEnabled) {
@@ -402,7 +402,7 @@ export class ContextMenuManager extends ResourceTracker {
 
         // --- API Provider Sub-Menus (Radio Buttons) ---
         const apiProviders = await getApiProviders();
-        logger.debug(`📊 [ContextMenuManager] Found ${apiProviders.length} providers`);
+        logger.debug(`[ContextMenuManager] Found ${apiProviders.length} providers`);
 
         let lastCategory = null;
         let separatorCount = 0;
@@ -468,9 +468,9 @@ export class ContextMenuManager extends ResourceTracker {
         logger.error("Error creating action context menus:", e);
       }
 
-      logger.info("✅ Default context menus created");
+      logger.info("Default context menus created");
     } catch (error) {
-      logger.error("❌ Failed to setup default menus:", error);
+      logger.error("Failed to setup default menus:", error);
       throw error;
     }
   }
@@ -527,10 +527,10 @@ export class ContextMenuManager extends ResourceTracker {
       });
 
       this.createdMenus.add(menuConfig.id || menuId);
-      logger.debug(`📋 Created context menu: ${menuConfig.title || menuConfig.id}`);
+      logger.debug(`Created context menu: ${menuConfig.title || menuConfig.id}`);
       return menuId;
     } catch (error) {
-      logger.error("❌ Failed to create context menu:", error);
+      logger.error("Failed to create context menu:", error);
       throw error;
     }
   }
@@ -548,9 +548,9 @@ export class ContextMenuManager extends ResourceTracker {
 
     try {
       await this.browser.contextMenus.update(menuId, updateInfo);
-      logger.debug(`📋 Updated context menu: ${menuId}`);
+      logger.debug(`Updated context menu: ${menuId}`);
     } catch (error) {
-      logger.error(`❌ Failed to update context menu ${menuId}:`, error);
+      logger.error(`Failed to update context menu ${menuId}:`, error);
       throw error;
     }
   }
@@ -569,9 +569,9 @@ export class ContextMenuManager extends ResourceTracker {
       await this.browser.contextMenus.remove(menuId);
       this.createdMenus.delete(menuId);
 
-      logger.debug(`📋 Removed context menu: ${menuId}`);
+      logger.debug(`Removed context menu: ${menuId}`);
     } catch (error) {
-      logger.error(`❌ Failed to remove context menu ${menuId}:`, error);
+      logger.error(`Failed to remove context menu ${menuId}:`, error);
       throw error;
     }
   }
@@ -591,7 +591,7 @@ export class ContextMenuManager extends ResourceTracker {
 
       logger.info("Cleared all context menus");
     } catch (error) {
-      logger.error("❌ Failed to clear context menus:", error);
+      logger.error("Failed to clear context menus:", error);
       throw error;
     }
   }
@@ -639,7 +639,7 @@ export class ContextMenuManager extends ResourceTracker {
    */
   async handleMenuClick(info, tab) {
     try {
-      logger.info(`📋 Context menu clicked: ${info.menuItemId}`);
+      logger.info(`Context menu clicked: ${info.menuItemId}`);
 
       // --- Handle browser action menu clicks ---
       const isApiProviderClick = info.menuItemId.startsWith(
@@ -763,7 +763,7 @@ export class ContextMenuManager extends ResourceTracker {
           logger.warn(`Unhandled context menu: ${info.menuItemId}`);
       }
     } catch (error) {
-      logger.error("❌ Context menu click handler failed:", error);
+      logger.error("Context menu click handler failed:", error);
     }
   }
 
@@ -782,7 +782,7 @@ export class ContextMenuManager extends ResourceTracker {
         }
       };
       browser.storage.onChanged.addListener(this.storageListener);
-      logger.info("📋 Storage change listener registered");
+      logger.info("Storage change listener registered");
     }
   }
 
@@ -819,7 +819,7 @@ export class ContextMenuManager extends ResourceTracker {
    * Cleanup resources
    */
   async cleanup() {
-    logger.info("🧹 Cleaning up context menu manager");
+    logger.info("Cleaning up context menu manager");
 
     try {
       await this.clearAllMenus();
@@ -830,7 +830,7 @@ export class ContextMenuManager extends ResourceTracker {
         this.storageListener = null;
       }
     } catch (error) {
-      logger.error("❌ Error during context menu cleanup:", error);
+      logger.error("Error during context menu cleanup:", error);
     }
 
     this.initialized = false;

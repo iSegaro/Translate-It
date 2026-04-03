@@ -99,7 +99,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
 
     // Handle normal response
     if (contentScriptResponse && contentScriptResponse.success) {
-      logger.info(`✅ Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+      logger.info(`Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
 
       sendResponse({
         success: true,

@@ -32,12 +32,12 @@ export class ChromeSidePanelManager extends ResourceTracker {
         throw new Error("Chrome sidePanel API not available");
       }
 
-      logger.debug("📋 Initializing Chrome side panel manager");
+      logger.debug("Initializing Chrome side panel manager");
       this.initialized = true;
-      logger.debug("✅ Chrome side panel manager initialized");
+      logger.debug("Chrome side panel manager initialized");
     } catch (error) {
       logger.error(
-        "❌ Failed to initialize Chrome side panel manager:",
+        "Failed to initialize Chrome side panel manager:",
         error,
       );
       throw error;
@@ -56,9 +56,9 @@ export class ChromeSidePanelManager extends ResourceTracker {
 
     try {
       await browser.sidePanel.open({ tabId });
-      logger.debug("📋 Chrome side panel opened");
+      logger.debug("Chrome side panel opened");
     } catch (error) {
-      logger.error("❌ Failed to open Chrome side panel:", error);
+      logger.error("Failed to open Chrome side panel:", error);
       throw error;
     }
   }
@@ -78,9 +78,9 @@ export class ChromeSidePanelManager extends ResourceTracker {
         tabId,
         openPanelOnActionClick: behavior === "enabled",
       });
-      logger.debug(`📋 Side panel behavior set to ${behavior} for tab ${tabId}`);
+      logger.debug(`Side panel behavior set to ${behavior} for tab ${tabId}`);
     } catch (error) {
-      logger.error("❌ Failed to set side panel behavior:", error);
+      logger.error("Failed to set side panel behavior:", error);
     }
   }
 

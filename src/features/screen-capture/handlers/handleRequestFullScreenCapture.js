@@ -54,7 +54,7 @@ export async function handleRequestFullScreenCapture(message, sender, sendRespon
     // Clean up the stream
     stream.getTracks().forEach(track => track.stop());
     
-    logger.debug(`✅ [requestFullScreenCapture] Screen capture completed for tab ${targetTabId}`);
+    logger.debug(`[requestFullScreenCapture] Screen capture completed for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

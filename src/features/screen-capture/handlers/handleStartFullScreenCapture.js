@@ -40,7 +40,7 @@ export async function handleStartFullScreenCapture(message, sender, sendResponse
       sender
     });
     
-    logger.debug(`✅ [startFullScreenCapture] Full screen capture started for tab ${targetTabId}`);
+    logger.debug(`[startFullScreenCapture] Full screen capture started for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

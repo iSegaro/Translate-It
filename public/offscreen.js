@@ -329,13 +329,13 @@ function handleTTSSpeak(data, sendResponse) {
       if (data.volume) currentUtterance.volume = data.volume;
 
       currentUtterance.onend = () => {
-        console.log("✅ TTS speech ended");
+        console.log("TTS speech ended");
         currentUtterance = null;
         sendResponse({ success: true });
       };
 
       currentUtterance.onerror = (error) => {
-        console.error("❌ TTS speech error:", error);
+        console.error("TTS speech error:", error);
         currentUtterance = null;
         // Fallback to Google TTS on speech synthesis error
         const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(data.text)}&client=gtx`;
@@ -343,7 +343,7 @@ function handleTTSSpeak(data, sendResponse) {
       };
 
       currentUtterance.onstart = () => {
-        console.log("🔊 TTS speech started");
+        console.log("TTS speech started");
       };
 
       speechSynthesis.speak(currentUtterance);
@@ -762,7 +762,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         let responseAlreadySent = false;
 
         currentUtterance.onend = () => {
-          console.log("✅ Web Speech TTS ended");
+          console.log("Web Speech TTS ended");
           currentUtterance = null;
           isPlaying = false; // Reset playing state
           if (!responseAlreadySent) {
@@ -774,9 +774,9 @@ function handleWebSpeechFallback(data, sendResponse) {
         currentUtterance.onerror = (error) => {
           // Use debug level for expected synthesis failures
           if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
-            console.debug("❌ Web Speech TTS error (expected):", error.error);
+            console.debug("Web Speech TTS error (expected):", error.error);
           } else {
-            console.error("❌ Web Speech TTS error:", error);
+            console.error("Web Speech TTS error:", error);
           }
           
           currentUtterance = null;
@@ -800,7 +800,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                   retryUtterance.volume = 1; // Use default volume for retry
                   
                   retryUtterance.onend = () => {
-                    console.log("✅ Web Speech TTS retry succeeded");
+                    console.log("Web Speech TTS retry succeeded");
                     isPlaying = false; // Reset playing state
                     if (!responseAlreadySent) {
                       responseAlreadySent = true;
@@ -809,7 +809,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                   };
                   
                   retryUtterance.onerror = (retryError) => {
-                    console.error("❌ Web Speech TTS retry also failed:", retryError);
+                    console.error("Web Speech TTS retry also failed:", retryError);
                     isPlaying = false; // Reset playing state
                     if (!responseAlreadySent) {
                       responseAlreadySent = true;
@@ -828,7 +828,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         };
 
         currentUtterance.onstart = () => {
-          console.log("🔊 Web Speech TTS started");
+          console.log("Web Speech TTS started");
         };
 
         // Add timeout as additional safety measure

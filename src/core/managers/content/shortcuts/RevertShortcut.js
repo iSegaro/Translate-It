@@ -133,7 +133,7 @@ export class RevertShortcut {
       const result = await revertHandler.executeRevert();
 
       if (result.success) {
-        logger.debug(`[RevertShortcut] ✅ Successfully reverted ${result.revertedCount} translations`);
+        logger.debug(`[RevertShortcut] Successfully reverted ${result.revertedCount} translations`);
       } else {
         logger.debug('[RevertShortcut] No translations found to revert');
       }

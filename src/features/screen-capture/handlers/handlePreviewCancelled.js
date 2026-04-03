@@ -36,7 +36,7 @@ export async function handlePreviewCancelled(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [previewCancelled] Preview cancelled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`[previewCancelled] Preview cancelled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

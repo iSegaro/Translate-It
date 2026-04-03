@@ -23,7 +23,7 @@ export const handleOffscreenReady = async () => {
     };
     
   } catch (error) {
-    logger.error('[OffscreenReadyHandler] ❌ Error handling offscreen ready:', error);
+    logger.error('[OffscreenReadyHandler] Error handling offscreen ready:', error);
     return {
       success: false,
       error: error.message || 'Offscreen ready handler failed'

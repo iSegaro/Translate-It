@@ -36,7 +36,7 @@ export async function handleAreaSelectionCancel(message, sender, sendResponse) {
       sender
     });
     
-    logger.debug(`✅ [areaSelectionCancel] Area selection cancelled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`[areaSelectionCancel] Area selection cancelled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

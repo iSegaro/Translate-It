@@ -67,14 +67,14 @@ const isSaving = ref(false)
 
 // Save all settings
 const saveAllSettings = async () => {
-  logger.debug('💾 Save All Settings clicked!')
+  logger.debug('Save All Settings clicked!')
   isSaving.value = true
   statusType.value = ''
   statusMessage.value = ''
   
   try {
     await settingsStore.saveAllSettings()
-    logger.debug('✅ All settings saved successfully')
+    logger.debug('All settings saved successfully')
 
     // Refresh settings in all content scripts
     await settingsManager.refreshSettings()
@@ -84,7 +84,7 @@ const saveAllSettings = async () => {
       action: MessageActions.SETTINGS_UPDATED,
       timestamp: Date.now()
     }, 'settings-notification')
-    logger.debug('✅ Settings update notification sent to all tabs')
+    logger.debug('All settings update notification sent to all tabs')
     statusType.value = 'success'
   statusMessage.value = t('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     
@@ -94,7 +94,7 @@ const saveAllSettings = async () => {
       statusType.value = ''
     }, 2000)
   } catch (error) {
-    logger.error('❌ Failed to save settings:', error)
+    logger.error('Failed to save settings:', error)
     statusType.value = 'error'
   statusMessage.value = t('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
     

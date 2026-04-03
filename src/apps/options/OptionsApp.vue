@@ -89,13 +89,13 @@ const isRTL = computed(() => {
 })
 
 const initialize = async () => {
-  logger.debug('🗳️ OptionsApp mounting...')
+  logger.debug('OptionsApp mounting...')
   
   try {
   // Step 1: Set loading text
-  logger.debug('📝 Setting loading text...')
+  logger.debug('Setting loading text...')
   loadingText.value = t('options_loading') || 'Loading Settings...'
-  logger.debug('✅ Loading text set')
+  logger.debug('Loading text set')
     
     // Step 2: Load settings store
   logger.debug('⚙️ Loading settings store...')
@@ -105,21 +105,21 @@ const initialize = async () => {
         setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-  logger.debug('✅ Settings store loaded')
+  logger.debug('Settings store loaded')
     
     // Step 3: Load additional modules
-  logger.debug('🔧 Loading additional modules...')
+  logger.debug('Loading additional modules...')
     await initializeOptions()
-  logger.debug('✅ Additional modules loaded')
+  logger.debug('Additional modules loaded')
     
   } catch (error) {
-  logger.error('❌ Failed to initialize options:', error)
+  logger.error('Failed to initialize options:', error)
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
     // Extract error type for reactive translation
     errorType.value = matchErrorToType(error)
   } finally {
-  logger.debug('✅ OptionsApp initialization complete')
+  logger.debug('OptionsApp initialization complete')
     isLoading.value = false
   }
 };
@@ -131,13 +131,13 @@ const initializeOptions = async () => {
   try {
     await loadSettingsModules()
   } catch (error) {
-  logger.warn('⚠️ Failed to load settings modules:', error)
+  logger.warn('Failed to load settings modules:', error)
     // Don't throw - this is optional
   }
 }
 
 const retryLoading = () => {
-  logger.debug('🔄 Retrying options loading...')
+  logger.debug('Retrying options loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
