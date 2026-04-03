@@ -34,7 +34,7 @@ export class UnifiedTranslationCoordinator {
   async coordinateTranslation(message, options = {}) {
     const { action, data } = message;
 
-    logger.info(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
+    logger.debug(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
 
     try {
       // Early check if operation was cancelled before any processing
