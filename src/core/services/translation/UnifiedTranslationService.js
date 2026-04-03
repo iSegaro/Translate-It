@@ -190,7 +190,7 @@ export class UnifiedTranslationService {
         statsManager.printSummary(summaryId, { 
           status: 'Batch', 
           batchChars: networkChars,
-          batchOriginalChars: batchCharCount // Original sum of input segments
+          batchOriginalChars: result.originalCharCount || 0
         });
       } else if (!isMultiBatch || (isSelectElementMode && !result.streaming)) {
         // For Standalone OR Select Element (when not streaming): Print summary
@@ -521,6 +521,7 @@ class TranslationModeCoordinator {
     const errorMessages = [];
     let hasErrors = false;
     let totalActualChars = 0;
+    const totalOriginalChars = segments.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     // Check if provider supports batch/chunk
     const isAIProvider = providerInstance?.constructor?.type === "ai" || typeof providerInstance?._translateBatch === 'function';
@@ -630,14 +631,16 @@ class TranslationModeCoordinator {
           success: false,
           error: errorMessages.join(', ') || 'Batch translation failed',
           partialResults: JSON.stringify(finalResults),
-          actualCharCount: totalActualChars
+          actualCharCount: totalActualChars,
+          originalCharCount: totalOriginalChars
         };
       }
 
       return {
         success: true,
         translatedText: JSON.stringify(finalResults),
-        actualCharCount: totalActualChars
+        actualCharCount: totalActualChars,
+        originalCharCount: totalOriginalChars
       };
     } finally {
       translationEngine.activeTranslations.delete(messageId);
