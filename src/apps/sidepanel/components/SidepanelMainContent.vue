@@ -263,31 +263,36 @@ const handleTranslate = async () => {
   logger.debug("Translation button clicked", { provider: currentProviderLocal.value });
   
   if (!canTranslate.value) {
-    logger.warn("⚠️ Translation blocked - canTranslate is false");
+    logger.warn("Translation blocked - canTranslate is false");
     return;
   }
   
   try {
-    logger.info("🗳️ Starting translation process...");
+    logger.debug("Starting translation process...");
     
+    let success = false;
     // Use ref to trigger translation if available, otherwise fallback to composable
     if (sourceInputRef.value && typeof sourceInputRef.value.triggerTranslation === 'function') {
-      await sourceInputRef.value.triggerTranslation();
+      success = await sourceInputRef.value.triggerTranslation();
     } else {
       // Fallback to direct composable call (already handles languages)
-      await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value, currentProviderLocal.value);
+      success = await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value, currentProviderLocal.value);
     }
     
-    logger.info("✅ Translation completed successfully");
+    if (success) {
+      logger.info("Translation completed successfully");
+    } else {
+      logger.debug("Translation failed (handled internally)");
+    }
 
   } catch (error) {
-    logger.error("❌ Translation failed:", error);
+    logger.error("Translation failed (unexpected):", error);
     await handleError(error, 'sidepanel-translation')
   }
 }
 
 const clearFields = async () => {
-  logger.debug("🧹 Clearing fields and resetting languages");
+  logger.debug("Clearing fields and resetting languages");
   await clearTranslation();
 };
 
