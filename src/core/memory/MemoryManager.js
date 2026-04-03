@@ -421,7 +421,7 @@ class MemoryManager {
         this.eventStats.byType.set(event, 0);
       }
       this.eventStats.byType.set(event, this.eventStats.byType.get(event) + 1);
-      logger.info(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`);
+      logger.debug(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`);
     }
   }
 
@@ -822,7 +822,7 @@ class MemoryManager {
       const minutes = Math.floor(this.centralTimerInterval / 60000);
       const seconds = Math.round((this.centralTimerInterval % 60000) / 1000);
       const formattedSeconds = seconds.toString().padStart(2, '0');
-      logger.info(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
+      logger.debug(`Centralized cleanup timer initialized (${minutes}:${formattedSeconds} interval)`);
     }
   }
 
@@ -846,14 +846,14 @@ class MemoryManager {
         if (monitor && typeof monitor.performMonitoring === 'function') {
           // Skip cleanup of translation-related managers during active translation
           if (isTranslationActive && monitor.constructor.name === 'SelectElementManager') {
-            logger.info('Skipping SelectElementManager cleanup during active translation');
+            logger.debug('Skipping SelectElementManager cleanup during active translation');
             return;
           }
           monitor.performMonitoring();
         }
       });
 
-      logger.info(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors (translation active: ${isTranslationActive})`);
+      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors (translation active: ${isTranslationActive})`);
     } catch (error) {
       logger.warn('Error during central cleanup:', error);
     }

@@ -57,7 +57,7 @@ class MessageHandler {
   _handleMessage(message, sender, sendResponse) {
     // Allow messages with just action (for backward compatibility)
     if (!message || !message.action) {
-      logger.warn('Received message without action.');
+      logger.debug('Received message without action.');
       return false;
     }
 
@@ -78,7 +78,7 @@ class MessageHandler {
             this._sendResponse(messageId, response);
           })
           .catch(error => {
-            logger.error(`Error in promise-based handler for ${action}:`, error);
+            logger.debug(`Error in promise-based handler for ${action}:`, error.message);
             const errorResponse = MessageFormat.createErrorResponse(error, messageId);
             this._sendResponse(messageId, errorResponse);
           });
@@ -95,7 +95,7 @@ class MessageHandler {
             sendResponse(result);
           }
         } catch (error) {
-          logger.warn(`Failed to send synchronous response for ${action}:`, error);
+          logger.debug(`Failed to send synchronous response for ${action}:`, error.message);
         }
         return false;
       }
