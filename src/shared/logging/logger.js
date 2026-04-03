@@ -2,17 +2,16 @@
  * Unified Logging System for Translate-It Extension
  *
  * Features:
- * - Environment-aware logging (development vs production)
- * - Consistent log formatting
  * - Component-based log grouping
  * - Performance-conscious logging
  * - Easy to disable/enable per component
+ * - TDZ-proof architecture
  */
 
 import { LOG_LEVELS } from './logConstants.js';
 import {
   getGlobalDebugState,
-    getGlobalLogLevel,
+  getGlobalLogLevel,
   setGlobalLogLevel,
   getComponentLogLevel,
   setComponentLogLevel,
@@ -25,19 +24,6 @@ import {
   resetPerformanceStats
 } from './GlobalDebugState.js';
 import { safeConsole } from './SafeConsole.js';
-
-// Development environment detection - use Vite's build-time constant
-const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPMENT__ :
-  (() => {
-    try {
-      return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-    } catch {
-      // Fallback for extension environments
-      return false;
-    }
-  })();
-
-// (Component log levels moved to GlobalDebugState.js)
 
 // Cache size for LRU eviction
 const MAX_CACHE_SIZE = 100;
@@ -53,15 +39,9 @@ function __getLoggerCache() {
   }
   return g.__TRANSLATE_IT__.__LOGGER_CACHE;
 }
-// (Devtools helper removed for production cleanliness)
-(() => {
-  try {
-    return { ...getGlobalDebugState().componentLogLevels };
-  } catch {
-    // Fallback for initialization order issues
-    return {};
-  }
-})();
+
+// Clear log level cache on initialization to ensure fresh settings
+clearSharedLogLevelCache();
 
 /**
  * Helper function for lazy logging to reduce code duplication
@@ -95,19 +75,10 @@ function createLazyLogMethod(component, loggerName, level, consoleMethod) {
  * @param {string|null} subComponent Optional sub-scope (e.g. specific strategy or feature)
  */
 export function getScopedLogger(component, subComponent = null) {
-  // Pure implementation: always go through global cache accessor
   const cache = __getLoggerCache();
   const key = subComponent ? `${component}::${subComponent}` : component;
   if (!cache.has(key)) cache.set(key, createLogger(component, subComponent));
   return cache.get(key);
-}
-
-// Introspection helper (mainly for debugging / devtools)
-export function listLoggerLevels() {
-  const globalState = getGlobalDebugState();
-  return {
-    components: { ...globalState.componentLogLevels }
-  };
 }
 
 /**
@@ -126,7 +97,6 @@ function formatMessage(component, level, message, data) {
 
   // Optimized: Only perform expensive string operations for ERROR (0) and WARN (1)
   if (level <= 1) {
-    // 1. Smart Summary: Append object info if it's a plain data object
     if (data && typeof data === 'object' && !(data instanceof Error)) {
       const summary = data.message || data.error || (data.status ? `Status ${data.status}` : '');
       if (summary && !String(msg).includes(String(summary))) {
@@ -134,20 +104,17 @@ function formatMessage(component, level, message, data) {
       }
     }
 
-    // 2. Length Safety: Truncate very long messages for Chrome Extensions UI
     if (msg.length > 600) {
       msg = msg.substring(0, 600) + '...';
     }
   }
 
   const fullMessage = `${prefix} ${msg}`;
-
   return data !== undefined ? [fullMessage, data] : [fullMessage];
 }
 
 /**
  * Check if logging is enabled for this component and level
- * - Memoized per component to avoid repeated lookups
  */
 function shouldLog(component, level) {
   incrementShouldLogCalls();
@@ -164,14 +131,16 @@ function shouldLog(component, level) {
 
   const globalState = getGlobalDebugState();
   const componentLevel = getComponentLogLevel(component);
-  const shouldLogValue = globalState.debugOverride
-    ? level <= LOG_LEVELS.DEBUG
-    : level <= componentLevel;
+  
+  // Logic: 
+  // 1. If a component level is explicitly set to something other than the default, respect it.
+  // 2. Otherwise, if debugOverride is active, allow everything up to DEBUG.
+  // 3. Otherwise, use the standard filtering logic.
+  const shouldLogValue = level <= componentLevel;
 
   // Cache the result
   cache.set(cacheKey, shouldLogValue);
 
-  // LRU eviction (simplified)
   if (cache.size > MAX_CACHE_SIZE) {
     const oldestKey = cache.keys().next().value;
     cache.delete(oldestKey);
@@ -187,56 +156,35 @@ export function clearLogLevelCache() {
   clearSharedLogLevelCache();
 }
 
-// Fast helper specifically for debug gating (avoid recomputing numbers in callers if needed)
+// Fast helper specifically for debug gating
 export function shouldDebug(component) {
   return shouldLog(component, LOG_LEVELS.DEBUG);
 }
 
-// Log batching system for performance optimization
+// Log batching system
 const logBatch = [];
 let batchTimeout = null;
-const BATCH_DELAY = 100; // Batch logs within 100ms
+const BATCH_DELAY = 100;
 
-/**
- * Process batched logs
- */
 function processLogBatch() {
   if (logBatch.length === 0) return;
 
-  // Filter logs based on environment and level
-  const filteredLogs = logBatch.filter(log =>
-    isDevelopment || log.levelNum <= LOG_LEVELS.WARN
-  );
-
-  if (filteredLogs.length === 0) {
-    // Clear batch and return if no logs to show
-    logBatch.length = 0;
-    batchTimeout = null;
-    return;
-  }
-
-  // Group by component and level for better readability
   const groupedLogs = {};
-  for (const log of filteredLogs) {
+  for (const log of logBatch) {
     const key = `${log.component}:${log.level}`;
-    if (!groupedLogs[key]) {
-      groupedLogs[key] = [];
-    }
+    if (!groupedLogs[key]) groupedLogs[key] = [];
     groupedLogs[key].push(log);
   }
 
-  // Output grouped logs
   for (const [key, logs] of Object.entries(groupedLogs)) {
     const [component, level] = key.split(':');
     const consoleMethod = getConsoleMethod(level);
 
     if (logs.length === 1) {
-      // Single log, output normally
       const log = logs[0];
       const formatted = formatMessage(component, log.levelNum, log.message, log.data);
       consoleMethod(...formatted);
     } else {
-      // Multiple logs, batch them
       const formatted = formatMessage(
         component,
         logs[0].levelNum,
@@ -247,53 +195,27 @@ function processLogBatch() {
     }
   }
 
-  // Clear batch
   logBatch.length = 0;
   batchTimeout = null;
 }
 
-/**
- * Get safe console method for log level
- */
 function getConsoleMethod(level) {
-  // Support both numeric levels and string names (for batched logs)
   switch (level) {
-    case 0:
-    case 'error': 
-      return safeConsole.error.bind(safeConsole);
-    case 1:
-    case 'warn':
-      return safeConsole.warn.bind(safeConsole);
-    case 2:
-    case 'info':
-      return safeConsole.info.bind(safeConsole);
-    case 3:
-    case 'debug':
-      return safeConsole.debug.bind(safeConsole);
-    default: 
-      return safeConsole.log.bind(safeConsole);
+    case 0: case 'error': return safeConsole.error.bind(safeConsole);
+    case 1: case 'warn': return safeConsole.warn.bind(safeConsole);
+    case 2: case 'info': return safeConsole.info.bind(safeConsole);
+    case 3: case 'debug': return safeConsole.debug.bind(safeConsole);
+    default: return safeConsole.log.bind(safeConsole);
   }
 }
 
-/**
- * Add log to batch
- */
 function batchLog(component, level, levelNum, message, data) {
-  // In production, only batch ERROR and WARN logs
-  if (!isDevelopment && levelNum > LOG_LEVELS.WARN) {
-    return; // Skip INFO and DEBUG logs in production
-  }
-
   logBatch.push({ component, level, levelNum, message, data, timestamp: Date.now() });
-
   if (!batchTimeout) {
     batchTimeout = setTimeout(processLogBatch, BATCH_DELAY);
   }
 }
 
-/**
- * Force flush any pending logs (call before page unload)
- */
 export function flushLogBatch() {
   if (batchTimeout) {
     clearTimeout(batchTimeout);
@@ -301,7 +223,6 @@ export function flushLogBatch() {
   }
 }
 
-// Register beforeunload handler to flush logs
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', flushLogBatch);
 }
@@ -312,140 +233,87 @@ if (typeof window !== 'undefined') {
 export function createLogger(component, subComponent = null) {
   const loggerName = subComponent ? `${component}.${subComponent}` : component;
 
-  const loggerApi = {
+  return Object.freeze({
     error: (message, data) => {
-      const ERROR_LEVEL = 0; // LOG_LEVELS.ERROR
-      if (shouldLog(component, ERROR_LEVEL) && passesRuntimeFilter(loggerName, ERROR_LEVEL, message)) {
-        // Use batching for non-error logs in production
-        if (!isDevelopment && !data?.isImmediate) {
-          batchLog(loggerName, 'error', ERROR_LEVEL, message, data);
-        } else {
-          const formatted = formatMessage(loggerName, ERROR_LEVEL, message, data);
-          safeConsole.error(...formatted);
-        }
+      const LEVEL = 0;
+      if (shouldLog(component, LEVEL) && passesRuntimeFilter(loggerName, LEVEL, message)) {
+        const formatted = formatMessage(loggerName, LEVEL, message, data);
+        safeConsole.error(...formatted);
       }
     },
 
     warn: (message, data) => {
-      const WARN_LEVEL = 1; // LOG_LEVELS.WARN
-      if (shouldLog(component, WARN_LEVEL) && passesRuntimeFilter(loggerName, WARN_LEVEL, message)) {
-        // Use batching in production for non-critical warns
-        if (!isDevelopment && !data?.isImmediate) {
-          batchLog(loggerName, 'warn', WARN_LEVEL, message, data);
-        } else {
-          const formatted = formatMessage(loggerName, WARN_LEVEL, message, data);
-          safeConsole.warn(...formatted);
-        }
+      const LEVEL = 1;
+      if (shouldLog(component, LEVEL) && passesRuntimeFilter(loggerName, LEVEL, message)) {
+        const formatted = formatMessage(loggerName, LEVEL, message, data);
+        safeConsole.warn(...formatted);
       }
     },
 
     info: (message, data) => {
-      const INFO_LEVEL = 2; // LOG_LEVELS.INFO
-      if (shouldLog(component, INFO_LEVEL) && passesRuntimeFilter(loggerName, INFO_LEVEL, message)) {
-        // Use batching in production for non-critical info
-        if (!isDevelopment && !data?.isImmediate) {
-          batchLog(loggerName, 'info', INFO_LEVEL, message, data);
-        } else {
-          const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
+      const LEVEL = 2;
+      if (shouldLog(component, LEVEL)) {
+        if (passesRuntimeFilter(loggerName, LEVEL, message)) {
+          const formatted = formatMessage(loggerName, LEVEL, message, data);
           safeConsole.info(...formatted);
         }
       }
     },
 
     debug: (message, data) => {
-      const DEBUG_LEVEL = 3; // LOG_LEVELS.DEBUG
-      if (shouldLog(component, DEBUG_LEVEL) && passesRuntimeFilter(loggerName, DEBUG_LEVEL, message)) {
-        // Always batch debug logs in production
-        if (!isDevelopment) {
-          batchLog(loggerName, 'debug', DEBUG_LEVEL, message, data);
-        } else {
-          const formatted = formatMessage(loggerName, DEBUG_LEVEL, message, data);
+      const LEVEL = 3;
+      if (shouldLog(component, LEVEL)) {
+        if (passesRuntimeFilter(loggerName, LEVEL, message)) {
+          const formatted = formatMessage(loggerName, LEVEL, message, data);
           safeConsole.log(...formatted);
         }
       }
     },
 
-    // Check if debug logging is enabled for this logger
     isDebugEnabled: () => {
       const globalState = getGlobalDebugState();
       const componentLevel = getComponentLogLevel(component);
       return globalState.debugOverride || componentLevel >= LOG_LEVELS.DEBUG;
     },
 
-    // Lazy debug: accept function returning (message, data?) tuple or array of args
     debugLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.DEBUG, safeConsole.log.bind(safeConsole)),
-
-    // Lazy info: similar to debugLazy but for info level
     infoLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.INFO, safeConsole.info.bind(safeConsole)),
-
-    // Lazy warn: similar to debugLazy but for warn level
     warnLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.WARN, safeConsole.warn.bind(safeConsole)),
 
-    // Special method for initialization logs (always important)
     init: (message, data) => {
-      const INFO_LEVEL = 2; // LOG_LEVELS.INFO
-      if (isDevelopment || shouldLog(component, INFO_LEVEL)) {
-        const formatted = formatMessage(
-          loggerName,
-          INFO_LEVEL,
-          `✅ ${message}`,
-          data
-        );
+      const LEVEL = 2;
+      if (shouldLog(component, LEVEL)) {
+        const formatted = formatMessage(loggerName, LEVEL, `✅ ${message}`, data);
         safeConsole.log(...formatted);
       }
     },
 
-    // Special method for cleanup/important operations
     operation: (message, data) => {
-      const INFO_LEVEL = 2; // LOG_LEVELS.INFO
-      if (shouldLog(component, INFO_LEVEL)) {
-        const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
+      const LEVEL = 2;
+      if (shouldLog(component, LEVEL)) {
+        const formatted = formatMessage(loggerName, LEVEL, message, data);
         safeConsole.log(...formatted);
       }
-    },
-  };
-  return Object.freeze(loggerApi);
-}
-
-
-/**
- * Update log level for a component or globally
- */
-export function setLogLevel(component, level) {
-  if (component === "global") {
-    setGlobalLogLevel(level);
-  } else {
-    setComponentLogLevel(component, level);
-  }
-  clearLogLevelCache();
-}
-
-/**
- * Get current log level for a component
- */
-export function getLogLevel(component) {
-  return getComponentLogLevel(component);
+    }
+  });
 }
 
 /**
  * Performance-aware logging for initialization sequences
  */
 export function logInitSequence(component, steps) {
-  const INFO_LEVEL = 2;
-  if (!isDevelopment && !shouldLog(component, INFO_LEVEL)) {
-    return;
-  }
+  const LEVEL = 2;
+  if (!shouldLog(component, LEVEL)) return;
 
   const logger = createLogger(component);
   logger.info("Initialization sequence started");
-
   steps.forEach((step, index) => {
     logger.debug(`Step ${index + 1}: ${step}`);
   });
 }
 
 /**
- * Quick loggers for common components (created on-demand)
+ * Quick loggers
  */
 export const quickLoggers = {
   getBackground: () => createLogger("Background"),
@@ -459,8 +327,7 @@ export const quickLoggers = {
 };
 
 /**
- * Runtime log level filtering configuration
- * Allows dynamic adjustment of logging behavior without restart
+ * Runtime filtering logic
  */
 const runtimeFilter = {
   enabled: false,
@@ -470,85 +337,39 @@ const runtimeFilter = {
   blockedPatterns: []
 };
 
-/**
- * Configure runtime log filtering
- * @param {Object} config - Filter configuration
- */
 export function configureRuntimeFilter(config = {}) {
   runtimeFilter.enabled = config.enabled ?? false;
   runtimeFilter.minLevel = config.minLevel ?? LOG_LEVELS.ERROR;
   runtimeFilter.allowedComponents = new Set(config.allowedComponents || []);
   runtimeFilter.allowedPatterns = config.allowedPatterns || [];
   runtimeFilter.blockedPatterns = config.blockedPatterns || [];
-
-  // Clear cache when filter changes
   clearLogLevelCache();
 }
 
-/**
- * Check if log message passes runtime filter
- * @param {string} component - Component name
- * @param {number} level - Log level
- * @param {string} message - Log message
- * @returns {boolean} True if message should be logged
- */
 function passesRuntimeFilter(component, level, message) {
-  if (!runtimeFilter.enabled) {
-    return true;
+  if (!runtimeFilter.enabled) return true;
+  if (level < runtimeFilter.minLevel) return false;
+  if (runtimeFilter.allowedComponents.size > 0 && !runtimeFilter.allowedComponents.has(component)) return false;
+
+  const messageStr = message.toString();
+  for (const pattern of runtimeFilter.blockedPatterns) {
+    if (pattern.test(messageStr)) return false;
   }
 
-  // Check minimum level
-  if (level < runtimeFilter.minLevel) {
+  if (runtimeFilter.allowedPatterns.length > 0) {
+    for (const pattern of runtimeFilter.allowedPatterns) {
+      if (pattern.test(messageStr)) return true;
+    }
     return false;
   }
-
-  // Check allowed components
-  if (runtimeFilter.allowedComponents.size > 0) {
-    if (!runtimeFilter.allowedComponents.has(component)) {
-      return false;
-    }
-  }
-
-  // Check message patterns
-  const messageStr = message.toString();
-
-  // Check blocked patterns first
-  for (const pattern of runtimeFilter.blockedPatterns) {
-    if (pattern.test(messageStr)) {
-      return false;
-    }
-  }
-
-  // Check allowed patterns if specified
-  if (runtimeFilter.allowedPatterns.length > 0) {
-    let allowed = false;
-    for (const pattern of runtimeFilter.allowedPatterns) {
-      if (pattern.test(messageStr)) {
-        allowed = true;
-        break;
-      }
-    }
-    if (!allowed) {
-      return false;
-    }
-  }
-
   return true;
 }
 
-/**
- * Enable/disable runtime filtering
- * @param {boolean} enabled - Whether to enable filtering
- */
 export function setRuntimeFiltering(enabled) {
   runtimeFilter.enabled = enabled;
   clearLogLevelCache();
 }
 
-/**
- * Get current runtime filter configuration
- * @returns {Object} Current filter configuration
- */
 export function getRuntimeFilterConfig() {
   return {
     enabled: runtimeFilter.enabled,
@@ -559,25 +380,16 @@ export function getRuntimeFilterConfig() {
   };
 }
 
-/**
- * Test-only helper to reset logging system state (cache + levels).
- * Exposed with a double underscore prefix to discourage production use.
- */
 export function __resetLoggingSystemForTests() {
-  __getLoggerCache().clear(); // global cache
-  getSharedLogLevelCache().clear(); // shared memoization cache
+  __getLoggerCache().clear();
+  getSharedLogLevelCache().clear();
   resetPerformanceStats();
-  // Reset runtime filter
   configureRuntimeFilter({ enabled: false });
 }
 
-/**
- * Get logging performance statistics
- */
 export function getLoggingPerformanceStats() {
   const globalStats = getPerformanceStats();
   const cache = getSharedLogLevelCache();
-
   return {
     ...globalStats,
     cacheSize: cache.size,

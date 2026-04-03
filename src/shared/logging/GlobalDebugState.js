@@ -17,13 +17,13 @@ const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPME
 // Global state shared by all logger instances
 const globalState = {
   // Global log level
-  globalLogLevel: isDevelopment ? 3 : 1, // DEBUG : WARN
+  globalLogLevel: 1, // Default to WARN for a clean console experience
 
   // Runtime global debug override
   debugOverride: false,
 
-  // Component-specific log levels (copied from logger.js)
-  // Organized into logical categories and sorted alphabetically within each category.
+  // Component-specific log levels
+  // 0: ERROR, 1: WARN, 2: INFO, 3: DEBUG
   componentLogLevels: {
     // Core
     Background: 2,
@@ -94,6 +94,7 @@ export function getGlobalDebugState() {
 
 export function setGlobalDebugOverride(value) {
   globalState.debugOverride = value;
+  globalState.sharedLogLevelCache.clear();
 }
 
 export function getGlobalLogLevel() {
@@ -102,6 +103,7 @@ export function getGlobalLogLevel() {
 
 export function setGlobalLogLevel(level) {
   globalState.globalLogLevel = level;
+  globalState.sharedLogLevelCache.clear();
 }
 
 export function getComponentLogLevel(component) {
@@ -110,6 +112,7 @@ export function getComponentLogLevel(component) {
 
 export function setComponentLogLevel(component, level) {
   globalState.componentLogLevels[component] = level;
+  globalState.sharedLogLevelCache.clear();
 }
 
 // Cache management
