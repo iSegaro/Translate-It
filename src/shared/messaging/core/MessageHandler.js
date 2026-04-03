@@ -129,12 +129,11 @@ class MessageHandler {
 
   _sendResponse(messageId, response) {
     const sendResponse = this.pendingResponses.get(messageId);
-    logger.debug(`Sending response for messageId ${messageId}:`, response);
     if (sendResponse) {
       try {
         sendResponse(response);
       } catch (error) {
-        logger.warn(`Failed to send response for messageId ${messageId}:`, error.message);
+        logger.debug(`Failed to send response for messageId ${messageId}:`, error.message);
       }
       this.pendingResponses.delete(messageId);
     } else {
