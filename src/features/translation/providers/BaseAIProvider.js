@@ -847,12 +847,35 @@ export class BaseAIProvider extends BaseProvider {
         throw new Error('No valid JSON array or object found in the response.');
       }
 
-      // If we got an object instead of an array, try to find the array inside it
-      // Some models wrap the output even when asked for an array
-      if (!Array.isArray(parsed) && typeof parsed === 'object') {
-        const potentialArray = Object.values(parsed).find(Array.isArray);
-        if (potentialArray) {
-          parsed = potentialArray;
+      // 4. Handle Object-based results (ID to Text mapping or nested array)
+      if (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
+        // High Priority: Check for the 'translations' key (requested by prompt)
+        if (Array.isArray(parsed.translations)) {
+          parsed = parsed.translations;
+        } else {
+          // Fallback: Try to find any array property
+          const potentialArray = Object.values(parsed).find(Array.isArray);
+          if (potentialArray) {
+            parsed = potentialArray;
+          } else {
+            // If no array found, check if it's a map of IDs to values
+            const results = [];
+            for (let i = 0; i < expectedCount; i++) {
+              // Check for various possible keys: "0", 0, "text_0", etc.
+              const val = parsed[i] || parsed[String(i)] || parsed[`text_${i}`] || parsed[`id_${i}`];
+              if (val) {
+                results[i] = typeof val === 'object' ? (val.text || JSON.stringify(val)) : val;
+              }
+            }
+            
+            if (results.filter(Boolean).length > 0) {
+              // Fill missing with original
+              for (let i = 0; i < expectedCount; i++) {
+                if (!results[i]) results[i] = originalBatch[i] || '';
+              }
+              return results;
+            }
+          }
         }
       }
       
@@ -896,6 +919,7 @@ export class BaseAIProvider extends BaseProvider {
       throw new Error(`Invalid batch result structure or empty array.`);
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to parse batch result: ${error.message}. Falling back to splitting by lines.`);
+      logger.debug(`[${this.providerName}] Raw response snippet: ${result.substring(0, 500)}...`);
       return this._fallbackParsing(result, expectedCount, originalBatch);
     }
   }
