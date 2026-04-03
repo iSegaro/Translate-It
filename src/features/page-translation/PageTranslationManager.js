@@ -455,7 +455,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
 
-    this.logger.error('Fatal error. Stopping page translation.', error);
+    this.logger.warn('Fatal error. Stopping page translation.', error.message);
     
     // Check if cancellation is already handled to avoid loop
     if (!this._isCancelling) {
